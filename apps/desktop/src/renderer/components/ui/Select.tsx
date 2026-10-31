@@ -30,7 +30,7 @@ function groupOptions(options: SelectOption[]) {
 }
 
 export function Select({
-  value, onValueChange, options, placeholder, disabled = false, ariaLabel, className, contentClassName,
+  value, onValueChange, options, placeholder, disabled = false, ariaLabel, className, contentClassName, wrapOptions = false,
 }: {
   value: string;
   onValueChange: (value: string) => void;
@@ -42,6 +42,8 @@ export function Select({
   /** 触发器的布局类（宽度、外边距）。 */
   className?: string;
   contentClassName?: string;
+  /** 长路径等必须全文可读的选项，在受限弹层宽度内换行。 */
+  wrapOptions?: boolean;
 }) {
   const selected = options.find((option) => option.value === value);
   return (
@@ -69,7 +71,9 @@ export function Select({
                     className={cn(MENU_ITEM_CLASS, "data-[state=checked]:bg-selected data-[state=checked]:font-medium")}>
                     <SelectPrimitive.ItemIndicator className="shrink-0"><Check size={14} strokeWidth={2.4} aria-hidden="true" /></SelectPrimitive.ItemIndicator>
                     {option.value === value ? null : <span className="w-[14px] shrink-0" aria-hidden="true" />}
-                    <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
+                    {wrapOptions ? <span className="min-w-0 whitespace-normal break-all py-1">
+                      <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
+                    </span> : <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>}
                   </SelectPrimitive.Item>
                 ))}
               </SelectPrimitive.Group>

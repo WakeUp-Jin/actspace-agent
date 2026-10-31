@@ -5,21 +5,12 @@ import { CliError, CliUsageError } from "./errors";
 import type { CliArtifactResult, CliExitCode } from "./types";
 import { formatCliVersion } from "./version";
 import { runV2Command } from "./runtime-v2/run";
-import type { RuntimeV2RunCommandControl } from "./runtime-v2/types";
+import { CliTermination } from "./termination";
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
-  let control: RuntimeV2RunCommandControl | undefined;
-  let interrupted = false;
-  let interruptCount = 0;
-  const onSigint = () => {
-    interrupted = true;
-    interruptCount += 1;
-    if (interruptCount === 1) {
-      control?.abort();
-      return;
-    }
-    process.exit(130);
-  };
+  const termination = new CliTermination((code) => process.exit(code));
+  const onSigint = () => termination.signal("SIGINT");
+  const onSigterm = () => termination.signal("SIGTERM");
 
   try {
     if (argv[0] === "host") return await (await import("./runtime-v2/host-command")).runHostCommand(argv.slice(1));
@@ -34,6 +25,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
 
     process.on("SIGINT", onSigint);
+    process.on("SIGTERM", onSigterm);
     const result = await runV2Command(parsed.options, {
       stdinIsTTY: process.stdin.isTTY === true,
       readStdin: readProcessStdin,
@@ -41,20 +33,24 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         ? (event) => writeJsonLine({ type: "runtime_event", event })
         : undefined,
       onControl: (nextControl) => {
-        control = nextControl;
-        if (interrupted) control.abort();
+        termination.setAbort(nextControl.abort);
       },
-      isInterrupted: () => interrupted,
+      onForceCleanup: (cleanup) => termination.addCleanup(cleanup),
+      isInterrupted: () => termination.exitCode !== undefined,
+      interruptionExitCode: () => termination.exitCode,
       onDiagnostic: (code, message) => {
         process.stderr.write(`[${code}] ${message}\n`);
       },
     });
     writeResult(result, parsed.options.outputFormat);
-    return result.exitCode;
+    return termination.exitCode ?? result.exitCode;
   } catch (error) {
-    return reportError(error);
+    const code = reportError(error);
+    return termination.exitCode ?? code;
   } finally {
     process.removeListener("SIGINT", onSigint);
+    process.removeListener("SIGTERM", onSigterm);
+    termination.dispose();
   }
 }
 

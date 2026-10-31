@@ -119,7 +119,7 @@ export class ReviewCoordinator {
     const resolved = await this.options.resolveWorkspace(input);
     if (resolved.ok === false) return { ok: false, code: "invalid_workspace", message: resolved.message };
     this.invalidateResolved(resolved.workspace.workspaceId, "refresh");
-    return this.getSnapshot({ ...input, workspaceId: resolved.workspace.workspaceId, workspaceRoot: undefined });
+    return this.getSnapshot({ ...input, ...resolved.workspace });
   }
 
   async getFileDiff(input: ReviewGetFileDiffInput): Promise<ReviewGetFileDiffResult> {

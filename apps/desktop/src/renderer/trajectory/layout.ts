@@ -61,7 +61,7 @@ export function deriveLayout(runtime: TrajectoryRuntimeSnapshot): TrajectoryLayo
   const approval = approvals(raw);
   const covered = new Set(runtime.records.map(record => requestKeyOf(record, requests)).filter(Boolean));
   const pending = raw.filter(record => {
-    if (record.eventType !== "request/header") return false;
+    if (record.eventType !== "request/header" && record.eventType !== "llm/auxiliary-start" && record.eventType !== "llm/auxiliary-end") return false;
     const key = requests.byRequestId.get(record.requestId ?? "");
     return key !== undefined && !covered.has(key) && covered.add(key);
   });
@@ -89,7 +89,7 @@ export function deriveLayout(runtime: TrajectoryRuntimeSnapshot): TrajectoryLayo
       kind,
       turn,
       group: group.key,
-      requestKey: kind === "compacted" ? `compaction:${record.id}` : requestKeyOf(record, requests),
+      requestKey: requestKeyOf(record, requests) ?? (kind === "compacted" ? `compaction:${record.id}` : null),
       requestOnly,
       startedAt: parseTimestamp(record.startedAt),
       durationMs: requestOnly ? null : timed ?? record.durationMs,

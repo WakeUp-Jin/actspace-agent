@@ -21,6 +21,9 @@ import { EMPTY_LLM_USAGE } from "@actspace/llm-service";
 import { emptyRuntimePromptSource } from "@actspace/prompt";
 import { ManagedRuns } from "./managed-runs.js";
 import { RuntimeSessionController } from "../session/session-controller.js";
+import { createAuxiliaryRequestRecorder } from "../session/auxiliary-request-recorder.js";
+import { createNodeSandboxHostPort, type SandboxStatus } from "@actspace/sandbox";
+import { DEFAULT_HARNESS_ENTRIES } from "./default-harness-definition.js";
 
 it("executes the default Loop from its fixed closure with Harness-owned policies", async () => {
   const directory = await mkdtemp(join(tmpdir(), "actspace-default-harness-"));
@@ -34,14 +37,18 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   let holdRequest = false;
   let requestEntered!: () => void;
   const entered = new Promise<void>(resolve => { requestEntered = resolve; });
+  let reportSandbox!: (status: SandboxStatus | undefined) => void;
+  const sandboxStatus = new Promise<SandboxStatus | undefined>(resolve => { reportSandbox = resolve; });
   const ports = {
+    "actspace.host.sandbox": createNodeSandboxHostPort(),
     "agent.registry": agentRegistry,
     ...Object.fromEntries(["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }])),
     "session.runtime": sessions,
+    "llm.auxiliary-requests": createAuxiliaryRequestRecorder(sessions),
     "session.journal": { registry },
     "session.projection": {},
     "actspace.host.session": { dataRoot: directory, runtimeId: "test" },
-    "actspace.host.agent": { authorizeHarness: async (r: import("@actspace/harness-control").AuthorizationRequest) => ({ ...r, actor: "test-host", decisionId: "approved", expiresAt: Date.now() + 10000 }), disabledHarnessEntries: ["browser-tools"], contextDisclosure: createContextHost(() => sessions, toolEnvironment), host, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
+    "actspace.host.agent": { authorizeHarness: async (r: import("@actspace/harness-control").AuthorizationRequest) => ({ ...r, actor: "test-host", decisionId: "approved", expiresAt: Date.now() + 10000 }), disabledHarnessEntries: ["browser-tools"], onSandboxStatus: reportSandbox, contextDisclosure: createContextHost(() => sessions, toolEnvironment), host, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
     "actspace.host.prompt": { workspaceRoot: directory, resolveSource: async () => emptyRuntimePromptSource() },
     "actspace.host.llm": { credentials: { resolve: async () => ({}) }, routes: [{ routeId: "default", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async (input: { signal?: AbortSignal }) => (async function* () {
       if (holdRequest) {
@@ -55,7 +62,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   await root.mount("host", ctx => { for (const [name, value] of Object.entries(ports)) ctx.provide(name, value); }, { provides: Object.keys(ports) });
   root.context.provide?.("session.checkpoint", { flush: async (value: { sessionId: string; throughSeq: number }) => { await sessions.getOpen(value.sessionId)!.flush(value.throughSeq); } });
   const runtime = new AgentRuntimeService(root.context);
-  await root.mount("subagent-host", ctx => { ctx.provide("actspace.host.subagents", runtime.subagents); }, { provides: ["actspace.host.subagents"] });
+  await root.mount("subagent-host", ctx => { ctx.provide("actspace.host.subagents", runtime.subagents); ctx.provide("actspace.host.background-tasks", runtime.backgroundTasks); }, { provides: ["actspace.host.subagents", "actspace.host.background-tasks"] });
   await runtime.initialize(root.context);
   const harnesses = runtime.harnesses;
   // Existing core checkpoint policy stays a Host durability service.
@@ -64,6 +71,8 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   try {
     await sessions.create("conversation", undefined, "chat");
     expect(agentRegistry.list()).toHaveLength(0);
+    // Without a bundled nono only Seatbelt can serve, so the status is platform-dependent but always reported.
+    expect(await sandboxStatus).toMatchObject(process.platform === "darwin" ? { available: true, isolation: "sandboxed", backend: { id: "seatbelt" } } : { available: false, isolation: "sandboxed" });
     await app.submit("conversation", "one", "Hello"); await app.waitForIdle("conversation");
     const state = await app.snapshot("conversation");
     expect(failures).toEqual([]);
@@ -83,7 +92,19 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       return (async function* () { yield { type: "done" as const, stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text" as const, text: '{"approved":true,"reason":"User requested inspection"}' }] }; })();
     } } });
     try {
-      expect(await reviewer!.review({ sessionId: "conversation", callId: "review-fixture", model: "test", snapshot: { user: "inspect", action: "ls" }, signal: new AbortController().signal })).toMatchObject({ approved: true });
+      const session = sessions.getOpen("conversation")!;
+      const priorTurn = (await sessions.inspectEvents("conversation")).find(event => event.type === "turn/start")!;
+      const reviewOwner = { agentRunId: (priorTurn.data as Record<string, unknown>).agentRunId as string, turnId: "review-turn", stepId: "review-step", callId: "review-fixture" };
+      expect(reviewOwner.agentRunId).toBeTruthy();
+      const appendReview = (type: string, data: import("@actspace/session-journal").SessionEventCandidateV1["data"]) => session.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
+      await appendReview("turn/start", reviewOwner);
+      await appendReview("step/start", reviewOwner);
+      await appendReview("tool/call", { ...reviewOwner, name: "shell" });
+      expect(await reviewer!.review({ ...reviewOwner, sessionId: "conversation", logicalRequestId: "review-logical", model: "test", snapshot: { user: "inspect", action: "ls" }, signal: new AbortController().signal })).toMatchObject({ approved: true });
+      expect(session.journal.events.filter(event => event.type === "llm/auxiliary-end").map(event => event.data)).toContainEqual(expect.objectContaining({ ...reviewOwner, purpose: "auto-review", status: "completed" }));
+      await appendReview("tool/result", { ...reviewOwner, name: "shell", status: "completed" });
+      await appendReview("step/end", reviewOwner);
+      await appendReview("turn/end", reviewOwner);
       await sessions.create("route-regression", undefined, "chat");
       await app.submit("route-regression", "chat-route", "Use the main model, not the reviewer");
       await app.waitForIdle("route-regression");
@@ -165,4 +186,11 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
 it("keeps Host compatibility modules in the persisted artifact canonical order", async () => {
   const modules = await defaultHarnessSharedModules();
   expect(modules.map(module => module.specifier)).toEqual(modules.map(module => module.specifier).sort((a, b) => a.localeCompare(b)));
+});
+
+it("registers the sandbox manager and both backends as replaceable Harness entries", () => {
+  const rows = new Map(DEFAULT_HARNESS_ENTRIES.map(row => [row[0], row]));
+  expect(rows.get("sandbox")).toEqual(["sandbox", ["sandbox"], ["actspace.host.sandbox"]]);
+  expect(rows.get("sandbox-nono")).toEqual(["sandbox-nono", [], ["sandbox", "actspace.host.sandbox"]]);
+  expect(rows.get("sandbox-seatbelt")).toEqual(["sandbox-seatbelt", [], ["sandbox", "actspace.host.sandbox"]]);
 });

@@ -54,6 +54,8 @@ export type PermissionDecision =
   | { readonly kind: "deny"; readonly code: string; readonly reason: string };
 
 export type ResourceExtractionContext = {
+  /** The mode the call is admitted under; a change before execution re-admits the call. */
+  readonly mode: PermissionMode;
   readonly workspaceRoot: string;
   canonicalizeFile(path: string, access: "read" | "write" | "delete"): Promise<Extract<ToolResource, { kind: "file" }>>;
 };

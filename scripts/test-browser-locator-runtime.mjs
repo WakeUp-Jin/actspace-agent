@@ -71,8 +71,19 @@ frame.contentDocument.body.innerHTML = `<button id="frame-save" style="opacity:1
 window.eval(runtime);
 
 const locator = window.__actspaceLocator;
-assert.equal(locator.version, "5");
+assert.equal(locator.version, "6");
 assert.match(locator.buildHash, /^[a-f0-9]{64}$/);
+
+let frameScrolls = 0;
+frame.style.opacity = "1";
+frame.scrollIntoView = () => { frameScrolls++; };
+const currentFrameOffset = await locator.invoke("frame_offset", {
+  selector: "#profile-frame", scrollIntoView: false,
+});
+assert.deepEqual({ x: currentFrameOffset.x, y: currentFrameOffset.y }, { x: 10, y: 20 });
+assert.equal(frameScrolls, 0, "measuring the frame after leaf scrolling must not scroll it again");
+await locator.invoke("frame_offset", { selector: "#profile-frame" });
+assert.ok(frameScrolls > 0, "initial frame routing still prepares the frame for interaction");
 
 const createPoint = await locator.invoke("point", {
   target: { kind: "role", role: "button", name: "创建", exact: true },
@@ -177,4 +188,45 @@ assert.equal(richClipboard.items[0].entries[0].text, "hello");
 await locator.invoke("clipboard_write", { items: richClipboard.items });
 assert.equal(clipboardItems[0].types[0], "text/plain");
 
-process.stdout.write("browser locator runtime fixture passed\n");
+// A label names its control; the control's own value/options are not label text.
+const labelCases = window.document.createElement("section");
+labelCases.innerHTML = `
+  <label for="color-select"> Color <span> palette </span>
+    <select id="color-select" style="opacity:1"><option>Red</option><option>Green</option><option>Blue</option></select>
+  </label>
+  <label>Notes<textarea id="label-notes" style="opacity:1">Existing note</textarea></label>
+  <label>Execute<button id="label-button" style="opacity:1">Run now</button></label>
+  <label for="external-select">External color</label>
+  <select id="external-select" multiple style="opacity:1"><option>One</option><option>Two</option></select>
+  <label for="aria-select">Native color<select id="aria-select" aria-label="Override color" style="opacity:1"><option>Red</option></select></label>
+  <span id="labelledby-name">Referenced color</span>
+  <label>Fallback color<select id="labelledby-select" aria-labelledby="labelledby-name" aria-label="Lower priority" style="opacity:1"><option>Blue</option></select></label>
+  <label>Duplicate color<select style="opacity:1"><option>A</option></select></label>
+  <label>Duplicate color<select style="opacity:1"><option>B</option></select></label>
+`;
+window.document.body.appendChild(labelCases);
+const shadowLabelHost = window.document.createElement("div");
+labelCases.appendChild(shadowLabelHost);
+shadowLabelHost.attachShadow({ mode: "open" }).innerHTML = `
+  <label>Shadow color<select id="shadow-select" style="opacity:1"><option>Red</option><option>Green</option></select></label>
+`;
+for (const [name, id] of [
+  ["Color palette", "color-select"], ["Notes", "label-notes"], ["Execute", "label-button"],
+  ["External color", "external-select"], ["Shadow color", "shadow-select"],
+]) {
+  const target = { kind: "label", value: name, exact: true };
+  assert.equal((await locator.invoke("count", { target })).count, 1, `exact label ${name}`);
+  assert.equal((await locator.invoke("get_attribute", { target, name: "id", timeoutMs: 100 })).value, id);
+}
+for (const [id, name] of [
+  ["color-select", "Color palette"], ["aria-select", "Override color"], ["labelledby-select", "Referenced color"],
+]) {
+  const row = (await locator.invoke("read_all", { selector: `#${id}` })).values[0];
+  assert.equal(row.accessible_name, name, `accessible name ${id}`);
+}
+assert.equal((await locator.invoke("count", { target: { kind: "role", role: "combobox", name: "Color palette", exact: true } })).count, 1);
+assert.equal((await locator.invoke("count", { selector: "#color-select" })).count, 1);
+const duplicateLabel = { kind: "label", value: "Duplicate color", exact: true };
+assert.equal((await locator.invoke("count", { target: duplicateLabel })).count, 2);
+await assert.rejects(() => locator.invoke("point", { target: duplicateLabel, timeoutMs: 100 }), /selector_ambiguous/);
+process.stdout.write("browser locator runtime fixture passed (including control-excluding labels)\n");

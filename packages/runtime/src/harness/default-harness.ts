@@ -16,12 +16,14 @@ const toolEvents: readonly HarnessContract[] = [
   { id: "tools/result", version: 1, mode: "emit" },
 ];
 
-import { DEFAULT_HARNESS_ENTRIES as rows } from "./default-harness-definition.js";
+import { DEFAULT_HARNESS_ENTRIES, type DefaultHarnessEntry } from "./default-harness-definition.js";
+
+const rows: readonly DefaultHarnessEntry[] = DEFAULT_HARNESS_ENTRIES;
 
 /** Host modules supply data contracts, persistence, and scope identity, not execution policy. */
 const hostModules = ["@actspace/cordis-adapter", "@actspace/core-scope", "@actspace/shared", "@actspace/shared/runtime-v2", "@actspace/session-journal", "@actspace/session-persistence", "@actspace/session-projection"];
 export const DEFAULT_HARNESS_SHARED_SERVICES = Object.freeze([
-  "actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "agent.registry", "session.runtime", "session.checkpoint", "session.journal", "session.projection", "actspace.host.tools.browser",
+  "actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "actspace.host.background-tasks", "actspace.host.sandbox", "agent.registry", "session.runtime", "llm.auxiliary-requests", "session.checkpoint", "session.journal", "session.projection", "actspace.host.tools.browser",
   ...["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => `actspace.host.tools.${id}`),
 ]);
 
@@ -48,13 +50,13 @@ export async function prepareDefaultHarnessArtifact(options: {
   const manifest: PluginManifest = {
     schemaVersion: 1, pluginId: id, version: "1", name: "Default built-in Harness", runtimeContract: "actspace.runtime.v2",
     source: { kind: "builtin", reference: "builtin:actspace.default-harness" }, codecs: [],
-    behaviors: rows.map(([name, provides, injects]): PluginBehaviorDescriptor => ({ entryId: entryId(name as string), module: `./${name}.js`, required: true, enabled: !options.disabledEntries?.includes(name as string), config: name === "browser-tools" ? { disposeHost: false } : {}, host: { required: [], optional: [] }, frontend: null, provides: [...provides].map(serviceId), injects: [...injects].map(serviceId), contracts: { services: { provides: [...provides].map(id => ({ id, version: 1 })), requires: [...injects].map(id => ({ id, version: 1 })) }, events: { provides: name === "agent-factory" ? loopEvents : name === "tools-runtime" ? toolEvents : [], requires: [] } } })),
+    behaviors: rows.map(([name, provides, injects, optional = []]): PluginBehaviorDescriptor => ({ entryId: entryId(name), module: `./${name}.js`, required: true, enabled: !options.disabledEntries?.includes(name), config: name === "browser-tools" ? { disposeHost: false } : {}, host: { required: [], optional: [] }, frontend: null, provides: provides.map(serviceId), injects: injects.map(serviceId), ...(optional.length ? { optionalInjects: optional.map(o => serviceId(o.id)) } : {}), contracts: { services: { provides: provides.map(id => ({ id, version: 1 })), requires: [...injects.map(id => ({ id, version: 1 })), ...optional.map(o => ({ id: o.id, version: 1, optional: true, fallback: o.fallback }))] }, events: { provides: name === "agent-factory" ? loopEvents : name === "tools-runtime" ? toolEvents : [], requires: [] } } })),
     contributions: { services: rows.flatMap(([, provides]) => [...provides]), events: [], contributions: [] },
   };
   const artifact = await publishPluginArtifact({ sourceRoot, artifactRoot: options.artifactRoot, plugin: manifest, files: files as string[], sharedModules });
   const composition: ResolvedComposition = {
     schemaVersion: 1, profileId: "actspace.default-harness", bundles: [], manifests: [manifest],
-    entries: manifest.behaviors.map(row => ({ entryId: row.entryId, pluginId: id, pluginVersion: manifest.version, module: row.module, required: row.required, enabled: row.enabled, config: row.config, requiredCapabilities: [], optionalCapabilities: [], provides: [...row.provides ?? []], injects: [...row.injects ?? []], frontendRequired: false, provenance: manifest.source.reference, state: row.enabled ? "candidate" : "skipped" })),
+    entries: manifest.behaviors.map(row => ({ entryId: row.entryId, pluginId: id, pluginVersion: manifest.version, module: row.module, required: row.required, enabled: row.enabled, config: row.config, requiredCapabilities: [], optionalCapabilities: [], provides: [...row.provides ?? []], injects: [...row.injects ?? []], ...(row.optionalInjects ? { optionalInjects: [...row.optionalInjects] } : {}), frontendRequired: false, provenance: manifest.source.reference, state: row.enabled ? "candidate" : "skipped" })),
     patchResults: [], hostCapabilities: [...options.hostCapabilities], warnings: [], config: {}, digest: artifact.artifactId,
   };
   return { composition, artifacts: new Map([[id, artifact]]), sharedServices: DEFAULT_HARNESS_SHARED_SERVICES };

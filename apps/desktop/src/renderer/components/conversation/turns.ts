@@ -5,11 +5,14 @@ import type { ConversationTurnNavigationItem } from "../ConversationTurnRail";
 
 export type UserMessageBlock = Extract<MessageBlock, { kind: "user" }>;
 export type AssistantMessageBlock = Extract<MessageBlock, { kind: "assistant" }>;
+export type BackgroundNoticeBlock = Extract<MessageBlock, { kind: "background_notice" }>;
 type TodoMessageBlock = Extract<MessageBlock, { kind: "todo" }>;
 
 export type ConversationTurn = {
   id: string;
   user: UserMessageBlock | null;
+  /** 后台任务通知唤醒的轮次没有用户输入，以这条分隔行开头。 */
+  notice?: BackgroundNoticeBlock;
   messages: MessageBlock[];
 };
 
@@ -40,6 +43,12 @@ export function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTu
         user: message,
         messages: []
       };
+      turns.push(currentTurn);
+      continue;
+    }
+
+    if (message.kind === "background_notice") {
+      currentTurn = { id: message.renderKey ?? message.id, user: null, notice: message, messages: [] };
       turns.push(currentTurn);
       continue;
     }

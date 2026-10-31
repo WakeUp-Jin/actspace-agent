@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文档 B4 · 细节</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="docs-a-base.css">
+<link rel="stylesheet" href="docs-b-base.css">
+<style>
+/* B4 细节：B1 的薄荷不变，不加颜色，只加质感——舞台右下角大号衬线分组号、源文件路径、h2 等宽章节号、更明显的纸纹。 */
+.head-stage::after { opacity: .22; }
+.head-stage .wm { position: absolute; right: 26px; bottom: -34px; z-index: -1; font: 500 168px/1 var(--display); color: color-mix(in srgb, var(--t-deep) 45%, transparent); letter-spacing: -.02em; pointer-events: none; }
+.head-stage .meta .copy { margin-left: 6px; }
+.head-stage .src { position: absolute; right: 36px; top: 38px; font: 11.5px var(--mono); color: var(--t-muted); }
+.prose { counter-reset: sec; }
+.prose h2 { counter-increment: sec; display: flex; align-items: baseline; gap: 14px; }
+.prose h2::before { content: counter(sec, decimal-leading-zero); font: 12px var(--mono); color: var(--t-ink); background: color-mix(in srgb, var(--t-base) 80%, var(--site-paper)); border-radius: 6px; padding: 2px 7px; transform: translateY(-4px); }
+.shot figcaption::before { content: "▲ "; color: var(--t-deep); font-size: 10px; }
+@media (max-width: 760px) { .head-stage .src { display: none; } .head-stage .wm { font-size: 110px; bottom: -22px; } }
+:root { --t-base: #d5e6d6; --t-soft: #e3ede1; --t-deep: #9cc5ae; --t-ink: #2f5a43; --t-body: #44514a; --t-muted: #5f6e63; }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+<div class="layout">
+  <aside class="sidebar"><nav data-nav aria-label="文档目录"></nav></aside>
+  <main class="article">
+    <header class="head-stage">
+    <span class="wm" aria-hidden="true">03</span><span class="src">docs/context.md</span>
+    <p class="crumb"><span>文档</span><span>/</span><span data-fill="group"></span></p>
+    <h1 data-fill="title"></h1>
+    <p class="lead" data-fill="lead"></p>
+    <div class="meta"><span>更新于 <span data-fill="updated"></span></span><span>约 <span data-fill="minutes"></span> 分钟</span><button class="copy" type="button">复制页面</button></div>
+    </header>
+    <div class="prose" data-body></div>
+    <nav class="pager" data-pager></nav>
+    <div class="foot"><span>这页有帮助吗？</span><a href="#">在 GitHub 上编辑 ↗</a></div>
+  </main>
+  <aside class="toc"><p class="toc-label">本页内容</p><nav data-toc-list></nav></aside>
+</div>
+<script src="shared.js"></script>
+<script>bootDoc("B4");</script>
+</body>
+</html>

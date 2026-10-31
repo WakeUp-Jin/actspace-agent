@@ -126,10 +126,22 @@ export type TrajectoryRecord = {
   readonly messageSource?: RuntimeV2JsonValue | null;
   /** Parent call identity for nested tool dispatch records. */
   readonly parentCallId?: string | null;
-  readonly childSessionId?: string;
   readonly contextPresentation?: { readonly category: string; readonly title: string; readonly action: string; readonly placement: string; readonly previousText?: string };
   /** Resolved owner from explicit message/call identity, never row proximity. */
   readonly assistantRecordId?: string | null;
+  /** Compaction facts merged from `compaction/start` and `compaction/end`; fields are null in journals that predate them. */
+  readonly compaction?: TrajectoryCompactionFacts;
+};
+
+export type TrajectoryCompactionFacts = {
+  readonly compactionId: string | null;
+  readonly trigger: "manual" | "auto" | null;
+  /** Surface entries replaced by the summary (`end − start` on `compaction/start`). */
+  readonly messageCount: number | null;
+  readonly beforeTokens: number | null;
+  readonly afterTokens: number | null;
+  /** `beforeTokens` includes estimates (content appended after the last measured request). */
+  readonly beforeEstimated: boolean;
 };
 
 export type TrajectoryStep = {
@@ -188,7 +200,7 @@ export type TrajectoryLayoutTurn = { readonly section: number; readonly turn: nu
 export type TrajectoryRequestView = {
   readonly key: string;
   readonly number: number;
-  readonly purpose: "assistant" | "compaction";
+  readonly purpose: "assistant" | "compaction" | "image-inspection" | "session-title" | "auto-review";
   readonly status: TrajectoryStatus;
   readonly turn: number | null;
   readonly group: string;
@@ -204,6 +216,10 @@ export type TrajectoryRequestView = {
   readonly retryDelayMs: number | null;
   /** Assistant message or compaction record produced by this request. */
   readonly resultRecordId: string | null;
+  /** Auxiliary attempts link to their owning tool without inventing an assistant result. */
+  readonly parentRecordId?: string | null;
+  readonly attempt?: number;
+  readonly terminalStatus?: "completed" | "failed" | "aborted";
   readonly toolCalls: number;
   readonly subtoolCalls: number;
 };

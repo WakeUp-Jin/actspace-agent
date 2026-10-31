@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markdown 渲染</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="md-render.css">
+<style>
+/* 只比 Markdown 渲染：页面框架固定（标题 + 一栏正文），正文用真实文章原文，底部切换渲染风格时不跳页、不丢滚动位置。 */
+:root { --r-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+.frame { width: min(720px, calc(100vw - 40px)); margin: 0 auto; padding: 56px 0 160px; }
+.frame-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--site-muted); margin: 0 0 14px; }
+.frame-meta b { color: var(--site-ink); font-weight: 500; }
+.frame h1 { font: 650 38px/1.32 var(--r-font); margin: 0 0 14px; letter-spacing: -.01em; }
+.frame .desc { font-size: 18px; line-height: 1.75; color: var(--site-body); margin: 0 0 40px; padding-bottom: 32px; border-bottom: 1px solid var(--site-line); }
+.demo-switcher button { all: unset; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; color: rgba(255,255,255,.72); cursor: pointer; white-space: nowrap; }
+.demo-switcher button:hover { color: #fff; }
+.demo-switcher button b { font: 600 11px var(--mono); opacity: .6; }
+.demo-switcher button[aria-pressed="true"] { background: #fff; color: var(--site-ink); }
+.demo-switcher button[aria-pressed="true"] b { opacity: 1; color: var(--site-accent); }
+@media (max-width: 640px) { .frame h1 { font-size: 29px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+<main class="frame">
+  <p class="frame-meta"><b>工具与扩展</b><span>2026年6月16日</span><span>WakeUp-Jin</span><span>约 11 分钟</span></p>
+  <h1 id="title">Write和Edit工具的实现细节</h1>
+  <p class="desc">文件写入和编辑中的 TOCTOU 防护、原子写入与内容匹配。</p>
+  <article class="md" id="md"></article>
+</main>
+
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/highlight.min.js"></script>
+<script src="shared.js"></script>
+<script src="md-source.js"></script>
+<script src="md-pipeline.js"></script>
+<script>
+const THEMES = [
+  { id: "M1", name: "GitHub 清爽" },
+  { id: "M2", name: "精致卡片" },
+  { id: "M3", name: "暗色代码" },
+  { id: "M4", name: "中文阅读" },
+  { id: "M5", name: "技术手册" },
+];
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+let theme = store.get("md.theme", "M1"), spacing = store.get("md.spacing", "on") === "on";
+function render() {
+  const md = document.getElementById("md");
+  md.className = `md ${theme.toLowerCase()}`;
+  renderMarkdown(md, MD_SRC, { spacing });
+  document.getElementById("title").textContent = spacing ? spaceText("Write和Edit工具的实现细节") : "Write和Edit工具的实现细节";
+}
+
+function switcher() {
+  const bar = document.createElement("div"); bar.className = "demo-switcher";
+  bar.innerHTML = `<span>Markdown 渲染</span>${THEMES.map((t) => `<button type="button" data-t="${t.id}"><b>${t.id}</b>${t.name}</button>`).join("")}<i class="demo-sep"></i><button type="button" data-sp>中英空格</button>`;
+  document.body.append(bar);
+  const sync = () => { bar.querySelectorAll("[data-t]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.t === theme)); bar.querySelector("[data-sp]").setAttribute("aria-pressed", spacing); };
+  bar.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.t) { theme = b.dataset.t; store.set("md.theme", theme); }
+    if (b.hasAttribute("data-sp")) { spacing = !spacing; store.set("md.spacing", spacing ? "on" : "off"); }
+    const y = scrollY; render(); scrollTo(0, y); sync();
+  });
+  sync();
+}
+
+const q = new URLSearchParams(location.search).get("t"); if (q) theme = q;
+renderHeader(document.querySelector("[data-header]"));
+document.querySelectorAll(".sh-nav a").forEach((a) => a.toggleAttribute("aria-current", a.textContent === "博客"));
+render(); switcher();
+</script>
+</body>
+</html>

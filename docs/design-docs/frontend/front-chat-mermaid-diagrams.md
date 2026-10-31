@@ -241,5 +241,5 @@ apps/desktop/src/renderer/test/
 - `apps/desktop/src/renderer/components/messages/mermaid-renderer.ts`：懒加载、固定 strict 配置与 `secure` 键、源码策略（剥离 `%%{init}%%`、frontmatter `config`、`click` / `link` / `callback`）、DOMPurify 二次净化（只保留 `#` 内部 href）、上限（源码 20k 字符、500 条边、10 秒、SVG 2 MB）、LRU 32 与并发去重、实例 id 重写、PNG 导出。
 - `MermaidDiagramBlock.tsx`：loading / ready / error / 源码视图与工具栏（查看源码、复制源码、下载 PNG、放大）。
 - `MermaidPreviewDialog.tsx`：适配视口（不放大）、预设档位 25%–500%、Ctrl/⌘ + 滚轮以光标为锚、拖拽平移、`+` / `-` / `0` 与 Esc、焦点归还。
-- `MarkdownProse.tsx`：通过 context 拿到原始 Markdown，仅对语言完整匹配且 fence 闭合的块分流。
+- `MarkdownProse.tsx`：通过 context 拿到当前顶层块的原始 Markdown（回复按顶层块分开解析，见会话状态规范 2.2），仅对语言完整匹配且 fence 闭合的块分流。
 - 视觉验收页：`apps/desktop/src/renderer/test/fixtures/mermaid-preview.html`（`?theme=dark`、`?streaming=1`、`?expand=N`、`?png=N`）。

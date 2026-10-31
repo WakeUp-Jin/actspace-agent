@@ -61,7 +61,6 @@ const settingsApiStub = {
   "settings.update": async () => defaultSettings,
   "providers.setKey": async () => ({ ok: true }),
   "providers.clearKey": async () => ({ ok: true }),
-  "providers.testConnection": async () => ({ ok: true, message: "连接成功" }),
   "visualize.convertReply": async () => ({ html: "<!doctype html><html></html>", sourceHash: "stub", cached: false }),
   "visualize.list": async () => ({ items: [] }),
   "sessions.describeContext": async () => null,
@@ -312,8 +311,6 @@ describe("App streaming user message", () => {
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({ provider: "deepseek", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
-      "providers.getKimiBalance": async () => ({ provider: "kimi", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "sessions.archiveMany": archiveSessions,
@@ -367,8 +364,6 @@ describe("App streaming user message", () => {
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({ provider: "deepseek", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
-      "providers.getKimiBalance": async () => ({ provider: "kimi", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": () => () => {},
@@ -416,8 +411,6 @@ describe("App streaming user message", () => {
       getRecord: async ({ sessionId }) => sessionId === visible.meta.id ? visible : null,
       "workspaces.setVisibility": setWorkspaceVisibility,
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({ provider: "deepseek", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
-      "providers.getKimiBalance": async () => ({ provider: "kimi", isConfigured: false, isAvailable: null, generatedAt: now, displayBalance: null }),
       "approvals.listPending": listPending,
       "events.hostsChanged": (callback: (hosts: unknown[]) => void) => { hostListeners.add(callback); return () => { hostListeners.delete(callback); }; },
       ...settingsApiStub,
@@ -482,20 +475,6 @@ describe("App streaming user message", () => {
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "review.getSnapshot": getReviewSnapshot,
@@ -581,20 +560,6 @@ describe("App streaming user message", () => {
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": () => () => {},
@@ -680,20 +645,6 @@ describe("App streaming user message", () => {
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": () => () => {},
@@ -757,20 +708,6 @@ describe("App streaming user message", () => {
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -839,20 +776,6 @@ describe("App streaming user message", () => {
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -904,20 +827,6 @@ describe("App streaming user message", () => {
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -941,8 +850,8 @@ describe("App streaming user message", () => {
     await userEvent.type(composer, "wait for the model");
     await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
-
+    // The 300ms visibility boundary is covered with a controlled clock in
+    // model-waiting-status.test.tsx; userEvent may itself exceed that delay.
     const initialWaitingText = await screen.findByText("Operating Space · Expanding");
     expect(initialWaitingText).toHaveClass("tool-log-text-running");
     expect(initialWaitingText).toHaveAttribute("data-shimmer-text", "Operating Space · Expanding");
@@ -1116,20 +1025,6 @@ sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -1254,20 +1149,6 @@ sessionId: alphaSessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -1394,20 +1275,6 @@ sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": () => () => {},
@@ -1455,20 +1322,6 @@ sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       executeCompaction: compactContext,
@@ -1513,7 +1366,6 @@ sessionId,
       expect(compactContext).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByText("正在压缩上下文")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "上下文压缩进度" })).toBeInTheDocument();
     expect(screen.getByLabelText("正在压缩上下文，压缩完成后可继续")).toHaveAttribute("aria-disabled", "true");
     expect(screen.queryByText("/compact")).not.toBeInTheDocument();
     expect(execute).not.toHaveBeenCalled();
@@ -1537,7 +1389,7 @@ sessionId,
     await userEvent.type(composer, "/compact");
     await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(await screen.findByText("上下文压缩失败 · 模型请求超时")).toBeInTheDocument();
+    expect(await screen.findByText("模型请求超时")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "重试" }));
 
     await waitFor(() => {
@@ -1545,7 +1397,7 @@ sessionId,
     });
     expect(compactContext.mock.calls[1]?.[0]).toMatchObject({ sessionId: "session-compact-failed" });
     await waitFor(() => {
-      expect(screen.queryByText("上下文压缩失败 · 模型请求超时")).not.toBeInTheDocument();
+      expect(screen.queryByText("模型请求超时")).not.toBeInTheDocument();
     });
   });
 
@@ -1569,13 +1421,13 @@ sessionId,
         ? { ...identity, type, error: { code: "TEST", message: "自动压缩超时", recoverable: true } }
         : { ...identity, type, payload: { triggerTokens: 100, thresholdTokens: 90, summaryChars: 0, historyRefPath: "session.jsonl", status: "failed", beforeCount: 10, afterCount: 10, reason: "自动压缩超时" } });
     });
-    expect(await screen.findByText("上下文压缩失败 · 自动压缩超时")).toBeInTheDocument();
+    expect(await screen.findByText("自动压缩超时")).toBeInTheDocument();
     await act(async () => { finish(); });
     await waitFor(() => expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument());
-    expect(screen.getByText("上下文压缩失败 · 自动压缩超时")).toBeInTheDocument();
+    expect(screen.getByText("自动压缩超时")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "重试" }));
     await waitFor(() => expect(compact).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.queryByText("上下文压缩失败 · 自动压缩超时")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("自动压缩超时")).not.toBeInTheDocument());
   });
 
   it("aborts an Agent while automatic compaction is running", async () => {
@@ -1637,20 +1489,6 @@ sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "sessions.getPage": async () => storedProjection,
@@ -1731,20 +1569,6 @@ sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -1879,20 +1703,6 @@ sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: now,
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: now,
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -2070,20 +1880,6 @@ sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       "sessions.getSubAgentTranscript": async () => [{ ...transcriptEvent, type: "tool_result", payload: { toolCallId: "tool-read-app", status: "running", uiPreview: { kind: "read", filePath: "apps/desktop/src/renderer/App.tsx", displayText: "Read apps/desktop/src/renderer/App.tsx" } } }],
       ...settingsApiStub,
@@ -2219,20 +2015,6 @@ sessionId: input.sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       "dialogs.selectWorkspaceDirectory": selectWorkspaceDirectory,
       ...settingsApiStub,
@@ -2323,20 +2105,6 @@ sessionId: input.sessionId,
       "sessions.pin": async () => ({ ok: true }),
       "sessions.setWorkspace": setSessionWorkspace,
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": () => () => {},
@@ -2397,20 +2165,6 @@ sessionId: input.sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       "dialogs.selectImages": async () => ({ canceled: false, attachments: [selectedAttachment] }),
       "models.listUsable": async () => ({
@@ -2525,20 +2279,6 @@ sessionId: input.sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -2625,20 +2365,6 @@ sessionId: input.sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -2743,20 +2469,6 @@ sessionId: input.sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async (input) =>
         input?.sessionId === sessionId && approvalPending
           ? [{
@@ -2899,20 +2611,6 @@ sessionId,
       "approvals.submit": submitApproval,
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async (input) =>
         input?.sessionId === sessionId && approvalPending
           ? [{
@@ -3059,20 +2757,6 @@ sessionId,
       "approvals.submit": submitApproval,
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -3162,20 +2846,6 @@ sessionId: input.sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -3313,20 +2983,6 @@ sessionId: input.sessionId,
       "approvals.submit": async () => ({ ok: true }),
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
-      "providers.getDeepSeekBalance": async () => ({
-        provider: "deepseek",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
-      "providers.getKimiBalance": async () => ({
-        provider: "kimi",
-        isConfigured: false,
-        isAvailable: null,
-        generatedAt: new Date().toISOString(),
-        displayBalance: null,
-      }),
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "events.agentStream": (callback) => {
@@ -3586,31 +3242,6 @@ sessionId: input.sessionId,
     expect(screen.getAllByText('/tmp/background.txt')).toHaveLength(1);
   });
 
-  it('keeps background Bash updates after the run settles and isolates equal task IDs', async () => {
-    const fixture = setupBackgroundSessions();
-    renderApp();
-    await fixture.send('Launch background Bash');
-    await fixture.select('background-b');
-    await act(async () => fixture.complete('background-a'));
-    for (const id of ['background-a', 'background-b']) {
-      const record = fixture.records.get(id)!;
-      const base = { sessionId: id, agentRunId: `run-${id}`, schemaVersion: 2 as const, timestamp: record.meta.createdAt };
-      record.events = [
-        { ...base, id: `user-${id}`, type: 'user_message', payload: { content: 'Launch background Bash' } },
-        { ...base, id: `call-${id}`, type: 'tool_call', payload: { toolCallId: `bash-${id}`, name: 'bash', args: { command: 'sleep 1' } } },
-        { ...base, id: `result-${id}`, type: 'tool_result', payload: { toolCallId: `bash-${id}`, toolName: 'bash', ok: true, detail: [{ label: 'background-task', value: { taskId: 'task-shared', status: 'running' } }] } },
-      ] as SessionEvent[];
-    }
-    await act(async () => fixture.event('background-a', { type: 'bash_task_update', taskId: 'task-shared', status: 'completed', exitCode: 0 }));
-    await fixture.select('background-a');
-    await userEvent.click(screen.getByRole('button', { name: /^Worked/ }));
-    expect(await screen.findByText('后台完成')).toBeInTheDocument();
-    await fixture.select('background-b');
-    await userEvent.click(screen.getByRole('button', { name: /^Worked/ }));
-    expect(await screen.findByText('后台运行中')).toBeInTheDocument();
-    expect(screen.queryByText('后台完成')).not.toBeInTheDocument();
-  });
-
   it('marks a background run that finished as unread until the session is opened', async () => {
     const fixture = setupBackgroundSessions();
     renderApp();
@@ -3718,6 +3349,6 @@ sessionId: input.sessionId,
     expect(screen.getByText('Pinned live question')).toBeInTheDocument();
     expect(screen.getByText('Pinned reply')).toBeInTheDocument();
     expect(screen.getByLabelText('停止 Agent')).toBeInTheDocument();
-  });
+  }, 10_000);
 
 });

@@ -104,9 +104,10 @@ export function queryCSSComposed(root: Document | ShadowRoot | Element, selector
   }
 }
 
-export function composedText(element: Element): string {
+export function composedText(element: Element, excludedSubtree?: Element): string {
   const parts: string[] = [];
   const visit = (node: Node): void => {
+    if (node === excludedSubtree) return;
     if (node.nodeType === 3) {
       parts.push(node.textContent ?? "");
       return;

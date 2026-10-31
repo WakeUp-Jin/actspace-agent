@@ -9,6 +9,15 @@ import type { HostUploads } from "./uploads.js";
 export class HostArtifacts {
   constructor(private readonly uploads: HostUploads, private readonly store: NodeArtifactStore) {}
   async reference(sessionId: string, workspace: string, path: string) {
+    const source = await this.#snapshotSource(workspace, path).catch((error: unknown) => {
+      const code = (error as NodeJS.ErrnoException)?.code;
+      if (code === "ENOENT" || code === "ENOTDIR") throw new HostError("NOT_FOUND", "Result file does not exist; restore or regenerate it, then retry");
+      throw error;
+    });
+    const ref = await this.store.create({ bytes: source.bytes, mediaType: mediaType(source.bytes), owner: { sessionId, callId: "file-reference", pluginId: "actspace.agent-host", name: source.name } });
+    return { id: ref.artifactId, name: source.name, size: ref.size, sha256: ref.sha256, mediaType: ref.mediaType };
+  }
+  async #snapshotSource(workspace: string, path: string) {
     const root = await realpath(workspace), target = await realpath(resolve(root, path));
     const nested = relative(root, target);
     if (nested === ".." || nested.startsWith("../") || isAbsolute(nested)) throw new HostError("FORBIDDEN", "File is outside the Session workspace");
@@ -21,8 +30,7 @@ export class HostArtifacts {
       if (!before.isFile() || before.size > 20 * 1024 * 1024) throw new HostError("LIMIT_EXCEEDED", "Result must be a regular file up to 20 MiB");
       const bytes = await file.readFile(), after = await file.stat();
       if (bytes.length !== before.size || after.mtimeMs !== before.mtimeMs || after.size !== before.size) throw new HostError("CONFLICT", "Result changed during snapshot; retry", true);
-      const ref = await this.store.create({ bytes, mediaType: mediaType(bytes), owner: { sessionId, callId: "file-reference", pluginId: "actspace.agent-host", name: basename(target) } });
-      return { id: ref.artifactId, name: basename(target), size: ref.size, sha256: ref.sha256, mediaType: ref.mediaType };
+      return { bytes, name: basename(target) };
     } finally { await file.close(); }
   }
   async #read(sessionId: string, id: string) {

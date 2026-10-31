@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   ChevronRight,
   FileCode,
@@ -14,7 +14,7 @@ import {
   Table,
 } from "lucide-react";
 import type { WorkspaceDirEntry } from "@actspace/shared";
-import { useRightPanel, workspaceFileTabId } from "./RightPanelContext";
+import { useRightPanel, workspaceFileTabId, workspaceDirCacheKey } from "./RightPanelContext";
 import { readFailureTab, tabFromFile } from "./workspaceFileTab";
 import { IconButton } from "../ui/IconButton";
 import { workspacesApi } from "../../api/workspaces";
@@ -83,7 +83,8 @@ function DirView({
   filter: string;
 }) {
   const { dirCache, cacheDir, fileTreeRefreshKey } = useRightPanel();
-  const cached = dirCache.get(relativePath);
+  const cacheKey = workspaceDirCacheKey(relativePath, workspaceRoot);
+  const cached = dirCache.get(cacheKey);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(cached ? "ready" : "loading");
   const [truncatedListing, setTruncatedListing] = useState(false);
 
@@ -91,7 +92,7 @@ function DirView({
     let cancelled = false;
     const api = workspacesApi.listDir;
     // 命中缓存就不再打 IPC：收起 / 展开树栏、来回切 Tab 都不该重新拉一遍目录。
-    if (dirCache.has(relativePath)) {
+    if (dirCache.has(cacheKey)) {
       setStatus("ready");
       return;
     }
@@ -105,7 +106,7 @@ function DirView({
           return;
         }
         setTruncatedListing(result.error === "too_many_entries");
-        cacheDir(relativePath, result.entries);
+        cacheDir(relativePath, result.entries, workspaceRoot);
         setStatus("ready");
       })
       .catch(() => {
@@ -115,7 +116,7 @@ function DirView({
       cancelled = true;
     };
     // fileTreeRefreshKey 变化时缓存已被清空，需要重新拉取。
-  }, [relativePath, workspaceRoot, dirCache, cacheDir, fileTreeRefreshKey]);
+  }, [relativePath, workspaceRoot, cacheKey, dirCache, cacheDir, fileTreeRefreshKey]);
 
   const entries = cached;
 
@@ -186,6 +187,12 @@ function EntryRow({
 }) {
   const { openTab, activeTabId, expandedDirs, toggleDir } = useRightPanel();
   const [opening, setOpening] = useState(false);
+  const ownership = useRef(0);
+  useEffect(() => {
+    ownership.current += 1;
+    setOpening(false);
+    return () => { ownership.current += 1; };
+  }, [workspaceRoot]);
 
   if (entry.kind === "dir") {
     const expanded = expandedDirs.has(entry.relativePath);
@@ -216,18 +223,20 @@ function EntryRow({
     );
   }
 
-  const isActive = activeTabId === workspaceFileTabId(entry.relativePath);
+  const isActive = activeTabId === workspaceFileTabId(entry.relativePath, { workspaceRoot });
 
   const openFile = async () => {
     const api = workspacesApi.readFile;
     if (opening) return;
     setOpening(true);
+    const owner = ownership.current;
     try {
-      openTab(tabFromFile(await api({ workspaceRoot, relativePath: entry.relativePath })));
+      const result = await api({ workspaceRoot, relativePath: entry.relativePath });
+      if (owner === ownership.current) openTab(tabFromFile(result, { workspaceRoot }));
     } catch {
-      openTab(readFailureTab(entry.relativePath, entry.name));
+      if (owner === ownership.current) openTab(readFailureTab(entry.relativePath, entry.name, { workspaceRoot }));
     } finally {
-      setOpening(false);
+      if (owner === ownership.current) setOpening(false);
     }
   };
 

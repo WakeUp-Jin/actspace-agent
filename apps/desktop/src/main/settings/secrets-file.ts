@@ -1,5 +1,5 @@
 /** secrets.json 的解析和凭据 secret id 格式：纯函数，不读写文件。 */
-import { PROVIDER_IDS, type CredentialStorageIssueCode, type LlmProviderId } from "@actspace/shared";
+import { PROVIDER_IDS, type CredentialStorageIssueCode } from "@actspace/shared";
 import { ALL_SECRET_PROVIDER_IDS } from "./constants";
 import type { PersistedSecrets, PersistedSecretsV1, ReadSecretsResult } from "./types";
 import { isRecord } from "./utils";
@@ -55,7 +55,9 @@ export function parseSecretFields(
       legacyProviderRemoved = true;
       continue;
     }
-    if (!isProviderCredentialSecretId(id) || typeof secret !== "string" || secret.length === 0) return undefined;
+    if (typeof secret !== "string" || secret.length === 0) return undefined;
+    if (isRemovedExtraKeyId(id)) continue;
+    if (!isProviderCredentialSecretId(id)) return undefined;
     parsed.providerCredentials[id] = secret;
   }
   return { secrets: parsed, legacyProviderRemoved };
@@ -75,15 +77,14 @@ export function isValidCredentialId(value: unknown): value is string {
   return typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 }
 
-export function providerCredentialSecretId(provider: LlmProviderId, credentialId: string): string {
-  return `${provider}:${credentialId}`;
+/** 连接 Key 的 secret id：`connection:<连接标识>`。 */
+export function isProviderCredentialSecretId(value: string): boolean {
+  return value.startsWith("connection:") && /^[a-zA-Z0-9._-]{3,80}$/.test(value.slice("connection:".length));
 }
 
-export function isProviderCredentialSecretId(value: string): boolean {
-  if (value.startsWith("connection:")) return /^[a-zA-Z0-9._-]{3,80}$/.test(value.slice("connection:".length));
+/** 多 Key 已删除：旧的 `<provider>:<credentialId>` 额外 Key 读取时静默丢弃。 */
+function isRemovedExtraKeyId(value: string): boolean {
   const separator = value.indexOf(":");
   if (separator <= 0 || value.indexOf(":", separator + 1) !== -1) return false;
-  const provider = value.slice(0, separator);
-  const credentialId = value.slice(separator + 1);
-  return (PROVIDER_IDS as readonly string[]).includes(provider) && isValidCredentialId(credentialId);
+  return (PROVIDER_IDS as readonly string[]).includes(value.slice(0, separator)) && isValidCredentialId(value.slice(separator + 1));
 }

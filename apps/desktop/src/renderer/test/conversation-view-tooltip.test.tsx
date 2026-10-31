@@ -245,7 +245,7 @@ describe("ConversationView tooltips", () => {
     renderConversation(messagesWithCompaction);
 
     const actionsButton = screen.getByRole("button", { name: "更多消息操作" });
-    const divider = screen.getByRole("separator", { name: "上下文已压缩 · 8 条消息" });
+    const divider = screen.getByRole("separator", { name: "以上 8 条消息已压缩" });
 
     expect(actionsButton.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });

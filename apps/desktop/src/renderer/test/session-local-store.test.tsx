@@ -13,8 +13,8 @@ describe("SessionLocalStore", () => {
   it("returns the shared default for unknown sessions and again after evict", () => {
     const store = createSessionLocalStore();
     expect(store.get("s-1")).toBe(DEFAULT_SESSION_LOCAL_STATE);
-    store.update("s-1", (state) => ({ ...state, failed: true, bashUpdates: { t1: { status: "running" } } }));
-    expect(store.get("s-1")).toMatchObject({ failed: true, bashUpdates: { t1: { status: "running" } } });
+    store.update("s-1", (state) => ({ ...state, failed: true, unread: true }));
+    expect(store.get("s-1")).toMatchObject({ failed: true, unread: true });
     expect(store.ids()).toEqual(["s-1"]);
 
     store.evict("s-1");

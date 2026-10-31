@@ -9,7 +9,7 @@ import type {
 } from "@actspace/shared";
 import { SettingsNav, type SettingsSectionId } from "./SettingsNav";
 import { HostConnectionsSettings } from "./HostConnectionsSettings";
-import { ProviderSettings } from "./ProviderSettings";
+import { ModelsPage } from "./models/ModelsPage";
 import { SearchSettings } from "./SearchSettings";
 import { ShortcutSettings } from "./ShortcutSettings";
 import { SpeechSettingsSection } from "./SpeechSettingsSection";
@@ -76,6 +76,10 @@ export function SettingsPage({
     useSettings(onSettingsChange);
   const [keyModalProvider, setKeyModalProvider] = useState<SecretProviderId | null>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!shellRef.current?.contains(document.activeElement) && !document.querySelector('[aria-modal="true"]')) shellRef.current?.focus();
+  }, []);
 
   const navigate = useCallback((nextSection: SettingsSectionId) => {
     setSection(nextSection);
@@ -92,6 +96,14 @@ export function SettingsPage({
   return (
     <SettingsSaveNoticeProvider>
     <div
+      ref={shellRef}
+      tabIndex={-1}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onBack();
+      }}
       data-testid="settings-page-shell"
       className="flex h-screen min-h-0 flex-col overflow-hidden bg-app-bg text-text-main"
     >
@@ -170,15 +182,12 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
           <GeneralSection {...rest} />
           <AgentInstructionsSection {...rest} />
           <TaskModelDefaultsSection
-            settings={rest.settings}
             settingsV4={rest.settingsV4}
             onUpdateNamespace={rest.onUpdateNamespace}
-            onChanged={rest.onRefresh}
             onNavigate={rest.onNavigate}
           />
           <MediaDefaultsSection
             settings={rest.settings}
-            onUpdate={rest.onUpdate}
             onClear={rest.onClearProvider}
             onRefresh={rest.onRefresh}
             onNavigate={rest.onNavigate}
@@ -189,9 +198,9 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       );
     case "model":
       return (
-        // 「模型」的页头由 ProviderSettings 自己画：二级路由要把返回箭头放进标题行。
+        // 「模型」的页头由 ModelsPage 自己画：二级路由要把返回箭头放进标题行。
         <PageShell>
-          <ProviderSettings settings={rest.settings} onChanged={rest.onRefresh} />
+          <ModelsPage onChanged={rest.onRefresh} />
         </PageShell>
       );
     case "search":
@@ -207,7 +216,7 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
     case "archivedChats":
       return <PageShell title="归档会话"><ArchivedChatsSection onArchivedSessionsChange={rest.onArchivedSessionsChange} /></PageShell>;
     case "subagents":
-      return <PageShell title="子 Agent" description="主 Agent 可以委派任务的专门代理。"><SubagentSection settings={rest.settings} onRefresh={rest.onRefresh} /></PageShell>;
+      return <PageShell title="子 Agent" description="主 Agent 可以委派任务的专门代理。"><SubagentSection onNavigate={rest.onNavigate} /></PageShell>;
     case "usage":
       return (
         <UsageStatisticsPage

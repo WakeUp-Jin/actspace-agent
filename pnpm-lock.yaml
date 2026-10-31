@@ -11,6 +11,11 @@ overrides:
   '@deepseek-ai/cordis-plugin-group': 1.0.1
   '@deepseek-ai/cordis-plugin-timer': 1.1.3
 
+patchedDependencies:
+  '@earendil-works/pi-ai@0.82.1':
+    hash: f1a2c7490bcb8d14f42d9c84f19940a5078d136b83ca4b559bf6cf241a399b50
+    path: patches/@earendil-works__pi-ai@0.82.1.patch
+
 importers:
 
   .:
@@ -113,6 +118,9 @@ importers:
       '@actspace/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox/manager
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../../packages/session/journal
@@ -197,9 +205,18 @@ importers:
       lucide-react:
         specifier: ^1.16.0
         version: 1.16.0(react@18.3.1)
+      mdast-util-from-markdown:
+        specifier: 2.0.3
+        version: 2.0.3
+      mdast-util-gfm:
+        specifier: 3.1.0
+        version: 3.1.0
       mermaid:
         specifier: 11.17.2
         version: 11.17.2
+      micromark-extension-gfm:
+        specifier: 3.0.0
+        version: 3.0.0
       node-pty:
         specifier: 1.1.0
         version: 1.1.0
@@ -422,12 +439,18 @@ importers:
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../cordis-adapter
+      '@actspace/harness-evaluation':
+        specifier: workspace:*
+        version: link:../harness-evaluation
       '@actspace/llm-pi-ai':
         specifier: workspace:*
         version: link:../llm/pi-ai
       '@actspace/llm-service':
         specifier: workspace:*
         version: link:../llm/service
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox/manager
       '@actspace/session-jsonl':
         specifier: workspace:*
         version: link:../session/jsonl
@@ -552,6 +575,31 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/background-tasks:
+    dependencies:
+      '@actspace/core-agent':
+        specifier: workspace:*
+        version: link:../core/agent
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../session/persistence
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session/journal
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/boot:
     dependencies:
       '@actspace/bundle':
@@ -629,6 +677,31 @@ importers:
       '@actspace/diagnostics':
         specifier: workspace:*
         version: link:../diagnostics
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/background-tasks:
+    dependencies:
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../../prompt
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1086,6 +1159,31 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/harness-evaluation:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/harness-control':
+        specifier: workspace:*
+        version: link:../harness-control
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox/manager
+    devDependencies:
+      '@actspace/sandbox-nono':
+        specifier: workspace:*
+        version: link:../sandbox/nono
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/harness-hmr:
     dependencies:
       '@actspace/boot':
@@ -1152,7 +1250,7 @@ importers:
         version: 0.91.1(zod@4.4.3)
       '@earendil-works/pi-ai':
         specifier: 0.82.1
-        version: 0.82.1(ws@8.21.0)(zod@4.4.3)
+        version: 0.82.1(patch_hash=f1a2c7490bcb8d14f42d9c84f19940a5078d136b83ca4b559bf6cf241a399b50)(ws@8.21.0)(zod@4.4.3)
       openai:
         specifier: 6.26.0
         version: 6.26.0(ws@8.21.0)(zod@4.4.3)
@@ -1283,6 +1381,9 @@ importers:
       '@actspace/auto-review':
         specifier: workspace:*
         version: link:../auto-review
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../background-tasks
       '@actspace/boot':
         specifier: workspace:*
         version: link:../boot
@@ -1292,6 +1393,9 @@ importers:
       '@actspace/composition':
         specifier: workspace:*
         version: link:../composition
+      '@actspace/context-background-tasks':
+        specifier: workspace:*
+        version: link:../context/background-tasks
       '@actspace/context-compaction':
         specifier: workspace:*
         version: link:../context/compaction
@@ -1364,6 +1468,15 @@ importers:
       '@actspace/prompt':
         specifier: workspace:*
         version: link:../prompt
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox/manager
+      '@actspace/sandbox-nono':
+        specifier: workspace:*
+        version: link:../sandbox/nono
+      '@actspace/sandbox-seatbelt':
+        specifier: workspace:*
+        version: link:../sandbox/seatbelt
       '@actspace/session-checkpoint-policy':
         specifier: workspace:*
         version: link:../session/checkpoint-policy
@@ -1394,6 +1507,9 @@ importers:
       '@actspace/tools-approval':
         specifier: workspace:*
         version: link:../tools/approval
+      '@actspace/tools-background-tasks':
+        specifier: workspace:*
+        version: link:../tools/background-tasks
       '@actspace/tools-browser-tools':
         specifier: workspace:*
         version: link:../tools/browser-tools
@@ -1434,6 +1550,60 @@ importers:
       esbuild:
         specifier: 0.21.5
         version: 0.21.5
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/sandbox/manager:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/sandbox/nono:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../manager
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/sandbox/seatbelt:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../manager
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
@@ -1628,6 +1798,9 @@ importers:
 
   packages/subagent:
     dependencies:
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../background-tasks
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../cordis-adapter
@@ -1690,6 +1863,40 @@ importers:
         specifier: workspace:*
         version: link:../../shared
     devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/tools/background-tasks:
+    dependencies:
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@actspace/tools-runtime':
+        specifier: workspace:*
+        version: link:../runtime
+    devDependencies:
+      '@actspace/core-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/journal
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../../session/persistence
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
@@ -1859,9 +2066,15 @@ importers:
 
   packages/tools/shell-tools:
     dependencies:
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../cordis-adapter
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../../sandbox/manager
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../shared
@@ -1869,6 +2082,12 @@ importers:
         specifier: workspace:*
         version: link:../runtime
     devDependencies:
+      '@actspace/sandbox-nono':
+        specifier: workspace:*
+        version: link:../../sandbox/nono
+      '@actspace/sandbox-seatbelt':
+        specifier: workspace:*
+        version: link:../../sandbox/seatbelt
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
@@ -7237,7 +7456,7 @@ snapshots:
 
   '@deepseek-ai/cosmokit@1.8.2': {}
 
-  '@earendil-works/pi-ai@0.82.1(ws@8.21.0)(zod@4.4.3)':
+  '@earendil-works/pi-ai@0.82.1(patch_hash=f1a2c7490bcb8d14f42d9c84f19940a5078d136b83ca4b559bf6cf241a399b50)(ws@8.21.0)(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.91.1(zod@4.4.3)
       '@aws-sdk/client-bedrock-runtime': 3.1048.0

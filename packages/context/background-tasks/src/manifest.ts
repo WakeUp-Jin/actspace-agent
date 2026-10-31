@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ pluginId: "actspace.context-background-tasks", version: "0.1.0", name: "ActSpace Context background tasks", entry: { entryId: "context.background-tasks", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: ["actspace.host.background-tasks"], contributions: { services: ["context.source.background-tasks"], tools: [], prompts: [], events: [] } });

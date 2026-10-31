@@ -9,7 +9,7 @@ const dialog = document.querySelector<HTMLDialogElement>('.media-dialog')!;
 const expanded = dialog.querySelector('img')!;
 let trigger: HTMLElement | null = null;
 // Plain Markdown images gain a keyboard-accessible link; existing links retain their intent.
-document.querySelectorAll<HTMLImageElement>('.docs-prose img').forEach(img => {
+document.querySelectorAll<HTMLImageElement>('.prose img').forEach(img => {
   if (img.closest('a')) return;
   const link = document.createElement('a');
   link.href = img.currentSrc || img.src;

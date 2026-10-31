@@ -42,3 +42,46 @@ it("re-enables the buttons and shows the reason when the decision fails", async 
   expect(screen.getByRole("button", { name: "运行" })).toBeEnabled();
   expect(store.errors).toHaveLength(1);
 });
+
+it("recovers the full pending command through the session-owned tool detail before enabling allow", async () => {
+  let resolve!: (value: unknown) => void;
+  const client = fakeClient(() => new Promise(done => { resolve = done; }));
+  const store = new FakeConnectionStore(fakeConnection(client));
+  render(<ApprovalCard request={request(true)} />, { wrapper: connectionWrapper(store) });
+  expect(screen.getByRole("button", { name: "运行" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /本会话允许/ })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "拒绝" })).toBeEnabled();
+  const command = `printf '%s' '${"long sensitive fixture ".repeat(300)}'`;
+  resolve({ snapshot: { sessionId: "s1" }, journal: [
+    { type: "tool/call", data: { callId: "other", name: "bash", args: { command: "WRONG" } } },
+    { type: "tool/call", data: { callId: "c1", name: "bash", args: { command } } },
+  ] });
+  await waitFor(() => expect(screen.getByRole("button", { name: "运行" })).toBeEnabled());
+  expect(document.querySelector("pre")?.textContent).toBe(`$ ${command}`);
+  expect(client.calls[0]).toEqual({ method: "sessions.tool", params: { sessionId: "s1", callId: "c1" } });
+});
+
+it("rejects a mismatched detail response, supports retry, and leaves deny available", async () => {
+  let attempts = 0;
+  const client = fakeClient(method => method === "sessions.tool" ? {
+    snapshot: { sessionId: ++attempts === 1 ? "different-session" : "s1" },
+    journal: [{ type: "tool/call", data: { callId: "c1", name: "bash", args: { command: "echo safe" } } }],
+  } : null);
+  render(<ApprovalCard request={request(false)} />, { wrapper: connectionWrapper(new FakeConnectionStore(fakeConnection(client))) });
+  expect(await screen.findByRole("status")).toHaveTextContent("命令详情不可用");
+  expect(screen.getByRole("button", { name: "运行" })).toBeDisabled();
+  await userEvent.click(screen.getByRole("button", { name: "重试详情" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "运行" })).toBeEnabled());
+  await userEvent.dblClick(screen.getByRole("button", { name: "拒绝" }));
+  expect(client.calls.filter(call => call.method === "approvals.decide")).toHaveLength(1);
+});
+
+it("keeps an already handled approval locked and refreshes instead of allowing another decision", async () => {
+  const onStale = vi.fn(async () => {});
+  const client = fakeClient(() => { throw { kind: "NOT_FOUND", message: "handled by another observer" }; });
+  render(<ApprovalCard request={request(true)} command="git status" onStale={onStale} />, { wrapper: connectionWrapper(new FakeConnectionStore(fakeConnection(client))) });
+  await userEvent.click(screen.getByRole("button", { name: "运行" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("已处理或过期");
+  expect(onStale).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: "运行" })).toBeDisabled();
+});

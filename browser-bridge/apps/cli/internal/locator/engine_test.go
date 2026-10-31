@@ -2,12 +2,100 @@ package locator
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
 	"agent-browser-bridge/apps/cli/internal/backend"
 	"agent-browser-bridge/packages/protocol"
 )
+
+func TestFrameCoordinatesAreMeasuredAfterLeafScroll(t *testing.T) {
+	for _, depth := range []int{1, 2} {
+		for _, action := range []string{"point", "set_checked"} {
+			t.Run(fmt.Sprintf("%s/depth%d", action, depth), func(t *testing.T) {
+				leafInvoked, measurements := false, 0
+				request := func(_ context.Context, method string, params any) (any, error) {
+					if method != protocol.MethodBackendExecuteCDP {
+						return map[string]any{}, nil
+					}
+					p := params.(protocol.CDPParams)
+					contextID, _ := p.CommandParams["contextId"].(int)
+					switch p.Method {
+					case "Runtime.evaluate":
+						expression, _ := p.CommandParams["expression"].(string)
+						value := func(v any) (any, error) { return map[string]any{"result": map[string]any{"value": v}}, nil }
+						switch {
+						case strings.Contains(expression, "?.version"):
+							return value(true)
+						case strings.Contains(expression, `invoke("frame_offset"`):
+							x, y := 10.0, 20.0
+							if contextID == 1 {
+								x, y = 100, 200
+							}
+							if strings.Contains(expression, `"scrollIntoView":false`) {
+								if !leafInvoked {
+									t.Fatal("remeasured frame before leaf scrolling")
+								}
+								measurements++
+								x, y = x+20, y+40
+							}
+							return value(map[string]any{"x": x, "y": y})
+						case strings.Contains(expression, `invoke("frame_element"`):
+							return map[string]any{"result": map[string]any{"objectId": fmt.Sprintf("frame-%d", contextID+1)}}, nil
+						case strings.Contains(expression, fmt.Sprintf(`invoke(%q`, action)):
+							if contextID != depth {
+								t.Fatalf("leaf context = %d, want %d", contextID, depth)
+							}
+							leafInvoked = true
+							point := map[string]any{"x": 1.0, "y": 2.0, "box": map[string]any{"x": 0.0, "y": 1.0}}
+							if action == "set_checked" {
+								return value(map[string]any{"value": false, "point": point})
+							}
+							return value(point)
+						}
+					case "DOM.describeNode":
+						return map[string]any{"node": map[string]any{"frameId": p.CommandParams["objectId"]}}, nil
+					case "Page.createIsolatedWorld":
+						id := 1.0
+						if p.CommandParams["frameId"] == "frame-2" {
+							id = 2
+						}
+						return map[string]any{"executionContextId": id}, nil
+					}
+					return map[string]any{}, nil
+				}
+				frames := []any{map[string]any{"kind": "css", "value": "#outer"}}
+				if depth == 2 {
+					frames = append(frames, map[string]any{"kind": "css", "value": "#inner"})
+				}
+				target := map[string]any{"kind": "css", "value": "button", "framePath": frames}
+				engine := Engine{Backend: &backend.ExtensionBackend{Request: request}}
+				result, err := engine.Invoke(context.Background(), 7, action, map[string]any{"target": target})
+				if err != nil {
+					t.Fatal(err)
+				}
+				point := result.(map[string]any)
+				if action == "set_checked" {
+					point = point["point"].(map[string]any)
+				}
+				wantX, wantY := 31.0, 62.0
+				if depth == 2 {
+					wantX, wantY = 151, 302
+				}
+				if point["x"] != wantX || point["y"] != wantY {
+					t.Fatalf("point = %+v, want (%v, %v) after parent scrolling", point, wantX, wantY)
+				}
+				if measurements != depth {
+					t.Fatalf("measurements = %d, want %d", measurements, depth)
+				}
+				if _, ok := target["framePath"]; !ok {
+					t.Fatal("mutated caller framePath")
+				}
+			})
+		}
+	}
+}
 
 func TestEngineInjectsOnceAndReinjectsAfterNavigationReset(t *testing.T) {
 	runtimePresent := false

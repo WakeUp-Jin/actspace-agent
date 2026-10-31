@@ -15,7 +15,8 @@ it("records the side chat parent from the Session header and counts it on the pa
     for (const item of [source("main"), source("side", lineage("side-chat")), source("fork", lineage("fork"))]) fallback.append(row(item), [], true);
     const visible = prepare(fallback.database, "SELECT session_id,is_child_session,(SELECT COUNT(*) FROM session_catalog AS side WHERE side.side_chat_parent_id=session_catalog.session_id AND side.archived=0) AS side_chat_count FROM session_catalog WHERE side_chat_parent_id IS NULL ORDER BY session_id").all();
     expect(visible).toEqual([
-      { session_id: "fork", is_child_session: 1, side_chat_count: 0 },
+      // 只有 delegation 算子会话；普通分叉照常进侧栏。
+      { session_id: "fork", is_child_session: 0, side_chat_count: 0 },
       { session_id: "main", is_child_session: 0, side_chat_count: 1 },
     ]);
     expect(prepare(fallback.database, "SELECT side_chat_parent_id FROM session_catalog WHERE session_id='side'").get()).toEqual({ side_chat_parent_id: "main" });

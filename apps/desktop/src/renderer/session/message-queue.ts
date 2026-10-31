@@ -1,6 +1,6 @@
 import type { ComposerSendOptions } from "../components/Composer";
 import type { ComposerAttachment } from "@actspace/shared";
-import type { TaskContentEnvelope } from "@actspace/shared/runtime-v2";
+import { isBackgroundWake, type TaskContentEnvelope } from "@actspace/shared/runtime-v2";
 import { isLocalSession } from "../target/locate-session";
 
 /** Reconstruct remote attachments from durable Host facts, including after Reload. */
@@ -54,7 +54,8 @@ export function projectTaskQueue(snapshot: import("@actspace/shared/runtime-v2")
   const items: QueuedComposerMessage[] = []; const steering: QueuedComposerMessage[] = [];
   for (const id of snapshot.queue) {
     const task = snapshot.tasks.find(task => task.taskId === id);
-    if (!task || task.state !== "pending") continue;
+    // 后台任务唤醒不是用户消息，不进排队列表。
+    if (!task || task.state !== "pending" || isBackgroundWake(task.content)) continue;
     const envelope = task.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
     const original = envelope?.kind === "composer-task" ? envelope.original as unknown as import("@actspace/shared/runtime-v2").SubmitTaskInput : null;
     const text = original?.userInput ?? (typeof task.content === "string" ? task.content : "待执行消息");

@@ -117,7 +117,18 @@ RuntimeV2TrajectorySnapshot（projectTrajectoryWindow，同一事件对象只转
 
 **类型映射**：builder 记录映射成 DSH 的 7 种 cell：系统、用户、上下文、助手、工具、子工具（有 `parentCallId`）、已压缩。
 
+**子智能体**（2026-10-21，对齐 DSH「轨迹只显示当前会话」）：
+
+- 父轨迹里，一次委派只占 `agent` 工具调用那一行，不把子会话的记录并进来。「子工具」只指同一会话里带 `parentCallId` 的嵌套调用。
+- `trajectoryDelegations(snapshot)`（`trajectory/subagents.ts`）从 `delegation/requested` 取出 `parentCallId → childSessionId`。`agent` 行详情的「概述」据此显示「子智能体」一栏和「查看轨迹」按钮。
+- 点「查看轨迹」会在右侧「子 Agent」面板打开这个子会话，并停在轨迹页。面板标题前用和主会话一样的 `SessionViewToggle` 切换对话 / 轨迹。
+- 子轨迹由 `<TrajectoryView sessionId={child} variant="panel" />` 渲染：
+  - 只在挂载时 `bridge.watch` 子会话。
+  - 不处理 Context 面板跳转。
+  - 详情从下半部分弹出，不能拖宽。
+
 - 上下文行有两种来源：`plugin/actspace.context/supplement` 的 `op=add`，以及 `source=task_notification` 的 inbox claim。`remove`、`bind` 不进主表。
+- 上下文分类按 owner 映射（`contextCategory`）：owner `actspace.context-background-tasks` 显示为「后台任务」，标题「后台任务清单」；任务全部结束后的收尾文本同样显示为「已更新」。后台任务完成通知仍是 inbox claim，分类「通知」。
 - 审批并入工具行（概述里的「审批」字段）。
 - 重试、错误并入请求视图（「重试」「上次尝试错误」「错误」）。
 - 其余原始事件不进主表。
@@ -140,6 +151,8 @@ RuntimeV2TrajectorySnapshot（projectTrajectoryWindow，同一事件对象只转
 | 请求 | 概述 / 选项（有选项时）/ 用量 / 计时 |
 
 换选中对象时，回到最近用过且新对象也有的页签。不做 `run_code` 代码页签。
+
+**已压缩的概述**：状态、触发方式（手动 / 自动）、时长、压缩消息数、Token（`182400 tok → 约 9100 tok`，压缩前含估算时为 `约 182400 tok → 约 9100 tok`），下面是摘要正文。builder 把 `compaction/start` 的区间和 `compaction/end` 的 `trigger` / `beforeTokens` / `afterTokens` / `beforeEstimated` 合进记录的 `compaction` 字段；旧 journal 没有触发方式时不显示那一行，没有 token 时 Token 显示「—」。对话里压缩分隔线的「在轨迹中查看」按 `compactionId` 选中这一行。
 
 **样式**：DSH 的 CSS module 移植成全局的 `styles/trajectory.css`（前缀 `tjv-`、`tjb-`、`tjl-`、`tj-`）和 `styles/json-tree.css`。原因是 DSH 依赖伪元素、容器查询和属性选择器，用 Tailwind 类无法一比一还原。
 

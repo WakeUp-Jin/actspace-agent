@@ -1,98 +1,16 @@
 import { useRef, useState } from "react";
-import { DEFAULT_IMAGE_GENERATION_BASE_URL, DEFAULT_IMAGE_GENERATION_MODEL, DEFAULT_IMAGE_INSPECTION_MODEL_KEY, IMAGE_INSPECTION_MODEL_LIST, resolveImageInspectionModel, type AppSettings, type SecretProviderId, type SettingsUpdateInput } from "@actspace/shared";
+import { DEFAULT_IMAGE_GENERATION_BASE_URL, DEFAULT_IMAGE_GENERATION_MODEL, type AppSettings, type SecretProviderId } from "@actspace/shared";
 import type { SettingsSectionId } from "../SettingsNav";
 import { ImageGenerationSettingsDialog, formatImageGenerationEndpoint } from "../dialogs/ImageGenerationSettingsDialog";
-import { SettingGroup, SettingLinkRow, InlineWarning, StatusDot, useSettingsSaveNotice, SettingRow, SettingsSelect } from "../SettingsPrimitives";
-import type { SectionProps } from "./shared";
-
-function ImageInspectionSettingsRows({
-  settings,
-  onUpdate,
-  onNavigate,
-}: Pick<SectionProps, "settings" | "onUpdate"> & { onNavigate?: (section: SettingsSectionId) => void }) {
-  const notifySaved = useSettingsSaveNotice();
-  const current = settings.imageInspection ?? { modelKey: DEFAULT_IMAGE_INSPECTION_MODEL_KEY };
-  const selectedModel = resolveImageInspectionModel(current.modelKey);
-  const provider = settings.providers[selectedModel.provider];
-  const credentials = provider?.additionalCredentials ?? [];
-  const selectedCredential = credentials.find((credential) => credential.id === current.credentialId);
-  const credentialAvailable = current.credentialId
-    ? selectedCredential?.hasApiKey === true
-    : provider?.hasApiKey === true;
-  const providerLabel = selectedModel.provider === "openrouter" ? "OpenRouter" : "Kimi";
-  const modelOptions = IMAGE_INSPECTION_MODEL_LIST.map((model) => ({
-    value: model.key,
-    label: `${model.label} · ${model.provider === "openrouter" ? "OpenRouter" : "Kimi"}`,
-  }));
-  const credentialOptions = [
-    { value: "", label: `默认 Key${provider?.hasApiKey ? "" : "（不可用）"}`, disabled: !provider?.hasApiKey },
-    ...(current.credentialId && !selectedCredential ? [{ value: current.credentialId, label: "已删除的 Key（不可用）", disabled: true }] : []),
-    ...credentials.map((credential) => ({
-      value: credential.id,
-      label: `${credential.label}${credential.hasApiKey ? "" : "（不可用）"}`,
-      disabled: !credential.hasApiKey,
-    })),
-  ];
-
-  return (
-    <>
-      <SettingRow
-        title="图片分析模型"
-        description={credentialAvailable
-          ? `${selectedModel.apiModel} · 调用时会把本地图片发送给 ${providerLabel}。`
-          : (
-            <InlineWarning actionLabel={onNavigate ? "去连接" : undefined} onAction={onNavigate ? () => onNavigate("model") : undefined}>
-              缺少 {providerLabel} Key，调用会失败。
-            </InlineWarning>
-          )}
-        control={
-          <SettingsSelect
-            value={current.modelKey}
-            options={modelOptions}
-            ariaLabel="图片分析模型"
-            onChange={(modelKey) => {
-              const nextModel = resolveImageInspectionModel(modelKey);
-              const nextProvider = settings.providers[nextModel.provider];
-              const fallbackCredential = nextProvider?.hasApiKey
-                ? undefined
-                : nextProvider?.additionalCredentials?.find((credential) => credential.hasApiKey)?.id;
-              onUpdate({ imageInspection: { modelKey: nextModel.key as typeof current.modelKey, credentialId: fallbackCredential } });
-              notifySaved();
-            }}
-          />
-        }
-      />
-      {credentials.length > 0 ? (
-        <SettingRow
-          indent
-          title="调用 Key"
-          description={`${providerLabel} 已保存的凭据；Key 本身不会进入界面设置。`}
-          control={
-            <SettingsSelect
-              value={current.credentialId ?? ""}
-              options={credentialOptions}
-              ariaLabel="图片分析调用 Key"
-              onChange={(credentialId) => {
-                onUpdate({ imageInspection: { modelKey: current.modelKey, credentialId: credentialId || undefined } });
-                notifySaved();
-              }}
-            />
-          }
-        />
-      ) : null}
-    </>
-  );
-}
+import { SettingGroup, SettingLinkRow, StatusDot } from "../SettingsPrimitives";
 
 export function MediaDefaultsSection({
   settings,
-  onUpdate,
   onClear,
   onRefresh,
   onNavigate,
 }: {
   settings: AppSettings;
-  onUpdate: (input: SettingsUpdateInput) => void;
   onClear: (provider: SecretProviderId) => Promise<void>;
   onRefresh: () => Promise<void>;
   onNavigate?: (section: SettingsSectionId) => void;
@@ -108,7 +26,7 @@ export function MediaDefaultsSection({
 
   return (
     <>
-      <SettingGroup title="媒体" headingLevel={3} description="图片生成与图片分析默认使用的服务。">
+      <SettingGroup title="媒体" headingLevel={3} description="图片生成与图片分析使用的服务。">
         <SettingLinkRow
           title="图片生成"
           description={current.hasApiKey
@@ -121,7 +39,13 @@ export function MediaDefaultsSection({
             setDialogOpen(true);
           }}
         />
-        <ImageInspectionSettingsRows settings={settings} onUpdate={onUpdate} onNavigate={onNavigate} />
+        <SettingLinkRow
+          title="看图模型"
+          description="图片分析用的模型，在「模型 › 用途 › 看图」中设置；未设置时用会话默认模型。"
+          ariaLabel="前往模型设置看图模型"
+          disabled={!onNavigate}
+          onClick={() => onNavigate?.("model")}
+        />
       </SettingGroup>
       {dialogOpen ? (
         <ImageGenerationSettingsDialog

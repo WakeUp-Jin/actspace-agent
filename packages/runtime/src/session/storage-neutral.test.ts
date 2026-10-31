@@ -4,6 +4,27 @@ import { SessionStore } from "@actspace/session-persistence";
 import { MemorySessionStorage } from "@actspace/session-storage/testing";
 import { RuntimeSessionController } from "./session-controller.js";
 
+it("uses current runtime provenance for each mode and both session creation forms", async () => {
+  const registry = createCoreCodecRegistry();
+  const storage = new MemorySessionStorage(registry);
+  const controller = new RuntimeSessionController({ dataRoot: "/unused", runtimeId: "current-runtime", registry, profileId: "current-profile", manifestDigest: "current-manifest", plugins: [] }, new SessionStore({ registry }, storage));
+  try {
+    for (const mode of ["chat", "plan", "agent"] as const) {
+      const provenance = controller.creationProvenance(mode);
+      expect(provenance).toMatchObject({ profileId: "current-profile", manifestDigest: "current-manifest", codecSetDigest: registry.digest, initialAgentMode: mode, agentFormId: "actspace.main", agentFormVersion: 1, runtimeContractVersion: "actspace.runtime.v2", plugins: [] });
+      expect(provenance.agentCompositionDigest).toEqual(expect.any(String));
+      if (mode === "plan") continue; // Plan is a runtime mode, not a standalone MainAgentForm.
+      const durable = await controller.create(`durable-${mode}`, "/workspace", mode);
+      const ephemeral = await controller.createEphemeral(`ephemeral-${mode}`, "/workspace", mode);
+      expect(durable.header.createdWith).toEqual(provenance);
+      expect(ephemeral.header.createdWith).toEqual(provenance);
+    }
+  } finally {
+    await controller.closeAll();
+    await storage.close();
+  }
+});
+
 it("cold reads, lists, pages, exports and forks sessions without a filesystem backend", async () => {
   const registry = createCoreCodecRegistry(); const storage = new MemorySessionStorage(registry);
   const store = new SessionStore({ registry }, storage);

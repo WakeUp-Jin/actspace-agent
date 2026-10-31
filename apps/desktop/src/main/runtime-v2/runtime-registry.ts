@@ -19,6 +19,7 @@ import type {
   RuntimeV2RunTurnRequest,
   RuntimeV2AttachmentRef,
   RuntimeV2JsonValue,
+  SessionEventEnvelopeV1,
 } from "@actspace/shared/runtime-v2";
 import type { BootedRuntimeProfile } from "@actspace/runtime";
 import type { DesktopAppServiceContract } from "@actspace/desktop-app";
@@ -33,6 +34,7 @@ export type DesktopRuntimeV2RegistryOptions = {
   readonly models: DesktopRuntimeV2ModelPort;
   readonly approvals: DesktopRuntimeV2ApprovalPort;
   readonly browser: DesktopRuntimeV2BrowserPort;
+  readonly nonoPath?: string;
   readonly disabledSkillIds?: () => readonly string[];
   readonly chatCompactionTriggerRatio?: () => number;
   readonly loadModule?: () => Promise<RuntimeV2Module>;
@@ -298,7 +300,9 @@ export class DesktopRuntimeV2Registry {
     const snapshot = await this.requireApp().inspectSession(sessionId);
     const toolArtifact = snapshot.tools.flatMap((tool) => tool.artifacts).find((candidate) => candidate.artifactId === artifactId);
     const messageArtifact = snapshot.messages.map((message) => findArtifactRef(message.content, artifactId)).find((candidate) => candidate !== null) ?? null;
-    const mimeType = toolArtifact?.mimeType ?? messageArtifact?.mimeType;
+    // Compaction changes model context, not the durable history displayed by the UI.
+    const mimeType = toolArtifact?.mimeType ?? messageArtifact?.mimeType
+      ?? findHistoricalArtifactRef(await this.requireApp().inspectSessionEvents(sessionId), artifactId)?.mimeType;
     if (mimeType === undefined) throw new Error("Artifact is not referenced by this Session.");
     if (this.#artifacts === undefined) throw new Error("Artifact store is unavailable.");
     const stored = await this.#artifacts.resolveForSession(sessionId, artifactId);
@@ -361,8 +365,10 @@ export class DesktopRuntimeV2Registry {
     try {
       if (this.#artifacts === undefined || artifactIds.length === 0) return;
       const snapshot = await this.requireApp().inspectSession(sessionId);
+      const history = await this.requireApp().inspectSessionEvents(sessionId);
       const unreferenced = artifactIds.filter((artifactId) => (
         snapshot.messages.every((message) => findArtifactRef(message.content, artifactId) === null)
+        && findHistoricalArtifactRef(history, artifactId) === null
       ));
       await Promise.allSettled(unreferenced.map((artifactId) => this.#artifacts!.deleteForSession(sessionId, artifactId)));
     } finally { this.#admittedWork--; }
@@ -544,6 +550,7 @@ export class DesktopRuntimeV2Registry {
         models: this.options.models,
         approvals: this.options.approvals,
         browser: this.options.browser,
+        nonoPath: this.options.nonoPath,
         disabledSkillIds: this.options.disabledSkillIds,
         chatCompactionTriggerRatio: this.options.chatCompactionTriggerRatio ?? (() => 0.8),
         speech: this.options.speech,
@@ -632,6 +639,15 @@ function findArtifactRef(value: unknown, artifactId: string): { readonly mimeTyp
   const record = value as Record<string, unknown>;
   if (record.artifactId === artifactId && typeof record.mediaType === "string") return { mimeType: record.mediaType };
   for (const child of Object.values(record)) { const match = findArtifactRef(child, artifactId); if (match !== null) return match; }
+  return null;
+}
+
+function findHistoricalArtifactRef(events: readonly SessionEventEnvelopeV1[], artifactId: string): { readonly mimeType: string } | null {
+  for (const event of events) {
+    if (event.surface?.kind !== "append") continue;
+    const match = findArtifactRef(event.surface.node.content, artifactId);
+    if (match !== null) return match;
+  }
   return null;
 }
 

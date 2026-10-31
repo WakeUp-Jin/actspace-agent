@@ -24,6 +24,7 @@ export interface AgentServicePorts {
   harnessId(session: SessionHandle): string;
   acquire(harnessId: string, signal?: AbortSignal): RunLease | Promise<RunLease>;
   readConfiguration(session: SessionHandle): ExecutionConfiguration | Promise<ExecutionConfiguration>;
+  hasPendingNotifications?(session: SessionHandle): boolean;
   onSnapshot?(sessionId: string, snapshot: TaskSnapshot): void;
   onFailure?(sessionId: string, error: unknown): void;
 }
@@ -74,6 +75,12 @@ export class AgentService {
     const manager = await this.#manager(sessionId);
     if (this.#draining) throw new Error("HOST_DRAINING");
     await manager.resume(revision);
+  }
+  /** A background notification arrived; open a wake Run if the Session scheduler is idle. */
+  wake(sessionId: string): void {
+    const manager = this.#sessions.get(sessionId);
+    if (!manager || this.#closed || this.#draining) return;
+    void manager.then(value => value.wake(), () => undefined);
   }
   /** Stop queue claims without aborting owned Runs or their approval waits. */
   beginDrain(): void { this.#draining = true; }
@@ -130,7 +137,7 @@ export class AgentService {
       if (session.header.sessionId !== sessionId) throw new Error("Session owner mismatch");
       const ledger = await TaskLedger.open(session);
       ledger.subscribe(snapshot => this.ports.onSnapshot?.(sessionId, snapshot));
-      return new SessionRunManager({ ledger, canStart: () => !this.#draining, operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: () => this.ports.harnessId(session), acquire: (id, signal) => this.ports.acquire(id, signal), readConfiguration: () => this.ports.readConfiguration(session), onFailure: error => this.ports.onFailure?.(sessionId, error) });
+      return new SessionRunManager({ ledger, canStart: () => !this.#draining, operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: () => this.ports.harnessId(session), acquire: (id, signal) => this.ports.acquire(id, signal), readConfiguration: () => this.ports.readConfiguration(session), hasPendingNotifications: () => this.ports.hasPendingNotifications?.(session) ?? false, onFailure: error => this.ports.onFailure?.(sessionId, error) });
     })();
     // Only an unacquired writer lease may be retried by the next request.
     // Recovery and durability failures remain cached to protect accepted writes.

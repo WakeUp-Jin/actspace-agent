@@ -81,17 +81,17 @@ describe("BashRunBlock tooltips", () => {
       kind: "bash",
       createdAt: "2026-07-03T00:00:00.000Z",
       title: "Bash command (background)",
-      status: "running",
       command: "pnpm build",
       backgroundTaskId: "bash_ghi789",
-      backgroundStatus: "completed",
+      background: true,
+      status: "success",
     });
 
-    const summary = screen.getByText("Running");
+    const summary = screen.getByText("Ran");
     expect(summary).not.toHaveClass("tool-log-text-running");
   });
 
-  it("shows a background badge for backgrounded commands", () => {
+  it("shows a single background tag for backgrounded commands", () => {
     renderBash({
       id: "bash-bg-1",
       kind: "bash",
@@ -100,27 +100,11 @@ describe("BashRunBlock tooltips", () => {
       status: "running",
       command: "pnpm dev",
       backgroundTaskId: "bash_abc123",
-      backgroundStatus: "running",
+      background: true,
       outputFilePath: "/tmp/tool-output/s1/x-bash.txt",
     });
 
-    expect(screen.getByText("后台运行中")).toBeInTheDocument();
-  });
-
-  it("shows the terminal background state after a task update", () => {
-    renderBash({
-      id: "bash-bg-2",
-      kind: "bash",
-      createdAt: "2026-07-03T00:00:00.000Z",
-      title: "Bash command (background)",
-      status: "running",
-      command: "pnpm build",
-      backgroundTaskId: "bash_def456",
-      backgroundStatus: "completed",
-      exitCode: 0,
-    });
-
-    expect(screen.getByText("后台完成")).toBeInTheDocument();
+    expect(screen.getByText("后台")).toBeInTheDocument();
   });
 
   it("keeps routine sandbox metadata in execution details", async () => {
@@ -256,6 +240,32 @@ describe("BashRunBlock tooltips", () => {
     // 通用审批提示、策略折叠不再出现。
     expect(screen.queryByText(/Allow Bash to run/)).toBeNull();
     expect(screen.queryByText("Allowlist")).toBeNull();
+  });
+
+  it("shows the escalation justification under the command only while approval is pending", () => {
+    const pending = {
+      id: "bash-approval-escalated",
+      kind: "bash" as const,
+      createdAt: "2026-06-02T00:00:00.000Z",
+      title: "Run Bash command: git",
+      intent: "推送分支",
+      status: "pending" as const,
+      command: "git push",
+      justification: "Pushing over HTTPS needs the keychain.",
+      sandboxed: false,
+      approvalRequestId: "approval-escalated",
+    };
+    const { unmount } = renderBash(pending);
+    const card = screen.getByRole("article");
+    expect(card.querySelector(".bash-approval-command + .bash-approval-justification")).toHaveTextContent("Pushing over HTTPS needs the keychain.");
+    expect(screen.getByText("真实环境")).toBeInTheDocument();
+    unmount();
+    for (const message of [{ ...pending, justification: undefined }, { ...pending, status: "running" as const, approvalRequestId: undefined }]) {
+      const view = renderBash(message);
+      expect(document.querySelector(".bash-approval-justification")).toBeNull();
+      expect(document.body).not.toHaveTextContent("needs the keychain");
+      view.unmount();
+    }
   });
 
   it("keeps the Bash approval actionable when the bridge rejects the decision", async () => {

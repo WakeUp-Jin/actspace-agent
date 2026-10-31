@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Worker } from 'node:worker_threads';
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -101,7 +101,7 @@ for (const failure of ['corrupt','version','application']) {
     t.after(async () => { await service.dispose(); await rm(root, { recursive: true, force: true }); });
     const result = await service.getSessionPage({});
     assert.equal(result.items[0].id, 'recovered');
-    const db = new DatabaseSync(path); assert.equal(db.prepare('PRAGMA user_version').get().user_version, 9); db.close();
+    const db = new DatabaseSync(path); assert.equal(db.prepare('PRAGMA user_version').get().user_version, 14); db.close();
   });
 }
 
@@ -134,6 +134,37 @@ test('SQL activity matches JSON projection costs and dimensions with mixed curre
     delete actual.generatedAt; delete expected.generatedAt;
     assert.deepEqual(JSON.parse(JSON.stringify(actual)), JSON.parse(JSON.stringify(expected)));
   }
+});
+
+test('SQL activity preserves unknown token counts separately from explicit zero and tool rows', async t => {
+  const { projectIndexedUsageActivity } = require('../../../packages/client/dist/sessions.cjs');
+  const send = await fixture(t);
+  const unknown = { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, totalTokens: null };
+  const zero = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, totalTokens: 0 };
+  const rows = [
+    { ...row('unknown', 'target-session'), tokens: unknown, model: 'model', providerId: 'provider', connectionId: 'a' },
+    { ...row('zero', 'target-session'), tokens: zero, model: 'model', providerId: 'provider', connectionId: 'a' },
+    { ...row('mixed', 'target-session'), tokens: { ...zero, inputTokens: 4, outputTokens: 8, totalTokens: 12 }, model: 'model', providerId: 'provider', connectionId: 'a' },
+    { ...row('tool', 'target-session'), kind: 'tool_invocation', toolName: 'search', providerId: 'provider', connectionId: 'a', tokens: unknown },
+  ].map((item, i) => ({ ...item, startedAt: new Date(Date.now() - 10_000 + i * 1000).toISOString() }));
+  const sources = [source(rows, 'target-session'), source([{ ...row('other-session', 'other-session'), kind: 'tool_invocation', toolName: 'other-tool', tokens: unknown }], 'other-session')];
+  await send({ type: 'sync', sources });
+  for (const input of [{ range: 'total' }, { range: 'day' }]) {
+    const actual = await send({ type: 'query', request: 'activity', input });
+    const expected = projectIndexedUsageActivity(sources, input);
+    delete actual.generatedAt; delete expected.generatedAt;
+    assert.deepEqual(JSON.parse(JSON.stringify(actual)), JSON.parse(JSON.stringify(expected)));
+    assert.deepEqual(actual.summary.unknownTokenRequestCounts, { input: 1, output: 1, cacheRead: 1, cacheWrite: 1, reasoning: 1, total: 1 });
+    assert.equal(actual.summary.totalTokens, 12);
+    assert.equal(actual.aggregates.providers[0].unknownTokenRequestCount, 1);
+    assert.equal(actual.aggregates.models[0].unknownTokenRequestCount, 1);
+    assert.equal(actual.aggregates.tools[0].unknownTokenRequestCount, 0);
+  }
+  // SQL search also matches catalog session titles; the JSON projection helper
+  // only searches activity dimensions, so verify that path independently.
+  const searched = await send({ type: 'query', request: 'activity', input: { range: 'total', search: 'target' } });
+  assert.equal(searched.rowsPage.totalRows, 4);
+  assert.equal(searched.summary.unknownTokenRequestCounts.total, 1);
 });
 
 test('multi-message replacement is atomic and a failing last chunk restores the old session', async t => {
@@ -185,6 +216,119 @@ async function journalFixture(t) {
 }
 
 function normalizeRows(rows) { return JSON.parse(JSON.stringify(rows)).sort((a,b) => a.activityId.localeCompare(b.activityId)); }
+
+function auxiliaryRequest(attemptId, extras = {}) {
+  return { sessionId: 's', agentRunId: 'run', turnId: 't', stepId: 'step0', callId: 'image0', logicalRequestId: 'vision0', attemptId, attempt: 1, purpose: 'image-inspection', routeId: 'vision-route', model: 'vision-model', startedAt: '2026-10-11T00:00:00.000Z', ...extras };
+}
+function auxiliaryEnd(start, status = 'completed', usage = { inputTokens: 90, outputTokens: 10, cacheReadTokens: 20, cacheWriteTokens: 0, reasoningTokens: null, cost: null, costCurrency: null, source: 'provider-reported' }) {
+  return { ...start, status, finishedAt: '2026-10-11T00:00:02.000Z', usage };
+}
+
+test('auxiliary requests index seven main plus two vision calls once and survive a current-cursor schema-11 rebuild', async t => {
+  const f = await journalFixture(t);
+  const records = [['turn/start', { turnId: 't', agentRunId: 'run' }]];
+  for (let i = 0; i < 7; i++) {
+    records.push(['request/header', { requestId: `main${i}`, turnId: 't', stepId: `step${i}`, routeId: 'main-route', model: 'main-model' }]);
+    if (i < 2) {
+      const start = auxiliaryRequest(`vision${i}`, { stepId: `step${i}`, callId: `image${i}`, logicalRequestId: `vision${i}` });
+      records.push(['tool/call', { turnId: 't', stepId: `step${i}`, callId: `image${i}`, name: 'inspect_image' }], ['llm/auxiliary-start', { ...start, privateImage: 'must never be indexed' }], ['llm/auxiliary-end', { ...auxiliaryEnd(start), privateResponse: 'must never be indexed' }], ['tool/result', { callId: `image${i}`, status: 'success' }]);
+    }
+    records.push(['assistant/message', { requestId: `main${i}`, finishReason: 'stop', usage: { inputTokens: 100, outputTokens: 20 } }], ['step/end', { stepId: `step${i}`, reason: 'completed', usage: { inputTokens: 100, outputTokens: 20 } }]);
+  }
+  await f.append(records);
+  const { projectSessionUsageActivities } = require('../../../packages/client/dist/sessions.cjs');
+  const expected = projectSessionUsageActivities({ sessionId: 's', throughJournalSeq: f.summary().throughJournalSeq, workspaceRoot: '/workspace', metadata: { title: 's' } }, f.journal);
+  const compare = async service => {
+    const result = await service.getActivity({ range: 'total', requestRowsPage: { limit: 500 } });
+    assert.equal(result.summary.requestCount, 9);
+    assert.equal(result.summary.totalTokens, 1080);
+    assert.deepEqual(normalizeRows(result.rows), normalizeRows(expected));
+  };
+  const service = f.service();
+  await compare(service);
+  const stats = await service.getStatistics({ range: 'total' });
+  assert.equal(stats.requestRowsPage.totalRows, 9);
+  assert.equal(stats.summary.totalTokens, 1080);
+  await service.dispose();
+  f.readSeqs.length = 0;
+  const restarted = f.service();
+  await compare(restarted);
+  assert.equal(f.readSeqs.length, 0, 'restart reuses the durable cursor without duplicating usage');
+  await restarted.dispose();
+  const path = join(f.root, 'runtime-v2', 'usage-read-model.sqlite');
+  const db = new DatabaseSync(path);
+  assert(!JSON.stringify(db.prepare('SELECT event_json FROM usage_projection_events').all()).includes('must never be indexed'));
+  // Reproduce the published old index: the cursor is current, but auxiliary rows are missing.
+  db.exec("DELETE FROM usage_activity WHERE activity_id LIKE '%:auxiliary:%'; PRAGMA user_version=11");
+  db.close();
+  await compare(f.service());
+  assert.equal(f.readSeqs.length, f.journal.length, 'schema change invalidates both rows and cursor and replays all facts');
+  const repaired = new DatabaseSync(path, { readOnly: true });
+  try { assert.equal(repaired.prepare('PRAGMA user_version').get().user_version, 14); } finally { repaired.close(); }
+});
+
+test('auxiliary start/end and retries span batches with partial, cancelled, zero and unknown usage intact', async t => {
+  const f = await journalFixture(t);
+  const service = f.service();
+  const first = auxiliaryRequest('a1');
+  await f.append([['llm/auxiliary-start', first]]);
+  let result = await service.getActivity({ range: 'total' });
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rows[0].tokens.totalTokens, null);
+  const second = auxiliaryRequest('a2', { attempt: 2 });
+  await f.append([
+    ['llm/auxiliary-end', auxiliaryEnd(first, 'failed', { inputTokens: 12, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, cost: null, costCurrency: null, source: 'provider-reported' })],
+    ['llm/auxiliary-start', second],
+  ]);
+  await service.getActivity({ range: 'total' });
+  await service.dispose();
+  const third = auxiliaryRequest('a3', { attempt: 3 });
+  await f.append([
+    ['llm/auxiliary-end', auxiliaryEnd(second, 'aborted', { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: null, cost: 0, costCurrency: 'USD', source: 'provider-reported', costProvenance: { version: 1, basis: 'provider-reported', pricingSnapshot: null, reason: null } })],
+    ['llm/auxiliary-start', third],
+  ]);
+  result = await f.service().getActivity({ range: 'total' });
+  const { projectSessionUsageActivities } = require('../../../packages/client/dist/sessions.cjs');
+  const expected = projectSessionUsageActivities({ sessionId: 's', throughJournalSeq: f.summary().throughJournalSeq, workspaceRoot: '/workspace', metadata: { title: 's' } }, f.journal);
+  assert.deepEqual(normalizeRows(result.rows), normalizeRows(expected));
+  assert.equal(result.summary.requestCount, 3);
+  assert.equal(result.summary.totalTokens, 12);
+  assert.equal(result.rows.find(row => row.requestId === 'a2').costUsd, 0);
+  assert.equal(result.rows.find(row => row.requestId === 'a2').retryOfRequestId, 'a1');
+  assert.equal(result.rows.find(row => row.requestId === 'a3').tokens.totalTokens, null);
+});
+
+test('Session-owned auxiliary facts survive restart and replay an existing schema-13 cursor', async t => {
+  const f = await journalFixture(t);
+  const requests = ['session-title', 'compaction'].map((purpose, i) => ({
+    sessionId: 's', logicalRequestId: `background-${i}`, attemptId: `background-${i}`,
+    attempt: 1, purpose, routeId: 'background-route', model: 'background-model',
+    startedAt: '2026-10-11T00:00:00.000Z',
+  }));
+  await f.append(requests.flatMap(start => [
+    ['llm/auxiliary-start', start], ['llm/auxiliary-end', auxiliaryEnd(start)],
+  ]));
+  const compare = async service => {
+    const activity = await service.getActivity({ range: 'total' });
+    assert.equal(activity.summary.requestCount, 2);
+    assert.equal(activity.summary.totalTokens, 240);
+    assert.deepEqual(activity.rows.map(row => row.purpose).sort(), ['compaction', 'session-title']);
+    const stats = await service.getStatistics({ range: 'total' });
+    assert.equal(stats.summary.conversationCount, 0);
+    assert.equal(stats.dailyRows[0].conversationCount, 0);
+    assert.equal(stats.summary.totalTokens, 240);
+  };
+  const service = f.service(); await compare(service); await service.dispose();
+  f.readSeqs.length = 0;
+  const restarted = f.service(); await compare(restarted); await restarted.dispose();
+  assert.equal(f.readSeqs.length, 0, 'current schema reuses the durable cursor');
+  const path = join(f.root, 'runtime-v2', 'usage-read-model.sqlite');
+  const old = new DatabaseSync(path); old.exec('PRAGMA user_version=13'); old.close();
+  await compare(f.service());
+  assert.equal(f.readSeqs.length, f.journal.length, 'old triggers and current cursors are invalidated together');
+  const rebuilt = new DatabaseSync(path, { readOnly: true });
+  try { assert.equal(rebuilt.prepare('PRAGMA user_version').get().user_version, 14); } finally { rebuilt.close(); }
+});
 
 test('real provider batches match the original projection, resume across queries and survive Worker restart', async t => {
   const fixture = await journalFixture(t);
@@ -321,6 +465,54 @@ test('statistics rollups match direct Session SQL and repeated-run daily distinc
     const session = await send({ type: 'query', request: 'statistics', input: { range, scope: 'session', sessionId: 's' } });
     for (const key of ['summary','modelDistribution','toolDistribution','dailyRows','requestRows','requestRowsPage']) assert.deepEqual(global[key], session[key], key);
   }
+});
+
+for (const size of [2, 10]) {
+  test(`Session-owned auxiliary usage preserves billing without counting Runs (${size < 8 ? 'triggers' : 'batch'})`, async t => {
+    const send = await fixture(t);
+    const rows = Array.from({ length: size }, (_, i) => ({
+      ...row(`background-${i}`), agentRunId: 'system',
+      purpose: i % 2 ? 'compaction' : 'session-title', costUsd: 0.1,
+      startedAt: new Date(Date.now() - 1000).toISOString(),
+    }));
+    const check = async expectedRuns => {
+      for (const range of ['total', 'day', 'week']) for (const scope of ['global', 'session']) {
+        const stats = await send({ type: 'query', request: 'statistics', input: { range, scope, sessionId: 's' } });
+        assert.equal(stats.summary.conversationCount, expectedRuns, `${scope}/${range} summary`);
+        assert.equal(stats.dailyRows[0].conversationCount, expectedRuns, `${scope}/${range} daily`);
+        assert.equal(stats.summary.totalTokens, (size + expectedRuns) * 3);
+        assert.equal(stats.requestRowsPage.totalRows, size + expectedRuns);
+        assert(Math.abs(stats.summary.costUsd - size * 0.1) < 1e-10);
+      }
+    };
+    await send({ type: 'sync', sources: [source(rows)] });
+    await check(0);
+    // A legacy real Run can share the display fallback ID. Purpose, not the
+    // string 'system', determines whether the row participates in Run counts.
+    const real = { ...row('real-run'), agentRunId: 'system', startedAt: rows[0].startedAt };
+    await send({ type: 'sync', sources: [source([real])], replaceSessionIds: [] });
+    await check(1);
+    await send({ type: 'sync', sources: [source([real])] });
+    const remaining = await send({ type: 'query', request: 'statistics', input: { range: 'total' } });
+    assert.equal(remaining.summary.conversationCount, 1, 'deleting background rows cannot decrement a real Run');
+    await send({ type: 'sync', sources: [source(rows)] });
+    await check(0);
+  });
+}
+
+test('partial-hour Run counts exclude Session-owned auxiliary rows', async t => {
+  const send = await fixture(t);
+  await send({ type: 'sync', sources: [source([
+    { ...row('title'), purpose: 'session-title', agentRunId: 'system', startedAt: '2026-10-11T00:35:00.000Z' },
+    { ...row('compact'), purpose: 'compaction', agentRunId: 'system', startedAt: '2026-10-11T00:45:00.000Z' },
+    { ...row('main'), startedAt: '2026-10-11T01:15:00.000Z' },
+  ])] });
+  const { runCountsSource } = require('../dist-electron/main/runtime-v2/usage-rollups.js');
+  const db = new DatabaseSync(join(send.root, 'runtime-v2', 'usage-read-model.sqlite'), { readOnly: true });
+  try {
+    const count = db.prepare(`SELECT COUNT(DISTINCT session_id || ':' || agent_run_id) AS n FROM ${runCountsSource('2026-10-11T00:30:00.000Z')}`).get();
+    assert.equal(count.n, 1);
+  } finally { db.close(); }
 });
 
 test('cancelling during a provider batch rolls back and later query succeeds', async t => {
@@ -966,7 +1158,7 @@ test('cancelling a chunked Session replacement rolls back deleted activities', a
 
 // Known failing repros retained for the deferred unified acceptance plan.
 // U-08/U-10 regression: compare canonical instants in both read paths.
-for (const fallback of [false, true]) test(`offset timestamps respect the reset boundary in ${fallback ? 'fallback' : 'indexed'} Usage`, async t => {
+for (const fallback of [false, true]) test(`offset timestamps preserve and order all history in ${fallback ? 'fallback' : 'indexed'} Usage`, async t => {
   const send = await fixture(t);
   const events = [
     ['before', '2026-10-11T03:00:00+08:00'],
@@ -977,13 +1169,12 @@ for (const fallback of [false, true]) test(`offset timestamps respect the reset 
     { seq: i * 3 + 2, time, type: 'assistant/message', data: { requestId: id, finishReason: 'stop', usage: { inputTokens: 1, outputTokens: 2 } }, surface: null },
   ]);
   const journalSource = { sessionId: 's', title: 's', workspaceRoot: '/workspace', throughJournalSeq: 5 };
-  const resetAt = '2026-10-11T00:00:00.000Z';
   if (fallback) {
     await send({ type: 'fallback-begin' });
     await send({ type: 'fallback-append', source: journalSource, events });
-  } else await send({ type: 'journal', source: journalSource, events, cursor: 'done', first: true, final: true, reset: true, resetAt });
-  const page = await send({ type: fallback ? 'fallback-query' : 'query', request: 'activity', input: { range: 'total' }, resetAt });
-  assert.deepEqual(page.rows.map(row => row.requestId), ['after']);
+  } else await send({ type: 'journal', source: journalSource, events, cursor: 'done', first: true, final: true, reset: true });
+  const page = await send({ type: fallback ? 'fallback-query' : 'query', request: 'activity', input: { range: 'total' } });
+  assert.deepEqual(page.rows.map(row => row.requestId), ['after', 'before']);
   assert.equal(page.rows[0].startedAt, '2026-10-11T02:00:00.000Z');
 });
 
@@ -1089,7 +1280,7 @@ test('bulk and single-row writes preserve identical rollups, null costs, run cou
   assert.equal((await bulk({type:'query',request:'activity',input:{range:'total'}})).rowsPage.totalRows,31);
 });
 
-test('C-03 advancing resetAt filters an already indexed Session without replaying it', async t => {
+test('legacy reset files do not hide indexed history or trigger a replay', async t => {
   const root = await mkdtemp(join(tmpdir(), 'usage-hot-reset-'));
   const resetFile = join(root, 'global-usage-reset.json');
   await writeFile(resetFile, JSON.stringify({ version: 1, resetAt: '2000-01-01T00:00:00Z' }));
@@ -1104,10 +1295,61 @@ test('C-03 advancing resetAt filters an already indexed Session without replayin
   assert.equal((await service.getActivity({ range: 'total' })).rowsPage.totalRows, 2);
   await writeFile(resetFile, JSON.stringify({ version: 1, resetAt: '2026-10-11T08:00:01+08:00' }));
   const boundary = await service.getActivity({ range: 'total' });
-  assert.equal(boundary.rowsPage.totalRows, 1, 'equal boundary remains, earlier indexed rows disappear');
-  assert.equal(boundary.summary.toolCount, 1); assert.equal(boundary.tabCounts.requests, 1);
+  assert.equal(boundary.rowsPage.totalRows, 2, 'legacy reset files cannot hide historical rows');
+  assert.equal(boundary.summary.toolCount, 2); assert.equal(boundary.tabCounts.requests, 2);
   await writeFile(resetFile, JSON.stringify({ version: 1, resetAt: '2026-10-11T00:00:02Z' }));
-  assert.equal((await service.getActivity({ range: 'total' })).rowsPage.totalRows, 0);
-  assert.equal((await service.getStatistics({ range: 'total' })).summary.toolCallCount, 0);
-  assert.equal(reads, 1, 'advancing the reset boundary must not rebuild the index');
+  assert.equal((await service.getActivity({ range: 'total' })).rowsPage.totalRows, 2);
+  assert.equal((await service.getStatistics({ range: 'total' })).summary.toolCallCount, 2);
+  assert.equal(reads, 1, 'changing a retired reset file must not rebuild the index');
+});
+
+for (const legacyIndex of [false, true]) test(`usage history survives ${legacyIndex ? 'a reset-filtered schema-9 index' : 'the first query without a reset file'}`, async t => {
+  const root = await mkdtemp(join(tmpdir(), 'usage-history-regression-'));
+  const now = Date.now();
+  const times = [new Date(now - 2 * 86_400_000).toISOString(), new Date(now - 3_600_000).toISOString()];
+  const header = { sessionId: 's', createdAt: times[0], lineage: null, createdWith: { profileId: 'test' } };
+  const querySource = { header, throughSeq: 5, stamp: 'unchanged', codecSetDigest: 'codec' };
+  const events = times.flatMap((time, i) => [
+    { seq: i * 3, time, type: 'turn/start', data: { turnId: `t${i}`, agentRunId: `run${i}` }, surface: null },
+    { seq: i * 3 + 1, time, type: 'request/header', data: { requestId: `r${i}`, turnId: `t${i}`, stepId: `step${i}`, model: 'model' }, surface: null },
+    { seq: i * 3 + 2, time, type: 'assistant/message', data: { requestId: `r${i}`, finishReason: 'stop', usage: { inputTokens: 10, outputTokens: 2 } }, surface: null },
+  ]);
+  if (legacyIndex) {
+    await writeFile(join(root, 'global-usage-reset.json'), JSON.stringify({ version: 1, resetAt: new Date(now).toISOString() }));
+    const send = await fixture(t, root);
+    await send({ type: 'journal', source: { sessionId: 's', title: 's', workspaceRoot: null, throughJournalSeq: 5, querySource }, events, cursor: 'done', first: true, final: true, reset: true });
+    await send.worker.terminate();
+    const db = new DatabaseSync(join(root, 'runtime-v2/usage-read-model.sqlite'));
+    // Reproduce the old published state: cursor is current but history was filtered out.
+    db.exec('DELETE FROM usage_activity; PRAGMA user_version=9');
+    db.close();
+  }
+  let reads = 0;
+  const reader = {
+    sessionQuerySources: async () => ({ sources: [querySource], failedSessionIds: [] }),
+    readSessionEventBatch: async () => { reads++; return { events, cursor: 'done', done: true }; },
+  };
+  const service = new UsageReadModelService(reader, root);
+  t.after(async () => { await service.dispose(); await rm(root, { recursive: true, force: true }); });
+  const all = await service.getActivity({ range: 'total' });
+  assert.equal(all.rowsPage.totalRows, 2);
+  assert.equal(all.summary.requestCount, 2);
+  assert.equal(all.summary.totalTokens, 24);
+  assert.equal(all.readModel?.source ?? 'sqlite', 'sqlite');
+  assert.equal((await service.getActivity({ range: 'day' })).rowsPage.totalRows, 1);
+  assert.equal((await service.getActivity({ range: 'week' })).rowsPage.totalRows, 2);
+  assert.equal((await service.getActivity({ range: 'total', search: 'absent-model' })).rowsPage.totalRows, 0);
+  assert.equal(reads, 1, 'history is replayed once, not on each filter change');
+  if (!legacyIndex) await assert.rejects(readFile(join(root, 'global-usage-reset.json')), { code: 'ENOENT' });
+  await service.dispose();
+  const db = new DatabaseSync(join(root, 'runtime-v2/usage-read-model.sqlite'), { readOnly: true });
+  try {
+    assert.equal(db.prepare('PRAGMA user_version').get().user_version, 14);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM usage_activity').get().n, 2);
+  } finally { db.close(); }
+  const restarted = new UsageReadModelService(reader, root);
+  try {
+    assert.equal((await restarted.getActivity({ range: 'total' })).rowsPage.totalRows, 2);
+    assert.equal(reads, 1, 'repaired history survives restart without another replay');
+  } finally { await restarted.dispose(); }
 });

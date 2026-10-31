@@ -3,7 +3,7 @@ import type { RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 export type PermissionMode = RuntimeV2PermissionMode;
 
 export type CliOutputFormat = "text" | "json" | "jsonl";
-export type CliExitCode = 0 | 1 | 2 | 3 | 4 | 130;
+export type CliExitCode = 0 | 1 | 2 | 3 | 4 | 130 | 143;
 
 export interface RunCommandOptions {
   input?: string;
@@ -18,6 +18,10 @@ export interface RunCommandOptions {
   dataDir?: string;
   persist?: boolean;
   resume?: string;
+  /** Only the evaluation sandbox's launcher passes this: the CLI already runs inside an outer sandbox. */
+  sandboxInherited?: boolean;
+  /** Selection file: boot this Harness instead of the built-in one. */
+  harness?: string;
 }
 
 export interface CliArtifactResult {

@@ -261,7 +261,7 @@ describe("FileDiffBlock approval state", () => {
 
     render(<FileDiffBlock message={makePendingEditBlock()} />);
     const sessionButton = await screen.findByRole("button", { name: "本会话允许" });
-    expect(sessionButton).toHaveAttribute("title", "This file only");
+    expect(sessionButton).toHaveAttribute("title", "精确路径 · 写入 · /Users/me/.agents/vocab.md · 本会话");
     expect(screen.queryByText("This directory tree")).toBeNull();
     await userEvent.click(sessionButton);
     expect(submitApproval).toHaveBeenCalledWith({ requestId: "approval-edit-1", decision: "session", suggestionId: "exact-1" });

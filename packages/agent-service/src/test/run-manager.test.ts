@@ -22,6 +22,30 @@ async function fixture(factory: RunFactory, release: () => Promise<void> = async
 }
 
 describe("SessionRunManager", () => {
+  it("executes a withdrawn SECOND before FIRST and THIRD exactly once", async () => {
+    const entered = gate(); const proceed = gate(); const seen: unknown[] = [];
+    const { manager, ledger, session } = await fixture({ create: async input => ({
+      execute: async () => {
+        seen.push(input.initial.content);
+        if (seen.length === 1) { entered.resolve(); await proceed.promise; }
+        return { outcome: "completed", value: null };
+      },
+      dispose: async () => {},
+    }) });
+    try {
+      await manager.submit("initial", "INITIAL"); await entered.promise;
+      await manager.submit("first", "FIRST");
+      const second = await manager.submit("second", "SECOND");
+      await manager.submit("third", "THIRD");
+      const runId = ledger.snapshot().runs.find(run => run.state === "running")!.runId;
+      await ledger.designate(second.task.taskId, runId, ledger.snapshot().revision);
+      await ledger.designate(second.task.taskId, null, ledger.snapshot().revision);
+      proceed.resolve(); await manager.waitForIdle();
+      expect(seen).toEqual(["INITIAL", "SECOND", "FIRST", "THIRD"]);
+      expect(ledger.snapshot().tasks.every(task => task.state === "completed")).toBe(true);
+    } finally { proceed.resolve(); await manager.dispose(); await session.close(); }
+  });
+
   it("creates nothing on session open, reads latest config at consumption and keeps mode fixed", async () => {
     const ready = gate(); const proceed = gate(); const seen: unknown[] = []; let count = 0; let released = 0; let disposed = 0;
     const fixtureState = await fixture({ create: async input => ({ execute: async () => {

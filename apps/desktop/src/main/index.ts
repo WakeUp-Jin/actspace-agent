@@ -5,7 +5,8 @@ import { registerPerformanceIpc } from "./performance-ipc";
 import { ModelCatalogService } from "./model-catalog-service";
 import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
-import { app, BrowserWindow, globalShortcut, safeStorage, webContents, net } from "electron";
+import { app, BrowserWindow, globalShortcut, safeStorage, webContents, net, screen } from "electron";
+import { presentQuickOpenWindow } from "./quick-open-window";
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { AppDataRoots } from "./app-paths";
@@ -16,6 +17,7 @@ import type { RuntimeStreamEvent } from "@actspace/shared";
 import { resolveAppDataRoots } from "./app-paths";
 import { PendingApprovalRegistry } from "./approval-registry";
 import { BrowserBridgeService } from "./browser-bridge-service";
+import { resolveDesktopNonoPath } from "./sandbox-resources";
 import { SettingsService, type SecretCrypto } from "./settings-service";
 import { ModelStoreService } from "./model-store-service";
 import { ModelRuntimeService } from "./model-runtime-service";
@@ -25,7 +27,6 @@ import { TerminalSessionService } from "./terminal/terminal-session-service";
 import { createNodePtyBackend } from "./terminal/node-pty-terminal-backend";
 import { ProviderNetworkService } from "./runtime-v2/provider-network-service";
 import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
-import { RuntimeV2OpenRouterCatalogService } from "./runtime-v2/openrouter-catalog-service";
 import { registerFixedRendererIpc, type FixedRendererIpcRegistration } from "./runtime-v2/fixed-renderer-ipc";
 import { LocalUpdateService } from "./local-update-service";
 import { attachWindowLifecycle, installProcessErrorLogging } from "./main-lifecycle";
@@ -52,9 +53,6 @@ let pricingCatalog: ModelCatalogService | undefined;
 let modelRuntimeService: ModelRuntimeService | undefined;
 let providerNetworkService: ProviderNetworkService | undefined;
 let quickOpenShortcutController: QuickOpenShortcutController | undefined;
-let openRouterCatalogService: RuntimeV2OpenRouterCatalogService | undefined;
-let deepSeekCatalogService: RuntimeV2OpenRouterCatalogService | undefined;
-let kimiCatalogService: RuntimeV2OpenRouterCatalogService | undefined;
 let browserBridgeService: BrowserBridgeService | undefined;
 let browserConnectionTimer: NodeJS.Timeout | undefined;
 let localUpdateService: LocalUpdateService | undefined;
@@ -170,30 +168,15 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   providerNetworkService = new ProviderNetworkService();
   pricingCatalog = new ModelCatalogService({ dataRoot: roots.dataRoot, fetch: net.fetch.bind(net) as typeof fetch });
   await pricingCatalog.load();
-  let modelStore: ModelStoreService;
-  openRouterCatalogService = new RuntimeV2OpenRouterCatalogService({
-    dataRoot: roots.dataRoot,
-    pricingCatalog: () => pricingCatalog!.snapshot(),
-    fetchCatalog: (runtime) => providerNetworkService!.fetchModelCatalog(runtime),
-    isAdded: (apiModel) => modelStore?.isCatalogModelAdded(apiModel) ?? false,
-  });
-  deepSeekCatalogService = new RuntimeV2OpenRouterCatalogService({
-    provider: "deepseek", dataRoot: roots.dataRoot,
-    fetchCatalog: (runtime) => providerNetworkService!.fetchModelCatalog(runtime),
-    isAdded: (apiModel) => modelStore?.isCatalogModelAdded(apiModel, "deepseek") ?? false,
-  });
-  kimiCatalogService = new RuntimeV2OpenRouterCatalogService({ provider: "kimi", dataRoot: roots.dataRoot, fetchCatalog: (runtime) => providerNetworkService!.fetchModelCatalog(runtime), isAdded: (apiModel) => modelStore?.isCatalogModelAdded(apiModel, "kimi") ?? false });
-  await Promise.all([openRouterCatalogService.load(), deepSeekCatalogService.load(), kimiCatalogService.load()]);
-  modelStore = new ModelStoreService({ settings: settingsService, findCatalogModel: (apiModel, provider) => (provider === "deepseek" ? deepSeekCatalogService : provider === "kimi" ? kimiCatalogService : openRouterCatalogService)?.findModel(apiModel) });
+  const modelStore = new ModelStoreService({ settings: settingsService, catalog: () => pricingCatalog!.snapshot() });
   modelRuntimeService = new ModelRuntimeService(settingsService, modelStore, () => pricingCatalog!.snapshot());
   const quickOpenSettings = settingsService.getV2().shortcuts.quickOpen;
   quickOpenShortcutController = new QuickOpenShortcutController(globalShortcut, () => {
     const window = getMainWindow();
     if (!window) return;
-    if (window.isMinimized()) window.restore();
-    window.show();
-    window.focus();
-    fixedRendererIpc?.requestQuickOpen();
+    void presentQuickOpenWindow(window, screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea)
+      .then((presented) => { if (presented) fixedRendererIpc?.requestQuickOpen(); })
+      .catch((error) => void logMain("quick open presentation failed", { error: String(error) }));
   }, quickOpenSettings.accelerator);
   await logMain("v2 quick open initialized", quickOpenShortcutController.activate(quickOpenSettings));
   browserBridgeService = new BrowserBridgeService({
@@ -210,6 +193,9 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     onReadyToReplace: () => app.quit(),
   });
   await localUpdateService.load();
+  const packagedResources = app.isPackaged && !process.env.ACTSPACE_DEV_APP_ID;
+  const nonoPath = resolveDesktopNonoPath({ packaged: packagedResources, resourcesPath: process.resourcesPath, repoRoot: join(roots.logRoot, ".."), env: process.env });
+  await logMain("sandbox nono resolved", { nonoPath: nonoPath ?? null });
   const speech = new DesktopSpeechPlayback(roots.tmpRoot, settingsService);
   speechPlayback = speech;
   runtimeV2Registry = new DesktopRuntimeV2Registry({
@@ -218,6 +204,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     models: modelRuntimeService,
     approvals: approvalRegistry,
     browser: browserBridgeService,
+    nonoPath,
     disabledSkillIds: () => settingsService?.get().skills.disabled ?? [],
     chatCompactionTriggerRatio: () => settingsService?.getV4().settings.general.taskDefaults.chatCompactionTriggerRatio ?? 0.8,
     log: (message, details) => void logMain(message, details),
@@ -293,7 +280,6 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     modelRuntime: modelRuntimeService,
     pricingCatalog,
     providerNetwork: providerNetworkService,
-    catalog: openRouterCatalogService, deepSeekCatalog: deepSeekCatalogService, kimiCatalog: kimiCatalogService,
     approvals: approvalRegistry,
     browserBridge: browserBridgeService,
     quickOpen: quickOpenShortcutController,

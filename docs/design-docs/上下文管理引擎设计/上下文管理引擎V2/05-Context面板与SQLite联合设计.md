@@ -108,7 +108,7 @@ Runtime 增加 `sessionQuerySource(sessionId)`，只读取指定会话并执行�
 
 当前与基准采用同一 estimatorVersion；算法升级后重建派生索引，旧快照有内容时重算。不能还原稳定身份的旧记录保留总量与趋势，比较标记 unavailable；不把变化显示成全量新增。新旧混合和缺少 contextWindow 都必须有测试，上限未知返回 null。
 
-全局 Usage 重置只改变全局统计的可见范围，不删除 Context 会话累计事实。Context 投影从完整 Session 独立累计，复用 Usage 解释规则但不读被 resetAt 过滤的 activity 作为完整事实。清空全局统计后，Context 的累计 usage 与最近请求比较保持不变。
+Usage 与 Context 都从完整 Session 事实构建派生索引。旧全局 Usage 自动重置边界已退役，`global-usage-reset.json` 不再参与投影或查询；Usage 的时间范围仅是查询筛选。Context 独立累计，不随 Usage 页面时间范围变化。
 
 上下文事件优先使用真实事件；从相邻请求推导的工具/模型变化标记 inferred，时间表示观察到变化的请求边界。不能把请求之间未观察到的每次变化都补造出来。压缩 reclaimedTokens 只比较压缩前后相同 estimator 的上下文，不能用夹带新消息的两个请求差值当回收量；无可靠证据返回 null，并同步放宽现有类型。
 
@@ -124,7 +124,9 @@ Runtime 增加 `sessionQuerySource(sessionId)`，只读取指定会话并执行�
 
 表不存完整 transcript、工具结果或请求正文。新增磁盘成本随请求摘要和事件线性增长；最新清单随当前请求条目数增长。每批只保留有界数据，不在 Main 累积全历史数组。
 
-schema 8 → 9 使用受控派生库重建，修复旧时间字段与过滤结果；不修改 Journal。这是联合方案的迁移选择，不代表 U-05 已解决。仅增加 Context 空表不足以修复 U-08：旧 resetAt 过滤可能已经漏存合法行，必须回读相应事实。旧 M/L 冷投影约 35/91 分钟，重建成本必须计入升级验收，不能宣传为即时升级。
+schema 9 → 10 同样通过受控派生库重建，补回曾被自动统计起点排除的历史活动；不修改 Journal，旧重置文件保留但忽略。已有目录和 Context 派生表随库重建，升级后首次读取需要重新投影。
+
+此前 schema 8 → 9 使用受控派生库重建，修复旧时间字段与过滤结果；不修改 Journal。这是联合方案的迁移选择，不代表 U-05 已解决。仅增加 Context 空表不足以修复 U-08：旧 resetAt 过滤可能已经漏存合法行，必须回读相应事实。旧 M/L 冷投影约 35/91 分钟，重建成本必须计入升级验收，不能宣传为即时升级。
 
 迁移只在查询需要时启动，确认旧 owner 停止后初始化；空表先建索引，再按查询作用域分批导入并保存进度。单 Context 查询不为升级强制重放其他 Session。未知旧 schema 的行不能按新 schema 查询；迁移期历史明确 unavailable/rebuilding，保留可用 current，不承诺跨 schema 继续读旧 published 数据。同 schema 的投影重建才适用下一节保留旧 published generation 的规则。已发布 schema 不再用隐式首次查询补建大辅助索引；超时、取消、重开页面不能反复清库。U-05 还须单独验证原生长 SQL、退出等待及新索引准备，不能仅靠升版绕过复现。
 

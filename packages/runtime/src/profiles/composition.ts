@@ -18,6 +18,9 @@ import { manifest as shelltoolsManifest } from "@actspace/tools-shell-tools/mani
 import { manifest as webtoolsManifest } from "@actspace/tools-web-tools/manifest";
 import { manifest as imagegenerationManifest } from "@actspace/tools-image-generation/manifest";
 import { manifest as imageinspectionManifest } from "@actspace/tools-image-inspection/manifest";
+import { manifest as sandboxManifest } from "@actspace/sandbox/manifest";
+import { manifest as sandboxNonoManifest } from "@actspace/sandbox-nono/manifest";
+import { manifest as sandboxSeatbeltManifest } from "@actspace/sandbox-seatbelt/manifest";
 
 export const RUNTIME_PROFILE_IDS = Object.freeze({
   headless: "actspace.headless",
@@ -82,7 +85,7 @@ export function toolTransportPatches(composition: ResolvedComposition) {
 }
 // Admit the pure Context codecs on the Host; behavior lives only in the Harness.
 const contextCodecManifest: PluginManifest = Object.freeze({ ...contextManifest, behaviors: [], contributions: { services: [], events: contextManifest.contributions.events, contributions: [] } });
-const baseBundle: Bundle = Object.freeze({ id: BASE_BUNDLE.id, version: BASE_BUNDLE.version, manifests: Object.freeze([coreManifest, contextCodecManifest, agentServiceManifest, todoManifest, filesystemreadManifest, filesystemsearchManifest, filesystemwriteManifest, shelltoolsManifest, webtoolsManifest, imagegenerationManifest, imageinspectionManifest]), provenance: "builtin:actspace.base" });
+const baseBundle: Bundle = Object.freeze({ id: BASE_BUNDLE.id, version: BASE_BUNDLE.version, manifests: Object.freeze([coreManifest, contextCodecManifest, agentServiceManifest, todoManifest, filesystemreadManifest, filesystemsearchManifest, filesystemwriteManifest, shelltoolsManifest, webtoolsManifest, imagegenerationManifest, imageinspectionManifest, sandboxManifest, sandboxNonoManifest, sandboxSeatbeltManifest]), provenance: "builtin:actspace.base" });
 const browserManifest: PluginManifest = Object.freeze({ schemaVersion: 1, pluginId: pluginId("actspace.browser-tools"), version: "2.0.0", name: "ActSpace Browser Tools", runtimeContract: "actspace.runtime.v2", source: { kind: "builtin" as const, reference: "builtin:actspace.browser-tools" }, codecs: [], behaviors: [{ entryId: entryId("browser-tools"), module: "builtin:browser-tools", required: false, enabled: true, config: {}, host: { required: ["browser" as const], optional: [] }, frontend: null, provides: [serviceId("browser-tools")], injects: [serviceId("tools")] }], contributions: { services: ["browser-tools"], events: [], contributions: ["browser-tools"] } });
 const browserBundle: Bundle = Object.freeze({ id: "actspace.host.browser", version: "2.0.0", manifests: Object.freeze([browserManifest]), provenance: "builtin:actspace.host.browser" });
 const headlessBundle: Bundle = Object.freeze({ id: "actspace.headless", version: headlessManifest.version, manifests: Object.freeze([headlessManifest]), provenance: "@actspace/headless" });
@@ -114,7 +117,7 @@ export const TRUSTED_LOADER_ENTRIES = Object.freeze([
   Object.freeze({ id: "llm-service", name: "@actspace/llm-service/plugin", inject: ["actspace.host.llm"] }),
   Object.freeze({ id: "todo-projection", name: "@actspace/runtime/todo-projection", inject: ["session.projection"] }),
   Object.freeze({ id: "core-agent", name: "@actspace/core-agent/plugin", inject: [] }),
-  Object.freeze({ id: "agent-runtime", name: "@actspace/runtime/agent-runtime", inject: ["actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "agent.registry", "session.runtime", "session.checkpoint", "session.journal", "session.projection", "actspace.host.tools.filesystem-read", "actspace.host.tools.filesystem-search", "actspace.host.tools.filesystem-write", "actspace.host.tools.shell-tools", "actspace.host.tools.web-tools", "actspace.host.tools.image-generation", "actspace.host.tools.image-inspection", "actspace.host.session"] }),
+  Object.freeze({ id: "agent-runtime", name: "@actspace/runtime/agent-runtime", inject: ["actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "actspace.host.background-tasks", "actspace.host.sandbox", "agent.registry", "session.runtime", "llm.auxiliary-requests", "session.checkpoint", "session.journal", "session.projection", "actspace.host.tools.filesystem-read", "actspace.host.tools.filesystem-search", "actspace.host.tools.filesystem-write", "actspace.host.tools.shell-tools", "actspace.host.tools.web-tools", "actspace.host.tools.image-generation", "actspace.host.tools.image-inspection", "actspace.host.session"] }),
   Object.freeze({ id: "headless-runner", name: "@actspace/headless/plugin", inject: ["actspace.host.headless", "session.runtime", "agent.runtime"] }),
   Object.freeze({ id: "agent-host", name: "@actspace/agent-host/plugin", inject: ["session.runtime", "agent.runtime"] }),
   Object.freeze({ id: "desktop-app", name: "@actspace/desktop-app/plugin", inject: ["session.runtime", "agent.runtime", "llm.service"] }),

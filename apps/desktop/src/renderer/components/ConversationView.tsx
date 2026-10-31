@@ -56,6 +56,7 @@ export function ConversationView({
   onConnectHost,
   activeView = "chat",
   permissionControl,
+  focusRequest = 0,
 }: {
   /** 与投影合并后的上下文用量（WorkbenchLayout 计算）。 */
   contextSnapshot: ContextUsageSnapshot | null;
@@ -71,6 +72,8 @@ export function ConversationView({
   onConnectHost?: () => void;
   activeView?: SessionMainView;
   permissionControl?: ReactNode;
+  /** 返回整页设置后，通过已有 Composer 聚焦通道恢复键盘入口。 */
+  focusRequest?: number;
 }) {
   const { sessionId, messages, isStreaming, isAborting, sendScrollRequestId, composerFocusRequestId, onAbort, onRetryCompaction } = useActiveSession();
   const { draftRestore, draftKey, readAnnotationDraft, writeAnnotationDraft } = useComposerContext();
@@ -131,7 +134,7 @@ export function ConversationView({
   const annotations = useResponseAnnotationState({ draftKey, draftRestore, readAnnotationDraft, writeAnnotationDraft, scrollContainerRef, canAnnotate });
   // 评论框保存 / 取消后把焦点还给 Composer：和上层的聚焦请求叠加成同一个递增 id。
   const [annotationFocusRequest, setAnnotationFocusRequest] = useState(0);
-  const focusRequestId = composerFocusRequestId + annotationFocusRequest;
+  const focusRequestId = composerFocusRequestId + annotationFocusRequest + focusRequest;
   const updateConversationViewportRef = useRef<() => void>(() => {});
   // 是否「贴底自动跟随」：流式输出时保持视图贴底；用户向上滚动阅读历史则暂停，
   // 滚回接近底部时恢复（类似 Cursor 的聊天滚动）。
@@ -154,6 +157,9 @@ export function ConversationView({
 
   const openAgentTranscript = useCallback((message: AgentMessageBlock) => {
     if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, selected: message });
+  }, [sessionId, openTab]);
+  const openSubagentTrajectory = useCallback((childSessionId: string) => {
+    if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, focus: { childSessionId, view: "trajectory", revision: Date.now() } });
   }, [sessionId, openTab]);
   const { openReadFile, openWorkspaceFile } = useWorkspaceFileLinks();
   useEffect(() => {
@@ -362,7 +368,7 @@ export function ConversationView({
         </div>
         {activeView === "trajectory" ? <div className="flex h-full min-h-0 flex-col">
           {/* 「停止」放在轨迹工具栏最右侧（DSH 工具栏只有 32px，不再单独占一行）。 */}
-          <div className="min-h-0 flex-1"><TrajectoryView onAbort={isStreaming ? onAbort : undefined} isAborting={isAborting} /></div>
+          <div className="min-h-0 flex-1"><TrajectoryView onAbort={isStreaming ? onAbort : undefined} isAborting={isAborting} onOpenSubagent={openSubagentTrajectory} /></div>
         </div> : null}
       </div>
       {/* 放在消息区之后：React 按树序挂 ref 并跑 layout effect，放前面时首帧拿不到 scrollContainerRef。 */}

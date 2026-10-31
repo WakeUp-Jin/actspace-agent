@@ -1,4 +1,3 @@
-import type { CustomConnectionInput } from "../settings";
 import type { RuntimeV2DiagnosticsSnapshot, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot } from "./projection";
 import type { RuntimeV2BootManifest, RuntimeV2RuntimeState, RuntimeV2SessionListItem } from "./runtime";
 
@@ -23,8 +22,6 @@ export type RuntimeV2ForkSessionInput = { readonly parentSessionId: string; read
 export type RuntimeV2RequestRestartInput = { readonly reason: string; readonly source: string; readonly candidateDigest?: string };
 export type RuntimeV2UpdateSessionMetadataInput = { readonly sessionId: string; readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean };
 export type RuntimeV2ReadArtifactResult = { readonly artifactId: string; readonly mimeType: string; readonly bytesBase64: string };
-/** apiKey 留空表示保留原 Key。 */
-export type RuntimeV2UpdateCustomConnectionInput = Omit<CustomConnectionInput, "apiKey"> & { readonly connectionId: string; readonly apiKey?: string };
 export type RuntimeV2AttachmentRef = {
   readonly artifactId: string;
   readonly mimeType: string;

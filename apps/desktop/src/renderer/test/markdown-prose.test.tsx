@@ -27,6 +27,51 @@ afterEach(() => {
 const FLOW = "flowchart TD\n  A[Start] --> B[Done]";
 
 describe("MarkdownProse", () => {
+  it("follows footnotes and backlinks inside the reply without opening a new page", async () => {
+    const onOpenWorkspaceFile = vi.fn();
+    const { container } = render(<MarkdownProse content={"Read[^note].\n\n[^note]: Footnote detail."} onOpenWorkspaceFile={onOpenWorkspaceFile} />);
+    const reference = container.querySelector<HTMLAnchorElement>("[data-footnote-ref]")!;
+    const backlink = container.querySelector<HTMLAnchorElement>("[data-footnote-backref]")!;
+    const definition = container.querySelector<HTMLElement>(".footnotes li")!;
+    const scrollDefinition = vi.spyOn(definition, "scrollIntoView");
+    const scrollReference = vi.spyOn(reference, "scrollIntoView");
+    expect(reference).not.toHaveAttribute("target");
+    expect(backlink).not.toHaveAttribute("target");
+    await userEvent.click(reference);
+    expect(scrollDefinition).toHaveBeenCalledOnce();
+    expect(definition).toHaveFocus();
+    await userEvent.click(backlink);
+    expect(scrollReference).toHaveBeenCalledOnce();
+    expect(reference).toHaveFocus();
+    expect(onOpenWorkspaceFile).not.toHaveBeenCalled();
+  });
+
+  it("keeps repeated footnotes local to their reply and stable while its content updates", async () => {
+    const content = "Read[^same].\n\n[^same]: Detail.";
+    const { container, rerender } = render(<><MarkdownProse content={content} /><MarkdownProse content={content} /></>);
+    const references = Array.from(container.querySelectorAll<HTMLAnchorElement>("[data-footnote-ref]"));
+    const definitions = Array.from(container.querySelectorAll<HTMLElement>(".footnotes li"));
+    expect(definitions[0].id).not.toBe(definitions[1].id);
+    const labels = Array.from(container.querySelectorAll(".footnotes h2"));
+    expect(labels[0].id).not.toBe(labels[1].id);
+    references.forEach((reference, index) => expect(reference).toHaveAttribute("aria-describedby", labels[index].id));
+    const firstScroll = vi.spyOn(definitions[0], "scrollIntoView");
+    const secondScroll = vi.spyOn(definitions[1], "scrollIntoView");
+    await userEvent.click(references[1]);
+    expect(secondScroll).toHaveBeenCalledOnce();
+    expect(firstScroll).not.toHaveBeenCalled();
+    const href = references[1].getAttribute("href");
+    rerender(<><MarkdownProse content={content} /><MarkdownProse content={`${content}\n\nMore streamed text.`} /></>);
+    expect(container.querySelectorAll("[data-footnote-ref]")[1]).toHaveAttribute("href", href);
+  });
+
+  it("keeps HTTPS links external while fragments remain local", () => {
+    render(<MarkdownProse content="[website](https://example.com/) and [section](#section)." />);
+    expect(screen.getByRole("link", { name: "website" })).toHaveAttribute("target", "_blank");
+    expect(screen.getByRole("link", { name: "website" })).toHaveAttribute("rel", "noreferrer noopener");
+    expect(screen.getByRole("link", { name: "section" })).not.toHaveAttribute("target");
+  });
+
   it("renders fenced code with a language toolbar and copy action", async () => {
     const writeText = vi.fn(async () => undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
@@ -112,6 +157,22 @@ describe("MarkdownProse Mermaid fences", () => {
     expect(await mermaidRender()).toHaveBeenCalledTimes(1);
   });
 
+  it("closes the expanded preview on the first Escape when its close button has initial focus", async () => {
+    render(<MarkdownProse content={`\`\`\`mermaid\n${FLOW}\n\`\`\``} />);
+    await screen.findByRole("img", { name: /Mermaid 图表/ });
+
+    const expand = screen.getByRole("button", { name: "放大查看" });
+    await userEvent.click(expand);
+    const dialog = screen.getByRole("dialog", { name: "Mermaid 图表预览" });
+    expect(within(dialog).getByRole("button", { name: "关闭预览" })).toHaveFocus();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "Mermaid 图表预览" })).not.toBeInTheDocument();
+    expect(expand).toHaveFocus();
+  });
+
   it("opens the expanded preview and closes it with Escape, returning focus", async () => {
     render(<MarkdownProse content={`\`\`\`mermaid\n${FLOW}\n\`\`\``} />);
     await screen.findByRole("img", { name: /Mermaid 图表/ });
@@ -135,7 +196,7 @@ describe("MarkdownProse Mermaid fences", () => {
     await userEvent.tab({ shift: true });
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
 
-    // 键盘聚焦的按钮会显示 Tooltip，它是最上层：第一下 Esc 只关 Tooltip，第二下才关对话框。
+    // 其他工具按钮的 Tooltip 是最上层：第一下 Esc 只关 Tooltip，第二下才关对话框。
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();

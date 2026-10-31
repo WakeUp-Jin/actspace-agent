@@ -9,7 +9,7 @@ import {
   ApprovalCard,
   ApprovalReason,
   useApprovalDecision,
-  useExactGrantSuggestion,
+  useFileGrantSuggestions,
 } from "./ApprovalParts";
 import {
   getToolLogRunningTextAttrs,
@@ -28,7 +28,7 @@ type ToolLogStatus = "pending" | "running" | "completed" | "failed" | "denied" |
 type FileReadApprovalMessage = Extract<MessageBlock, { kind: "read" | "grep" | "glob" }>;
 
 function FileReadApprovalLine({ message, className }: { message: FileReadApprovalMessage; className?: string }) {
-  const suggestion = useExactGrantSuggestion(message.approvalRequestId);
+  const suggestions = useFileGrantSuggestions(message.approvalRequestId);
   const decision = useApprovalDecision(message.approvalRequestId);
   const isRead = message.kind === "read";
   return (
@@ -37,7 +37,7 @@ function FileReadApprovalLine({ message, className }: { message: FileReadApprova
       verb={isRead ? "读取" : message.kind === "grep" ? "搜索" : "匹配"}
       target={isRead ? <ApprovalPath path={message.filePath} /> : <ApprovalPattern pattern={message.pattern} scope={message.scope} />}
       meta={<ApprovalReason reason={message.reason} />}
-      actions={<ApprovalActions state={decision} primaryLabel="允许" suggestion={suggestion} />}
+      actions={<ApprovalActions state={decision} primaryLabel="允许" fileSuggestions={suggestions} />}
     />
   );
 }
@@ -148,6 +148,12 @@ function getToolLogLineClass(status: ToolLogStatus, className?: string) {
   }`;
 }
 
+function getToolFailureLabel(status: ToolLogStatus): string | undefined {
+  return status === "failed" || status === "denied" || status === "aborted"
+    ? status
+    : status === "outcome-unknown" ? "outcome unknown" : undefined;
+}
+
 function getToolLogLineTextClass(status: ToolLogStatus) {
   return `${TOOL_LOG_LINE_TEXT_CLASS}${status === "running" ? ` ${TOOL_LOG_LINE_TEXT_RUNNING_CLASS}` : ""}`;
 }
@@ -239,7 +245,7 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
   if (status === "running" || (!detailItems.length && !onExpand)) {
     return <div className={`${getToolLogLineClass(status, className)} tool-result-line`}>{summary}</div>;
   }
-  return <article className={`tool-result-disclosure${className ? ` ${className}` : ""}`}>
+  return <article className={`tool-result-disclosure${getToolFailureLabel(status) ? " is-error" : ""}${className ? ` ${className}` : ""}`}>
     <div className="tool-result-header">
       {canOpenFile ? summary : null}
       <button className="tool-result-toggle" type="button" aria-label={canOpenFile ? `Show result for ${displayText}` : undefined} aria-expanded={expanded} onClick={() => { if (!expanded) onExpand?.(); setExpanded((value) => !value); }}>
@@ -255,17 +261,20 @@ export function ToolLogLine({ message, className, onOpenFile, onExpand }: { onEx
   if (message.kind === "tool" && message.status === "pending" && message.approvalRequestId) return <GenericToolApprovalLine message={message} className={className} />;
   if ((message.kind === "read" || message.kind === "grep" || message.kind === "glob") && message.status === "pending") return <FileReadApprovalLine message={message} className={className} />;
   if (message.kind === "read") {
-    const text = message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Read ${message.filePath}${message.range ? ` ${message.range}` : ""}`;
-    return <ResultPreviewBlock onExpand={onExpand} displayText={text} summaryContent={(!message.status || message.status === "completed") ? <ToolSummary action="Read" target={message.filePath} meta={message.range} /> : undefined} status={message.status} resultPreview={message.resultPreview} className={className} onOpenFile={onOpenFile ? () => onOpenFile(message) : undefined} />;
+    const failure = getToolFailureLabel(message.status);
+    const text = `Read ${message.filePath}${message.range ? ` ${message.range}` : ""}`;
+    return <ResultPreviewBlock onExpand={onExpand} displayText={text} summaryContent={<ToolSummary action="Read" target={message.filePath} meta={failure ?? message.range} />} detail={failure ? message.displayText : undefined} status={message.status} resultPreview={message.resultPreview} className={className} onOpenFile={onOpenFile ? () => onOpenFile(message) : undefined} />;
   }
 
   if (message.kind === "search") {
+    const failure = getToolFailureLabel(message.status);
     const text = `Searched files ${message.scope ? `${message.scope} ` : ""}for ${message.query}`;
-    return <ResultPreviewBlock onExpand={onExpand} displayText={text} summaryContent={<ToolSummary action="Searched files" target={`${message.scope ? `${message.scope} ` : ""}for ${message.query}`} />} status={message.status} resultPreview={message.resultPreview} className={className} />;
+    return <ResultPreviewBlock onExpand={onExpand} displayText={text} summaryContent={<ToolSummary action="Searched files" target={`${message.scope ? `${message.scope} ` : ""}for ${message.query}`} meta={failure} />} detail={failure ? message.displayText : undefined} status={message.status} resultPreview={message.resultPreview} className={className} />;
   }
 
   if (message.kind === "grep") {
-    if (message.resultPreview?.length || onExpand) return <ResultPreviewBlock onExpand={onExpand} displayText={`Grep ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} summaryContent={<ToolSummary action="Grep" target={`${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} />} status={message.status} resultPreview={message.resultPreview} className={className} />;
+    const failure = getToolFailureLabel(message.status);
+    if (failure || message.resultPreview?.length || onExpand) return <ResultPreviewBlock onExpand={onExpand} displayText={`Grep ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} summaryContent={<ToolSummary action="Grep" target={`${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} meta={failure} />} detail={failure ? message.displayText : undefined} status={message.status} resultPreview={message.resultPreview} className={className} />;
     return (
       <OverflowToolLine
         className={getToolLogLineClass(message.status, className)}
@@ -276,7 +285,8 @@ export function ToolLogLine({ message, className, onOpenFile, onExpand }: { onEx
   }
 
   if (message.kind === "glob") {
-    if (message.resultPreview?.length || onExpand) return <ResultPreviewBlock onExpand={onExpand} displayText={`Glob ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} summaryContent={<ToolSummary action="Glob" target={`${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} />} status={message.status} resultPreview={message.resultPreview} className={className} />;
+    const failure = getToolFailureLabel(message.status);
+    if (failure || message.resultPreview?.length || onExpand) return <ResultPreviewBlock onExpand={onExpand} displayText={`Glob ${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} summaryContent={<ToolSummary action="Glob" target={`${message.pattern}${message.scope ? ` in ${message.scope}` : ""}`} meta={failure} />} detail={failure ? message.displayText : undefined} status={message.status} resultPreview={message.resultPreview} className={className} />;
     return (
       <OverflowToolLine
         className={getToolLogLineClass(message.status, className)}
@@ -334,8 +344,10 @@ export function ToolLogLine({ message, className, onOpenFile, onExpand }: { onEx
   }
 
   if (message.kind === "directory_list") {
-    const text = message.status && message.status !== "running" && message.status !== "completed" ? message.displayText : `Listed ${message.path}${message.entryCount !== undefined ? ` (${message.entryCount} entries)` : ""}`;
-    return <ResultPreviewBlock onExpand={onExpand} displayText={text} summaryContent={(!message.status || message.status === "completed") ? <ToolSummary action="Listed" target={message.path} meta={message.entryCount !== undefined ? `(${message.entryCount} entries)` : undefined} /> : undefined} status={message.status} resultPreview={message.resultPreview} className={className} />;
+    const failure = getToolFailureLabel(message.status);
+    const count = message.entryCount !== undefined ? `(${message.entryCount} entries)` : undefined;
+    const text = `Listed ${message.path}${count ? ` ${count}` : ""}`;
+    return <ResultPreviewBlock onExpand={onExpand} displayText={text} summaryContent={<ToolSummary action="Listed" target={message.path} meta={failure ?? count} />} detail={failure ? message.displayText : undefined} status={message.status} resultPreview={message.resultPreview} className={className} />;
   }
 
   if (message.kind === "delete") {

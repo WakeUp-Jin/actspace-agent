@@ -51,7 +51,7 @@ export class SessionProjectionCache {
     for (const event of snapshot.events) {
       if (event.type === "turn/start") starts.push(floor);
       if (event.type === "turn/end") floor = event.seq + 1;
-      if (event.type === "request/header") requests.push(event.seq);
+      if (event.type === "request/header" || event.type === "llm/auxiliary-start") requests.push(event.seq);
       const data = event.data;
       const callId = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>).callId : null;
       if (typeof callId === "string") (calls[callId] ??= []).push(event.seq);

@@ -1,6 +1,7 @@
 import { isCommandPrefixSelector, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { EventCodecRegistry, type EventCodec } from "./codec-registry.js";
 import { SessionError } from "./errors.js";
+import { validateAuxiliaryRequest } from "./auxiliary-codec.js";
 
 /** The DSH SessionEventMap: the only events the Agent Loop must know about. */
 export const CORE_EVENT_TYPES = [
@@ -47,6 +48,8 @@ export const PERSISTED_EXTENSION_EVENT_TYPES = [
   "hook/result",
   "llm/retry",
   "llm/retry-started",
+  "llm/auxiliary-start",
+  "llm/auxiliary-end",
   "plan/mode",
   "sandbox/mode",
   "schedule/change",
@@ -68,6 +71,7 @@ export const PERSISTED_EXTENSION_EVENT_TYPES = [
   "delegation/requested",
   "delegation/child-terminal",
   "delegation/completed",
+  "background/task",
   "recovery/committed",
   "recovery/start",
   "surface/replaced",
@@ -102,6 +106,7 @@ function createExtensionCodec(type: PersistedExtensionEventType): EventCodec {
       if (data === null || typeof data !== "object" || Array.isArray(data)) {
         throw invalid(type, "data must be an object");
       }
+      if (type === "llm/auxiliary-start" || type === "llm/auxiliary-end") validateAuxiliaryRequest(type, record(data));
       if (type === "agent/mode-set") {
         const mode = (data as Readonly<Record<string, RuntimeV2JsonValue>>).mode;
         const revision = (data as Readonly<Record<string, RuntimeV2JsonValue>>).revision;
@@ -109,8 +114,28 @@ function createExtensionCodec(type: PersistedExtensionEventType): EventCodec {
         if (!Number.isSafeInteger(revision) || (revision as number) < 1) throw invalid(type, "revision must be a positive integer");
       }
       if (type.startsWith("permission/")) validatePermissionData(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
+      if (type === "background/task") validateBackgroundTaskData(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
     },
   });
+}
+
+function validateBackgroundTaskData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+  requireId(data.taskId, type, "taskId");
+  if (data.op === "start") {
+    if (data.kind !== "bash" && data.kind !== "agent") throw invalid(type, "kind must be bash or agent");
+    requireId(data.callId, type, "callId");
+    if (typeof data.description !== "string") throw invalid(type, "description must be a string");
+    requireTimestamp(data.startedAt, type, "startedAt");
+    return;
+  }
+  if (data.op === "settle") {
+    if (data.status !== "completed" && data.status !== "failed" && data.status !== "stopped" && data.status !== "lost") throw invalid(type, "status must be completed, failed, stopped or lost");
+    if (data.delivery !== "notified" && data.delivery !== "wait" && data.delivery !== "stopped" && data.delivery !== "lost") throw invalid(type, "delivery must be notified, wait, stopped or lost");
+    if (data.exitCode !== undefined && data.exitCode !== null && !Number.isSafeInteger(data.exitCode)) throw invalid(type, "exitCode must be an integer or null when present");
+    requireTimestamp(data.endedAt, type, "endedAt");
+    return;
+  }
+  throw invalid(type, "op must be start or settle");
 }
 
 function validatePermissionData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {

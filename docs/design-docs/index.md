@@ -5,6 +5,8 @@
 - [Tool 插件边界与 Todo 领域事件](agent-plugin-runtime/agent-tool-plugin-boundaries.md)：独立工具包、Host port、Projection Contributor、scope 和不兼容旧 Todo 的事件断点。
 
 
+- [沙箱设计](execution-safety/agent-沙箱设计.md)：2026-10-25 确认，第一期工具沙箱、第二期评估沙箱已实施；工具沙箱 / 评估沙箱，可替换的 Harness 插件（管理器 + 后端），macOS / Linux 用打包的 nono，Windows 第三期原生；第一期计划见 [20261025-sandbox-v1-tool-sandbox](../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md)；第二期评估沙箱已实施，计划见 [20261025-sandbox-v2-evaluation-sandbox](../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md)；工具沙箱的出沙箱与回退已实施，计划见 [20261025-sandbox-escape-fallback](../exec-plans/completed/20261025-sandbox-escape-fallback.md)。
+
 - [Agent 工具权限模型](execution-safety/agent-tool-permission-model.md)：当前权限事实源；定义已实施的 `default/full-access`、结构化资源、once 与 Desktop 文件 Session Grant。
 
 - [LLM Core Pi 收敛设计](agent-plugin-runtime/agent-llm-core-pi.md)：已实施 Host prepare、重试 generation、pi-ai 直接调用、backend parity 与 replay；外部验收边界见执行摘要。
@@ -14,6 +16,8 @@
 - [Session 三类读模型设计规范](agent-plugin-runtime/agent-spec-runtime-projection.md)：已落地；定义 Global Aggregate、Session Projection、Window Presentation 及其水位、缓存和 Client 边界。
 
 - [工具输出、文件引用与图片输入](tool-system/agent-tool-output-references.md)：Bash 大输出回读、历史引用、Provider 图片转换和失败反馈。
+
+- [设置 › 模型页面](frontend/front-模型设置页面-Maka重做规范.md)：2026-10-21 按四层数据模型（协议 / 服务商模板 / 连接 / 模型）重做，已实施，Electron 验收待做；用途表 + 连接列表，模型行就地展开，有效值 = 用户修改 > 服务商 > 目录 > 未知；Demo 见 [model-provider-demo](frontend/model-provider-demo/index.html)，价格规则见[本地模型目录及使用费用](model-context/agent-model-catalog-and-usage-cost.md)。
 
 - [Web / PWA 客户端规范](frontend/front-web-pwa客户端规范.md)：已实施（2026-10-17）；手机与浏览器共用的响应式客户端 `apps/web`，支持 PWA，直连 agent-host（Host 同源托管，手机经 Tailscale HTTPS）；2026-10-18 视觉改为 B · 轻玻璃；真机验收待做。
 

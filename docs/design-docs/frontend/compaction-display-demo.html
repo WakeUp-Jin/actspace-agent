@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>压缩回显 Demo</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "PingFang SC", monospace;
+  /* 应用外壳（照 tokens.css --act-color-*） */
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --selected: #e4e4e1; --hover: #eaeae7;
+  --line: #deded9; --line-strong: #8c8c85;
+  --text: #20201e; --muted: #676762; --faint: #72726b;
+  --operational: #087a4b; --operational-soft: #e5f2ea;
+  --danger-soft: #f8e9e9; --on-danger: #a93a3a;
+  --user-bubble: #ececE9;
+  /* 轨迹（照 tokens.css --act-trajectory-*） */
+  --t1: rgb(15,17,21); --t2: rgb(97,102,107); --t3: rgb(129,133,140); --t4: rgb(173,178,184);
+  --tbg: rgb(255,255,255); --tside: rgb(249,250,251); --tmod: rgb(245,246,247);
+  --tb1: rgba(0,0,0,.04); --tb2: rgba(0,0,0,.1);
+  --thover: rgba(38,49,72,.06); --tactive: rgba(38,49,72,.1);
+  --primary: rgb(65,118,230); --primary-soft: rgb(228,237,253); --primary-new: rgb(65,118,230);
+  --err2: rgb(242,90,90); --success: rgb(34,197,94); --success-soft: rgb(230,250,237);
+  --warn: rgb(221,134,41); --warn-soft: rgb(254,245,231);
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --selected: #30312d; --hover: #2a2b27;
+  --line: #353630; --line-strong: #787870;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f;
+  --operational: #36c783; --operational-soft: #193a2b;
+  --danger-soft: #452525; --on-danger: #f08a8a;
+  --user-bubble: #30312d;
+  --t1: rgb(249,250,251); --t2: rgb(207,211,214); --t3: rgb(173,178,184); --t4: rgb(129,133,140);
+  --tbg: rgb(35,35,36); --tside: rgb(27,27,28); --tmod: rgb(53,54,56);
+  --tb1: rgba(255,255,255,.06); --tb2: rgba(255,255,255,.12);
+  --thover: rgba(255,255,255,.08); --tactive: rgba(255,255,255,.14);
+  --primary: rgb(122,170,255); --primary-soft: rgb(52,65,91); --primary-new: rgb(86,134,254);
+  --success-soft: rgb(35,60,44); --warn-soft: rgb(39,36,31);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 13px/1.55 var(--font-ui); -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+svg { flex-shrink: 0; display: block; }
+code { font-family: var(--font-mono); font-size: 12px; background: var(--surface-subtle); padding: 0 4px; border-radius: 4px; }
+@keyframes rise-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes compact-progress { 0% { transform: translateX(-110%); } 100% { transform: translateX(220%); } }
+@keyframes pulse { 50% { opacity: .35; } }
+
+/* ---------- demo 控制条 ---------- */
+.demo-bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 9px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.demo-bar h1 { margin: 0 6px 0 0; font-size: 13px; font-weight: 600; }
+.grp { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.seg button { padding: 2px 9px; border-radius: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--selected); }
+.note { width: 100%; color: var(--faint); font-size: 12px; }
+
+/* ---------- 窗口 ---------- */
+.win { display: flex; height: calc(100vh - 74px); }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--surface); }
+.main-head { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; border-bottom: 1px solid var(--line); }
+.main-head h2 { margin: 0; font-size: 14px; font-weight: 500; }
+.main-head .sp { flex: 1; }
+.ib { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 8px; border-radius: 6px; color: var(--muted); font-size: 12px; }
+.ib:hover { background: var(--hover); color: var(--text); }
+.ib[aria-pressed="true"] { background: var(--selected); color: var(--text); }
+.scroll { flex: 1; overflow-y: auto; }
+.thread { --inset: 4px; max-width: 760px; margin: 0 auto; padding: 22px 28px 40px; display: flex; flex-direction: column; gap: 16px; }
+.u { align-self: flex-end; max-width: 78%; padding: 8px 12px; border-radius: 12px; background: var(--user-bubble); font-size: 14px; }
+.a { padding: 0 var(--inset); font-size: 14px; line-height: 1.65; }
+.a p { margin: 0 0 6px; }
+.tool { display: flex; align-items: center; gap: 6px; margin: 2px 0 4px; color: var(--faint); font-size: 12.5px; }
+.tool b { color: var(--muted); font-weight: 500; }
+.old { opacity: 1; }
+
+/* ---------- 现状：CompactCommandBlock ---------- */
+.cc { width: 100%; padding: 0 var(--inset); animation: rise-in 220ms ease both; }
+.cc-running { padding: 8px 0; }
+.cc-running .txt { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 14px; line-height: 20px; }
+.cc-running .title { font-weight: 600; color: var(--text); }
+.cc-running .meta { color: var(--faint); font-variant-numeric: tabular-nums; }
+.cc-track { margin-top: 8px; height: 3px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.cc-track i { display: block; height: 100%; width: 50%; border-radius: 999px; background: var(--operational); animation: compact-progress 1.1s ease-in-out infinite; }
+.cc-caption { margin-top: 6px; font-size: 12px; line-height: 16px; color: var(--faint); }
+.cc-div { display: flex; align-items: center; gap: 12px; padding: 10px 0; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--faint); }
+.cc-div .ln { height: 1px; min-width: 24px; flex: 1; background: var(--line); }
+.cc-div.failed { color: var(--on-danger); }
+.cc-div.failed .ln { background: var(--danger-soft); }
+.cc-label { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+button.cc-label:hover { color: var(--text); }
+.cc-label .chev { transition: transform 120ms; }
+.cc-label[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.cc-retry { margin-left: 4px; font-weight: 600; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+.cc-sum { margin-bottom: 8px; border-radius: 8px; background: var(--surface-subtle); padding: 12px 14px; font-size: 13px; color: var(--muted); animation: rise-in 180ms ease both; }
+.cc-sum-head { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; line-height: 16px; color: var(--faint); }
+.cc-sum-head button { color: var(--muted); }
+.cc-sum-head button:hover { color: var(--text); }
+.cc-sum-body { max-height: 240px; overflow-y: auto; }
+.cc-sum-foot { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 12px; line-height: 16px; color: var(--faint); }
+
+/* 摘要 Markdown（对话里收敛到正文档位） */
+.md h4 { margin: 4px 0 2px; font-size: inherit; font-weight: 600; color: var(--text); }
+.md ul { margin: 0 0 6px; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+.md p { margin: 0 0 6px; }
+
+/* ---------- 共用 ---------- */
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes stripes { to { background-position: 16px 0; } }
+.spin { width: 12px; height: 12px; border-radius: 50%; border: 1.6px solid var(--line-strong); border-top-color: transparent; animation: spin .8s linear infinite; display: inline-block; flex: none; }
+.sk { height: 9px; border-radius: 4px; background: linear-gradient(90deg, var(--line) 0%, var(--surface-subtle) 50%, var(--line) 100%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+.link { color: var(--muted); display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+.link:hover { color: var(--text); }
+.retry { font-weight: 600; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+.caret::after { content: "▍"; color: var(--faint); animation: pulse 1s infinite; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- 输入框 + 状态条（A 用） ---------- */
+.compose { max-width: 760px; width: 100%; margin: 0 auto; padding: 0 28px 16px; }
+.status-strip { display: flex; align-items: center; gap: 8px; margin: 0 6px; padding: 7px 12px; border: 1px solid var(--line); border-bottom: 0; border-radius: 12px 12px 0 0; background: var(--surface-subtle); font-size: 12.5px; color: var(--muted); animation: rise-in 180ms ease both; }
+.status-strip b { color: var(--text); font-weight: 500; }
+.status-strip .sp { flex: 1; }
+.composer { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 10px 12px; color: var(--faint); font-size: 14px; display: flex; align-items: center; }
+.composer .sp { flex: 1; }
+.composer .send { width: 28px; height: 28px; border-radius: 50%; background: var(--text); color: var(--surface); display: grid; place-items: center; opacity: .35; }
+
+/* ---------- A 极简 + 数据 ---------- */
+.va { display: flex; align-items: center; gap: 10px; padding: 6px var(--inset); font-size: 12.5px; color: var(--faint); animation: rise-in 220ms ease both; }
+.va .ic { color: var(--muted); }
+.va .lbl { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.va .ln { flex: 1; height: 1px; background: var(--line); min-width: 24px; }
+.va.failed, .va.failed .lbl, .va.failed .ic { color: var(--on-danger); }
+.va.failed .ln { background: var(--danger-soft); }
+
+/* ---------- A1 居中加重：两侧线向中间「收」 ---------- */
+@keyframes sweep-in-r { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+@keyframes sweep-in-l { from { transform: translateX(260%); } to { transform: translateX(-100%); } }
+.a1 { display: flex; align-items: center; gap: 12px; padding: 8px var(--inset); font-size: 12.5px; color: var(--faint); animation: rise-in 220ms ease both; }
+.a1 .ln { position: relative; flex: 1; min-width: 24px; height: 1px; overflow: hidden; background: color-mix(in srgb, var(--line-strong) 40%, var(--line)); }
+.a1 .mid { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.a1 .lbl, .a1 .ic { color: var(--muted); }
+.a1 .lbl { font-weight: 500; }
+.a1.running .ln::after { content: ""; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, var(--operational), transparent); animation: sweep-in-r 1.6s ease-in-out infinite; }
+.a1.running .ln:last-child::after { animation-name: sweep-in-l; }
+.a1.failed, .a1.failed .lbl, .a1.failed .ic { color: var(--on-danger); }
+.a1.failed .ln { background: var(--danger-soft); }
+
+/* ---------- A2 胶囊 ---------- */
+@keyframes march { to { background-position: 9px 0; } }
+.a2 { display: flex; align-items: center; gap: 10px; padding: 6px var(--inset); font-size: 12.5px; color: var(--faint); animation: rise-in 220ms ease both; }
+.a2 .pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-subtle); color: var(--muted); font-weight: 500; white-space: nowrap; }
+.a2 .ln { flex: 1; min-width: 24px; height: 1px; background: var(--line); }
+.a2.running .ln { background: repeating-linear-gradient(90deg, var(--line-strong) 0 4px, transparent 4px 9px); opacity: .55; animation: march .6s linear infinite; }
+.a2.failed .pill { border-color: transparent; background: var(--danger-soft); color: var(--on-danger); }
+.a2.failed .ln { background: var(--danger-soft); }
+
+/* ---------- A3 折缝 + 上方旧消息变淡 ---------- */
+@keyframes squeeze { 50% { height: 2px; } }
+.thread .old { transition: opacity .3s; }
+.thread.dim-old .old { opacity: .5; }
+.thread.dim-old .old:hover { opacity: 1; }
+.a3 { display: flex; align-items: center; gap: 10px; padding: 8px var(--inset); font-size: 12.5px; color: var(--faint); animation: rise-in 220ms ease both; }
+.a3 .seam { flex: 1; min-width: 24px; height: 5px; border-top: 1px solid color-mix(in srgb, var(--line-strong) 45%, var(--line)); border-bottom: 1px solid color-mix(in srgb, var(--line-strong) 45%, var(--line)); }
+.a3 .lbl, .a3 .ic { color: var(--muted); }
+.a3 .lbl { font-weight: 500; }
+.a3.running .seam { animation: squeeze 1.2s ease-in-out infinite; }
+.a3.failed, .a3.failed .lbl, .a3.failed .ic { color: var(--on-danger); }
+.a3.failed .seam { border-color: var(--danger-soft); }
+
+/* ---------- A4 浅色横带 ---------- */
+.a4 { position: relative; overflow: hidden; margin: 0 var(--inset); padding: 9px 12px; border-radius: 8px; background: color-mix(in srgb, var(--surface-subtle) 80%, transparent); animation: rise-in 220ms ease both; }
+.a4 .r1 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.a4 .r1 .sp { flex: 1; }
+.a4 .r1 .link, .a4 .r1 .num { font-size: 12px; font-weight: 400; color: var(--faint); }
+.a4 .r2 { margin: 2px 0 0 22px; font-size: 12px; color: var(--faint); }
+.a4 .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; overflow: hidden; }
+.a4 .bar i { display: block; width: 30%; height: 100%; background: var(--operational); opacity: .7; animation: compact-progress 1.3s ease-in-out infinite; }
+.a4.failed { background: color-mix(in srgb, var(--danger-soft) 70%, transparent); }
+.a4.failed .r1, .a4.failed .r2 { color: var(--on-danger); }
+
+/* ---------- A5 文字微光 ---------- */
+@keyframes shine { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+.a5 { display: flex; align-items: center; gap: 10px; padding: 6px var(--inset); font-size: 12.5px; color: var(--faint); animation: rise-in 220ms ease both; }
+.a5 .lbl, .a5 .ic { color: var(--muted); }
+.a5 .lbl { font-weight: 500; }
+.a5 .ln { flex: 1; min-width: 24px; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--line-strong) 60%, transparent), transparent); }
+.a5 .shine { font-weight: 500; color: transparent; background: linear-gradient(90deg, var(--faint) 0 38%, var(--text) 50%, var(--faint) 62% 100%); background-size: 260% 100%; -webkit-background-clip: text; background-clip: text; animation: shine 1.8s linear infinite; }
+.a5.failed, .a5.failed .lbl, .a5.failed .ic { color: var(--on-danger); }
+.a5.failed .ln { background: linear-gradient(90deg, var(--danger-soft), transparent); }
+
+/* ---------- 轨迹面板 ---------- */
+.rp { width: 760px; flex: none; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--tbg); color: var(--t1); }
+.rp[hidden] { display: none; }
+.rp-head { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border-bottom: .5px solid var(--tb2); font-size: 12.5px; font-weight: 500; }
+.tj-split { flex: 1; min-height: 0; display: flex; }
+.tj-body { flex: 1; min-width: 0; overflow: auto; }
+.tj-turn { height: 26px; padding: 0 12px; display: flex; align-items: center; gap: 8px; background: var(--tside); color: var(--t3); font-size: 11.5px; border-bottom: .5px solid var(--tb1); }
+.row { display: grid; grid-template-columns: 74px 58px minmax(0, 1fr) minmax(0, .7fr); align-items: center; height: 30px; padding: 0 8px 0 10px; border-bottom: .5px solid var(--tb1); cursor: default; }
+.row:hover { background: var(--thover); }
+.row[aria-selected="true"] { background: var(--tactive); }
+.req { color: var(--t3); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 4px; padding: 1px 4px; justify-self: start; }
+.req.link { cursor: pointer; }
+.req.link:hover, .req[aria-selected="true"] { color: var(--t1); background: var(--tactive); }
+.tag { display: inline-flex; align-items: center; height: 19px; padding: 0 5px; border-radius: 4px; font-size: 10px; line-height: 16px; font-weight: 650; letter-spacing: .035em; white-space: nowrap; justify-self: start; }
+.k-user { color: var(--primary); background: var(--primary-soft); }
+.k-message { color: color-mix(in srgb, var(--primary-new) 60%, var(--err2)); background: color-mix(in srgb, color-mix(in srgb, var(--primary-new) 55%, var(--err2)) 15%, var(--tbg)); }
+.k-tool { color: var(--warn); background: var(--warn-soft); }
+.k-compacted { color: var(--t2); background: var(--tmod); }
+.content { min-width: 0; padding-left: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row[data-k="tool"] .content, .res { font: 12px/18px var(--font-mono); }
+.res { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--t2); padding-left: 8px; }
+.res .arrow { color: var(--t4); margin-right: 8px; }
+.dot { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--t3); vertical-align: 1px; animation: pulse 1s infinite; }
+.det { width: 340px; flex: none; display: flex; flex-direction: column; min-height: 0; border-left: .5px solid var(--tb2); }
+.det-head { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; border-bottom: .5px solid var(--tb2); flex: none; }
+.det-loc { color: var(--t3); font: 11px/16px var(--font-mono); }
+.det-tabs { display: flex; gap: 2px; padding: 6px 10px 0; border-bottom: .5px solid var(--tb2); flex: none; }
+.det-tabs button { padding: 4px 8px 6px; color: var(--t3); font-size: 12px; border-bottom: 1.5px solid transparent; }
+.det-tabs button.on { color: var(--t1); border-color: var(--t1); }
+.det-body { flex: 1; min-height: 0; overflow: auto; }
+.ov { margin: 0; padding: 8px 0; font: 13px/20px var(--font-ui); }
+.ov > div { display: grid; grid-template-columns: 72px minmax(0, 1fr); min-height: 24px; padding: 0 14px; align-items: center; }
+.ov dt { color: var(--t3); }
+.ov dd { margin: 0; color: var(--t1); }
+.ov .nav { color: var(--t2); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.ov .err { color: var(--err2); }
+.tj-sum { margin-top: 12px; padding: 0 14px 14px; font: 13px/20px var(--font-ui); border-top: .5px solid var(--tb1); padding-top: 10px; }
+.raw { margin: 0; padding: 12px 14px; font: 12px/18px var(--font-mono); white-space: pre-wrap; color: var(--t2); }
+.callout { margin: 10px 12px; padding: 8px 10px; border-radius: 6px; background: var(--warn-soft); color: var(--warn); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="demo-bar">
+  <h1>压缩回显 Demo</h1>
+  <div class="grp">版本 <div class="seg" id="seg-variant"><button data-v="now" aria-pressed="true">现状</button><button data-v="A">A 原版</button><button data-v="A1">A1 居中加重</button><button data-v="A2">A2 胶囊</button><button data-v="A3">A3 折缝+淡化</button><button data-v="A4">A4 浅色横带</button><button data-v="A5">A5 文字微光</button></div></div>
+  <div class="grp">状态 <div class="seg" id="seg-state">
+    <button data-v="running">进行中</button><button data-v="done" aria-pressed="true">已完成</button><button data-v="failed">失败</button>
+  </div></div>
+  <div class="grp">主题 <div class="seg" id="seg-theme"><button data-v="light" aria-pressed="true">浅色</button><button data-v="dark">深色</button></div></div>
+  <div class="note" id="note"></div>
+</div>
+
+<div class="win">
+  <section class="main">
+    <header class="main-head">
+      <h2>沙箱改造收尾</h2><span class="sp"></span>
+      <button class="ib" id="toggle-traj" aria-pressed="false">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h10"/></svg>轨迹
+      </button>
+    </header>
+    <div class="scroll" id="scroll"><div class="thread" id="thread"></div></div>
+    <div class="compose"><div id="strip"></div><div class="composer">输入消息…<span class="sp"></span><span class="send"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg></span></div></div>
+  </section>
+
+  <aside class="rp" id="rp" hidden>
+    <div class="rp-head">轨迹</div>
+    <div class="tj-split">
+      <div class="tj-body" id="tj-rows"></div>
+      <div class="det" id="det"></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const SUMMARY_MD = `#### 目标
+把桌面端 Bash 工具改成「默认进沙箱，必要时申请出沙箱」，审批卡上要能看到出沙箱理由。
+
+#### 已完成
+- \`shell-tools\` 出沙箱参数改为 \`sandbox_permissions\` + \`justification\`，full-access 不再进沙箱
+- 识别沙箱拦截（EPERM / Operation not permitted），提示模型重新申请出沙箱
+- 桌面端 Bash 审批卡显示出沙箱理由
+
+#### 关键文件
+- \`packages/shell-tools/src/sandbox-policy.ts\`
+- \`apps/desktop/src/renderer/components/messages/ApprovalParts.tsx\`
+
+#### 下一步
+- 在 Electron 里走一遍审批卡，确认理由文案换行正常
+- 推送分支并开 PR`;
+
+const SUMMARY_TEXT = SUMMARY_MD.replace(/`/g, '');
+const S = { variant: 'now', state: 'done', expanded: false, sel: 'compact' };
+
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+function md(src) {
+  let html = '', inList = false;
+  for (const line of src.split('\n')) {
+    const t = esc(line).replace(/`([^`]+)`/g, '<code>$1</code>');
+    if (line.startsWith('- ')) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${t.slice(2)}</li>`; continue; }
+    if (inList) { html += '</ul>'; inList = false; }
+    if (line.startsWith('#### ')) html += `<h4>${t.slice(5)}</h4>`;
+    else if (line.trim()) html += `<p>${t}</p>`;
+  }
+  return html + (inList ? '</ul>' : '');
+}
+
+const chev = `<svg class="chev" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 3 7.5 6 4.5 9"/></svg>`;
+
+const BEFORE = `
+  <div class="u old">把 Bash 的出沙箱参数改成 sandbox_permissions，加个 justification 字段</div>
+  <div class="a old">
+    <div class="tool"><b>读取</b> packages/shell-tools/src/sandbox-policy.ts</div>
+    <div class="tool"><b>编辑</b> packages/shell-tools/src/bash-tool.ts</div>
+    <p>已把 <code>escalate</code> 换成 <code>sandbox_permissions</code>，取值 <code>use_default</code> / <code>require_escalated</code>，申请出沙箱时必须带 <code>justification</code>。</p>
+  </div>
+  <div class="u old">审批卡上也显示一下这个理由</div>
+  <div class="a old">
+    <div class="tool"><b>编辑</b> apps/desktop/src/renderer/components/messages/ApprovalParts.tsx</div>
+    <p>审批卡标题下面加了一行灰色理由文字，超过两行折叠。</p>
+  </div>`;
+
+const AFTER_DONE = `
+  <div class="u">好，接着把 Electron 验收清单列一下</div>
+  <div class="a"><p>根据压缩前的进度，剩下要在 Electron 里验三件事：审批卡理由换行、拒绝后模型是否改走沙箱内方案、full-access 模式下不再弹卡……</p></div>`;
+
+/* ---------- 现状 ---------- */
+function nowBlock() {
+  if (S.state === 'running') return `
+    <article class="cc"><div class="cc-running">
+      <div class="txt" role="status"><span class="title">正在压缩上下文</span><span class="meta">·</span><span class="meta">12s</span></div>
+      <div class="cc-track"><i></i></div>
+      <div class="cc-caption">正在总结较早的消息。</div>
+    </div></article>`;
+  if (S.state === 'failed') return `
+    <article class="cc"><div class="cc-div failed"><span class="ln"></span>
+      <span class="cc-label" role="alert">上下文压缩失败 · 模型请求超时<button class="cc-retry">重试</button></span>
+    <span class="ln"></span></div></article>`;
+  return `
+    <article class="cc">
+      <div class="cc-div"><span class="ln"></span>
+        <button class="cc-label" data-act="toggle" aria-expanded="${S.expanded}">上下文已压缩 · 48 条消息 · 23s ${chev}</button>
+      <span class="ln"></span></div>
+      ${S.expanded ? `<div class="cc-sum">
+        <div class="cc-sum-head"><span>压缩摘要 · ${SUMMARY_TEXT.length} 字</span><button>复制</button></div>
+        <div class="cc-sum-body md">${md(SUMMARY_MD)}</div>
+        <div class="cc-sum-foot">分隔线以上的消息仍然显示，但模型之后只通过这段摘要了解它们。</div>
+      </div>` : ''}
+    </article>`;
+}
+
+/* ---------- 新版本共用 ---------- */
+const SECTIONS = {};
+{ let cur = null; for (const line of SUMMARY_MD.split('\n')) {
+  if (line.startsWith('#### ')) { cur = line.slice(5); SECTIONS[cur] = []; }
+  else if (cur && line.trim()) SECTIONS[cur].push(line.replace(/^- /, ''));
+} }
+const inline = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+const PREVIEW = SECTIONS['目标'][0];
+const icArchive = `<svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="3.2" rx="1"/><path d="M3 6.2V12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6.2M6.5 9h3"/></svg>`;
+const icCheck = `<svg class="mk done" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.3 5 8.6l4.5-5"/></svg>`;
+const icWarn = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11h0"/></svg>`;
+const arrow = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 3 7.5 6 4.5 9"/></svg>`;
+const trajLink = `<button class="link" data-act="traj">在轨迹中查看${arrow}</button>`;
+
+/* A：Codex 式一行 + 数据；进行中挪到输入框上方状态条 */
+function blockA() {
+  if (S.state === 'running') return '';
+  if (S.state === 'failed') return `<div class="va failed">${icWarn}<span class="lbl">上下文压缩失败</span><span>模型请求超时</span><button class="retry">重试</button><span class="ln"></span></div>`;
+  return `<div class="va">${icArchive}<span class="lbl">已压缩 48 条较早消息</span><span class="num">182K → 9K tokens · 23s</span><span class="ln"></span>${trajLink}</div>`;
+}
+function stripA() {
+  if (S.variant !== 'A' || S.state !== 'running') return '';
+  return `<div class="status-strip"><span class="spin"></span><b>正在压缩上下文</b><span class="num">12s</span><span>· 腾出空间继续对话</span><span class="sp"></span></div>`;
+}
+
+/* A1–A5：都从 A 出发，进行中留在消息流里 */
+const STATS = '<span class="num">182K → 9K tokens · 23s</span>';
+const FAIL = `<span>模型请求超时，上下文没有变化</span><button class="retry">重试</button>`;
+const spinIc = '<span class="spin"></span>';
+
+function blockA1() {
+  const wrap = (cls, mid) => `<div class="a1 ${cls}"><span class="ln"></span><span class="mid">${mid}</span><span class="ln"></span></div>`;
+  if (S.state === 'running') return wrap('running', `${spinIc}<span class="lbl">正在压缩以上 48 条消息</span><span class="num">12s</span>`);
+  if (S.state === 'failed') return wrap('failed', `${icWarn}<span class="lbl">上下文压缩失败</span>${FAIL}`);
+  return wrap('', `${icArchive}<span class="lbl">以上 48 条消息已压缩</span>${STATS}<span>·</span>${trajLink}`);
+}
+function blockA2() {
+  if (S.state === 'running') return `<div class="a2 running"><span class="pill">${spinIc}正在压缩上下文</span><span class="num">12s · 总结以上 48 条消息</span><span class="ln"></span></div>`;
+  if (S.state === 'failed') return `<div class="a2 failed"><span class="pill">${icWarn}压缩失败</span>${FAIL}<span class="ln"></span></div>`;
+  return `<div class="a2"><span class="pill">${icArchive}已压缩 48 条较早消息</span>${STATS}<span class="ln"></span>${trajLink}</div>`;
+}
+function blockA3() {
+  if (S.state === 'running') return `<div class="a3 running">${spinIc}<span class="lbl">正在压缩以上消息</span><span class="num">12s</span><span class="seam"></span></div>`;
+  if (S.state === 'failed') return `<div class="a3 failed">${icWarn}<span class="lbl">上下文压缩失败</span>${FAIL}<span class="seam"></span></div>`;
+  return `<div class="a3">${icArchive}<span class="lbl">以上 48 条消息已压缩</span>${STATS}<span class="seam"></span>${trajLink}</div>`;
+}
+function blockA4() {
+  if (S.state === 'running') return `<div class="a4"><div class="r1">${spinIc}<span>正在压缩上下文</span><span class="sp"></span><span class="num">12s</span></div>
+    <div class="r2">正在把较早的 48 条消息总结成摘要，完成后继续对话</div><div class="bar"><i></i></div></div>`;
+  if (S.state === 'failed') return `<div class="a4 failed"><div class="r1">${icWarn}<span>上下文压缩失败</span><span class="sp"></span><button class="retry">重试</button></div>
+    <div class="r2">模型请求超时，上下文没有变化</div></div>`;
+  return `<div class="a4"><div class="r1">${icArchive}<span>上下文已压缩</span><span class="sp"></span>${trajLink}</div>
+    <div class="r2">以上 48 条消息已总结为摘要 · 182K → 9K tokens · 23s</div></div>`;
+}
+function blockA5() {
+  if (S.state === 'running') return `<div class="a5">${icArchive}<span class="shine">正在压缩上下文</span><span class="num">12s · 总结以上 48 条消息</span><span class="ln"></span></div>`;
+  if (S.state === 'failed') return `<div class="a5 failed">${icWarn}<span class="lbl">上下文压缩失败</span>${FAIL}<span class="ln"></span></div>`;
+  return `<div class="a5">${icArchive}<span class="lbl">以上 48 条消息已压缩</span>${STATS}<span class="ln"></span>${trajLink}</div>`;
+}
+
+const VARIANTS = {
+  now: { note: '现状：进行中是标题 + 计时 + 不确定进度条；完成是一条细分隔线，点标签才展开摘要卡片；失败是红色分隔线 + 重试。', block: nowBlock },
+  A: { note: 'A 原版（参考 Codex）：对话里只留一行带数据的标记，摘要不进对话，点「在轨迹中查看」跳到轨迹压缩行；进行中不占对话，显示在输入框上方。', block: blockA },
+  A1: { note: 'A1 居中加重：分隔线居中、线色加深，文案改成「以上 48 条消息已压缩」；进行中两侧的线有一道光从外往中间收。', block: blockA1 },
+  A2: { note: 'A2 胶囊：左侧一个浅灰胶囊标签，比纯文字更好扫到；进行中胶囊里转圈，后面的线变成流动虚线。', block: blockA2 },
+  A3: { note: 'A3 折缝 + 淡化：双线像一道折缝，分隔线以上的旧消息变淡（悬停恢复），直接看出「上面被压缩了」；进行中双线一开一合。', block: blockA3 },
+  A4: { note: 'A4 浅色横带：一条很淡的灰底横带，两行字（标题 + 说明）；进行中底边有一条细进度条。', block: blockA4 },
+  A5: { note: 'A5 文字微光：和原版 A 一样的一行，线从左往右渐隐；进行中「正在压缩上下文」几个字上有一道微光扫过。', block: blockA5 },
+};
+
+/* ---------- 轨迹 ---------- */
+function trajRows() {
+  const running = S.state === 'running', failed = S.state === 'failed';
+  const compactRes = running ? '<span class="dot"></span>进行中' : failed ? '失败' : '';
+  const row = (id, req, kind, tag, content, res = '') =>
+    `<div class="row" data-k="${kind}" data-id="${id}" aria-selected="${S.sel === id}">${req || '<span></span>'}<span class="tag k-${kind}">${tag}</span><span class="content">${content}</span><span class="res">${res}</span></div>`;
+  const req = (n, id, label) => id ? `<span class="req link" data-req="${id}" aria-selected="${S.sel === id}">${label ?? '请求 ' + n}</span>` : '<span></span>';
+  let html = `<div class="tj-turn">#7 · 第 7 轮</div>`
+    + row('u7', '', 'user', '用户', '审批卡上也显示一下这个理由')
+    + row('m7', req(13, 'r13'), 'message', '助手', '')
+    + row('t7', '', 'tool', '工具', 'edit ApprovalParts.tsx', '<span class="arrow">→</span>ok')
+    + row('m7b', req(14, 'r14'), 'message', '助手', '审批卡标题下面加了一行灰色理由文字，超过两行折叠。');
+  html += `<div class="tj-turn">压缩</div>`
+    + row('compact', req(15, 'rcompact', '请求 15 · 压缩'), 'compacted', '已压缩', running ? '' : failed ? '' : esc(SUMMARY_TEXT.split('\n').join(' ')), compactRes);
+  if (S.state === 'done') html += `<div class="tj-turn">#8 · 第 8 轮</div>`
+    + row('u8', '', 'user', '用户', '好，接着把 Electron 验收清单列一下')
+    + row('m8', req(16, 'r16'), 'message', '助手', '根据压缩前的进度，剩下要在 Electron 里验三件事……');
+  return html;
+}
+
+function trajDetail() {
+  const running = S.state === 'running', failed = S.state === 'failed';
+  const status = running ? '进行中' : failed ? '<span class="err">失败</span>' : '已完成';
+  if (S.sel === 'rcompact') return `
+    <div class="det-head"><span class="tag k-compacted">请求</span><span class="det-loc">压缩 · 第 7 轮之后</span></div>
+    <div class="det-tabs"><button class="on">概述</button><button>用量</button><button>计时</button></div>
+    <div class="det-body"><dl class="ov">
+      <div><dt>请求</dt><dd>请求 15</dd></div>
+      <div><dt>用途</dt><dd>压缩</dd></div>
+      <div><dt>状态</dt><dd>${status}</dd></div>
+      <div><dt>模型</dt><dd>—</dd></div>
+      ${failed ? '<div><dt>错误</dt><dd class="err">模型请求超时</dd></div>' : ''}
+      ${S.state === 'done' ? '<div><dt>结果</dt><dd><span class="nav" data-go="compact">已压缩</span></dd></div>' : ''}
+    </dl>
+    <div class="callout">现状：压缩请求不带 provider / model / options，「模型」恒为 —；用量页签取 record.usage，常为空。</div></div>`;
+  if (S.sel !== 'compact') return `<div class="det-head"><span class="det-loc">（只演示压缩行，点左侧「已压缩」或「请求 15 · 压缩」）</span></div>`;
+  const tab = S.tab ?? 'overview';
+  return `
+    <div class="det-head"><span class="tag k-compacted">已压缩</span><span class="det-loc">压缩</span></div>
+    <div class="det-tabs"><button data-tab="overview" class="${tab === 'overview' ? 'on' : ''}">概述</button><button data-tab="raw" class="${tab === 'raw' ? 'on' : ''}">原始输出</button></div>
+    <div class="det-body">${tab === 'raw'
+      ? `<pre class="raw">${running || failed ? '' : esc(SUMMARY_MD)}</pre>`
+      : `<dl class="ov">
+          <div><dt>状态</dt><dd>${status}</dd></div>
+          <div><dt>耗时</dt><dd>${running ? '—' : '23s'}</dd></div>
+          <div><dt>Token</dt><dd>—</dd></div>
+        </dl>
+        ${S.state === 'done' ? `<div class="tj-sum md">${md(SUMMARY_MD)}</div>` : ''}
+        <div class="callout">现状：概述只有状态 / 耗时 / Token（恒为 —），下面直接铺摘要。没有「压缩前 → 后」token、被压掉多少条消息、触发方式（手动 / 自动）。</div>`}
+    </div>`;
+}
+
+/* ---------- 渲染 ---------- */
+function render() {
+  const v = VARIANTS[S.variant];
+  document.getElementById('note').textContent = v.note;
+  document.getElementById('thread').innerHTML = BEFORE + v.block() + (S.state === 'done' ? AFTER_DONE : '');
+  document.getElementById('strip').innerHTML = stripA();
+  document.getElementById('tj-rows').innerHTML = trajRows();
+  document.getElementById('det').innerHTML = trajDetail();
+  document.getElementById('thread').classList.toggle('dim-old', S.variant === 'A3' && S.state !== 'failed');
+  if (S.state === 'done' && !S.scrolled) { S.scrolled = true; const sc = document.getElementById('scroll'); sc.scrollTop = sc.scrollHeight; }
+}
+
+function bindSeg(id, key, apply) {
+  const seg = document.getElementById(id);
+  seg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    S[key] = b.dataset.v; apply?.(b.dataset.v); render();
+  });
+}
+bindSeg('seg-variant', 'variant', () => { S.expanded = false; });
+bindSeg('seg-state', 'state', () => { S.expanded = false; });
+bindSeg('seg-theme', 'theme', v => { document.documentElement.dataset.theme = v; });
+
+function setTraj(on) {
+  document.getElementById('toggle-traj').setAttribute('aria-pressed', on);
+  document.getElementById('rp').hidden = !on;
+}
+document.getElementById('toggle-traj').addEventListener('click', e => setTraj(e.currentTarget.getAttribute('aria-pressed') !== 'true'));
+document.body.addEventListener('click', e => {
+  if (e.target.closest('[data-act="traj"]')) { setTraj(true); S.sel = 'compact'; S.tab = 'overview'; render(); return; }
+  const t = e.target.closest('[data-act="toggle"]');
+  if (t) { S.expanded = !S.expanded; render(); return; }
+  const rq = e.target.closest('[data-req]');
+  if (rq) { S.sel = rq.dataset.req; render(); return; }
+  const go = e.target.closest('[data-go]');
+  if (go) { S.sel = go.dataset.go; S.tab = 'overview'; render(); return; }
+  const tab = e.target.closest('[data-tab]');
+  if (tab) { S.tab = tab.dataset.tab; render(); return; }
+  const row = e.target.closest('.row');
+  if (row) { S.sel = row.dataset.id; S.tab = 'overview'; render(); }
+});
+// ?v=A&s=running&t=dark&x=1：直接打开某个版本 / 状态（截图用）
+{
+  const q = new URLSearchParams(location.search);
+  const pick = (id, key, val) => { if (!val) return; S[key] = val; document.querySelectorAll(`#${id} button`).forEach(b => b.setAttribute('aria-pressed', b.dataset.v === val)); };
+  pick('seg-variant', 'variant', q.get('v')); pick('seg-state', 'state', q.get('s')); pick('seg-theme', 'theme', q.get('t'));
+  if (q.get('t')) document.documentElement.dataset.theme = q.get('t');
+  if (q.get('x')) S.expanded = true;
+}
+render();
+</script>
+</body>

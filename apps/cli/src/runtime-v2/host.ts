@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { loadRuntimeV2 } from "./loader";
 import type { HostConfig } from "@actspace/agent-host";
 import type { AgentApplicationContract, AgentService } from "@actspace/agent-service";
-import { HostModelRouter, createNodeToolHostServices } from "@actspace/agent-host/node-ports";
+import { HostModelRouter, createNodeToolHostServices, resolveNodeHostNonoPath } from "@actspace/agent-host/node-ports";
+import { CLI_REPO_ROOT } from "./host-adapter";
 const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<typeof import("@actspace/agent-host")>;
 
 export async function startRemoteHost(config: HostConfig, options: { mock?: boolean; forceExit?: () => void } = {}) {
@@ -24,7 +25,7 @@ export async function startRemoteHost(config: HostConfig, options: { mock?: bool
         [runtime.LLM_HOST_PORT_ID]: { credentials, routes },
         [runtime.HEADLESS_HOST_PORT_ID]: { enabled: false },
         [runtime.PROMPT_HOST_PORT_ID]: { workspaceRoot, resolveUserSource: () => runtime.prepareUserPromptSource(config.dataRoot), resolveSource: (root: string) => runtime.prepareRuntimePromptSource({ dataRoot: config.dataRoot, workspaceRoot: root }) },
-        ...createNodeToolHostServices({ workspaceRoot, tmpRoot: join(config.dataRoot, "runtime/tmp"), model: config.defaultModel, readArtifact, resolveArtifact }),
+        ...createNodeToolHostServices({ nonoPath: resolveNodeHostNonoPath(process.env, CLI_REPO_ROOT), workspaceRoot, tmpRoot: join(config.dataRoot, "runtime/tmp"), model: config.defaultModel, readArtifact, resolveArtifact }),
       } });
       const profile = await runtime.bootProfileRuntime({ host, dataRoot: config.dataRoot, hostServices, gracefulShutdownMs: 10000, finalShutdownMs: 4000,
         composition: runtime.createProfileComposition(runtime.RUNTIME_PROFILE_IDS.host, host),
@@ -35,12 +36,12 @@ export async function startRemoteHost(config: HostConfig, options: { mock?: bool
       try {
         const application = profile.context.get?.("host.application") as AgentApplicationContract | undefined;
         if (!application) throw new Error("Host application plugin unavailable");
-        const agentRuntime = profile.context.get?.("agent.runtime") as { runs: { service: AgentService; inspectCapability<T, R>(name: string, read: (service: T | undefined) => R): R | Promise<R> }; subagents: { activeCount: number }; harnesses: { inspect(): { blocked: string; instances: readonly { state: string }[] } } };
+        const agentRuntime = profile.context.get?.("agent.runtime") as { runs: { service: AgentService; inspectCapability<T, R>(name: string, read: (service: T | undefined) => R): R | Promise<R> }; subagents: { activeCount: number }; backgroundTasks: { hasRunning(sessionId?: string): boolean }; harnesses: { inspect(): { blocked: string; instances: readonly { state: string }[] } } };
         return {
           application,
           beginDrain: () => agentRuntime.runs.service.beginDrain(),
           waitForOwnedRuns: () => agentRuntime.runs.service.waitForOwnedRuns(),
-          backgroundTask: async sessionId => agentRuntime.runs.inspectCapability<{ hasRunningBackgroundTask?: (id: string) => boolean }, boolean>("tools.shell-tools", tools => tools?.hasRunningBackgroundTask?.(sessionId) ?? false),
+          backgroundTask: async sessionId => agentRuntime.backgroundTasks.hasRunning(sessionId),
           activeSubagents: () => agentRuntime.subagents.activeCount,
           recovery: () => agentRuntime.harnesses.inspect(),
           subscribeTasks: listener => {

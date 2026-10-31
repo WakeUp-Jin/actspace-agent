@@ -22,7 +22,7 @@ export function createBuiltInPresets(allToolNames: readonly string[]): StaticPre
   const registry = new StaticPresetRegistry();
   const readOnlyTools = allToolNames.filter((name) => /^(read_file|list_directory|grep|glob)$/.test(name));
   registry.register({ id: "actspace.agent", version: 1, routeId: "default", model: "default", promptContributorIds: [], allowedToolNames: readOnlyTools, readOnly: true, maxSteps: 300, maxDurationMs: 1_800_000, maxDelegationDepth: 1 });
-  registry.register({ id: "actspace.explore", version: 1, routeId: "default", model: "default", promptContributorIds: [], allowedToolNames: readOnlyTools, readOnly: true, maxSteps: 300, maxDurationMs: 1_800_000, maxDelegationDepth: 1 });
+  registry.register({ id: "actspace.explore", version: 1, routeId: "explore", model: "default", promptContributorIds: [], allowedToolNames: readOnlyTools, readOnly: true, maxSteps: 300, maxDurationMs: 1_800_000, maxDelegationDepth: 1 });
   return registry;
 }
 

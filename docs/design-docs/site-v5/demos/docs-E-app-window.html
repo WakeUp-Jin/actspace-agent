@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文档 E · 窗口</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* E 窗口：整个文档区就是一扇 ActSpace 桌面端窗口（与首页首屏窗口同一套样子）。左栏像会话列表，标题栏放复制，右栏像上下文面板放本页目录。窗口内部滚动。 */
+body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+.desk { flex: 1; min-height: 0; width: var(--site-page); margin: 0 auto; padding: 20px 0 76px; }
+.win { height: 100%; display: grid; grid-template-columns: 248px minmax(0, 1fr) 232px; background: var(--site-paper); border: 1px solid var(--site-line); border-radius: 14px; overflow: hidden; box-shadow: 0 40px 80px -50px rgba(29,28,26,.45); }
+
+.side { display: flex; flex-direction: column; min-height: 0; background: #f4f3ef; border-right: 1px solid var(--site-line); }
+.side-top { display: flex; align-items: center; gap: 7px; height: 46px; padding: 0 16px; flex: none; }
+.side-top i { width: 11px; height: 11px; border-radius: 50%; background: var(--site-line); }
+.side-scroll { overflow: auto; padding: 4px 10px 24px; scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.side-scroll:hover { scrollbar-color: var(--site-line) transparent; }
+.nav-group { margin-bottom: 10px; }
+.nav-label { display: flex; align-items: center; gap: 8px; height: 30px; margin: 0; padding: 0 8px; font-size: 13px; color: var(--site-ink); border-radius: 7px; cursor: pointer; user-select: none; }
+.nav-label:hover { background: rgba(29,28,26,.05); }
+.nav-ico svg { width: 15px; height: 15px; color: var(--site-body); }
+.nav-items { display: none; }
+.nav-group.is-open .nav-items { display: block; }
+.nav-items a { display: flex; align-items: center; height: 30px; padding: 0 8px 0 31px; border-radius: 7px; font-size: 13px; color: var(--site-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-items a:hover { background: rgba(29,28,26,.05); color: var(--site-ink); }
+.nav-items a[aria-current] { background: rgba(29,28,26,.08); color: var(--site-ink); font-weight: 500; }
+.side-foot { flex: none; border-top: 1px solid var(--site-line); padding: 10px 18px; font-size: 12px; color: var(--site-muted); display: flex; justify-content: space-between; }
+
+.center { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.titlebar { flex: none; height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 20px; border-bottom: 1px solid var(--site-line); font-size: 13px; }
+.titlebar .path { color: var(--site-muted); }
+.titlebar .path b { color: var(--site-ink); font-weight: 500; }
+.titlebar .tools { margin-left: auto; display: flex; gap: 4px; }
+.titlebar button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--site-body); font-size: 12.5px; }
+.titlebar button:hover { background: rgba(29,28,26,.06); color: var(--site-ink); }
+.scroller { flex: 1; overflow: auto; scroll-behavior: smooth; }
+.article { max-width: 720px; margin: 0 auto; padding: 56px 40px 120px; }
+h1 { font: 500 40px/1.22 var(--display); margin: 0 0 14px; }
+.lead { font-size: 18px; line-height: 1.75; color: var(--site-body); margin: 0 0 14px; }
+.meta { font: 12px var(--mono); color: var(--site-muted); margin-bottom: 44px; display: flex; gap: 14px; }
+
+.prose { color: #45423c; font-size: 16px; line-height: 1.9; }
+.prose p, .prose ul { margin: 0 0 18px; }
+.prose ul { padding-left: 1.2em; }
+.prose li { margin: 8px 0; }
+.prose li::marker { color: var(--site-line-strong); }
+.prose strong { color: var(--site-ink); font-weight: 600; }
+.prose h2 { font: 500 26px/1.4 var(--display); color: var(--site-ink); margin: 52px 0 14px; scroll-margin-top: 24px; }
+.prose h3 { font: 600 17px/1.5 var(--sans); color: var(--site-ink); margin: 32px 0 8px; scroll-margin-top: 24px; }
+.prose a { color: var(--site-ink); text-decoration: underline; text-decoration-color: var(--site-accent-line); text-underline-offset: 4px; }
+.prose a:hover { text-decoration-color: var(--site-accent); }
+.prose :not(pre) > code { font: .86em var(--mono); background: var(--site-canvas); border: 1px solid var(--site-line); border-radius: 5px; padding: 1px 5px; color: var(--site-ink); }
+.shot { margin: 32px 0; }
+.shot-frame { border-radius: 10px; overflow: hidden; background: #fff; border: 1px solid var(--site-line); }
+.shot:first-of-type .shot-frame { max-width: 500px; }
+.shot figcaption { font-size: 12.5px; color: var(--site-muted); margin-top: 10px; }
+/* 提示块：像桌面端审批卡片 */
+.note { margin: 28px 0; border: 1px solid var(--site-line); border-radius: 12px; background: #fff; overflow: hidden; font-size: 15px; }
+.note p { margin: 0; padding: 12px 16px 14px; }
+.note strong { display: block; margin: -12px -16px 10px; padding: 8px 16px; background: #f4f3ef; border-bottom: 1px solid var(--site-line); font-size: 12.5px; font-weight: 500; color: var(--site-ink); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 24px 0; }
+th { text-align: left; font-weight: 500; font-size: 12.5px; color: var(--site-muted); padding: 8px 12px; background: #f4f3ef; }
+th:first-child { border-radius: 8px 0 0 8px; } th:last-child { border-radius: 0 8px 8px 0; }
+td { padding: 12px; border-bottom: 1px solid var(--site-line); }
+td:first-child { color: var(--site-ink); }
+/* 代码块：像桌面端工具行里的终端输出 */
+.code-block { margin: 24px 0; border: 1px solid var(--site-line); border-radius: 10px; overflow: hidden; background: #fff; }
+.code-bar { display: flex; justify-content: space-between; align-items: center; height: 34px; padding: 0 8px 0 14px; border-bottom: 1px solid var(--site-line); font-size: 12.5px; }
+.code-lang { font: 12px var(--mono); color: var(--site-body); }
+.code-lang::before { content: "▸ "; color: var(--site-muted); }
+.code-copy { font-size: 12px; color: var(--site-body); background: none; border: 0; padding: 3px 8px; border-radius: 6px; }
+.code-copy:hover { background: rgba(29,28,26,.06); }
+pre { margin: 0; padding: 14px 16px; overflow: auto; font: 13px/1.75 var(--mono); color: var(--site-ink); }
+
+.pager { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 64px; }
+.pager a { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--site-line); border-radius: 12px; background: #fff; }
+.pager a:hover { border-color: var(--site-accent-line); }
+.pager-next { text-align: right; }
+.pager-dir { font-size: 12px; color: var(--site-muted); }
+.pager-title { font-size: 15px; font-weight: 500; }
+
+/* 右栏：像上下文面板 */
+.panel { border-left: 1px solid var(--site-line); display: flex; flex-direction: column; min-height: 0; }
+.panel-head { flex: none; height: 46px; display: flex; align-items: center; padding: 0 16px; font-size: 13px; font-weight: 500; border-bottom: 1px solid var(--site-line); }
+.panel-body { overflow: auto; padding: 16px; }
+.panel .toc-progress { height: 6px; border-radius: 999px; background: var(--site-canvas-soft); overflow: hidden; margin: 2px 0 6px; }
+.panel .toc-progress i { display: block; height: 100%; width: 0; background: var(--site-accent); border-radius: inherit; transition: width 120ms; }
+.panel .toc-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--site-muted); margin-bottom: 18px; }
+.panel-sub { font-size: 12px; color: var(--site-muted); margin: 0 0 6px; }
+.panel nav a { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin: 0 -8px; border-radius: 7px; font-size: 13px; color: var(--site-body); }
+.panel nav a::before { content: ""; width: 6px; height: 6px; border-radius: 2px; background: var(--site-line-strong); flex: none; }
+.panel nav a.nested { padding-left: 22px; }
+.panel nav a:hover { background: rgba(29,28,26,.05); color: var(--site-ink); }
+.panel nav a.is-active { color: var(--site-ink); background: rgba(29,28,26,.06); }
+.panel nav a.is-active::before { background: var(--site-accent); }
+.panel-card { margin-top: 22px; padding: 12px; border: 1px solid var(--site-line); border-radius: 10px; font-size: 12.5px; color: var(--site-body); line-height: 1.6; background: #fff; }
+.panel-card b { display: block; color: var(--site-ink); font-weight: 500; margin-bottom: 2px; }
+
+@media (max-width: 1240px) { .win { grid-template-columns: 228px minmax(0, 1fr); } .panel { display: none; } }
+@media (max-width: 820px) { body { height: auto; overflow: auto; } .desk { padding: 12px 0 80px; } .win { display: block; height: auto; } .side { border-right: 0; border-bottom: 1px solid var(--site-line); } .side-scroll { max-height: 220px; } .side-foot { display: none; } .scroller { overflow: visible; } .article { padding: 32px 20px 64px; } h1 { font-size: 32px; } .pager { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+<div class="desk">
+  <div class="win">
+    <aside class="side">
+      <div class="side-top"><i></i><i></i><i></i></div>
+      <div class="side-scroll"><nav data-nav aria-label="文档目录"></nav></div>
+      <div class="side-foot"><span>文档 · 28 篇</span><span>v0.1</span></div>
+    </aside>
+    <section class="center">
+      <div class="titlebar">
+        <span class="path">文档 / <span data-fill="group"></span> / <b data-fill="title"></b></span>
+        <span class="tools"><button type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>复制页面</button><button type="button">在 GitHub 编辑 ↗</button></span>
+      </div>
+      <div class="scroller">
+        <main class="article">
+          <h1 data-fill="title"></h1>
+          <p class="lead" data-fill="lead"></p>
+          <p class="meta"><span>更新于 <span data-fill="updated"></span></span><span>约 <span data-fill="minutes"></span> 分钟</span></p>
+          <div class="prose" data-body></div>
+          <nav class="pager" data-pager></nav>
+        </main>
+      </div>
+    </section>
+    <aside class="panel">
+      <div class="panel-head">本页</div>
+      <div class="panel-body">
+        <div class="toc-progress"><i></i></div>
+        <div class="toc-meta"><span>已读 <span data-read>0</span>%</span><span>约 4 分钟</span></div>
+        <p class="panel-sub">章节</p>
+        <nav data-toc-list></nav>
+        <div class="panel-card"><b>相关</b>上下文面板的数字来自哪里，见「Token、缓存与费用」。</div>
+      </div>
+    </aside>
+  </div>
+</div>
+<script src="shared.js"></script>
+<script>
+const folder = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>';
+bootDoc("E", { nav: { icons: Array(7).fill(folder) } });
+document.querySelectorAll(".nav-label").forEach((l) => l.addEventListener("click", () => l.parentElement.classList.toggle("is-open")));
+// 窗口内部滚动：目录高亮与阅读进度跟随 .scroller
+const sc = document.querySelector(".scroller");
+const links = [...document.querySelectorAll("[data-toc]")];
+const bar = document.querySelector(".toc-progress i"), read = document.querySelector("[data-read]");
+const sync = () => {
+  const top = sc.getBoundingClientRect().top;
+  let cur = links[0]?.dataset.toc;
+  links.forEach((a) => { const h = document.getElementById(a.dataset.toc); if (h && h.getBoundingClientRect().top - top < 80) cur = a.dataset.toc; });
+  links.forEach((a) => a.classList.toggle("is-active", a.dataset.toc === cur));
+  const p = Math.round((sc.scrollTop / Math.max(1, sc.scrollHeight - sc.clientHeight)) * 100);
+  bar.style.width = p + "%"; read.textContent = p;
+};
+sc.addEventListener("scroll", sync, { passive: true }); sync();
+</script>
+</body>
+</html>

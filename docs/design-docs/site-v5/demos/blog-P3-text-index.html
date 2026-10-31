@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博客 P3 · 纯文字</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="blog-prose.css">
+<style>
+/* P3 纯文字：像个人博客。列表不放图，按月份分组，左边固定标题和分类，右边一篇一段；文章页左侧一条细栏放返回、信息和目录，正文单栏。全站最安静的一版。 */
+.page { width: var(--site-page); margin-inline: auto; display: grid; grid-template-columns: 280px minmax(0, 760px); gap: 80px; justify-content: center; padding: 72px 0 140px; }
+.side { position: sticky; top: calc(var(--site-header-height) + 72px); align-self: start; }
+.side h1 { font: 500 56px/1 var(--display); margin: 0 0 18px; }
+.side > p { font-size: 15px; line-height: 1.75; color: var(--site-body); margin: 0 0 36px; }
+.cats { display: grid; gap: 2px; }
+.cats button { position: relative; display: flex; justify-content: space-between; background: none; border: 0; padding: 8px 0; font-size: 14px; color: var(--site-body); text-align: left; border-bottom: 1px solid transparent; }
+.cats button small { font: 12px var(--mono); color: var(--site-muted); }
+.cats button:hover { color: var(--site-ink); }
+.cats button[aria-pressed="true"] { color: var(--site-ink); font-weight: 500; }
+.cats button[aria-pressed="true"]::before { content: "→"; position: absolute; left: -22px; color: var(--site-accent); }
+.month { font: 12px var(--mono); color: var(--site-muted); padding: 0 0 10px; margin: 48px 0 0; border-bottom: 1px solid var(--site-ink); }
+.month:first-child { margin-top: 6px; }
+.entry { display: block; padding: 26px 0 28px; border-bottom: 1px solid var(--site-line); }
+.entry h3 { font: 500 25px/1.4 var(--display); margin: 0 0 10px; }
+.entry h3 span { background-image: linear-gradient(var(--site-accent), var(--site-accent)); background-size: 0 1.5px; background-repeat: no-repeat; background-position: 0 100%; transition: background-size 250ms; }
+.entry:hover h3 span { background-size: 100% 1.5px; }
+.entry p { margin: 0 0 12px; font-size: 15.5px; line-height: 1.8; color: var(--site-body); }
+.entry .meta { font-size: 13px; color: var(--site-muted); display: flex; gap: 14px; }
+.entry .meta b { font-weight: 400; color: var(--site-accent); }
+
+/* 文章页 */
+.post { width: var(--site-page); margin-inline: auto; display: grid; grid-template-columns: 220px minmax(0, 700px) 220px; gap: 64px; justify-content: center; padding: 64px 0 140px; }
+.rail { position: sticky; top: calc(var(--site-header-height) + 64px); align-self: start; font-size: 13px; }
+.rail .back { display: inline-block; color: var(--site-body); margin-bottom: 40px; }
+.rail .back:hover { color: var(--site-ink); }
+.rail dl { margin: 0 0 36px; display: grid; gap: 14px; }
+.rail dt { font: 11.5px var(--mono); color: var(--site-muted); margin-bottom: 2px; }
+.rail dd { margin: 0; color: var(--site-ink); }
+.rail nav p { font: 11.5px var(--mono); color: var(--site-muted); margin: 0 0 8px; }
+.rail nav a { display: block; padding: 5px 0; color: var(--site-muted); line-height: 1.5; }
+.rail nav a:hover, .rail nav a.is-active { color: var(--site-ink); }
+.rail nav a.is-active::before { content: "— "; color: var(--site-accent); }
+.post h1 { font: 500 46px/1.28 var(--display); margin: 0 0 20px; }
+.post .desc { font: 20px/1.75 var(--display); color: var(--site-body); margin: 0 0 48px; padding-bottom: 40px; border-bottom: 1px solid var(--site-line); }
+.bprose h2 { font-size: 28px; }
+
+@media (max-width: 1100px) { .post { grid-template-columns: 200px minmax(0, 700px); } .post > .spacer { display: none; } }
+@media (max-width: 860px) { .page, .post { display: block; padding-top: 40px; } .side, .rail { position: static; margin-bottom: 32px; } .side h1 { font-size: 42px; } .cats { grid-auto-flow: column; overflow-x: auto; gap: 18px; } .rail dl { grid-template-columns: repeat(3, auto); justify-content: start; gap: 18px; } .rail nav { display: none; } .post h1 { font-size: 32px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+
+<main class="page" data-view="list">
+  <aside class="side">
+    <h1>博客</h1>
+    <p>开发 ActSpace 时的设计笔记与踩坑记录。写给同样在做 Agent 的人。</p>
+    <div class="cats" id="cats"></div>
+  </aside>
+  <div id="entries"></div>
+</main>
+
+<div class="post" data-view="post" hidden>
+  <aside class="rail">
+    <a class="back" href="#">← 全部文章</a>
+    <dl><div><dt>分类</dt><dd data-post-fill="cat"></dd></div><div><dt>发布</dt><dd data-post-fill="date"></dd></div><div><dt>阅读</dt><dd>约 9 分钟</dd></div><div><dt>作者</dt><dd>WakeUp-Jin</dd></div></dl>
+    <nav><p>目录</p><div data-post-toc></div></nav>
+  </aside>
+  <main>
+    <h1 data-post-fill="title"></h1>
+    <p class="desc" data-post-fill="desc"></p>
+    <article class="bprose" data-post-body></article>
+  </main>
+  <div class="spacer"></div>
+</div>
+
+<script src="shared.js"></script>
+<script>// 返回链接走列表视图
+document.addEventListener("click", (e) => { if (e.target.closest(".back")) { e.preventDefault(); history.pushState(null, "", location.pathname); syncBlogView(); scrollTo(0, 0); } });</script>
+<script src="blog-shared.js"></script>
+<script>
+const counts = Object.fromEntries(CATS.map((c) => [c, POSTS.filter((p) => p.cat === c).length]));
+document.getElementById("cats").innerHTML = `<button aria-pressed="true">全部<small>${POSTS.length}</small></button>` + CATS.map((c) => `<button aria-pressed="false">${c}<small>${counts[c]}</small></button>`).join("");
+document.querySelectorAll(".cats button").forEach((b) => b.addEventListener("click", () => document.querySelectorAll(".cats button").forEach((x) => x.setAttribute("aria-pressed", x === b))));
+let html = "", last = "";
+for (const p of POSTS) {
+  const [y, m] = p.date.split("-");
+  const key = `${y} 年 ${+m} 月`;
+  if (key !== last) { html += `<p class="month">${key}</p>`; last = key; }
+  html += `<a class="entry" href="#post"><h3><span>${besc(p.title)}</span></h3><p>${besc(p.desc)}</p><p class="meta"><b>${p.cat}</b><span>${p.date.slice(5)}</span><span>${p.min} 分钟</span></p></a>`;
+}
+document.getElementById("entries").innerHTML = html;
+bootBlog("P3");
+</script>
+</body>
+</html>

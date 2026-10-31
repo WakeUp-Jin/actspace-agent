@@ -1,4 +1,4 @@
-import { billingReferenceProvider, type ModelApi, type resolveModelPricing } from "@actspace/shared";
+import type { ModelApi, resolveModelPricing } from "@actspace/shared";
 
 export type DesktopRuntimeV2ResolvedModel = {
   readonly key: string;
@@ -15,6 +15,7 @@ export type DesktopRuntimeV2ResolvedModel = {
     readonly thinkingDefault?: boolean;
     readonly requestModelByReasoningEffort?: Partial<Record<import("@actspace/shared").ModelReasoningEffort, string>>;
     readonly capabilities?: import("@actspace/shared").ModelCapabilities;
+    readonly effective?: Pick<import("@actspace/shared").EffectiveModel, "sources" | "ratesUnsupported">;
   };
   readonly providerRuntime: {
     readonly apiKey?: string;
@@ -23,7 +24,6 @@ export type DesktopRuntimeV2ResolvedModel = {
     readonly pricingMultiplier?: number;
     readonly promptCacheMode?: import("@actspace/shared").CustomConnectionPromptCacheMode;
     readonly authScheme?: import("@actspace/shared").CustomConnectionResolvedAuth;
-    readonly billingMode?: import("@actspace/shared").CustomConnectionBillingMode;
   };
 };
 
@@ -34,6 +34,9 @@ export type DesktopRuntimeV2ModelResolution =
 export interface DesktopRuntimeV2ModelPort {
   resolveAutoReviewModel?(requestedMain?: string | null): DesktopRuntimeV2ModelResolution;
   resolveUtilityTaskModel?(requestedMain?: string | null): DesktopRuntimeV2ModelResolution;
+  resolveExploreTaskModel?(requestedMain?: string | null): DesktopRuntimeV2ModelResolution;
+  /** 用途表里的思考档位；null = 模型默认。 */
+  purposeThinking?(purpose: "utility" | "autoReview" | "explore" | "vision"): import("@actspace/shared").ThinkingLevel | null;
   resolvePricing?(model: DesktopRuntimeV2ResolvedModel, apiModel: string): import("@actspace/shared").ModelPricingSnapshot | null;
   resolveMainModel(requested?: string | null): DesktopRuntimeV2ModelResolution;
   resolveImageInspectionModel(): DesktopRuntimeV2ModelResolution;
@@ -44,7 +47,7 @@ export interface DesktopRuntimeV2ModelPort {
   };
 }
 
-/** 运行时和 legacy 兜底共用的计价参数。definition.pricing 在 resolve 时已按计费方式处理过倍率。 */
+/** 运行时和 legacy 兜底共用的计价参数。definition.pricing 是快照里算好的最终价（参考价已乘倍率）。 */
 export function customConnectionPricingInput(model: DesktopRuntimeV2ResolvedModel, apiModel: string): Parameters<typeof resolveModelPricing>[1] {
   return {
     providerId: model.definition.provider,
@@ -53,8 +56,8 @@ export function customConnectionPricingInput(model: DesktopRuntimeV2ResolvedMode
     baseUrl: model.providerRuntime.baseUrl ?? "",
     connectionId: model.connectionId,
     multiplier: model.providerRuntime.pricingMultiplier,
-    configured: model.definition.source === "custom" && apiModel === model.definition.apiModel ? model.definition.pricing : undefined,
-    configuredAlreadyMultiplied: true,
-    ...(model.providerRuntime.billingMode ? { billingMode: model.providerRuntime.billingMode, referenceProviderId: billingReferenceProvider(model.definition.api) } : {}),
+    configured: apiModel === model.definition.apiModel ? model.definition.pricing : undefined,
+    configuredByUser: model.definition.effective?.sources.rates === "user",
+    unsupportedBilling: model.definition.effective?.ratesUnsupported === true,
   };
 }

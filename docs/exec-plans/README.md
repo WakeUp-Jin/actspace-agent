@@ -18,14 +18,28 @@
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
-| [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 实施 shared 契约、设置入口与协议回归。 |
+| [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 已被[设置 › 模型重做](completed/20261021-model-provider-redesign.md)取代（思考档位改为每个模型声明的档位）；是否删除由用户决定。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；DropdownMenu（及 Popover、Dialog、Select、ContextMenu）由 Desktop 前端重构 16 接手；剩 Switch、Textarea、Tabs 及对应迁移。 |
 
 六个早期后端计划已移出执行导航，短页仅保留历史链接。独有目标与未完成项见[结算](../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)，当前验证见本轮清理摘要。
 
+## 已停止的本轮验收
+
+2026-10-25 用户决定本轮验收到此为止，因暂时没有时间，未验证部分留待对外发版时完整验收。原 165 项中 104 项历史通过、61 项部分或未覆盖；52 个 Bug 中 51 个关闭，BUG-039 保留未关闭。两份旧验收/集中修复 active 计划退出执行入口，131 份过程文档合并为[唯一结算与未验证清单](../exec-runs/20261021-actspace-full-acceptance/execution-summary.md)，完整原文保存在清理前提交 `8dbc68a5`；不代表验收全部完成。
+
 ## 最近完成
 
 - [侧边对话](completed/20261021-side-chat.md)：插件 `@actspace/side-chat`、`openSideChat` IPC、右栏 `sideChat` tab、`/side` 与侧栏数量完成；desktop 1986 项测试与前端检查通过；Electron 实机 1–7 未执行，见[执行摘要](../exec-runs/20261021-side-chat/execution-summary.md)。
+- [压缩的前端回显（A1）](completed/20261025-compaction-display.md)：对话里压缩改为居中分隔线（条数、压缩前 → 约压缩后 tokens、耗时、「在轨迹中查看」），摘要只在轨迹看；后端在 `compaction/end` 记录触发方式与前后 token，轨迹概述补齐；desktop 2029 项测试通过，`?mock=compaction` 截图完成；Electron 未验证，见[执行摘要](../exec-runs/20261025-compaction-display/execution-summary.md)。
+- [工具沙箱的出沙箱与回退](completed/20261025-sandbox-escape-fallback.md)：T0–T6 完成（分支 `feat/sandbox-refactor`，提 PR 合入 main）；`full-access` 下 bash 不进沙箱，出沙箱改为 `sandbox_permissions` 加 `justification` 并每次批准，审批卡显示理由，被沙箱拦了在结果里提示；真实 Host 端到端、全仓检查与 Codex 验收通过（验收发现的完全权限提示过时已修复）；审批卡理由行与深色主题未经实机完整复验，见[执行摘要](../exec-runs/20261025-sandbox-escape-fallback/execution-summary.md)。
+- [沙箱第二期：评估沙箱](completed/20261025-sandbox-v2-evaluation-sandbox.md)：T0–T8 完成（分支 `feat/sandbox-refactor`，提 PR 合入 main）；nono `run` 域名白名单（本机端口、上游代理），继承模式改由 Host 告知，CLI `--harness` / `--sandbox-inherited`，新包 `harness-evaluation` 在评估沙箱里跑 CLI 候选；真实 nono + CLI 集成测试（macOS、Linux Docker）与全仓检查通过；工具沙箱是否排除系统写入组待用户决定，见[执行摘要](../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)。
+- [沙箱第一期：地基 + 工具沙箱](completed/20261025-sandbox-v1-tool-sandbox.md)：T0–T10 完成（分支 `feat/sandbox-refactor`，提 PR 合入 main）；沙箱管理器与 nono / Seatbelt 后端作为 Harness 插件进入默认组合，bash 经 `sandbox` 服务执行，缺失或不可用时转“真实环境”审批；全仓检查、真实 Host 端到端（nono / Seatbelt）、Linux Docker 与打包签名通过；Desktop 界面未验证，见[执行摘要](../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。
+- [官网 V5：文档、博客与更新日志改版](completed/20261025-site-v5-docs-blog-updates.md)：文档 A4 小舞台、博客 Q2 列表 + R3 头部 + M2 正文、更新日志 U1 时间轴；Markdown 改为构建期 Sätteri 插件；check / test / build 通过，用户视觉验收通过，见[执行摘要](../exec-runs/20261025-site-v5-docs-blog-updates/execution-summary.md)。真实浏览器剪贴板复制未单独验证。
+- [子智能体轨迹](completed/20261021-subagent-trajectory.md)：父轨迹只留 `agent` 一行，详情「查看轨迹」在右侧子 Agent 面板打开子会话轨迹（对话 / 轨迹切换，窄面板详情在下半部分）；desktop 1920 项测试通过，浏览器 mock 截图完成；Electron 真实子智能体未验证，见[执行摘要](../exec-runs/20261021-subagent-trajectory/execution-summary.md)与[验收交接](../exec-runs/20261021-subagent-trajectory/acceptance-handoff.md)。
+
+- [后台任务：后台 Bash、后台子智能体与任务工具](completed/20261022-background-tasks.md)：T1–T10 完成（feat/background-tasks 已合并入 fix/settings-model-select）；统一登记表、空闲唤醒、`task_*` 四个工具、后台子 Agent、任务清单上下文、「后台」标签与唤醒分隔行；浏览器 mock 截图完成；Electron 未验证，见[执行摘要](../exec-runs/20261022-background-tasks/execution-summary.md)。
+- [设置 › 模型：四层数据模型与页面重做](completed/20261021-model-provider-redesign.md)：A–E 完成，旧 provider 页面、多 Key、billingMode 与旧 IPC 删除；desktop main 512、renderer 1388、shared 179 通过，浏览器 mock 截图完成；Electron 与真实 Key 未验证，见[执行摘要](../exec-runs/20261021-model-provider-redesign/execution-summary.md)。
+- [设置 › 模型：获取可用模型与连接详情重做](completed/20261021-model-acquisition-picker.md)：去掉启用开关（迁移删掉停用模型）、所有连接用「获取可用模型」弹窗手动勾选、新连接为空并自动弹窗、手动添加按 ID 自动补全、行内移除 + 8 秒撤销、连接字段失焦即保存；desktop 1926 项测试通过，浏览器 mock 截图完成；Electron 与真实 Key 未验证，见[执行摘要](../exec-runs/20261021-model-acquisition-picker/execution-summary.md)与[验收交接](../exec-runs/20261021-model-acquisition-picker/acceptance-handoff.md)。
 
 - [会话查询授权与替我审批](completed/20261018-permission-auto-review.md)：查询会话授权、判断插件、模型设置与结果审计完成；398 项定向测试通过，追加真实 Electron 交互、路由缺陷修复复验及原生 Computer Use；商业 Provider 未覆盖，见[执行摘要](../exec-runs/20261018-permission-auto-review/execution-summary.md)。
 

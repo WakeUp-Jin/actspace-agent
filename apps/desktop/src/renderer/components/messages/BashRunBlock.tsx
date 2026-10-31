@@ -29,6 +29,9 @@ const BASH_APPROVAL_HEADS_CLASS = "bash-approval-heads min-w-0 shrink-[2] trunca
 // act-code-hl 提供随主题翻转的语法色（markdown.css）；命令名用红橙、连接符用蓝，接近终端里的常见配色。
 const BASH_APPROVAL_COMMAND_CLASS =
   "bash-approval-command act-code-hl m-0 max-h-[168px] overflow-auto whitespace-pre-wrap px-3 pt-2.5 pb-0.5 font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.6] text-text-main [overflow-wrap:anywhere]";
+// 申请出沙箱的理由：命令下面一行次要文字，和底部的「真实环境」一起说明为什么要离开沙盒。
+const BASH_APPROVAL_JUSTIFICATION_CLASS =
+  "bash-approval-justification m-0 px-3 pt-1 pb-0.5 text-act-sm leading-[1.5] text-text-muted [overflow-wrap:anywhere]";
 const SHELL_TOKEN_CLASS: Record<ShellTokenKind, string | undefined> = {
   command: "text-(--md-hl-variable)",
   operator: "text-(--md-hl-function)",
@@ -45,16 +48,13 @@ export function BashRunBlock({ message, replyCompleted = false, onExpand }: { me
   return <BashExecutionBlock message={message} replyCompleted={replyCompleted} onExpand={onExpand} />;
 }
 
-const BASH_BACKGROUND_BADGE_CLASS =
-  "bash-background-badge inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-act-xs leading-4 font-medium text-text-faint";
+/** 后台 Bash 与后台子 Agent 共用的「后台」标签；状态仍由卡片自身的状态表达。 */
+export const BACKGROUND_TAG_CLASS =
+  "background-tag inline-flex flex-none items-center rounded-act-sm border border-line bg-surface-subtle px-1.5 py-px text-act-xs leading-4 font-medium text-text-faint";
 
-const BACKGROUND_BADGE_TEXT: Record<NonNullable<BashMessage["backgroundStatus"]>, string> = {
-  running: "后台运行中",
-  completed: "后台完成",
-  failed: "后台失败",
-  killed: "已终止",
-  stalled: "疑似等待输入",
-};
+export function BackgroundTag() {
+  return <span className={BACKGROUND_TAG_CLASS}>后台</span>;
+}
 
 // 沙盒标签：沙盒是默认态弱化显示；真实环境是例外态，醒目提示用户命令未受沙盒约束
 const BASH_SANDBOX_BADGE_CLASS =
@@ -81,9 +81,7 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
   const summary = getExecutionSummary(message);
   const target = message.commandPreview || message.command || "Bash command";
   // 前台执行中 / 后台仍在跑：标题走 shimmer 高光，让用户看出命令正在执行
-  const isActive =
-    message.status === "running" &&
-    (message.backgroundStatus === undefined || message.backgroundStatus === "running");
+  const isActive = message.status === "running";
 
   return (
     <article className={`${BASH_RUN_CLASS} is-${message.status}`}>
@@ -106,9 +104,7 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
         <span className={BASH_COMMAND_PREVIEW_CLASS} title={target}>{target}</span>
         <span className={BASH_RUN_TRAILING_CLASS}>
           <EnvironmentBadge sandboxed={message.sandboxed === false ? false : undefined} notExecuted={message.notExecuted} />
-          {message.backgroundStatus ? (
-            <span className={BASH_BACKGROUND_BADGE_CLASS}>{BACKGROUND_BADGE_TEXT[message.backgroundStatus]}</span>
-          ) : null}
+          {message.background ? <BackgroundTag /> : null}
           {chevron}
         </span>
       </button>
@@ -188,6 +184,7 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
           return className ? <span key={index} className={className}>{token.text}</span> : token.text;
         })}
       </pre>
+      {message.justification ? <p className={BASH_APPROVAL_JUSTIFICATION_CLASS}>{message.justification}</p> : null}
     </ApprovalCard>
   );
 }

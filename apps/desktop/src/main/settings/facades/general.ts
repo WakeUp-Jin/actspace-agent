@@ -24,9 +24,10 @@ import {
   isValidModelDefinition,
   redactProxyUrl,
   sanitizeAgentV2,
+  sanitizeCustomModels,
   sanitizeImageGenerationSettings,
-  sanitizeImageInspectionSettings,
   sanitizeInstalledModel,
+  sanitizeModelOverridesMap,
   sanitizeProviderSettings,
   sanitizeQuickOpenShortcut,
   sanitizeShortcuts,
@@ -90,7 +91,6 @@ export function get(store: SettingsStore): AppSettings {
     taskModels: v2.taskModels,
     searchProviders: v2.searchProviders,
     imageGeneration: v2.imageGeneration,
-    imageInspection: v2.imageInspection,
     agent: { ...v2.agent, exploreModelId },
     skills: v2.skills,
     shortcuts: v2.shortcuts,
@@ -118,11 +118,6 @@ export function getV2(store: SettingsStore): AppSettingsV2 {
       installedModelCount: installed.length,
       enabledModelCount: enabled.length,
       defaultPricingMultiplier: settings.defaultPricingMultiplier,
-      additionalCredentials: settings.additionalCredentials.map((credential) => ({
-        ...credential,
-        lastConnection: { ...credential.lastConnection },
-        hasApiKey: Boolean(store.getStoredProviderCredential(provider, credential.id)),
-      })),
     }];
   })) as AppSettingsV2["providers"];
 
@@ -140,7 +135,6 @@ export function getV2(store: SettingsStore): AppSettingsV2 {
       exa: { hasApiKey: Boolean(store.getStoredKey("exa")) },
     },
     imageGeneration: media.getImageGenerationSettingsView(store),
-    imageInspection: { ...store.settings.imageInspection },
     agent: { ...store.settings.agent, disabledTools: [...store.settings.agent.disabledTools] },
     skills: { disabled: [...store.settings.skills.disabled] },
     shortcuts: cloneJson(store.settings.shortcuts),
@@ -148,11 +142,12 @@ export function getV2(store: SettingsStore): AppSettingsV2 {
 }
 
 /** Main-only storage snapshot used by model services; never contains decrypted secrets. */
-export function getModelStorageState(store: SettingsStore): Pick<PersistedSettingsV3, "installedModels" | "customModels" | "taskModels"> {
+export function getModelStorageState(store: SettingsStore): Pick<PersistedSettingsV3, "installedModels" | "customModels" | "taskModels" | "modelOverrides"> {
   return cloneJson({
     installedModels: store.settings.installedModels,
     customModels: store.settings.customModels,
     taskModels: store.settings.taskModels,
+    modelOverrides: store.settings.modelOverrides,
   });
 }
 
@@ -170,8 +165,16 @@ export async function updateModelStorage(store: SettingsStore, input: ModelStora
         const key = normalizeModelKey(rawKey);
         if (!key) continue;
         if (value === null) delete store.settings.customModels[key];
-        else if (isValidModelDefinition(value, key)) store.settings.customModels[key] = cloneJson(value);
+        else if (isValidModelDefinition(value, key)) store.settings.customModels[key] = sanitizeCustomModels({ [key]: value })[key]!;
       }
+      for (const [rawKey, value] of Object.entries(input.overrides ?? {})) {
+        const key = normalizeModelKey(rawKey);
+        if (!key) continue;
+        const overrides = value === null ? undefined : sanitizeModelOverridesMap({ [key]: value })[key];
+        if (overrides) store.settings.modelOverrides[key] = overrides;
+        else delete store.settings.modelOverrides[key];
+      }
+      if (input.taskModels) store.settings.taskModels = sanitizeTaskModels({ ...store.settings.taskModels, ...input.taskModels });
       if (input.connections) {
         const current = store.getV4();
         await applyNamespaceV4(store, { namespace: "models", expectedRevision: current.revision, patch: { connections: input.connections } as Partial<SettingsV4Models> });
@@ -205,9 +208,6 @@ export async function update(store: SettingsStore, input: SettingsUpdateInput): 
       }
       if (input.skills) {
         store.settings.skills = sanitizeSkills({ ...store.settings.skills, ...input.skills });
-      }
-      if (input.imageInspection) {
-        store.settings.imageInspection = sanitizeImageInspectionSettings(input.imageInspection);
       }
       await store.writeSettingsFile();
       store.applyToEnv();
@@ -260,9 +260,6 @@ export async function updateV2(store: SettingsStore, input: SettingsV2UpdateInpu
       if (input.skills) store.settings.skills = sanitizeSkills({ ...store.settings.skills, ...input.skills });
       if (input.imageGeneration) {
         store.settings.imageGeneration = sanitizeImageGenerationSettings({ ...store.settings.imageGeneration, ...input.imageGeneration }, store.settings.imageGeneration);
-      }
-      if (input.imageInspection) {
-        store.settings.imageInspection = sanitizeImageInspectionSettings({ ...store.settings.imageInspection, ...input.imageInspection });
       }
       if (input.shortcuts) {
         store.settings.shortcuts = sanitizeShortcuts({ ...store.settings.shortcuts, ...input.shortcuts, quickOpen: { ...store.settings.shortcuts.quickOpen, ...input.shortcuts.quickOpen } });
@@ -318,8 +315,10 @@ function applySettingsV4NamespacePatch(settings: SettingsV4, input: SettingsV4Up
         ...next.models,
         ...input.patch,
         connections: applyRecordPatch(next.models.connections, input.patch.connections),
-        definitions: { ...next.models.definitions, ...(input.patch.definitions ?? {}) },
-        installed: { ...next.models.installed, ...(input.patch.installed ?? {}) },
+        // 三张表都按「null = 删除」合并。
+        definitions: applyRecordPatch(next.models.definitions, input.patch.definitions),
+        installed: applyRecordPatch(next.models.installed, input.patch.installed),
+        overrides: applyRecordPatch(next.models.overrides ?? {}, input.patch.overrides),
         taskBindings: { ...next.models.taskBindings, ...(input.patch.taskBindings ?? {}) },
       };
       break;
@@ -327,7 +326,7 @@ function applySettingsV4NamespacePatch(settings: SettingsV4, input: SettingsV4Up
       next.tools = { ...next.tools, ...input.patch, bash: { ...next.tools.bash, ...(input.patch.bash ?? {}) }, searchProviders: { ...next.tools.searchProviders, ...(input.patch.searchProviders ?? {}) } };
       break;
     case "media":
-      next.media = { ...next.media, ...input.patch, imageGeneration: { ...next.media.imageGeneration, ...(input.patch.imageGeneration ?? {}) }, imageInspection: { ...next.media.imageInspection, ...(input.patch.imageInspection ?? {}) } };
+      next.media = { ...next.media, ...input.patch, imageGeneration: { ...next.media.imageGeneration, ...(input.patch.imageGeneration ?? {}) } };
       break;
     case "skills":
       next.skills = { ...next.skills, ...input.patch };

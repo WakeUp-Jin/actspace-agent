@@ -19,6 +19,7 @@ export type ActiveSessionValue = {
   readonly isCompacting: boolean;
   readonly isSessionReady: boolean;
   readonly sendScrollRequestId: number;
+  /** New Quick Open intent: reveal chat in the workbench, then focus its composer. */
   readonly composerFocusRequestId: number;
   readonly onSend?: (text: string, options: ComposerSendOptions) => void;
   readonly onAbort?: () => void;

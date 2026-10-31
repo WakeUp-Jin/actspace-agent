@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { MainAgentInbox } from "@actspace/core-agent";
+import { MainAgentInbox } from "@actspace/core-agent";
 import type { LlmMessage } from "@actspace/llm-service";
 import type { AgentLoop } from "../loop.js";
 import { runToolStreamFixture } from "../testing.js";
@@ -45,15 +45,17 @@ describe("AgentLoop notifications and Task input", () => {
     expect(events.filter(event => event.kind === "inbox-claimed")).toEqual([expect.objectContaining({ messageId: "task-insert", source: "steer" })]);
   });
 
-  it("does not extend the turn for pending task notifications", async () => {
+  it("extends a final reply when a background notification arrives", async () => {
     let inbox: MainAgentInbox | undefined;
-    const { result } = await runToolStreamFixture({
+    let sent = false;
+    const { result, journal } = await runToolStreamFixture({
       onLoop: (_loop, value) => { inbox = value; },
-      beforeFinalText: async () => { await inbox!.enqueue("background done"); },
+      beforeFinalText: async () => { if (!sent) { sent = true; await inbox!.enqueue("background done"); } },
     });
 
-    expect(result.steps).toBe(2);
-    expect(inbox!.pending()).toEqual([expect.objectContaining({ content: "background done", source: "task_notification" })]);
+    expect(result.steps).toBe(3);
+    expect(inbox!.pending()).toEqual([]);
+    expect(journal.filter(event => event.type === "agent/inbox/spliced" && (event.data as { operation?: string }).operation === "claim")).toHaveLength(1);
   });
 
   it("returns a cancelled result after settlement and does not report an execution error", async () => {
@@ -81,7 +83,7 @@ describe("AgentLoop notifications and Task input", () => {
     })).rejects.toThrow("settlement checkpoint also failed");
   });
 
-  it("discards an unread notification when the turn is aborted", async () => {
+  it("keeps an unread notification for the next Run when the turn is aborted", async () => {
     let inbox: MainAgentInbox | undefined;
     let loop: AgentLoop | undefined;
     await expect(runToolStreamFixture({
@@ -93,7 +95,32 @@ describe("AgentLoop notifications and Task input", () => {
       },
     })).resolves.toMatchObject({ result: { reason: "aborted" } });
 
-    expect(inbox!.pending()).toEqual([]);
+    expect(inbox!.pending()).toEqual([expect.objectContaining({ source: "task_notification" })]);
+  });
+
+  it("settles a wake turn without a model call when nothing is pending", async () => {
+    const requests: (readonly LlmMessage[])[] = [];
+    const { result, journal } = await runToolStreamFixture({ wake: true, onMessages: messages => requests.push(messages) });
+    expect(result).toMatchObject({ reason: "completed", steps: 0 });
+    expect(requests).toEqual([]);
+    expect(journal).toEqual([]);
+  });
+
+  it("opens a wake turn with the pending notification instead of a user message", async () => {
+    const requests: (readonly LlmMessage[])[] = [];
+    const notice = { taskId: "bash_1", kind: "bash", title: "pnpm test", status: "completed" };
+    const { result, events, journal } = await runToolStreamFixture({
+      wake: true,
+      terminalOnly: true,
+      seedSession: async session => { await new MainAgentInbox(session).enqueue([{ type: "text", text: STEER }], notice); },
+      onMessages: messages => requests.push(messages),
+    });
+    expect(result).toMatchObject({ reason: "completed", steps: 1 });
+    expect(requests.map(mentionsSteer)).toEqual([true]);
+    expect(journal.filter(event => event.type === "user/message")).toEqual([]);
+    expect(journal.find(event => event.type === "agent/inbox/spliced" && (event.data as { operation?: string }).operation === "claim")?.data).toMatchObject({ opensTurn: true, notice });
+    // 唤醒回合的领取事件带上 notice 与正文，前端在回合开头画分隔行。
+    expect(events.filter(event => event.kind === "inbox-claimed")).toEqual([expect.objectContaining({ source: "task_notification", notice, content: expect.stringContaining(STEER) })]);
   });
 
   it("drops a steer left over from the previous turn instead of placing it after the new user message", async () => {

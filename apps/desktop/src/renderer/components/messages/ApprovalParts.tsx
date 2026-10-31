@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import type { GrantSuggestion, RuntimeV2ApprovalDecisionInput } from "@actspace/shared/runtime-v2";
 import { Button } from "../ui/Button";
 import { approvalsApi } from "../../api/approvals";
 import { useHostDirectory } from "../../target/host-directory";
 import { useRunTargetContext } from "../../target/run-target-context";
+import { FileGrantScope, grantScopeLabel } from "./FileGrantScope";
 
 // 工具审批的共享外壳：上方一行「等待确认」，下面是卡片（标题一句话 + 可选内容 + 底部按钮），可选的说明底托垫在卡片下方。
 // 设计稿见 docs/design-docs/frontend/approval-card-redesign.html（D 方向，2026-10-11）。
@@ -18,13 +19,13 @@ const APPROVAL_TRAY_CLASS = "approval-tray rounded-act-lg bg-surface-subtle";
 const APPROVAL_CARD_CLASS = "approval-card rounded-act-lg border border-line bg-surface shadow-act-xs";
 const APPROVAL_CARD_HEAD_CLASS = "approval-card-head flex min-h-[30px] min-w-0 items-center gap-1.5 px-3 pt-2.5 text-act-md leading-5";
 const APPROVAL_CARD_HEAD_DIVIDED_CLASS = "border-b border-line pb-2";
-const APPROVAL_CARD_FOOTER_CLASS = "approval-card-footer flex min-h-10 items-center gap-1.5 py-2 pr-2 pl-3";
+const APPROVAL_CARD_FOOTER_CLASS = "approval-card-footer flex min-h-10 flex-wrap items-center gap-1.5 py-2 pr-2 pl-3";
 const APPROVAL_CARD_FOOTER_META_CLASS = "approval-card-meta mr-auto flex min-w-0 items-center gap-1.5 truncate text-act-sm leading-5 text-text-faint";
 const APPROVAL_NOTE_CLASS = "approval-note px-3 pt-1.5 pb-2 text-act-sm leading-[1.5] text-text-faint";
 const APPROVAL_ICON_CLASS = "grid size-4 flex-none place-items-center text-text-faint";
 const APPROVAL_VERB_CLASS = "flex-none text-text-muted";
 const APPROVAL_TARGET_CLASS = "approval-target flex min-w-0 items-center gap-1.5 text-text-faint";
-const APPROVAL_ACTIONS_CLASS = "approval-actions ml-auto flex flex-none items-center gap-1.5 pl-2";
+const APPROVAL_ACTIONS_CLASS = "approval-actions ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5 pl-2";
 
 const OUTSIDE_WORKSPACE_REASON = "The requested file is outside the workspace.";
 const SENSITIVE_FILE_REASON = "This file may contain credentials and requires one-time approval.";
@@ -88,16 +89,23 @@ export function useApprovalDecision(requestId: string | undefined): ApprovalDeci
   const unavailable = Boolean(remoteHost && !remoteConnected);
   const [submitting, setSubmitting] = useState<ApprovalChoice | null>(null);
   const [resolved, setResolved] = useState<ApprovalChoice | null>(null);
+  const busy = useRef(false);
+  const current = useRef(requestId);
+  current.current = requestId;
+  useEffect(() => { busy.current = false; setSubmitting(null); setResolved(null); }, [requestId]);
   const decide = async (choice: ApprovalChoice, suggestionId?: string) => {
-    if (!requestId || submitting !== null || unavailable) return;
+    if (!requestId || busy.current || unavailable) return;
     if (choice === "session" && !suggestionId) return;
+    busy.current = true;
     setSubmitting(choice);
     const host = remoteHost ? { hostId: remoteHost } : {};
     const input: RuntimeV2ApprovalDecisionInput = choice === "session" && suggestionId
       ? { requestId, ...host, decision: "session", suggestionId }
       : { requestId, ...host, decision: choice === "deny" ? "deny" : "once" };
-    if (await submitApprovalDecision(input)) setResolved(choice);
-    else setSubmitting(null);
+    const accepted = await submitApprovalDecision(input);
+    if (current.current !== requestId) return;
+    if (accepted) setResolved(choice);
+    else { busy.current = false; setSubmitting(null); }
   };
   return { submitting, resolved, disabled: !requestId || submitting !== null || unavailable, decide };
 }
@@ -119,9 +127,22 @@ function useGrantSuggestion(requestId: string | undefined, pick: (suggestion: Gr
 
 const isExactSuggestion = (suggestion: GrantSuggestion) => suggestion.selector.kind === "exact";
 
-/** 只取精确路径的会话授权建议；目录树授权由权限服务自行判断，不在审批卡上暴露。 */
+/** Compatibility for consumers that only need the exact suggestion. */
 export function useExactGrantSuggestion(requestId: string | undefined): GrantSuggestion | undefined {
   return useGrantSuggestion(requestId, isExactSuggestion);
+}
+
+export function useFileGrantSuggestions(requestId: string | undefined): readonly GrantSuggestion[] {
+  const [result, setResult] = useState<{ requestId: string; suggestions: readonly GrantSuggestion[] }>();
+  useEffect(() => {
+    let active = true;
+    if (requestId) void approvalsApi.listPending().then(pending => {
+      const suggestions = pending.find(item => item.requestId === requestId)?.grantSuggestions.filter(item => item.selector.kind === "exact" || item.selector.kind === "subtree") ?? [];
+      if (active) setResult({ requestId, suggestions });
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [requestId]);
+  return result?.requestId === requestId ? result.suggestions : [];
 }
 
 /** Backend-owned command prefix; the renderer never derives authorization from command text. */
@@ -175,19 +196,25 @@ export function ApprovalActions({
   primaryLabel,
   primaryVariant = "accent",
   suggestion,
+  fileSuggestions,
   sessionDetail,
 }: {
   state: ApprovalDecisionState;
   primaryLabel: string;
   primaryVariant?: "accent" | "danger";
   suggestion?: GrantSuggestion;
+  fileSuggestions?: readonly GrantSuggestion[];
   /** 「本会话允许」后面的补充，如 Bash 命令前缀；用等宽字显示。 */
   sessionDetail?: string;
 }) {
+  const [chosen, setChosen] = useState<GrantSuggestion>();
+  const fileGrant = fileSuggestions?.find(item => item.suggestionId === chosen?.suggestionId) ?? fileSuggestions?.find(item => item.selector.kind === "exact");
+  const selected = fileSuggestions ? fileGrant : suggestion;
   return <>
+    {fileSuggestions ? <FileGrantScope suggestions={fileSuggestions} selectedId={fileGrant?.suggestionId} disabled={state.disabled} onChoose={setChosen} /> : null}
     <Button variant="ghost" size="xs" shape="pill" busy={state.submitting === "deny"} disabled={state.disabled} onClick={() => void state.decide("deny")}>拒绝</Button>
-    {suggestion ? (
-      <Button variant="tonal" size="xs" shape="pill" busy={state.submitting === "session"} disabled={state.disabled} title={suggestion.label} onClick={() => void state.decide("session", suggestion.suggestionId)}>
+    {selected ? (
+      <Button variant="tonal" size="xs" shape="pill" busy={state.submitting === "session"} disabled={state.disabled} title={fileSuggestions ? grantScopeLabel(selected) : selected.label} onClick={() => void state.decide("session", selected.suggestionId)}>
         本会话允许{sessionDetail ? <code className="font-mono font-normal">{sessionDetail}</code> : null}
       </Button>
     ) : null}

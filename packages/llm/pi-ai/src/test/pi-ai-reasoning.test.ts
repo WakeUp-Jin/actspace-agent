@@ -35,7 +35,7 @@ it.each(["short", "long", "none"] as const)("passes Anthropic cache retention an
 
 it("ignores the SDK zero-price cost and freezes an estimated price for the request", async () => {
   const { calculateCost } = await import("@earendil-works/pi-ai");
-  const usage = { input: 1000, output: 500, cacheRead: 2000, cacheWrite: 0, totalTokens: 3500, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+  const usage = { actspaceWireUsage: { version: 1 as const, input: 3000, output: 500, cacheRead: 2000, cacheWrite: 0, reasoning: null }, input: 1000, output: 500, cacheRead: 2000, cacheWrite: 0, totalTokens: 3500, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
   calculateCost({ cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } } as never, usage);
   expect(usage.cost.total).toBe(0);
   const engine = new PiAiAdapter({ wire: { route: "openai-completions", providerId: "deepseek", baseUrl: "https://api.deepseek.com", pricing: { providerId: "deepseek", apiModel: "m", modelKey: "deepseek:m", connectionId: null, currency: "USD", rates: { input: 2, output: 8, cacheRead: 0.2, cacheWrite: null }, multiplier: 1, source: "configured", contentHash: "test", fetchedAt: "2026-09-07T00:00:00Z", capturedAt: "2026-09-07T00:00:00Z", unsupportedBilling: false }, load: async () => ({ core: { createProvider: () => ({ id: "deepseek" }), createModels: () => ({ setProvider: () => {}, getModel: () => ({ id: "m", provider: "deepseek" }), streamSimple: () => (async function* () { yield { type: "done", message: { content: [], stopReason: "stop", usage } }; })() }) }, api: { stream: () => {}, streamSimple: () => {} } }) } });

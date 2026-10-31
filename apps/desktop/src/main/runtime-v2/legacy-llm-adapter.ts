@@ -4,7 +4,7 @@ import type { LlmAdapter, LlmAdapterDispatchInput, LlmAdapterPrepareInput, LlmPr
 import type { PiAiWireRoute } from "@actspace/llm-pi-ai";
 import { DeepSeekFileUploader, PiAiAdapter } from "@actspace/llm-pi-ai";
 import { ProviderProxyPool } from "@actspace/llm-service";
-import type { ModelApi } from "@actspace/shared";
+import type { ModelApi, ModelCapabilities, ThinkingLevel } from "@actspace/shared";
 import { IMAGE_INSPECTION_CREDENTIAL_REF, bearerAwareAuth } from "./credential-resolver";
 import { customConnectionPricingInput, type DesktopRuntimeV2ModelPort } from "./model-port";
 
@@ -16,16 +16,23 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
   readonly #proxies = new ProviderProxyPool();
   #deepSeekFiles: DeepSeekFileUploader | undefined;
 
-  constructor(private readonly models: DesktopRuntimeV2ModelPort, private readonly readArtifact: SessionArtifactReader, private readonly purpose: "chat" | "utility" | "auto-review" = "chat") {}
+  constructor(private readonly models: DesktopRuntimeV2ModelPort, private readonly readArtifact: SessionArtifactReader, private readonly purpose: "chat" | "utility" | "auto-review" | "explore" = "chat") {}
 
   private resolveModel(requested?: string) {
     if (this.purpose === "auto-review") {
       if (!this.models.resolveAutoReviewModel) throw new Error("自动审批模型不可用");
       return this.models.resolveAutoReviewModel(requested);
     }
+    if (this.purpose === "explore" && this.models.resolveExploreTaskModel) return this.models.resolveExploreTaskModel(requested);
     return this.purpose === "utility" && this.models.resolveUtilityTaskModel
       ? this.models.resolveUtilityTaskModel(requested)
       : this.models.resolveMainModel(requested);
+  }
+
+  /** 会话默认以外的用途按用途表的思考档位发请求；会话里的档位由对话框决定。 */
+  private purposeThinking(imageInspection: boolean): ThinkingLevel | null {
+    const purpose = imageInspection ? "vision" : this.purpose === "auto-review" ? "autoReview" : this.purpose === "chat" ? null : this.purpose;
+    return purpose ? this.models.purposeThinking?.(purpose) ?? null : null;
   }
 
   resolveModelFacts(model: string): LlmRequestModelFacts {
@@ -35,14 +42,16 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
 
   prepare(input: LlmAdapterPrepareInput): LlmPreparedAdapterCall {
     const requested = input.request.model === "default" ? undefined : input.request.model;
-    const resolution = input.request.credentialRef === IMAGE_INSPECTION_CREDENTIAL_REF
+    const imageInspection = input.request.credentialRef === IMAGE_INSPECTION_CREDENTIAL_REF;
+    const resolution = imageInspection
       ? this.models.resolveImageInspectionModel()
       : this.resolveModel(requested);
     if (!("model" in resolution)) throw new Error(resolution.message);
     const model = resolution.model;
     const runtime = model.providerRuntime;
     const capabilities = model.definition.capabilities;
-    const requestedOptions = input.request.options;
+    const purposeLevel = this.purposeThinking(imageInspection);
+    const requestedOptions = purposeLevel ? { ...input.request.options, ...thinkingLevelOptions(purposeLevel, capabilities) } : input.request.options;
     const reasoning = capabilities?.reasoning === false ? false
       : capabilities?.reasoningMandatory ? true
       : capabilities?.thinkingToggle === false ? model.definition.thinkingDefault ?? capabilities.reasoning
@@ -134,4 +143,10 @@ function toWireRoute(api: ModelApi): PiAiWireRoute { return api; }
 function withoutApiKey<T extends { readonly apiKey?: string }>(credential: T): Omit<T, "apiKey"> {
   const { apiKey: _apiKey, ...rest } = credential;
   return rest;
+}
+
+/** 用途档位 → 请求参数：关 = 不思考；其他档位只在模型声明了这档强度时才带上，否则只开思考、强度用模型默认。 */
+export function thinkingLevelOptions(level: ThinkingLevel, capabilities: ModelCapabilities | undefined): { reasoning: boolean; reasoningEffort?: Exclude<ThinkingLevel, "off"> } {
+  if (level === "off") return { reasoning: false };
+  return capabilities?.reasoningEfforts?.includes(level) ? { reasoning: true, reasoningEffort: level } : { reasoning: true };
 }

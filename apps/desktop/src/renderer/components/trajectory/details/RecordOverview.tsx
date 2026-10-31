@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, PanelRight } from 'lucide-react';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
   APPROVAL_LABEL, STATUS_LABEL, T, TAB_LABEL, promptDiffLines, cellStatus, formatDurationMs, formatTokens, requestLabel, toolInput, toolOutput,
@@ -8,6 +8,8 @@ import { MarkdownRecordContent, markdownSource } from './MessageBody';
 import { MarkdownFragment, findToolCell, type RecordBodyProps } from './shared';
 import { RecordPayload, RecordSchema } from './ToolBody';
 import { RecordTiming, StartedAtValue } from './TimingFields';
+import { Button } from '../../ui/Button';
+import type { TrajectoryDelegation } from '../../../trajectory/subagents';
 
 /** 概述里的跳转链接：文字加一个小箭头。 */
 export function NavLink({ label, onClick }: { label: string; onClick: () => void }) {
@@ -87,22 +89,37 @@ type OverviewProps = RecordBodyProps & {
   readonly onThinkingExpanded: (expanded: boolean) => void;
   readonly onTab: (tab: DetailTab) => void;
   readonly onSelectRequest: (requestKey: string) => void;
+  readonly subagentFor?: (callId: string) => TrajectoryDelegation | null;
+  readonly onOpenSubagent?: (childSessionId: string) => void;
 };
+
+/** 子智能体名称：委派时写的任务描述，其次是预设名。 */
+function subagentLabel(args: unknown, delegation: TrajectoryDelegation): string {
+  let value = args;
+  if (typeof value === 'string') { try { value = JSON.parse(value); } catch { value = null; } }
+  const description = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>).description : undefined;
+  return typeof description === 'string' && description.trim() !== '' ? description.trim() : delegation.presetId ?? '子智能体';
+}
 
 /** 记录概述：标签列表加可跳转的预览小节（照 DSH 概述页签）。 */
 export function RecordOverview(props: OverviewProps) {
-  const { cell, layout, onTab, onSelectRecord, onSelectRequest } = props;
+  const { cell, layout, onTab, onSelectRecord, onSelectRequest, subagentFor, onOpenSubagent } = props;
   const { record } = cell;
   const status = cellStatus(cell);
   const failed = status === 'failed';
   if (cell.kind === 'compacted') {
     const summary = markdownSource(cell);
+    const facts = record.compaction;
+    // 压缩后总是估算；压缩前纯实测时不带「约」，含估算时也带。旧 journal 没有这两项时显示「—」。
+    const tokens = facts?.beforeTokens != null && facts.afterTokens != null ? `${facts.beforeEstimated ? '约 ' : ''}${formatTokens(facts.beforeTokens)} → 约 ${formatTokens(facts.afterTokens)}` : '—';
     return (
       <>
         <dl className="tj-overview tj-summaryScrollRegion" data-summary-scroll-region="">
           <OverviewRow label={T.status} error={failed}>{STATUS_LABEL[status]}</OverviewRow>
+          {facts?.trigger != null && <OverviewRow label={T.compactionTrigger}>{facts.trigger === 'manual' ? T.compactionManual : T.compactionAuto}</OverviewRow>}
           <OverviewRow label={T.duration}>{formatDurationMs(cell.durationMs)}</OverviewRow>
-          <OverviewRow label={T.tokens}>—</OverviewRow>
+          {facts?.messageCount != null && <OverviewRow label={T.compactedMessages}>{`${facts.messageCount} 条`}</OverviewRow>}
+          <OverviewRow label={T.tokens}>{tokens}</OverviewRow>
         </dl>
         {summary !== '' && <div className="tj-compactedSummary tj-summaryScrollRegion" data-summary-scroll-region=""><MarkdownFragment text={summary} /></div>}
       </>
@@ -114,6 +131,7 @@ export function RecordOverview(props: OverviewProps) {
   const parentMessage = isTool && record.assistantRecordId ? layout.cells.find(item => item.recordId === record.assistantRecordId) : undefined;
   const parentTool = cell.kind === 'subtool' ? findToolCell(layout, record.parentCallId) : undefined;
   const hasHierarchy = request !== undefined || parentMessage !== undefined || parentTool !== undefined;
+  const subagent = cell.kind === 'tool' && record.callId && subagentFor ? subagentFor(record.callId) : null;
   return (
     <>
       <dl className="tj-overview tj-summaryScrollRegion" data-summary-scroll-region="">
@@ -131,11 +149,23 @@ export function RecordOverview(props: OverviewProps) {
           </div>
         )}
         <OverviewRow label={T.status} error={failed}>{STATUS_LABEL[status]}</OverviewRow>
+        {subagent && (
+          <div className="tj-overviewSubagent">
+            <dt>{T.subagent}</dt>
+            <dd>
+              <span className="tj-overviewSubagentName">{subagentLabel(record.toolArguments, subagent)}</span>
+              {onOpenSubagent && (
+                <Button size="xs" aria-label={T.openSubagentTrajectory} title={T.openSubagentTrajectory} onClick={() => { onOpenSubagent(subagent.childSessionId); }}>
+                  <PanelRight size={12} aria-hidden="true" />{T.viewTrajectory}
+                </Button>
+              )}
+            </dd>
+          </div>
+        )}
         {cell.approval && <OverviewRow label={T.approval}>{APPROVAL_LABEL[cell.approval]}</OverviewRow>}
         {cell.kind === 'message' && <TokenRows cell={cell} />}
         {(cell.kind === 'user' || cell.kind === 'context') && <><div><dt>{T.started}</dt><StartedAtValue timestamp={cell.startedAt} /></div><OverviewRow label={T.duration}>{formatDurationMs(cell.durationMs)}</OverviewRow></>}
         {record.contextPresentation && <><OverviewRow label="上下文类型">{record.contextPresentation.category}</OverviewRow><OverviewRow label="名称">{record.contextPresentation.title}</OverviewRow><OverviewRow label="变更">{record.contextPresentation.action}</OverviewRow><OverviewRow label="模型消息角色">{record.contextPresentation.placement}（请求组成）</OverviewRow></>}
-        {record.childSessionId && <OverviewRow label="子会话">{record.childSessionId}</OverviewRow>}
       </dl>
       <div className="tj-overviewSections">
         {record.contextPresentation?.previousText !== undefined && <details className="tj-toolCatalogItem"><summary>与上一版本比较</summary><pre className="tj-promptDiff">{promptDiffLines(record.contextPresentation.previousText, typeof record.inputDetail === 'string' ? record.inputDetail : '').map((line, index) => <span className={`tj-promptDiffLine${line.kind}`} key={index}>{line.text}{'\n'}</span>)}</pre></details>}

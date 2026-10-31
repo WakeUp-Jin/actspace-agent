@@ -86,6 +86,13 @@ export class HostRpc {
         observations.publish("host", { kind: "sessions-changed" }); return result;
       }
       case "sessions.fork": fields(params, ["sessionId", "boundarySeq", "newSessionId"]); return app.forkMainSession(stringParam(params, "sessionId", 128), integerParam(params, "boundarySeq", Number.MAX_SAFE_INTEGER), stringParam(params, "newSessionId", 128));
+      case "sessions.revokeGrant": {
+        fields(params, ["sessionId", "grantId"]);
+        const sessionId = stringParam(params, "sessionId", 128);
+        await app.revokeSessionGrant(sessionId, stringParam(params, "grantId", 128));
+        observations.publish(sessionId, { kind: "session-changed" });
+        return { ok: true };
+      }
       case "sessions.tool": fields(params, ["sessionId", "callId"]); return app.browseToolDetail(stringParam(params, "sessionId", 128), stringParam(params, "callId", 128));
       case "sessions.page": {
         fields(params, ["sessionId", "beforeSeq"]);

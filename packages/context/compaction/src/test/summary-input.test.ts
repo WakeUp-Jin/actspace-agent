@@ -1,3 +1,4 @@
+import { EMPTY_LLM_USAGE } from "@actspace/llm-service";
 import { expect, it, vi } from "vitest";
 import type { LlmService } from "@actspace/llm-service";
 import { LlmCompactionSummarizer } from "../summarizer.js";
@@ -6,9 +7,9 @@ import { DEFAULT_COMPACTION_POLICY } from "../policy.js";
 
 it("passes the full Relevant Files instruction, prior summary once, no tools, and cancellation", async () => {
   const release = vi.fn(); const signal = new AbortController().signal;
-  const prepareAsync = vi.fn(async request => ({ request, registration: { registrationId: "test", adapter: { adapterVersion: "test" } }, release,
-    dispatch: async () => (async function* () { yield { type: "done", content: [{ type: "text", text: "summary\n## Relevant files / directories\nAGENTS.md" }] }; })() }));
-  const summarizer = new LlmCompactionSummarizer({ llm: { prepareAsync } as unknown as LlmService, routeId: "utility", model: "default" });
+  const prepareAsync = vi.fn(async request => ({ request: { ...request, requestId: "fixture-request" }, registration: { registrationId: "test", adapter: { adapterVersion: "test" } }, release,
+    dispatch: async () => (async function* () { yield { type: "done", usage: EMPTY_LLM_USAGE, stopReason: "stop", content: [{ type: "text", text: "summary\n## Relevant files / directories\nAGENTS.md" }] }; })() }));
+  const summarizer = new LlmCompactionSummarizer({ recorder: { start: async () => ({ finish: async () => {} }) }, llm: { prepareAsync } as unknown as LlmService, routeId: "utility", model: "default" });
   const summary = await summarizer.summarize([
     { node: { kind: "user", messageId: "prior", content: "PRIOR-FACT" }, sourceEventSeqs: [1] },
     { node: { kind: "user", messageId: "new", content: "NEW-FACT" }, sourceEventSeqs: [2] },

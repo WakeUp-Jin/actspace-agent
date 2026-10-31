@@ -175,6 +175,7 @@ export const mockUsageActivity: UsageActivitySnapshot = {
     cacheWriteTokens: 0,
     reasoningTokens: 0,
     totalTokens: 30,
+    unknownTokenRequestCounts: { input: 1, output: 1, cacheRead: 2, cacheWrite: 2, reasoning: 2, total: 1 },
     costUsd: 0.12,
     costUnavailableCount: 2,
   },

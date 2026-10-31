@@ -21,7 +21,9 @@ export type StreamingSegment =
   | { type: "compaction"; agentRunId: string }
   | { type: "workspace_preparation"; agentRunId: string }
   /** 运行中引导、已被 loop 读到的用户消息。 */
-  | { type: "user_message"; block: Extract<MessageBlock, { kind: "user" }> };
+  | { type: "user_message"; block: Extract<MessageBlock, { kind: "user" }> }
+  /** 唤醒回合开头的后台任务通知分隔行。 */
+  | { type: "background_notice"; block: Extract<MessageBlock, { kind: "background_notice" }> };
 
 export type StreamingState = {
   segments: StreamingSegment[];

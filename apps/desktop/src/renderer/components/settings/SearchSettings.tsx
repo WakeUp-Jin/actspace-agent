@@ -213,6 +213,7 @@ function SearchProviderRow({
               <Toggle ariaLabel={`启用 ${label} 搜索`} checked={enabled} disabled={toggleDisabled} onChange={onToggle} />
               <StatusDot tone="ok">已连接</StatusDot>
               <SettingsMenuButton
+                id={`${editorId}-trigger`}
                 label="管理"
                 ariaLabel={`管理 ${label}`}
                 items={[
@@ -222,7 +223,7 @@ function SearchProviderRow({
               />
             </>
           ) : (
-            <Button aria-label={`连接 ${label}`} aria-expanded={editing} aria-controls={editorId} onClick={onEdit}>
+            <Button id={`${editorId}-trigger`} aria-label={`连接 ${label}`} aria-expanded={editing} aria-controls={editorId} onClick={onEdit}>
               连接
             </Button>
           )
@@ -231,6 +232,7 @@ function SearchProviderRow({
       {editing ? (
         <SettingEditor
           id={editorId}
+          returnFocusId={`${editorId}-trigger`}
           hint={provider === "deepseek" ? "与 DeepSeek 模型及网页抓取共用官方 Key；更换会影响三者。Key 只保存在本机，不会回显。" : "Key 只保存在本机，不会回显。"}
           error={error}
           saving={saving}

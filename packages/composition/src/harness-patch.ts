@@ -17,7 +17,7 @@ export function resolveHarnessPatch(base: ResolvedComposition, patch: Patch, art
     return { entryId: slot, manifestEntryId, artifactId, pluginId: manifest.pluginId, pluginVersion: manifest.version,
       module: row.module, required: row.required, enabled: row.enabled, config: structuredClone(row.config),
       requiredCapabilities: row.host.required, optionalCapabilities: row.host.optional, provides: row.provides ?? [],
-      injects: row.injects ?? [], frontendRequired: row.frontend?.required ?? false,
+      injects: row.injects ?? [], ...(row.optionalInjects?.length ? { optionalInjects: row.optionalInjects } : {}), frontendRequired: row.frontend?.required ?? false,
       provenance: manifest.source.reference, state: row.enabled ? "candidate" : "skipped" };
   };
   const prepared: Patch = { ...patch, operations: patch.operations.map(op => {

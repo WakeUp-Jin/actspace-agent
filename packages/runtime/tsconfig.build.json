@@ -16,6 +16,9 @@
       "path": "./../auto-review/tsconfig.build.json"
     },
     {
+      "path": "./../background-tasks/tsconfig.build.json"
+    },
+    {
       "path": "./../boot/tsconfig.build.json"
     },
     {
@@ -23,6 +26,9 @@
     },
     {
       "path": "./../composition/tsconfig.build.json"
+    },
+    {
+      "path": "./../context/background-tasks/tsconfig.build.json"
     },
     {
       "path": "./../context/compaction/tsconfig.build.json"
@@ -97,6 +103,15 @@
       "path": "./../prompt/tsconfig.build.json"
     },
     {
+      "path": "./../sandbox/manager/tsconfig.build.json"
+    },
+    {
+      "path": "./../sandbox/nono/tsconfig.build.json"
+    },
+    {
+      "path": "./../sandbox/seatbelt/tsconfig.build.json"
+    },
+    {
       "path": "./../session/checkpoint-policy/tsconfig.build.json"
     },
     {
@@ -125,6 +140,9 @@
     },
     {
       "path": "./../tools/approval/tsconfig.build.json"
+    },
+    {
+      "path": "./../tools/background-tasks/tsconfig.build.json"
     },
     {
       "path": "./../tools/browser-tools/tsconfig.build.json"

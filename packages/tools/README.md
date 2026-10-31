@@ -5,7 +5,8 @@ Tool Runtime 拥有通用注册、prepared execution、权限准入、checkpoint
 - `filesystem-read/`：read_file、list_directory。
 - `filesystem-search/`：grep、glob。
 - `filesystem-write/`：edit_file、write_file、delete_file。
-- `shell-tools/`：bash、bash_output、bash_kill。
+- `shell-tools/`：bash（经可选的 `sandbox` 服务执行，沙箱缺失或不可用时转审批；后台命令登记到 Host 后台任务登记表）。
+- `background-tasks/`：task_list、task_output、task_stop、task_wait。
 - `web-tools/`：web、web_search、web_fetch。
 - `image-generation/`：generate_image。
 - `image-inspection/`：inspect_image。

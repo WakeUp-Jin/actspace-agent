@@ -3,21 +3,23 @@ import { DEFAULT_SPEECH_SETTINGS, isSpeechModel, type SpeechSettings } from "@ac
 import { dirname, isAbsolute, join } from "node:path";
 import {
   DEEPSEEK_FLASH_KEY,
-  DEFAULT_IMAGE_INSPECTION_MODEL_KEY,
   DEFAULT_QUICK_OPEN_ACCELERATOR,
   isPublicModelId,
-  isImageInspectionModelKey,
+  isEmptyFacts,
+  isThinkingLevel,
   normalizeModelKey,
+  PURPOSE_IDS,
+  sanitizeModelFacts,
+  sanitizeModelOverrides,
   type AgentSettingsV2,
   type InstalledModelSettings,
-  type ImageInspectionSettings,
   type LlmProviderId,
   type ModelDefinition,
   type ModelId,
   type ModelKey,
+  type ModelOverrides,
   type ProviderConnectionSettings,
   type ProviderConnectionState,
-  type ProviderCredentialSettings,
   type ProviderProxySettings,
   type SettingsV4UsagePreferences,
   type SkillsSettings,
@@ -25,7 +27,6 @@ import {
   type TaskModelSettings,
 } from "@actspace/shared";
 import { BUILTIN_MODEL_ADDED_AT } from "./constants";
-import { isValidCredentialId } from "./secrets-file";
 import { type PersistedSettingsV3, ProviderSettingsError } from "./types";
 import { cloneJson, isRecord } from "./utils";
 
@@ -102,18 +103,6 @@ export function sanitizeQuickOpenTarget(input: unknown): ShortcutsSettings["quic
   return { kind: "automatic" };
 }
 
-export function sanitizeImageInspectionSettings(input: unknown): ImageInspectionSettings {
-  const value = isRecord(input) ? input : {};
-  const modelKey = isImageInspectionModelKey(value.modelKey)
-    ? value.modelKey
-    : DEFAULT_IMAGE_INSPECTION_MODEL_KEY;
-  const credentialId = isValidCredentialId(value.credentialId) ? value.credentialId : undefined;
-  return {
-    modelKey,
-    ...(credentialId && { credentialId }),
-  };
-}
-
 export function sanitizeImageGenerationSettings(
   input: unknown,
   fallback: PersistedSettingsV3["imageGeneration"],
@@ -181,7 +170,6 @@ export function sanitizeProviderSettings(
     proxy: sanitizeProxySettings(value.proxy, fallback.proxy),
     lastConnection: sanitizeConnectionState(value.lastConnection, fallback.lastConnection),
     defaultPricingMultiplier: normalizePricingMultiplier(value.defaultPricingMultiplier, fallback.defaultPricingMultiplier),
-    additionalCredentials: sanitizeProviderCredentials(value.additionalCredentials),
   };
 }
 
@@ -190,25 +178,6 @@ export function migrateLegacyProviderBaseUrl(provider: LlmProviderId, baseUrl: s
   return provider === "deepseek" && baseUrl === "https://api.deepseek.com/anthropic"
     ? null
     : baseUrl;
-}
-
-export function sanitizeProviderCredentials(input: unknown): ProviderCredentialSettings[] {
-  if (!Array.isArray(input)) return [];
-  const seen = new Set<string>();
-  const out: ProviderCredentialSettings[] = [];
-  for (const value of input) {
-    if (!isRecord(value) || !isValidCredentialId(value.id) || seen.has(value.id)) continue;
-    const label = typeof value.label === "string" ? value.label.trim().slice(0, 80) : "";
-    if (!label) continue;
-    seen.add(value.id);
-    out.push({
-      id: value.id,
-      label,
-      pricingMultiplier: normalizePricingMultiplier(value.pricingMultiplier, 1),
-      lastConnection: sanitizeConnectionState(value.lastConnection, { status: "untested" }),
-    });
-  }
-  return out;
 }
 
 export function sanitizeProxySettings(input: unknown, fallback: ProviderProxySettings): ProviderProxySettings {
@@ -234,12 +203,6 @@ export function normalizeOptionalBaseUrl(value: string | null): string | null {
   try { return normalizeBaseUrl(value); } catch {
     throw new ProviderSettingsError("Base URL 无效，仅支持不含认证信息的 HTTP(S) 地址。", "invalid_base_url");
   }
-}
-
-export function normalizeCredentialLabel(value: string): string {
-  const label = value.trim();
-  if (!label) throw new ProviderSettingsError("API Key 名称不能为空。", "invalid_api_key");
-  return label.slice(0, 80);
 }
 
 export function normalizePricingMultiplier(value: unknown, fallback?: number): number {
@@ -296,7 +259,6 @@ export function sanitizeInstalledModel(input: unknown, fallback: InstalledModelS
     addedAt: typeof value.addedAt === "string" && value.addedAt ? value.addedAt : fallback.addedAt,
     ...(typeof value.connectionId === "string" ? { connectionId: value.connectionId } : fallback.connectionId ? { connectionId: fallback.connectionId } : {}),
     ...(typeof value.customLabel === "string" && value.customLabel.trim() && { customLabel: value.customLabel.trim() }),
-    ...(isValidCredentialId(value.credentialId) && { credentialId: value.credentialId }),
   };
 }
 
@@ -307,7 +269,10 @@ export function sanitizeCustomModels(input: unknown): Partial<Record<ModelKey, M
     const key = normalizeModelKey(rawKey);
     // Official Flash facts replace retired/alias catalog records; connection-specific models keep their own keys.
     if (key === DEEPSEEK_FLASH_KEY) continue;
-    if (key && isValidModelDefinition(value, key)) out[key] = { ...cloneJson(value), key };
+    if (!key || !isValidModelDefinition(value, key)) continue;
+    const { providerFacts, effective: _effective, ...definition } = cloneJson(value);
+    const facts = sanitizeModelFacts(providerFacts);
+    out[key] = { ...definition, key, ...(isEmptyFacts(facts) ? {} : { providerFacts: facts }) };
   }
   return out;
 }
@@ -327,7 +292,24 @@ export function sanitizeTaskModels(input: unknown): TaskModelSettings {
     utilityModel: normalizeNullableModelKey(value.utilityModel),
     autoReviewModel: normalizeNullableModelKey(value.autoReviewModel),
     exploreModel: normalizeNullableModelKey(value.exploreModel),
+    visionModel: normalizeNullableModelKey(value.visionModel),
+    ...(sanitizePurposeThinking(value.thinking) ?? {}),
   };
+}
+
+export function sanitizePurposeThinking(input: unknown): { thinking: NonNullable<TaskModelSettings["thinking"]> } | undefined {
+  if (!isRecord(input)) return undefined;
+  const thinking = Object.fromEntries(PURPOSE_IDS.flatMap((id) => isThinkingLevel(input[id]) ? [[id, input[id]]] : []));
+  return Object.keys(thinking).length ? { thinking } : undefined;
+}
+
+export function sanitizeModelOverridesMap(input: unknown): Partial<Record<ModelKey, ModelOverrides>> {
+  if (!isRecord(input)) return {};
+  return Object.fromEntries(Object.entries(input).flatMap(([rawKey, value]) => {
+    const key = normalizeModelKey(rawKey);
+    const overrides = sanitizeModelOverrides(value);
+    return key && !isEmptyFacts(overrides) ? [[key, overrides]] : [];
+  }));
 }
 
 export function sanitizeAgentV2(input: unknown, fallback: AgentSettingsV2): AgentSettingsV2 {

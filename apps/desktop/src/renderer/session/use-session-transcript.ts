@@ -7,7 +7,6 @@ import { useSessionLocalState, type SessionLocalState, type SessionLocalStore } 
 import { mergeTranscript } from "./transcript";
 
 const EMPTY_EVENTS: SessionEvent[] = [];
-const selectBashUpdates = (state: SessionLocalState) => state.bashUpdates;
 const selectCompactionFailure = (state: SessionLocalState) => state.compactionFailure ?? null;
 
 export type SessionTranscript = {
@@ -29,16 +28,15 @@ export function useSessionTranscript(
   workspaceRoot: string | undefined,
 ): SessionTranscript {
   const live = useLiveRunView(stores.liveRuns, sessionId);
-  const { sessionRecord, historyBefore } = useChatSessionRecord(stores.sessionStore, sessionId, workspaceRoot);
-  const bashUpdates = useSessionLocalState(stores.localStore, sessionId, selectBashUpdates);
+  const { sessionRecord, historyBefore } = useChatSessionRecord(stores.sessionStore, sessionId, workspaceRoot, live.recovered);
   const compactionFailure = useSessionLocalState(stores.localStore, sessionId, selectCompactionFailure);
   const persistedEvents = sessionRecord?.events ?? EMPTY_EVENTS;
   const { blocks, runId, recovered, isStreaming } = live;
   const messages = useMemo<MessageBlock[]>(() => mergeTranscript(
     { blocks: sessionRecord?.messageBlocks, events: persistedEvents },
     { blocks, runId, recovered },
-    { compactionFailure, isStreaming, bashUpdates },
-  ), [sessionRecord?.messageBlocks, persistedEvents, blocks, runId, recovered, compactionFailure, isStreaming, bashUpdates]);
+    { compactionFailure, isStreaming },
+  ), [sessionRecord?.messageBlocks, persistedEvents, blocks, runId, recovered, compactionFailure, isStreaming]);
   const isCompacting = blocks.some((block) => block.kind === "context_compaction" && block.status === "running");
   return { sessionRecord, historyBefore, live, messages, isCompacting };
 }

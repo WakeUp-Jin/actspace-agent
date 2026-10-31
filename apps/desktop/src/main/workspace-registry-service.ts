@@ -168,14 +168,19 @@ export async function resolveRegisteredWorkspaceSelection(
 ): Promise<WorkspaceSelectionResult> {
   const registry = await readWorkspaceRegistry(options);
   const workspaceId = input.workspaceId?.trim();
+  const requestedRoot = input.workspaceRoot?.trim();
+  if (!workspaceId && !requestedRoot) return { ok: false, error: "workspace is required" };
   if (workspaceId) {
     const entry = registry.items.find((item) => item.id === workspaceId);
+    if (entry && input.workspaceRoot !== undefined && normalizeWorkspacePath(input.workspaceRoot) !== entry.path) {
+      return { ok: false, error: "workspaceId and workspaceRoot refer to different workspaces" };
+    }
     return entry
       ? { ok: true, workspaceId: entry.id, workspaceRoot: entry.path }
       : { ok: false, error: `workspaceId not found: ${workspaceId}` };
   }
 
-  const workspaceRoot = normalizeWorkspacePath(input.workspaceRoot ?? options.defaultWorkspaceRoot);
+  const workspaceRoot = normalizeWorkspacePath(requestedRoot!);
   const entry = registry.items.find((item) => item.path === workspaceRoot);
   return entry
     ? { ok: true, workspaceId: entry.id, workspaceRoot: entry.path }

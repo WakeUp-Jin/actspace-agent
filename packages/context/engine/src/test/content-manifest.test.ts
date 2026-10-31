@@ -14,6 +14,42 @@ describe("Context content manifest", () => {
     expect(first.entries.filter(row => row.bucket === "conversation").every(row => !row.preview)).toBe(true);
     expect(first.entries.find(row => row.kind === "thinking")?.trajectoryRef).toEqual({ messageId: "a" });
   });
+  it.each([
+    { name: "compaction identity", state: { summaries: [{ messageId: "summary-message", compactionId: "compact-1" }] }, key: '["summary","compact-1"]' },
+    { name: "legacy summary identities", state: { summaryIds: ["summary-message"] }, key: '["summary","summary-message"]' },
+  ])("previews summaries without exposing full text or persisting previews: $name", async ({ state, key }) => {
+    const summaryText = "Summary preview boundary. ".repeat(40);
+    const withSummary: Context = {
+      ...context,
+      content: { ...context.content, conversation: {
+        ...context.content.conversation,
+        entries: [...context.content.conversation.entries, {
+          node: { kind: "user", messageId: "summary-message", content: summaryText }, sourceEventSeqs: [3],
+        }],
+      } },
+      status: { ...context.status, plugins: { "actspace.context.compaction": state } },
+    };
+    const described = describeContextContent(withSummary);
+    const summary = described.manifest.entries.find(entry => entry.key === key)!;
+    expect(summary).toMatchObject({
+      bucket: "summarizedConversation", title: "压缩摘要", preview: summaryText.slice(0, 600),
+      estimatedTokens: Math.ceil(summaryText.length / 4), trajectoryRef: { messageId: "summary-message" },
+    });
+    expect(summary.fullTextAvailable).toBeUndefined();
+    expect(described.text.has(key)).toBe(false);
+    expect(described.manifest.entries.filter(entry => entry.bucket === "conversation")
+      .every(entry => entry.preview === undefined && entry.fullTextAvailable === undefined && !described.text.has(entry.key))).toBe(true);
+
+    const engine = new ContextEngine({ resolve: () => withSummary });
+    const view = await engine.getContext(withSummary.request);
+    expect(engine.getProjection(view.request)!.manifest.entries.find(entry => entry.key === key)?.preview).toBe(summaryText.slice(0, 600));
+    const input = await engine.toLlmInput(view);
+    const persisted = requestContentManifest(view, input, input);
+    expect(persisted.entries.find(entry => entry.key === key)).toMatchObject({ bucket: "summarizedConversation" });
+    expect(persisted.entries.every(entry => entry.preview === undefined && entry.fullTextAvailable === undefined)).toBe(true);
+    const snapshot = snapshotContext(view, input, {}, "composition", "host", input) as Record<string, unknown>;
+    expect(JSON.stringify(snapshot.contextManifest)).not.toContain("Summary preview boundary.");
+  });
   it("records actual repaired input and rejects provenance after an adapter rewrite", async () => {
     const engine = new ContextEngine({ resolve: () => context });
     const input = await engine.toLlmInput(context);

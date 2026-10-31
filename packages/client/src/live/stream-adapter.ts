@@ -92,7 +92,10 @@ export class FixedRendererStreamAdapter {
       return;
     }
     if (event.kind === "compaction-finished") {
-      this.#emit({ type: "context_compaction_finished", sessionId: event.sessionId, agentRunId: event.agentRunId, payload: { triggerTokens: 0, thresholdTokens: 0, beforeCount: event.removedCount, afterCount: 1, summaryChars: 0, historyRefPath: "journal.jsonl", status: "compacted", removedCount: event.removedCount, durationMs: event.durationMs } });
+      this.#emit({ type: "context_compaction_finished", sessionId: event.sessionId, agentRunId: event.agentRunId, payload: { triggerTokens: event.beforeTokens ?? 0, thresholdTokens: 0, beforeCount: event.removedCount, afterCount: 1, summaryChars: 0, historyRefPath: "journal.jsonl", status: "compacted", removedCount: event.removedCount, durationMs: event.durationMs,
+        ...(event.compactionId ? { compactionId: event.compactionId } : {}), ...(event.trigger ? { trigger: event.trigger } : {}),
+        ...(event.beforeTokens === undefined ? {} : { beforeTokens: event.beforeTokens }), ...(event.afterTokens === undefined ? {} : { afterTokens: event.afterTokens }),
+        ...(event.beforeEstimated ? { beforeEstimated: true } : {}) } });
       return;
     }
     if (event.kind === "compaction-failed") {
@@ -102,6 +105,10 @@ export class FixedRendererStreamAdapter {
     if (event.kind === "inbox-claimed") {
       // 任务通知只给模型看；用户插入的消息要立刻出现在当前回合里。
       if (event.source === "steer") this.#emit({ type: "user_message_steered", ...ids, messageId: event.messageId });
+      const notice = event.notice;
+      if (event.source === "task_notification" && notice && (notice.kind === "bash" || notice.kind === "agent")) {
+        this.#emit({ type: "background_notice_claimed", ...ids, messageId: event.messageId, content: event.content ?? "", notice: { taskId: notice.taskId, taskKind: notice.kind, title: notice.title, status: notice.status } });
+      }
       return;
     }
     const key = this.#key(event.sessionId, event.agentRunId, event.callId);

@@ -2,19 +2,16 @@ import {
   BUILTIN_MODEL_LIST,
   DEFAULT_IMAGE_GENERATION_BASE_URL,
   DEFAULT_IMAGE_GENERATION_MODEL,
-  DEFAULT_IMAGE_INSPECTION_MODEL_KEY,
   DEFAULT_QUICK_OPEN_ACCELERATOR,
   DEFAULT_SPEECH_SETTINGS,
   type AppSettings,
   type BootstrapState,
   type BrowserBridgeStatus,
   type EnglishLearningState,
-  type InstalledModelView,
   type LocalUpdateState,
   type ModelDefinition,
   type ProviderId,
   type ProviderSettingsView,
-  type ProvidersListResult,
   type SettingsV4Snapshot,
   type ShortcutsSettings,
   type UsableModelView,
@@ -70,7 +67,6 @@ export function mockAppSettings(): AppSettings {
     skills: { disabled: [] },
     taskModels: { defaultChatModel: MOCK_DEFAULT_MODEL_KEY, utilityModel: null, exploreModel: null },
     imageGeneration: { hasApiKey: false, baseUrl: DEFAULT_IMAGE_GENERATION_BASE_URL, model: DEFAULT_IMAGE_GENERATION_MODEL },
-    imageInspection: { modelKey: DEFAULT_IMAGE_INSPECTION_MODEL_KEY },
     shortcuts,
   };
 }
@@ -97,28 +93,12 @@ export function mockSettingsV4(): SettingsV4Snapshot {
       media: {
         speech: { ...DEFAULT_SPEECH_SETTINGS },
         imageGeneration: { baseUrl: DEFAULT_IMAGE_GENERATION_BASE_URL, model: DEFAULT_IMAGE_GENERATION_MODEL },
-        imageInspection: { modelKey: DEFAULT_IMAGE_INSPECTION_MODEL_KEY },
       },
       skills: { disabled: [] },
       subagents: { routes: {} },
       activity: { usage: { range: "30d", status: "all", modelFilter: "", showDetails: true, activeTab: "requests" } },
     },
   };
-}
-
-export function mockProviders(): ProvidersListResult {
-  return {
-    credentialStorage: { status: "ready" },
-    providers: { deepseek: providerView("deepseek"), kimi: providerView("kimi"), openrouter: unconfigured },
-  };
-}
-
-export function mockInstalledModels(): InstalledModelView[] {
-  return mockModels.map((definition) => ({
-    definition,
-    settings: { enabled: true, addedAt: "2026-10-01T00:00:00.000Z" },
-    unavailableReasons: {},
-  }));
 }
 
 export function mockUsableModels(): UsableModelView[] {
@@ -165,3 +145,5 @@ export function mockEnglishLearningState(): EnglishLearningState {
 export function mockBrowserBridgeStatus(): BrowserBridgeStatus {
   return { installed: false, abbPath: `${MOCK_DATA_ROOT}/browser-bridge`, runState: "not_installed", doctorChecks: [] };
 }
+
+/** 设置 › 模型的浏览器预览数据；阶段 C 补全连接和模型。 */

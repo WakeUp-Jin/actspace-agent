@@ -50,6 +50,104 @@ describe("Review workbench", () => {
     expect(screen.getByRole("button", { name: "显示文件列表" }).querySelector("svg")).toHaveClass("lucide-folder");
   });
 
+  it("keeps the scope trigger separated from large change statistics", async () => {
+    const user = userEvent.setup();
+    const snapshot = {
+      ...dirtySnapshot(),
+      totals: { files: 1, additions: 6002, deletions: 6001, changedLines: 12003, estimatedChangedBytes: 256 },
+    };
+    setupBridge(reviewBridge(snapshot));
+    render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
+
+    const toolbar = screen.getByLabelText("审查工具栏");
+    const scroll = toolbar.querySelector<HTMLElement>("[data-review-toolbar-scroll]");
+    const scopeSlot = scroll?.firstElementChild;
+    const trigger = within(toolbar).getByRole("button", { name: "审查范围" });
+    expect(scopeSlot).toHaveClass("shrink-0");
+    expect(trigger).toHaveClass("min-w-[76px]", "whitespace-nowrap");
+    expect(await within(toolbar).findByText("+6002")).toBeInTheDocument();
+    expect(await within(toolbar).findByText("-6001")).toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(await screen.findByRole("menu", { name: "审查范围选项" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("reveals an overflowing toolbar button on Tab and the first button on Shift-Tab", async () => {
+    const user = userEvent.setup();
+    setupBridge(reviewBridge(dirtySnapshot()));
+    render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
+    await screen.findByText("apps/desktop/src/renderer/App.tsx");
+    const toolbar = screen.getByLabelText("审查工具栏");
+    const scroll = toolbar.querySelector<HTMLElement>("[data-review-toolbar-scroll]")!;
+    const scope = within(toolbar).getByRole("button", { name: "审查范围" });
+    const last = within(toolbar).getByRole("button", { name: "提交或推送" });
+    act(() => within(toolbar).getByRole("button", { name: "显示文件列表" }).focus());
+    Object.defineProperties(scroll, { clientWidth: { value: 389 }, scrollWidth: { value: 470 } });
+    vi.spyOn(scroll, "getBoundingClientRect").mockImplementation(() => new DOMRect(100, 50, 389, 44));
+    vi.spyOn(last, "getBoundingClientRect").mockImplementation(() => new DOMRect(443.7 - scroll.scrollLeft, 56, 116, 32));
+    vi.spyOn(scope, "getBoundingClientRect").mockImplementation(() => new DOMRect(110.3 - scroll.scrollLeft, 56, 76, 32));
+
+    await user.tab();
+    expect(last).toHaveFocus();
+    // Chromium can round fractional scroll offsets toward the clipped edge.
+    expect(scroll.scrollLeft).toBe(74);
+    expect(last.getBoundingClientRect().right + 3).toBeLessThanOrEqual(489);
+
+    // Start immediately after Scope so reverse keyboard navigation exercises its reveal.
+    act(() => within(toolbar).getByRole("button", { name: "审查选项" }).focus());
+    scroll.scrollLeft = 74;
+    await user.tab({ shift: true });
+    expect(scope).toHaveFocus();
+    expect(scroll.scrollLeft).toBe(7);
+    expect(scope.getBoundingClientRect().left - 3).toBeGreaterThanOrEqual(100);
+  });
+
+  it.each([
+    { width: 470, content: 470, right: 460, expected: 0 },
+    { width: 389, content: 470, right: 380, expected: 0 },
+    { width: 389, content: 470, right: 470, expected: 81 },
+  ])("keeps toolbar focus scrolling within its own bounds ($width/$content/$right)", async ({ width, content, right, expected }) => {
+    setupBridge(reviewBridge(dirtySnapshot()));
+    render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
+    await screen.findByText("apps/desktop/src/renderer/App.tsx");
+    const toolbar = screen.getByLabelText("审查工具栏");
+    const scroll = toolbar.querySelector<HTMLElement>("[data-review-toolbar-scroll]")!;
+    const last = within(toolbar).getByRole("button", { name: "提交或推送" });
+    Object.defineProperties(scroll, { clientWidth: { value: width }, scrollWidth: { value: content } });
+    vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue(new DOMRect(100, 50, width, 44));
+    vi.spyOn(last, "getBoundingClientRect").mockReturnValue(new DOMRect(100 + right - 116, 56, 116, 32));
+
+    act(() => last.focus());
+    expect(last).toHaveFocus();
+    expect(scroll.scrollLeft).toBe(expected);
+    expect(document.documentElement.scrollLeft).toBe(0);
+  });
+
+  it("ignores focus inside a portalled toolbar menu", async () => {
+    const user = userEvent.setup();
+    setupBridge(reviewBridge(dirtySnapshot()));
+    render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
+    await screen.findByText("apps/desktop/src/renderer/App.tsx");
+    const toolbar = screen.getByLabelText("审查工具栏");
+    const scroll = toolbar.querySelector<HTMLElement>("[data-review-toolbar-scroll]")!;
+    const trigger = within(toolbar).getByRole("button", { name: "审查选项" });
+    Object.defineProperties(scroll, { clientWidth: { value: 389 }, scrollWidth: { value: 470 } });
+    vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue(new DOMRect(100, 50, 389, 44));
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue(new DOMRect(200, 56, 28, 28));
+    scroll.scrollLeft = 40;
+    await user.click(trigger);
+    const refresh = await screen.findByRole("menuitem", { name: "刷新" });
+    expect(scroll.contains(refresh)).toBe(false);
+    await user.keyboard("{ArrowDown}");
+    expect(refresh).toHaveFocus();
+    expect(scroll.scrollLeft).toBe(40);
+    await user.keyboard("{Escape}");
+    expect(trigger).toHaveFocus();
+    expect(scroll.scrollLeft).toBe(40);
+  });
+
   it("refreshes through the coordinator bridge when refreshKey changes", async () => {
     const bridge = reviewBridge(emptySnapshot());
     setupBridge(bridge);
@@ -177,7 +275,7 @@ describe("Review workbench", () => {
     expect(screen.queryByRole("menuitem", { name: "Review" })).not.toBeInTheDocument();
   });
 
-  it("reloads an open Review against the currently selected workspace", async () => {
+  it("keeps Review on the session execution root when the sidebar workspace changes", async () => {
     const user = userEvent.setup();
     const bridge = reviewBridge(emptySnapshot());
     setupBridge(bridge);
@@ -187,14 +285,21 @@ describe("Review workbench", () => {
       title: "Workspace review",
       messages: [],
       contextSnapshot: null,
+      runTarget: { kind: "local" as const, workspaceRoot: "/tmp/workspace-a" },
     };
     const { rerender } = render(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-a" /></RightPanelProvider>);
     await user.click(screen.getByRole("button", { name: "Review" }));
     await waitFor(() => expect(bridge["review.getSnapshot"]).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-a" })));
 
     rerender(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} selectedWorkspaceRoot="/tmp/workspace-b" /></RightPanelProvider>);
+    expect(bridge["review.getSnapshot"]).not.toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" }));
+
+    rerender(<RightPanelProvider initialOpen><TestWorkbenchLayout {...props} runTarget={{ kind: "local", workspaceRoot: "/tmp/workspace-b" }} selectedWorkspaceRoot="/tmp/workspace-b" /></RightPanelProvider>);
+    expect(bridge["review.getSnapshot"]).not.toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" }));
+    await user.click(screen.getByRole("button", { name: "新建右侧面板对象" }));
+    await user.click(screen.getByRole("menuitem", { name: "Review" }));
     await waitFor(() => expect(bridge["review.getSnapshot"]).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/workspace-b" })));
-    expect(screen.getAllByRole("tab", { name: "Review" })).toHaveLength(1);
+    expect(screen.getAllByRole("tab", { name: "Review" })).toHaveLength(2);
   });
 
   it("keeps capped Review requests scoped to the selected file", async () => {

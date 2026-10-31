@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博客 R4 · 大字杂志</title>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="blog-r.css">
+<link rel="stylesheet" href="blog-r-prose.css">
+<style>
+/* R4 大字杂志：标题居中放大，封面做成一张宽幅大图；正文字号最大（18px），首段更大做导语，小节上方标编号，引用做成居中的大字摘句，图片比正文更宽。读起来最「有排场」的一版。 */
+.post { padding: 64px 0 140px; }
+.p-head { width: min(860px, calc(100vw - 40px)); margin: 0 auto; text-align: center; }
+.p-head .cat { font: 600 13px var(--r-font); letter-spacing: .06em; color: var(--site-accent); margin: 0 0 18px; }
+.p-head h1 { font: 700 54px/1.24 var(--r-font); margin: 0 0 20px; letter-spacing: -.015em; }
+.p-head .desc { font-size: 20px; line-height: 1.7; color: var(--site-body); margin: 0 auto 26px; max-width: 32em; }
+.byline { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; color: var(--site-body); }
+.byline .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--site-ink); color: #fff; display: grid; place-items: center; font: 600 12px var(--r-font); }
+.byline i { width: 3px; height: 3px; border-radius: 50%; background: var(--site-line-strong); }
+.p-cover { position: relative; overflow: hidden; width: min(1120px, calc(100vw - 40px)); aspect-ratio: 2.4 / 1; margin: 52px auto 72px; border-radius: 28px; background: var(--cv-bg); }
+.p-cover::after { content: ""; position: absolute; inset: 0; z-index: 1; background: var(--stage-grain); opacity: .14; mix-blend-mode: multiply; pointer-events: none; }
+.cv-light .p-cover { box-shadow: inset 0 0 0 1px rgba(29, 28, 26, .07); }
+.p-cover img { -webkit-mask-image: radial-gradient(closest-side, #000 74%, transparent); mask-image: radial-gradient(closest-side, #000 74%, transparent); position: absolute; left: 50%; top: 50%; height: 150%; width: auto; max-width: none; translate: -50% -50%; }
+.p-body { width: min(700px, calc(100vw - 40px)); margin: 0 auto; }
+.rprose { font-size: 18px; line-height: 2; color: #34322e; }
+.rprose > p:first-child { font-size: 21px; line-height: 1.85; color: var(--site-ink); }
+.rprose h2 { font: 700 30px/1.4 var(--r-font); margin-top: 2.6em; }
+.rprose .h2-no { display: block; font: 500 13px var(--mono); color: var(--site-accent); margin-bottom: 10px; letter-spacing: .04em; }
+.rprose blockquote { border: 0; margin: 2.4em 0; padding: 0 20px; text-align: center; font: 600 23px/1.7 var(--r-font); color: var(--site-ink); }
+.rprose blockquote::before { content: "“"; display: block; font: 72px/.7 var(--display); color: var(--site-accent); margin-bottom: .1em; }
+.rprose .pimg { width: min(920px, calc(100vw - 40px)); margin-left: 50%; translate: -50% 0; }
+.rprose .pimg img { border-radius: 16px; }
+.rprose .refs { gap: 0; padding: 6px 22px; border: 1px solid var(--site-line); border-radius: 16px; background: var(--site-paper); }
+.rprose .refs li + li { border-top: 1px solid var(--site-line); }
+.rprose .ref { border: 0; background: none; border-radius: 0; padding: 14px 0; }
+.rprose .callout { background: none; border: 0; border-radius: 0; border-top: 1px solid var(--site-line); border-bottom: 1px solid var(--site-line); padding: 18px 0; font-size: 18px; font-weight: 500; gap: 14px; }
+.rprose .callout .ico { font-size: 24px; line-height: 1.5; }
+.rprose ol > li::marker { font: 600 .95em var(--mono); color: var(--site-accent); }
+@media (max-width: 640px) { .p-head h1 { font-size: 34px; } .p-head .desc { font-size: 17px; } .p-cover { aspect-ratio: 16 / 10; border-radius: 18px; } .rprose { font-size: 17px; } .rprose > p:first-child { font-size: 18.5px; } .rprose h2 { font-size: 24px; } .rprose blockquote { font-size: 19px; } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+
+<main class="page" data-view="list" data-r-list></main>
+
+<main class="post" data-view="post" hidden>
+  <header class="p-head">
+    <p class="cat" data-post-fill="cat"></p>
+    <h1 data-post-fill="title"></h1>
+    <p class="desc" data-post-fill="desc"></p>
+    <div class="byline"><span class="avatar">W</span><span>WakeUp-Jin</span><i></i><span data-post-fill="date"></span><i></i><span>约 9 分钟</span></div>
+  </header>
+  <div class="p-cover"><img data-cover-img alt=""></div>
+  <div class="p-body">
+    <article class="rprose" data-post-body></article>
+    <nav class="r-next" data-post-next></nav>
+  </div>
+</main>
+
+<script src="shared.js"></script>
+<script src="blog-shared.js"></script>
+<script src="blog-r.js"></script>
+<script>
+bootR("R4");
+// 小节编号：「一、」挪到标题上方的 01 / 04
+const hs = document.querySelectorAll(".rprose h2");
+hs.forEach((h, i) => { h.innerHTML = `<span class="h2-no">${String(i + 1).padStart(2, "0")} / ${String(hs.length).padStart(2, "0")}</span>${h.innerHTML.replace(/^[一二三四五六七八九十]+、/, "")}`; });
+</script>
+</body>
+</html>

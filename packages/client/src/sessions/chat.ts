@@ -1,5 +1,6 @@
 import { toolPreview } from "./tool-card.js";
 import {
+  type BackgroundNotice,
   createMessageBlocks,
   type ContextUsageSnapshot,
   projectContextState,
@@ -19,8 +20,10 @@ import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 
 type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
 
-export function projectChatWindow(projection: import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection, workspaceRoot = ""): SessionRecord {
-  const record = projectChatSession(projection.snapshot, projection.window.events, workspaceRoot);
+export type ChatProjectionOptions = { readonly includePendingChunks?: boolean };
+
+export function projectChatWindow(projection: import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection, workspaceRoot = "", options: ChatProjectionOptions = {}): SessionRecord {
+  const record = projectChatSession(projection.snapshot, projection.window.events, workspaceRoot, options);
   const deferred = new Set(projection.deferredToolCalls);
   for (const block of record.messageBlocks ?? []) {
     const event = record.events.find(event => event.id === block.id);
@@ -48,14 +51,17 @@ type EventIndex = {
   readonly toolByCall: Map<string, RuntimeV2ToolView>;
   readonly callData: Map<string, EventRecord>;
   readonly childByCall: Map<string, { readonly childSessionId: string; readonly presetId: string; readonly status: string }>;
+  /** Background task status by the tool call that started it, from `background/task` facts. */
+  readonly backgroundByCall: Map<string, { readonly status: string }>;
 };
 
 export function projectChatSession(
   snapshot: RuntimeV2SessionSnapshot,
   journal: readonly SessionEventEnvelopeV1[],
   fallbackWorkspaceRoot: string,
+  options: ChatProjectionOptions = {},
 ): SessionRecord {
-  const events = projectChatEvents(snapshot, journal);
+  const events = projectChatEvents(snapshot, journal, options);
   return {
     meta: {
       schemaVersion: 2,
@@ -82,11 +88,18 @@ export function projectChatSession(
 export function projectChatEvents(
   snapshot: RuntimeV2SessionSnapshot,
   journal: readonly SessionEventEnvelopeV1[],
+  options: ChatProjectionOptions = {},
 ): SessionEvent[] {
   const index = buildIndex(snapshot, journal);
+  const pendingChunks = options.includePendingChunks ? projectPendingChunks(snapshot, journal, index) : null;
   const activeSurface = indexActiveSurface(snapshot, journal);
   const projected: SessionEvent[] = [];
   for (const event of journal) {
+    if (event.type === "assistant/chunk") {
+      const pending = pendingChunks?.get(eventId(event));
+      if (pending) projected.push(pending);
+      continue;
+    }
     const data = record(event.data);
     const identity = identityFor(event, data, index);
     const base = {
@@ -102,7 +115,7 @@ export function projectChatEvents(
     if (event.type === "user/message" || (event.type === "agent/inbox/spliced" && string(data.operation) === "claim")) {
       const node = appendNode(event);
       if (node === null || !activeSurface.showsMessage(node.messageId, event.seq)) continue;
-      projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index, string(data.source) ?? undefined);
+      projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index, string(data.source) ?? undefined, data.opensTurn === true ? backgroundNotice(data.notice) : undefined);
       continue;
     }
     if (event.type === "assistant/message") {
@@ -116,6 +129,12 @@ export function projectChatEvents(
       const tool = index.toolByCall.get(callId);
       if (tool?.state !== "running" && !activeSurface.showsToolCall(callId)) continue;
       projected.push({ ...base, id: eventId(event), type: "tool_call", payload: { id: callId, name: string(data.name) ?? "tool", arguments: record(data.args) } });
+      if (tool?.state === "running") {
+        projected.push({ ...base, id: `${eventId(event)}-running`, type: "tool_result", payload: {
+          toolCallId: callId, toolName: tool.name, status: "running",
+          uiPreview: toolPreview(tool.name, tool, {}, data, index.childByCall.get(callId), snapshot.sessionId, identity.agentRunId, "running", snapshot.workspaceRoot ?? undefined),
+        } });
+      }
       continue;
     }
     if (isToolTerminal(event.type)) {
@@ -124,7 +143,7 @@ export function projectChatEvents(
       const tool = index.toolByCall.get(callId);
       const toolName = tool?.name ?? string(index.callData.get(callId)?.name) ?? "tool";
       const ok = event.type === "tool/result" && string(data.status) === "completed";
-      const preview = toolPreview(toolName, tool, data, index.callData.get(callId), index.childByCall.get(callId), snapshot.sessionId, identity.agentRunId, "finished", snapshot.workspaceRoot ?? undefined);
+      const preview = toolPreview(toolName, tool, data, index.callData.get(callId), index.childByCall.get(callId), snapshot.sessionId, identity.agentRunId, "finished", snapshot.workspaceRoot ?? undefined, undefined, index.backgroundByCall.get(callId));
       projected.push({
         ...base,
         id: eventId(event),
@@ -148,12 +167,15 @@ export function projectChatEvents(
     }
     if (event.type === "surface/replaced") continue;
     // 每次请求的用量记一次：成功的落在 step/end（assistant/message 带的是同一份，上面已 continue），
-    // 失败重试的落在 llm/retry。没有 usage 的 step/end（中断、失败）不记。
-    if (event.type === "step/end" || event.type === "llm/retry") {
+    // 失败重试的落在 llm/retry；辅助尝试只消费独立终结事实，不生成聊天消息。
+    const auxiliary = event.type === "llm/auxiliary-end";
+    if (event.type === "step/end" || event.type === "llm/retry" || auxiliary) {
       const usage = record(data.usage);
       if (Object.keys(usage).length === 0) continue;
+      // 轮尾只累加已报告的 Token；全未知和未终结尝试仍由 activity/轨迹展示未知。
+      if (auxiliary && activityTokens(usage).totalTokens === null) continue;
       const stepId = string(data.stepId);
-      const requestId = string(data.requestId) ?? (stepId ? index.lastRequestByStep.get(stepId) : undefined) ?? `request-${event.seq}`;
+      const requestId = (auxiliary ? string(data.attemptId) : string(data.requestId) ?? (stepId ? index.lastRequestByStep.get(stepId) : undefined)) ?? `request-${event.seq}`;
       const request = index.requestById.get(requestId);
       const promptTokens = nonNegative(usage.inputTokens);
       const completionTokens = nonNegative(usage.outputTokens);
@@ -163,7 +185,9 @@ export function projectChatEvents(
       const cost = activityCost(usage);
       // request/context 里的 route 常是 "default"；计价快照里有真实的提供方和模型。
       const pricing = cost.costProvenance?.pricingSnapshot;
-      projected.push({ ...base, id: eventId(event), llmCallId: requestId, type: "llm_usage", payload: { llmCallId: requestId, attempt: 1, durationMs: 0, provider: pricing?.providerId ?? request?.provider ?? "default", model: pricing?.apiModel ?? request?.model ?? "default", promptTokens, completionTokens, totalTokens: promptTokens + completionTokens + cacheHitTokens + cacheMissTokens, reasoningTokens, cacheHitTokens, cacheMissTokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: cost.costUsd ?? 0, currency: "USD" }, costBasis: cost.costBasis === "unavailable" ? "unavailable" : cost.costBasis === "estimated" ? "estimated" : "priced" } });
+      const provider = pricing?.providerId ?? (auxiliary ? string(data.routeId) : request?.provider) ?? "default";
+      const model = pricing?.apiModel ?? (auxiliary ? string(data.model) : request?.model) ?? "default";
+      projected.push({ ...base, id: eventId(event), llmCallId: requestId, type: "llm_usage", payload: { llmCallId: requestId, attempt: auxiliary ? finiteInteger(data.attempt) ?? 1 : 1, durationMs: 0, provider, model, promptTokens, completionTokens, totalTokens: promptTokens + completionTokens + cacheHitTokens + cacheMissTokens, reasoningTokens, cacheHitTokens, cacheMissTokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: cost.costUsd ?? 0, currency: "USD" }, costBasis: cost.costBasis === "unavailable" ? "unavailable" : cost.costBasis === "estimated" ? "estimated" : "priced" } });
       continue;
     }
     if (event.type === "agent/error" || (event.type === "turn/end" && string(data.reason) === "failed")) {
@@ -184,11 +208,20 @@ export function projectChatEvents(
         ? data.durationMs
         : started === undefined ? undefined : Date.parse(event.time) - Date.parse(started.time);
       const summary = compactionSummaryText(journal, compactionId);
+      const trigger = data.trigger === "manual" || data.trigger === "auto" ? data.trigger : undefined;
+      // 旧 journal 没有压缩前后 token，这里不再拿会话当前用量充数。
+      const beforeTokens = nullableNonNegative(data.beforeTokens);
+      const afterTokens = beforeTokens === null ? null : nullableNonNegative(data.afterTokens);
       projected.push({ ...base, id: eventId(event), type: "context_compaction", payload: {
-        triggerTokens: snapshot.usage.totalTokens, thresholdTokens: snapshot.usage.totalTokens, beforeCount: end, afterCount: Math.max(1, start + 1),
+        triggerTokens: beforeTokens ?? 0, thresholdTokens: 0, beforeCount: end, afterCount: Math.max(1, start + 1),
         summaryChars: summary?.length ?? 0, historyRefPath: "journal.jsonl", status: "compacted", removedCount: Math.max(0, end - start),
         ...(durationMs !== undefined && Number.isFinite(durationMs) && durationMs >= 0 ? { durationMs } : {}),
         ...(summary ? { summary } : {}),
+        ...(compactionId ? { compactionId } : {}),
+        ...(trigger ? { trigger } : {}),
+        ...(beforeTokens === null ? {} : { beforeTokens }),
+        ...(afterTokens === null ? {} : { afterTokens }),
+        ...(beforeTokens !== null && data.beforeEstimated === true ? { beforeEstimated: true as const } : {}),
       } });
     }
   }
@@ -203,6 +236,7 @@ function projectSurfaceNode(
   base: SurfaceProjectionBase,
   index: EventIndex,
   source?: string,
+  notice?: BackgroundNotice,
 ): void {
   if (node.kind === "user") {
     const fileReferences = readFileReferenceBlocks(node.content);
@@ -213,6 +247,7 @@ function projectSurfaceNode(
       ...(fileReferences.length === 0 ? {} : { fileReferences }),
       ...(responseAnnotations.length === 0 ? {} : { responseAnnotations }),
       ...(source === undefined ? {} : { source }),
+      ...(notice === undefined ? {} : { backgroundNotice: notice }),
     } });
     return;
   }
@@ -269,9 +304,8 @@ export function projectContextSnapshot(snapshot: RuntimeV2SessionSnapshot, journ
 
 export { projectContextState } from "@actspace/shared";
 
-export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): SessionEvent[] {
-  const events = projectChatEvents(snapshot, journal);
-  const index = buildIndex(snapshot, journal);
+/** Pending text is Journal-derived during recovery; completed messages replace their chunks. */
+function projectPendingChunks(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[], index: EventIndex): Map<string, SessionEvent> {
   const completedMessages = new Set(journal.filter((event) => event.type === "assistant/message").map((event) => string(record(event.data).messageId)));
   const chunks = new Map<string, SessionEvent>();
   for (const event of journal) {
@@ -281,12 +315,22 @@ export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, jo
     const key = `${string(data.messageId)}:${string(data.kind)}`;
     const previous = chunks.get(key);
     const identity = identityFor(event, data, index);
-    chunks.set(key, { id: previous?.id ?? eventId(event), sessionId: snapshot.sessionId, agentRunId: identity.agentRunId, timestamp: event.time,
+    chunks.set(key, { id: previous?.id ?? eventId(event), sessionId: snapshot.sessionId, agentRunId: identity.agentRunId,
+      ...(identity.turnId === null ? {} : { turnId: identity.turnId }),
+      ...(identity.requestId === null ? {} : { llmCallId: identity.requestId }),
+      timestamp: previous?.timestamp ?? event.time,
       type: data.kind === "reasoning-delta" ? "thinking" : "assistant_message",
       payload: { content: String((previous?.payload as { content?: string } | undefined)?.content ?? "") + String(data.content ?? "") } } as SessionEvent);
   }
-  events.push(...chunks.values());
+  // A combined event spans multiple envelopes, so it has no single sourceSeq.
+  return new Map([...chunks.values()].map(event => [event.id, event]));
+}
+
+export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): SessionEvent[] {
+  const events = projectChatEvents(snapshot, journal, { includePendingChunks: true });
+  const index = buildIndex(snapshot, journal);
   for (const tool of snapshot.tools.filter((tool) => tool.state === "running")) {
+    if (events.some(event => event.type === "tool_result" && (event.payload as { toolCallId?: string }).toolCallId === tool.callId)) continue;
     const call = index.callData.get(tool.callId);
     events.push({ id: `live-tool:${tool.callId}`, sessionId: snapshot.sessionId, agentRunId: "subagent-live", timestamp: tool.startedAt ?? new Date(0).toISOString(), type: "tool_result",
       payload: { toolCallId: tool.callId, status: "running", uiPreview: toolPreview(tool.name, tool, {}, call, index.childByCall.get(tool.callId), snapshot.sessionId, "subagent-live", "running", snapshot.workspaceRoot ?? undefined) } } as SessionEvent);
@@ -303,7 +347,7 @@ export function projectSubagentList(snapshot: RuntimeV2SessionSnapshot, journal:
     const child = index.childByCall.get(callId);
     const terminalEvent = journal.find((candidate) => isToolTerminal(candidate.type) && record(candidate.data).callId === callId);
     const identity = identityFor(event, call, index);
-    const preview = toolPreview(String(call.name), tool, terminalEvent ? record(terminalEvent.data) : {}, call, child, snapshot.sessionId, identity.agentRunId, terminalEvent ? "finished" : "running", snapshot.workspaceRoot ?? undefined);
+    const preview = toolPreview(String(call.name), tool, terminalEvent ? record(terminalEvent.data) : {}, call, child, snapshot.sessionId, identity.agentRunId, terminalEvent ? "finished" : "running", snapshot.workspaceRoot ?? undefined, undefined, index.backgroundByCall.get(callId));
     if (preview.kind === "agent" && !terminalEvent) preview.stats = { durationMs: Math.max(0, Date.now() - Date.parse(event.time)), toolCallCount: 0 };
     return createMessageBlocks([{ id: `subagent:${callId}`, sessionId: snapshot.sessionId, agentRunId: identity.agentRunId, timestamp: event.time, type: "tool_result", payload: { toolCallId: callId, uiPreview: preview, status: terminalEvent ? tool?.state : "running" } } as SessionEvent]);
   });
@@ -347,9 +391,21 @@ export function projectSessionUsageActivities(snapshot: UsageSession, journal: r
   const retries = new Map<string, SessionEventEnvelopeV1>();
   const retryStarted = new Map<string, SessionEventEnvelopeV1>();
   const tools = new Map<string, { call: SessionEventEnvelopeV1; terminal?: SessionEventEnvelopeV1 }>();
+  const auxiliary = new Map<string, { start: SessionEventEnvelopeV1; end?: SessionEventEnvelopeV1 }>();
 
   for (const event of journal) {
     const data = record(event.data);
+    if (event.type === "llm/auxiliary-start") {
+      const attemptId = string(data.attemptId);
+      if (attemptId) auxiliary.set(attemptId, { start: event });
+      continue;
+    }
+    if (event.type === "llm/auxiliary-end") {
+      const attemptId = string(data.attemptId);
+      const attempt = attemptId ? auxiliary.get(attemptId) : undefined;
+      if (attempt) attempt.end = event;
+      continue;
+    }
     if (event.type === "request/header") {
       const requestId = string(data.requestId);
       const turnId = string(data.turnId);
@@ -432,10 +488,47 @@ export function projectSessionUsageActivities(snapshot: UsageSession, journal: r
 
   const rows: UsageActivityRow[] = [];
   for (const state of requests.values()) rows.push(activityRowForRequest(snapshot, state));
+  const previousAttempts = new Map<string, string>();
+  for (const { start, end } of auxiliary.values()) {
+    const row = activityRowForAuxiliary(snapshot, start, end);
+    const previous = previousAttempts.get(row.logicalRequestId!);
+    if (previous) row.retryOfRequestId = previous;
+    previousAttempts.set(row.logicalRequestId!, row.requestId!);
+    rows.push(row);
+  }
   for (const { call, terminal } of tools.values()) rows.push(activityRowForTool(snapshot, call, terminal, runByTurn));
   for (const row of rows) row.sessionTitle = snapshot.metadata.title ?? undefined;
   activityRowsCache.set(journal, { revision: snapshot.throughJournalSeq, sessionId: snapshot.sessionId, rows });
   return rows;
+}
+
+function activityRowForAuxiliary(snapshot: UsageSession, start: SessionEventEnvelopeV1, end: SessionEventEnvelopeV1 | undefined): UsageActivityRow {
+  const data = record(start.data);
+  const terminal = record(end?.data);
+  const usage = record(terminal.usage);
+  const cost = activityCost(usage);
+  const pricing = cost.costProvenance?.pricingSnapshot;
+  const providerId = pricing?.providerId ?? string(data.routeId) ?? undefined;
+  const model = pricing?.apiModel ?? string(data.model) ?? undefined;
+  const startedAt = string(data.startedAt) ?? start.time;
+  const endedAt = end ? string(terminal.finishedAt) ?? end.time : undefined;
+  return {
+    activityId: `${snapshot.sessionId}:auxiliary:${data.attemptId}`,
+    kind: "llm_request", sessionId: snapshot.sessionId,
+    agentRunId: string(data.agentRunId) ?? "system",
+    turnId: string(data.turnId) ?? undefined, stepId: string(data.stepId) ?? undefined,
+    requestId: string(data.attemptId) ?? undefined, callId: string(data.callId) ?? undefined,
+    logicalRequestId: string(data.logicalRequestId) ?? undefined, purpose: data.purpose as UsageActivityRow["purpose"],
+    routeId: string(data.routeId) ?? undefined, providerId, model,
+    modelKey: modelKeyFor(providerId, model),
+    ...(pricing?.connectionId ? { connectionId: pricing.connectionId } : {}),
+    ...(snapshot.workspaceRoot ? { workspaceRoot: snapshot.workspaceRoot } : {}),
+    startedAt, ...(endedAt ? { endedAt, durationMs: duration(startedAt, endedAt) } : {}),
+    attempt: finiteInteger(data.attempt) ?? undefined,
+    tokens: activityTokens(usage), ...cost,
+    status: end ? requestActivityStatus(string(terminal.status)) : "running",
+    sourceEventSeq: start.seq, relatedEventSeqs: [start.seq, ...(end ? [end.seq] : [])],
+  };
 }
 
 function activityRowForRequest(snapshot: UsageSession, state: ActivityRequestState): UsageActivityRow {
@@ -548,7 +641,7 @@ function toolActivityStatus(status: string | null): UsageActivityStatus {
 }
 
 function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): EventIndex {
-  const runByTurn = new Map<string, string>(); const turnByStep = new Map<string, string>(); const runByInboxMessage = new Map<string, string>(); const turnByInboxMessage = new Map<string, string>(); const requestById = new Map<string, RequestInfo>(); const lastRequestByStep = new Map<string, string>(); const callData = new Map<string, EventRecord>(); const childByCall = new Map<string, { childSessionId: string; presetId: string; status: string }>();
+  const runByTurn = new Map<string, string>(); const turnByStep = new Map<string, string>(); const runByInboxMessage = new Map<string, string>(); const turnByInboxMessage = new Map<string, string>(); const requestById = new Map<string, RequestInfo>(); const lastRequestByStep = new Map<string, string>(); const callData = new Map<string, EventRecord>(); const childByCall = new Map<string, { childSessionId: string; presetId: string; status: string }>(); const backgroundByCall = new Map<string, { status: string }>(); const callByTask = new Map<string, string>();
   const turnStarts = journal
     .filter((event) => event.type === "turn/start")
     .map((event) => {
@@ -587,13 +680,19 @@ function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly Sessio
       const parentCallId = string(data.parentCallId); const presetId = string(data.presetId);
       if (parentCallId) childByCall.set(parentCallId, { childSessionId: string(data.childSessionId) ?? "", presetId: presetId ?? "unknown", status: "running" });
     }
+    if (event.type === "background/task") {
+      const taskId = string(data.taskId);
+      if (data.op === "start" && taskId && callId) { callByTask.set(taskId, callId); backgroundByCall.set(callId, { status: "running" }); }
+      const owner = taskId ? callByTask.get(taskId) : undefined;
+      if (data.op === "settle" && owner) backgroundByCall.set(owner, { status: string(data.status) ?? "lost" });
+    }
     if (event.type === "delegation/completed") {
       const invocationId = string(data.invocationId); const completed = invocationId ? journal.find((candidate) => candidate.type === "delegation/requested" && string(record(candidate.data).invocationId) === invocationId) : undefined;
       const parentCallId = completed ? string(record(completed.data).parentCallId) : null;
       if (parentCallId) childByCall.set(parentCallId, { childSessionId: string(data.childSessionId) ?? "", presetId: string(data.presetId) ?? childByCall.get(parentCallId)?.presetId ?? "unknown", status: string(data.status) ?? "completed" });
     }
   }
-  return { runByTurn, turnByStep, runByInboxMessage, turnByInboxMessage, requestById, lastRequestByStep, toolByCall: new Map(snapshot.tools.map((tool) => [tool.callId, tool])), callData, childByCall };
+  return { runByTurn, turnByStep, runByInboxMessage, turnByInboxMessage, requestById, lastRequestByStep, toolByCall: new Map(snapshot.tools.map((tool) => [tool.callId, tool])), callData, childByCall, backgroundByCall };
 }
 
 function identityFor(event: SessionEventEnvelopeV1, data: EventRecord, index: EventIndex) {
@@ -608,6 +707,10 @@ function identityFor(event: SessionEventEnvelopeV1, data: EventRecord, index: Ev
   return { requestId, turnId, stepId, agentRunId };
 }
 
+function backgroundNotice(value: RuntimeV2JsonValue | undefined): BackgroundNotice | undefined {
+  const notice = record(value); const taskId = string(notice.taskId); const kind = notice.kind;
+  return taskId && (kind === "bash" || kind === "agent") ? { taskId, taskKind: kind, title: string(notice.title) ?? taskId, status: string(notice.status) ?? "completed" } : undefined;
+}
 function appendNode(event: SessionEventEnvelopeV1) { return event.surface?.kind === "append" ? event.surface.node : null; }
 function contentBlocks(value: RuntimeV2JsonValue): readonly EventRecord[] { return Array.isArray(value) ? value.filter(isRecord) : []; }
 function contentText(value: RuntimeV2JsonValue, includeReasoning = true): string { if (typeof value === "string") return value; if (!Array.isArray(value)) return JSON.stringify(value ?? null, null, 2); return value.flatMap((entry) => { if (typeof entry === "string") return [entry]; if (!isRecord(entry)) return [JSON.stringify(entry)]; if (entry.type === "text" && typeof entry.text === "string") return [entry.text]; if (includeReasoning && entry.type === "reasoning" && typeof entry.text === "string") return [entry.text]; if (entry.type === "image") return [typeof entry.alt === "string" ? `[${entry.alt}]` : "[image]"]; if (entry.type === "artifact") return [typeof entry.label === "string" ? `[${entry.label}]` : "[attachment]"]; return []; }).join(""); }

@@ -1263,7 +1263,7 @@ describe("Composer follow-up bar", () => {
     expect(screen.getByRole("combobox", { name: "搜索" })).toHaveFocus();
   });
 
-  it("keeps the context popup open for clicks inside it or the composer, and closes it on Escape or an outside click", async () => {
+  it("keeps the context popup open for clicks inside it, and closes it on Escape, the toggle or any click outside it", async () => {
     const user = userEvent.setup();
     renderComposer();
     const outside = document.createElement("button");
@@ -1277,10 +1277,17 @@ describe("Composer follow-up bar", () => {
     const bucket = popup.querySelector<HTMLButtonElement>(".context-bucket")!;
     await user.click(bucket);
     expect(bucket).toHaveAttribute("aria-pressed", "true");
+    // 输入框也算浮层外：点它就关闭。
     await user.click(screen.getByRole("textbox"));
-    expect(screen.getByRole("dialog", { name: "上下文用量" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
 
-    await user.click(bucket);
+    await user.click(toggle);
+    expect(screen.getByRole("dialog", { name: "上下文用量" })).toBeInTheDocument();
+    await user.click(toggle);
+    expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    await user.click(screen.getByRole("dialog", { name: "上下文用量" }).querySelector<HTMLButtonElement>(".context-bucket")!);
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "上下文用量" })).not.toBeInTheDocument();
     await waitFor(() => expect(toggle).toHaveFocus());
@@ -1787,6 +1794,65 @@ describe("Composer follow-up status row", () => {
   it("shows 工作树 for a worktree session", () => {
     renderComposer({ surface: "followup", executionContext: { gitContext: { status: "ready", workspaceRoot: "/work/repo", currentBranch: "actspace/92803054", branches: [] }, selectedBranch: "actspace/92803054", runLocation: "worktree" } });
     expect(screen.getByLabelText("运行位置")).toHaveTextContent(/^actspace\/92803054·工作树36%$/);
+  });
+
+  it("exposes the full worktree source tooltip to keyboard focus without button semantics", async () => {
+    const user = userEvent.setup();
+    const workspaceRoot = "/workspaces/actspace-agent";
+    const worktreeRoot = "/worktrees/actspace-92803054";
+    const branch = "actspace/92803054";
+    const baseBranch = "main";
+    const source = `原工作区：${workspaceRoot} · 基于 ${baseBranch}`;
+    const executionContext = {
+      gitContext: { status: "ready" as const, workspaceRoot: worktreeRoot, currentBranch: branch, branches: [] },
+      selectedBranch: branch,
+      runLocation: "worktree" as const,
+    };
+    const runTargetValue = legacyRunTarget({
+      runTarget: {
+        kind: "local",
+        workspaceRoot: worktreeRoot,
+        branch,
+        worktree: {
+          kind: "worktree",
+          sourceWorkspaceRoot: workspaceRoot,
+          workspaceRoot: worktreeRoot,
+          baseBranch,
+          branch,
+          baseCommit: "0123456789abcdef",
+          createdAt: "2026-10-22T00:00:00.000Z",
+        },
+      },
+      targetLocked: true,
+      executionContext,
+    });
+
+    render(
+      <RunTargetContext.Provider value={runTargetValue}>
+        <TooltipProvider delayDuration={0}>
+          <Composer contextSnapshot={mockContextSnapshot} surface="followup" executionContext={executionContext} />
+        </TooltipProvider>
+      </RunTargetContext.Provider>,
+    );
+
+    const sourceLabel = screen.getByLabelText(`工作树，${source}`);
+    expect(sourceLabel).toHaveAttribute("tabindex", "0");
+    expect(sourceLabel).toHaveClass("focus-visible:ring-2");
+    expect(sourceLabel).not.toHaveAttribute("role", "button");
+    expect(sourceLabel).not.toHaveAttribute("type", "button");
+
+    const input = screen.getByLabelText("消息输入框");
+    input.focus();
+    for (let step = 0; step < 40; step += 1) {
+      await user.tab();
+      if (document.activeElement === sourceLabel || document.activeElement === input) break;
+    }
+    expect(sourceLabel).toHaveFocus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(source);
+
+    await user.keyboard("{Escape}");
+    expect(sourceLabel).toHaveFocus();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("shows the Host and workspace names remotely, with status and path in the Host tooltip", async () => {

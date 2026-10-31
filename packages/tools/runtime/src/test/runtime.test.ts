@@ -148,6 +148,19 @@ describe("Tool Runtime execution contract", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("extracts resources under the mode the call is admitted in, also on the pre-execution recheck", async () => {
+    const seen: string[] = [];
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { execute: async () => success() }, permission: {
+      extractResources: (_args, context) => { seen.push(context.mode); return []; },
+      evaluate: (_a, _r, c) => c.mode === "full-access" ? { kind: "allow" } : { kind: "ask", reason: "risk", risk: "high" },
+    } });
+    const once = { approvalBroker: { requestApproval: async (request: { requestId: string }) => ({ requestId: request.requestId, kind: "once" as const, decidedAt: new Date().toISOString() }) } };
+    await runtime.executeBatch([call("mode-full")], { ...environment([]), permissionMode: () => "full-access" });
+    await runtime.executeBatch([call("mode-default")], { ...environment([], once), permissionMode: () => "default" });
+    expect(seen).toEqual(["full-access", "full-access", "default", "default"]);
+  });
+
   it("re-evaluates a pending approval on mode change and cleans up its request", async () => {
     let mode: "default" | "full-access" = "default";
     let listener: (() => void) | undefined;
@@ -572,6 +585,7 @@ describe("process Session Grant execution", () => {
     const options = { sessionGrants: grants, sessionGrantCapability: true, trustedGrantAudiences, permissionRecords: records };
     const broker: ApprovalBroker = { async requestApproval(request) {
       expect(request.grantSuggestions).toHaveLength(1);
+      expect(request.resources).toMatchObject([{ kind: "process", noSandbox: false }]);
       return { requestId: request.requestId, kind: "session", suggestionId: request.grantSuggestions[0]!.suggestionId, decidedAt: new Date().toISOString() };
     } };
     const run = (id: string, value: string, env = environment([], options)) => runtime.executeBatch([call(id, { value })], env);

@@ -1,3 +1,4 @@
+import { localExecutionRoot } from "../target/run-target";
 import { PerformancePanel } from "./PerformancePanel";
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
 import type { AppSettings, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
@@ -62,10 +63,11 @@ export function WorkbenchLayout({
   reviewSummary?: ComposerReviewSummary | null;
   onReviewChanged?: () => void;
 }) {
-  const { sessionId: activeSessionId, title, messages, contextSnapshot, contextState, isStreaming, isSessionReady, onSend } = useActiveSession();
+  const { sessionId: activeSessionId, title, messages, contextSnapshot, contextState, isStreaming, isSessionReady, composerFocusRequestId, onSend } = useActiveSession();
   const { composerMode, selectedModelId, defaultModelId, selectedSkills } = useComposerContext();
   const { onSelectSession } = useSessionActions();
-  const { capabilities, selectedWorkspaceRoot } = useRunTargetContext();
+  const { target, capabilities, selectedWorkspaceRoot } = useRunTargetContext();
+  const executionRoot = localExecutionRoot(target, selectedWorkspaceRoot);
   const reviewEnabled = capabilities.review.enabled;
   const terminalEnabled = capabilities.terminal.enabled;
   const {
@@ -75,6 +77,7 @@ export function WorkbenchLayout({
     openTab,
   } = useRightPanel();
   const [view, setView] = useState<SidebarView>("chat");
+  const [returnFocusRequest, setReturnFocusRequest] = useState(0);
   // 所有 Space 分支都挂在 SPACE_DEMO_ENABLED 上：生产构建里它是常量 false，演示代码整块删掉。
   const isSpace = SPACE_DEMO_ENABLED && view === "space";
   // Space 演示的右栏开关记在它自己的 store 里（按上下文分别记标签，名册页没有右栏）。
@@ -124,6 +127,18 @@ export function WorkbenchLayout({
     setSessionMainView(activeSessionId ? sessionViewByIdRef.current.get(activeSessionId) ?? "chat" : "chat");
   }, [activeSessionId]);
 
+  const handledQuickOpenRequest = useRef(composerFocusRequestId);
+  useEffect(() => {
+    if (handledQuickOpenRequest.current === composerFocusRequestId) return;
+    handledQuickOpenRequest.current = composerFocusRequestId;
+    // Quick Open must mount the composer even when Settings or the trajectory currently owns the page.
+    setView("chat");
+    setSessionMainView("chat");
+    if (activeSessionId) sessionViewByIdRef.current.set(activeSessionId, "chat");
+    setCompactSidebarOpen(false);
+    if (isCompactLayout) closeRightPanel();
+  }, [composerFocusRequestId, activeSessionId, isCompactLayout, closeRightPanel, setCompactSidebarOpen]);
+
   const toggleSessionMainView = useCallback(() => {
     setSessionMainView((current) => {
       const next: SessionMainView = current === "chat" ? "trajectory" : "chat";
@@ -144,15 +159,15 @@ export function WorkbenchLayout({
     if (!reviewEnabled) return;
     const refreshKey = ++reviewTabRefreshCounterRef.current;
     openTab({
-      id: "review",
+      id: `review:${executionRoot ?? ""}`,
       kind: "review",
       title: "Review",
-      workspaceRoot: selectedWorkspaceRoot ?? undefined,
+      workspaceRoot: executionRoot,
       scope: "uncommitted",
       refreshKey,
     });
     onReviewChanged?.();
-  }, [reviewEnabled, onReviewChanged, openTab, selectedWorkspaceRoot]);
+  }, [reviewEnabled, onReviewChanged, openTab, executionRoot]);
 
   const openHostSettings = useCallback(() => {
     setSettingsSection("hosts");
@@ -285,6 +300,7 @@ export function WorkbenchLayout({
         activeView={sessionMainView}
         permissionControl={permissionControl}
         onConnectHost={openHostSettings}
+        focusRequest={returnFocusRequest}
       />
     );
   }
@@ -298,7 +314,7 @@ export function WorkbenchLayout({
   // ② turn 从「进行中」变为「结束」时递增一个 key → 触发一次 mtime 兜底重校验，
   //    覆盖 bash 脚本写文件这类不产生 diff 块的间接改动。
   const agentEditedPaths = useMemo(() => collectEditedFilePaths(messages), [messages]);
-  useAgentEditSignals(agentEditedPaths);
+  useAgentEditSignals(agentEditedPaths, executionRoot);
   const [fileRevalidateKey, setFileRevalidateKey] = useState(0);
   const wasStreamingRef = useRef(isStreaming);
   useEffect(() => {
@@ -313,7 +329,7 @@ export function WorkbenchLayout({
   if (view === "settings") {
     return (
       <SettingsPage
-        onBack={() => setView("chat")}
+        onBack={() => { setView("chat"); setReturnFocusRequest((value) => value + 1); }}
         initialSection={settingsSection}
         focusSpeech={focusSpeech}
         onSpeechFocused={() => setFocusSpeech(false)}
@@ -357,7 +373,7 @@ export function WorkbenchLayout({
       contextState={effectiveContextState}
       contextRevision={projectionCell?.snapshot?.throughJournalSeq}
       sessionId={activeSessionId}
-      workspaceRoot={selectedWorkspaceRoot ?? undefined}
+      workspaceRoot={executionRoot}
       fileRevalidateKey={fileRevalidateKey}
       onOpenReview={openReviewTab}
       onReviewChanged={onReviewChanged}
@@ -396,7 +412,7 @@ export function WorkbenchLayout({
         onToggleSessionView={view === "chat" ? toggleSessionMainView : undefined}
         center={isSpace ? <SpaceTabBar /> : undefined}
         centerTrailing={isSpace ? <SpaceDemoHelpButton /> : view === "chat" ? <>
-          {reviewEnabled && composerMode !== "chat" && selectedWorkspaceRoot ? <WorkspaceChromeControls workspaceRoot={selectedWorkspaceRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
+          {reviewEnabled && composerMode !== "chat" && executionRoot ? <WorkspaceChromeControls workspaceRoot={executionRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
         </> : undefined}
         rightLeading={
           view === "chat" ? (

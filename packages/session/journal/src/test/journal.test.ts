@@ -19,6 +19,15 @@ describe("Session Journal", () => {
     ]);
   });
 
+  it("validates background task start and settle facts", () => {
+    const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-10-22T12:00:00.000Z" });
+    journal.append(candidate("background/task", { op: "start", taskId: "bash_1", kind: "bash", callId: "call-1", description: "pnpm test", startedAt: "2026-10-22T12:00:00.000Z" }));
+    journal.append(candidate("background/task", { op: "settle", taskId: "bash_1", status: "completed", exitCode: 0, endedAt: "2026-10-22T12:00:05.000Z", delivery: "notified" }));
+    expect(journal.events.map(event => event.type)).toEqual(["background/task", "background/task"]);
+    expect(() => journal.append(candidate("background/task", { op: "settle", taskId: "bash_1", status: "running", endedAt: "2026-10-22T12:00:05.000Z", delivery: "notified" }))).toThrow(/status must be/);
+    expect(() => journal.append(candidate("background/task", { op: "start", taskId: "x", kind: "shell", callId: "c", description: "", startedAt: "2026-10-22T12:00:00.000Z" }))).toThrow(/kind must be/);
+  });
+
   it("accepts a DSH core Turn and rebuilds a deterministic Surface", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-08-29T12:00:00.000Z" });
     journal.append(candidate("turn/start", { turnId: "turn-1" }));

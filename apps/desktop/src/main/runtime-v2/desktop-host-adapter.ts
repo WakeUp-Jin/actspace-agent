@@ -18,6 +18,8 @@ export type DesktopRuntimeV2BootOptions = {
   readonly models: DesktopRuntimeV2ModelPort;
   readonly approvals: DesktopRuntimeV2ApprovalPort;
   readonly browser: DesktopRuntimeV2BrowserPort;
+  /** The bundled nono; absent when it was not found (see `resolveDesktopNonoPath`). */
+  readonly nonoPath?: string;
   readonly disabledSkillIds?: () => readonly string[];
   readonly chatCompactionTriggerRatio: () => number;
   readonly invocationId: string;
@@ -105,17 +107,25 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
           modelPattern: "*",
           adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "utility"),
           credentialRef: "desktop:utility",
-          defaults: { reasoning: false },
+          // 思考档位读用途表（设置 › 模型），由 adapter 在 prepare 时带上。
+          defaults: {},
         }, {
           routeId: "auto-review",
           providerId: "desktop",
           modelPattern: "*",
           adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "auto-review"),
           credentialRef: DEFAULT_CREDENTIAL_REF,
-          defaults: { reasoning: false },
+          defaults: {},
+        }, {
+          routeId: "explore",
+          providerId: "desktop",
+          modelPattern: "*",
+          adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "explore"),
+          credentialRef: DEFAULT_CREDENTIAL_REF,
+          defaults: {},
         }]),
       }),
-      ...createDesktopToolHostServices({ workspaceRoot: options.roots.workspaceRoot, tmpRoot: options.roots.tmpRoot, modelRuntime: options.models, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) }),
+      ...createDesktopToolHostServices({ workspaceRoot: options.roots.workspaceRoot, tmpRoot: options.roots.tmpRoot, modelRuntime: options.models, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId), nonoPath: options.nonoPath }),
       [options.module.PROMPT_HOST_PORT_ID]: Object.freeze({
         workspaceRoot: options.roots.workspaceRoot,
         resolveUserSource: () => options.module.prepareUserPromptSource(options.roots.dataRoot),

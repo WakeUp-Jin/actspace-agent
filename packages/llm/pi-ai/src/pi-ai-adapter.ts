@@ -1,5 +1,5 @@
 import { catalogProviderForEndpoint } from "@actspace/shared";
-import type { LlmAdapter, LlmAdapterDispatchInput, LlmStreamSource } from "@actspace/llm-service";
+import { createRequestRedactor, type LlmAdapter, type LlmAdapterDispatchInput, type LlmStreamSource } from "@actspace/llm-service";
 import { LegacyProxyWireEngine, type LegacyProxyWireEngineOptions } from "./legacy-proxy-wire-engine.js";
 import { streamPiAi, type PiAiConnectionOptions } from "./pi-ai-stream.js";
 
@@ -19,7 +19,16 @@ export class PiAiAdapter implements LlmAdapter {
     const needsLegacy = input.credential.proxyUrl !== undefined
       || (catalogProviderForEndpoint(endpoint) === "openrouter" && wire.route !== "anthropic-messages")
       || (hasImage && wire.providerId === "deepseek" && wire.route === "openai-completions" && wire.deepSeekFiles !== undefined);
-    if (needsLegacy) return new LegacyProxyWireEngine(this.options.legacyProxy ?? wire).stream(input);
-    return streamPiAi(wire, input);
+    // Host routing may bind credentials after PreparedLlmCall has resolved them.
+    // Sanitize with the actual wire credential before failures leave this adapter.
+    const redactor = createRequestRedactor(input.credential);
+    try {
+      const source = needsLegacy
+        ? await new LegacyProxyWireEngine(this.options.legacyProxy ?? wire).stream(input)
+        : await streamPiAi(wire, input);
+      return redactor.stream(source);
+    } catch (error) {
+      throw redactor.error(error);
+    }
   }
 }

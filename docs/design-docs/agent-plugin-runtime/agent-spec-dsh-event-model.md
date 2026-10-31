@@ -51,6 +51,8 @@ Todo 新事件为 `plugin/actspace.todo/todo-write`，owner 为 `actspace.todo`�
 | `request/context` | 发送给模型的上下文 | `requestId`, `messages`, `system`, `tools`, `sourceRefs` | internal |
 | `session/end-seed` | Session 关闭前的确定性收尾种子 | `sessionId`, `lastSeq`, `reason` | internal |
 
+正常响应即使没有任何content block，也必须在step/end之前写入唯一assistant/message，保留requestId、空content、finishReason和真实usage。正文为空不能省略请求终态，否则请求仍开放并违反Session收尾不变量；不得填造占位正文来替代该事实。
+
 ### 3.1 正常无工具顺序
 
 ```mermaid
@@ -93,7 +95,7 @@ flowchart TD
     Stop --> End[turn/end]
 ```
 
-一次模型请求对应一个 `step`。工具调用完成后，如果模型需要继续生成，则开启新的 `step`；重试仍属于同一 `step`，通过扩展事件记录，而不是伪造新的 `turn`。
+主循环的一次模型请求对应一个 `step`。工具调用完成后，如果主模型需要继续生成，则开启新的 `step`；重试仍属于同一 `step`，通过扩展事件记录，而不是伪造新的 `turn`。工具内部的辅助模型请求归属既有父工具与 Step，使用独立辅助生命周期，不新建主循环 Step。
 
 ## 4. Event Envelope
 
@@ -123,6 +125,7 @@ Journal 的 append 是唯一逻辑提交点：先校验 codec 和序号并接纳
 | 分类 | 事件 |
 |---|---|
 | LLM 重试 | `llm/retry`, `llm/retry-started` |
+| 辅助 LLM 请求 | `llm/auxiliary-start`, `llm/auxiliary-end` |
 | 压缩 | `compaction/start`, `compaction/summary`, `compaction/prune`, `compaction/end` |
 | 审批与权限 | `permission/asked`, `permission/decided`, `permission/mode-set`, `permission/scope-denied` |
 | Hook 与命令 | `hook/invoked`, `hook/result`, `command/run`, `command/done` |
@@ -143,9 +146,17 @@ Journal 的 append 是唯一逻辑提交点：先校验 codec 和序号并接纳
 - 旧的持久化 `llm/chunk`、`llm/usage`、`llm/error`、`llm/aborted`；当前同名 `llm/chunk` 仅是非持久化增量通知；
 - 任何把工具权限、审批或 UI 临时状态冒充核心事件的旧名称。
 
-usage、finish、error、abort 都分别归入 `assistant/chunk`、`assistant/message`、`step/end`/`turn/end` 的结构化字段；重试用 `llm/retry*` 扩展事件表达。
+主循环请求的 usage、finish、error、abort 都分别归入 `assistant/chunk`、`assistant/message`、`step/end`/`turn/end` 的结构化字段；重试用 `llm/retry*` 扩展事件表达。辅助请求使用下述独立事实，不污染主请求用量。
 
 失败回合在 `turn/end(reason=failed)` 的可选 `failure` 中保存脱敏、有界原因；live 与恢复后的 UI 使用同一失败信息。旧记录缺少该字段时展示明确的通用失败提示，`agent/error` 仍是通知，不要求成为独立 Journal 事件。
+
+### 5.2 辅助请求生命周期
+
+首次接入 `inspect_image`。`llm/auxiliary-start` 与 `llm/auxiliary-end` 为 required codec，均使用 `surface: null`；启动必须引用既有的父工具及对应 Turn/Step/Run。`logicalRequestId` 标识一次逻辑调用，`attemptId` 标识一次真实 dispatch，并使用 Prepared Call 的实际 route/model/requestId。重试的尝试编号递增，不能借用其他逻辑调用或父工具的身份。
+
+启动 flush 成功后才 dispatch；同一 attempt 至多一个终结，终结必须与启动身份匹配。失败或取消仍保留已报告用量；未终结和缺失字段保持未知。持久化失败不能触发第二次终结或重复 dispatch。未知 required codec 的读者按现有规则进入 browse-only；历史没有辅助事实时不从工具次数猜测请求与 Token。
+
+Usage、轨迹和窗口分页分别消费辅助事实：每次尝试计一次请求，重试按 logicalRequestId 归组；轨迹保留父工具导航；分页请求偏移包含辅助启动，延迟加载父工具正文不裁掉辅助身份和用量。实现、测试与 Host 接线见[图片分析工具](../tool-system/agent-image-inspection-tool.md)。
 
 ## 6. 错误、取消与恢复
 

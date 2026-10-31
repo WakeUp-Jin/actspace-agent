@@ -26,6 +26,8 @@
     "build:electron": "tsc -p tsconfig.electron.json && esbuild src/preload/index.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/preload/index.bundle.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
     "test": "vitest run",
+    "test:file-grant-scope-layout": "node scripts/test-file-grant-scope-layout.mjs",
+    "test:composer-palette-layout": "node scripts/test-composer-palette-layout.mjs",
     "dev:host-bundles": "concurrently -k \"pnpm --filter @actspace/client exec esbuild src/host/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/host.cjs --watch=forever\" \"pnpm --filter @actspace/client exec esbuild src/live/index.ts --bundle --platform=neutral --format=cjs --external:@actspace/shared --external:@actspace/shared/* --outfile=dist/live.cjs --watch=forever\" \"pnpm --filter @actspace/agent-host exec esbuild src/node-ports/index.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/node-ports.cjs --watch=forever\""
   },
   "dependencies": {
@@ -56,7 +58,10 @@
     "dompurify": "^3.4.16",
     "highlight.js": "^11.11.1",
     "lucide-react": "^1.16.0",
+    "mdast-util-from-markdown": "2.0.3",
+    "mdast-util-gfm": "3.1.0",
     "mermaid": "11.17.2",
+    "micromark-extension-gfm": "3.0.0",
     "node-pty": "1.1.0",
     "prosemirror-commands": "^1.7.2",
     "prosemirror-history": "^1.5.0",
@@ -78,7 +83,8 @@
     "@actspace/tools-image-inspection": "workspace:*",
     "@actspace/agent-host": "workspace:*",
     "@actspace/official-skills": "workspace:*",
-    "@actspace/session-storage": "workspace:*"
+    "@actspace/session-storage": "workspace:*",
+    "@actspace/sandbox": "workspace:*"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",

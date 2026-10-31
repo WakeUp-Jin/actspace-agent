@@ -68,6 +68,8 @@ export type RuntimeStreamEvent =
   | { type: "context_compaction_failed"; sessionId: SessionId; agentRunId: AgentRunId; error: SessionError }
   /** 运行中插入的消息已被 Agent 读到（下一步开始前）。 */
   | { type: "user_message_steered"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; messageId: string }
+  /** 唤醒回合领取了后台任务通知，回合以分隔行开头。 */
+  | { type: "background_notice_claimed"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; messageId: string; notice: BackgroundNotice; content: string }
   | { type: "assistant_text_delta"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; messageId: EventId; delta: string }
   | { type: "assistant_thinking_delta"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; messageId: EventId; delta: string }
   | {
@@ -85,14 +87,6 @@ export type RuntimeStreamEvent =
     }
   | { type: "tool_started"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; toolCallId: ToolCallId; toolName: string; argsPreview: string; preview?: ToolUiPreview }
   | { type: "tool_finished"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; toolCallId: ToolCallId; toolName: string; resultEventId: EventId; isError: boolean; status?: "completed" | "failed" | "denied" | "aborted" | "outcome-unknown"; preview?: ToolUiPreview }
-  | {
-      /** 后台 bash 任务状态更新：turn 内外统一走 agent:stream 推送，前端按 taskId 更新对应块 */
-      type: "bash_task_update";
-      sessionId: SessionId;
-      taskId: string;
-      status: BashBackgroundStatus;
-      exitCode?: number | null;
-    }
   | {
       type: "subagent_event";
       sessionId: SessionId;
@@ -161,6 +155,16 @@ export type UserMessagePayload = {
   responseAnnotations?: ResponseAnnotationReference[];
   /** 非用户手动输入的注入消息来源（如 "task_notification"），前端据此换展示样式。 */
   source?: string;
+  /** 后台任务通知开启了一轮空闲唤醒时才有；聊天里渲染成一行分隔行。 */
+  backgroundNotice?: BackgroundNotice;
+};
+
+/** 后台任务完成通知的元数据，来自收件箱 `notice`。 */
+export type BackgroundNotice = {
+  taskId: string;
+  taskKind: "bash" | "agent";
+  title: string;
+  status: string;
 };
 
 export type AssistantMessagePayload = AssistantReply;
@@ -264,6 +268,14 @@ export type ContextCompactionPayload = {
   durationMs?: number;
   /** 模型之后看到的摘要正文 */
   summary?: string;
+  /** journal 里的压缩事务 id，用于在轨迹里定位压缩行 */
+  compactionId?: string;
+  /** 压缩前上下文 token：最近一次实测用量 + 之后新增内容的估算；没有实测基准时缺省 */
+  beforeTokens?: number;
+  /** 压缩后上下文 token（压缩前 − 估算被替换条目 + 估算摘要） */
+  afterTokens?: number;
+  /** 压缩前 token 含估算（实测之后又追加了内容，或基准是上一次压缩的估算结果），显示时带「约」 */
+  beforeEstimated?: true;
 };
 
 export type SessionWorktreeContext = {
@@ -386,6 +398,8 @@ export type AgentToolPreview = {
   subagentType: "explore";
   /** 主消息行展示的委托类型；缺省时兼容旧事件并按 Explore 处理。 */
   agentKind?: "agent" | "explore";
+  /** 以 background=true 启动；卡片多一个「后台」标签，status 跟随 delegation/completed。 */
+  background?: boolean;
   displayText: string;
   summary?: string;
   recentEvents?: AgentToolRecentEvent[];
@@ -535,13 +549,6 @@ export type BashStatus =
   | "expired"
   | "cancelled";
 
-/**
- * 后台 bash 任务的 UI 状态（shared 为契约权威）。
- * 前四态与 Runtime BashTaskStatus 对齐；"stalled" 是 UI 附加态：
- * 进程仍在运行但疑似阻塞在交互式提问（看门狗事件），输出恢复后回到 running。
- */
-export type BashBackgroundStatus = "running" | "completed" | "failed" | "killed" | "stalled";
-
 export type BashPreview = {
   kind: "bash";
   status: BashStatus;
@@ -557,10 +564,12 @@ export type BashPreview = {
   policyLabel?: string;
   approvalRequestId?: string;
   intent?: string;
-  /** 命令已转后台运行时的任务 id（bash_task_update 事件按它定位块）。 */
+  /** 申请出沙箱时模型给的理由，显示在审批卡上。 */
+  justification?: string;
+  /** 命令已转后台运行时的任务 id。 */
   backgroundTaskId?: string;
-  /** 后台任务当前状态；存在即表示该命令走了后台路径。 */
-  backgroundStatus?: BashBackgroundStatus;
+  /** 命令走了后台路径；卡片只多一个「后台」标签，status 跟随后台任务的真实结果。 */
+  background?: boolean;
   /** 后台任务落盘输出路径。 */
   outputFilePath?: string;
   /** 本次命令是否在沙盒内执行（true 沙盒 / false 真实环境 / 缺省未知——历史数据）。 */
@@ -943,12 +952,26 @@ export type MessageBlock = {
       removedCount?: number;
       /** completed：压缩耗时，来自 journal 时间差 */
       durationMs?: number;
-      /** completed：模型之后看到的摘要正文，分隔线展开后显示 */
-      summary?: string;
+      /** completed：压缩事务 id，「在轨迹中查看」按它定位 */
+      compactionId?: string;
+      /** completed：手动 /compact 或自动压缩 */
+      trigger?: "manual" | "auto";
+      /** completed：压缩前 / 后上下文 token；旧会话没有 */
+      beforeTokens?: number;
+      afterTokens?: number;
+      /** completed：压缩前 token 含估算，显示带「约」 */
+      beforeEstimated?: true;
       /** failed：失败原因 */
       errorMessage?: string;
       createdAt: string;
     }
+  | ({
+      /** 空闲会话被后台任务通知唤醒的那一轮的开头分隔行；content 是通知原文。 */
+      kind: "background_notice";
+      id: EventId;
+      content: string;
+      createdAt: string;
+    } & BackgroundNotice)
   | {
       kind: "workspace_preparation";
       id: EventId;

@@ -79,6 +79,12 @@ fi
 
 node "${repo_root}/scripts/check-provider-proxy-package.mjs" "${deploy_dir}"
 node "${repo_root}/scripts/package-browser-components.mjs" "${deploy_dir}/browser-components"
+# The tool sandbox only uses this bundled nono (never one on PATH); without it macOS falls back to Seatbelt and
+# Linux bash needs approval, so a missing or unverified binary fails the package.
+nono_relative="sandbox-components/bin/nono"
+if [[ "${platform}" == "darwin" || "${platform}" == "linux" ]]; then
+  node "${repo_root}/scripts/sandbox/fetch-nono.mjs" --out "${deploy_dir}/${nono_relative}"
+fi
 
 find "${deploy_dir}" -type d -name test -prune -exec rm -rf {} +
 find "${deploy_dir}" \( -name "*.map" -o -name "*.d.ts" -o -name "*.d.mts" \) -type f -delete
@@ -136,7 +142,10 @@ case "${platform}" in
         || /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string icon.icns" "${packaged_app}/Contents/Info.plist" 2>/dev/null \
         || true
     fi
+    packaged_nono="${packaged_app}/Contents/Resources/app/${nono_relative}"
     if [[ -n "${mac_codesign_identity}" ]]; then
+      # --deep does not reach loose executables under Resources; sign nono on its own first.
+      codesign --force --options runtime --timestamp --sign "${mac_codesign_identity}" "${packaged_nono}"
       codesign --force --deep --options runtime --timestamp --sign "${mac_codesign_identity}" "${packaged_app}"
       codesign --verify --deep --strict --verbose=2 "${packaged_app}"
       signed=true
@@ -150,6 +159,10 @@ case "${platform}" in
       codesign --remove-signature "${packaged_app}" 2>/dev/null || true
     fi
     node "${repo_root}/scripts/verify-browser-components.mjs" "${packaged_app}/Contents/Resources/app/browser-components"
+    # Unsigned and ad-hoc packages keep the upstream Developer ID signature on nono.
+    codesign --verify --strict --verbose=2 "${packaged_nono}"
+    "${packaged_nono}" --version | grep -qx "nono $(node -p "require('${repo_root}/scripts/sandbox/nono-version.json').version")" \
+      || { echo "Packaged nono does not report the pinned version." >&2; exit 1; }
     if is_truthy "${mac_notarize}"; then
       if [[ "${signed}" != "true" ]]; then
         echo "ACTSPACE_MAC_NOTARIZE=true requires ACTSPACE_MAC_CODESIGN_IDENTITY." >&2

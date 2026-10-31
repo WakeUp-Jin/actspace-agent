@@ -55,7 +55,7 @@ export function accessibleName(element: Element, visited = new Set<Element>()): 
 
   const labels = labelsFor(element);
   if (labels.length > 0) {
-    const value = normalizeWhitespace(labels.map((label) => textAlternative(label, visited, false)).join(" "));
+    const value = normalizeWhitespace(labels.map((label) => labelText(label, element)).join(" "));
     if (value) return value;
   }
 
@@ -97,12 +97,16 @@ export function labelsFor(element: Element): HTMLLabelElement[] {
   return values;
 }
 
-function textAlternative(element: Element, visited: Set<Element>, referenced: boolean): string {
+export function labelText(label: HTMLLabelElement, control: Element): string {
+  return textAlternative(label, new Set([control]), false, control);
+}
+
+function textAlternative(element: Element, visited: Set<Element>, referenced: boolean, excludedSubtree?: Element): string {
   if (!referenced && (element.hasAttribute("hidden") || element.getAttribute("aria-hidden") === "true")) return "";
   const nestedLabel = normalizeWhitespace(element.getAttribute("aria-label"));
   if (nestedLabel) return nestedLabel;
   if (element.tagName.toLowerCase() === "img") return normalizeWhitespace((element as HTMLImageElement).alt);
-  const direct = composedText(element);
+  const direct = composedText(element, excludedSubtree);
   if (direct) return direct;
   return accessibleName(element, visited);
 }

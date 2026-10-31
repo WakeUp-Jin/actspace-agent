@@ -4,9 +4,7 @@ import type { TaskReceipt, TaskSnapshot } from "@actspace/shared/runtime-v2";
 import {
   mockBrowserBridgeStatus,
   mockEnglishLearningState,
-  mockInstalledModels,
   mockLocalUpdateState,
-  mockProviders,
   mockUsableModels,
 } from "./fixtures";
 import {
@@ -24,6 +22,7 @@ import { emitLiveMessage, type MockClock } from "./clock";
 import { MOCK_REPLY, MOCK_SIDE_CHAT_REPLY, playReply, type ReplyPlayback } from "./stream-player";
 import { MOCK_CONTEXT_PATHS, MOCK_CONTEXT_PATHS_REVISION, mockContextPanelView, mockContextState } from "./context-panel-fixture";
 import { mockContextPathsPage } from "./context-paths-fixture";
+import { createModelConnectionsMock } from "./model-connections-fixture";
 
 /** 按域覆盖 mock 实现；未覆盖的成员用默认实现，默认也没有的成员调用时 reject。 */
 export type MockHandlers = { [D in keyof DesktopBridge]?: Partial<DesktopBridge[D]> };
@@ -32,7 +31,7 @@ const SYSTEM_PROMPT = "你是 ActSpace 的主 Agent。\n- 先理解需求，再�
 
 /** 分页视图建立在 `sessions.list` 之上：测试只覆盖 `sessions.list` 时，侧栏分页读到的是同一份数据。 */
 async function listPage(clock: MockClock, input: SessionListPageInput): Promise<SessionListPage> {
-  const items = (await clock.bridge.sessions.list({})).filter((item) => !item.sideChatParentId &&
+  const items = (await clock.bridge.sessions.list({})).filter((item) => !item.isChildSession && !item.sideChatParentId &&
     (!input.search || (!item.hostId && item.title.toLowerCase().includes(input.search.toLowerCase()))) &&
     (input.hostId === undefined || item.hostId === input.hostId) &&
     (input.workspaceRoot === undefined || item.workspaceRoot === input.workspaceRoot) &&
@@ -221,7 +220,6 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       getShortcutStatus: async () => ({ registered: false, accelerator: db.settings.shortcuts?.quickOpen.accelerator ?? "" }),
     },
     providers: {
-      list: async () => mockProviders(),
       setKey: async ({ provider }) => {
         if (provider in db.settings.providers) db.settings.providers[provider as keyof typeof db.settings.providers] = { ...db.settings.providers[provider as keyof typeof db.settings.providers], hasApiKey: true };
         if (provider in db.settings.searchProviders) db.settings.searchProviders[provider as keyof typeof db.settings.searchProviders] = { hasApiKey: true };
@@ -234,11 +232,11 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       },
     },
     models: {
-      listInstalled: async () => ({ models: mockInstalledModels() }),
       listUsable: async () => ({ models: mockUsableModels() }),
       getPricingCatalog: async () => null,
       refreshPricingCatalog: async () => null,
     },
+    modelConnections: createModelConnectionsMock(),
     englishLearning: { getState: async () => mockEnglishLearningState() },
     browserBridge: { getStatus: async () => mockBrowserBridgeStatus() },
     skills: { list: async () => ({ items: [], warnings: [] }) },

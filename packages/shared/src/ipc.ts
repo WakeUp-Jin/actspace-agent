@@ -5,15 +5,7 @@ import type {
 } from "./model-config";
 import type { ModelPurpose, ModelUnavailabilityReason } from "./model-resolver";
 import type { ProviderId } from "./provider-config";
-import type { CatalogCacheState, CatalogModelView } from "./openrouter-catalog";
-import type {
-  InstalledModelSettings,
-  ProviderConnectionErrorKind,
-  ProviderProxySettings,
-  ProviderSettingsView,
-  CredentialStorageView,
-  TaskModelSettings,
-} from "./settings";
+import type { InstalledModelSettings } from "./settings";
 
 export type BootstrapState = {
   appVersion: string;
@@ -181,99 +173,11 @@ export type WorkspaceCreateFolderResult =
 
 // ─── 多供应商与模型管理 IPC（Plan 0 只锁契约，Plan 2/3/5 接实现） ───
 
-export type ProviderOperationErrorCode =
-  | "invalid_provider"
-  | "invalid_api_key"
-  | "invalid_base_url"
-  | "invalid_proxy_url"
-  | "secret_storage_unavailable"
-  | "write_failed"
-  | "connection_failed"
-  | "credential_not_found"
-  | "credential_in_use";
-
-export type ProviderOperationError = {
-  code: ProviderOperationErrorCode;
-  message: string;
-  errorKind?: ProviderConnectionErrorKind;
-};
-
-export type ProvidersListResult = {
-  providers: Record<ProviderId, ProviderSettingsView>;
-  credentialStorage: CredentialStorageView;
-};
-
-export type ProviderConnectInput = {
-  provider: ProviderId;
-  apiKey: string;
-  managementKey?: string | null;
-  baseUrl?: string | null;
-  proxy?: ProviderProxySettings;
-  defaultPricingMultiplier?: number;
-};
-
-export type ProviderUpdateInput = {
-  provider: ProviderId;
-  apiKey?: string;
-  managementKey?: string | null;
-  baseUrl?: string | null;
-  proxy?: ProviderProxySettings;
-  enabled?: boolean;
-  defaultPricingMultiplier?: number;
-};
-
-export type ProviderCredentialAddInput = {
-  provider: ProviderId;
-  label: string;
-  apiKey: string;
-  pricingMultiplier?: number;
-};
-
-export type ProviderCredentialUpdateInput = {
-  provider: ProviderId;
-  credentialId: string;
-  label: string;
-  pricingMultiplier?: number;
-};
-
-export type ProviderCredentialInput = {
-  provider: ProviderId;
-  credentialId: string;
-};
-
-export type ProviderCredentialOperationResult =
-  | { ok: true; provider: ProviderSettingsView }
-  | { ok: false; error: ProviderOperationError & { references?: ModelKey[] } };
-
-export type ProviderIdInput = { provider: ProviderId };
-
-export type ProviderOperationResult =
-  | { ok: true; provider: ProviderSettingsView }
-  | { ok: false; error: ProviderOperationError };
-
-export type ProviderTestResult =
-  | {
-      ok: true;
-      provider: ProviderSettingsView;
-      message: string;
-      checkedAt: string;
-    }
-  | {
-      ok: false;
-      provider: ProviderSettingsView;
-      message: string;
-      checkedAt: string;
-      errorKind: ProviderConnectionErrorKind;
-      statusCode?: number;
-    };
-
 export type InstalledModelView = {
   definition: ModelDefinition;
   settings: InstalledModelSettings;
   unavailableReasons: Partial<Record<ModelPurpose, ModelUnavailabilityReason>>;
 };
-
-export type ModelsListInstalledResult = { models: InstalledModelView[] };
 
 export type ModelsListUsableInput = { purpose: ModelPurpose };
 
@@ -291,65 +195,6 @@ export type UsableModelView = {
 };
 
 export type ModelsListUsableResult = { models: UsableModelView[] };
-
-export type ModelsCatalogListInput = {
-  provider: Extract<ProviderId, "openrouter" | "deepseek" | "kimi">;
-  query?: string;
-};
-
-export type ModelsCatalogListResult = {
-  provider: "openrouter" | "deepseek" | "kimi";
-  state: CatalogCacheState;
-  fetchedAt?: string;
-  stale: boolean;
-  models: CatalogModelView[];
-  skippedCount: number;
-  error?: { code: string; message: string };
-};
-
-export type ModelsAddInput = {
-  provider: Extract<ProviderId, "openrouter" | "deepseek" | "kimi">;
-  apiModel: string;
-};
-
-export type ModelsAddCustomInput = import("./custom-model-input").CustomModelCreateInput;
-export type ModelsEditCustomInput = import("./custom-model-input").CustomModelEditInput;
-export type ModelsSetCustomDefaultInput = import("./custom-model-input").CustomModelSetDefaultInput;
-
-export type ModelsUpdateInput = {
-  reasoningConfig?: import("./custom-model-reasoning").CustomModelReasoning;
-  modelKey: ModelKey;
-  enabled?: boolean;
-  customLabel?: string | null;
-  credentialId?: string | null;
-  connectionId?: string | null;
-};
-
-export type ModelsRemoveInput = { modelKey: ModelKey };
-
-export type ModelMutationResult =
-  | { ok: true; model?: InstalledModelView }
-  | {
-      ok: false;
-      error: {
-        code:
-          | "model_missing"
-          | "model_in_use"
-          | "model_not_removable"
-          | "invalid_model"
-          | "invalid_pricing"
-          | "connection_missing"
-          | "model_already_exists"
-          | "default_model_requires_replacement"
-          | "credential_missing"
-          | "write_failed";
-        message: string;
-        references?: Array<"defaultChatModel" | "utilityModel" | "exploreModel" | "autoReviewModel">;
-      };
-    };
-
-export type TaskModelsUpdateInput = Partial<TaskModelSettings>;
-export type TaskModelsUpdateResult = { taskModels: TaskModelSettings };
 
 export type SelectFilesResult = {
   canceled: boolean;
@@ -1174,6 +1019,10 @@ export type UsageActivityRow = {
   stepId?: string;
   requestId?: string;
   callId?: string;
+  /** Auxiliary attempts remain separate from main Agent requests. */
+  purpose?: "image-inspection" | "auto-review" | "session-title" | "compaction";
+  logicalRequestId?: string;
+  routeId?: string;
   retryId?: string;
   retryOfRequestId?: string;
   providerId?: string;
@@ -1215,6 +1064,15 @@ export type UsageActivitySummary = {
   cacheWriteTokens: number;
   reasoningTokens: number;
   totalTokens: number;
+  /** LLM requests whose corresponding token fact was not reported; explicit zero remains known. */
+  unknownTokenRequestCounts: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    reasoning: number;
+    total: number;
+  };
   costUsd: number | null;
   costUnavailableCount: number;
 };
@@ -1246,6 +1104,8 @@ export type UsageActivityAggregate = {
   count: number;
   errorCount: number;
   totalTokens: number;
+  /** LLM requests in this provider/model group with unknown total token usage. Always zero for tools. */
+  unknownTokenRequestCount: number;
   durationMs: number;
   costSummary: UsageCostSummary;
 };
@@ -1280,10 +1140,6 @@ export type ProviderBalanceDisplay = {
 /** 余额 / 额度可读取的供应商。 */
 export type BalanceProviderId = Extract<ProviderId, "deepseek" | "kimi" | "openrouter">;
 
-export type ProviderBalanceGetInput = {
-  provider: BalanceProviderId;
-};
-
 /** 通用供应商余额快照；按 provider 区分来源，UI 每个 provider 渲染一张卡。 */
 export type ProviderBalanceSnapshot = {
   provider: BalanceProviderId;
@@ -1292,18 +1148,6 @@ export type ProviderBalanceSnapshot = {
   generatedAt: string;
   displayBalance: ProviderBalanceDisplay | null;
 };
-
-/** @deprecated 用 ProviderBalanceDisplay；保留别名向后兼容。 */
-export type DeepSeekBalanceDisplay = ProviderBalanceDisplay;
-
-/** DeepSeek 余额快照（ProviderBalanceSnapshot 的 deepseek 特化）。 */
-export type DeepSeekBalanceSnapshot = ProviderBalanceSnapshot & { provider: "deepseek" };
-
-/** Kimi（Moonshot）余额快照（ProviderBalanceSnapshot 的 kimi 特化）。 */
-export type KimiBalanceSnapshot = ProviderBalanceSnapshot & { provider: "kimi" };
-
-/** OpenRouter 账户 credits 余额快照（使用独立 Management Key 查询）。 */
-export type OpenRouterBalanceSnapshot = ProviderBalanceSnapshot & { provider: "openrouter" };
 
 export type LocalUpdateErrorCode =
   | "invalid_source"

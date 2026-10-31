@@ -11,4 +11,3 @@
 @import "./space.css" layer(components);
 @import "./trajectory.css" layer(components);
 @import "./json-tree.css" layer(components);
-@import "./model-connection.css" layer(components);

@@ -13,7 +13,9 @@ describe("PermissionModeControl", () => {
 
     render(<PermissionModeControl sessionId="session-1" mode="default" disabled={false} onChanged={onChanged} />);
     const trigger = screen.getByRole("button", { name: "会话权限模式" });
-    expect(trigger).toHaveAttribute("title", expect.stringContaining("自动批准通过策略检查的 Bash"));
+    expect(trigger).toHaveAttribute("title", expect.stringContaining("Bash 不进沙箱，通过禁止规则后直接运行"));
+    // full-access runs Bash outside the sandbox; the hint must not promise otherwise.
+    expect(trigger.getAttribute("title")).not.toMatch(/沙箱[^；。]*仍生效/);
     await user.click(trigger);
     expect(screen.getByRole("menuitemradio", { name: "自动" })).toHaveAttribute("aria-checked", "true");
     await user.click(screen.getByRole("menuitemradio", { name: "完全权限" }));
@@ -82,7 +84,7 @@ describe("PermissionModeControl", () => {
     trigger.focus();
     await user.keyboard("{Enter}");
     await waitFor(() => expect(screen.getByRole("menuitemradio", { name: "自动" })).toHaveFocus());
-    await user.keyboard("{End}");
+    await user.keyboard("{End}{ArrowUp}");
     expect(screen.getByRole("menuitemradio", { name: "完全权限" })).toHaveFocus();
     await user.keyboard("{Enter}");
     expect(screen.queryByRole("menu")).toBeNull();
@@ -96,19 +98,53 @@ describe("PermissionModeControl", () => {
     expect(trigger).toHaveFocus();
   });
 
-  it("does not submit while a turn is running", () => {
+  it("keeps mode changes disabled while a turn is running but permits grant management", async () => {
     const setSessionPermissionMode = vi.fn(async () => ({ ok: true as const }));
     setupBridge({ "sessions.setPermissionMode": setSessionPermissionMode });
 
     render(<PermissionModeControl sessionId="session-1" mode="default" disabled onChanged={() => undefined} />);
 
-    expect(screen.getByRole("button", { name: "会话权限模式" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "会话权限模式" }));
+    expect(screen.getByRole("menuitemradio", { name: "完全权限" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: "管理会话授权" })).not.toHaveAttribute("aria-disabled", "true");
     expect(setSessionPermissionMode).not.toHaveBeenCalled();
   });
 
-  it("does not render a persistent grant management control", () => {
+  it("reads live current-session grants and revokes by grantId without caching a selector", async () => {
+    let grants = [{ grantId: "g1", sessionId: "session-1", agentId: "agent-1", access: "read", action: "file.read", selector: { kind: "subtree", canonicalRoot: "/allowed/dir" } }];
+    const get = vi.fn(async () => ({ snapshot: { sessionId: "session-1", sessionGrants: grants } }));
+    const revoke = vi.fn(async () => { grants = []; return { ok: true }; });
+    setupBridge({ "sessions.get": get, "sessions.revokeGrant": revoke });
     render(<PermissionModeControl sessionId="session-1" mode="default" disabled={false} onChanged={() => undefined} />);
-    expect(screen.queryByLabelText("管理会话授权")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "会话权限模式" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "管理会话授权" }));
+    expect(await screen.findByText("/allowed/dir")).toBeInTheDocument();
+    await userEvent.dblClick(screen.getByRole("button", { name: "撤销" }));
+    await waitFor(() => expect(screen.getByText("本会话没有有效授权")).toBeInTheDocument());
+    expect(revoke).toHaveBeenCalledOnce();
+    expect(revoke).toHaveBeenCalledWith({ sessionId: "session-1", grantId: "g1" });
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a rejected revoke reason and permits retrying the same grant", async () => {
+    let revoked = false;
+    const grants = [{ grantId: "g1", sessionId: "session-1", agentId: "agent-1", access: "read", action: "file.read", selector: { kind: "exact", canonicalPath: "/allowed/file" } }];
+    const revoke = vi.fn(async () => {
+      if (!revoked) { revoked = true; return { ok: false, error: "授权已过期，请重试" }; }
+      return { ok: true };
+    });
+    setupBridge({
+      "sessions.get": async () => ({ snapshot: { sessionId: "session-1", sessionGrants: revoke.mock.calls.length > 1 ? [] : grants } }),
+      "sessions.revokeGrant": revoke,
+    });
+    render(<PermissionModeControl sessionId="session-1" mode="default" disabled={false} onChanged={() => undefined} />);
+    await userEvent.click(screen.getByRole("button", { name: "会话权限模式" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "管理会话授权" }));
+    await userEvent.click(await screen.findByRole("button", { name: "撤销" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("授权已过期，请重试");
+    await userEvent.click(screen.getByRole("button", { name: "撤销" }));
+    expect(await screen.findByText("本会话没有有效授权")).toBeInTheDocument();
+    expect(revoke).toHaveBeenCalledTimes(2);
   });
 });
 

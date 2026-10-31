@@ -1,6 +1,12 @@
 import type { SessionListItem, SessionListPage, SessionListPageInput } from './ipc';
 import type { RuntimeV2BrowseList } from './runtime-v2';
 
+/** Only explicit delegation creates a child session. Forks and legacy origins stay accessible. */
+export function isDelegatedSession(lineage: unknown): boolean {
+  return typeof lineage === 'object' && lineage !== null && !Array.isArray(lineage) &&
+    'origin' in lineage && lineage.origin === 'delegation';
+}
+
 /** Parent of a side chat, read from Session lineage; undefined for every other Session. */
 export function sideChatParentId(lineage: unknown): string | undefined {
   if (!lineage || typeof lineage !== 'object' || Array.isArray(lineage)) return undefined;
@@ -16,11 +22,11 @@ export function paginateSessionSummaries(result: RuntimeV2BrowseList, input: Ses
     const parent = sideChatParentId(item.lineage);
     if (parent !== undefined && !item.metadata.archived) sideChatCounts.set(parent, (sideChatCounts.get(parent) ?? 0) + 1);
   }
-  const sorted = [...result.items].filter(s => !s.metadata.archived && sideChatParentId(s.lineage) === undefined).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
+  const sorted = [...result.items].filter(s => !s.metadata.archived && !isDelegatedSession(s.lineage) && sideChatParentId(s.lineage) === undefined).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.sessionId.localeCompare(b.sessionId));
   for (const item of sorted) {
     const key = JSON.stringify([item.worktree?.sourceWorkspaceRoot ?? item.workspaceRoot ?? '', item.metadata.pinned]);
     const group = grouped.get(key) ?? [];
-    group.push({ id: item.sessionId, title: item.metadata.title ?? 'New chat', updatedAt: item.updatedAt, workspaceRoot: item.workspaceRoot ?? undefined, ...(item.worktree ? { worktree: item.worktree } : {}), pinned: item.metadata.pinned, archived: false, accessState: item.accessState, isChildSession: item.lineage !== null, agentRunCount: item.completedTurnCount ?? 0, ...(sideChatCounts.get(item.sessionId) ? { sideChatCount: sideChatCounts.get(item.sessionId) } : {}) });
+    group.push({ id: item.sessionId, title: item.metadata.title ?? 'New chat', updatedAt: item.updatedAt, workspaceRoot: item.workspaceRoot ?? undefined, ...(item.worktree ? { worktree: item.worktree } : {}), pinned: item.metadata.pinned, archived: false, accessState: item.accessState, isChildSession: false, agentRunCount: item.completedTurnCount ?? 0, ...(sideChatCounts.get(item.sessionId) ? { sideChatCount: sideChatCounts.get(item.sessionId) } : {}) });
     grouped.set(key, group);
   }
   const groups: SessionListPage['groups'] = [];

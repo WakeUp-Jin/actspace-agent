@@ -20,12 +20,14 @@ it("can send a new Session while the historical catalog is rebuilding, without a
   render(<App />);
   await user.click(screen.getByRole("button", { name: "新建会话" }));
   const input = await screen.findByRole("textbox", { name: /消息|输入/ });
-  await user.type(input, "Start while history rebuilds");
+  await user.click(input);
+  await user.paste("Start while history rebuilds");
   await user.click(screen.getByLabelText("发送消息"));
   await waitFor(() => expect(create).toHaveBeenCalledOnce());
   await waitFor(() => expect(submit).toHaveBeenCalledWith(expect.objectContaining({ userInput: "Start while history rebuilds" })));
   await act(async () => finishList({ items: [], groups: [], indexing: false, failed: 0 }));
-  await user.type(screen.getByRole("textbox", { name: /消息|输入/ }), "Continue this Session");
+  await user.click(screen.getByRole("textbox", { name: /消息|输入/ }));
+  await user.paste("Continue this Session");
   await user.click(screen.getByLabelText("发送消息"));
   await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
   expect(submit.mock.calls[1][0].sessionId).toBe(submit.mock.calls[0][0].sessionId);

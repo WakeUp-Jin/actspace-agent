@@ -19,6 +19,20 @@ function msg(kind: MessageBlock["kind"], id: string, extra: Record<string, unkno
 const ids = (messages: MessageBlock[]) => messages.map((message) => message.id);
 
 describe("groupMessagesIntoTurns", () => {
+  it("opens a user-less turn at a background notice and keeps the following replies in it", () => {
+    const turns = groupMessagesIntoTurns([
+      msg("user", "u1"),
+      msg("assistant", "a1"),
+      msg("background_notice", "n1", { renderKey: "n1-key", taskId: "bash_1", taskKind: "bash", title: "pnpm test", status: "completed" }),
+      msg("bash", "b1"),
+      msg("assistant", "a2"),
+    ]);
+    expect(turns.map((turn) => [turn.id, turn.user?.id ?? null, turn.notice?.id ?? null, ids(turn.messages)])).toEqual([
+      ["u1", "u1", null, ["a1"]],
+      ["n1-key", null, "n1", ["b1", "a2"]],
+    ]);
+  });
+
   it("starts a turn at each user message and keeps compaction and worktree preparation on their own", () => {
     const turns = groupMessagesIntoTurns([
       msg("status", "orphan"),

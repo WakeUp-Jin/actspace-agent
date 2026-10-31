@@ -258,6 +258,7 @@ function messageBlockFromToolPreview(
         command: preview.command,
         commandPreview: preview.commandPreview,
         intent: preview.intent,
+        justification: preview.justification,
         cwd: preview.cwd,
         stdout: preview.stdout,
         stderr: preview.stderr,
@@ -266,7 +267,7 @@ function messageBlockFromToolPreview(
         reason: preview.reason,
         policyLabel: preview.policyLabel,
         backgroundTaskId: preview.backgroundTaskId,
-        backgroundStatus: preview.backgroundStatus,
+        background: preview.background,
         outputFilePath: preview.outputFilePath,
         sandboxed: preview.sandboxed,
         notExecuted: preview.notExecuted,
@@ -280,6 +281,7 @@ function messageBlockFromToolPreview(
         status: preview.status,
         subagentType: preview.subagentType,
         agentKind: preview.agentKind,
+        background: preview.background,
         displayText: preview.displayText,
         summary: preview.summary,
         recentEvents: preview.recentEvents,
@@ -346,7 +348,11 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
       status: "completed",
       removedCount: payload.removedCount ?? Math.max(payload.beforeCount - payload.afterCount, 0),
       ...(typeof payload.durationMs === "number" ? { durationMs: payload.durationMs } : {}),
-      ...(payload.summary ? { summary: payload.summary } : {}),
+      ...(payload.compactionId ? { compactionId: payload.compactionId } : {}),
+      ...(payload.trigger ? { trigger: payload.trigger } : {}),
+      ...(typeof payload.beforeTokens === "number" ? { beforeTokens: payload.beforeTokens } : {}),
+      ...(typeof payload.afterTokens === "number" ? { afterTokens: payload.afterTokens } : {}),
+      ...(payload.beforeEstimated === true ? { beforeEstimated: true as const } : {}),
       createdAt: getDisplayTime(event.timestamp),
     }
   ];
@@ -463,10 +469,10 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
     switch (event.type) {
       case "user_message": {
         const payload = event.payload as UserMessagePayload;
-        // 任务通知注入消息只给模型消费，用户侧不渲染：
-        // 任务状态由 bash 块徽标（bash_task_update）呈现，输出在落盘文件里
+        // 任务通知只给模型消费；只有开启空闲唤醒那一轮的通知渲染成一行分隔行。
         if (payload.source === "task_notification") {
-          return [];
+          const notice = payload.backgroundNotice;
+          return notice ? [{ kind: "background_notice", id: event.id, renderKey: nextRenderKey(event, "background-notice"), content: payload.content, createdAt: getDisplayTime(event.timestamp), ...notice }] : [];
         }
         return [
           {

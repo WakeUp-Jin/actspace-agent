@@ -3,13 +3,14 @@ import { resolveModelPricing, type ModelCatalogSnapshot } from "@actspace/shared
 import { customConnectionPricingInput, type DesktopRuntimeV2ResolvedModel } from "./runtime-v2/model-port";
 import {
   DEFAULT_MODEL_KEY,
+  listUsableModels,
   normalizeModelKey,
   resolveConfiguredModel,
-  resolveImageInspectionModel as resolveImageInspectionModelDefinition,
   type ModelDefinition,
   type ModelKey,
-  type ModelPricing,
   type ModelPurpose,
+  type PurposeId,
+  type ThinkingLevel,
   type UsableModel,
   type UsableModelView,
 } from "@actspace/shared";
@@ -23,7 +24,6 @@ type ProviderRuntimeConfig = {
   readonly pricingMultiplier?: number;
   readonly promptCacheMode?: import("@actspace/shared").CustomConnectionPromptCacheMode;
   readonly authScheme?: import("@actspace/shared").CustomConnectionResolvedAuth;
-  readonly billingMode?: import("@actspace/shared").CustomConnectionBillingMode;
   readonly transport?: { readonly proxyUrl: string };
 };
 type LegacyLlmConfig = {
@@ -135,27 +135,27 @@ export class ModelRuntimeService {
     return { ok: true, model: { ...main, source: "fallback", fallbackReason: "explore_to_main:not_configured" } };
   }
 
+  /** 子 Agent 探索：用途表里设了就用，否则跟随会话模型。 */
+  resolveExploreTaskModel(requestedMain?: string | null): RuntimeModelResolution {
+    const main = this.resolveMainModel(requestedMain);
+    return main.ok ? this.resolveExploreModel(main.model) : main;
+  }
+
+  /** 看图：用途表里的模型 → 会话默认模型（能看图时）→ 第一个能看图的可用模型。 */
   resolveImageInspectionModel(): RuntimeModelResolution {
-    const configured = this.settings.getV2().imageInspection;
-    const definition = resolveImageInspectionModelDefinition(configured.modelKey);
-    const runtime = this.settings.getProviderRuntimeConfigForCredential(
-      definition.provider,
-      configured.credentialId,
-    );
-    if ("code" in runtime) {
-      return { ok: false, code: runtime.code, message: runtime.message, modelKey: definition.key };
-    }
-    const pricedDefinition = applyPricingMultiplier(definition, runtime.pricingMultiplier ?? 1);
-    return {
-      ok: true,
-      model: {
-        key: pricedDefinition.key,
-        definition: pricedDefinition,
-        providerRuntime: runtime,
-        llmConfig: toLegacyLlmConfig(pricedDefinition.apiModel, runtime),
-        source: "configured",
-      },
-    };
+    const taskModels = this.settings.getModelStorageState().taskModels;
+    if (taskModels.visionModel) return this.resolve(taskModels.visionModel, "vision", "configured");
+    const snapshot = this.models.getModelSnapshot();
+    const chat = resolveConfiguredModel(snapshot, taskModels.defaultChatModel ?? DEFAULT_MODEL_KEY, "vision");
+    if (chat.ok) return this.fromUsable(chat.model, "fallback");
+    const first = listUsableModels(snapshot, "vision")[0];
+    if (first) return this.fromUsable(first, "fallback");
+    return { ok: false, code: "model_unavailable", message: "没有可用的看图模型，请在设置 › 模型的用途里选一个能看图的模型。" };
+  }
+
+  /** 用途表里的思考档位；null = 用模型默认档位。会话默认的档位由对话框决定，这里不读。 */
+  purposeThinking(purpose: Exclude<PurposeId, "chat">): ThinkingLevel | null {
+    return this.settings.getModelStorageState().taskModels.thinking?.[purpose] ?? null;
   }
 
   private resolve(key: ModelKey, purpose: ModelPurpose, source: ResolvedRuntimeModel["source"]): RuntimeModelResolution {
@@ -168,17 +168,12 @@ export class ModelRuntimeService {
   }
 
   private fromUsable(model: UsableModel, source: ResolvedRuntimeModel["source"]): RuntimeModelResolution {
-    const runtime = this.settings.getProviderRuntimeConfigForCredential(
-      model.definition.provider,
-      model.installed.credentialId,
-      model.installed.connectionId,
-    );
+    const runtime = this.settings.getConnectionRuntimeConfig(model.definition.provider, model.installed.connectionId);
     if ("code" in runtime) {
       return { ok: false, code: runtime.code, message: runtime.message, modelKey: model.key };
     }
-    // 按官方价折算时，倍率只作用于目录价；模型上手填的单价是用户实际付的价格，不再乘。
-    const multiplier = runtime.billingMode === "reference" && model.definition.source === "custom" ? 1 : runtime.pricingMultiplier ?? 1;
-    const definition = applyPricingMultiplier(runtime.protocol ? { ...model.definition, api: runtime.protocol } : model.definition, multiplier);
+    // 快照里的价格已经按倍率算好（手填价不乘），这里不再处理价格。
+    const definition = runtime.protocol ? { ...model.definition, api: runtime.protocol } : model.definition;
     return {
       ok: true,
       model: {
@@ -195,25 +190,4 @@ export class ModelRuntimeService {
 
 function toLegacyLlmConfig(model: string, runtime: ProviderRuntimeConfig): LegacyLlmConfig {
   return { model, apiKey: runtime.apiKey, baseUrl: runtime.baseUrl };
-}
-
-function applyPricingMultiplier(definition: ModelDefinition, multiplier: number): ModelDefinition {
-  if (!definition.pricing || multiplier === 1) return definition;
-  return { ...definition, pricing: multiplyPricing(definition.pricing, multiplier) };
-}
-
-function multiplyPricing(pricing: ModelPricing, multiplier: number): ModelPricing {
-  const multiply = (value: number): number => Number((value * multiplier).toFixed(8));
-  return {
-    currency: pricing.currency,
-    inputCacheHitPerMillion: multiply(pricing.inputCacheHitPerMillion),
-    inputCacheMissPerMillion: multiply(pricing.inputCacheMissPerMillion),
-    ...(pricing.inputCacheWritePerMillion !== undefined && {
-      inputCacheWritePerMillion: multiply(pricing.inputCacheWritePerMillion),
-    }),
-    outputPerMillion: multiply(pricing.outputPerMillion),
-    ...(pricing.reasoningPerMillion !== undefined && {
-      reasoningPerMillion: multiply(pricing.reasoningPerMillion),
-    }),
-  };
 }

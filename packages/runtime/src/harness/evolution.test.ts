@@ -18,7 +18,9 @@ import { EMPTY_LLM_USAGE, type LlmAdapterDispatchInput } from "@actspace/llm-ser
 import { emptyRuntimePromptSource } from "@actspace/prompt";
 import { AgentRuntimeService } from "./agent-runtime-plugin.js";
 import { RuntimeSessionController } from "../session/session-controller.js";
+import { createAuxiliaryRequestRecorder } from "../session/auxiliary-request-recorder.js";
 import { createContextHost } from "./context-host.js";
+import { createNodeSandboxHostPort } from "@actspace/sandbox";
 
 it("runs the model/tool pipeline: explicit development, next-message activation, session isolation and restart", async () => {
   const directory = await mkdtemp(join(tmpdir(), "runtime-evolution-"));
@@ -32,9 +34,11 @@ it("runs the model/tool pipeline: explicit development, next-message activation,
   let phase = "develop"; let step = 0; let workspaceId = "";
   const seen: Array<{ phase: string; tools: string[] }> = [];
   const ports = {
+    "actspace.host.sandbox": createNodeSandboxHostPort(),
     "agent.registry": new AgentRegistry(),
     ...Object.fromEntries(["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }])),
-    "session.runtime": sessions, "session.journal": { registry }, "session.projection": {},
+    "session.runtime": sessions,
+    "llm.auxiliary-requests": createAuxiliaryRequestRecorder(sessions), "session.journal": { registry }, "session.projection": {},
     "actspace.host.session": { dataRoot: directory, runtimeId: "evolution" },
     "actspace.host.agent": { disabledHarnessEntries: ["browser-tools"], evolution: { inspect: (context: any) => runtime.evolution.inspect(context), execute: (args: any, context: any) => runtime.evolution.execute(args, context) }, contextDisclosure: createContextHost(() => sessions, toolEnvironment), host, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
     "actspace.host.prompt": { workspaceRoot: directory, resolveSource: async () => emptyRuntimePromptSource() },
@@ -62,7 +66,7 @@ it("runs the model/tool pipeline: explicit development, next-message activation,
   await root.mount("host", ctx => { for (const [name, value] of Object.entries(ports)) ctx.provide(name, value); }, { provides: Object.keys(ports) });
   root.context.provide?.("session.checkpoint", { flush: async (value: { sessionId: string; throughSeq: number }) => sessions.getOpen(value.sessionId)!.flush(value.throughSeq) });
   runtime = new AgentRuntimeService(root.context);
-  await root.mount("subagent-host", ctx => ctx.provide("actspace.host.subagents", runtime.subagents), { provides: ["actspace.host.subagents"] });
+  await root.mount("subagent-host", ctx => { ctx.provide("actspace.host.subagents", runtime.subagents); ctx.provide("actspace.host.background-tasks", runtime.backgroundTasks); }, { provides: ["actspace.host.subagents", "actspace.host.background-tasks"] });
   await runtime.initialize(root.context);
   try {
     await sessions.create("local", undefined, "agent");
@@ -90,7 +94,7 @@ it("runs the model/tool pipeline: explicit development, next-message activation,
     await root.mount("host", ctx => { for (const [name, value] of Object.entries(ports)) ctx.provide(name, value); }, { provides: Object.keys(ports) });
     root.context.provide?.("session.checkpoint", { flush: async (value: { sessionId: string; throughSeq: number }) => sessions.getOpen(value.sessionId)!.flush(value.throughSeq) });
     runtime = new AgentRuntimeService(root.context);
-    await root.mount("subagent-host", ctx => ctx.provide("actspace.host.subagents", runtime.subagents), { provides: ["actspace.host.subagents"] });
+    await root.mount("subagent-host", ctx => { ctx.provide("actspace.host.subagents", runtime.subagents); ctx.provide("actspace.host.background-tasks", runtime.backgroundTasks); }, { provides: ["actspace.host.subagents", "actspace.host.background-tasks"] });
     await runtime.initialize(root.context);
     expect(await runtime.hmr.inspect("local")).toEqual(binding);
     phase = "recovered"; step = 0;

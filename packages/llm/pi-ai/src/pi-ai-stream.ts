@@ -37,7 +37,8 @@ type PiAiProvider = { readonly id: string };
 type PiAiModels = { setProvider(provider: PiAiProvider): void; getModel(provider: string, model: string): PiAiModel | undefined; streamSimple(model: PiAiModel, context: PiAiContext, options: RuntimeV2JsonValue): AsyncIterable<PiAiEvent> };
 type PiAiModel = { readonly id: string; readonly provider: string };
 type PiAiContext = { readonly systemPrompt?: string; readonly messages: readonly RuntimeV2JsonValue[]; readonly tools?: readonly RuntimeV2JsonValue[] };
-type PiAiUsage = { readonly input?: number; readonly output?: number; readonly cacheRead?: number; readonly cacheWrite?: number; readonly reasoning?: number; readonly cost?: { readonly total?: number } };
+type PiAiWireUsage = { readonly version: 1; readonly input: number | null; readonly output: number | null; readonly cacheRead: number | null; readonly cacheWrite: number | null; readonly reasoning: number | null };
+type PiAiUsage = { readonly actspaceWireUsage?: PiAiWireUsage };
 type PiAiAssistant = { readonly content: readonly RuntimeV2JsonValue[]; readonly stopReason: string; readonly errorMessage?: string; readonly usage?: PiAiUsage; readonly status?: number; readonly code?: string; readonly retryAfterMs?: number };
 type PiAiEvent = { readonly type: string; readonly contentIndex?: number; readonly delta?: string; readonly content?: string; readonly toolCall?: { readonly id: string; readonly name: string; readonly arguments: RuntimeV2JsonValue }; readonly partial?: PiAiAssistant; readonly message?: PiAiAssistant; readonly error?: PiAiAssistant };
 
@@ -140,14 +141,30 @@ async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: stri
     else if (event.type === "thinking_delta") yield { type: "reasoning-delta", text: event.delta ?? "" };
     else if (event.type === "toolcall_start") { const block = event.partial?.content[event.contentIndex ?? -1] as { id?: string; name?: string } | undefined; calls.set(event.contentIndex ?? -1, { callId: block?.id ?? `${requestId}:${event.contentIndex ?? 0}`, name: block?.name ?? "unknown" }); }
     else if (event.type === "toolcall_delta") { const call = calls.get(event.contentIndex ?? -1) ?? { callId: `${requestId}:${event.contentIndex ?? 0}`, name: "unknown" }; yield { type: "tool-call-delta", callId: call.callId, name: call.name, argumentsDelta: event.delta ?? "" }; }
-    else if (event.type === "done" && event.message !== undefined) { yield { type: "done", stopReason: mapStopReason(event.message.stopReason), usage: calculateUsageCost(mapUsage(event.message.usage), pricing), content: toActSpaceContent(event.message.content, identity) }; return; }
-    else if (event.type === "error") { const terminal = event.error; if (terminal?.stopReason === "aborted") yield { type: "aborted", usage: calculateUsageCost(mapUsage(terminal.usage), pricing), reason: terminal.errorMessage ?? "pi-ai request aborted" }; else yield { type: "error", usage: calculateUsageCost(mapUsage(terminal?.usage), pricing), failure: classifyFailure(terminal ?? new Error("pi-ai stream failed")) }; return; }
+    else if (event.type === "done" && event.message !== undefined) { yield { type: "done", stopReason: mapStopReason(event.message.stopReason), usage: calculateUsageCost(mapUsage(event.message.usage, identity.protocol), pricing), content: toActSpaceContent(event.message.content, identity) }; return; }
+    else if (event.type === "error") { const terminal = event.error; if (terminal?.stopReason === "aborted") yield { type: "aborted", usage: calculateUsageCost(mapUsage(terminal.usage, identity.protocol), pricing), reason: terminal.errorMessage ?? "pi-ai request aborted" }; else yield { type: "error", usage: calculateUsageCost(mapUsage(terminal?.usage, identity.protocol), pricing), failure: classifyFailure(terminal ?? new Error("pi-ai stream failed")) }; return; }
   }
   yield { type: "error", failure: { kind: "malformed-stream", message: "pi-ai stream ended without a terminal event.", retryable: false, attempt: 1 } };
 }
 
 function toActSpaceContent(content: readonly RuntimeV2JsonValue[], identity: { readonly providerId: string; readonly protocol: string; readonly modelId: string }): readonly LlmContentBlock[] { return content.flatMap((raw): LlmContentBlock[] => { const block = raw as { type?: string; text?: string; thinking?: string; thinkingSignature?: string; id?: string; name?: string; arguments?: RuntimeV2JsonValue }; if (block.type === "text") return [{ type: "text", text: block.text ?? "" }]; if (block.type === "thinking") { const replay: LlmReplayEnvelope | undefined = block.thinkingSignature === undefined ? undefined : { schemaVersion: 1, adapterFamily: "pi-ai", providerId: identity.providerId, protocol: identity.protocol, modelId: identity.modelId, payload: { thinkingSignature: block.thinkingSignature } }; return [{ type: "reasoning", text: block.thinking ?? "", ...(block.thinkingSignature ? { signature: block.thinkingSignature } : {}), ...(replay === undefined ? {} : { replay }) }]; } if (block.type === "toolCall") return [{ type: "tool-call", callId: block.id ?? "unknown", name: block.name ?? "unknown", arguments: JSON.stringify(block.arguments ?? {}) }]; return []; }); }
-function mapUsage(usage?: PiAiUsage): LlmUsage { return { inputTokens: usage?.input ?? null, outputTokens: usage?.output ?? null, cacheReadTokens: usage?.cacheRead ?? null, cacheWriteTokens: usage?.cacheWrite ?? null, reasoningTokens: usage?.reasoning ?? null, cost: null, costCurrency: null, source: usage === undefined ? "unknown" : "provider-reported" }; }
+function mapUsage(usage: PiAiUsage | undefined, protocol: string): LlmUsage {
+  // Only the pinned wire patch can distinguish provider facts from SDK defaults.
+  // An unpatched/unsupported SDK must stay unknown rather than fabricate zeroes.
+  const wire = usage?.actspaceWireUsage?.version === 1 ? usage.actspaceWireUsage : undefined;
+  const input = wire?.input ?? null;
+  const cacheRead = wire?.cacheRead ?? null;
+  const cacheWrite = wire?.cacheWrite ?? null;
+  return {
+    inputTokens: input === null || protocol === "anthropic-messages" ? input : Math.max(0, input - (cacheRead ?? 0) - (cacheWrite ?? 0)),
+    outputTokens: wire?.output ?? null,
+    cacheReadTokens: cacheRead,
+    cacheWriteTokens: cacheWrite,
+    reasoningTokens: wire?.reasoning ?? null,
+    cost: null, costCurrency: null,
+    source: wire && [wire.input, wire.output, wire.cacheRead, wire.cacheWrite, wire.reasoning].some(value => value !== null) ? "provider-reported" : "unknown",
+  };
+}
 function zeroUsage() { return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }; }
 function mapStopReason(reason: string): string { return reason === "toolUse" ? "tool-calls" : reason === "length" ? "max-tokens" : reason; }
 function messageText(message: LlmMessage): string { if (typeof message.content === "string") return message.content; return message.content.map((block) => block.type === "text" ? block.text : block.type === "reasoning" ? block.text : block.type === "tool-result" ? block.content : "").join(""); }

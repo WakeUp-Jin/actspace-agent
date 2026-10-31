@@ -40,7 +40,7 @@
 ## 文件系统访问控制
 
 - **文件工具边界**：v2 Tool Runtime 在审批前 canonicalize file resource，并由 `default/full-access`、敏感分类、Tool Permission 与 Host capability 合并决策；`default` 的 workspace 外读写需要审批，Desktop 可对非敏感核心文件签发当前 Session/当前主 Agent 的 exact 或显式 subtree Grant，CLI 不签发或消费。Grant 仍按 action/access/audience/policyVersion 和当前资源完整覆盖复验；`full-access` 只扩大非敏感文件范围。executor 在 syscall 前重新解析并核对已准入资源，路径、目标类型、Grant 或符号链接状态变化时 fail-closed。
-- **Bash 边界**：Bash 默认要求批准；本地 Desktop 主 Agent 可显式签发当前会话、当前工作区的命令前缀授权，后续符合工具规则的简单命令可复用。硬拒绝优先于授权，复杂语法、排除参数及显式 `no_sandbox` 不复用；`full-access` 不扩大工作目录范围。前缀授权不是沙箱或只读保证，包含项目脚本；现有 macOS sandbox 尝试及降级行为不变。详见 [前缀授权方案](exec-plans/completed/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md)。
+- **Bash 边界**：Bash 默认要求批准；本地 Desktop 主 Agent 可显式签发当前会话、当前工作区的命令前缀授权，后续符合工具规则的简单命令可复用。硬拒绝优先于授权，复杂语法、排除参数及申请出沙箱（`sandbox_permissions: "require_escalated"`）的命令不复用；`full-access` 不扩大工作目录范围。前缀授权不是只读保证，包含项目脚本，只在命令会进沙箱执行时提供。Bash 经 Harness `sandbox` 服务执行（macOS：nono，其次 Seatbelt），`full-access` 下不进沙箱；其他模式下出沙箱必须附 `justification` 并每次批准；沙箱缺失或不可用时转审批并标为“真实环境”，不会静默在沙箱外执行，详见[沙箱设计](design-docs/execution-safety/agent-沙箱设计.md)。详见 [前缀授权方案](exec-plans/completed/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md)。
 - **读类工具边界**：v2 Tool Runtime 由 Host capability、Session permission mode 和 plugin manifest 共同约束读写范围；不得沿用 v1 的任意主 Agent 读边界。
 -  - **当前取舍**：需要回读 Session artifact、诊断或工具输出时，通过显式 artifact / projection capability 授权，不把整个 `userData` 目录提升为默认 workspace。
 -  - **v1 guard**：旧 scheduler 双校验属于历史实现，已随 v1 产品路径从 v2 删除。
@@ -75,6 +75,7 @@
 - 历史 session 中的 Anthropic server `server_tool_use`、`web_search_tool_result` 属于 provider 响应协议，不应当作为本地 ToolManager 执行日志写入；session / run log 只保留 `serverToolUse` 请求计数，不应将未裁剪网页全文或 provider tool result 原文写入 session。
 - 验收真实 provider 时应先发送不含仓库内容和隐私的固定探针，确认连接后再决定是否允许工具结果进入外部模型上下文。
 - API 错误仅暴露必要的结构化诊断信息，不把鉴权请求头或密钥写入日志、session 或界面。
+- LLM 错误脱敏必须使用实际出站请求的凭据：Host 或 Desktop 在路由中延迟绑定凭据时，`PreparedLlmCall` 的早期解析结果可能为空。共用 PiAiAdapter 在最终凭据绑定后，对两种传输引擎的错误事件、取消原因和同步/异步异常执行请求级脱敏；正常回复内容不改写。脱敏器不跨请求共享密钥，不保留原始 cause、stack、headers 或任意 Provider 属性；通用格式匹配仅作补充，不能代替实际凭据匹配。
 
 ## 沙箱执行
 

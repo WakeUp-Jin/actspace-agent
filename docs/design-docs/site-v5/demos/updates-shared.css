@@ -1,0 +1,30 @@
+/* 更新日志抽卡共用：和博客终版同一套字（无衬线标题）；三种分类各一种颜色：新功能绿、改进紫、修复琥珀。条目文字沿用 M2 正文的气质。 */
+:root { --r-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --t-feature: #2f7d5b; --t-feature-soft: #e1efe6;
+  --t-improvement: #6d4fc2; --t-improvement-soft: #f0ebfb;
+  --t-fix: #a0661c; --t-fix-soft: #f5ead6; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.dot.t-feature { background: var(--t-feature); } .dot.t-improvement { background: var(--t-improvement); } .dot.t-fix { background: var(--t-fix); }
+.upd-head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 36px; }
+.upd-head h1 { font: 650 40px/1.1 var(--r-font); margin: 0; }
+.upd-head .sub { font-size: 14px; color: var(--site-muted); margin: 10px 0 0; }
+.filters { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--site-canvas-soft); }
+.filters button { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 14px; border-radius: 999px; font-size: 13.5px; color: var(--site-body); }
+.filters button:hover { color: var(--site-ink); }
+.filters button[aria-pressed="true"] { background: var(--site-paper); color: var(--site-ink); font-weight: 500; box-shadow: 0 1px 2px rgba(29, 28, 26, .08); }
+/* 条目：M2 式正文 */
+.items { list-style: none; margin: 0; padding: 0; font: 15.5px/1.8 var(--r-font); color: #45423c; }
+.items li { position: relative; padding-left: 1.4em; margin: .4em 0; }
+.items li::before { content: ""; position: absolute; left: .2em; top: .72em; width: 6px; height: 6px; border-radius: 2px; background: var(--site-line-strong); }
+.items code { font: .86em var(--mono); background: var(--site-accent-soft); color: #5a3fae; border-radius: 5px; padding: .15em .4em; }
+.items strong { color: var(--site-ink); font-weight: 600; }
+.tlabel { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--r-font); letter-spacing: .02em; }
+.tlabel.t-feature { color: var(--t-feature); } .tlabel.t-improvement { color: var(--t-improvement); } .tlabel.t-fix { color: var(--t-fix); }
+.tpill { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; font: 600 11.5px var(--r-font); }
+.tpill.t-feature { color: var(--t-feature); background: var(--t-feature-soft); }
+.tpill.t-improvement { color: var(--t-improvement); background: var(--t-improvement-soft); }
+.tpill.t-fix { color: var(--t-fix); background: var(--t-fix-soft); }
+body[data-filter="feature"] [data-type]:not([data-type="feature"]),
+body[data-filter="improvement"] [data-type]:not([data-type="improvement"]),
+body[data-filter="fix"] [data-type]:not([data-type="fix"]) { display: none !important; }
+@media (max-width: 640px) { .upd-head h1 { font-size: 32px; } .filters { overflow-x: auto; max-width: 100%; } }

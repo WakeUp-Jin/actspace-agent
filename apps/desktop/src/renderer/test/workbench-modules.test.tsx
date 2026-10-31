@@ -80,25 +80,42 @@ describe("usePanelLayout", () => {
   it("hides a wide sidebar when the window leaves less than the conversation minimum", () => {
     const { result } = panelLayout();
     act(() => result.current.handleContainerWidthChange(1400));
-    act(() => result.current.resizeLeftPanel(300));
-    act(() => result.current.handleContainerWidthChange(860));
+    act(() => result.current.resizeLeftPanel(340));
+    act(() => result.current.handleContainerWidthChange(900));
     expect(result.current.isSidebarHidden).toBe(false);
-    act(() => result.current.handleContainerWidthChange(850));
+    act(() => result.current.handleContainerWidthChange(899));
     expect(result.current.isSidebarHidden).toBe(true);
   });
 
-  it("hides the sidebar first, then closes the right panel when the window gets too narrow", () => {
+  it("hides the sidebar first, then keeps the right panel open as an overlay when the window gets too narrow", () => {
     const { result, closePanel } = panelLayout({ isOpen: true });
     act(() => result.current.handleContainerWidthChange(1000));
     expect(result.current.isSidebarHidden).toBe(true);
-    expect(closePanel).not.toHaveBeenCalled();
     act(() => result.current.handleContainerWidthChange(860));
-    expect(closePanel).toHaveBeenCalled();
+    expect(result.current.isCompactLayout).toBe(true);
+    expect(closePanel).not.toHaveBeenCalled();
   });
 
-  it("switches to overlays at 820px: the sidebar toggle opens the overlay and closes the right panel", () => {
+  // 主区 560 + 右栏 320 = 880：低于它两栏放不下，必须走覆盖层，否则右栏打开后会被收栏 effect 立刻关掉。
+  it.each([
+    [820, true], [821, true], [832, true], [879, true], [880, false], [881, false],
+  ])("opens the right panel and keeps it open at %ipx (compact=%s)", (width, compact) => {
+    let open = false;
+    const closePanel = vi.fn(() => { open = false; });
+    const openPanel = vi.fn(() => { open = true; });
+    const { result, rerender } = renderHook(() => usePanelLayout({ isOpen: open, openPanel, closePanel }));
+    act(() => result.current.handleContainerWidthChange(width));
+    expect(result.current.isCompactLayout).toBe(compact);
+    act(() => result.current.toggleRightPanel());
+    rerender();
+    expect(open).toBe(true);
+    expect(closePanel).not.toHaveBeenCalled();
+    if (!compact) expect(result.current.isSidebarHidden).toBe(true);
+  });
+
+  it("switches to overlays below 880px: the sidebar toggle opens the overlay and closes the right panel", () => {
     const { result, rerender, closePanel, openPanel } = panelLayout({ isOpen: true });
-    act(() => result.current.handleContainerWidthChange(820));
+    act(() => result.current.handleContainerWidthChange(879));
     expect(result.current.isCompactLayout).toBe(true);
     expect(result.current.chromeLeftMode).toBe("hidden");
     act(() => result.current.toggleSidebarMode());
@@ -111,7 +128,7 @@ describe("usePanelLayout", () => {
     expect(result.current.compactSidebarOpen).toBe(false);
     expect(openPanel).toHaveBeenCalledTimes(1);
 
-    act(() => result.current.handleContainerWidthChange(821));
+    act(() => result.current.handleContainerWidthChange(880));
     expect(result.current.isCompactLayout).toBe(false);
   });
 

@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolExecutionContext } from "@actspace/tools-runtime";
 import type { ToolBodyResult } from "@actspace/tools-runtime";
@@ -15,6 +15,19 @@ async function invoke(handler: ((args: Readonly<Record<string, RuntimeV2JsonValu
 
 import { createNodeToolPorts as createNodeToolPorts } from "../node-ports.js";
 describe("image-inspection ports", () => {
+  it("passes the parent execution identity and cancellation signal to the inspector", async () => {
+    const execution = context("owner");
+    const inspect = vi.fn(async () => "A valid image.");
+    const ports = createNodeToolPorts({
+      readArtifact: async () => ({ bytes: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), mediaType: "image/png" }),
+      inspect,
+    });
+    await expect(ports.inspect_image!({ artifact_id: "image", question: "Describe it" }, execution)).resolves.toMatchObject({ status: "completed" });
+    expect(inspect).toHaveBeenCalledWith({
+      sessionId: "owner", agentRunId: "run", turnId: "turn", stepId: "step", callId: "call",
+      artifactId: "image", mediaType: "image/png", question: "Describe it", signal: execution.signal,
+    });
+  });
   it("inspects only a Session-bound image artifact", async () => {
     const root = await workspace(); const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]); const reads: string[] = []; const inspections: string[] = [];
     const ports = createNodeToolPorts({

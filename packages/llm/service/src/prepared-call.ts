@@ -3,6 +3,7 @@ import type { CredentialResolver } from "./credential-port.js";
 import { LlmRuntimeError, type LlmFailure } from "./failure.js";
 import type { CapturedLlmRoute } from "./route-registry.js";
 import { LlmStreamHandle } from "./stream.js";
+import { createRequestRedactor } from "./request-redaction.js";
 
 export class PreparedLlmCall {
   #dispatched = false;
@@ -21,17 +22,22 @@ export class PreparedLlmCall {
     if (this.#dispatched) throw new LlmRuntimeError(failure("invalid-request", "Prepared LLM call can only dispatch once."));
     if (this.#released) throw new LlmRuntimeError(failure("abort", "Prepared LLM call has been released."));
     this.#dispatched = true;
+    let redactor = createRequestRedactor();
     try {
       const credential = await this.credentials.resolve(this.request.credentialRef, this.signal);
+      redactor = createRequestRedactor(credential);
       const dispatchInput = { request: this.request, credential, signal: this.signal } satisfies LlmAdapterDispatchInput;
       const source = await (this.adapterCall?.dispatch(dispatchInput) ?? this.registration.adapter.dispatch(dispatchInput));
-      const stream = new LlmStreamHandle(source, () => this.release(), async (reason) => { await this.adapterCall?.cancel?.(this.request.requestId); await this.registration.adapter.cancel?.(this.request.requestId); void reason; });
+      const stream = new LlmStreamHandle(redactor.stream(source), () => this.release(), async () => {
+        try { await this.adapterCall?.cancel?.(this.request.requestId); await this.registration.adapter.cancel?.(this.request.requestId); }
+        catch (error) { throw redactor.error(error); }
+      });
       if (this.signal.aborted) await stream.abort("signal-aborted");
       else this.signal.addEventListener("abort", () => { void stream.abort("signal-aborted"); }, { once: true });
       return stream;
     } catch (error) {
       this.release();
-      throw error;
+      throw redactor.error(error);
     }
   }
 

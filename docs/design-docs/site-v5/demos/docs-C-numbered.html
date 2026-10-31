@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文档 C · 编号</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* C 编号：杂志式。沿用首页的 01/02/03 编号语言；目录按分组折叠，只展开当前组；正文章节号挂在左侧页边，全靠细线和留白分层，没有卡片。 */
+.layout { width: var(--site-page); margin-inline: auto; display: grid; grid-template-columns: 248px minmax(0, 1fr) 188px; gap: 40px; }
+.sidebar { position: sticky; top: var(--site-header-height); height: calc(100vh - var(--site-header-height)); overflow: auto; padding: 36px 0 80px; scrollbar-width: none; border-right: 1px solid var(--site-line); padding-right: 20px; }
+.nav-group { border-bottom: 1px solid var(--site-line); }
+.nav-label { display: flex; align-items: baseline; gap: 12px; margin: 0; padding: 13px 4px; font-size: 14px; color: var(--site-body); cursor: pointer; user-select: none; }
+.nav-label:hover { color: var(--site-ink); }
+.nav-num { font: 11px var(--mono); color: var(--site-muted); width: 18px; }
+.nav-label::after { content: "+"; margin-left: auto; font: 14px var(--mono); color: var(--site-muted); }
+.nav-group.is-open .nav-label { color: var(--site-ink); font-weight: 500; }
+.nav-group.is-open .nav-label::after { content: "−"; }
+.nav-group.is-open .nav-num { color: var(--site-accent); }
+.nav-items { display: none; padding: 0 0 12px 34px; }
+.nav-group.is-open .nav-items { display: block; }
+.nav-items a { display: block; padding: 5px 0; font-size: 14px; line-height: 1.55; color: var(--site-body); }
+.nav-items a:hover { color: var(--site-ink); }
+.nav-items a[aria-current] { color: var(--site-ink); font-weight: 500; text-decoration: underline; text-decoration-color: var(--site-accent); text-decoration-thickness: 2px; text-underline-offset: 6px; }
+
+.article { min-width: 0; max-width: 760px; width: 100%; justify-self: center; padding: 64px 0 120px 64px; counter-reset: sec fig; }
+.kicker { font: 12px var(--mono); color: var(--site-muted); display: flex; gap: 10px; }
+.kicker b { color: var(--site-accent); font-weight: 500; }
+h1 { font: 500 54px/1.15 var(--display); margin: 22px 0 22px; }
+.lead { font: 21px/1.7 var(--display); color: var(--site-body); margin: 0 0 28px; max-width: 36em; }
+.meta { display: flex; gap: 24px; font: 12px var(--mono); color: var(--site-muted); padding: 14px 0; border-top: 1px solid var(--site-ink); border-bottom: 1px solid var(--site-line); margin-bottom: 44px; }
+.meta button { margin-left: auto; background: none; border: 0; padding: 0; font: inherit; color: var(--site-body); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--site-line-strong); }
+.meta button:hover { color: var(--site-ink); }
+
+.prose { color: #403d38; font-size: 17px; line-height: 1.9; }
+.prose p, .prose ul { margin: 0 0 20px; }
+.prose ul { padding-left: 1.1em; }
+.prose li { margin: 10px 0; padding-left: 4px; }
+.prose li::marker { content: "— "; color: var(--site-muted); }
+.prose strong { color: var(--site-ink); font-weight: 600; }
+.prose h2 { position: relative; counter-increment: sec; font: 500 30px/1.35 var(--display); color: var(--site-ink); margin: 64px 0 18px; scroll-margin-top: 96px; }
+.prose h2::before { content: counter(sec, decimal-leading-zero); position: absolute; left: -64px; top: .55em; font: 12px var(--mono); color: var(--site-accent); }
+.prose h3 { font: 600 18px/1.5 var(--sans); color: var(--site-ink); margin: 36px 0 10px; scroll-margin-top: 96px; }
+.prose a { color: var(--site-ink); text-decoration: underline; text-decoration-color: var(--site-accent-line); text-underline-offset: 4px; }
+.prose a:hover { text-decoration-color: var(--site-accent); }
+.prose :not(pre) > code { font: .84em var(--mono); color: var(--site-accent); background: var(--site-accent-soft); border-radius: 4px; padding: 1px 5px; }
+.shot { margin: 40px 0; counter-increment: fig; }
+.shot-frame { border-radius: 10px; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px var(--site-line), 0 18px 36px -28px rgba(29,28,26,.45); }
+.shot:first-of-type .shot-frame { max-width: 480px; }
+.shot figcaption { display: flex; gap: 12px; font-size: 13px; color: var(--site-body); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--site-line); }
+.shot figcaption::before { content: "图 " counter(fig); font: 12px var(--mono); color: var(--site-muted); white-space: nowrap; padding-top: 2px; }
+.note { margin: 32px 0; padding: 4px 0 4px 20px; border-left: 2px solid var(--site-accent); font: 17px/1.8 var(--display); color: var(--site-ink); }
+.note p { margin: 0; }
+.note strong { display: block; font: 12px var(--mono); color: var(--site-accent); margin-bottom: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 28px 0; border-top: 1px solid var(--site-ink); }
+th { text-align: left; font: 12px var(--mono); color: var(--site-muted); padding: 12px 12px 12px 0; border-bottom: 1px solid var(--site-line); font-weight: 400; }
+td { padding: 14px 12px 14px 0; border-bottom: 1px solid var(--site-line); }
+td:first-child { font-family: var(--display); color: var(--site-ink); font-size: 16px; }
+.code-block { margin: 28px 0; background: var(--site-canvas-soft); border-radius: 10px; overflow: hidden; }
+.code-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px 0 18px; }
+.code-lang { font: 11px var(--mono); color: var(--site-muted); }
+.code-copy { font: 11px var(--mono); color: var(--site-body); background: none; border: 0; padding: 4px 6px; }
+.code-copy:hover { color: var(--site-ink); }
+pre { margin: 0; padding: 10px 18px 18px; overflow: auto; font: 13.5px/1.8 var(--mono); color: var(--site-ink); }
+
+.pager { display: grid; grid-template-columns: 1fr 1fr; margin-top: 80px; border-top: 1px solid var(--site-ink); }
+.pager a { display: grid; gap: 8px; padding: 22px 0; }
+.pager-next { text-align: right; border-left: 1px solid var(--site-line); }
+.pager-dir { font: 12px var(--mono); color: var(--site-muted); }
+.pager-title { font: 500 24px var(--display); transition: color 150ms; }
+.pager a:hover .pager-title { color: var(--site-accent); }
+
+.toc { position: sticky; top: var(--site-header-height); align-self: start; padding: 72px 0 24px; }
+.toc-label { font: 12px var(--mono); color: var(--site-muted); margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px solid var(--site-line); }
+.toc a { display: flex; gap: 10px; padding: 6px 0; font-size: 13px; line-height: 1.5; color: var(--site-muted); }
+.toc a.nested { padding-left: 28px; }
+.toc-num { font: 11px/1.9 var(--mono); width: 18px; flex: none; }
+.toc a:hover { color: var(--site-ink); }
+.toc a.is-active { color: var(--site-ink); }
+.toc a.is-active .toc-num { color: var(--site-accent); }
+
+@media (max-width: 1180px) { .layout { grid-template-columns: 230px minmax(0, 1fr); } .toc { display: none; } }
+@media (max-width: 860px) { .layout { display: block; } .sidebar { position: static; height: auto; border-right: 0; padding: 8px 0; } .article { padding: 36px 0 80px; } .prose h2::before { position: static; display: block; margin-bottom: 6px; } h1 { font-size: 36px; } .pager { grid-template-columns: 1fr; } .pager-next { border-left: 0; border-top: 1px solid var(--site-line); } }
+</style>
+</head>
+<body>
+<header class="site-header" data-header></header>
+<div class="layout">
+  <aside class="sidebar"><nav data-nav aria-label="文档目录"></nav></aside>
+  <main class="article">
+    <p class="kicker"><b>03</b><span data-fill="group"></span><span>·</span><span>第 3 篇</span></p>
+    <h1 data-fill="title"></h1>
+    <p class="lead" data-fill="lead"></p>
+    <div class="meta"><span>更新于 <span data-fill="updated"></span></span><span>约 <span data-fill="minutes"></span> 分钟</span><button type="button">复制页面</button></div>
+    <div class="prose" data-body></div>
+    <nav class="pager" data-pager></nav>
+  </main>
+  <aside class="toc"><p class="toc-label">本页</p><nav data-toc-list></nav></aside>
+</div>
+<script src="shared.js"></script>
+<script>
+bootDoc("C", { nav: { numbered: true }, toc: { numbered: true } });
+document.querySelectorAll(".nav-label").forEach((l) => l.addEventListener("click", () => l.parentElement.classList.toggle("is-open")));
+</script>
+</body>
+</html>

@@ -335,7 +335,10 @@ export const mockMessages: MessageBlock[] = [
     status: "completed",
     removedCount: 18,
     durationMs: 12_000,
-    summary: "## 当前目标\n- 修复会话恢复后压缩分隔线的显示\n\n## 已完成\n- 投影保留被压缩的旧消息\n- 摘要挂到分隔线上",
+    compactionId: "mock-compaction-1",
+    trigger: "manual",
+    beforeTokens: 182_400,
+    afterTokens: 9_100,
     createdAt: now
   },
   {

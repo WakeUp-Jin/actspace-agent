@@ -57,20 +57,31 @@ App 只负责把这些 store 装配起来、把事件接到对应的 store，以
 - App 的 effect 先 `retain(当前会话 + busy)`，再 `viewed(当前会话)`。
 - `ClientSessionStore.evict` 拒绝 evict 当前选中的会话，也不通知订阅者（只用于没人观察的会话）。
 
-## 3. identity 字段
+### 2.2 流式输出的渲染预算
+
+流式输出时每个 delta 都会来事件，每秒可达上百个。渲染成本 = 渲染次数 × 渲染范围 × 每次解析量，三项都要压住：
+
+- **按帧合并通知**：`R/session/frame-batch.ts` 的 `scheduleFrame` 是渲染进程共用的帧调度器。`LiveRunStore`（`createLiveRunStore(limit, { scheduleNotify })`）对 `assistant_text_delta`、`assistant_thinking_delta`、`tool_call_streaming` 只登记、下一帧统一通知；Session bridge（`scheduleStreamFlush`）把 `assistant-delta`、`reasoning-delta` 和 `assistant/chunk` 的 journal-update 排队，下一帧在一次 `store.batch` 里应用。两个 store 的通知落在同一个帧回调里，React 只渲染一次。
+- **结构性事件立即生效**：run 开始 / 结束、工具结果、`assistant/message` 等不排队；bridge 收到它们时先冲掉已排队的增量再应用，顺序不变。新增高频事件类型时才往延迟集合里加，结构性事件不能加。
+- **普通流式投影复用**：`useChatSessionRecord` 仅在非 recovered 模式下，新 cell 相对上一个只追加了 `assistant/chunk`、投影值和快照（除 `throughJournalSeq`、`updatedAt`）都没变时，复用上一次的 record（`onlyStreamChunksSince`）。普通 Chat 投影默认忽略 chunk，正文由 LiveRunStore 按帧显示，历史块保持引用不变。
+- **重载恢复投影**：App 将既有 `isRecoveredRun` 传给 `useChatSessionRecord`；恢复模式显式启用 Client 的 `includePendingChunks`，从 cell 的 Journal 窗口聚合尚未完成的正文及思考片段，并继续消费后续 chunk，不走普通流式复用。片段按 messageId/类型聚合，保留 run/turn/request 身份与首片段顺序；同消息的完整 `assistant/message` 到来后替换合成片段，不重复追加。片段仍是 durable 事实的派生结果，不新增 React 正文状态或第二个事实源；子轨迹复用同一片段投影。
+- **按引用跳过**：`TurnView` 逐条比较消息块引用，`AssistantReply`、`MarkdownProse` 用 `memo`。新增给这些组件的 props 必须是稳定引用（`useCallback` / 常量），否则整页历史每帧都会重渲染。
+- **Markdown 分块**：`MarkdownProse` 用 `components/messages/markdown-blocks.ts` 按顶层块切分，除最后两块外冻结复用，只重新解析尾部；每块单独交给 react-markdown，`MarkdownSourceContext` 给的是本块源码。引用式链接定义、脚注会跨块生效，出现时整条消息退回一块。还在写的代码围栏不做语言自动识别，闭合后再识别。
+
+
 
 `MessageBlock` 与 `SessionEvent` 上有两个可选字段，只在 renderer 本地计算，不属于 Runtime / Host / Session 协议：
 
 | 字段 | 含义 | 谁写入 |
 | --- | --- | --- |
 | `runId` | 块所属的 agent run | durable：`createMessageBlocks` 的 `withIdentity` 从 `event.agentRunId` 写入，每个块都有；live：`streamingStateToBlocks(state, agentRunId)` 补写，`createCompactionBlock` 自己写，App 构造的 user / steer / workspace-preparation 块显式写 |
-| `sourceSeq` | 投影来源 Journal envelope 的 seq | 只由 client 的 `projectChatEvents` 写入（`base` 里的 `sourceSeq: event.seq`）。live 块和 subagent 合成事件没有这个键 |
+| `sourceSeq` | 投影来源 Journal envelope 的 seq | 只由 client 的 `projectChatEvents` 写入（`base` 里的 `sourceSeq: event.seq`）。live 块、subagent 合成事件及多条 chunk 聚合的恢复片段没有这个键 |
 
 规则：
 
 - 两个字段都用条件展开：没有值时连键都不出现，不写 `undefined`。
 - 同一条 envelope 可能投影出多个事件（如 user + thinking），它们共用一个 `sourceSeq`。**`sourceSeq` 标识来源，不是块的唯一键。**
-- 「是否已落盘」看 `sourceSeq` 是否存在。例：回复批注只允许批注带 `sourceSeq` 的块（`annotatableMessageIds`）。
+- `sourceSeq` 表示可指向单条 Journal envelope 的直接投影；没有它不等于底层事实未落盘，多条 chunk 合成的恢复片段也不伪造一个来源 seq。回复批注只允许批注带 `sourceSeq` 的块（`annotatableMessageIds`），合成片段须等完整消息接手。
 - `renderKey` 保留，只用于 DOM 复用和 user 块去重，不用来判断归属。
 - renderer 里不允许解析 id / renderKey 字符串来判断归属或序号：不写 `startsWith("turn:…")`、`includes(":tool:")`、`/^v2-/`。新代码需要归属信息时读 `runId` / `sourceSeq`。
 
@@ -88,7 +99,7 @@ mergeTranscript(
 
 1. **durable 部分**（`durableTranscript`）：
    - 正在流式输出的 run（live 有块且不是恢复的 run）：durable 里 `runId` 相同的块隐藏，由 live 显示。run 结束、live 卸下后，durable 接手，相同 renderKey 复用 DOM。
-   - 恢复的 run（渲染进程重载后重新挂上）：live 只有重新收到的部分，durable 全部保留，只隐藏 live 里已有的工具块（按 renderKey 比较）。`todo` 不算工具块，恢复时 durable 的 todo 不隐藏。
+   - 恢复的 run（渲染进程重载后重新挂上）：live 不重建正文/思考增量，durable 启用待完成片段投影并全部保留，只隐藏 live 里已有的工具块（按 renderKey 比较）。`todo` 不算工具块，恢复时 durable 的 todo 不隐藏。
    - record 没有块时，退回用 events 现算，同样过滤正在流式的 run。
 2. **user 去重**：durable 已有相同 renderKey 的 user 块时，丢掉 live 的占位 user 块，保留 durable 的。
 3. **追加 live 块**。没有 durable 对应物的块（steer 插入的 user、workspace-preparation）保持原样显示，不套用「run 完成后整组让位」。

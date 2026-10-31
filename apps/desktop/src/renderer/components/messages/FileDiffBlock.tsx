@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
-import { ApprovalActions, ApprovalCard, ApprovalPath, ApprovalReason, useApprovalDecision, useExactGrantSuggestion } from "./ApprovalParts";
+import { ApprovalActions, ApprovalCard, ApprovalPath, ApprovalReason, useApprovalDecision, useFileGrantSuggestions } from "./ApprovalParts";
 import {
   getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_CLASS,
@@ -68,7 +68,7 @@ function FileDiffApprovalCard({
   className?: string;
 }) {
   const [diffOpen, setDiffOpen] = useState(false);
-  const suggestion = useExactGrantSuggestion(message.approvalRequestId);
+  const suggestions = useFileGrantSuggestions(message.approvalRequestId);
   const decision = useApprovalDecision(message.approvalRequestId);
   const isWrite = message.kind === "write_diff";
   const hasStats = message.additions > 0 || message.deletions > 0;
@@ -109,7 +109,7 @@ function FileDiffApprovalCard({
         ) : stats ? <span className="inline-flex flex-none items-center font-mono text-act-xs leading-4">{stats}</span> : null}
         <ApprovalReason reason={message.reason} />
       </>}
-      actions={<ApprovalActions state={decision} primaryLabel={isWrite ? "写入" : "应用"} suggestion={suggestion} />}
+      actions={<ApprovalActions state={decision} primaryLabel={isWrite ? "写入" : "应用"} fileSuggestions={suggestions} />}
     >
       {diffOpen ? <div className="file-diff-approval-preview mx-3"><DiffLines message={message} /></div> : null}
     </ApprovalCard>

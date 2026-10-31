@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { DEFAULT_IMAGE_INSPECTION_MODEL_KEY, resolveImageInspectionModel, type SettingsV4NamespacePatch } from "@actspace/shared";
+import type { SettingsV4NamespacePatch } from "@actspace/shared";
 import { BROWSER_TOOL_GROUP, BROWSER_TOOL_ITEMS, PRIMARY_TOOL_ITEMS } from "../tool-catalog";
 import { useToolToggle } from "../useToolToggle";
 import { SettingGroup, SettingLinkRow, SettingSubhead, InlineWarning, useSettingsSaveNotice, SettingRow, Toggle } from "../SettingsPrimitives";
@@ -19,9 +19,6 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
   const mediaTools = PRIMARY_TOOL_ITEMS.filter((tool) => ["generate_image", "inspect_image"].includes(tool.name));
   const enabledCodeTools = codeTools.filter((tool) => tools.isEnabled(tool.name)).length;
   const imageGenerationReady = settings.imageGeneration?.hasApiKey === true;
-  const imageInspectionModel = resolveImageInspectionModel((settings.imageInspection ?? { modelKey: DEFAULT_IMAGE_INSPECTION_MODEL_KEY }).modelKey);
-  const imageInspectionReady = settings.providers[imageInspectionModel.provider]?.hasApiKey === true
-    || Boolean(settings.providers[imageInspectionModel.provider]?.additionalCredentials?.some((credential) => credential.hasApiKey));
 
   const writeToolsPatch = (patch: Extract<SettingsV4NamespacePatch, { namespace: "tools" }>["patch"], legacy: () => void, label: string) => {
     if (tools.v4Writable) {
@@ -62,9 +59,7 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
         ? "使用「通用 → 媒体」中配置的服务。"
         : <InlineWarning>图片生成服务尚未配置，工具不会出现。</InlineWarning>;
     }
-    return imageInspectionReady
-      ? "使用「通用 → 媒体」中选择的模型。"
-      : <InlineWarning>当前图片分析模型缺少可用 Key。</InlineWarning>;
+    return "使用「模型 › 用途 › 看图」中的模型。";
   };
 
   return (

@@ -8,7 +8,7 @@ export type HostErrorKind = "UNAUTHENTICATED" | "REVOKED" | "INCOMPATIBLE_PROTOC
 export class HostError extends Error {
   constructor(readonly kind: HostErrorKind, message: string, readonly retryable = false) { super(message); this.name = "HostError"; }
 }
-export const HOST_METHODS = ["host.hello", "auth.pair", "auth.resume", "host.describe", "host.observe", "host.unobserve", "sessions.list", "sessions.browse", "sessions.create", "sessions.fork", "sessions.update", "sessions.page", "sessions.tool", "sessions.observe", "sessions.unobserve", "sessions.output", "tasks.submit", "tasks.lookup", "tasks.command", "approvals.list", "approvals.decide", "files.reference", "uploads.begin", "uploads.status", "uploads.write", "uploads.finish", "uploads.abort", "artifacts.describe", "artifacts.read", "payloads.read"] as const;
+export const HOST_METHODS = ["host.hello", "auth.pair", "auth.resume", "host.describe", "host.observe", "host.unobserve", "sessions.list", "sessions.browse", "sessions.create", "sessions.fork", "sessions.update", "sessions.revokeGrant", "sessions.page", "sessions.tool", "sessions.observe", "sessions.unobserve", "sessions.output", "tasks.submit", "tasks.lookup", "tasks.command", "approvals.list", "approvals.decide", "files.reference", "uploads.begin", "uploads.status", "uploads.write", "uploads.finish", "uploads.abort", "artifacts.describe", "artifacts.read", "payloads.read"] as const;
 export type HostMethod = typeof HOST_METHODS[number];
 export type RpcId = string | number | null;
 export interface HostRequest { readonly jsonrpc: "2.0"; readonly id: RpcId; readonly method: HostMethod; readonly params: Readonly<Record<string, unknown>> }

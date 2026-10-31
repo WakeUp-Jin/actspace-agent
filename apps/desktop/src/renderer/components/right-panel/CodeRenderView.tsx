@@ -1,5 +1,6 @@
-import { memo, useEffect, useMemo, useState } from "react";
-import { escapeHtml, highlightToLines } from "./highlight";
+import { memo, useMemo } from "react";
+import { highlightToLines } from "./highlight";
+import { VirtualCodeView } from "./VirtualCodeView";
 
 /**
  * 文本 / 代码文件视图。
@@ -9,7 +10,7 @@ import { escapeHtml, highlightToLines } from "./highlight";
  *   不会与行号错位；gutter 带 `select-none`，复制内容不会把行号一起带走。
  * - **软换行固定开启**：不提供开关。长行横向滚动在窄面板里比折行更难读，
  *   而右侧面板本来就窄，所以直接按折行呈现。
- * - **分块高亮**：大文件先同步高亮首屏，其余用空闲时间分批推进，不阻塞渲染进程。
+ * - **有界窗口**：大文件只挂载可见及相邻行，软换行动态测量；复制依据源文本偏移。
  *
  * 本视图**没有工具栏**：查找 / 复制 / 换行开关都不放在这里。文件级动作集中在上方的
  * 工作区操作栏，视图本身只负责把内容读得清楚。
@@ -25,13 +26,11 @@ const GRID_CLASS = "grid w-full grid-cols-[auto_1fr] font-mono text-act-xs leadi
 // 需要不透明背景（bg-surface-subtle）压住从下面滚过去的代码。
 const GUTTER_CLASS =
   "sticky left-0 z-1 select-none border-r border-line bg-surface-subtle px-2 text-right text-text-faint [font-variant-numeric:tabular-nums]";
-const LINE_CLASS = "whitespace-pre-wrap break-words px-3 text-text-main";
+const LINE_CLASS = "min-w-0 whitespace-pre-wrap break-words px-3 text-text-main";
 const FOOTER_CLASS = "border-t border-line bg-surface-subtle px-3 py-1.5 text-act-xxs text-text-faint";
 
-/** 超过这个行数就走分块高亮：首屏立即可读，其余交给空闲时间。 */
-const CHUNKED_HIGHLIGHT_LINE_THRESHOLD = 4000;
-const FIRST_CHUNK_LINES = 500;
-const CHUNK_LINES = 1000;
+const VIRTUAL_LINE_THRESHOLD = 4000;
+const VIRTUAL_CHAR_THRESHOLD = 256 * 1024;
 
 /**
  * 最多渲染这么多行。
@@ -55,7 +54,22 @@ export function CodeRenderView({ content, language }: { content: string; languag
     () => (hiddenLineCount > 0 ? plainLines.join("\n") : content),
     [hiddenLineCount, plainLines, content],
   );
-  const highlightedLines = useProgressiveHighlight(renderedContent, language, plainLines);
+  const isLarge = plainLines.length > VIRTUAL_LINE_THRESHOLD || renderedContent.length > VIRTUAL_CHAR_THRESHOLD;
+  const highlightedLines = useMemo(() => isLarge ? [] : highlightToLines(renderedContent, language), [renderedContent, language, isLarge]);
+  const footer = hiddenLineCount > 0 ? (
+    <div className={FOOTER_CLASS} role="status">
+      {`仅渲染前 ${MAX_RENDERED_LINES.toLocaleString()} 行，另有 ${hiddenLineCount.toLocaleString()} 行未显示`}
+    </div>
+  ) : null;
+
+  if (isLarge) return (
+    <div className={ROOT_CLASS}>
+      <VirtualCodeView lines={plainLines} language={language}
+        renderLine={(index, html) => <LineRow lineNumber={index + 1} html={html} />}>
+        {footer}
+      </VirtualCodeView>
+    </div>
+  );
 
   return (
     <div className={ROOT_CLASS}>
@@ -65,23 +79,12 @@ export function CodeRenderView({ content, language }: { content: string; languag
             <LineRow key={index} lineNumber={index + 1} html={highlightedLines[index] ?? ""} />
           ))}
         </div>
-        {/* 截断说明放在内容末尾：用户滚到底发现没了，答案就在原地，不占顶部空间。 */}
-        {hiddenLineCount > 0 ? (
-          <div className={FOOTER_CLASS} role="status">
-            {`仅渲染前 ${MAX_RENDERED_LINES.toLocaleString()} 行，另有 ${hiddenLineCount.toLocaleString()} 行未显示`}
-          </div>
-        ) : null}
+        {footer}
       </div>
     </div>
   );
 }
 
-/**
- * memo 是必需的，不是优化点缀。
- *
- * 分块高亮每推进一批就 `setChunked` 换掉整个数组，没有 memo 的话每批都会把**全部**行重渲染一遍：
- * 5 万行的文件 = 50 批 × 5 万次渲染，打开要十几秒。memo 之后未变的行只做一次 props 比较。
- */
 const LineRow = memo(function LineRow({ lineNumber, html }: { lineNumber: number; html: string }) {
   return (
     <>
@@ -98,75 +101,3 @@ const LineRow = memo(function LineRow({ lineNumber, html }: { lineNumber: number
   );
 });
 
-/**
- * 分块高亮。
- *
- * 小文件直接一次算完。超过阈值时先同步高亮前 `FIRST_CHUNK_LINES` 行让首屏立刻可读，
- * 剩下的按 `CHUNK_LINES` 一批在空闲时推进 —— 否则 2MB 文件会把 `hljs.highlight`
- * 的耗时整块压在一次渲染里，直接卡住渲染进程。
- */
-function useProgressiveHighlight(
-  content: string,
-  language: string | undefined,
-  plainLines: string[],
-): string[] {
-  const isLarge = plainLines.length > CHUNKED_HIGHLIGHT_LINE_THRESHOLD;
-
-  const fullLines = useMemo(
-    () => (isLarge ? null : highlightToLines(content, language)),
-    [content, language, isLarge],
-  );
-
-  const [chunked, setChunked] = useState<string[] | null>(null);
-
-  useEffect(() => {
-    if (!isLarge) {
-      setChunked(null);
-      return;
-    }
-    let cancelled = false;
-    let handle = 0;
-
-    // 首屏同步：不等空闲回调，避免打开大文件时先闪一屏空白。
-    setChunked(highlightToLines(plainLines.slice(0, FIRST_CHUNK_LINES).join("\n"), language));
-
-    const schedule = (task: () => void) => {
-      const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => number })
-        .requestIdleCallback;
-      handle = idle ? idle(task) : window.setTimeout(task, 0);
-    };
-
-    const step = (from: number) => {
-      if (cancelled || from >= plainLines.length) return;
-      const to = Math.min(from + CHUNK_LINES, plainLines.length);
-      // 每批独立高亮：跨批的多行 token（块注释）会在批边界断开，
-      // 这是分块的已知代价，换来的是大文件可读且不卡界面。
-      const part = highlightToLines(plainLines.slice(from, to).join("\n"), language);
-      setChunked((current) => {
-        if (!current) return current;
-        const next = current.slice();
-        for (let index = 0; index < part.length; index += 1) {
-          next[from + index] = part[index];
-        }
-        return next;
-      });
-      schedule(() => step(to));
-    };
-
-    schedule(() => step(Math.min(FIRST_CHUNK_LINES, plainLines.length)));
-
-    return () => {
-      cancelled = true;
-      const cancelIdle = (window as unknown as { cancelIdleCallback?: (id: number) => void })
-        .cancelIdleCallback;
-      if (cancelIdle) cancelIdle(handle);
-      else window.clearTimeout(handle);
-    };
-  }, [content, language, isLarge, plainLines]);
-
-  if (!isLarge) {
-    return fullLines ?? [];
-  }
-  // 还没高亮到的行先按纯文本显示，用户能立即读到内容而不是空白。
-  return plainLines.map((line, index) => chunked?.[index] ?? escapeHtml(line));
-}

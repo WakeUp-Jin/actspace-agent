@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Subagent Trajectory Demo</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "PingFang SC", monospace;
+  /* 应用外壳 */
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --selected: #e4e4e1; --hover: #eaeae7;
+  --line: #deded9; --text: #20201e; --muted: #676762; --faint: #8c8c85;
+  /* 轨迹（照 tokens.css --act-trajectory-*） */
+  --t1: rgb(15,17,21); --t2: rgb(97,102,107); --t3: rgb(129,133,140); --t4: rgb(173,178,184);
+  --tbg: rgb(255,255,255); --tside: rgb(249,250,251); --tmod: rgb(245,246,247);
+  --tb1: rgba(0,0,0,.04); --tb2: rgba(0,0,0,.1);
+  --thover: rgba(38,49,72,.06); --tactive: rgba(38,49,72,.1);
+  --primary: rgb(65,118,230); --primary-soft: rgb(228,237,253); --primary-new: rgb(65,118,230);
+  --err2: rgb(242,90,90); --success: rgb(34,197,94); --success-soft: rgb(230,250,237);
+  --warn: rgb(221,134,41); --warn-soft: rgb(254,245,231);
+  --shadow-sheet: 0 -8px 24px rgba(0,0,0,.08);
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --selected: #30312d; --hover: #2a2b27;
+  --line: #353630; --text: #f1f1ed; --muted: #b5b5ae; --faint: #8a8a83;
+  --t1: rgb(249,250,251); --t2: rgb(207,211,214); --t3: rgb(173,178,184); --t4: rgb(129,133,140);
+  --tbg: rgb(35,35,36); --tside: rgb(27,27,28); --tmod: rgb(53,54,56);
+  --tb1: rgba(255,255,255,.06); --tb2: rgba(255,255,255,.12);
+  --thover: rgba(255,255,255,.08); --tactive: rgba(255,255,255,.14);
+  --primary: rgb(122,170,255); --primary-soft: rgb(52,65,91); --primary-new: rgb(86,134,254);
+  --success-soft: rgb(35,60,44); --warn-soft: rgb(39,36,31);
+  --shadow-sheet: 0 -8px 24px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 13px/1.5 var(--font-ui); -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+svg { display: block; }
+
+/* ---------- demo 控制条 ---------- */
+.demo-bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 9px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.demo-bar h1 { margin: 0 6px 0 0; font-size: 13px; font-weight: 600; }
+.grp { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.seg button { padding: 2px 9px; border-radius: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--selected); }
+.hint { margin-left: auto; color: var(--faint); font-size: 12px; }
+
+/* ---------- 窗口 ---------- */
+.win { display: flex; height: calc(100vh - 47px); }
+.side { width: 210px; flex-shrink: 0; padding: 14px 10px; background: var(--surface-subtle); border-right: 1px solid var(--line); font-size: 13px; }
+.side .it { display: flex; justify-content: space-between; padding: 5px 10px; border-radius: 6px; color: var(--muted); }
+.side .it.on { background: var(--selected); color: var(--text); }
+.side .ws { margin: 14px 0 4px; padding: 0 10px; color: var(--faint); font-size: 12px; }
+.side .ts { color: var(--faint); font-size: 11.5px; }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--tbg); }
+.main-head { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.main-head h2 { margin: 0; font-size: 14px; font-weight: 500; }
+.main-head .sp { flex: 1; }
+.ib { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--muted); }
+.ib:hover { background: var(--hover); color: var(--text); }
+.ib[aria-pressed="true"] { background: var(--selected); color: var(--text); }
+
+/* ---------- 轨迹 ---------- */
+.tj { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--tbg); color: var(--t1); }
+.tj-toolbar { display: flex; align-items: center; gap: 14px; height: 34px; padding: 0 12px; color: var(--t2); font-size: 12px; border-bottom: .5px solid var(--tb2); }
+.tj-toolbar .sp { flex: 1; }
+.tj-search { width: 150px; height: 22px; padding: 0 8px; border-radius: 11px; border: .5px solid var(--tb2); color: var(--t4); font-size: 11.5px; line-height: 21px; }
+.mm { position: relative; flex: none; display: grid; grid-template-columns: 40px 1fr; padding: 4px 10px 4px 12px; border-bottom: .5px solid var(--tb2); background: var(--tside); }
+.mm-labels { display: grid; grid-template-rows: repeat(3, 14px); color: var(--t3); font-size: 10px; line-height: 14px; }
+.mm-lanes { position: relative; height: 42px; }
+.mm-span { position: absolute; height: 9px; top: 2px; border-radius: 1.5px; }
+.mm-span[data-k="user"] { background: var(--primary); }
+.mm-span[data-k="context"] { background: color-mix(in srgb, var(--success) 68%, var(--t2)); }
+.mm-span[data-k="message"] { background: color-mix(in srgb, var(--primary-new) 60%, var(--err2)); }
+.mm-span[data-k="tool"], .mm-span[data-k="subtool"] { background: var(--warn); }
+.mm-span[data-running] { animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+
+.tj-split { flex: 1; min-height: 0; display: flex; position: relative; }
+.tj-body { flex: 1; min-width: 0; overflow: auto; }
+.tj-turn { position: sticky; top: 0; z-index: 2; height: 26px; padding: 0 12px; display: flex; align-items: center; gap: 8px; background: var(--tside); color: var(--t3); font-size: 11.5px; border-bottom: .5px solid var(--tb1); }
+.row { display: grid; grid-template-columns: 58px minmax(0, 1fr) minmax(0, .85fr); align-items: center; height: 30px; padding: 0 8px 0 12px; border-bottom: .5px solid var(--tb1); cursor: default; }
+.row:hover { background: var(--thover); }
+.row[aria-selected="true"] { background: var(--tactive); }
+.row.new { animation: rowIn .35s ease-out; }
+@keyframes rowIn { from { background: var(--primary-soft); } }
+.tag { display: inline-flex; align-items: center; height: 19px; padding: 0 5px; border-radius: 4px; font-size: 10px; line-height: 16px; font-weight: 650; letter-spacing: .035em; white-space: nowrap; justify-self: start; }
+.k-user { color: var(--primary); background: var(--primary-soft); }
+.k-context { color: color-mix(in srgb, var(--success) 68%, var(--t2)); background: var(--success-soft); }
+.k-message { color: color-mix(in srgb, var(--primary-new) 60%, var(--err2)); background: color-mix(in srgb, color-mix(in srgb, var(--primary-new) 55%, var(--err2)) 15%, var(--tbg)); }
+.k-tool { color: var(--warn); background: var(--warn-soft); }
+.k-subtool { color: color-mix(in srgb, var(--warn) 62%, var(--t3)); background: color-mix(in srgb, var(--warn-soft) 58%, var(--tbg)); }
+.content { min-width: 0; padding-left: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row[data-k="tool"] .content, .row[data-k="subtool"] .content, .row .res { font: 12px/18px var(--font-mono); }
+.row[data-k="subtool"] .content { padding-left: 22px; }
+.name { color: var(--t1); }
+.payload { margin-left: 7px; color: var(--t2); }
+.res { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--t2); padding-left: 8px; }
+.res .arrow { color: var(--t4); margin-right: 8px; }
+.res.running { color: var(--t3); }
+.dot { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--warn); vertical-align: 1px; animation: pulse 1s infinite; }
+
+/* 详情抽屉（主区域：右侧） */
+.det { width: 400px; flex: none; display: flex; flex-direction: column; min-height: 0; border-left: .5px solid var(--tb2); background: var(--tbg); }
+.det[hidden] { display: none; }
+.det-head { display: flex; align-items: center; justify-content: space-between; height: 42px; padding: 0 8px 0 12px; border-bottom: .5px solid var(--tb2); flex: none; }
+.det-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.det-loc { color: var(--t3); font: 11px/16px var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.x { width: 28px; height: 28px; border-radius: 6px; color: var(--t2); font-size: 18px; line-height: 18px; }
+.x:hover { background: var(--thover); color: var(--t1); }
+.det-tabs { display: flex; gap: 2px; padding: 6px 10px 0; border-bottom: .5px solid var(--tb2); flex: none; }
+.det-tabs span { padding: 4px 8px 6px; color: var(--t3); font-size: 12px; border-bottom: 1.5px solid transparent; }
+.det-tabs span.on { color: var(--t1); border-color: var(--t1); }
+.det-body { flex: 1; min-height: 0; overflow: auto; }
+.ov { margin: 0; padding: 8px 0; font: 13px/20px var(--font-ui); }
+.ov > div { display: grid; grid-template-columns: 82px minmax(0, 1fr); min-height: 24px; padding: 0 14px; align-items: center; }
+.ov dt { color: var(--t3); }
+.ov dd { margin: 0; min-width: 0; color: var(--t1); display: flex; align-items: center; gap: 8px; }
+.ov dd .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav { color: var(--t2); cursor: pointer; }
+.nav:hover { color: var(--t1); }
+.ok { color: color-mix(in srgb, var(--success) 75%, var(--t1)); }
+/* ★ 新增：详情里的小按钮 */
+.mini-btn { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 7px; border-radius: 5px; border: .5px solid var(--tb2); color: var(--t2); font-size: 11.5px; white-space: nowrap; }
+.mini-btn:hover { color: var(--t1); background: var(--thover); }
+.mini-btn.flash { animation: flash 1.2s ease-out 2; }
+@keyframes flash { 30% { box-shadow: 0 0 0 3px var(--primary-soft); color: var(--primary); } }
+.sec { padding: 4px 14px 12px; }
+.sec h4 { margin: 4px 0 6px; font-size: 12px; font-weight: 500; color: var(--t2); }
+.pre { margin: 0; padding: 8px 10px; border-radius: 6px; background: var(--tside); border: .5px solid var(--tb1); font: 11.5px/17px var(--font-mono); color: var(--t1); white-space: pre-wrap; word-break: break-all; }
+
+/* ---------- 右侧面板 ---------- */
+.rp { flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--surface); transition: width .18s ease; container-type: inline-size; }
+.rp[hidden] { display: none; }
+.rp-tabs { display: flex; align-items: center; gap: 2px; height: 40px; padding: 0 8px; border-bottom: 1px solid var(--line); flex: none; }
+.rp-tabs .tab { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; color: var(--faint); font-size: 12.5px; }
+.rp-tabs .tab.on { background: var(--selected); color: var(--text); font-weight: 500; }
+.rp-tabs .sp { flex: 1; }
+.sa-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); flex: none; }
+.ava { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--primary) 16%, var(--surface)); color: var(--primary); font-size: 12px; font-weight: 600; }
+.sa-meta { min-width: 0; flex: 1; }
+.sa-meta h3 { margin: 0; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sa-meta p { margin: 2px 0 0; color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+.st-run { color: var(--warn); } .st-done { color: color-mix(in srgb, var(--success) 75%, var(--text)); }
+/* ★ 新增：对话 / 轨迹 切换，照 SessionViewToggle（.chrome-button）：标题前一个图标，按下不加底色 */
+.vt { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; color: var(--muted); transition: background .12s ease, color .12s ease; }
+.vt:hover, .vt:focus-visible { background: var(--hover); color: var(--text); }
+.vt[aria-pressed="true"] { color: var(--text); }
+.vt.flash { animation: flash 1.2s ease-out 2; }
+.rp-body { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.chat { flex: 1; overflow: auto; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.chat .prompt { align-self: flex-end; max-width: 88%; padding: 8px 12px; border-radius: 12px; background: var(--surface-subtle); }
+.chat .proc { color: var(--muted); font-size: 12.5px; display: flex; flex-direction: column; gap: 3px; }
+.chat .proc span::before { content: "✓ "; color: var(--faint); }
+.chat p { margin: 0; }
+.list { padding: 12px; overflow: auto; }
+.list h4 { margin: 0 0 6px; padding: 0 10px; font-size: 12px; font-weight: 400; color: var(--faint); }
+.list button { width: 100%; display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 8px; text-align: left; }
+.list button:hover { background: var(--surface-subtle); }
+
+/* 右侧里的轨迹：紧凑表格 + 下半部分详情 */
+.rp .tj { flex: 1; min-height: 0; }
+.rp .row { grid-template-columns: 50px minmax(0, 1fr) minmax(0, .8fr); padding-left: 10px; }
+@container (max-width: 420px) {
+  .rp .row .payload { display: none; }
+  .rp .row { grid-template-columns: 50px minmax(0, 1fr) minmax(0, 1fr); }
+}
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 56%; display: flex; flex-direction: column; background: var(--tbg); border-top: .5px solid var(--tb2); box-shadow: var(--shadow-sheet); border-radius: 10px 10px 0 0; animation: sheetIn .18s ease-out; z-index: 5; }
+.sheet[hidden] { display: none; }
+.sheet .grab { flex: none; height: 10px; display: grid; place-items: center; cursor: row-resize; }
+.sheet .grab::before { content: ""; width: 32px; height: 3px; border-radius: 2px; background: var(--tb2); }
+.sheet .det-head { height: 34px; }
+@keyframes sheetIn { from { transform: translateY(24px); opacity: 0; } }
+
+/* 说明浮层 */
+.notes { position: fixed; left: 222px; bottom: 14px; z-index: 20; max-width: 430px; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0,0,0,.1); color: var(--muted); font-size: 12px; }
+.notes b { color: var(--text); font-weight: 600; }
+.notes ol { margin: 4px 0 0; padding-left: 18px; }
+.notes[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div class="demo-bar">
+  <h1>子智能体轨迹 · Demo</h1>
+  <div class="grp">父轨迹 <div class="seg" id="segMode"><button data-v="old">现状（平铺子工具）</button><button data-v="new" aria-pressed="true">新方案（只留一行）</button></div></div>
+  <div class="grp">子智能体 <div class="seg" id="segRun"><button data-v="done" aria-pressed="true">已完成</button><button data-v="run">运行中（回放）</button></div></div>
+  <div class="grp">右侧宽度 <div class="seg" id="segW"><button data-v="320">320</button><button data-v="420" aria-pressed="true">420</button><button data-v="560">560</button></div></div>
+  <div class="grp">主题 <div class="seg" id="segTheme"><button data-v="light" aria-pressed="true">浅色</button><button data-v="dark">深色</button></div></div>
+  <button class="hint" id="toggleNotes">说明</button>
+</div>
+
+<div class="win">
+  <aside class="side">
+    <div class="it">新建会话</div><div class="it">扩展</div>
+    <div class="ws">工作区</div>
+    <div class="it">pi-project</div>
+    <div class="it on">查看pi-durable设计 <span class="ts">23小时</span></div>
+    <div class="it">New chat <span class="ts">23小时</span></div>
+  </aside>
+
+  <section class="main">
+    <header class="main-head">
+      <button class="vt" aria-pressed="true" title="返回对话（主会话现有的切换按钮）"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
+      <h2>查看pi-durable设计</h2><span class="sp"></span>
+      <button class="ib" id="togglePanel" title="右侧面板" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+    </header>
+    <div class="tj" id="parentTj">
+      <div class="tj-toolbar"><span>◷ 时长</span><span>⊟ 轮次</span><span>⊟ 调用</span><span class="sp"></span><span class="tj-search">搜索</span></div>
+      <div class="mm"><div class="mm-labels"><span>输入</span><span>模型</span><span>工具</span></div><div class="mm-lanes" id="parentMm"></div></div>
+      <div class="tj-split">
+        <div class="tj-body" id="parentRows"></div>
+        <div class="det" id="parentDet" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="rp" id="rp" hidden>
+    <div class="rp-tabs">
+      <span class="tab">文件</span><span class="tab">审查</span>
+      <span class="tab on">子 Agent</span><span class="sp"></span>
+      <button class="x" id="closePanel" aria-label="关闭右侧面板">×</button>
+    </div>
+    <div class="rp-body" id="rpBody"></div>
+  </aside>
+</div>
+
+<div class="notes" id="notes">
+  <b>试一下：</b>
+  <ol>
+    <li>点父轨迹里的 <code>agent</code> 那一行 → 打开详情（和其他行一样）。</li>
+    <li>详情「子智能体」一栏右边的小按钮 <b>查看轨迹</b> → 右侧打开子 Agent，直接停在「轨迹」页。</li>
+    <li>右侧标题前的小图标切换对话 / 轨迹（和主会话标题前那个一样）。</li>
+    <li>在右侧点任意一行 → 详情从下半部分弹出。</li>
+    <li>切到「运行中（回放）」看子轨迹实时长出来；切「现状」对比平铺。</li>
+  </ol>
+</div>
+
+<script>
+// ---------- 数据 ----------
+const PARENT = [
+  { k: 'user', text: '帮我看一下 pi-durable 的设计，重点是会话事务和存储层。' },
+  { k: 'context', text: '路径导航 · navigation · 已注入' },
+  { k: 'message', text: "I'll get an overview of the package layout first, then delegate a focused read of the session/storage modules." },
+  { k: 'tool', name: 'bash', payload: '{"command":"ls pi/packages/durable/src"}', res: 'Bash completed in 18ms (exit 0, sandboxed=true).' },
+  { k: 'message', text: 'Let me delegate reading session/ and storage/ to an explorer so I can look at harness/ in parallel.' },
+  { k: 'tool', id: 'agent', name: 'agent', payload: '{"description":"查看 durable 存储层","agent":"explore"}', res: 'agent completed' },
+  { k: 'message', text: "Now let me look at harness/generation.ts and tool.ts briefly, and documents.ts to understand docs (Chord)." },
+  { k: 'tool', name: 'read_file', payload: '{"path":"pi/packages/durable/src/harness/generation.ts"}', res: 'Read pi/packages/durable/src/harness/generation.ts' },
+  { k: 'tool', name: 'read_file', payload: '{"path":"pi/packages/durable/src/documents.ts"}', res: 'Read pi/packages/durable/src/documents.ts' },
+  { k: 'message', text: 'pi-durable 把会话写成追加式事件日志：事务分 prepare / commit 两段，SQLite 里 entries 与 forks 两张主表……' },
+];
+const F = p => `{"path":"/Users/wakeup-jin/Desktop/code-project/pi/packages/durable/src/${p}"}`;
+const R = p => `Read pi/packages/durable/src/${p}`;
+const CHILD = [
+  { k: 'user', text: '阅读 pi/packages/durable/src 下的 session 与 storage 模块，说明事务提交流程和 SQLite 表结构，结论用中文。' },
+  { k: 'context', text: '工作区规则 · AGENTS.md · 已注入' },
+  { k: 'message', text: "I'll list the source directory first to see how session/ and storage/ are laid out." },
+  { k: 'tool', name: 'list_directory', payload: '{"path":"/Users/wakeup-jin/Desktop/code-project/pi/packages/durable/src"}', res: 'Listed pi/packages/durable/src' },
+  { k: 'tool', name: 'glob', payload: '{"pattern":"**/*.ts","path":"/Users/wakeup-jin/…/durable/src"}', res: 'Found 81 files' },
+  { k: 'message', text: 'Reading session.ts and transaction.ts to trace commit/prepare.' },
+  { k: 'tool', name: 'read_file', payload: F('session/session.ts'), res: R('session/session.ts') },
+  { k: 'tool', name: 'read_file', payload: F('session/transaction.ts'), res: R('session/transaction.ts') },
+  { k: 'tool', name: 'read_file', payload: F('session/observation.ts'), res: R('session/observation.ts') },
+  { k: 'message', text: 'Now the storage layer: migrations define the tables.' },
+  { k: 'tool', name: 'read_file', payload: F('storage/sqlite/migrations.ts'), res: R('storage/sqlite/migrations.ts') },
+  { k: 'tool', name: 'grep', payload: '{"pattern":"^(export )?(class|function|async f","path":"…/src"}', res: 'Found 48 matches' },
+  { k: 'message', text: '结论：Session 通过 Transaction 先 prepare（校验 + 排序）再 commit（单条 SQLite 事务写入 entries）；forks 表记录分叉点……' },
+];
+const OLD_SUBTOOLS = CHILD.filter(r => r.k === 'tool');
+
+// ---------- 状态 ----------
+const S = { mode: 'new', run: 'done', width: 420, theme: 'light', panel: false, view: 'detail', childView: 'trajectory',
+  parentSel: null, childSel: null, childShown: CHILD.length, timer: null };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const LABEL = { user: '用户', context: '上下文', message: '助手', tool: '工具', subtool: '子工具' };
+const LANE = { user: 0, context: 0, message: 1, tool: 2, subtool: 2 };
+
+function childRunning() { return S.run === 'run' && S.childShown < CHILD.length; }
+function parentRows() {
+  const out = [];
+  for (const r of PARENT) {
+    out.push(r);
+    if (r.id === 'agent' && S.mode === 'old') OLD_SUBTOOLS.slice(0, toolsShown()).forEach(t => out.push({ ...t, k: 'subtool' }));
+  }
+  return out;
+}
+function toolsShown() { return CHILD.slice(0, S.childShown).filter(r => r.k === 'tool').length; }
+
+function rowHtml(r, i, sel, extra = '') {
+  const isTool = r.k === 'tool' || r.k === 'subtool';
+  const running = r.id === 'agent' ? childRunning() : r._running;
+  const content = isTool ? `<span class="name">${esc(r.name)}</span><span class="payload">${esc(r.payload)}</span>` : esc(r.text);
+  const res = isTool ? (running ? `<span class="res running"><span class="dot"></span>运行中…</span>` : `<span class="res"><span class="arrow">→</span>${esc(r.res)}</span>`) : '<span></span>';
+  return `<div class="row ${extra}" data-k="${r.k}" data-i="${i}" aria-selected="${sel === i}" role="row"><span class="tag k-${r.k}">${LABEL[r.k]}</span><span class="content">${content}</span>${res}</div>`;
+}
+function minimap(el, rows, runningIdx) {
+  const n = rows.length, w = 100 / Math.max(n, 1);
+  el.innerHTML = rows.map((r, i) => `<span class="mm-span" data-k="${r.k}" ${i === runningIdx ? 'data-running' : ''} style="left:calc(${i * w}% + 1px);width:calc(${w}% - 2px);top:${LANE[r.k] * 14 + 2}px"></span>`).join('');
+}
+
+// ---------- 父轨迹 ----------
+function renderParent() {
+  const rows = parentRows();
+  $('parentRows').innerHTML = `<div class="tj-turn">第 1 轮 · ${rows.filter(r => r.k === 'tool' || r.k === 'subtool').length} 次调用</div>` + rows.map((r, i) => rowHtml(r, i, S.parentSel)).join('');
+  minimap($('parentMm'), rows, rows.findIndex(r => r.id === 'agent' && childRunning()));
+  renderParentDetail(rows);
+}
+function renderParentDetail(rows) {
+  const det = $('parentDet');
+  const r = S.parentSel === null ? null : rows[S.parentSel];
+  if (!r) { det.hidden = true; return; }
+  det.hidden = false;
+  const isTool = r.k === 'tool' || r.k === 'subtool';
+  const isAgent = r.id === 'agent';
+  const running = isAgent && childRunning();
+  const status = running ? '<span class="st-run">运行中</span>' : '<span class="ok">已完成</span>';
+  det.innerHTML = `
+    <div class="det-head"><div class="det-title"><span class="tag k-${r.k}">${LABEL[r.k]}</span><span class="det-loc">第 1 轮 · 消息组 ${isTool ? '· ' + esc(r.name) : ''}</span></div><button class="x" data-close>×</button></div>
+    <div class="det-tabs"><span class="on">概述</span>${isTool ? '<span>参数</span><span>结果</span><span>Schema</span>' : '<span>预览</span><span>原文</span>'}</div>
+    <div class="det-body">
+      <dl class="ov">
+        ${isTool ? '<div><dt>层级</dt><dd><span class="nav">助手消息 ↗</span></dd></div>' : ''}
+        <div><dt>状态</dt><dd>${isTool || r.k === 'message' ? status : '<span class="ok">已注入</span>'}</dd></div>
+        ${isAgent && S.mode === 'new' ? `<div><dt>子智能体</dt><dd><span class="txt">Explore · 查看 durable 存储层</span><button class="mini-btn" id="openChildTj" title="在右侧面板查看子智能体轨迹"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg>查看轨迹</button></dd></div>` : ''}
+        ${isAgent && S.mode === 'old' ? '<div><dt>子会话</dt><dd><span class="txt" style="font-family:var(--font-mono);font-size:12px;color:var(--t2)">session-7f3a9c2e-41d0-4b8e-a1f5-9d2c</span></dd></div>' : ''}
+        ${isTool ? `<div><dt>耗时</dt><dd>${running ? '—' : isAgent ? '38.2s' : '0.02s'}</dd></div>` : ''}
+      </dl>
+      ${isTool ? `<div class="sec"><h4>参数</h4><pre class="pre">${esc(JSON.stringify(JSON.parse(r.payload.replace('…', '...')), null, 2))}</pre></div>` : ''}
+      ${isTool ? `<div class="sec"><h4>结果</h4><pre class="pre">${running ? '运行中…' : esc(r.res) + (isAgent ? '\n\n结论：Session 通过 Transaction 先 prepare 再 commit；SQLite 表 entries / forks / documents……' : '')}</pre></div>` : `<div class="sec"><h4>预览</h4><p style="margin:0;font-size:13px">${esc(r.text)}</p></div>`}
+    </div>`;
+  det.querySelector('[data-close]').onclick = () => { S.parentSel = null; renderParent(); };
+  const btn = det.querySelector('#openChildTj');
+  if (btn) btn.onclick = () => { S.panel = true; S.view = 'detail'; S.childView = 'trajectory'; S.childSel = null; renderPanel(); $('rp').scrollIntoView?.(); };
+}
+$('parentRows').addEventListener('click', e => {
+  const row = e.target.closest('.row'); if (!row) return;
+  S.parentSel = Number(row.dataset.i); renderParent();
+});
+
+// ---------- 右侧面板 ----------
+function renderPanel() {
+  const rp = $('rp');
+  rp.hidden = !S.panel;
+  rp.style.width = S.width + 'px';
+  $('togglePanel').setAttribute('aria-pressed', String(S.panel));
+  if (!S.panel) return;
+  const body = $('rpBody');
+  const running = childRunning();
+  if (S.view === 'list') {
+    body.innerHTML = `<div class="list"><h4>${running ? '运行中' : '已结束'} · 1</h4><button id="pickChild"><span class="ava">E</span><span class="sa-meta"><h3>查看 durable 存储层</h3><p>${running ? '<span class="st-run">运行中</span>' : '<span class="st-done">已完成</span>'} · Explore · 38s</p></span></button></div>`;
+    body.querySelector('#pickChild').onclick = () => { S.view = 'detail'; S.childView = 'chat'; renderPanel(); };
+    return;
+  }
+  const onTj = S.childView === 'trajectory';
+  const vtLabel = onTj ? '返回对话' : '查看执行轨迹';
+  const vtIcon = onTj
+    ? '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'
+    : '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>';
+  body.innerHTML = `
+    <div class="sa-head">
+      <button class="ib" id="backList" title="返回子 Agent 列表">←</button>
+      <button class="vt" id="childVt" aria-pressed="${onTj}" aria-label="${vtLabel}" title="${vtLabel}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${vtIcon}</svg></button>
+      <span class="ava">E</span>
+      <div class="sa-meta"><h3>查看 durable 存储层</h3><p>Explore · ${running ? '<span class="st-run">运行中</span>' : '<span class="st-done">已完成</span>'}</p></div>
+    </div>
+    <div class="rp-body" id="childArea"></div>`;
+  body.querySelector('#backList').onclick = () => { S.view = 'list'; renderPanel(); };
+  body.querySelector('#childVt').onclick = () => { S.childView = onTj ? 'chat' : 'trajectory'; S.childSel = null; renderPanel(); };
+  if (S.childView === 'chat') renderChildChat($('childArea')); else renderChildTj($('childArea'));
+}
+function renderChildChat(el) {
+  const shown = CHILD.slice(0, S.childShown);
+  const parts = [`<div class="prompt">${esc(CHILD[0].text)}</div>`];
+  let tools = [];
+  const flush = () => { if (tools.length) parts.push(`<div class="proc">${tools.map(t => `<span>${esc(t.res)}</span>`).join('')}</div>`); tools = []; };
+  for (const r of shown.slice(1)) {
+    if (r.k === 'tool') tools.push(r);
+    else if (r.k === 'message') { flush(); parts.push(`<p>${esc(r.text)}</p>`); }
+  }
+  flush();
+  el.innerHTML = `<div class="chat">${parts.join('')}${childRunning() ? '<p style="color:var(--faint)"><span class="dot"></span>执行中…</p>' : ''}</div>`;
+}
+function renderChildTj(el, newIdx) {
+  const rows = CHILD.slice(0, S.childShown).map((r, i) => ({ ...r, _running: childRunning() && i === S.childShown - 1 && r.k === 'tool' }));
+  el.innerHTML = `
+    <div class="tj">
+      <div class="mm"><div class="mm-labels"><span>输入</span><span>模型</span><span>工具</span></div><div class="mm-lanes" id="childMm"></div></div>
+      <div class="tj-body" id="childRows"><div class="tj-turn">第 1 轮 · ${rows.filter(r => r.k === 'tool').length} 次调用</div>${rows.map((r, i) => rowHtml(r, i, S.childSel, i === newIdx ? 'new' : '')).join('')}</div>
+    </div>
+    <div class="sheet" id="childSheet" hidden></div>`;
+  minimap($('childMm'), rows, rows.findIndex(r => r._running));
+  const body = $('childRows');
+  if (S.run === 'run') body.scrollTop = body.scrollHeight;
+  body.addEventListener('click', e => { const row = e.target.closest('.row'); if (!row) return; S.childSel = Number(row.dataset.i); renderChildTj(el); });
+  renderChildSheet(rows);
+}
+function renderChildSheet(rows) {
+  const sheet = $('childSheet');
+  const r = S.childSel === null ? null : rows[S.childSel];
+  if (!r) { sheet.hidden = true; return; }
+  sheet.hidden = false;
+  const isTool = r.k === 'tool';
+  sheet.innerHTML = `
+    <div class="grab" title="拖动调整高度"></div>
+    <div class="det-head"><div class="det-title"><span class="tag k-${r.k}">${LABEL[r.k]}</span><span class="det-loc">第 1 轮 ${isTool ? '· ' + esc(r.name) : ''}</span></div><button class="x" data-close>×</button></div>
+    <div class="det-tabs"><span class="on">概述</span>${isTool ? '<span>参数</span><span>结果</span>' : '<span>预览</span>'}</div>
+    <div class="det-body">
+      <dl class="ov"><div><dt>状态</dt><dd>${r._running ? '<span class="st-run">运行中</span>' : '<span class="ok">已完成</span>'}</dd></div>${isTool ? `<div><dt>耗时</dt><dd>${r._running ? '—' : '0.01s'}</dd></div>` : ''}</dl>
+      ${isTool ? `<div class="sec"><h4>参数</h4><pre class="pre">${esc(r.payload)}</pre></div><div class="sec"><h4>结果</h4><pre class="pre">${r._running ? '运行中…' : esc(r.res)}</pre></div>` : `<div class="sec"><h4>预览</h4><p style="margin:0;font-size:13px">${esc(r.text)}</p></div>`}
+    </div>`;
+  sheet.querySelector('[data-close]').onclick = () => { S.childSel = null; renderPanel(); };
+  // 详情占下半部分时，表格底部让出同样高度，并把选中行滚到详情上方
+  const list = $('childRows');
+  list.style.paddingBottom = sheet.offsetHeight + 'px';
+  const sel = list.querySelector('.row[aria-selected="true"]');
+  if (sel) {
+    const visible = list.clientHeight - sheet.offsetHeight + list.offsetTop;
+    const bottom = sel.offsetTop + sel.offsetHeight - list.scrollTop;
+    if (bottom > visible) list.scrollTop += bottom - visible + 8;
+  }
+}
+
+// ---------- 回放 ----------
+function startReplay() {
+  clearInterval(S.timer);
+  if (S.run !== 'run') { S.childShown = CHILD.length; renderAll(); return; }
+  S.childShown = 2; renderAll();
+  S.timer = setInterval(() => {
+    S.childShown += 1;
+    if (S.childShown >= CHILD.length) clearInterval(S.timer);
+    renderParent();
+    if (S.panel && S.view === 'detail') {
+      if (S.childView === 'trajectory') {
+        // 只重绘子轨迹，保留下半部分详情
+        const area = $('childArea'); if (area) renderChildTj(area, S.childShown - 1);
+        const meta = document.querySelector('.sa-meta p'); if (meta) meta.innerHTML = `Explore · ${childRunning() ? '<span class="st-run">运行中</span>' : '<span class="st-done">已完成</span>'}`;
+      } else renderPanel();
+    } else renderPanel();
+  }, 1100);
+}
+
+// ---------- 控制条 ----------
+function seg(id, key, after) {
+  $(id).querySelectorAll('button').forEach(b => b.onclick = () => {
+    $(id).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    S[key] = key === 'width' ? Number(b.dataset.v) : b.dataset.v;
+    after?.();
+  });
+}
+function renderAll() { renderParent(); renderPanel(); }
+seg('segMode', 'mode', () => { S.parentSel = null; renderAll(); });
+seg('segRun', 'run', startReplay);
+seg('segW', 'width', renderPanel);
+seg('segTheme', 'theme', () => document.documentElement.dataset.theme = S.theme);
+$('togglePanel').onclick = () => { S.panel = !S.panel; if (S.panel) S.view = 'list'; renderPanel(); };
+$('closePanel').onclick = () => { S.panel = false; renderPanel(); };
+$('toggleNotes').onclick = () => { $('notes').hidden = !$('notes').hidden; };
+
+// 初始：选中 agent 行，让小按钮直接可见并闪两下
+S.parentSel = PARENT.findIndex(r => r.id === 'agent');
+renderAll();
+document.getElementById('openChildTj')?.classList.add('flash');
+</script>
+</body>
+</html>

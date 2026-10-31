@@ -44,7 +44,9 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
     // Persisted Session roots authorize generated worktrees without adding them to Recents.
     try {
       const workspaceRoot = await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot }, workspaceAccess);
-      return { ok: true as const, workspace: { workspaceRoot, workspaceId: `session-root:${createHash("sha256").update(workspaceRoot).digest("hex")}` } };
+      const workspaceId = `session-root:${createHash("sha256").update(workspaceRoot).digest("hex")}`;
+      if (input.workspaceId && input.workspaceId !== workspaceId) return registered;
+      return { ok: true as const, workspace: { workspaceRoot, workspaceId } };
     } catch { return registered; }
   };
   const reviewWorker = new ReviewGitWorkerClient(join(__dirname, "..", "review-git-worker.js"));

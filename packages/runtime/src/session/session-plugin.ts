@@ -5,6 +5,7 @@ import { SessionStoreService } from "@actspace/session-persistence";
 import { repairSubagentPublications } from "@actspace/subagent";
 import type { RendererAllowlist } from "../projection/tool-dto.js";
 import { RuntimeSessionController } from "./session-controller.js";
+import { createAuxiliaryRequestRecorder } from "./auxiliary-request-recorder.js";
 
 export const SESSION_RUNTIME_HOST_PORT_ID = "actspace.host.session" as const;
 
@@ -45,6 +46,7 @@ export function apply(ctx: CordisContext): void {
     onDisposed: (sessionId, outcome) => emitNotification(ctx, "session/disposed", { sessionId, outcome }),
   }, sessionStore.store);
   ctx.provide?.("session.runtime", service);
+  ctx.provide?.("llm.auxiliary-requests", createAuxiliaryRequestRecorder(service));
   ctx.effect?.(() => async () => {
     await service.closeAll();
   }, "session-runtime");

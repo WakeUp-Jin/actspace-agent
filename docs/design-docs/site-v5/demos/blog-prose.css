@@ -1,0 +1,30 @@
+/* 博客正文共用底子：修掉现网的问题（代码块顶部 56px 空白、裸链接撑行、引用空行），各版在自己文件里再调。 */
+.bprose { color: #403d38; font-size: 17px; line-height: 1.95; overflow-wrap: anywhere; }
+.bprose > :first-child { margin-top: 0; }
+.bprose p, .bprose ul, .bprose ol { margin: 0 0 22px; }
+.bprose ul, .bprose ol { padding-left: 1.3em; }
+.bprose li { margin: 8px 0; padding-left: 2px; }
+.bprose li::marker { color: var(--site-muted); }
+.bprose strong { color: var(--site-ink); font-weight: 600; }
+.bprose h2 { font: 500 27px/1.45 var(--display); color: var(--site-ink); margin: 64px 0 18px; scroll-margin-top: 96px; }
+.bprose a { color: var(--site-ink); text-decoration: underline; text-decoration-color: var(--site-accent-line); text-underline-offset: 4px; }
+.bprose a:hover { text-decoration-color: var(--site-accent); }
+/* 资料列表里的裸链接：等宽小字、淡色，另起一行 */
+.bprose .refs { list-style: none; padding: 0; }
+.bprose .refs li { padding: 12px 0; margin: 0; border-bottom: 1px solid var(--site-line); font-size: 15px; line-height: 1.7; color: var(--site-ink); }
+.bprose .refs li:first-child { border-top: 1px solid var(--site-line); }
+.bprose .refs a { display: block; font: 12.5px/1.6 var(--mono); color: var(--site-muted); text-decoration: none; word-break: break-all; margin-top: 2px; }
+.bprose .refs a:hover { color: var(--site-accent); }
+.bprose :not(pre) > code { font: .84em var(--mono); background: var(--site-canvas-soft); border-radius: 5px; padding: 2px 6px; color: var(--site-ink); }
+.bprose .emoji { color: var(--site-ink); font-weight: 500; }
+.bprose blockquote { margin: 28px 0; padding: 2px 0 2px 20px; border-left: 2px solid var(--site-line-strong); color: var(--site-body); }
+.bprose blockquote p { margin: 0; }
+.bprose .pimg { margin: 36px 0; }
+.bprose .pimg img { width: 100%; border-radius: 12px; background: #fff; box-shadow: 0 0 0 1px var(--site-line), 0 18px 36px -28px rgba(29,28,26,.45); }
+.bprose .pimg figcaption { margin-top: 10px; font-size: 13px; color: var(--site-muted); text-align: center; }
+.bprose .code-block { margin: 26px 0; background: var(--site-paper); border: 1px solid var(--site-line); border-radius: 12px; overflow: hidden; }
+.bprose .code-bar { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px 6px 16px; border-bottom: 1px solid var(--site-line); }
+.bprose .code-lang { font: 11.5px var(--mono); color: var(--site-muted); }
+.bprose .code-copy { font-size: 12px; color: var(--site-body); background: none; border: 0; padding: 4px 8px; border-radius: 6px; }
+.bprose .code-copy:hover { background: var(--site-canvas-soft); color: var(--site-ink); }
+.bprose pre { margin: 0; padding: 14px 18px; overflow: auto; font: 13.5px/1.75 var(--mono); color: var(--site-ink); }

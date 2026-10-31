@@ -21,6 +21,11 @@ export type ChildRunLease = {
   release(): Promise<void>;
 };
 
+/** A started child Run; `result` settles with the terminal and parent `delegation/completed`. */
+export type SubagentLaunch = { readonly invocationId: string; readonly childSessionId: string; readonly childAgentId: string; readonly presetId: string; readonly result: Promise<SubagentTerminalResult>; stop(reason?: string): void; progress(): SubagentProgress | undefined };
+/** Read from the child Journal while it runs; undefined before the child Session exists or after it closes. */
+export type SubagentProgress = { readonly steps: number; readonly toolCalls: number; readonly recentToolCalls: readonly string[] };
+
 export class OneShotSubagentProvider {
   readonly #active = new Map<string, AbortController>();
   readonly #inflight = new Set<Promise<SubagentTerminalResult>>();
@@ -28,14 +33,15 @@ export class OneShotSubagentProvider {
   #accepting = true;
   constructor(private readonly options: { readonly store: SessionStore; readonly presets: StaticPresetRegistry; readonly parentPort?: ParentDelegationPort; readonly createLoop: ChildLoopFactory; readonly acquireRun?: (preset: StaticAgentPreset, signal?: AbortSignal, invocation?: SubagentInvocation) => ChildRunLease | Promise<ChildRunLease>; readonly manifestDigest: string; readonly plugins: readonly { id: string; version: string }[] }) {}
 
-  invoke(input: SubagentInvocation): Promise<SubagentTerminalResult> {
-    const task = this.#invoke(input);
-    this.#inflight.add(task);
-    void task.then(() => this.#inflight.delete(task), () => this.#inflight.delete(task));
-    return task;
+  async invoke(input: SubagentInvocation): Promise<SubagentTerminalResult> {
+    return (await this.launch(input)).result;
   }
 
-  async #invoke(input: SubagentInvocation): Promise<SubagentTerminalResult> {
+  /**
+   * Resolve once the child holds its own Harness lease, so it no longer depends
+   * on the parent scope. Without `signal` the child outlives the parent Run.
+   */
+  async launch(input: SubagentInvocation): Promise<SubagentLaunch> {
     if (!this.#accepting) throw new Error("Subagent provider is quiescing.");
     const preset = this.options.presets.get(input.presetId);
     if (input.delegationDepth >= preset.maxDelegationDepth) throw new Error("Subagent delegation depth exceeded.");
@@ -45,6 +51,18 @@ export class OneShotSubagentProvider {
     const parentPort = this.options.parentPort ?? sessionParentPort(input.parentSession);
     await parentPort.recordRequested({ invocationId, presetId: preset.id, parentCallId: input.parentCallId, childSessionId });
     const controller = new AbortController(); this.#active.set(invocationId, controller);
+    let markReady!: () => void;
+    const ready = new Promise<void>(resolve => { markReady = resolve; });
+    const holder: { child?: SessionHandle; closed?: boolean } = {};
+    const result = this.#run(input, { preset, invocationId, childSessionId, childAgentId, started, allowedToolNames, parentPort, controller, markReady, holder });
+    this.#inflight.add(result);
+    void result.then(() => this.#inflight.delete(result), () => this.#inflight.delete(result));
+    await Promise.race([ready, result.then(() => undefined, () => undefined)]);
+    return Object.freeze({ invocationId, childSessionId, childAgentId, presetId: preset.id, result, stop: (reason = "task-stop") => controller.abort(reason), progress: () => holder.child && !holder.closed ? childProgress(holder.child) : undefined });
+  }
+
+  async #run(input: SubagentInvocation, run: { readonly preset: StaticAgentPreset; readonly invocationId: string; readonly childSessionId: string; readonly childAgentId: string; readonly started: number; readonly allowedToolNames: readonly string[]; readonly parentPort: ParentDelegationPort; readonly controller: AbortController; readonly markReady: () => void; readonly holder: { child?: SessionHandle; closed?: boolean } }): Promise<SubagentTerminalResult> {
+    const { preset, invocationId, childSessionId, childAgentId, started, allowedToolNames, parentPort, controller } = run;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const parentAbort = () => controller.abort(input.signal?.reason);
     if (input.signal?.aborted) parentAbort(); else input.signal?.addEventListener("abort", parentAbort, { once: true });
@@ -57,6 +75,7 @@ export class OneShotSubagentProvider {
     try {
       const workspaceRoot = resolveSessionWorkspaceRoot(input.parentSession.header, input.parentSession.journal);
       child = await createChildSession({ store: this.options.store, parentSessionId: input.parentSession.header.sessionId, parentBoundarySeq: input.parentSession.lastSeq, parentCallId: input.parentCallId, childSessionId, createdAt: new Date().toISOString(), ...(workspaceRoot ? { cwd: workspaceRoot } : {}), delegationDepth: input.delegationDepth + 1, task: input.task, preset, manifestDigest: this.options.manifestDigest, plugins: this.options.plugins });
+      run.holder.child = child;
       controller.signal.throwIfAborted();
       lease = await this.options.acquireRun?.(preset, controller.signal, input);
       controller.signal.throwIfAborted();
@@ -66,6 +85,7 @@ export class OneShotSubagentProvider {
       scope = lease ? lease.scope.child(childAgentId) : input.isolatedScope === true ? input.parentScope.isolatedChild(childAgentId) : input.parentScope.child(childAgentId);
       loop = await (lease?.createLoop ?? this.options.createLoop)({ session: child, scope, preset, allowedToolNames, signal: controller.signal, agentId: childAgentId });
       controller.signal.throwIfAborted();
+      run.markReady();
       timeout = setTimeout(() => controller.abort("subagent-timeout"), preset.maxDurationMs);
       timeout.unref?.();
       const turn = await loop.runTurn({ content, agentRunId: invocationId, ...(accepted ? { messageId: accepted.messageId } : {}) });
@@ -103,6 +123,7 @@ export class OneShotSubagentProvider {
         result = terminal({ invocationId, childAgentId, childSessionId, presetId: preset.id, status: "failed", text: "", durationMs: Date.now() - started, failure: { code: "SUBAGENT_PUBLICATION_FAILED", message: error instanceof Error ? error.message : String(error), retryable: false } });
       }
     }
+    run.holder.closed = true;
     const cleanup: PromiseSettledResult<void>[] = lifecycleFailure === undefined ? await Promise.allSettled([
       child?.close() ?? Promise.resolve(),
       scope?.dispose() ?? Promise.resolve(),
@@ -127,6 +148,20 @@ export class OneShotSubagentProvider {
   abortAll(reason = "runtime-shutdown"): void { this.#accepting = false; for (const controller of this.#active.values()) controller.abort(reason); }
   async dispose(reason = "runtime-shutdown"): Promise<void> { this.abortAll(reason); await Promise.allSettled([...this.#inflight]); }
   get activeCount(): number { return this.#active.size; }
+}
+
+function childProgress(child: SessionHandle): SubagentProgress {
+  let steps = 0, toolCalls = 0;
+  const recent: string[] = [];
+  for (const event of child.journal.iterateEvents()) {
+    if (event.type === "step/start") steps += 1;
+    if (event.type !== "tool/call") continue;
+    toolCalls += 1;
+    const data = event.data as Record<string, unknown>;
+    recent.push(`${String(data.name ?? "tool")} ${JSON.stringify(data.args ?? {})}`.slice(0, 120));
+    if (recent.length > 3) recent.shift();
+  }
+  return Object.freeze({ steps, toolCalls, recentToolCalls: Object.freeze(recent) });
 }
 
 function intersectTools(parent: readonly string[], preset: StaticAgentPreset): readonly string[] { const visible = new Set(parent); return Object.freeze(preset.allowedToolNames.filter((name) => visible.has(name)).sort()); }

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { MessageBlock } from "@actspace/shared";
 import { CompactCommandBlock, CompactionRetryContext, formatCompactionDuration } from "../components/messages/CompactCommandBlock";
+import { TrajectoryNavigationProvider, useTrajectoryNavigation } from "../components/trajectory/TrajectoryNavigation";
 
 function makeBlock(
   partial: Partial<Extract<MessageBlock, { kind: "context_compaction" }>>,
@@ -19,15 +20,15 @@ describe("CompactCommandBlock", () => {
     vi.useRealTimers();
   });
 
-  it("renders running state with an elapsed timer and an indeterminate progressbar", () => {
+  it("renders running state as a divider with an elapsed timer", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-02T00:00:08.000Z"));
-    render(<CompactCommandBlock message={makeBlock({ status: "running", startedAt: "2026-06-02T00:00:00.000Z" })} />);
+    const { container } = render(<CompactCommandBlock message={makeBlock({ status: "running", startedAt: "2026-06-02T00:00:00.000Z" })} />);
 
-    expect(screen.getByText("正在压缩上下文")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("正在压缩上下文");
     expect(screen.getByText("8s")).toBeInTheDocument();
-    expect(screen.getByText("正在总结较早的消息。")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "上下文压缩进度" })).not.toHaveAttribute("aria-valuenow");
+    expect(container.querySelector(".compact-divider-running")).not.toBeNull();
+    expect(container.querySelectorAll(".compact-divider-line")).toHaveLength(2);
 
     act(() => {
       vi.advanceTimersByTime(2000);
@@ -35,29 +36,47 @@ describe("CompactCommandBlock", () => {
     expect(screen.getByText("10s")).toBeInTheDocument();
   });
 
-  it("renders completed state as a divider that expands the summary", () => {
+  it("renders completed state with counts, tokens and duration", () => {
     const { container } = render(
-      <CompactCommandBlock message={makeBlock({ status: "completed", removedCount: 29, durationMs: 12_000, summary: "## 目标\n修复登录" })} />,
+      <CompactCommandBlock message={makeBlock({ status: "completed", removedCount: 48, durationMs: 23_000, compactionId: "c1", beforeTokens: 182_400, afterTokens: 9_100 })} />,
     );
 
-    const toggle = screen.getByRole("button", { name: "上下文已压缩 · 29 条消息 · 12s" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("separator", { name: "以上 48 条消息已压缩 · 182.4K → 约 9.1K tokens · 23s" })).toBeInTheDocument();
     expect(container.querySelector(".compact-command-block")).toHaveClass("w-full");
-    expect(screen.queryByText("修复登录")).not.toBeInTheDocument();
-
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("修复登录")).toBeInTheDocument();
-    expect(screen.getByText(/压缩摘要 · \d+ 字/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "复制" })).toBeInTheDocument();
-    expect(screen.getByText("分隔线以上的消息仍然显示，但模型之后只通过这段摘要了解它们。")).toBeInTheDocument();
+    // 没有轨迹导航（单独渲染）时不提供跳转。
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("renders a plain divider when no summary is available yet", () => {
-    render(<CompactCommandBlock message={makeBlock({ status: "completed", removedCount: 5 })} />);
+  it("marks the before count approximate when it includes estimates", () => {
+    render(<CompactCommandBlock message={makeBlock({ status: "completed", removedCount: 12, durationMs: 9_000, beforeTokens: 5_157, afterTokens: 126, beforeEstimated: true })} />);
 
-    expect(screen.getByRole("separator", { name: "上下文已压缩 · 5 条消息" })).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("separator", { name: "以上 12 条消息已压缩 · 约 5.2K → 约 126 tokens · 9s" })).toBeInTheDocument();
+  });
+
+  it("shows only count and duration for compactions recorded before token counts", () => {
+    render(<CompactCommandBlock message={makeBlock({ status: "completed", removedCount: 5, durationMs: 4_000 })} />);
+
+    expect(screen.getByRole("separator", { name: "以上 5 条消息已压缩 · 4s" })).toBeInTheDocument();
+    expect(screen.queryByText(/tokens/)).not.toBeInTheDocument();
+  });
+
+  it("reveals the compaction row in the trajectory", () => {
+    const show = vi.fn();
+    let pending: unknown = null;
+    function Probe() {
+      pending = useTrajectoryNavigation()?.pending?.target ?? null;
+      return null;
+    }
+    render(
+      <TrajectoryNavigationProvider onShowTrajectory={show}>
+        <CompactCommandBlock message={makeBlock({ status: "completed", removedCount: 5, compactionId: "c1" })} />
+        <Probe />
+      </TrajectoryNavigationProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "在轨迹中查看" }));
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(pending).toEqual({ compactionId: "c1" });
   });
 
   it("renders failed state with a retry action from context", () => {
@@ -68,7 +87,8 @@ describe("CompactCommandBlock", () => {
       </CompactionRetryContext.Provider>,
     );
 
-    expect(screen.getByText("上下文压缩失败 · 模型请求超时（60s）")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("上下文压缩失败");
+    expect(screen.getByText("模型请求超时（60s）")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     expect(retry).toHaveBeenCalledTimes(1);
   });

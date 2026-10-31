@@ -4,7 +4,6 @@ import type {
   AppSettings,
   AppSettingsV2,
   CredentialStorageView,
-  CustomConnectionInput,
   ImageGenerationSettingsView,
   LlmProviderId,
   QuickOpenShortcutUpdateInput,
@@ -12,6 +11,7 @@ import type {
   SecretProviderId,
   SettingsUpdateInput,
   SettingsV2UpdateInput,
+  SettingsV4Models,
   SettingsV4Snapshot,
   SettingsV4UpdateInput,
   SpeechSettings,
@@ -19,22 +19,19 @@ import type {
 } from "@actspace/shared";
 import { SettingsStore } from "./store";
 import type {
-  CustomConnectionRuntimeConfig,
   ImageGenerationRuntimeConfig,
   ModelStorageMutationInput,
   PersistedSecretProviderId,
   PersistedSettingsV3,
   ProviderConnectionMutationInput,
-  ProviderConnectionProbeResult,
-  ProviderCredentialMutationResult,
   ProviderRuntimeConfig,
   ProviderRuntimeError,
   SettingsServiceOptions,
   SettingsV4ChangeListener,
 } from "./types";
-import * as customConnections from "./facades/custom-connections";
 import * as general from "./facades/general";
 import * as media from "./facades/media";
+import * as modelConnections from "./facades/model-connections";
 import * as providers from "./facades/providers";
 import * as search from "./facades/search";
 
@@ -80,7 +77,7 @@ export class SettingsService {
   }
 
   /** Main-only storage snapshot used by model services; never contains decrypted secrets. */
-  getModelStorageState(): Pick<PersistedSettingsV3, "installedModels" | "customModels" | "taskModels"> {
+  getModelStorageState(): Pick<PersistedSettingsV3, "installedModels" | "customModels" | "taskModels" | "modelOverrides"> {
     return general.getModelStorageState(this.store);
   }
 
@@ -104,37 +101,21 @@ export class SettingsService {
     return providers.updateProviderConnection(this.store, input);
   }
 
-  removeProvider(provider: LlmProviderId): Promise<AppSettings> {
-    return providers.removeProvider(this.store, provider);
+  getConnectionRuntimeConfig(provider: LlmProviderId, connectionId?: string): ProviderRuntimeConfig | ProviderRuntimeError {
+    return providers.getConnectionRuntimeConfig(this.store, provider, connectionId);
   }
 
-  getProviderRuntimeConfig(provider: LlmProviderId): ProviderRuntimeConfig | ProviderRuntimeError {
-    return providers.getProviderRuntimeConfig(this.store, provider);
+  /** 设置 › 模型 的连接写入：Key 与 models 补丁一起提交。 */
+  applyModelsChange(build: (models: SettingsV4Models) => Partial<SettingsV4Models>, secret?: modelConnections.ConnectionSecretChange): Promise<void> {
+    return modelConnections.applyModelsChange(this.store, build, secret);
   }
 
-  /** requireModel 为 false 时用于探测模型列表，允许还没有默认模型的连接。 */
-  getCustomConnectionRuntimeConfig(connectionId: string, options: { requireModel?: boolean } = {}): CustomConnectionRuntimeConfig | ProviderRuntimeError {
-    return customConnections.getCustomConnectionRuntimeConfig(this.store, connectionId, options);
+  hasConnectionKey(connectionId: string, providerId: LlmProviderId): boolean {
+    return modelConnections.hasConnectionKey(this.store, connectionId, providerId);
   }
 
-  getProviderRuntimeConfigForCredential(
-    provider: LlmProviderId,
-    credentialId?: string,
-    connectionId?: string,
-  ): ProviderRuntimeConfig | ProviderRuntimeError {
-    return providers.getProviderRuntimeConfigForCredential(this.store, provider, credentialId, connectionId);
-  }
-
-  createCustomConnection(input: CustomConnectionInput): Promise<SettingsV4Snapshot> {
-    return customConnections.createCustomConnection(this.store, input);
-  }
-
-  removeCustomConnection(connectionId: string): Promise<SettingsV4Snapshot> {
-    return customConnections.removeCustomConnection(this.store, connectionId);
-  }
-
-  updateCustomConnection(input: Omit<CustomConnectionInput, "apiKey"> & { connectionId: string; apiKey?: string }): Promise<SettingsV4Snapshot> {
-    return customConnections.updateCustomConnection(this.store, input);
+  hasOpenRouterManagementKey(): boolean {
+    return modelConnections.hasManagementKey(this.store);
   }
 
   getImageGenerationRuntimeConfig(): ImageGenerationRuntimeConfig | undefined {
@@ -147,52 +128,8 @@ export class SettingsService {
     return media.updateImageGeneration(this.store, input);
   }
 
-  addProviderCredential(input: {
-    provider: LlmProviderId;
-    label: string;
-    apiKey: string;
-    pricingMultiplier?: number;
-  }): Promise<AppSettings> {
-    return providers.addProviderCredential(this.store, input);
-  }
-
-  updateProviderCredential(
-    provider: LlmProviderId,
-    credentialId: string,
-    label: string,
-    pricingMultiplier?: number,
-  ): Promise<ProviderCredentialMutationResult> {
-    return providers.updateProviderCredential(this.store, provider, credentialId, label, pricingMultiplier);
-  }
-
-  removeProviderCredential(
-    provider: LlmProviderId,
-    credentialId: string,
-  ): Promise<ProviderCredentialMutationResult> {
-    return providers.removeProviderCredential(this.store, provider, credentialId);
-  }
-
-  markProviderCredentialConnectionResult(
-    provider: LlmProviderId,
-    credentialId: string,
-    result: ProviderConnectionProbeResult,
-  ): Promise<ProviderCredentialMutationResult> {
-    return providers.markProviderCredentialConnectionResult(this.store, provider, credentialId, result);
-  }
-
   getOpenRouterManagementRuntimeConfig(): ProviderRuntimeConfig | ProviderRuntimeError {
     return providers.getOpenRouterManagementRuntimeConfig(this.store);
-  }
-
-  markProviderConnectionResult(
-    provider: LlmProviderId,
-    result: ProviderConnectionProbeResult,
-  ): Promise<void> {
-    return providers.markProviderConnectionResult(this.store, provider, result);
-  }
-
-  markCustomConnectionResult(connectionId: string, result: ProviderConnectionProbeResult): Promise<void> {
-    return customConnections.markCustomConnectionResult(this.store, connectionId, result);
   }
 
   readAgentSystemPrompt(): Promise<AgentSystemPromptFile> {

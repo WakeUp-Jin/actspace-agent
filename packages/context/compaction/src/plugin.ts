@@ -6,7 +6,7 @@ import { compactionThreshold } from "./policy.js";
 import type { CompactionSummarizer } from "./summarizer.js";
 import { Service } from "@actspace/cordis-adapter";
 import type { CordisContext, CordisServiceContext } from "@actspace/cordis-adapter";
-import type { LlmService } from "@actspace/llm-service";
+import type { AuxiliaryRequestRecorder, LlmService } from "@actspace/llm-service";
 import { DEFAULT_COMPACTION_POLICY } from "./policy.js";
 import { LlmCompactionSummarizer } from "./summarizer.js";
 
@@ -16,7 +16,7 @@ export type CompactionObserver = import("@actspace/context-engine").CompactionOb
 
 /** Cordis owner for compaction policy and summarizer resources. */
 export class CompactionService extends Service {
-  static inject = Object.freeze(["llm.service", "context.engine"]);
+  static inject = Object.freeze(["llm.service", "context.engine", "llm.auxiliary-requests"]);
   static Config = {
     "~standard": {
       version: 1,
@@ -35,10 +35,12 @@ export class CompactionService extends Service {
     const llmValue = ctx.get("llm.service") as (LlmService & { readonly runtime?: LlmService }) | undefined;
     if (llmValue === undefined) throw new Error("Compaction Service requires llm.service.");
     const llm = llmValue.runtime ?? llmValue;
+    const recorder = ctx.get("llm.auxiliary-requests") as AuxiliaryRequestRecorder | undefined;
+    if (!recorder) throw new Error("Compaction requires llm.auxiliary-requests.");
     const routes = llm.routes.list();
     const routeId = config.routeId ?? routes.find(route => route.routeId === "utility")?.routeId ?? routes[0]?.routeId;
     if (routeId === undefined) throw new Error("Compaction Service requires an active LLM route.");
-    this.runtime = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, new LlmCompactionSummarizer({ llm, routeId, model: config.model ?? "default" }));
+    this.runtime = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, new LlmCompactionSummarizer({ llm, recorder, routeId, model: config.model ?? "default" }));
   }
 
   withTriggerRatio(triggerRatio: number | (() => number)): CompactionPlugin { return this.runtime.withTriggerRatio(triggerRatio); }
@@ -82,7 +84,7 @@ export class CompactionPlugin implements ContextCompactionStrategy {
   }
   // Compatibility for direct package callers; production uses the Harness engine coordinator.
   async maybeCompact(session: SessionHandle, usage: TokenUsage, observer?: CompactionObserver): Promise<boolean> {
-    return this.shouldCompact(usage) ? this.compact(session, observer) : false;
+    return this.coordinator.withStrategy(this).maybeCompact(session, usage, observer);
   }
   async compact(session: SessionHandle, observer?: CompactionObserver): Promise<boolean> {
     return this.coordinator.withStrategy(this).compact(session, observer);

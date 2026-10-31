@@ -68,8 +68,15 @@ function RequestOverview({ layout, request, onTab, onSelectRecord }: Omit<Reques
   return (
     <>
       <dl className="tj-overview tj-summaryScrollRegion" data-summary-scroll-region="">
-        <OverviewRow label={T.status} error={failed}>{STATUS_LABEL[request.status]}</OverviewRow>
+        <OverviewRow label={T.status} error={failed}>{request.terminalStatus === 'aborted' ? T.cancelled : STATUS_LABEL[request.status]}</OverviewRow>
         {request.purpose === 'compaction' && <OverviewRow label={T.purpose}>{T.compactionPurpose}</OverviewRow>}
+        {request.purpose === 'image-inspection' && <OverviewRow label={T.purpose}>{T.imageInspectionPurpose}</OverviewRow>}
+        {request.purpose === 'session-title' && <OverviewRow label={T.purpose}>{T.sessionTitlePurpose}</OverviewRow>}
+        {request.purpose === 'auto-review' && <OverviewRow label={T.purpose}>{T.autoReviewPurpose}</OverviewRow>}
+        {request.attempt !== undefined && <OverviewRow label={T.attempt}>{request.attempt}</OverviewRow>}
+        {request.parentRecordId && <OverviewRow label={T.parentTool}>
+          <NavLink label={layout.cells.find(cell => cell.recordId === request.parentRecordId)?.record.toolName ?? T.toolCall} onClick={() => { onSelectRecord(request.parentRecordId!); }} />
+        </OverviewRow>}
         {request.provider && <OverviewRow label={T.provider}>{request.provider}</OverviewRow>}
         {request.model && <OverviewRow label={T.model}>{request.model}</OverviewRow>}
         <OverviewRow label={T.toolCalls}>{request.toolCalls}</OverviewRow>

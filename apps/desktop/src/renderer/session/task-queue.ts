@@ -1,4 +1,4 @@
-import { taskOperation, type SubmitTaskInput, type TaskContentEnvelope, type TaskSnapshot } from "@actspace/shared/runtime-v2";
+import { isBackgroundWake, taskOperation, type SubmitTaskInput, type TaskContentEnvelope, type TaskSnapshot } from "@actspace/shared/runtime-v2";
 import type { ComposerSendOptions } from "../components/Composer";
 import type { SessionLocalState } from "./session-local-store";
 import { projectTaskQueue, taskAttachments, type QueuedComposerMessage } from "./message-queue";
@@ -107,7 +107,8 @@ export function applyTaskSnapshot(snapshot: TaskSnapshot, { tasks, runs, patchLo
   }
   const currentRun = runs.get(snapshot.sessionId);
   const initial = running && snapshot.tasks.find(task => task.taskId === running.taskId);
-  if (currentRun && initial && !currentRun.userBlock) {
+  // 后台任务唤醒的 run 没有用户消息，回合开头是 durable 的分隔行。
+  if (currentRun && initial && !currentRun.userBlock && !isBackgroundWake(initial.content)) {
     const content = initial.content as TaskContentEnvelope;
     const original = content?.kind === "composer-task" ? content.original as unknown as SubmitTaskInput : null;
     const submittedOptions = tasks.options(initial.submissionId);

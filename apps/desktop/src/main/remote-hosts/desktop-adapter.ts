@@ -1,8 +1,10 @@
 import { join } from "node:path";
+import { isDelegatedSession } from "@actspace/shared/session-list-page";
 import { toolPreview } from "@actspace/client/sessions";
 import { RemoteArtifacts } from "./artifacts";
 import { PendingSubmissions } from "./pending-submissions";
 import { FixedRendererStreamAdapter } from "../runtime-v2/fixed-renderer-stream-adapter";
+import { executionEnvironment } from "../runtime-v2/approval-broker";
 import { randomUUID } from "node:crypto";
 import type { BrowserWindow } from "electron";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as C, type RuntimeV2SessionListItem, type RuntimeV2SessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
@@ -98,7 +100,7 @@ export class RemoteDesktopAdapter {
     for (const request of requests) {
       const ref = { hostId, sessionId: request.sessionId }, requestId = remoteApprovalId(hostId, request.requestId);
       this.#approvalRefs.set(requestId, { ref, requestId: request.requestId });
-      this.#send(C.agentStream, { type: "tool_approval_required", sessionId: remoteSessionKey(ref), agentRunId: request.agentRunId, toolCallId: request.callId, toolName: request.toolName, requestId, hostId, summary: JSON.stringify(request.resources), reason: request.reasons.join(", ") });
+      this.#send(C.agentStream, { type: "tool_approval_required", sessionId: remoteSessionKey(ref), agentRunId: request.agentRunId, toolCallId: request.callId, toolName: request.toolName, requestId, hostId, summary: JSON.stringify(request.resources), reason: request.reasons.join(", "), executionEnvironment: executionEnvironment(request.resources) });
     }
   }
   #send(channel: string, value: unknown) { const window = this.getWindow(); if (window && !window.isDestroyed()) window.webContents.send(channel, value); }
@@ -172,10 +174,11 @@ export class RemoteDesktopAdapter {
       try { await this.#cache.setList(host.hostId, await this.hosts.call(host.hostId, "sessions.list", {}) as RuntimeV2SessionListItem[]); }
       catch { /* preserve last known list on connection failure */ }
     }));
-    return this.#cache.list(connections).filter(({ session }) => session.metadata.archived === archived).map(({ hostId, hostName, connectionState, session }) => ({
+    return this.#cache.list(connections).filter(({ session }) => session.metadata.archived === archived && !isDelegatedSession(session.lineage)).map(({ hostId, hostName, connectionState, session }) => ({
       id: remoteSessionKey({ hostId, sessionId: session.sessionId }), hostId, hostName, connectionState,
       title: session.metadata.title ?? "New chat", updatedAt: session.updatedAt, agentRunCount: session.completedTurnCount ?? 0, workspaceRoot: session.workspaceRoot ?? undefined,
-      pinned: session.metadata.pinned, archived: session.metadata.archived, agentMode: session.agentMode, agentModeRevision: session.agentModeRevision, agentForm: session.agentForm, accessState: session.accessState, isChildSession: session.lineage !== null,
+      ...(session.worktree ? { worktree: session.worktree } : {}),
+      pinned: session.metadata.pinned, archived: session.metadata.archived, agentMode: session.agentMode, agentModeRevision: session.agentModeRevision, agentForm: session.agentForm, accessState: session.accessState, isChildSession: false,
     }));
   }
   async mergeList(channel: string, input: unknown, local: unknown): Promise<unknown> {
@@ -236,6 +239,7 @@ export class RemoteDesktopAdapter {
       }
       case C.setSessionAgentMode: { const result = await call("sessions.update", { patch: { mode: input.mode, expectedRevision: input.expectedRevision } }) as { agentMode: string; agentModeRevision: number }; return { ok: true, mode: result.agentMode, revision: result.agentModeRevision }; }
       case C.setSessionPermissionMode: await call("sessions.update", { patch: { permissionMode: input.mode } }); return { ok: true, mode: input.mode };
+      case C.revokeSessionGrant: await call("sessions.revokeGrant", { grantId: input.grantId }); return { ok: true };
       case C.forkSession: { const parent = await observation(); const next = await call("sessions.fork", { boundarySeq: parent.snapshot.throughJournalSeq, newSessionId: randomUUID() }) as { sessionId: string }; return this.handle(C.getSessionPage, {}, { hostId: ref.hostId, sessionId: next.sessionId }); }
       case C.submitTask: {
         const paths = attachmentUploadSources(ref, input.attachments);
