@@ -41,6 +41,7 @@ import { NewSpaceDialog } from "./space/dialogs/NewSpaceDialog";
 import { SpaceDemoHelpButton } from "./space/dialogs/SpaceDemoHelpDialog";
 import { useSpacePanelBinding } from "./space/use-space-panel-binding";
 import { TrajectoryNavigationProvider } from "./trajectory/TrajectoryNavigation";
+import { devStartSettingsSection, devStartView } from "./harness-stats/dev-start";
 
 export function WorkbenchLayout({
   sessions,
@@ -76,7 +77,7 @@ export function WorkbenchLayout({
     closePanel: closeRightPanel,
     openTab,
   } = useRightPanel();
-  const [view, setView] = useState<SidebarView>("chat");
+  const [view, setView] = useState<SidebarView>(() => devStartView() ?? "chat");
   const [returnFocusRequest, setReturnFocusRequest] = useState(0);
   // 所有 Space 分支都挂在 SPACE_DEMO_ENABLED 上：生产构建里它是常量 false，演示代码整块删掉。
   const isSpace = SPACE_DEMO_ENABLED && view === "space";
@@ -114,7 +115,7 @@ export function WorkbenchLayout({
   const effectiveIsSessionReady = (projectedComposer != null && projectedComposer.phase !== "blank") || isSessionReady || projectionSessionReady;
   const sessionViewByIdRef = useRef(new Map<string, SessionMainView>());
   const [sessionMainView, setSessionMainView] = useState<SessionMainView>("chat");
-  const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("general");
+  const [settingsSection, setSettingsSection] = useState<SettingsSectionId>(() => devStartSettingsSection() ?? "general");
   const [focusSpeech, setFocusSpeech] = useState(false);
   const [usageSnapshot, setUsageSnapshot] = useState<UsageStatisticsSnapshot | null>(null);
   const [usageActivitySnapshot, setUsageActivitySnapshot] = useState<UsageActivitySnapshot | null>(null);

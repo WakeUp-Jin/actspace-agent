@@ -14,6 +14,21 @@ const CASES: Record<string, Case> = {
   "usage.getStatistics": { spec: contract.usage.getStatistics, valid: [{}, { scope: "global", status: "error" }], invalid: [[], { range: "year" }, { requestRowsPage: { limit: Infinity } }] },
   "usage.getStatus": { spec: contract.usage.getStatus, valid: [{ requestId: "q-123" }], invalid: [{}, { requestId: "" }, { requestId: 1 }] },
   "usage.cancel": { spec: contract.usage.cancel, valid: [{ requestId: "q-123" }], invalid: [undefined, { requestId: "a b" }] },
+  "harnessStats.query": {
+    spec: contract.harnessStats.query,
+    valid: [
+      { requestId: "h-1", kind: "overview", filter: { range: "week", sessionKind: "all" } },
+      { requestId: "h-2", kind: "versions", filter: { range: "total", sessionKind: "main", revision: "main@3", mode: "agent" }, compare: { from: "main@2", to: "main@3" } },
+    ],
+    invalid: [
+      undefined,
+      { requestId: "h-1", kind: "everything", filter: { range: "week", sessionKind: "all" } },
+      { requestId: "h-1", kind: "tools", filter: { range: "year", sessionKind: "all" } },
+      { requestId: "h-1", kind: "tools", filter: { range: "week", sessionKind: "robot" } },
+      { requestId: "h-1", kind: "tools", filter: { range: "week", sessionKind: "all", model: "x".repeat(2000) } },
+    ],
+  },
+  "harnessStats.cancel": { spec: contract.harnessStats.cancel, valid: [{ requestId: "h-1" }], invalid: [undefined, { requestId: "a b" }] },
   "sessions.create": { spec: contract.sessions.create, valid: [undefined, {}, { runLocation: "worktree", branch: "main", agentForm: "agent" }], invalid: [null, { runLocation: "invalid" }, { branch: [] }, { agentForm: "plan" }, { hostId: "host", runLocation: "worktree" }] },
   "workspaces.readFile": { spec: contract.workspaces.readFile, valid: [{ relativePath: "a.ts" }, { workspaceRoot: "/w", relativePath: "a.ts" }], invalid: [undefined, { workspaceRoot: "/w" }, { relativePath: 1 }] },
   "workspaces.statFile": { spec: contract.workspaces.statFile, valid: [{ workspaceRoot: null, relativePath: "a.ts" }], invalid: [{ relativePath: ["a"] }] },

@@ -1,6 +1,6 @@
 import { PerformancePanel } from "../PerformancePanel";
 import type { ComponentType } from "react";
-import { Server, Archive, ArrowLeft, BarChart3, Cpu, RefreshCw, Search, SlidersHorizontal, Sun, Users, Wrench } from "lucide-react";
+import { Server, Activity, Archive, ArrowLeft, BarChart3, Cpu, RefreshCw, Search, SlidersHorizontal, Sun, Users, Wrench } from "lucide-react";
 
 export type SettingsSectionId =
   | "hosts"
@@ -12,6 +12,7 @@ export type SettingsSectionId =
   | "appearance"
   | "archivedChats"
   | "usage"
+  | "harnessStats"
   | "update";
 
 type IconComponent = ComponentType<{ size?: number | string; strokeWidth?: number | string; className?: string }>;
@@ -38,6 +39,7 @@ export const SETTINGS_GROUPS: { label: string; sections: { id: SettingsSectionId
     label: "活动",
     sections: [
       { id: "usage", label: "使用统计", icon: BarChart3 },
+      { id: "harnessStats", label: "Harness 统计", icon: Activity },
       { id: "archivedChats", label: "归档会话", icon: Archive },
     ],
   },

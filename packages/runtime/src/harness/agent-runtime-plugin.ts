@@ -81,6 +81,7 @@ export class AgentRuntimeService {
       authorize: approval.authorize,
       onSelection: record => { emitNotification(ctx, "harness/selection-updated", record); },
       onDiagnostic: error => { host.onHarnessDiagnostic?.(error); },
+      ...(host.observeHarnessMount ? { observeMount: host.observeHarnessMount } : {}),
     });
     await this.harnesses.initialize();
     if (pinned) assertPinned(this.harnesses.inspect("main"), pinned);

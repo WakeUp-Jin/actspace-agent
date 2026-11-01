@@ -18,7 +18,7 @@ export class HarnessControl {
   #closing = false;
   #close?: Promise<void>;
   constructor(private readonly options: HarnessControlOptions) {
-    this.#manager = new HarnessGenerations(options.context);
+    this.#manager = new HarnessGenerations(options.context, options.observeMount ? { observe: options.observeMount } : {});
     this.#store = new SelectionStore(join(options.dataRoot, "harness-state"), options.runtimeId);
   }
   async initialize(): Promise<void> {

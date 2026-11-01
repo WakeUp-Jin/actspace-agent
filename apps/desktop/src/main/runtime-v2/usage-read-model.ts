@@ -3,7 +3,7 @@ import { isDelegatedSession, sideChatParentId } from "@actspace/shared/session-l
 import type { ContextHistoryState } from "./context-history-projection";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { ReadModelScheduler } from "./read-model-scheduler";
-import type { UsageQueryProgress, SessionListPage, SessionListPageInput, UsageActivitySnapshot, UsageStatisticsGetInput, UsageStatisticsSnapshot } from "@actspace/shared";
+import type { HarnessStatsData, HarnessStatsQueryInput, HarnessStatsQueryResult, HarnessStatsSyncStatus, UsageQueryProgress, SessionListPage, SessionListPageInput, UsageActivitySnapshot, UsageStatisticsGetInput, UsageStatisticsSnapshot } from "@actspace/shared";
 import { Worker } from "node:worker_threads";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -47,6 +47,7 @@ type Pending = { timer: ReturnType<typeof setTimeout>; resolve: (result: WorkerR
 
 class SessionSourceReadError extends Error {}
 class WorkerTimeoutError extends Error {}
+const HARNESS_SYNC_REQUEST = "harness-stats:sync";
 
 /**
  * Owns the disposable SQLite read model. The selected provider supplies bounded
@@ -69,6 +70,10 @@ export class UsageReadModelService {
   #catalogLock: Promise<unknown> = Promise.resolve();
   #fallbackLock: Promise<void> = Promise.resolve();
   #syncJobs = new Map<string, { key: string; waiters: Set<QueryScope>; task: Promise<void> }>();
+  #harnessQueries = new Map<string, boolean>();
+  #harnessSync: Promise<void> | undefined;
+  #harnessFingerprint: string | undefined;
+  #harnessStatus: HarnessStatsSyncStatus = { phase: "idle", completedSessions: 0, totalSessions: 0, eventsRead: 0, dataVersion: 0, failedSessions: 0 };
   #initializing?: Promise<void>;
   #activeSqlRequest?: string;
   #contextHistory = new Map<string, { key: string; result: ContextHistoryResult | null; fallback?: boolean; indexedThroughSeq?: number; error?: string; task?: Promise<void>; consumers: Map<string, number> }>();
@@ -174,6 +179,60 @@ export class UsageReadModelService {
   }
 
   getStatus(requestId: string): UsageQueryProgress | null { return this.#requests.get(requestId) ?? null; }
+
+  /**
+   * 「Harness 统计」：立即查已发布的数据并返回；随后在后台补同步（会话日志 + 运行时统计文件）。
+   * 同步期间每 3 秒、结束时比对数据指纹，变了才递增 dataVersion，页面据此刷新，不会无限循环。
+   */
+  async queryHarnessStats(input: HarnessStatsQueryInput): Promise<HarnessStatsQueryResult> {
+    if (this.#harnessQueries.size >= 8) throw new Error("Harness stats queue is full; retry shortly.");
+    if (this.#harnessQueries.has(input.requestId)) throw new Error("Duplicate Harness stats request id.");
+    this.#harnessQueries.set(input.requestId, false);
+    try {
+      const reply = await this.#serialize(async () => {
+        if (this.#harnessQueries.get(input.requestId)) throw new Error("Harness stats query cancelled.");
+        return await this.#send({ type: "harness-query", input }) as unknown as { data: HarnessStatsData; fingerprint: string };
+      }, true);
+      this.#harnessFingerprint ??= reply.fingerprint;
+      this.#startHarnessSync();
+      return { requestId: input.requestId, kind: input.kind, generatedAt: new Date().toISOString(), dataVersion: this.#harnessStatus.dataVersion, sync: this.getHarnessStatus(), data: reply.data };
+    } finally { this.#harnessQueries.delete(input.requestId); }
+  }
+  getHarnessStatus(): HarnessStatsSyncStatus {
+    const progress = this.#requests.get(HARNESS_SYNC_REQUEST);
+    return { ...this.#harnessStatus, ...(progress ? { completedSessions: progress.completedSessions, totalSessions: progress.totalSessions, eventsRead: progress.eventsRead } : {}) };
+  }
+  cancelHarnessStats(requestId: string): void { if (this.#harnessQueries.has(requestId)) this.#harnessQueries.set(requestId, true); }
+
+  #startHarnessSync(): void {
+    if (this.#harnessSync || this.#disposed) return;
+    this.#harnessStatus = { ...this.#harnessStatus, phase: "syncing", error: undefined };
+    this.#requests.set(HARNESS_SYNC_REQUEST, { requestId: HARNESS_SYNC_REQUEST, phase: "queued", completedSessions: 0, totalSessions: 0, eventsRead: 0 });
+    const check = async (result?: { fingerprint?: string }) => {
+      const fingerprint = result?.fingerprint ?? (await this.#send({ type: "harness-fingerprint" }) as unknown as { fingerprint: string }).fingerprint;
+      if (fingerprint !== this.#harnessFingerprint) { this.#harnessFingerprint = fingerprint; this.#harnessStatus = { ...this.#harnessStatus, dataVersion: this.#harnessStatus.dataVersion + 1 }; }
+    };
+    let checking = false;
+    const timer = setInterval(() => { if (checking) return; checking = true; void check().catch(() => undefined).finally(() => { checking = false; }); }, 3_000);
+    timer.unref?.();
+    this.#harnessSync = this.#serialize(async () => {
+      this.#currentRequest = HARNESS_SYNC_REQUEST;
+      try {
+        await check(await this.#send({ type: "harness-ingest" }) as unknown as { fingerprint: string });
+        this.#summaries = await this.#readSummaries();
+        if (this.#reader.sessionQuerySources && !this.#lightweightSources) throw new Error("Session provider does not support bounded Usage queries.");
+        await this.#syncChanged(false);
+        await check();
+        this.#harnessStatus = { ...this.#harnessStatus, phase: "idle", failedSessions: this.#failedSessionIds.size };
+      } finally { this.#currentRequest = undefined; this.#syncTotal = undefined; }
+    }).catch(error => {
+      this.#harnessStatus = { ...this.#harnessStatus, phase: "failed", error: error instanceof Error ? error.message : String(error) };
+    }).finally(() => {
+      clearInterval(timer);
+      this.#requests.delete(HARNESS_SYNC_REQUEST);
+      this.#harnessSync = undefined;
+    });
+  }
   cancel(requestId: string): void {
     const status = this.#requests.get(requestId);
     if (status) {

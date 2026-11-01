@@ -96,6 +96,7 @@ export const PACKAGE_PATHS = Object.freeze([
   "packages/harness-control/package.json",
   "packages/harness-evaluation/package.json",
   "packages/harness-hmr/package.json",
+  "packages/harness-stats/package.json",
   "packages/agent-service/package.json",
   "packages/background-tasks/package.json",
   "packages/agent-host/package.json",

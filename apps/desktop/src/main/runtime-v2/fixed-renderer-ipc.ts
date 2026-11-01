@@ -642,6 +642,9 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   ipc.handle(contract.sessions.describeContext, input => contextPanel.describeComposer(input.sessionId));
   ipc.handle(contract.usage.getStatus, input => usageReadModels.get(options.registry)?.getStatus(input.requestId) ?? null);
   ipc.handle(contract.usage.cancel, input => usageReadModels.get(options.registry)?.cancel(input.requestId));
+  ipc.handle(contract.harnessStats.query, input => usageReadModelFor(options.registry, options.roots.dataRoot).queryHarnessStats(input));
+  ipc.handle(contract.harnessStats.getStatus, () => usageReadModels.get(options.registry)?.getHarnessStatus() ?? null);
+  ipc.handle(contract.harnessStats.cancel, input => usageReadModels.get(options.registry)?.cancelHarnessStats(input.requestId));
   ipc.handle(contract.sessions.describeContextPanel, input => contextPanel.describe(input));
   ipc.handle(contract.sessions.listContextPaths, input => contextPanel.listPaths(input));
   ipc.handle(contract.sessions.listContextEntries, input => contextPanel.listEntries(input));
@@ -752,6 +755,12 @@ async function createUsageStatistics(
 }
 
 const usageReadModels = new WeakMap<DesktopRuntimeV2Registry, UsageReadModelService>();
+
+function usageReadModelFor(registry: DesktopRuntimeV2Registry, dataRoot: string): UsageReadModelService {
+  const service = usageReadModels.get(registry) ?? new UsageReadModelService(registry, dataRoot);
+  usageReadModels.set(registry, service);
+  return service;
+}
 
 async function createUsageActivity(registry: DesktopRuntimeV2Registry, dataRoot: string, input: UsageStatisticsGetInput): Promise<UsageActivitySnapshot | null> {
   const service = usageReadModels.get(registry) ?? new UsageReadModelService(registry, dataRoot);

@@ -95,6 +95,7 @@ http://127.0.0.1:5173/
 | `subagent-trajectory` | 父会话「查看pi-durable设计」：bash、一次 `agent` 委派（带 `delegation/requested`，preset `explore`）、两次 read_file；子会话（不进侧栏）有任务、4 条助手消息和 7 次读工具；`getSubagents` 返回一个已完成的 Explore | 父轨迹只留 `agent` 一行；详情「子智能体」一栏的「查看轨迹」→ 右侧子 Agent 面板停在子轨迹；面板标题前对话 / 轨迹切换；窄面板详情从下半部分弹出；浅色 / 深色、320–480px 面板 | 子 Agent 对话页的执行记录（`getSubAgentTranscript` 返回空，约 20 秒后退回摘要）；运行中子智能体的实时轨迹（需真实运行） |
 | `compaction` | 三个会话：「会话列表改游标分页」48 条消息后有一次已提交的自动压缩（182.4K → 约 9.1K tokens · 23s）；打开「压缩进行中」后停在压缩中；打开「压缩失败」后约 0.4s 压缩失败 | A1 压缩分隔线三态、两侧扫光、窄窗换行、「在轨迹中查看」选中轨迹压缩行、轨迹概述的触发方式 / 压缩消息数 / Token、浅深主题 | 手动 `/compact` 任务流程、重试后的真实压缩（mock 不处理压缩操作） |
 | `background-tasks` | 一个会话三轮：第 1 轮后台 `pnpm test` 与后台 `agent` 调研；第 2、3 轮由完成通知唤醒（无用户消息，以「后台任务 · …」分隔行开头）；第 3 轮另起一个仍在运行的后台 `pnpm dev` | Bash / 子 Agent 卡片的「后台」标签与状态（成功、已完成、运行中）、唤醒分隔行展开看通知原文、浅深主题 | 真实唤醒调度、`task_*` 工具输出、子 Agent 面板里的子会话内容（mock 没有子会话） |
+| `harness-stats` | 直接打开 设置 → Harness 统计；数据取自已确认的 demo（30 天、r8、4,812 次请求，见 `mock/harness-stats-fixture.ts`）。`&hsTab=<overview\|plugins\|tools\|context\|disclosure\|runtime\|versions>` 选 tab，`&theme=dark` 强制深色 | 7 个 tab 的布局、指标卡、「值得关注」跳转、表格排序与展开、图表 hover、筛选（改时间范围 / 会话类型按比例缩放计数，设模式 / 模型 / 工作区触发「运行时统计不按这些条件筛选」提示）、版本对比、浅深主题 | 真实汇总 Worker、会话日志同步与补历史进度、Host 运行时统计文件（由 main 单测 `harness-stats.test.ts` 与 Electron 验收覆盖） |
 
 mock 中没有实现的成员调用时 reject `Mock bridge does not implement 域.成员`，包括终端创建、新建工作树和 Git 写操作。界面上看到的报错属于 mock 的边界，不是缺陷。如需新增场景，按规范 §7 处理，并同步更新本表。
 

@@ -137,6 +137,12 @@ export const desktopBridgeContract = {
     getStatistics: invoke<S.UsageStatisticsGetInput, S.UsageStatisticsSnapshot | null>(CH.getUsageStatistics),
     getActivity: invoke<S.UsageStatisticsGetInput, S.UsageActivitySnapshot | null>(CH.getUsageActivity),
   },
+  /** 设置 →「Harness 统计」：按 tab 按需查询；同步在后台进行，进度见 getStatus。 */
+  harnessStats: {
+    query: invoke<S.HarnessStatsQueryInput, S.HarnessStatsQueryResult | null>(CH.queryHarnessStats),
+    getStatus: invoke<void, S.HarnessStatsSyncStatus | null>(CH.getHarnessStatsStatus),
+    cancel: invoke<{ requestId: string }, void>(CH.cancelHarnessStats),
+  },
   terminal: {
     create: invoke<S.TerminalCreateInput, S.TerminalSessionResult>(CH.terminalCreate),
     list: invoke<S.TerminalListInput, S.TerminalListResult>(CH.terminalList),

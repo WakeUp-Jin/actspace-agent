@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { scopeContext, type AgentScope } from "@actspace/core-scope";
-import type { CordisContext } from "@actspace/cordis-adapter";
+import type { CordisContext, HarnessMountObserver } from "@actspace/cordis-adapter";
 import { mountHarness, type HarnessMount, type HarnessMountRequest } from "./harness-mount.js";
 
 export type HarnessErrorCode = "CLOSED" | "NO_CURRENT" | "BASELINE_CONFLICT" | "INVALID_CANDIDATE" | "PREPARE_FAILED";
@@ -23,10 +23,21 @@ export interface HarnessLease {
   getService<T>(name: string): T | undefined;
   release(): Promise<void>;
 }
+/** Optional per-mount observation (e.g. Harness statistics); the manager only reports the mount's lifecycle to it. */
+export interface HarnessMountObservation {
+  readonly observer: HarnessMountObserver;
+  /** The mount was selected under this revision. */
+  activated(revision: number): void;
+  /** Preparation failed after the observer saw some plugins. */
+  failed(): void;
+  /** The mount was thrown away without being selected. */
+  discarded(): void;
+}
+export type HarnessMountObservationFactory = (identity: { readonly harnessId: string; readonly expectedRevision: number }) => HarnessMountObservation;
 type Generation = {
   candidate: HarnessCandidate; mount: HarnessMount;
   state: "ready" | "current" | "retired" | "disposed" | "cleanup-failed";
-  users: number; cleanup?: Promise<void>; error?: unknown;
+  users: number; cleanup?: Promise<void>; error?: unknown; observation?: HarnessMountObservation;
 };
 
 /** Selection and ownership only: task admission, cancellation and persistence belong to the caller. */
@@ -38,17 +49,18 @@ export class HarnessGenerations {
   #closed = false;
   #closing?: Promise<void>;
   readonly #waiters = new Set<() => void>();
-  constructor(private readonly parent: CordisContext) {}
+  constructor(private readonly parent: CordisContext, private readonly options: { readonly observe?: HarnessMountObservationFactory } = {}) {}
 
   prepare(harnessId: string, expectedRevision: number, request: HarnessMountRequest): Promise<HarnessCandidate> {
     this.#assertOpen(harnessId);
     if (!harnessId || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new HarnessError("INVALID_CANDIDATE", harnessId, "Invalid Harness identity or revision");
     const promise = (async () => {
       let mount: HarnessMount;
-      try { mount = await mountHarness(this.parent, request); }
-      catch (cause) { throw new HarnessError("PREPARE_FAILED", harnessId, `Harness preparation failed: ${harnessId}`, { cause }); }
+      const observation = this.#observe(harnessId, expectedRevision);
+      try { mount = await mountHarness(this.parent, request, observation?.observer); }
+      catch (cause) { try { observation?.failed(); } catch { /* statistics never affect preparation */ } throw new HarnessError("PREPARE_FAILED", harnessId, `Harness preparation failed: ${harnessId}`, { cause }); }
       const candidate = Object.freeze({ harnessId, expectedRevision, generationId: randomUUID(), executionDigest: mount.executionDigest });
-      const record: Generation = { candidate, mount, state: "ready", users: 0 };
+      const record: Generation = { candidate, mount, state: "ready", users: 0, ...(observation ? { observation } : {}) };
       this.#records.add(record);
       this.#ownedRecords.set(candidate, record);
       if (this.#closed) {
@@ -74,6 +86,7 @@ export class HarnessGenerations {
     const revision = candidate.expectedRevision + 1;
     record.state = "current";
     this.#current.set(candidate.harnessId, { record, revision });
+    this.#observed(record, revision);
     if (previous) { previous.record.state = "retired"; this.#collect(previous.record); }
     return Object.freeze({ revision, generationId: candidate.generationId });
   }
@@ -85,6 +98,7 @@ export class HarnessGenerations {
     if (this.#current.has(candidate.harnessId) || record.state !== "ready" || !Number.isSafeInteger(revision) || revision < 1) throw new HarnessError("INVALID_CANDIDATE", candidate.harnessId, "Invalid restored selection");
     record.state = "current";
     this.#current.set(candidate.harnessId, { record, revision });
+    this.#observed(record, revision);
   }
 
   acquire(harnessId: string, generationId?: string): HarnessLease {
@@ -122,7 +136,7 @@ export class HarnessGenerations {
   discard(candidate: HarnessCandidate): Promise<void> {
     const record = this.#owned(candidate);
     if (record.state === "current") throw new HarnessError("INVALID_CANDIDATE", candidate.harnessId, "Cannot discard a current composition");
-    if (record.state === "ready") record.state = "retired";
+    if (record.state === "ready") { record.state = "retired"; this.#discarded(record); }
     return this.#collect(record) ?? Promise.resolve();
   }
 
@@ -144,6 +158,11 @@ export class HarnessGenerations {
       if (errors.length) throw new AggregateError(errors, "Harness manager cleanup failed");
     })();
   }
+  #observe(harnessId: string, expectedRevision: number): HarnessMountObservation | undefined {
+    try { return this.options.observe?.({ harnessId, expectedRevision }); } catch { return undefined; }
+  }
+  #observed(record: Generation, revision: number): void { try { record.observation?.activated(revision); } catch { /* statistics never affect selection */ } }
+  #discarded(record: Generation): void { try { record.observation?.discarded(); } catch { /* ignored */ } }
   #collect(record: Generation): Promise<void> | undefined {
     if (record.cleanup) return record.cleanup;
     if (record.state !== "retired" || record.users !== 0) return;

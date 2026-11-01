@@ -56,6 +56,7 @@ export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: (
     const profile = await runtime.bootProfileRuntime({
       host, dataRoot: options.dataRoot,
       hostServices,
+      harnessStats: options.persistentArtifacts !== false,
       toolEnvironment: { workspaceRoot: options.workspace, permissionMode: options.permissionMode, permissionModeExplicit: options.permissionModeExplicit, hostCapabilities: new Set(capabilities), capabilitySet, approvalBroker: approval, createArtifact: (input) => artifacts.create(input), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) },
       composition,
       ...(options.pinnedHarness ? { pinnedHarness: options.pinnedHarness } : {}),

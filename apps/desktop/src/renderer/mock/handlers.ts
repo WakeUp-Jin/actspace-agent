@@ -23,6 +23,7 @@ import { MOCK_REPLY, MOCK_SIDE_CHAT_REPLY, playReply, type ReplyPlayback } from 
 import { MOCK_CONTEXT_PATHS, MOCK_CONTEXT_PATHS_REVISION, mockContextPanelView, mockContextState } from "./context-panel-fixture";
 import { mockContextPathsPage } from "./context-paths-fixture";
 import { createModelConnectionsMock } from "./model-connections-fixture";
+import { MOCK_HARNESS_STATS_SYNC, mockHarnessStats } from "./harness-stats-fixture";
 
 /** 按域覆盖 mock 实现；未覆盖的成员用默认实现，默认也没有的成员调用时 reject。 */
 export type MockHandlers = { [D in keyof DesktopBridge]?: Partial<DesktopBridge[D]> };
@@ -195,6 +196,7 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       describeContextPanel: async ({ sessionId, release }) => release ? null : mockContextPanelView(sessionId, db.sessions.get(sessionId)),
     },
     usage: { getStatus: async () => null, cancel: async () => undefined, getStatistics: async () => null, getActivity: async () => null },
+    harnessStats: { query: async input => mockHarnessStats(input), getStatus: async () => MOCK_HARNESS_STATS_SYNC, cancel: async () => undefined },
     // 浏览器里没有 pty：列表为空，其余操作在 UI 上不会出现（终端入口只在开发功能开启时显示）。
     terminal: { list: async () => ({ terminals: [] }) },
     settings: {

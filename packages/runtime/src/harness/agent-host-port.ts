@@ -20,6 +20,8 @@ export type AgentRuntimeHostPort = {
   readonly contextDisclosure?: import("@actspace/context-disclosure").DisclosureHost;
   readonly authorizeHarness?: import("@actspace/harness-control").HarnessAuthorizer;
   readonly onHarnessDiagnostic?: (error: unknown) => void;
+  /** Host-owned Harness statistics; absent when ACTSPACE_HARNESS_STATS=0. */
+  readonly observeHarnessMount?: import("@actspace/boot").HarnessMountObservationFactory;
   /** The main Harness's tool sandbox once it has mounted; undefined when the sandbox plugin is absent. */
   readonly onSandboxStatus?: (status: import("@actspace/sandbox/types").SandboxStatus | undefined) => void;
   readonly disabledHarnessEntries?: readonly string[];
