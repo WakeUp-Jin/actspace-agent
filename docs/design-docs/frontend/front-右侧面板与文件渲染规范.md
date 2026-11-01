@@ -4,13 +4,13 @@
 
 ## 定位
 
-右侧面板是当前会话的对象浏览工作区，用于查看文件、预览结果和 Review 变更结果。
+右侧面板是当前会话的对象浏览工作区，用于阅读工作区文档、预览结果和查看「改动」（Review）。
 
 它属于聊天态工作台的可调对象区；右侧开关、宽度边界和中间聊天区保护规则见 `工作台布局与面板交互规范.md`。
 
 ## 文档范围
 
-本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件打开与渲染、Workspace 文件浏览和 Context 面板。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
+本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件打开与渲染、Markdown 渲染栈和 Context 面板；工作区 Markdown 的树、阅读与编辑见[文档面板规范](front-文档面板规范.md)。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
 
 ## 交互模型
 
@@ -22,7 +22,7 @@
 - 面板打开后允许调整宽度，关闭后把宽度归还给中间聊天区。
 - 首版关闭右侧面板时不保留右侧 rail。
 - 右侧 Tab 行位于隐藏标题栏 chrome 的同一高度区间，必须保证 tab 按钮能高于 `.chrome-center` 拖拽区接收点击；同时继续给右上角 PanelRight 按钮预留 padding，避免 tab 命中区压住关闭右侧面板入口。
-- 没有对象 Tab 时，Tab 行仍显示稳定的面板身份：默认显示 `Objects`，进入工作区文件浏览态后显示 `Files`；不能让右栏顶部只剩一组悬空图标。
+- 没有对象 Tab 时，Tab 行仍显示稳定的面板身份：默认显示 `Objects`，打开「文档」后显示 `文档`；不能让右栏顶部只剩一组悬空图标。
 - `<= 600px` 且右侧面板作为全宽覆盖层时，Tab 行左侧必须避开 macOS 窗口控制与左侧 chrome 入口；全局中间标题 / Workspace 操作同时退场，不能覆盖 Tab 命中区。
 
 ## 对象启动页（2026-07-17）
@@ -31,8 +31,8 @@
 
 当前固定展示四个入口，另有「侧边对话」入口与已收起列表（见「侧边对话」一节）：
 
-- `Files`：进入 Workspace 文件浏览态，不新增对象 Tab。
-- `Review`：打开当前 workspace 的 Review，并创建/聚焦稳定的右侧 Review Tab。
+- `文档`：打开「文档」面板，创建或聚焦稳定的右侧文档 Tab（id 固定为 `docs`，见[文档面板规范](front-文档面板规范.md)）。
+- `改动`：打开当前 workspace 的 Review（界面名称 2026-11-01 起叫「改动」），并创建/聚焦稳定的右侧 Review Tab。
 - `Context`：打开主 Agent 当前会话的 Context 面板 Tab（占用、路径、明细、趋势和事件，只读）。
 
 布局与状态规则：
@@ -56,18 +56,18 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 
 ## Tab 类型
 
-- `Markdown`：Markdown 文件渲染。
+- `Docs`：「文档」面板（工作区 Markdown 的树 + 预览 / 源码编辑），单一实例，id 固定为 `docs`。Markdown 不再生成独立的文件 Tab。
 - `Image`：图片渲染。
 - `Text`：说明文字（读取失败、远端 Host 文本预览等），用 `CodeRenderView` 显示，见「代码视图能力」。本机工作区里的代码、HTML、CSV 等文件不再生成 Tab，见「文件打开路由与兜底对话框」。
-- `Review`：完整代码审阅工作台入口；支持 Git-first scope 与 `Last Turn` Agent 视角，具体契约见 `docs/design-docs/core-review-change-sources.md`。
+- `Review`（界面名称「改动」）：完整代码审阅工作台入口；支持 Git-first scope 与 `Last Turn` Agent 视角，具体契约见 `docs/design-docs/core-review-change-sources.md`。
 - `Context`：Context 面板；见本文「Context 面板」一节。
 - `sideChat`：侧边对话；见「侧边对话」一节。
 
 ## 「+ 新建对象」菜单（2026-05-30，2026-06-04 补 Review）
 
 - 隐藏标题栏 chrome 右段、右侧折叠（PanelRight）按钮**左侧**放一个 `+` 按钮（参考 Cursor 顶栏的 +）。
-- 点开是一个轻量菜单，可往右侧面板新增对象：`侧边对话`（排第一，仅本地运行目标）/ `工作区文件` / `Review` / `Context`。对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）。`工作区文件` 只切换工作区浏览态，不新增 Tab。
-- `Review` 入口复用 Composer 的 Review 打开逻辑，首次默认选择当前 workspace 的 Git `Uncommitted` scope；后续打开恢复该 workspace 最近 selection。
+- 点开是一个轻量菜单，可往右侧面板新增对象：`侧边对话`（排第一，仅本地运行目标）/ `文档` / `改动` / `Context`。对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）。`文档` 打开单一的「文档」Tab（id `docs`）。
+- `改动` 入口复用 Composer 的 Review 打开逻辑，首次默认选择当前 workspace 的 Git `Uncommitted` scope；后续打开恢复该 workspace 最近 selection。
 - 菜单与右侧折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`。
 - **`+` 仅在右侧面板打开时显示**（`view === "chat" && isRightPanelOpen`）：`+` 的语义是「往面板里加对象」，面板关着时无意义；面板关闭时 chrome-right 只保留 PanelRight 折叠按钮。
 
@@ -83,7 +83,7 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 
 ### 文件打开路由与兜底对话框（2026-11-01）
 
-所有「点一个本机工作区文件」的入口（交付卡主体、本轮改动的「打开整个文件」、聊天里的文件链接和读文件工具行、工作区文件树）都走同一个路由 `components/files/open-workspace-path.ts`，组件里经 `useOpenWorkspacePath()` 调用：
+所有「点一个本机工作区文件」的入口（交付卡主体、本轮改动的「打开整个文件」、聊天里的文件链接和读文件工具行）都走同一个路由 `components/files/open-workspace-path.ts`，组件里经 `useOpenWorkspacePath()` 调用：
 
 | 扩展名（大小写不敏感） | 行为 |
 |---|---|
@@ -121,7 +121,9 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 1. **Agent 编辑事件**（主力，零新增设施）：`edit_diff` / `write_diff` 消息块自带 `filePath`，renderer 本来就实时收到。
 2. **mtime 重校验**（兜底，O(1)）：只在 Tab 激活、窗口重获焦点、turn 结束三个时机各 `statWorkspaceFile` 一次，**不轮询**。
 
-检测到变化只打 stale 标记并显示提示条，内容替换必须由用户点提示条上的「重新加载」触发 —— 用户可能正在阅读或选中文本，内容被自动抽换比看到旧内容更糟。操作栏不再常驻刷新按钮（理由见「Workspace 文件浏览器」的取舍）。
+检测到变化只打 stale 标记并显示提示条，内容替换必须由用户点提示条上的「重新加载」触发 —— 用户可能正在阅读或选中文本，内容被自动抽换比看到旧内容更糟。操作栏不再常驻刷新按钮（需要重读的真实场景只有「文件已变更」，那时提示条自带「重新加载」）。
+
+> 2026-11-01：Markdown 已改在「文档」面板里读写，新鲜度由 `docs/use-docs-draft.ts` 实现同一套两级信号（Agent 编辑事件 + 挂载 / 窗口聚焦 / turn 结束时的 `statFile`），并带上未保存草稿的处理，见[文档面板规范](front-文档面板规范.md)「新鲜度」。本节其余内容现在只适用于图片 Tab 和远程 Host 的文件 Tab。
 
 文件已删除、变为目录或符号链接逃出工作区时，`statFile` 返回的 `not_found`、`not_a_file`、`escapes_root` 也是快照失效信号，必须显示过期提示并提供显式重新加载。重读后显示已有的文件不可用说明，不继续把旧正文当作当前文件。检测及重读均使用 Tab 绑定的工作区，不能误标另一个工作区的同路径文件。临时 IPC 异常保留快照，等待下一次既有触发重查，不作为确定的文件失效。 读盘结果转换只从目标提取 `workspaceRoot` / `hostId`；调用方可能传入整个旧 Tab，不能展开目标对象而把旧正文、渲染类型或截断状态混入新结果。
 
@@ -138,46 +140,24 @@ V1 渲染栈：
 - fenced code 的语言集显式传 `languages`，与 `CodeRenderView` 共用 `right-panel/highlight.ts` 的那一份，而不是沿用 lowlight 默认的 `common`：后者缺 dockerfile / protobuf / dart / cmake / powershell 等，与代码 Tab 覆盖面不一致。这里换不来体积（`rehype-highlight` 无条件静态 import 了 `common`，摇不掉）。
 - 不引入 `rehype-raw`，Markdown 中的原始 HTML 不直接执行。
 - 链接只放行 `http` / `https` / `mailto`，外链使用 `target="_blank" rel="noreferrer"`。
-- 复用 `.markdown-prose` 和 `styles/markdown.css`，代码块使用 `markdown-code-block`。
-- 预览 / 源码 两态切换，切换状态只属于当前 Tab。**工作区文件**的切换按钮在 Workspace 操作栏上（对齐 Cursor 的 `View source` / `View preview`），视图本身不再挂工具栏；聊天生成的 markdown 没有操作栏，仍用视图内那组分段控件。同一个组件按受控（传 `mode` + `onModeChange`）/ 不受控自动切换这两种壳，状态按 Tab 记在 `RightPanelContext`。
+- 复用 `.markdown-prose` 和 `styles/markdown.css`，代码块使用 `markdown-code-block`。`.markdown-doc` 把网格列设为 `minmax(0, 1fr)`，宽表格放进 `.markdown-table-wrap` 横向滚动，不撑宽整篇正文。
+- Mermaid：闭合的 ` ```mermaid ` 围栏复用聊天区的 `MermaidDiagramBlock` 渲染成图，未闭合的围栏仍按代码块显示。
+- 长文档按顶层块切分（`splitMarkdownBlocks`），每块 `memo`，编辑草稿时只重渲染改动的那一块。
+- 渲染入口是 `MarkdownPreviewBody`（只含正文，不含滚动容器），由「文档」面板使用；预览 / 源码 的切换、大纲、编辑都在文档面板里，见[文档面板规范](front-文档面板规范.md)。原来的 `MarkdownRenderView` 工具栏壳已删除。
 
 代码高亮配色必须随浅 / 深主题翻转。`hljs-*` token 颜色使用主题 token 或专用 CSS 变量，禁止写死 `#hex`、`text-black`、`bg-white` 这类非主题感知字面量。
 
-V1 不做数学公式、Mermaid、TOC、标题锚点、原始 HTML 内联和聊天区解析器迁移。
+V1 不做数学公式、标题锚点、原始 HTML 内联和聊天区解析器迁移。大纲在文档面板的浮层里，不是常驻 TOC。
 
-## Workspace 文件浏览器
+## Workspace 文件浏览器（已由「文档」面板取代）
 
-右侧面板提供一个轻量的 Workspace 文件浏览器：树 rail 常驻在浏览态**右**栏，点文件在其左侧以普通 Tab 打开。树根来自顶部 Workspace 选择器的当前选择；发送消息前该选择只停留在 renderer 本地状态，发送时才写入当前 session 的 `workspaceRoot`，随后与 Agent 文件工具操作的根一致。
+2026-11-01 起，右侧面板不再有通用的工作区文件树，唯一的文件阅读入口是只列 Markdown 的「文档」面板：布局、树、搜索、绿点、预览 / 源码编辑、新鲜度、空状态都见[文档面板规范](front-文档面板规范.md)。原来的树、`listDir` IPC、树状态（展开层级、目录列举缓存）和 shell 呈现规则随功能减法 P4 一并删除。
 
-结构为纵向三段（2026-07-30 对齐 Cursor 重排）：
-
-1. Tab 条横跨整条右面板。
-2. Workspace 操作栏：**左**是面包屑 `<workspace 名> › <相对路径>`（根名弱化、文件路径主色），**右**是「查看源码 / 查看预览」文字按钮（仅 markdown 这类渲染态之外还有源码的文件出现）+ 两个图标动作 ——「在外部应用中打开」与「收起 / 展开文件树」（文件夹图标，展开态用 `bg-selected` 表示）。下方按需挂「已变更」与「已截断」两条提示条。
-3. 两栏 `[文件预览区 | 文件树]`，文件树无独立头部；树顶有文件名过滤框与刷新按钮。
-
-这一层的取舍：
-
-- **文件树放右栏**，让预览区紧邻中间聊天区 —— 视线从消息移到代码不用跨过一条树栏，且树作为导航件靠外侧更符合「主内容居中」的重心。
-- **操作栏只放两个动作**，刻意去掉了常驻的「重新读取当前文件」按钮：需要重新读取的真实场景只有「文件已变更」，而那时下方的 stale 提示条自带「重新加载」。常驻一个几乎不会被点的刷新图标只会让这一层看起来像第二条工具栏。文件树自己的刷新按钮保留（它刷的是目录列举缓存，是另一件事）。
-- **过滤框常态无边框无填充**，只在 hover / 聚焦时浮出底色。200px 窄栏里，输入框边框会和下方每行树项的缩进线抢视觉层级，把最该看清的文件名压下去。
-- **「查看源码」用文字而不是图标**，且显示的是**目标态**而不是当前态：这一层已经有两个 icon 按钮，第三个图标会让人分不清哪个是模式切换；单个文字按钮点一下去对面，比分段控件省一半宽度。它必须要求当前 Tab 有 `relativePath` —— 浏览态下激活的可能是聊天生成的 markdown（内容区显示的是占位页），那时按钮点了没有任何视图会响应。
-
-呈现由当前 Tab 决定：
-
-- 激活工作区文件 Tab（文件类且有 `relativePath`）时进入 shell。
-- 激活对象 Tab（Context 等）时退出 shell，整面板展示对象视图。
-- `isFileTreeOpen` 表示显式进入浏览态；`isFileTreeCollapsed` 只折叠树栏，不关闭内容区。
-
-树状态规则（2026-07-30）：
-
-- 展开层级与目录列举缓存都**提升到 `RightPanelContext`**，不放在 `WorkspaceFileTree` 里 —— 该组件会随树栏折叠、切到对象 Tab 反复挂载卸载，状态留在组件里会被反复清空。
-- 「上次是哪个 workspaceRoot」同样记在 Provider（`{ known, root }`）。只有 root **真的变化**才清空展开层级；`known: false` 表示还没有树挂载过，此时同步 root 不算换根。若把它记成组件内的 ref，重挂载时 ref 一起重建，每次挂载都会误判成换根，等于这层状态白提升。
-- 过滤框只作用于**已加载层级**，不做递归搜索（跨文件快速打开属于 V2）。
-- 当前打开的文件在树里高亮。
+保留下来的是文件 Tab（图片、远程 Host 文本）上方的 Workspace 操作栏：左边是面包屑 `<workspace 名> › <相对路径>`，右边是「在外部应用中打开」菜单，下方按需挂「已变更」提示条。它不再有文件树开关和预览 / 源码切换。
 
 ### 在外部应用中打开（2026-07-30）
 
-操作栏右侧的外部打开入口使用共享的工具目录（`workspace-open:list-tools` / `workspace-open:open`），但目标是**当前文件**而不是 workspace 根：`WorkspaceOpenInput` 增了可选 `relativePath`，越界按 `escapes_root` 拒绝 —— 这个入口来自可点 UI，和文件浏览器同一条边界，不因为「只是调 `/usr/bin/open`」就放开整盘。
+文件 Tab 操作栏右侧的外部打开入口使用共享的工具目录（`workspace-open:list-tools` / `workspace-open:open`），但目标是**当前文件**而不是 workspace 根：`WorkspaceOpenInput` 增了可选 `relativePath`，越界按 `escapes_root` 拒绝 —— 这个入口来自可点 UI，和文件浏览器同一条边界，不因为「只是调 `/usr/bin/open`」就放开整盘。
 
 不同工具能接受的目标形态不同，main 侧按工具分派，三条各有单测锁住实际参数：
 
@@ -266,7 +246,7 @@ type WorkspaceOpenResult = {
 };
 ```
 
-会话生成图片不属于 workspace 文件树，使用独立 Session Artifact IPC：
+会话生成图片不属于工作区文件，使用独立 Session Artifact IPC：
 
 ```ts
 type SessionArtifactReadInput = {
@@ -288,22 +268,22 @@ type SessionArtifactReadResult = {
 - `artifactPath` 是历史字段名，当前实际承载 opaque Artifact ID。main 通过 `DesktopArtifactStore.resolveForSession()` 同时校验 ID、SHA-256、大小、owner session 和真实 store 路径，不接受 renderer 传入任意绝对路径。
 - 只允许 PNG / JPEG / WebP，按 Session 引用的 MIME 与 Artifact metadata 一致性确认，单图沿用生成工具 25 MB 上限。
 - data URL 按需返回：Turn Artifacts 在用户点击时读取；历史 UserMessage 只为缺失预览的图片 attachment 执行 hydration。data URL 不写入 Journal，也不成为恢复事实。
-- 生成图片作为对象 Tab 打开，不带 workspace `relativePath`，避免误进入 Workspace 文件浏览 shell。
+- 生成图片作为对象 Tab 打开，不带 workspace `relativePath`，避免被当成工作区文件处理。
 
 完成态 Write/Edit 结果在 tool preview 中携带 workspace root 内的 `outputPath/outputRelativePath`。Turn Artifacts 只用相对路径调用 `readWorkspaceFile()`，并通过共享 `tabFromFile()` 打开右侧 Tab；Assistant Markdown 中无协议的安全相对链接使用同一路径。`..`、工作区外绝对路径和外部 URL 不进入该路由。
 
 main 侧服务规则：
 
-- renderer 不直接访问文件系统；树展开和文件读取都走 preload + IPC。
+- renderer 不直接访问文件系统；文档清单、文件读取和保存都走 preload + IPC。
 - 顶部 Workspace 选择器允许用户在发送前多次切换；选择动作不迁移 session，只有发送消息时才把最终选择写入 session meta。
 - UI 浏览强约束在 `workspaceRoot` 内，`..` 逃逸返回 `escapes_root`。
-- 固定忽略 `node_modules`、`.git`、`.pnpm-store`、`dist`、`.next`、`.turbo`、`coverage`、`.DS_Store`。
-- 单目录最多列出 1000 条，目录在前、文件在后，各自按名称升序。
+- Markdown 清单 `listMarkdownFiles`：git 仓库用 `git ls-files --cached --others --exclude-standard`（遵守 `.gitignore`），否则有上限的递归遍历（跳过 `node_modules`、`.git`、`dist`、`build`、`out` 和 `.` 开头的目录，不跟随 symlink）；最多返回 5000 篇、遍历最多访问 50000 个目录项，超出标 `truncated`。只返回相对路径，不读内容。
+- Markdown 保存 `writeMarkdownFile`：只写**已存在**的 `.md` / `.markdown`，经 realpath 包含校验后写临时文件再 rename，保持原子；越界返回 `escapes_root`，不新建文件。
 - Markdown 上限 `WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES`（2MB），图片类 5MB。`external` 类不读内容，只返回 `size` / `mtimeMs`。**Markdown 超限是部分读**：返回上限内的**完整行** + `truncated: true`，不再整体拒绝（2026-07-30 起）。图片超限仍返回 `too_large`，因为部分图片字节无法解码。
 - 图片用 data URL；HTML 不在应用内渲染，走「文件打开路由与兜底对话框」。
 - `readWorkspaceFile` 与 `statWorkspaceFile` 都返回 `mtimeMs`，供右侧面板的新鲜度比对。
 
-V1 不做写 / 删 / 重命名、`.gitignore` 解析、快速打开、多 root 和 PDF 预览。
+V1 不做新建 / 删除 / 重命名、快速打开、多 root 和 PDF 预览；写入只限文档面板里的 Markdown 保存。
 
 ## Context 面板
 
@@ -409,7 +389,7 @@ Context Tab 回答三个问题：现在占了多少、由哪些条目组成、�
 
 ## 首版边界
 
-- 应用内只渲染 `md` 和 `图片`；其余文件交给系统默认应用（见「文件打开路由与兜底对话框」）。
+- 应用内只渲染 `md`（在「文档」面板里）和 `图片`；其余文件交给系统默认应用（见「文件打开路由与兜底对话框」）。
 - Git-first Review 作为第二主线；无 Git 时提示创建 Git repository，`Last Turn` 当前未接通数据源，显示不可用状态；不能用聊天工具 diff 冒充该 scope 已实现。
 - 其他类型后续再补，不抢首版设计重点。
 

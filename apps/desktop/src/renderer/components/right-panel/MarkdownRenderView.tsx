@@ -1,22 +1,24 @@
-import { useState, type AnchorHTMLAttributes } from "react";
-import Markdown from "react-markdown";
+import { memo, useContext, useRef, useState, createContext, type AnchorHTMLAttributes, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { CodeRenderView } from "./CodeRenderView";
 import { LANGUAGE_MODULES } from "./highlight";
-import { PreviewSourceToggle, type PreviewMode } from "./PreviewSourceToggle";
+import { loadAppearance } from "../../appearance/storage";
+import { MermaidDiagramBlock } from "../messages/MermaidDiagramBlock";
+import { codeText, fenceLanguage } from "../messages/MarkdownProse";
+import { splitMarkdownBlocks, type MarkdownBlock, type MarkdownBlockSplit } from "../messages/markdown-blocks";
+import { isFenceClosed, isMermaidLanguage } from "../messages/mermaid-renderer";
 
 /**
- * 右侧面板 Markdown 渲染视图（V1，见 `front-右侧面板与文件渲染规范.md`）。
+ * Markdown 预览正文（见 `front-右侧面板与文件渲染规范.md`「Markdown 渲染」和 `front-文档面板规范.md`）。
+ * 预览 / 源码切换、滚动容器和操作栏在「文档」面板（`docs/DocsReader.tsx`），这里只负责把一段 Markdown 渲染出来。
  *
  * 渲染栈：react-markdown + remark-gfm（表格 / 任务列表）+ rehype-highlight（highlight.js）。
+ * Mermaid：闭合的 ```mermaid 围栏复用聊天区的 `MermaidDiagramBlock`（源码按不可信输入处理，渲染失败回退显示源码）。
+ * 长文档按顶层块拆开渲染（`splitMarkdownBlocks`），块内容不变时整块跳过。
  * 安全：**不引 rehype-raw**，原始 HTML 一律转义不渲染；链接经默认 urlTransform 过滤后再统一加 target/rel。
  * 配色：包一层 `markdown-doc`，代码块与 hljs token 配色在 `markdown.css` 内随主题翻转。
  */
-
-// 只有「聊天生成的 markdown」才用到这条工具栏：它没有工作区操作栏可以挂切换按钮。
-const TOOLBAR_CLASS = "flex shrink-0 items-center justify-end gap-2 border-b border-line px-3 py-1.5";
-const PREVIEW_SCROLL_CLASS = "min-h-0 flex-1 overflow-auto p-[18px] text-act-sm leading-[1.7] text-text-main";
 
 const REMARK_PLUGINS = [remarkGfm];
 
@@ -42,49 +44,62 @@ function MarkdownLink({ href, children, ...rest }: AnchorHTMLAttributes<HTMLAnch
   );
 }
 
-const MARKDOWN_COMPONENTS = { a: MarkdownLink };
+/** 当前块的原文，用来判断 mermaid 围栏是否已闭合。 */
+const BlockSourceContext = createContext("");
 
-/**
- * `mode` / `onModeChange` 一起传 = 受控（切换按钮在工作区操作栏上，视图不再自带工具栏）；
- * 都不传 = 自持状态并渲染视图内的分段控件，供没有操作栏的聊天 markdown 使用。
- */
-export function MarkdownRenderView({
-  source,
-  mode,
-  onModeChange,
-}: {
-  source: string;
-  mode?: PreviewMode;
-  onModeChange?: (mode: PreviewMode) => void;
-}) {
-  const [ownMode, setOwnMode] = useState<PreviewMode>("preview");
-  const activeMode = mode ?? ownMode;
+type PositionedNode = { position?: { start?: { offset?: number }; end?: { offset?: number } } };
 
+function MermaidFence({ children }: { children: ReactNode }) {
+  const [themeId] = useState(() => loadAppearance().mermaidTheme);
+  return <MermaidDiagramBlock source={codeText(children).replace(/\n$/, "")} themeId={themeId} sourceView={children} />;
+}
+
+/** 闭合的 mermaid 围栏换成图；其余围栏保持原来的代码块。 */
+function MarkdownPre({ node, ...props }: ComponentPropsWithoutRef<"pre"> & { node?: PositionedNode }) {
+  const markdown = useContext(BlockSourceContext);
+  if (isMermaidLanguage(fenceLanguage(props.children))) {
+    const start = node?.position?.start?.offset;
+    const end = node?.position?.end?.offset;
+    if (start !== undefined && end !== undefined && isFenceClosed(markdown.slice(start, end))) {
+      return <MermaidFence>{props.children}</MermaidFence>;
+    }
+  }
+  return <pre {...props} />;
+}
+
+/** 宽表格在自己的容器里横向滚动，不撑宽整篇正文。 */
+function MarkdownTable(props: ComponentPropsWithoutRef<"table">) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {onModeChange ? null : (
-        <div className={TOOLBAR_CLASS}>
-          <PreviewSourceToggle mode={activeMode} onChange={setOwnMode} />
-        </div>
-      )}
-      {activeMode === "preview" ? (
-        <div className={PREVIEW_SCROLL_CLASS}>
-          <div className="markdown-prose markdown-doc act-code-hl">
-            <Markdown
-              remarkPlugins={REMARK_PLUGINS}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              rehypePlugins={REHYPE_PLUGINS as any}
-              components={MARKDOWN_COMPONENTS}
-            >
-              {source}
-            </Markdown>
-          </div>
-        </div>
-      ) : (
-        // 源码态复用代码视图：早期这里是裸 <pre>，既没有行号也不高亮，
-        // 和「代码文件 Tab」两套体验不一致。
-        <CodeRenderView content={source} language="markdown" />
-      )}
+    <div className="markdown-table-wrap">
+      <table {...props} />
     </div>
   );
 }
+
+const MARKDOWN_COMPONENTS: Components = { a: MarkdownLink, pre: MarkdownPre, table: MarkdownTable };
+
+const MarkdownBlockView = memo(function MarkdownBlockView({ block }: { block: MarkdownBlock }) {
+  return (
+    <BlockSourceContext.Provider value={block.source}>
+      <Markdown
+        remarkPlugins={REMARK_PLUGINS}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        rehypePlugins={REHYPE_PLUGINS as any}
+        components={MARKDOWN_COMPONENTS}
+      >
+        {block.source}
+      </Markdown>
+    </BlockSourceContext.Provider>
+  );
+}, (previous, next) => previous.block.source === next.block.source);
+
+/** Markdown 预览正文（不含滚动容器）：文件预览和「文档」面板共用。 */
+export const MarkdownPreviewBody = memo(function MarkdownPreviewBody({ source }: { source: string }) {
+  const split = useRef<MarkdownBlockSplit | undefined>(undefined);
+  split.current = splitMarkdownBlocks(source, split.current);
+  return (
+    <div className="markdown-prose markdown-doc act-code-hl">
+      {split.current.blocks.map((block) => <MarkdownBlockView key={block.start} block={block} />)}
+    </div>
+  );
+});

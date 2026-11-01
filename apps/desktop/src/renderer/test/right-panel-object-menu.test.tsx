@@ -24,7 +24,7 @@ describe("RightPanelObjectMenu", () => {
     const trigger = renderMenu(null);
     trigger.focus();
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("menuitem", { name: "工作区文件" })).toHaveFocus();
+    expect(screen.getByRole("menuitem", { name: "文档" })).toHaveFocus();
     expect(screen.queryByRole("menuitem", { name: "终端" })).not.toBeInTheDocument();
 
     await user.keyboard("{End}{Enter}");

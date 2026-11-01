@@ -394,34 +394,37 @@ export type WorkspaceOpenResult = {
 
 // ─── 工作区文件浏览器（见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`）───
 
-/** 懒加载一层工作区目录。renderer 不直接读 FS，全部经此 IPC。 */
-export type WorkspaceListDirInput = {
-  /** 会话根；不传由 main 用 BootstrapState.workspaceRoot 兜底。 */
-  workspaceRoot?: string;
-  /** 相对 workspaceRoot 的目录路径，"" / "." 表示根。 */
-  relativePath?: string;
+/**
+ * 取回工作区里全部 Markdown 的相对路径清单（「文档」面板用，见 `docs/design-docs/frontend/front-文档面板规范.md`）。
+ * 只有路径，不读内容；renderer 在本地把清单组装成树。renderer 不直接读 FS，全部经此 IPC。
+ */
+export type WorkspaceListMarkdownFilesInput = {
+  /** 工作区根的绝对路径。 */
+  workspaceRoot: string;
 };
 
-export type WorkspaceDirEntryKind = "dir" | "file";
+export type WorkspaceListMarkdownFilesResult =
+  | {
+      ok: true;
+      /** 相对 workspaceRoot 的 POSIX 路径，已去重、按路径排序。 */
+      files: string[];
+      /** 超过 5000 篇或遍历项数上限，清单只是前一部分。 */
+      truncated: boolean;
+      /** git 仓库用 `git ls-files`（遵守 .gitignore）；否则是有上限的递归遍历。 */
+      source: "git" | "walk";
+    }
+  | { ok: false; error: "not_found" | "not_a_directory" | "escapes_root" };
 
-export type WorkspaceDirEntry = {
-  name: string;
-  /** 相对 workspaceRoot 的 POSIX 路径。 */
+/** 写回一个已存在的工作区 Markdown 文件（「文档」面板的源码编辑保存）。不新建文件。 */
+export type WorkspaceWriteMarkdownFileInput = {
+  workspaceRoot: string;
   relativePath: string;
-  kind: WorkspaceDirEntryKind;
-  /** 文件字节数；目录为 undefined。 */
-  size?: number;
+  content: string;
 };
 
-export type WorkspaceListDirResult = {
-  /** 实际使用的根（绝对路径）。 */
-  root: string;
-  /** 规范化后的当前目录相对路径。 */
-  relativePath: string;
-  /** 目录在前、文件在后，各自按名字升序。 */
-  entries: WorkspaceDirEntry[];
-  error?: "not_found" | "not_a_directory" | "escapes_root" | "too_many_entries";
-};
+export type WorkspaceWriteMarkdownFileResult =
+  | { ok: true; mtimeMs: number; size: number }
+  | { ok: false; error: "not_found" | "escapes_root" | "not_markdown" | "write_failed" };
 
 /** 读取单个工作区文件，供右侧面板复用现有渲染视图打开。 */
 export type WorkspaceReadFileInput = {

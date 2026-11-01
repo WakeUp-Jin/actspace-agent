@@ -102,7 +102,7 @@ describe("Chat presentation and attachment recovery", () => {
     const view = render(content(false));
     expect(screen.queryByRole("tab", { name: "Review" })).toBeNull();
     expect(screen.getByRole("button", { name: "上下文" })).toBeVisible();
-    for (const name of ["文件", "Review", "子 Agent"]) expect(screen.queryByRole("button", { name })).toBeNull();
+    for (const name of ["文档", "改动", "子 Agent"]) expect(screen.queryByRole("button", { name })).toBeNull();
     await user.click(screen.getByLabelText("新建右侧面板对象"));
     expect(screen.getAllByRole("menuitem").map((el) => el.textContent)).toEqual(["上下文"]);
     view.rerender(content(true));

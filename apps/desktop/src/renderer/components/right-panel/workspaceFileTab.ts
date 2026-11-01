@@ -15,7 +15,7 @@ export const READ_ERROR_TEXT: Record<NonNullable<WorkspaceReadFileResult["error"
   escapes_root: "路径超出工作区范围，已拒绝读取。",
 };
 
-/** 应用内只渲染 Markdown 和图片；其他文件不生成预览标签。 */
+/** 文件标签只预览图片；Markdown 在「文档」面板里读，其他文件交给系统。 */
 const EXTERNAL_FILE_TEXT = "这类文件不在应用内预览，请用系统默认应用打开。";
 
 export function tabFromFile(result: WorkspaceReadFileResult, target?: WorkspaceFileTarget): RightPanelTab {
@@ -34,14 +34,11 @@ export function tabFromFile(result: WorkspaceReadFileResult, target?: WorkspaceF
   if (result.error) {
     return { id, kind: "text", title, content: READ_ERROR_TEXT[result.error], ...meta };
   }
-  const truncated = result.truncated ? { truncated: true } : {};
   switch (result.renderKind) {
-    case "markdown":
-      return { id, kind: "markdown", title, source: result.content ?? "", ...meta, ...truncated };
     case "image":
       return { id, kind: "image", title, src: result.dataUrl ?? "", ...meta };
     default:
-      // external 由 open-workspace-path 交给系统打开，正常不会走到这里（例如重载一个旧标签时才会）。
+      // Markdown 走文档面板、external 交给系统打开，正常不会走到这里（例如重载一个旧标签时才会）。
       return { id, kind: "text", title, content: EXTERNAL_FILE_TEXT, ...meta };
   }
 }

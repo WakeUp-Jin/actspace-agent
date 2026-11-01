@@ -5,8 +5,9 @@ import type { RightPanelTab } from "../right-panel/RightPanelContext";
 
 /**
  * 「点一个工作区文件」的统一路由（本机会话；远端 Host 会话走 `hooks/remoteArtifact.ts`，不经过这里）。
- * 应用内只渲染 Markdown 和图片，其余全部交给系统：`.html` / `.htm` 进默认浏览器，其他进默认应用。
- * 设计见 `docs/design-docs/架构优化/01-功能减法设计.md` 第 2 节。
+ * Markdown 打开右侧「文档」面板并在树里选中、展开到该文件；图片开预览标签；
+ * 其余全部交给系统：`.html` / `.htm` 进默认浏览器，其他进默认应用。
+ * 设计见 `docs/design-docs/架构优化/01-功能减法设计.md` 第 2 节和 `front-文档面板规范.md`。
  */
 
 export type WorkspaceFileOpenKind = "markdown" | "image" | "external";
@@ -47,6 +48,15 @@ export async function openWorkspacePath({ workspaceRoot, relativePath, openTab }
   try {
     if (classifyWorkspaceFile(relativePath) === "external") {
       return externalFailure(await workspacesApi.openFile({ workspaceRoot, relativePath, action: "open" }), relativePath);
+    }
+    if (classifyWorkspaceFile(relativePath) === "markdown") {
+      // 只确认文件还在：正文由文档面板自己读（读取、草稿、新鲜度都归它管）。
+      const stat = await workspacesApi.statFile({ workspaceRoot, relativePath });
+      if (stat.error === "not_found" || stat.error === "escapes_root" || stat.error === "not_a_file") {
+        return { ok: false, reason: "error", message: READ_ERROR_TEXT[stat.error] };
+      }
+      openTab({ id: "docs", kind: "docs", title: "文档", select: stat.relativePath || relativePath });
+      return { ok: true };
     }
     const result = await workspacesApi.readFile({ workspaceRoot, relativePath });
     if (result.error === "not_found" || result.error === "escapes_root") {

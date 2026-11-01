@@ -1,9 +1,9 @@
 import { BackgroundTasksPanel } from "./right-panel/BackgroundTasksPanel";
 import { SubagentsPanel } from "./right-panel/SubagentsPanel";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
+  BookOpen,
   Eye,
-  FolderTree,
   GitBranch,
   GitFork,
   Layers,
@@ -13,10 +13,11 @@ import type { SessionListItem } from "@actspace/shared";
 import type { ContextState } from "@actspace/shared";
 import { CodeRenderView } from "./right-panel/CodeRenderView";
 import { ContextPanel } from "./right-panel/context/ContextPanel";
-import { MarkdownRenderView } from "./right-panel/MarkdownRenderView";
+import { DocsLeaveDialog } from "./right-panel/docs/DocsLeaveDialog";
+import { DocsPanel } from "./right-panel/docs/DocsPanel";
+import { editedMarkdownPaths } from "./right-panel/docs/docs-tree-model";
 import { ReviewRenderView } from "./right-panel/ReviewRenderView";
 import { TurnReviewView } from "./turn-tail/TurnReviewView";
-import { WorkspaceFileTree } from "./right-panel/WorkspaceFileTree";
 import { RightPanelTabStrip } from "./right-panel/RightPanelTabStrip";
 import { RightPanelLauncherList, type RightPanelLauncherItem } from "./right-panel/RightPanelLauncherList";
 import { SideChatView } from "./right-panel/side-chat/SideChatView";
@@ -34,13 +35,9 @@ import { useFileFreshness } from "./right-panel/useFileFreshness";
 import { WorkspaceOperationBar } from "./right-panel/WorkspaceOperationBar";
 
 const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-line bg-surface";
-// 右面板纵向三段（对齐 Cursor 右侧）：① tab 条（全宽）→ ② 工作区操作栏（全宽，仅浏览态出现）→ ③ 两栏 [内容 | 文件树]。
-// 文件树在**右**栏：内容区紧邻聊天区，视线从消息移到代码不用跨过一条树栏。
-const RIGHT_PANEL_SPLIT_CLASS = "flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden";
+// 右面板纵向两段：① tab 条（全宽）→ ② 内容。文件标签（本机图片）在内容上方多一条操作栏；
+// 「文档」标签的操作栏和目录树都在它自己的面板里（`right-panel/docs`）。
 const RIGHT_PANEL_CONTENT_CLASS = "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden";
-const RIGHT_PANEL_BODY_CLASS = "min-h-0 flex-1 overflow-auto p-[18px] leading-[1.6] text-text-main";
-const RIGHT_PANEL_HEADING_CLASS = "m-0 mb-2 text-act-md font-semibold";
-const RIGHT_PANEL_TEXT_CLASS = "m-0 text-act-sm text-text-muted";
 export function RightPanel({
   developmentEnabled = true,
   contextState,
@@ -48,6 +45,7 @@ export function RightPanel({
   sessionId,
   workspaceRoot,
   fileRevalidateKey,
+  agentEditedPaths,
   onOpenReview,
   onReviewChanged,
   onSendToAgent,
@@ -57,62 +55,46 @@ export function RightPanel({
   contextRevision?: number;
   sessionId?: string | null;
   workspaceRoot?: string;
-  /** 递增即触发已打开文件 Tab 的新鲜度重校验（当前会话 turn 结束时由 App 递增）。 */
+  /** 递增即触发已打开文件 Tab 的新鲜度重校验、文档清单刷新（当前会话 turn 结束时由 App 递增）。 */
   fileRevalidateKey?: number;
+  /** 当前会话里 Agent 写过 / 改过的文件路径（绝对或工作区相对），「文档」面板据此标绿点。 */
+  agentEditedPaths?: readonly string[];
   onOpenReview?: () => void;
   onReviewChanged?: () => void;
   onSendToAgent?: (text: string) => void;
 }) {
-  const { activeTab, isFileTreeOpen, isFileTreeCollapsed } = useRightPanel();
+  const { activeTab } = useRightPanel();
   useFileFreshness({ workspaceRoot, revalidateKey: fileRevalidateKey, enabled: developmentEnabled });
+  const editedPaths = useMemo(
+    () => editedMarkdownPaths(agentEditedPaths ?? [], workspaceRoot),
+    [agentEditedPaths, workspaceRoot],
+  );
 
-  // 呈现由「当前 Tab」决定：
-  // - 工作区文件 Tab → 进入 shell（树 + 文件预览区），多个文件 Tab 间切换只换 shell 内的内容；
-  // - 浏览态显式打开（isFileTreeOpen，例如刚点 + 菜单还没选文件）→ 也进入 shell，但内容区显示占位；
-  // - 否则（对象 Tab）→ 走整面板，展示它自己的视图。
   // 侧边对话只在它的主会话下出现；切到别的会话时它的 tab 隐藏，激活的那个退回启动页。
   const visibleActiveTab = activeTab && !isVisibleTab(activeTab, sessionId ?? null) ? null : activeTab;
-  const isFileTab = isWorkspaceFileTab(activeTab);
-  const showShell = developmentEnabled && (isFileTab || isFileTreeOpen);
-  const showTree = showShell && !isFileTreeCollapsed;
+  const showFileBar = developmentEnabled && isWorkspaceFileTab(activeTab);
 
   return (
     <aside className={RIGHT_PANEL_CLASS}>
       <RightPanelTabs developmentEnabled={developmentEnabled} sessionId={sessionId ?? null} />
-      {showShell ? <WorkspaceOperationBar activeTab={activeTab} workspaceRoot={workspaceRoot} /> : null}
-      <div className={RIGHT_PANEL_SPLIT_CLASS}>
-        <div className={RIGHT_PANEL_CONTENT_CLASS}>
-          {showShell && !isFileTab ? (
-            <WorkspaceFileEmpty />
-          ) : (
-            <RightPanelBody
-              tab={!developmentEnabled && visibleActiveTab && isDevelopmentTab(visibleActiveTab) ? null : visibleActiveTab}
-              developmentEnabled={developmentEnabled}
-              contextState={contextState}
-              contextRevision={contextRevision}
-              sessionId={sessionId}
-              workspaceRoot={workspaceRoot}
-              onOpenReview={onOpenReview}
-              onReviewChanged={onReviewChanged}
-              onSendToAgent={onSendToAgent}
-            />
-          )}
-        </div>
-        {showTree ? <WorkspaceFileTree key={workspaceRoot ?? ""} workspaceRoot={workspaceRoot} /> : null}
+      {showFileBar ? <WorkspaceOperationBar activeTab={activeTab} workspaceRoot={workspaceRoot} /> : null}
+      <div className={RIGHT_PANEL_CONTENT_CLASS}>
+        <RightPanelBody
+          tab={!developmentEnabled && visibleActiveTab && isDevelopmentTab(visibleActiveTab) ? null : visibleActiveTab}
+          developmentEnabled={developmentEnabled}
+          contextState={contextState}
+          contextRevision={contextRevision}
+          sessionId={sessionId}
+          workspaceRoot={workspaceRoot}
+          fileRevalidateKey={fileRevalidateKey}
+          editedPaths={editedPaths}
+          onOpenReview={onOpenReview}
+          onReviewChanged={onReviewChanged}
+          onSendToAgent={onSendToAgent}
+        />
       </div>
+      <DocsLeaveDialog workspaceRoot={workspaceRoot} />
     </aside>
-  );
-}
-
-/** 工作区态下激活的是对象 Tab 时的文件预览区占位。 */
-function WorkspaceFileEmpty() {
-  return (
-    <div className={RIGHT_PANEL_BODY_CLASS}>
-      <h2 className={RIGHT_PANEL_HEADING_CLASS}>选择文件查看</h2>
-      <p className={RIGHT_PANEL_TEXT_CLASS}>
-        在右侧文件树中点击文件，将在这里打开预览。上下文等对象请关闭「工作区文件」后查看完整视图。
-      </p>
-    </div>
   );
 }
 
@@ -128,18 +110,18 @@ function SideChatTabIcon({ status }: { status: SessionUiStatusKind | undefined }
 }
 
 function isDevelopmentTab(tab: RightPanelTab): boolean {
-  return isWorkspaceFileTab(tab) || ["review", "turnReview", "subagents", "backgroundTasks"].includes(tab.kind);
+  return isWorkspaceFileTab(tab) || ["docs", "review", "turnReview", "subagents", "backgroundTasks"].includes(tab.kind);
 }
 
 // 展示部分在 RightPanelTabStrip；这里只管普通会话的 Tab 来源。
 function RightPanelTabs({ developmentEnabled, sessionId }: { developmentEnabled: boolean; sessionId: string | null }) {
-  const { tabs: allTabs, activeTabId, setActiveTab, closeTab, isFileTreeOpen } = useRightPanel();
+  const { tabs: allTabs, activeTabId, setActiveTab, requestCloseTab } = useRightPanel();
   const sideChat = useSideChatRuntime();
   const tabs = allTabs.filter((tab) => isVisibleTab(tab, sessionId) && (developmentEnabled || !isDevelopmentTab(tab)));
   return (
     <RightPanelTabStrip
       label="右侧面板"
-      emptyTitle={developmentEnabled && isFileTreeOpen ? "文件" : "对象"}
+      emptyTitle="对象"
       activeId={activeTabId}
       items={tabs.map((tab) => ({
         id: tab.id,
@@ -148,7 +130,7 @@ function RightPanelTabs({ developmentEnabled, sessionId }: { developmentEnabled:
         ...(tab.kind === "sideChat" ? { icon: <SideChatTabIcon status={sideChat?.statuses[tab.sessionId]} />, closeVerb: "收起" } : {}),
       }))}
       onSelect={setActiveTab}
-      onClose={closeTab}
+      onClose={requestCloseTab}
     />
   );
 }
@@ -160,6 +142,8 @@ function RightPanelBody({
   contextRevision,
   sessionId,
   workspaceRoot,
+  fileRevalidateKey,
+  editedPaths,
   onOpenReview,
   onReviewChanged,
   onSendToAgent,
@@ -170,11 +154,12 @@ function RightPanelBody({
   contextRevision?: number;
   sessionId?: string | null;
   workspaceRoot?: string;
+  fileRevalidateKey?: number;
+  editedPaths: ReadonlySet<string>;
   onOpenReview?: () => void;
   onReviewChanged?: () => void;
   onSendToAgent?: (text: string) => void;
 }) {
-  const { openTab } = useRightPanel();
   if (!tab) {
     return (
       <RightPanelLauncher
@@ -204,8 +189,8 @@ function RightPanelBody({
 
   if (tab.kind === "turnReview") return <TurnReviewView tab={tab} />;
 
-  if (tab.kind === "markdown") {
-    return <MarkdownTab tab={tab} />;
+  if (tab.kind === "docs") {
+    return <DocsPanel workspaceRoot={workspaceRoot} revalidateKey={fileRevalidateKey} editedPaths={editedPaths} />;
   }
 
   if (tab.kind === "image") {
@@ -219,24 +204,6 @@ function RightPanelBody({
   return <ContextPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} contextState={contextState} contextRevision={contextRevision} workspaceRoot={workspaceRoot} />;
 }
 
-/**
- * 工作区文件 Tab 的预览 / 源码由操作栏按钮控制（受控）；
- * 聊天生成的 markdown 没有操作栏，交给视图自己带切换控件（不受控）。
- */
-function MarkdownTab({ tab }: { tab: Extract<RightPanelTab, { kind: "markdown" }> }) {
-  const { isSourceShown, setSourceShown } = useRightPanel();
-  if (!isWorkspaceFileTab(tab)) {
-    return <MarkdownRenderView source={tab.source} />;
-  }
-  return (
-    <MarkdownRenderView
-      source={tab.source}
-      mode={isSourceShown(tab.id) ? "source" : "preview"}
-      onModeChange={(next) => setSourceShown(tab.id, next === "source")}
-    />
-  );
-}
-
 function RightPanelLauncher({
   developmentEnabled,
   sessionId,
@@ -246,7 +213,7 @@ function RightPanelLauncher({
   sessionId: string | null;
   onOpenReview?: () => void;
 }) {
-  const { openFileTree, openTab, tabs } = useRightPanel();
+  const { openTab, tabs } = useRightPanel();
   const sideChat = useOpenSideChat(sessionId);
   const collapsedSideChats = useCollapsedSideChats(sessionId, tabs);
   const items: RightPanelLauncherItem[] = [];
@@ -279,15 +246,15 @@ function RightPanelLauncher({
         onClick: () => sessionId && openTab({ id: "background-tasks", kind: "backgroundTasks", title: "后台任务", sessionId }),
       },
       {
-        id: "files",
-        label: "文件",
-        description: "浏览工作目录",
-        icon: <FolderTree size={15} strokeWidth={1.8} />,
-        onClick: openFileTree,
+        id: "docs",
+        label: "文档",
+        description: "工作区里的 Markdown，可预览和编辑",
+        icon: <BookOpen size={15} strokeWidth={1.8} />,
+        onClick: () => openTab({ id: "docs", kind: "docs", title: "文档" }),
       },
       {
         id: "review",
-        label: "Review",
+        label: "改动",
         description: "这次的改动",
         icon: <GitBranch size={15} strokeWidth={1.8} />,
         disabled: !onOpenReview,
@@ -339,7 +306,7 @@ function useCollapsedSideChats(sessionId: string | null, tabs: readonly RightPan
     .filter(({ item }) => !open.has(item.id));
 }
 
-// 路径已统一移到工作区操作栏（②），各文件视图不再自带 path 工具条，避免相邻两行重复同一路径。
+// 路径在文件操作栏里，图片视图不再自带 path 工具条，避免相邻两行重复同一路径。
 function ImageRenderView({ src, relativePath }: { src: string; relativePath?: string }) {
   return (
     <div className="grid min-h-0 flex-1 place-items-center overflow-auto bg-surface-subtle p-4">

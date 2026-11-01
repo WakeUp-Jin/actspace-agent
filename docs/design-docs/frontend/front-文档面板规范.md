@@ -1,6 +1,6 @@
 # 文档面板规范
 
-更新：2026-11-01。状态：用户已确认，待实施（同日补充：源码可编辑；渲染做精另开功能）。来源：[01 功能减法设计](../架构优化/01-功能减法设计.md)第 3 节；demo 见 [md-file-tree-demo.html](md-file-tree-demo.html)，用户选定方案 A。
+更新：2026-11-01。状态：已实施（2026-11-01 功能减法 P4；同日补充：源码可编辑；渲染做精另开功能）。来源：[01 功能减法设计](../架构优化/01-功能减法设计.md)第 3 节；demo 见 [md-file-tree-demo.html](md-file-tree-demo.html)，用户选定方案 A。
 
 ## 定位
 
@@ -144,3 +144,28 @@
 - 文件监听。
 - 右侧常驻大纲栏（方案 B）。
 - 非 Markdown 文件的任何应用内渲染（图片预览不属于文档面板，保持原有方式）。
+
+## 实施位置（2026-11-01）
+
+| 内容 | 位置（`apps/desktop/src/renderer/` 下，除非另写） |
+| --- | --- |
+| 面板外壳、正文区、目录树 | `components/right-panel/docs/DocsPanel.tsx`、`DocsReader.tsx`、`DocsTree.tsx` |
+| 树模型（组树、搜索高亮、筛选、绿点路径换算） | `components/right-panel/docs/docs-tree-model.ts` |
+| 清单获取、草稿 / 保存 / 新鲜度 | `components/right-panel/docs/use-docs-listing.ts`、`use-docs-draft.ts` |
+| 源码编辑器（原生 textarea） | `components/right-panel/docs/MarkdownSourceEditor.tsx` |
+| 大纲浮层 | `components/right-panel/docs/DocsOutline.tsx` |
+| 离开确认（保存 / 不保存 / 取消） | `components/right-panel/docs/DocsLeaveDialog.tsx`，挂在 `components/RightPanel.tsx` |
+| 状态（选中、草稿、展开、筛选、清单） | `components/right-panel/RightPanelContext.tsx` |
+| Markdown 预览正文、Mermaid、分块渲染 | `components/right-panel/MarkdownRenderView.tsx`（导出 `MarkdownPreviewBody`） |
+| 交付卡 / 聊天链接 → 文档面板 | `components/files/open-workspace-path.ts` |
+| 展开面板盖住聊天区 | `components/SplitView.tsx`（`rightExpanded`）、`components/WorkbenchLayout.tsx`（含文档标签自己的默认宽度 720px） |
+| 主进程 IPC | `workspaces.listMarkdownFiles`、`workspaces.writeMarkdownFile`：`apps/desktop/src/main/workspace-fs-service.ts`、`main/runtime-v2/desktop-shell-ipc.ts`、`main/ipc/guards.ts`；契约在 `packages/shared/src/desktop-bridge/contract.ts`、`ipc.ts`、`runtime-v2/fixed-renderer.ts` |
+| 浏览器 mock 数据 | `mock/docs-fixture.ts`、`mock/handlers.ts` |
+| 测试 | `test/docs-panel.test.tsx`、`docs-tree-model.test.ts`、`markdown-source-editor.test.tsx`、`markdown-render-view.test.tsx`、`split-view-expanded.test.tsx`；主进程 `main/test/workspace-fs-service.test.ts` 等 |
+
+实施时的几处取舍（与上文不冲突，补充说明）：
+
+- 面板较窄时，操作栏先收起「在 Finder 中显示 / 用默认应用打开 / 复制路径」三个次要操作（容器宽度小于 460px），保证文件名、未保存圆点、展开面板和收起文件树始终可见。
+- 「本会话改过」的绿点来自会话消息里的 `edit_diff` / `write_diff` 路径，换算成相对路径后只保留 Markdown。
+- 新鲜度由文档面板自己的 `use-docs-draft.ts` 实现（等价于文件 Tab 的 `useFileFreshness`，但要同时处理未保存草稿）：Agent 把当前文档新加进「改过」集合、挂载、窗口聚焦、turn 结束这几个时机触发 `statFile`，不轮询。
+- 保存后重新读取 `mtime`，不弹成功提示；保存失败留在原处并显示错误条。

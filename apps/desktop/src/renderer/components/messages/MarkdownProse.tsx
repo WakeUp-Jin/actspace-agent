@@ -59,7 +59,7 @@ function MarkdownHeading({ id, node: _node, ...props }: ComponentPropsWithoutRef
   return <h2 {...props} id={id === "footnote-label" ? `${footnotePrefix}footnote-label` : id} />;
 }
 
-function codeText(children: ReactNode): string {
+export function codeText(children: ReactNode): string {
   return Children.toArray(children).map((child) => {
     if (typeof child === "string" || typeof child === "number") return String(child);
     if (isValidElement<{ children?: ReactNode }>(child)) return codeText(child.props.children);
@@ -69,7 +69,7 @@ function codeText(children: ReactNode): string {
 
 type PositionedNode = { position?: { start?: { offset?: number }; end?: { offset?: number } } };
 
-function fenceLanguage(children: ReactNode): string | undefined {
+export function fenceLanguage(children: ReactNode): string | undefined {
   const codeElement = Children.toArray(children).find(isValidElement);
   const className = isValidElement<{ className?: string }>(codeElement) ? codeElement.props.className : undefined;
   return className?.match(/language-([\w-]+)/)?.[1];

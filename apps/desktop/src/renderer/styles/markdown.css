@@ -231,6 +231,11 @@
  * 右侧面板 Markdown 文档视图（react-markdown + rehype-highlight）的增量样式。
  * 作用域限定在 .markdown-doc，避免影响聊天区手写解析器（.markdown-prose 单用）。
  */
+.markdown-doc {
+  /* 网格列默认按最宽子项的 min-content 撑开；宽表格、长代码行不能把整篇正文撑出面板。 */
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .markdown-doc pre {
   border: 1px solid var(--act-color-code-border);
   border-radius: var(--radius-lg);

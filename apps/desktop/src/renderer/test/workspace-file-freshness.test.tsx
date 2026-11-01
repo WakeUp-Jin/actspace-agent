@@ -9,7 +9,7 @@ import { overrideBridge, setupBridge } from "./helpers/bridge";
 import { RightPanel } from "../components/RightPanel";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
-const file = { relativePath: "canary.md", renderKind: "markdown" as const, size: 8, mtimeMs: 100, content: "snapshot" };
+const file = { relativePath: "canary.png", renderKind: "image" as const, size: 8, mtimeMs: 100, dataUrl: "data:image/png;base64,SNAPSHOT" };
 const wrapper = ({ children }: { children: ReactNode }) => <RightPanelProvider>{children}</RightPanelProvider>;
 
 function useFiles() {
@@ -19,8 +19,8 @@ function useFiles() {
 
 describe("workspace file freshness after a file becomes unavailable", () => {
   it.each([
-    { name: "a missing-file explanation", response: { ...file, error: "not_found" as const, content: undefined, mtimeMs: 0, size: 0 }, expected: "文件不存在或已被移动。" },
-    { name: "updated disk contents", response: { ...file, content: "updated disk body", mtimeMs: 200 }, expected: "updated disk body" },
+    { name: "a missing-file explanation", response: { ...file, error: "not_found" as const, dataUrl: undefined, mtimeMs: 0, size: 0 }, expected: "文件不存在或已被移动。" },
+    { name: "updated disk contents", response: { ...file, dataUrl: "data:image/png;base64,UPDATED", mtimeMs: 200 }, expected: "data:image/png;base64,UPDATED" },
   ])("replaces the old snapshot with $name through the real reload button", async ({ response, expected }) => {
     const user = userEvent.setup();
     const read = vi.fn(async () => response);
@@ -33,21 +33,25 @@ describe("workspace file freshness after a file becomes unavailable", () => {
         </RightPanelProvider>
       </TooltipProvider>,
     );
-    expect(screen.getByText("snapshot")).toBeInTheDocument();
+    expect(screen.getByRole("img")).toHaveAttribute("src", "data:image/png;base64,SNAPSHOT");
     await user.click(screen.getByRole("button", { name: "重新加载" }));
-    expect(await screen.findByText(expected)).toBeInTheDocument();
-    expect(screen.queryByText("snapshot")).toBeNull();
+    if (expected.startsWith("data:")) {
+      await waitFor(() => expect(screen.getByRole("img")).toHaveAttribute("src", expected));
+    } else {
+      expect(await screen.findByText(expected)).toBeInTheDocument();
+      expect(screen.queryByRole("img")).toBeNull();
+    }
     expect(screen.queryByRole("button", { name: "重新加载" })).toBeNull();
     expect(read).toHaveBeenCalledWith({ workspaceRoot: "/tree-a", relativePath: file.relativePath });
   });
 
   it.each(["not_found", "not_a_file", "escapes_root"] as const)("marks only the bound snapshot stale on %s", async (error) => {
     const stat = vi.fn(async () => file);
-    const read = vi.fn(async () => ({ ...file, content: undefined, mtimeMs: 0, size: 0, error: "not_found" as const }));
+    const read = vi.fn(async () => ({ ...file, dataUrl: undefined, mtimeMs: 0, size: 0, error: "not_found" as const }));
     setupBridge({ "workspaces.statFile": stat, "workspaces.readFile": read });
     const target = { workspaceRoot: "/tree-a" };
     const a = tabFromFile(file, target);
-    const b = tabFromFile({ ...file, content: "other root" }, { workspaceRoot: "/tree-b" });
+    const b = tabFromFile({ ...file, dataUrl: "data:image/png;base64,OTHER" }, { workspaceRoot: "/tree-b" });
     const { result } = renderHook(useFiles, { wrapper });
     act(() => { result.current.panel.openTab(a); result.current.panel.openTab(b); });
     await waitFor(() => expect(stat).toHaveBeenCalledTimes(2));
@@ -59,12 +63,12 @@ describe("workspace file freshness after a file becomes unavailable", () => {
     act(() => { window.dispatchEvent(new Event("focus")); });
 
     await waitFor(() => expect(result.current.panel.tabs.find(tab => tab.id === a.id)).toMatchObject({ isStale: true }));
-    expect(result.current.panel.tabs.find(tab => tab.id === a.id)).toMatchObject({ source: "snapshot" });
-    expect(result.current.panel.tabs.find(tab => tab.id === b.id)).toMatchObject({ isStale: false, source: "other root" });
+    expect(result.current.panel.tabs.find(tab => tab.id === a.id)).toMatchObject({ src: "data:image/png;base64,SNAPSHOT" });
+    expect(result.current.panel.tabs.find(tab => tab.id === b.id)).toMatchObject({ isStale: false, src: "data:image/png;base64,OTHER" });
     expect(read).not.toHaveBeenCalled();
 
     if (error === "not_found") {
-      await act(() => result.current.reload(file.relativePath, "canary.md", target));
+      await act(() => result.current.reload(file.relativePath, "canary.png", target));
       expect(read).toHaveBeenCalledWith({ workspaceRoot: "/tree-a", relativePath: file.relativePath });
       expect(result.current.panel.tabs.find(tab => tab.id === a.id)).toMatchObject({
         isStale: false, content: "文件不存在或已被移动。", workspaceRoot: "/tree-a",
@@ -84,10 +88,10 @@ describe("workspace file freshness after a file becomes unavailable", () => {
     overrideBridge({ "workspaces.statFile": broken });
     await act(async () => { window.dispatchEvent(new Event("focus")); });
     expect(broken).toHaveBeenCalledOnce();
-    expect(result.current.panel.tabs[0]).toMatchObject({ isStale: false, source: "snapshot" });
+    expect(result.current.panel.tabs[0]).toMatchObject({ isStale: false, src: "data:image/png;base64,SNAPSHOT" });
 
     overrideBridge({ "workspaces.statFile": async () => ({ ...file, mtimeMs: 200 }) });
     act(() => { window.dispatchEvent(new Event("focus")); });
-    await waitFor(() => expect(result.current.panel.tabs[0]).toMatchObject({ isStale: true, source: "snapshot" }));
+    await waitFor(() => expect(result.current.panel.tabs[0]).toMatchObject({ isStale: true, src: "data:image/png;base64,SNAPSHOT" }));
   });
 });

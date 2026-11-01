@@ -68,7 +68,7 @@ const settingsApiStub = {
     alreadyRepository: true,
     workspaceRoot: "/tmp/workspace",
   }),
-  "workspaces.listDir": async () => ({ root: "/tmp/workspace", relativePath: "", entries: [] }),
+  "workspaces.listMarkdownFiles": async () => ({ ok: true as const, files: [], truncated: false, source: "walk" as const }),
   "workspaces.readFile": async () => ({ relativePath: "", renderKind: "text" as const, size: 0, mtimeMs: 0, content: "" }),
   "sessions.archive": async () => ({ ok: true }),
   "sessions.archiveMany": async (input: { sessionIds: string[] }) => ({

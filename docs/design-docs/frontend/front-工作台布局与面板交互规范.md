@@ -15,8 +15,9 @@
 - 窗口宽度小于 `880px`（主区最小 560 + 右栏最小 320）时进入紧凑布局，左右面板改为覆盖层，不再参与主区分栏。阈值与并排容量同源，不存在两种布局都打不开右栏的宽度。
 - 系统级「快速打开」复用同一个主窗口，将宽度收敛到约 `640px`、在鼠标所在屏幕居中，并直接进入紧凑布局；不创建第二套迷你聊天页面。
 - 中间聊天区始终是优先保护的主工作区。
-- Review 是右侧对象系统中的普通对象 Tab；打开后保持聊天主区、Composer 和左侧会话栏，不建立全屏例外。
+- 「改动」（Review）是右侧对象系统中的普通对象 Tab；打开后保持聊天主区、Composer 和左侧会话栏，不建立全屏例外。
 - SplitView 自研，不把工作台面板语义直接绑定到通用 splitter 依赖。
+- 「文档」标签有自己的默认右栏宽度（720px，受 `rightMaxWidth` 截断，拖宽只记在文档标签上，不改其他标签的宽度）；它的「展开面板」按钮通过 `SplitView.rightExpanded` 让右栏撑满主区，主区折成 0 宽但保持挂载，聊天状态与 Composer 草稿不丢，再点一次还原。紧凑布局（< 880px）已是覆盖层，不使用该展开。
 - 桌面端窗口隐藏系统标题栏，应用的左、中、右区域直接从窗口顶部开始；左侧栏为 macOS 窗口控制按钮预留安全距离，而不是在三栏外再套一条全局标题栏。
 
 ## 设计目标
@@ -41,7 +42,7 @@
 - 左右面板争抢空间时，中间区优先于右侧预览区和左侧展开态。
 - 顶部栏保持单行，不重复展示工作区状态副标题；标题和操作必须归属于真实 pane，而不是相对整窗居中或全部堆到窗口右端。
 - 中间栏顶部左侧展示当前会话标题；标题前的单个 icon-only 按钮用于在 Chat 与 Trajectory 主视图之间切换，按钮只切换当前会话的中心内容，不建立持久化 tab。Chat 状态显示 Trajectory 入口，Trajectory 状态显示返回 Chat 的消息图标，并提供动态 tooltip / aria label。右侧放置编辑器选择和 Environment；对象菜单与右侧面板入口只属于右栏。左列同时承载 Sidebar 折叠与会话历史 Back / Forward；顶部不再重复渲染 Search，Sidebar 内 Search 保持原有入口。Environment 的本地工作区、Git 与 Sources 规则见 `front-environment-and-git-actions.md`。
-- Trajectory 是 Session Projection 的只读派生视图，不属于右侧对象 Tab，也不应出现在 Sidebar 或右侧对象启动页。切换时保持 `ConversationView` 外壳挂载，使消息会话的 Composer、草稿与右侧 Files / Review / Context 面板不因观察轨迹而重置。
+- Trajectory 是 Session Projection 的只读派生视图，不属于右侧对象 Tab，也不应出现在 Sidebar 或右侧对象启动页。切换时保持 `ConversationView` 外壳挂载，使消息会话的 Composer、草稿与右侧 文档 / 改动 / Context 面板不因观察轨迹而重置。
 - 消息流滚动容器应占满中间主区 viewport，让滚动条贴近主区右边界；消息内容和 Composer 再由内层容器限制阅读宽度并居中。
 - 不要用父级 padding 加负 margin 对冲来决定滚动条位置，避免左侧隐藏态、右侧面板和窗口缩放时出现不一致的留白。
 
@@ -71,7 +72,7 @@
 - 打开后可调宽，关闭后不保留右侧 rail。
 - 对象 Tab 与内容渲染规则继续由 `右侧面板与文件渲染规范.md` 约束。
 
-### Review 右侧对象模式
+### 「改动」（Review）右侧对象模式
 
 - Composer、Environment 或右侧对象菜单打开 Review 时，以稳定 workspace Review 对象去重并激活右侧 Tab。
 - Review 不替换 `SplitView.main`，不主动隐藏左侧栏，也不修改聊天 scroll、Composer draft 或长期布局偏好。

@@ -11,7 +11,7 @@ import { createIpcRegistrar } from "../ipc/registry";
 import { readWorkspaceRegistry, resolveRegisteredWorkspaceSelection, type WorkspaceRegistryOptions } from "../workspace-registry-service";
 import { openExternalSafely } from "../platform-actions";
 import { createWorkspaceAccessDeps, resolveWorkspaceAccess, workspaceRegistryOptions } from "../workspace-access";
-import { listWorkspaceDir, readWorkspaceFile, statWorkspaceFile } from "../workspace-fs-service";
+import { listWorkspaceMarkdownFiles, readWorkspaceFile, statWorkspaceFile, writeWorkspaceMarkdownFile } from "../workspace-fs-service";
 import { listWorkspaceFileApplications, openWorkspaceFile } from "../file-applications-service";
 import { ReviewCoordinator, type ResolvedReviewWorkspace } from "../review-coordinator";
 import { ReviewGitEngine } from "../review-git-engine";
@@ -83,9 +83,10 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   });
 
   ipc.handle(contract.workspaces.list, () => readWorkspaceRegistry(registryOptions));
-  ipc.handle(contract.workspaces.listDir, async (input) => listWorkspaceDir(await withWorkspaceAccess(input), options.roots));
+  ipc.handle(contract.workspaces.listMarkdownFiles, async (input) => listWorkspaceMarkdownFiles((await withWorkspaceAccess(input)).workspaceRoot!));
   ipc.handle(contract.workspaces.readFile, async (input) => readWorkspaceFile(await withWorkspaceAccess(input), options.roots));
   ipc.handle(contract.workspaces.statFile, async (input) => statWorkspaceFile(await withWorkspaceAccess(input), options.roots));
+  ipc.handle(contract.workspaces.writeMarkdownFile, async (input) => writeWorkspaceMarkdownFile(await withWorkspaceAccess(input)));
   ipc.handle(contract.workspaces.listFileApplications, async (input) => listWorkspaceFileApplications(await withWorkspaceAccess(input), options.roots));
   ipc.handle(contract.workspaces.openFile, async (input) => openWorkspaceFile(await withWorkspaceAccess(input), options.roots));
   ipc.handle(contract.review.getSnapshot, (input) => review.getSnapshot(input));

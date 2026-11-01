@@ -95,15 +95,15 @@ describe("turn tail", () => {
   });
 
   it("previews a deliverable in the right panel and reports a missing file", async () => {
-    const readFile = vi.fn(async () => ({ relativePath: "docs/report.md", renderKind: "markdown" as const, content: "# Report", size: 8 }));
-    bridge({ "workspaces.readFile": readFile });
+    const statFile = vi.fn(async () => ({ relativePath: "docs/report.md", size: 8, mtimeMs: 1 }));
+    bridge({ "workspaces.statFile": statFile });
     await renderTurn(turn(presentMessage));
 
     await userEvent.click(screen.getByRole("button", { name: "打开 docs/report.md" }));
-    expect(readFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/report.md" });
-    expect(screen.getByTestId("active-tab")).toHaveTextContent("markdown:report.md");
+    expect(statFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/report.md" });
+    expect(screen.getByTestId("active-tab")).toHaveTextContent("docs:文档");
 
-    readFile.mockResolvedValueOnce({ relativePath: "docs/report.md", renderKind: "text", size: 0, error: "not_found" } as never);
+    statFile.mockResolvedValueOnce({ relativePath: "docs/report.md", size: 0, mtimeMs: 0, error: "not_found" } as never);
     await userEvent.click(screen.getByRole("button", { name: "打开 docs/report.md" }));
     expect(await screen.findByText("文件不存在或已被移动。")).toBeInTheDocument();
   });

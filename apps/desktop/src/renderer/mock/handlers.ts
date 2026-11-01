@@ -23,6 +23,7 @@ import { MOCK_REPLY, MOCK_SIDE_CHAT_REPLY, playReply, type ReplyPlayback } from 
 import { MOCK_CONTEXT_PATHS, MOCK_CONTEXT_PATHS_REVISION, mockContextPanelView, mockContextState } from "./context-panel-fixture";
 import { mockContextPathsPage } from "./context-paths-fixture";
 import { createModelConnectionsMock } from "./model-connections-fixture";
+import { mockListMarkdownFiles, mockReadMarkdown, mockStatMarkdown, mockWriteMarkdown } from "./docs-fixture";
 
 /** 按域覆盖 mock 实现；未覆盖的成员用默认实现，默认也没有的成员调用时 reject。 */
 export type MockHandlers = { [D in keyof DesktopBridge]?: Partial<DesktopBridge[D]> };
@@ -131,8 +132,11 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         db.workspaces = { ...db.workspaces, items: [...db.workspaces.items, { id: workspaceId, kind: "folder", label: name, path: workspaceRoot, order: db.workspaces.items.length, createdAt: now, updatedAt: now }] };
         return { ok: true, workspaceId, workspaceRoot };
       },
-      listDir: async ({ workspaceRoot }) => ({ root: workspaceRoot ?? db.bootstrap.workspaceRoot, relativePath: "", entries: [] }),
-      statFile: async ({ relativePath }) => ({ relativePath, size: 0, mtimeMs: 0, error: "not_found" }),
+      // 「文档」面板的数据来自内存里的示例目录（mock/docs-fixture.ts），预览、编辑、保存都能在浏览器里检查。
+      listMarkdownFiles: async () => mockListMarkdownFiles(),
+      readFile: async ({ relativePath }) => mockReadMarkdown(relativePath),
+      statFile: async ({ relativePath }) => mockStatMarkdown(relativePath),
+      writeMarkdownFile: async ({ relativePath, content }) => mockWriteMarkdown(relativePath, content),
       // 浏览器 mock 没有真实的关联应用；给几个示例应用，让交付卡的下拉菜单可以检查。
       listFileApplications: async () => ({
         applications: [

@@ -2,6 +2,7 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { MockClock } from "../clock";
 import type { MockHandlers } from "../handlers";
 import { appendMockMessage, type MockDb, type MockSession } from "../mock-db";
+import { mockReadMarkdown } from "../docs-fixture";
 import { seedSession } from "./seed";
 
 /**
@@ -102,7 +103,7 @@ export function turnDeliverablesScenario({ db }: MockClock): MockHandlers | void
       readFile: async ({ relativePath }) => {
         const content = relativePath === "docs/report.md" ? FILES[relativePath].replace("# 季度报告", "# 季度报告（终稿）") : FILES[relativePath];
         return content === undefined
-          ? { relativePath, renderKind: "external", size: 0, mtimeMs: 0, error: "not_found" }
+          ? mockReadMarkdown(relativePath)
           : relativePath.endsWith(".md")
             ? { relativePath, renderKind: "markdown", content, size: content.length, mtimeMs: 0 }
             : { relativePath, renderKind: "external", size: content.length, mtimeMs: 0 };

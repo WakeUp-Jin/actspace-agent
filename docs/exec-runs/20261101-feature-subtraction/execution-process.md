@@ -127,6 +127,37 @@
 | 残留检查：`grep -rn "HtmlRenderView\|CsvRenderView\|open-html-in-browser\|languageOf" apps/desktop/src packages/shared/src` | 无命中 |
 | 兜底对话框截图 | 浏览器 mock（`?mock=turn-deliverables`，点 `docs/chart.json` 交付卡），Chrome headless 经 CDP 截浅色、深色各一张（`tmp/p3-fallback-light.png`、`tmp/p3-fallback-dark.png`，不进 git），两种主题都正常 |
 
+### P4 文档面板
+
+- **操作**：按 `p4-docs-panel.md` 实施，规范 `front-文档面板规范.md` 为准。
+  - 后端：`workspaces.listMarkdownFiles`（git 仓库用 `git ls-files --cached --others --exclude-standard`，否则有上限的遍历；上限 5000 篇、50000 个目录项）和 `workspaces.writeMarkdownFile`（只写已存在的 `.md`、realpath 包含校验、临时文件加 rename）。契约、guard、handler、主进程服务都加了单测（共 63 个用例）。
+  - renderer 新增 `components/right-panel/docs/` 共 10 个文件（`DocsPanel`、`DocsReader`、`DocsTree`、`DocsOutline`、`DocsLeaveDialog`、`MarkdownSourceEditor`、`docs-tree-model`、`use-docs-draft`、`use-docs-listing`），以及 `mock/docs-fixture.ts`。
+  - 状态放进 `RightPanelContext`（选中、草稿、模式、展开、筛选、清单、离开确认），`markdown` 这种 Tab 类型删除，新增唯一的 `docs` Tab（id 固定为 `docs`，`select` 是一次性请求，由 `openTab` 剥掉）。
+  - `MarkdownRenderView` 只留 `MarkdownPreviewBody`：块级 `memo` 分块渲染，闭合的 mermaid 围栏复用聊天区的 `MermaidDiagramBlock`，表格放进 `.markdown-table-wrap`，`.markdown-doc` 的网格列改成 `minmax(0, 1fr)`。
+  - `open-workspace-path.ts` 的 Markdown 分支改成 `statFile` 后打开文档 Tab 并选中；`WorkspaceOperationBar` 瘦身为面包屑加外部打开菜单加过期提示条；删 `WorkspaceFileTree.tsx` 和 `listDir` 整条链（契约、guard、handler、`workspace-fs-service`、mock、测试）。
+  - 「文件」标签改名「文档」，「Review」改名「改动」（菜单、启动页、标签标题、测试断言）。
+  - `SplitView` 新增 `rightExpanded`，`WorkbenchLayout` 在文档 Tab 激活时传入，让右栏盖住聊天区；文档 Tab 另有自己的默认宽度 720px（拖宽只记在文档 Tab 上）。
+  - 文档：规范状态改「已实施」并补实施位置表；`front-右侧面板与文件渲染规范.md`（文件浏览器一节改成链接，Markdown 渲染一节更新）、`front-工作台布局与面板交互规范.md`、站点 `file-preview.md` 和 `review.md`；更新日志追加；新增 `docs/histories/2026-11/20261101-2000-docs-panel.md`。
+- **影响文件**：删 2 个源文件和测试（`WorkspaceFileTree.tsx`、`workspace-file-tree.test.tsx`）；新增约 11 个源文件和 5 个测试；改约 35 个。
+- **决定**：
+  - 文档状态（选中、草稿、展开层级、清单）放 Provider 而不是组件里：面板会随切标签、收起右栏反复卸载。离开确认对话框挂在 `RightPanel` 外壳上：从标签栏关闭「文档」时面板可能没挂载。
+  - 新鲜度做成文档面板自己的 `use-docs-draft.ts`，不复用文件 Tab 的 `useFileFreshness`：要同时处理未保存草稿，且 Agent 编辑信号只在「这篇刚被新加进改过集合」时才算（否则打开一篇本会话早就改过的文档会立刻误报已变更）。
+  - 清单在 turn 结束时随 `fileRevalidateKey` 刷新，没有另加刷新计数；树顶刷新按钮用 `docsRefreshKey`。
+  - 操作栏在面板窄时（容器宽度小于 460px）收起三个次要操作。
+  - 原生按钮基线：`DocsTree.tsx` 两个（目录行、文件行，行内含图标、名称、计数、绿点，不是普通按钮）；`WorkspaceOperationBar.tsx` 从 2 降到 1；删 `WorkspaceFileTree.tsx`；脚本顺带把 `PurposePicker.tsx` 从 3 收紧到 2（上一轮遗留的可收紧项），整个 JSON 被脚本重新排了序，所以 diff 看起来很大。
+- **验证**（先跑 `pnpm --filter @actspace/desktop build:deps:dev`）：
+
+| 命令 | 结果 |
+|---|---|
+| `pnpm --filter @actspace/shared test` | 通过（181） |
+| `pnpm --filter @actspace/client test` | 通过（56） |
+| `pnpm --filter @actspace/desktop test` | 通过（2113 通过、7 跳过） |
+| `pnpm --filter @actspace/desktop typecheck` / `pnpm typecheck` | 通过 |
+| `pnpm check:ipc-channels` | 通过（契约 145 个 channel） |
+| `pnpm check:renderer-bridge` / `check:frontend-tokens` / `check:frontend-theme` | 通过 |
+| 截图 | 浏览器 mock（`?mock=turn-deliverables`，打开右侧面板的「文档」），Chrome headless 经 CDP：`tmp/p4-docs-light.png`、`tmp/p4-docs-dark.png`、`tmp/p4-docs-source-dirty.png`（源码编辑加未保存圆点），不进 git |
+| `listMarkdownFiles` 耗时 | 本仓库 1989 篇 Markdown，git 路径冷启动 46.5ms、热 32–33ms（esbuild 打包后在 Node 里直接调用，不含 IPC） |
+
 ## 遇到的问题
 
 - P1：计划没列 `chat-presentation-recovery.test.tsx`，它断言「+」菜单项等于 `["可视化回复", "上下文"]`，删入口后失败，已改为 `["上下文"]`。另有 `RightPanel.tsx`、`RightPanelObjectMenu.tsx` 里提到 Reply / 可视化回复的注释和提示文字，一并改掉。
@@ -137,8 +168,22 @@
 - P3：`!result.ok` 在 renderer 里不能收窄带字面量的判别联合（该 tsconfig 没开严格空值检查），要写 `result.ok === false`。
 - P3：`pnpm --filter @actspace/desktop test` 有一次出现「环境销毁后捕获到错误」的偶发报错（1 个 Errors，所有用例仍通过），重跑两次没有复现；怀疑来自某个异步清理时序，未定位到具体文件。
 
+- P4：计划没列几个依赖旧「文件」Tab 的测试，实施时一并改：`workspace-file-freshness`、`workspace-file-target` 原来用 `.md` 样例走 markdown Tab，Markdown Tab 删掉后改用图片 Tab；`turn-tail`、`turn-output-artifacts`、`open-workspace-path` 原来断言读文件，现在断言 `statFile` 加文档 Tab；`right-panel-object-menu` 的菜单项名、`right-panel-review`、`chat-presentation-recovery` 里的「Review」「工作区文件」随改名更新。
+- P4：`!result.ok` 在 renderer 里仍不能收窄判别联合，`use-docs-draft.ts`、`use-docs-listing.ts` 都要写 `result.ok === false`（同 P3）。
+- P4：设计阶段发现一个会上线的误报：如果 Agent 编辑信号一律把当前文档标成已变更，打开一篇本会话早已改过的文档会立刻提示「已变更」。改成只在这篇文档从「不在改过集合」变成「在改过集合」时才触发。
+- P4：浏览器 mock 的 `turn-deliverables` 场景自己覆盖了 `readFile`，导致文档树里点其他文件读不到。让它对不认识的路径回落到 `docs-fixture`。
+- P4：截图里发现默认 390px 右栏放不下正文加 260px 文件树（正文只剩约 130px，操作栏被裁）。给文档 Tab 单独设了 720px 的默认宽度，面板窄时收起次要操作；同时发现 `.markdown-prose` 是 grid，宽表格的 `min-width` 会把整篇正文撑出面板，改成 `minmax(0, 1fr)` 并给表格加滚动容器。
+- P4：树里选中行的底色不显示：`bg-transparent` 和 `bg-selected` 同时在 class 里，前者生效。改成互斥。
+- P4：jsdom 里 `<mark>` 会让无障碍名称在高亮前后多出空格，测试里用 `\s*` 容忍。
+
 ## 跳过或推迟的事项
 
 - P1：Space 演示里的 mock「可视化回复」标签留待 Space 演示后续处理（见 P1 决定）。磁盘上旧的 `visualizations.json` 不读不删。
 - P2：`agent-contract-matrix.generated.md` 里仍含 node-pty 的依赖列表，基线已过期，留给 S1 重新生成。未实测完整打包（只做了 `bash -n`）。
 - P3：Windows / Linux 上 `shell.openPath` 对无关联应用文件的返回值未实测；Electron 实机（交付卡、聊天链接、读文件工具行点 `.md`、`.png`、`.html`、`.pdf`、`.ts`，以及兜底对话框三项）留给用户手工检查。`TurnChangesCard` 头部悬停文字「在侧边栏预览」仍对应打开本轮改动视图，没改。
+- P4：Electron 实机检查留给用户：默认应用打开 / Finder 显示、⌘S 保存与外部编辑器同时改同一文件的行为、窗口聚焦后的「重新加载」、关闭「文档」标签时的未保存询问、展开面板盖住聊天区再还原、拖宽右栏后切到其他标签的宽度、真实大仓库（5000 篇以上）下的树。
+- P4：补修三项原已知限制。(1) 换根不再丢草稿：新增模块级 `docs-draft-store.ts`，按 `workspaceRoot + relativePath` 暂存未保存草稿（含基准 mtime/size），`syncDocsRoot` 离开时暂存、回到同一个根时重新选中那一篇，`use-docs-draft` 读盘后套回草稿并显示未保存圆点；磁盘文件变过则同时出现已变化提示；不自动写盘，恢复时一次性取走，之后保存、不保存走原有流程；应用重启后丢失。(2) git 清单额外跑 `ls-files -z --deleted` 并排除结果，该调用失败时忽略。(3) git 使用 `:(icase)*.md`、`:(icase)*.markdown`；遍历和 `writeMarkdownFile` 原本就用不区分大小写的正则，补了测试。新增测试：`workspace-fs-service`（已删除、大小写、写入 `.MD`）、`docs-panel`（编辑、换根、切回恢复草稿）；原有截断测试的 fakeGit 改成按 `--deleted` 区分返回。
+- P4：已知限制，不在本步处理：保存前不做冲突检测（规范明确不做）；`open-workspace-path` 的 Markdown 分支不核对传入的根是否等于面板当前的根；搜索或「本会话改过」筛选自动展开的文件夹，在清除筛选前不能手动折叠。
+- P4：Space 演示里的「文件」「Review」标签文字（`SpaceReviewView`、`SpaceFilesView` 等）和 Composer 的 `ReviewStrip` 文字没改，它们不是右侧面板标签。站点 `file-preview.png` 截图仍是旧的文件树画面，已把图注改掉，截图需要在 Electron 里重拍。
+- P4：没有新建 `docs-panel.css`，只用 Tailwind token 类；计划里的 `getDocsDoc` 没有实现（不需要）。
+- P4：`pnpm --filter @actspace/site test` 通过（31）；`pnpm check:docs` / `check:current-docs` 仍是 363 条已知失败，全部在 `docs/exec-runs/`，无新增。

@@ -153,7 +153,8 @@ describe("runtime v2 desktop shell IPC", () => {
       expect(await read(worktree)).toMatchObject({ content: worktree });
       await expect(read(outside)).rejects.toThrow("workspace_not_registered");
       await expect(read("/")).rejects.toThrow("workspace_not_registered");
-      await expect(Promise.resolve().then(() => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaceDir)!(trusted.event, { workspaceRoot: outside }))).rejects.toThrow("workspace_not_registered");
+      await expect(Promise.resolve().then(() => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaceMarkdownFiles)!(trusted.event, { workspaceRoot: outside }))).rejects.toThrow("workspace_not_registered");
+      await expect(Promise.resolve().then(() => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.writeWorkspaceMarkdownFile)!(trusted.event, { workspaceRoot: outside, relativePath: "a.md", content: "x" }))).rejects.toThrow("workspace_not_registered");
       await expect(Promise.resolve().then(() => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.statWorkspaceFile)!(trusted.event, { workspaceRoot: outside, relativePath: "a.md" }))).rejects.toThrow("workspace_not_registered");
     } finally {
       registration.dispose();

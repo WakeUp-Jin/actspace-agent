@@ -79,7 +79,8 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
     const action = (input as Record<string, unknown>).action;
     return action === "open" || action === "reveal" ? null : "Invalid workspace file action";
   }],
-  [contract.workspaces.listDir, shape({ workspaceRoot: "string?", relativePath: "string?" }, "Invalid workspace directory")],
+  [contract.workspaces.listMarkdownFiles, shape({ workspaceRoot: "string" }, "Invalid workspace")],
+  [contract.workspaces.writeMarkdownFile, shape({ workspaceRoot: "string", relativePath: "string", content: "string" }, "Invalid workspace Markdown file")],
   [contract.sessions.readArtifact, shape({ sessionId: "string", artifactPath: "string" }, "Invalid session artifact")],
   [contract.sessions.openSideChat, shape({ parentSessionId: "string" }, "Invalid side chat parent")],
   [contract.sessions.listSideChats, shape({ parentSessionId: "string" }, "Invalid side chat parent")],
