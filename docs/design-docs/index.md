@@ -49,6 +49,8 @@
 ## 根层入口
 
 - `core-beliefs.md`：Agent-first 的工作原则和模板设计出发点。
+- [架构优化](架构优化/README.md)：2026-11-01 立项。第一步「功能减法」已确认、待实施，见 [01 功能减法设计](架构优化/01-功能减法设计.md)（删除 HTML / 代码 / CSV 渲染、可视化回复、终端、文件树和 Review 的操作与监听；浏览器能力与英语学习默认不加载），计划见 [20261101-feature-subtraction](../exec-plans/active/20261101-feature-subtraction/README.md)；第二步「插件结构」已确认、待实施，见 [02 插件结构设计](架构优化/02-插件结构设计.md)（`packages/<能力>/<包>` 两级目录、全局 / 会话两类插件、manifest 的 `display`、唯一插件清单、扩展 › 插件页、README 规范与检查），计划见 [20261101-plugin-structure](../exec-plans/active/20261101-plugin-structure/README.md)，插件页 demo 见 [plugins-page-demo](frontend/plugins-page-demo.html)。
+- [文档面板规范](frontend/front-文档面板规范.md)：2026-11-01 确认、待实施；只含 Markdown 的目录树取代工作区文件树，聊天 → 正文 → 文件树，绿点标出本会话改过的文档；demo 见 [md-file-tree-demo](frontend/md-file-tree-demo.html)（方案 A）。
 - [ActSpace 产品概念思路（初稿）](ActSpace产品概念思路初稿.md)：产品形象：定位、信念“唯变所适，每一个问题都有它的空间”、故事线、Agent / 场景 / Actor / Actor 名册 / 空间、意象与气质；视觉方向待定。
 - `core-storage-and-observability.md`：本地存储、workspace root 和可观测性边界。
 - [ActSpace 数据存储结构与职责](core-data-storage-design.md)：当前四块存储结构、接纳与落盘写入图、按用途读取图；区分完整事实、当前内存、SQLite 查询缓存和全局配置，明确冷读与检查点限制。

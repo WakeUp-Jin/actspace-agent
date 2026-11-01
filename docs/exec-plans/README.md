@@ -15,9 +15,11 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [功能减法](active/20261101-feature-subtraction/README.md) | 2026-11-01 立项（[架构优化](../design-docs/架构优化/README.md)第一步）；P1–P5 待执行，P6 并入插件结构 S3。 |
+| [插件结构](active/20261101-plugin-structure/README.md) | 2026-11-01 立项（[架构优化](../design-docs/架构优化/README.md)第二步）；S1–S4 计划已写，排在功能减法 P1–P5 之后连续执行。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
-| [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
+| [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 2026-11-01 随[功能减法](active/20261101-feature-subtraction/README.md)暂停（浏览器能力改为默认不加载）；是否删除由用户决定。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 已被[设置 › 模型重做](completed/20261021-model-provider-redesign.md)取代（思考档位改为每个模型声明的档位）；是否删除由用户决定。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；DropdownMenu（及 Popover、Dialog、Select、ContextMenu）由 Desktop 前端重构 16 接手；剩 Switch、Textarea、Tabs 及对应迁移。 |
 
