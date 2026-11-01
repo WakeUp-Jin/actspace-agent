@@ -32,7 +32,7 @@ function fixture(initial = false, background = false) {
     "sessions.list": async () => rows, "sessions.listPage": listPage,
     "sessions.getPage": async () => projectionFixture(id), "approvals.listPending": listPending,
     "events.sessionLive": (callback: (event: unknown) => void) => { listeners.add(callback); return () => listeners.delete(callback); },
-    "events.agentStream": () => () => {}, "review.getSnapshot": async () => ({ ok: false }), "visualize.list": async () => ({ items: [] }),
+    "events.agentStream": () => () => {}, "review.getSnapshot": async () => ({ ok: false }),
     "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
   });
   render(<App />);

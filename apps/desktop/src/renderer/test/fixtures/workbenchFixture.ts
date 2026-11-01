@@ -409,7 +409,7 @@ export const mockMessages: MessageBlock[] = [
     cwd: "/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent",
     intent: "对运行时与领域包执行 TypeScript 类型检查",
     stdout:
-      "> @actspace/runtime@0.1.0 typecheck /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/packages/runtime\n> tsc --noEmit -p tsconfig.json",
+      "> @actspace/runtime@0.1.0 typecheck /Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/packages/core/runtime\n> tsc --noEmit -p tsconfig.json",
     stderr: "",
     exitCode: 0,
     durationMs: 1284,

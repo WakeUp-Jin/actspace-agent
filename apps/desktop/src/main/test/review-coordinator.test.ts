@@ -1,13 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   ReviewFileDiff,
-  ReviewMutationResult,
   ReviewSelection,
   ReviewSnapshot,
 } from "@actspace/shared";
 import {
   ReviewCoordinator,
-  type ReviewMutationProvider,
   type ReviewQueryProvider,
 } from "../review-coordinator";
 
@@ -30,24 +28,10 @@ function snapshot(selection: ReviewSelection, generation: number): ReviewSnapsho
       renderKind: "text",
       source: "workingTree",
       diffLoadStatus: "idle",
-      viewed: false,
       fingerprint: "file-fingerprint",
     }],
     totals: { files: 1, additions: 1, deletions: 1, changedLines: 2, estimatedChangedBytes: 128 },
-    capabilities: {
-      canStageFile: true,
-      canStageHunk: true,
-      canUnstageFile: false,
-      canUnstageHunk: false,
-      canRevertFile: true,
-      canRevertHunk: true,
-      canLoadFullFile: true,
-      canOpenFile: true,
-      canCommit: false,
-      canPush: false,
-      canCreatePullRequest: false,
-      disabledReasons: {},
-    },
+    capabilities: { canLoadFullFile: true },
     loadPolicy: { mode: "all-files" },
     queryOptions: { ignoreWhitespaceChanges: false },
     generatedAt: "2026-07-30T00:00:00.000Z",
@@ -68,26 +52,18 @@ function fileDiff(snapshotId: string, generation: number): ReviewFileDiff {
   };
 }
 
-function setup(mutationResult?: ReviewMutationResult) {
+function setup() {
   const getSnapshot = vi.fn<ReviewQueryProvider["getSnapshot"]>(async (input) => snapshot(input.selection, input.generation));
   const getFileDiffs = vi.fn<ReviewQueryProvider["getFileDiffs"]>(async (input) => ({
     ok: true,
     outcomes: input.requests.map((request) => ({ fileId: request.fileId, status: "ready" as const, diff: fileDiff(input.snapshot.id, input.generation) })),
   }));
   const getFileContents = vi.fn<ReviewQueryProvider["getFileContents"]>(async () => ({ ok: true, outcomes: [] }));
-  const applyMutation = vi.fn<ReviewMutationProvider["applyMutation"]>(async () => mutationResult ?? ({
-    status: "success",
-    generation: 1,
-    completedSteps: [{ id: "stage", status: "completed" }],
-    failedSteps: [],
-  }));
   const coordinator = new ReviewCoordinator({
     resolveWorkspace: async () => ({ ok: true, workspace: { workspaceId: "workspace-1", workspaceRoot: "/workspace" } }),
     queryProvider: { getSnapshot, getFileDiffs, getFileContents },
-    mutationProvider: { applyMutation },
-    debounceMs: 20,
   });
-  return { coordinator, getSnapshot, getFileDiffs, getFileContents, applyMutation };
+  return { coordinator, getSnapshot, getFileDiffs, getFileContents };
 }
 
 describe("ReviewCoordinator", () => {
@@ -105,7 +81,7 @@ describe("ReviewCoordinator", () => {
     const loaded = await coordinator.getSnapshot({ workspaceId: "workspace-1", selection: { kind: "unstaged" } });
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
-    coordinator.invalidate("workspace-1", "workspace");
+    await coordinator.refreshSnapshot({ workspaceId: "workspace-1", selection: { kind: "unstaged" } });
 
     const result = await coordinator.getFileDiff({
       workspaceId: "workspace-1",
@@ -118,138 +94,18 @@ describe("ReviewCoordinator", () => {
     expect(getFileDiffs).not.toHaveBeenCalled();
   });
 
-  it("rejects stale mutations and invalidates after success", async () => {
-    const { coordinator, applyMutation } = setup();
-    const stale = await coordinator.applyMutation({
-      workspaceId: "workspace-1",
-      mutation: {
-        snapshotId: "snapshot-1",
-        expectedGeneration: 0,
-        action: "stage",
-        scope: "file",
-        source: "workingTree",
-        path: "src/index.ts",
-      },
-    });
-    expect(stale.status).toBe("stale");
-    expect(applyMutation).not.toHaveBeenCalled();
+  it("refreshSnapshot drops the cache, bumps the generation once, and notifies once", async () => {
+    const { coordinator, getSnapshot } = setup();
+    const notifications: Array<{ generation: number; reason: string }> = [];
+    coordinator.subscribe((notification) => notifications.push({ generation: notification.generation, reason: notification.reason }));
+    await coordinator.getSnapshot({ workspaceId: "workspace-1", selection: { kind: "uncommitted" } });
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
 
-    const success = await coordinator.applyMutation({
-      workspaceId: "workspace-1",
-      mutation: {
-        snapshotId: "snapshot-1",
-        expectedGeneration: 1,
-        action: "stage",
-        scope: "file",
-        source: "workingTree",
-        path: "src/index.ts",
-      },
-    });
-    expect(success).toMatchObject({ status: "success", generation: 2 });
-  });
+    const refreshed = await coordinator.refreshSnapshot({ workspaceId: "workspace-1", selection: { kind: "uncommitted" } });
 
-  it("debounces workspace events into one generation", async () => {
-    vi.useFakeTimers();
-    const { coordinator } = setup();
-    const notifications: number[] = [];
-    coordinator.subscribe((notification) => notifications.push(notification.generation));
-    coordinator.scheduleInvalidation("workspace-1", "watch");
-    coordinator.scheduleInvalidation("workspace-1", "watch");
-    coordinator.scheduleInvalidation("workspace-1", "watch");
-
-    await vi.advanceTimersByTimeAsync(25);
-
-    expect(notifications).toEqual([2]);
-    coordinator.dispose();
-    vi.useRealTimers();
-  });
-
-  it("uses a fixed window so continuous events still notify about twice per second and the last one arrives", async () => {
-    vi.useFakeTimers();
-    const coordinator = new ReviewCoordinator({
-      resolveWorkspace: async () => ({ ok: true, workspace: { workspaceId: "workspace-1", workspaceRoot: "/workspace" } }),
-      queryProvider: { getSnapshot: vi.fn(), getFileDiffs: vi.fn(), getFileContents: vi.fn() },
-    });
-    const notifications: number[] = [];
-    coordinator.subscribe((notification) => notifications.push(notification.generation));
-    for (let elapsed = 0; elapsed < 2_000; elapsed += 50) {
-      coordinator.scheduleInvalidation("workspace-1", "watch");
-      await vi.advanceTimersByTimeAsync(50);
-    }
-    expect(notifications).toEqual([2, 3, 4, 5]);
-    coordinator.scheduleInvalidation("workspace-1", "watch");
-    await vi.advanceTimersByTimeAsync(500);
-    expect(notifications).toEqual([2, 3, 4, 5, 6]);
-    coordinator.scheduleInvalidation("workspace-2", "watch");
-    await vi.advanceTimersByTimeAsync(500);
-    expect(notifications).toEqual([2, 3, 4, 5, 6, 2]);
-    coordinator.dispose();
-    vi.useRealTimers();
-  });
-
-  it("drops a watch window whose paths are all ignored by Git and keeps windows with real changes", async () => {
-    vi.useFakeTimers();
-    const filterWatchPaths = vi.fn(async ({ paths }: { workspaceRoot: string; paths: string[] }) => paths.some((path) => !path.startsWith("dist/")));
-    const coordinator = new ReviewCoordinator({
-      resolveWorkspace: async () => ({ ok: true, workspace: { workspaceId: "workspace-1", workspaceRoot: "/workspace" } }),
-      queryProvider: { getSnapshot: vi.fn(), getFileDiffs: vi.fn(), getFileContents: vi.fn() },
-      filterWatchPaths,
-      debounceMs: 20,
-    });
-    const notifications: number[] = [];
-    coordinator.subscribe((notification) => notifications.push(notification.generation));
-
-    for (let index = 0; index < 50; index += 1) coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: `dist/${index % 5}.js` });
-    await vi.advanceTimersByTimeAsync(25);
-    expect(filterWatchPaths).toHaveBeenCalledTimes(1);
-    expect(filterWatchPaths.mock.calls[0]![0].paths).toHaveLength(5);
-    expect(notifications).toEqual([]);
-
-    coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: "dist/0.js" });
-    coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: "src/a.ts" });
-    await vi.advanceTimersByTimeAsync(25);
-    expect(notifications).toEqual([2]);
-
-    filterWatchPaths.mockClear();
-    coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: "dist/0.js" });
-    coordinator.scheduleInvalidation("workspace-1", "watch");
-    await vi.advanceTimersByTimeAsync(25);
-    expect(filterWatchPaths).not.toHaveBeenCalled();
-    expect(notifications).toEqual([2, 3]);
-
-    filterWatchPaths.mockRejectedValueOnce(new Error("git failed"));
-    coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: "dist/0.js" });
-    await vi.advanceTimersByTimeAsync(25);
-    expect(notifications).toEqual([2, 3, 4]);
-
-    let release: (relevant: boolean) => void = () => undefined;
-    filterWatchPaths.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
-    coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: "src/a.ts" });
-    await vi.advanceTimersByTimeAsync(25);
-    coordinator.dispose();
-    release(true);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(notifications).toEqual([2, 3, 4]);
-    vi.useRealTimers();
-  });
-
-  it("refreshes without asking Git when a window collects too many paths", async () => {
-    vi.useFakeTimers();
-    const filterWatchPaths = vi.fn(async () => false);
-    const coordinator = new ReviewCoordinator({
-      resolveWorkspace: async () => ({ ok: true, workspace: { workspaceId: "workspace-1", workspaceRoot: "/workspace" } }),
-      queryProvider: { getSnapshot: vi.fn(), getFileDiffs: vi.fn(), getFileContents: vi.fn() },
-      filterWatchPaths,
-      debounceMs: 20,
-    });
-    const notifications: number[] = [];
-    coordinator.subscribe((notification) => notifications.push(notification.generation));
-    for (let index = 0; index < 2_001; index += 1) coordinator.scheduleInvalidation("workspace-1", "watch", { workspaceRoot: "/workspace", path: `dist/${index}.js` });
-    await vi.advanceTimersByTimeAsync(25);
-    expect(filterWatchPaths).not.toHaveBeenCalled();
-    expect(notifications).toEqual([2]);
-    coordinator.dispose();
-    vi.useRealTimers();
+    expect(getSnapshot).toHaveBeenCalledTimes(2);
+    expect(refreshed).toMatchObject({ ok: true, snapshot: { generation: 2 } });
+    expect(notifications).toEqual([{ generation: 2, reason: "refresh" }]);
   });
 
   it("deduplicates overlapping batch requests for the same file", async () => {
@@ -304,7 +160,7 @@ describe("ReviewCoordinator", () => {
     const pending = coordinator.getFileDiffs({ workspaceId: "workspace-1", snapshotId: loaded.snapshot.id, expectedGeneration: 1, requests: [{ fileId: "file-1" }] });
     await Promise.resolve();
 
-    coordinator.invalidate("workspace-1", "refresh");
+    await coordinator.refreshSnapshot({ workspaceId: "workspace-1", selection: { kind: "unstaged" } });
 
     expect(providerSignal?.aborted).toBe(true);
     await expect(pending).resolves.toMatchObject({ ok: true, outcomes: [{ status: "failed", code: "cancelled" }] });

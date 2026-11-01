@@ -13,8 +13,8 @@
 
 - 相关文档：[11-Harness统计设计](../../design-docs/自进化的方案设计/11-Harness统计设计.md)、[10-V1实现与使用说明](../../design-docs/自进化的方案设计/10-V1实现与使用说明.md)、`docs/references/front-新功能开发清单.md`（IPC 七步）。
 - 相关代码路径：
-  - 插件挂载：`packages/cordis-adapter/src/cordis-tree.ts:74-80`、`packages/boot/src/harness-mount.ts`、`packages/runtime/src/startup/boot.ts`
-  - 版本：`packages/boot/src/harness-generations.ts`、`<dataRoot>/harness-state/selections.jsonl`
+  - 插件挂载：`packages/composition/cordis-adapter/src/cordis-tree.ts:74-80`、`packages/composition/boot/src/harness-mount.ts`、`packages/core/runtime/src/startup/boot.ts`
+  - 版本：`packages/composition/boot/src/harness-generations.ts`、`<dataRoot>/harness-state/selections.jsonl`
   - 使用统计 Worker：`apps/desktop/src/main/runtime-v2/usage-read-model-*.ts`、`read-model-sync.ts`、`usage-journal-projection.ts`
   - 披露重放：`packages/context/engine/src/state.ts`（`applyStateEvent`）
   - 页面：`apps/desktop/src/renderer/components/SettingsNav.tsx`、`SettingsPage.tsx`、`UsageStatisticsPage.tsx`、`renderer/mock/handlers.ts`
@@ -49,15 +49,15 @@
 | # | 任务 | 主要文件 | 完成标准 |
 |---|---|---|---|
 | T0 | 设计文档、执行计划、索引 | `docs/design-docs/自进化的方案设计/11-*.md`、本文件 | 用户审阅通过 |
-| T1 | 共享类型与常量：tab、筛选、每个 tab 的结果类型、规则阈值、直方图分档、统计文件行格式 | `packages/shared/src/harness-stats.ts`、`packages/shared/src/ipc.ts` | 类型被 main / renderer / worker 共同引用 |
-| T2 | 挂载层通用观察口：`cordis-tree` 挂载选项接受可选的观察者，有就把插件 ctx 交给它包装，没有就原样挂载 | `packages/cordis-adapter/src/cordis-tree.ts` 及类型 | 无观察者时行为与现在完全一致（现有测试全过）；有观察者时每个插件调用一次 |
-| T3 | 新 Host 插件包 `@actspace/harness-stats`：观察者（包 `get` 得服务 Proxy、包 `on / once` 计监听、包 `apply` 计加载、`tools.runtime.register` 记工具归属）、内存累加器（小时 × 版本 × 插件 × 类型 × 名称 × 方法、直方图、2 万键上限）、统计文件写入（60 秒、退出时、失败计数）、插件清单记录 | `packages/harness-stats/*` | 单测覆盖：私有字段服务可调用、同对象同 Proxy、Promise 计时、抛错计数、累加、换小时、超上限立即写、写失败保留数据 |
-| T4 | 接线：Host 启动时创建 `@actspace/harness-stats`，把观察者经 `harness-mount` 传给挂载层，带上当前版本；`ACTSPACE_HARNESS_STATS=0` 时不创建；Host 退出时写文件 | `packages/runtime/src/startup/boot.ts`、`packages/boot/src/harness-mount.ts` | 真实 Host 跑一轮后 `<dataRoot>/harness-stats/` 有内容；`check:packages`、`gen:contract-matrix --check`、`check:harness-events` 通过 |
+| T1 | 共享类型与常量：tab、筛选、每个 tab 的结果类型、规则阈值、直方图分档、统计文件行格式 | `packages/util/shared/src/harness-stats.ts`、`packages/util/shared/src/ipc.ts` | 类型被 main / renderer / worker 共同引用 |
+| T2 | 挂载层通用观察口：`cordis-tree` 挂载选项接受可选的观察者，有就把插件 ctx 交给它包装，没有就原样挂载 | `packages/composition/cordis-adapter/src/cordis-tree.ts` 及类型 | 无观察者时行为与现在完全一致（现有测试全过）；有观察者时每个插件调用一次 |
+| T3 | 新 Host 插件包 `@actspace/harness-stats`：观察者（包 `get` 得服务 Proxy、包 `on / once` 计监听、包 `apply` 计加载、`tools.runtime.register` 记工具归属）、内存累加器（小时 × 版本 × 插件 × 类型 × 名称 × 方法、直方图、2 万键上限）、统计文件写入（60 秒、退出时、失败计数）、插件清单记录 | `packages/harness-evolution/harness-stats/*` | 单测覆盖：私有字段服务可调用、同对象同 Proxy、Promise 计时、抛错计数、累加、换小时、超上限立即写、写失败保留数据 |
+| T4 | 接线：Host 启动时创建 `@actspace/harness-stats`，把观察者经 `harness-mount` 传给挂载层，带上当前版本；`ACTSPACE_HARNESS_STATS=0` 时不创建；Host 退出时写文件 | `packages/core/runtime/src/startup/boot.ts`、`packages/composition/boot/src/harness-mount.ts` | 真实 Host 跑一轮后 `<dataRoot>/harness-stats/` 有内容；`check:packages`、`gen:contract-matrix --check`、`check:harness-events` 通过 |
 | T5 | Schema v15：设计文档 4.1、4.2 的全部表与索引，加入同步表清单；会话移出目录前把该会话的汇总追加到 `archived-sessions.jsonl`，重建时读回 | `usage-read-model-schema.ts`、`usage-read-model-worker.ts`、`read-model-sync.ts`、新建 `harness-stats-archive.ts` | 旧库自动重建；删除会话后统计仍在，重建后仍在；运行时表保留 |
 | T6 | 会话日志汇总：扩展投影白名单（只取元数据），一次读取同时产出使用统计与 Harness 统计；披露状态重放（含查索引与索引转化）；压缩拿掉的工具输出（`surface/replaced` 编号对 `harness_tool_output`）；Harness 版本关联（run 事件 → 父会话 → 未知） | `usage-journal-projection.ts`、新建 `harness-stats-projection.ts`、`harness-disclosure-replay.ts` | 每个指标有 fixture 单测（含旧日志缺字段）；增量与整会话重建结果一致 |
 | T7 | 统计文件汇总：按文件字节偏移增量读取、只读完整行、文件变小时重建；读 `selections.jsonl` 得版本列表 | 新建 `harness-stats-file-ingest.ts` | 单测覆盖半行、跨月文件、截断重建 |
 | T8 | 查询与规则：每个 tab 一个 SQL 查询函数、直方图求 P50 / P95、筛选选项查询、设计文档第 6 节的 12 条规则 | 新建 `harness-stats-queries.ts`、`harness-stats-flags.ts` | 每个 tab 有查询单测；每条规则有命中、不命中、样本不足三个用例 |
-| T9 | 主进程服务与 IPC：`harnessStats.query / getStatus / cancel`，查询时先返回现有结果并带同步进度，同步完成后通知；IPC 七步 | `apps/desktop/src/main/runtime-v2/harness-stats-service.ts`、`fixed-renderer-ipc.ts`、`packages/shared/src/desktop-bridge/contract.ts`、preload、`renderer/mock/handlers.ts` | `check:ipc-channels`、`test:ipc-channels`、`check:renderer-bridge` 通过 |
+| T9 | 主进程服务与 IPC：`harnessStats.query / getStatus / cancel`，查询时先返回现有结果并带同步进度，同步完成后通知；IPC 七步 | `apps/desktop/src/main/runtime-v2/harness-stats-service.ts`、`fixed-renderer-ipc.ts`、`packages/util/shared/src/desktop-bridge/contract.ts`、preload、`renderer/mock/handlers.ts` | `check:ipc-channels`、`test:ipc-channels`、`check:renderer-bridge` 通过 |
 | T10 | 设置页：导航项、页面骨架、筛选条、4 张指标卡、7 个 tab、SVG 图表（散点、趋势、堆叠条、直方图、悬停提示）、`useHarnessStatsTab`（按需、缓存、2 秒防抖刷新当前 tab）、同步进度条、mock 数据 `?mock=harness-stats` | `renderer/components/harness-stats/*`、`SettingsNav.tsx`、`SettingsPage.tsx` | renderer 测试覆盖按需加载、缓存、筛选只重查当前 tab；浅色 / 深色 mock 截图与 demo 方向 A 对齐 |
 | T11 | 验证：见下方“验证方式” | — | 全部通过，结果写入执行摘要 |
 | T12 | 收尾：`docs/histories` 记录、learnings、相关文档同步、计划移入 completed | `docs/histories/*`、本文件 | 索引与文档无过期描述 |

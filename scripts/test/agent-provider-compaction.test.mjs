@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { startAgentProvider } from "./fixtures/agent-provider.mjs";
-import { COMPACTION_SYSTEM } from "../../packages/context/compaction/dist/prompts.js";
+import { COMPACTION_SYSTEM } from "../../packages/context/context-compaction/dist/prompts.js";
 
 test("fixture compaction failure and recovery follow the actual compaction prompt", async () => {
   const provider = await startAgentProvider();

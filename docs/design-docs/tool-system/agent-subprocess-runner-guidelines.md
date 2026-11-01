@@ -11,7 +11,7 @@
 
 ## 当前 Grep/Glob Host 实现
 
-入口为 `packages/tools/filesystem-search/src/node-ports.ts`。
+入口为 `packages/fs/tool-fs-search/src/node-ports.ts`。
 
 - 使用显式 `ripgrepPath`；未提供时通过 PATH 启动 `rg`。
 - 当前没有 `ACTSPACE_RG_PATH` 自动解析、版本探测或 bundled `@vscode/ripgrep` fallback。
@@ -22,7 +22,7 @@
 
 ## 当前 Bash Host 实现
 
-入口为 `packages/tools/shell-tools/src/plugin.ts`、`command-rules.ts`、`node-ports.ts`。
+入口为 `packages/shell/tool-shell/src/plugin.ts`、`command-rules.ts`、`node-ports.ts`。
 
 - Bash permission 合同先提取 process resource，再应用命令 hard guard；通过后 default 请求审批或匹配已有会话前缀授权，full-access 自动放行。模式切换会撤销旧等待并重新评估；硬拒绝在所有模式下生效，沙箱只在 `default`、`auto-review` 下生效，`full-access` 不进沙箱（见[沙箱设计](../execution-safety/agent-沙箱设计.md)第 9 节）。
 - macOS 使用 `/bin/zsh -lc`，其他平台使用 `/bin/bash -lc`；沙箱经 Harness `sandbox` 服务（macOS：nono，其次 Seatbelt）。这是 Bash 工具专用 shell 边界。

@@ -27,29 +27,36 @@ type SummaryRun = {
   workspaceId: string | null;
   inFlight: boolean;
   pending: boolean;
+  /** 在途期间排队的补查里是否有强制刷新。 */
+  pendingForce: boolean;
 };
 
 /**
- * Composer 顶部的 Review 摘要。只响应当前目标工作区的变更通知；同一目标最多一个请求在途，
- * 期间的刷新合并成结束后的一次补查。切换目标时旧请求的结果直接丢弃。
+ * Composer 顶部的 Review 摘要。没有实时文件监听，数字只在几个明确的时机更新：切换目标、
+ * 每轮 Agent 结束、打开面板、手动刷新、顶部菜单提交之后，这些都走 `force`（`refreshSnapshot`，
+ * 丢弃缓存重新读 Git）。同一目标最多一个请求在途，期间的刷新合并成结束后的一次补查（任一次是
+ * 强制就按强制）。切换目标时旧请求的结果直接丢弃。
  */
 export function useReviewSummary(target: { workspaceRoot: string | null; sessionId: string | null }) {
   const [reviewSummary, setReviewSummary] = useState<ComposerReviewSummary | null>(null);
-  const runRef = useRef<SummaryRun>({ workspaceId: null, inFlight: false, pending: false });
+  const runRef = useRef<SummaryRun>({ workspaceId: null, inFlight: false, pending: false, pendingForce: false });
   const targetRef = useRef(target);
   targetRef.current = target;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     const run = runRef.current;
     if (run.inFlight) {
       run.pending = true;
+      run.pendingForce = run.pendingForce || force;
       return;
     }
     run.inFlight = true;
     run.pending = false;
+    run.pendingForce = false;
     let next: ComposerReviewSummary;
     try {
-      const result = await reviewApi.getSnapshot({
+      const fetchSnapshot = force ? reviewApi.refreshSnapshot : reviewApi.getSnapshot;
+      const result = await fetchSnapshot({
         workspaceRoot: targetRef.current.workspaceRoot ?? undefined,
         sessionId: targetRef.current.sessionId ?? undefined,
         selection: { kind: "uncommitted" },
@@ -64,14 +71,14 @@ export function useReviewSummary(target: { workspaceRoot: string | null; session
     if (runRef.current !== run) return;
     // 内容没变就保留原引用，避免整个 App 跟着重渲染。
     setReviewSummary((current) => current && sameReviewSummary(current, next) ? current : next);
-    if (run.pending) void load();
+    if (run.pending) void load(run.pendingForce);
   }, []);
 
   const { workspaceRoot, sessionId } = target;
   useEffect(() => {
-    runRef.current = { workspaceId: null, inFlight: false, pending: false };
+    runRef.current = { workspaceId: null, inFlight: false, pending: false, pendingForce: false };
     setReviewSummary({ status: "loading" });
-    void load();
+    void load(true);
   }, [workspaceRoot, sessionId, load]);
 
   useEffect(() => eventsApi.reviewChanged((notification) => {
@@ -80,6 +87,7 @@ export function useReviewSummary(target: { workspaceRoot: string | null; session
     if (run.workspaceId === notification.workspaceId || (run.workspaceId === null && run.inFlight)) void load();
   }), [load]);
 
-  const refreshReviewSummary = useCallback(() => load(), [load]);
+  /** 默认强制刷新；只有明确要读缓存时才传 `false`。 */
+  const refreshReviewSummary = useCallback((force = true) => load(force), [load]);
   return { reviewSummary, refreshReviewSummary };
 }

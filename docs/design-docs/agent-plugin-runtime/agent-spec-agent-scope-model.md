@@ -310,6 +310,6 @@ Scope P0 已完成以下代码接线：
 
 - `ScopeKey` 是按对象 identity 比较的 opaque object，parent chain 由 `WeakMap` 维护，`scopeTarget()` 只向目标 key 及其祖先准入事件；见 DSH Scope 原语（历史快照路径：`tmp/deepseek-harness/packages/core/scope/src/index.ts`）。
 - Agent dispatch 将 live Agent subject 与 Scope carrier 绑定；见 DSH Agent dispatch（历史快照路径：`tmp/deepseek-harness/packages/core/agent/src/dispatch.ts`）。
-- Preset composition 通过 standing mount 和显式 child composition 组织，而不是把 descriptor/preset id 当作 live Agent scope；见 DSH Agent preset composition（历史快照路径：`tmp/deepseek-harness/packages/preset/agent-presets/src/index.ts`） 与 DSH child composition（历史快照路径：`tmp/deepseek-harness/packages/subagent/subagent/src/child-agent.ts`）。
+- Preset composition 通过 standing mount 和显式 child composition 组织，而不是把 descriptor/preset id 当作 live Agent scope；见 DSH Agent preset composition（历史快照路径：`tmp/deepseek-harness/packages/preset/agent-presets/src/index.ts`） 与 DSH child composition（历史快照路径：`tmp/deepseek-harness/packages/subagent/subagent/subagent/src/child-agent.ts`）。
 - DSH 的 one-shot provider 选择 fresh flat registration scope，是一种隔离策略；ActSpace 原语保留显式 `isolatedChild()`。当前生产接线按独立 Harness lease 建树，不由早期参考实现决定。
 - Scope、工具 visibility、sandbox/approval policy 和 Session lineage 在 DSH 中是不同层次；见 DSH Scope README（历史快照路径：`tmp/deepseek-harness/packages/core/scope/README.zh.md`）、DSH Tools README（历史快照路径：`tmp/deepseek-harness/packages/core/tools/README.zh.md`） 和 DSH Session types（历史快照路径：`tmp/deepseek-harness/packages/core/session/src/types.ts`）。

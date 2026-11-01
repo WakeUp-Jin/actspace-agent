@@ -11,7 +11,7 @@
 
 ## 1. 依据与边界
 
-当前事件词汇与 envelope 以 ActSpace `packages/session/journal/src/core-codecs.ts`、默认 Agent Loop 和 [Session Format v1](agent-spec-session-format-v1.md)为准。以下保留 2026-08-29 设计时的参考资料顺序，不覆盖当前实现：
+当前事件词汇与 envelope 以 ActSpace `packages/session/session-journal/src/core-codecs.ts`、默认 Agent Loop 和 [Session Format v1](agent-spec-session-format-v1.md)为准。以下保留 2026-08-29 设计时的参考资料顺序，不覆盖当前实现：
 
 1. `tmp/deepseek-harness/packages/core/session/src/types.ts` 与 `tmp/deepseek-harness/packages/core/agent-loop/src/agent.ts` 的源码行为；
 2. `tmp/deepseek-harness/docs/persistence-catalog.md` 的持久化目录；

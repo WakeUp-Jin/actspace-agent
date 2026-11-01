@@ -8,7 +8,7 @@ export const statusLabel = { live: '已上线', wip: '进行中' } as const;
 export const todayCapabilities: Capability[] = [
   { title: '读取与检索', description: '按需读取文件、搜索代码，先弄清项目再动手。', slug: 'files-and-search' },
   { title: '编辑与 Review', description: '改动直接写进文件，逐个检查差异再决定保留。', slug: 'review' },
-  { title: '终端', description: '在当前项目里运行命令、构建与测试，输出回到对话。', slug: 'terminal' },
+  { title: 'Bash', description: '让 Agent 在当前项目里运行命令、构建与测试，输出回到对话。', slug: 'bash' },
   { title: '审批策略', description: '决定哪些操作直接执行，哪些先问你。', slug: 'tools-and-approvals' },
   { title: 'Skills', description: '把常用的工作方法装进 Skill，带进下一项任务。', slug: 'skills' },
   { title: '子 Agent', description: '把独立的检索拆给子 Agent，主会话保留全貌。', slug: 'subagents' },

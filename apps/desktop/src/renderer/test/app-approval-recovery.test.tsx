@@ -38,7 +38,6 @@ function fixture(ordinary = false, pendingTool?: { name: string; preview: NonNul
     "events.agentStream": (callback: typeof listener) => { listener = callback; return () => {}; },
     "events.sessionLive": (callback: typeof liveListener) => { liveListener = callback; return () => {}; },
     "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
-    "visualize.list": async () => ({ items: [] }),
     "tasks.abort": abort, "approvals.submit": decide,
     "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
   });

@@ -54,7 +54,6 @@ function installBridge(runAgent: (input: FixtureRunInput) => Promise<unknown>, p
     "settings.get": async () => defaultSettings,
     "sessions.getPage": async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
     "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
-    "visualize.list": async () => ({ items: [] }),
     "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
     "workspaces.list": async (): Promise<WorkspaceListResult> => ({ version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: "2026-09-28T00:00:00.000Z", updatedAt: "2026-09-28T00:00:00.000Z" }] }),
     "sessions.list": async () => [...records.values()].map((record) => ({ id: record.meta.id, title: record.meta.title, updatedAt: record.meta.updatedAt, agentRunCount: 1, agentForm: "chat", workspaceRoot: "/tmp/workspace" })),

@@ -73,6 +73,9 @@ describe("file applications service", () => {
     expect(await openWorkspaceFile({ ...input, action: "open", applicationId: "/Applications/Evil.app" }, roots, deps)).toMatchObject({ ok: false, error: "not_registered" });
     expect(await openWorkspaceFile({ ...input, action: "open" }, roots, deps)).toEqual({ ok: true });
     expect(openPath).toHaveBeenCalledWith(file);
+    // 实测：没有关联应用时 shell.openPath 返回错误串，映射为 no_application 供 renderer 弹兜底对话框。
+    const noAppOpenPath = vi.fn(async () => "Failed to open path");
+    expect(await openWorkspaceFile({ ...input, action: "open" }, roots, { ...deps, openPath: noAppOpenPath })).toMatchObject({ ok: false, error: "no_application", message: "Failed to open path" });
     expect(await openWorkspaceFile({ ...input, action: "reveal" }, roots, deps)).toEqual({ ok: true });
     expect(showItemInFolder).toHaveBeenCalledWith(file);
     expect(await openWorkspaceFile({ ...input, relativePath: "missing.docx", action: "reveal" }, roots, deps)).toMatchObject({ ok: false, error: "invalid_target" });

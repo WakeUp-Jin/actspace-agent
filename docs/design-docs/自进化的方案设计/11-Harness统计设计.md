@@ -90,7 +90,7 @@
 3. 自进化修改的正是 Harness；统计放在 Harness 里，会被被统计的对象删改，版本对比也会被它自身的变化干扰。
 4. 每次切换 Harness 版本都会重新挂载，内存计数会被打断。
 
-**插件挂载层**（`packages/cordis-adapter/src/cordis-tree.ts` 给每个插件包一层 `ctx.extend` 的位置，现有代码已经在这里限制 `provide`）只加一个通用的观察口：挂载选项里有观察者就把插件的 ctx 交给它包装，没有就原样挂载。Host 启动时把 `@actspace/harness-stats` 的观察者传进去（CLI 不持久化的临时运行不开统计，启动选项 `harnessStats: false`），**所有插件（包括用户安装的和自进化生成的）不用改一行代码就会被统计**。
+**插件挂载层**（`packages/composition/cordis-adapter/src/cordis-tree.ts` 给每个插件包一层 `ctx.extend` 的位置，现有代码已经在这里限制 `provide`）只加一个通用的观察口：挂载选项里有观察者就把插件的 ctx 交给它包装，没有就原样挂载。Host 启动时把 `@actspace/harness-stats` 的观察者传进去（CLI 不持久化的临时运行不开统计，启动选项 `harnessStats: false`），**所有插件（包括用户安装的和自进化生成的）不用改一行代码就会被统计**。
 
 包装规则：
 
@@ -170,7 +170,7 @@
 
 ## 6. 「值得关注」规则
 
-在 Worker 里对当前筛选范围的汇总结果逐条判断，不调用模型。每条规则有最小样本，不够样本不报。阈值集中在一个常量表里（`packages/shared/src/harness-stats.ts`），方便以后调整，也方便第二期 Agent 查询时引用同一套规则。
+在 Worker 里对当前筛选范围的汇总结果逐条判断，不调用模型。每条规则有最小样本，不够样本不报。阈值集中在一个常量表里（`packages/util/shared/src/harness-stats.ts`），方便以后调整，也方便第二期 Agent 查询时引用同一套规则。
 
 | 规则 | 等级 | 条件（最小样本） |
 |---|---|---|

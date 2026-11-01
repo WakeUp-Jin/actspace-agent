@@ -1,5 +1,7 @@
 # Chrome 扩展连接、启动与使用体验闭环
 
+> 随架构优化暂停：浏览器插件已改为默认不加载（扩展 › 插件 中开启），本计划剩余验收待恢复后继续。
+
 - 日期：2026-09-28
 - 状态：执行中
 - 执行模式：交互模式；用户已于 2026-09-28 授权开始实施
@@ -35,10 +37,10 @@
 | 事实 | 证据路径 | 实施含义 |
 |---|---|---|
 | 普通入口目前要求源码路径并执行构建 | `apps/desktop/src/renderer/components/extensions/CapabilitiesSection.tsx`、`apps/desktop/src/main/browser-bridge-service.ts` | 改为随包组件和连接向导 |
-| ready 在 boot 时读取，决定 capability ceiling 和工具注册 | `apps/desktop/src/main/runtime-v2/browser-capability.ts`、`desktop-host-adapter.ts`、`packages/tools/browser-tools/src/plugin.ts` | 页面轮询不能替代 Runtime 接入 |
-| 每次工具调用创建 transport 并 start/end session | `packages/tools/browser-tools/src/node-capability.ts` | 修复跨调用 ownership 与生命周期，不沿用旧文档的已实现长连接说法 |
+| ready 在 boot 时读取，决定 capability ceiling 和工具注册 | `apps/desktop/src/main/runtime-v2/browser-capability.ts`、`desktop-host-adapter.ts`、`packages/browser/tool-browser/src/plugin.ts` | 页面轮询不能替代 Runtime 接入 |
+| 每次工具调用创建 transport 并 start/end session | `packages/browser/tool-browser/src/node-capability.ts` | 修复跨调用 ownership 与生命周期，不沿用旧文档的已实现长连接说法 |
 | 默认 socket 固定，Host listen 前删除同名路径 | `browser-bridge/apps/cli/main.go` | 必须先消除多 profile 抢占路径，再自动恢复 |
-| 已知 Browser action 返回 allow，batch preflight 自动签 token | `packages/tools/browser-tools/src/plugin.ts`、`node-capability.ts`、`browser-bridge/apps/cli/command_router.go` | token 不能充当用户授权，补 action-level permission |
+| 已知 Browser action 返回 allow，batch preflight 自动签 token | `packages/browser/tool-browser/src/plugin.ts`、`node-capability.ts`、`browser-bridge/apps/cli/command_router.go` | token 不能充当用户授权，补 action-level permission |
 | 专题入口的历史通过表述与 P05 宿主复核不一致 | `docs/exec-runs/actspace-v2-p05-browser-bridge-cutover-and-verification/execution-summary.md` | 本轮验收独立留证，不继承历史 PASS |
 
 上述是静态检查结果，不是本轮运行或 Chrome 验收结果。
@@ -75,7 +77,7 @@ Renderer 不读文件、不注册 Host；安装与状态权威在 main。Go 继�
 
 ### 3.3 公共数据与 IPC 合同
 
-以 `packages/shared/src/browser-bridge.ts` 为连接 DTO 唯一来源，在现有 fixed-renderer typed IPC 注册，不另建字符串协议。
+以 `packages/util/shared/src/browser-bridge.ts` 为连接 DTO 唯一来源，在现有 fixed-renderer typed IPC 注册，不另建字符串协议。
 
 - 持久化连接设置：schemaVersion、用户连接意图 enabled、来源 bundled/source、已绑定 extensionInstanceId、已选择源码目录（仅高级模式）、已安装组件版本。存 main 管理的数据目录；不继续把 renderer localStorage 当连接状态权威。
 - Snapshot：revision、observedAt、connectionState、layers、selectedInstance、preparedVersions、runningVersions、runtimeRegistration、lastSuccessAt、error、allowedActions。layers 分别包含 Host 文件、registration、扩展连接、socket/protocol、Runtime、工具注册、只读 probe 的状态和时间。
@@ -132,10 +134,10 @@ Host 原子替换并保留旧文件；旧 Native Host 进程不因文件替换�
 
 | 任务 | 文件范围与具体动作 | 验证与完成条件 |
 |---|---|---|
-| T1 契约与实例路由 | `packages/shared/src/browser-bridge.ts`；`browser-bridge/packages/protocol/protocol.go`；`browser-bridge/apps/cli/main.go`；扩展 `manifest.json`、`src/background.js`。实现 snapshot/identity/握手/独立 socket/绑定和冲突语义 | 两个 profile/Host 并存不抢占；重连仅同实例；旧 Host、重复 ID、坏记录、超限消息均有失败测试 |
-| T2 Runtime 接入与执行合同 | `apps/desktop/src/main/runtime-v2/{runtime-registry,desktop-host-adapter,browser-capability,host-ports}.ts`；`packages/tools/browser-tools/src/{host-port,node-capability,plugin}.ts`；Go `command_router.go`。接入 idle gate、重组、Turn 连接、权限和取消 | 活动后台任务不被中断；重组无双 writer；多调用 ownership 连续；拒绝不 dispatch；stop 不执行后续 batch action；未知结果不冒充未执行 |
+| T1 契约与实例路由 | `packages/util/shared/src/browser-bridge.ts`；`browser-bridge/packages/protocol/protocol.go`；`browser-bridge/apps/cli/main.go`；扩展 `manifest.json`、`src/background.js`。实现 snapshot/identity/握手/独立 socket/绑定和冲突语义 | 两个 profile/Host 并存不抢占；重连仅同实例；旧 Host、重复 ID、坏记录、超限消息均有失败测试 |
+| T2 Runtime 接入与执行合同 | `apps/desktop/src/main/runtime-v2/{runtime-registry,desktop-host-adapter,browser-capability,host-ports}.ts`；`packages/browser/tool-browser/src/{host-port,node-capability,plugin}.ts`；Go `command_router.go`。接入 idle gate、重组、Turn 连接、权限和取消 | 活动后台任务不被中断；重组无双 writer；多调用 ownership 连续；拒绝不 dispatch；stop 不执行后续 batch action；未知结果不冒充未执行 |
 | T3 随包制品与安装 | `scripts/release-package.sh`、`browser-bridge/build.sh`、`apps/desktop/src/main/browser-bridge-service.ts`。新增 `scripts/package-browser-components.mjs` 产出并验证组件清单，纳入现有打包脚本；受管安装/备份/修复/更新事务 | 安装包内含匹配架构 Host 和完整扩展资源；无 Go 环境可安装；损坏 hash、权限错误、磁盘写入失败保留旧版本；不覆盖其他 Host |
-| T4 IPC 与连接页面 | `packages/shared/src/runtime-v2/fixed-renderer.ts`、`packages/shared/src/ipc.ts`、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`、`apps/desktop/src/preload/index.ts`、`apps/desktop/src/main/index.ts`；现有 `CapabilitiesSection.tsx`、`browser-bridge-settings-shared.ts`，新增相邻 `BrowserConnectPanel.tsx` | main snapshot 唯一权威；重复点击、旧响应、关闭/重开面板均一致；不以 ready 单字段宣称 Agent 可用；无 preload 显示明确桌面能力提示 |
+| T4 IPC 与连接页面 | `packages/util/shared/src/runtime-v2/fixed-renderer.ts`、`packages/util/shared/src/ipc.ts`、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`、`apps/desktop/src/preload/index.ts`、`apps/desktop/src/main/index.ts`；现有 `CapabilitiesSection.tsx`、`browser-bridge-settings-shared.ts`，新增相邻 `BrowserConnectPanel.tsx` | main snapshot 唯一权威；重复点击、旧响应、关闭/重开面板均一致；不以 ready 单字段宣称 Agent 可用；无 preload 显示明确桌面能力提示 |
 | T5 启动恢复与使用反馈 | 上述 service/registry/UI；`apps/desktop/src/renderer/components/messages/BrowserApprovalBlock.tsx` 及其实际工具进度消费者 | 扩展晚启动自动注册；应用/Chrome 重启恢复原绑定；主动断开持久化；默认权限下真实 approve/deny；截图 artifact 可查看 |
 | T6 验证与文档收口 | 现有 main、renderer、Browser Tools 测试；新增组件制品测试；Browser 专题设计、Extension README、发布记录和 history | 自动化完整通过或逐项记录独立基线失败；下面 A01–A16 实机结果逐项有证据；安装包与开发态分开说明 |
 
@@ -185,7 +187,7 @@ Host 原子替换并保留旧文件；旧 Native Host 进程不因文件替换�
 
 ```sh
 pnpm --filter @actspace/runtime... build
-pnpm --filter @actspace/tools-browser-tools test
+pnpm --filter @actspace/tool-browser test
 pnpm --filter @actspace/desktop test
 pnpm check:browser
 pnpm typecheck

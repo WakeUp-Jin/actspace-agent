@@ -19,6 +19,7 @@
 - 如果本次改动涉及代码或仓库流程，补齐或更新对应 history。
 - 如果变更对用户可感知，补齐 release note。
 - 确认示例、脚本、说明文档和当前实现一致。
+- 如果新增、删除或改了 `packages/` 下的包或插件，同步更新 `packages/README.md` 和对应能力目录的 README；`pnpm check:docs` 会检查包表、类别和默认开关与代码一致（需要先构建 runtime）。
 
 ## Review 默认要求
 

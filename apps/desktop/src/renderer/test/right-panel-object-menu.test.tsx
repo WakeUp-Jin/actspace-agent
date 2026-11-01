@@ -19,13 +19,13 @@ function renderMenu(sessionId: string | null) {
 }
 
 describe("RightPanelObjectMenu", () => {
-  it("disables the terminal without a session and opens a tab from the keyboard", async () => {
+  it("opens a tab from the keyboard", async () => {
     const user = userEvent.setup();
     const trigger = renderMenu(null);
     trigger.focus();
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("menuitem", { name: "工作区文件" })).toHaveFocus();
-    expect(screen.getByRole("menuitem", { name: "终端" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: "文档" })).toHaveFocus();
+    expect(screen.queryByRole("menuitem", { name: "终端" })).not.toBeInTheDocument();
 
     await user.keyboard("{End}{Enter}");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();

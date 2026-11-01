@@ -1,20 +1,20 @@
 import { useEffect, useState } from "react";
 import { Search, Unplug } from "lucide-react";
 import type { AppSettings, SettingsUpdateInput } from "@actspace/shared";
-import { CapabilitiesSection } from "./CapabilitiesSection";
+import { PluginsSection } from "./PluginsSection";
 import { SkillsSection } from "./SkillsSection";
 import { settingsApi } from "../../api/settings";
 
 const TABS = [
-  { id: "capabilities", label: "能力" },
+  { id: "plugins", label: "插件" },
   { id: "skills", label: "Skills" },
   { id: "mcp", label: "MCP" },
 ] as const;
 type ExtensionTab = typeof TABS[number]["id"];
 
 export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSettingsChange?: (settings: AppSettings) => void; onConfigureSpeech?: () => void }) {
-  const [tab, setTab] = useState<ExtensionTab>("capabilities");
-  const [queries, setQueries] = useState<Record<ExtensionTab, string>>({ capabilities: "", skills: "", mcp: "" });
+  const [tab, setTab] = useState<ExtensionTab>("plugins");
+  const [queries, setQueries] = useState<Record<ExtensionTab, string>>({ plugins: "", skills: "", mcp: "" });
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
@@ -45,7 +45,7 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
           <input
             type="search"
             aria-label="搜索扩展"
-            placeholder={tab === "skills" ? "搜索 Skills…" : tab === "mcp" ? "MCP 暂未接入" : "搜索能力…"}
+            placeholder={tab === "skills" ? "搜索 Skills…" : tab === "mcp" ? "MCP 暂未接入" : "搜索插件…"}
             value={queries[tab]}
             onChange={(event) => setQueries((current) => ({ ...current, [tab]: event.target.value }))}
             disabled={tab === "mcp"}
@@ -79,8 +79,8 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
           ))}
         </div>
         <div className="pt-3">
-          <section role="tabpanel" id="extension-panel-capabilities" aria-labelledby="extension-tab-capabilities" hidden={tab !== "capabilities"}>
-            <CapabilitiesSection query={queries.capabilities} onConfigureSpeech={onConfigureSpeech} />
+          <section role="tabpanel" id="extension-panel-plugins" aria-labelledby="extension-tab-plugins" hidden={tab !== "plugins"}>
+            <PluginsSection query={queries.plugins} onConfigureSpeech={onConfigureSpeech} />
           </section>
           <section role="tabpanel" id="extension-panel-skills" aria-labelledby="extension-tab-skills" hidden={tab !== "skills"}>
             {error ? (

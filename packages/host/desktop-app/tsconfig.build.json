@@ -1,0 +1,37 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./../../core/agent-service/tsconfig.build.json"
+    },
+    {
+      "path": "./../../composition/bundle/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/context-compaction/tsconfig.build.json"
+    },
+    {
+      "path": "./../../composition/cordis-adapter/tsconfig.build.json"
+    },
+    {
+      "path": "./../../english-learning/english-learning/tsconfig.build.json"
+    },
+    {
+      "path": "./../../llm/llm-service/tsconfig.build.json"
+    },
+    {
+      "path": "./../../session/session-journal/tsconfig.build.json"
+    },
+    {
+      "path": "./../../session/session-persistence/tsconfig.build.json"
+    },
+    {
+      "path": "./../../util/shared/tsconfig.build.json"
+    }
+  ]
+}

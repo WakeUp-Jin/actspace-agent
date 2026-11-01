@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { startAgentProvider } from "../../test/fixtures/agent-provider.mjs";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const require = createRequire(join(repo, "packages/agent-host/package.json"));
+const require = createRequire(join(repo, "packages/host/agent-host/package.json"));
 const exec = promisify(execFile);
 const [command, ...args] = process.argv.slice(2);
 const value = name => args[args.indexOf(name) + 1];

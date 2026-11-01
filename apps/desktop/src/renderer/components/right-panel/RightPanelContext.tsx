@@ -1,10 +1,10 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { TerminalSessionSnapshot, WorkspaceDirEntry } from "@actspace/shared";
-import { terminalDisplayTitle } from "./terminal-title";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import type { TurnChanges } from "../turn-tail/turn-tail-data";
+import { latestStashedDocsPath, stashDocsDraft } from "./docs/docs-draft-store";
+import { ancestorDirs, type DocsFilter } from "./docs/docs-tree-model";
 
 /**
- * 右侧面板的 Tab 模型。`id` 同时是去重 key：用稳定 id（如 `context`、`html:<agentRunId>`、
+ * 右侧面板的 Tab 模型。`id` 同时是去重 key：用稳定 id（如 `context`、`docs`、
  * `file:<相对路径>`）打开同一对象时只更新内容并聚焦，不重复堆 Tab。
  *
  * 工作区文件类 Tab 额外带一组**新鲜度**字段（`mtimeMs` / `size` / `isStale` / `truncated`）。
@@ -26,23 +26,18 @@ export type WorkspaceFileMeta = WorkspaceFileTarget & {
 };
 
 export type RightPanelTab = { id: string } & (
-  | ({ kind: "markdown"; title: string; source: string } & WorkspaceFileMeta)
-  | ({ kind: "html"; title: string; html: string; trust: "chat" | "file" } & WorkspaceFileMeta)
   | ({ kind: "image"; title: string; src: string } & WorkspaceFileMeta)
-  | ({ kind: "csv"; title: string; content: string } & WorkspaceFileMeta)
-  | ({ kind: "text"; title: string; content: string; language?: string } & WorkspaceFileMeta)
+  | ({ kind: "text"; title: string; content: string } & WorkspaceFileMeta)
   // focus：从轨迹详情「查看轨迹」打开时定位到这个子会话并停在指定视图；revision 每次点击递增，让已打开的 Tab 再次定位。
   | { kind: "subagents"; title: string; sessionId: string; selected?: Extract<import("@actspace/shared").MessageBlock, { kind: "agent" }>; focus?: SubagentFocus }
   // focus：从 bash 行的「后台」标签打开时选中这条命令；revision 每次点击递增，让已打开的 Tab 再次定位。
   | { kind: "backgroundTasks"; title: string; sessionId: string; focus?: BackgroundTaskFocus }
   | { kind: "context"; title: string }
+  // 「文档」面板：只有一个 Tab（id 固定为 `docs`）。select 是「打开并选中这篇」的一次性请求，openTab 消费后不会存进 Tab。
+  | { kind: "docs"; title: string; select?: string }
   | { kind: "review"; title: string; workspaceRoot?: string; scope: "uncommitted"; refreshKey?: number }
   // 某一轮的改动快照（轮尾改动卡点开）；index 是要选中的文件，revision 每次点击递增，让同一 Tab 重新跳到该文件。
   | { kind: "turnReview"; title: string; changes: TurnChanges; index: number; revision: number; sessionId: string | null; workspaceRoot?: string }
-  | { kind: "replyHtml"; title: string; sessionId: string | null }
-  | { kind: "terminalStarting"; title: string; requestId: string; sessionId: string }
-  | { kind: "terminalError"; title: string; sessionId: string; message: string }
-  | { kind: "terminal"; title: string; terminalId: string; sessionId: string; shellName: string }
   // 侧边对话：只在它的主会话下显示。继承轮数等打开时才知道的事实随 tab 带着，重新打开时由会话窗口推算。
   | { kind: "sideChat"; title: string; sessionId: string; parentSessionId: string; inheritedTurnCount?: number; runningTurnExcluded?: boolean }
 );
@@ -52,18 +47,12 @@ export type BackgroundTaskFocus = { taskId: string; revision: number };
 
 export type RightPanelTabKind = RightPanelTab["kind"];
 
-const FILE_TAB_KINDS: ReadonlySet<RightPanelTabKind> = new Set<RightPanelTabKind>([
-  "markdown",
-  "html",
-  "image",
-  "csv",
-  "text",
-]);
+const FILE_TAB_KINDS: ReadonlySet<RightPanelTabKind> = new Set<RightPanelTabKind>(["image", "text"]);
 
 /**
- * 是否「工作区文件 Tab」：由文件树点开、带工作区相对路径的文件类视图。
- * 聊天生成的 html/markdown（无 relativePath）不算——它们和 Context 一样是对象视图，走整面板呈现。
- * 用它把「文件预览区（shell 内）」与「对象整面板视图」区分开。
+ * 是否「工作区文件 Tab」：带工作区相对路径的文件类视图（本机图片、读取失败说明）。
+ * Markdown 不再有文件 Tab，统一在「文档」面板里打开。
+ * 用它决定是否显示文件操作栏（路径、过期提示、外部打开）。
  */
 export function isWorkspaceFileTab(tab: RightPanelTab | null | undefined): boolean {
   if (!tab) return false;
@@ -79,9 +68,33 @@ export function workspaceFileTabId(relativePath: string, target?: WorkspaceFileT
   return target ? `file:${JSON.stringify([target.hostId ?? "local", target.workspaceRoot ?? null, relativePath])}` : `file:${relativePath}`;
 }
 
-export function workspaceDirCacheKey(relativePath: string, workspaceRoot?: string): string {
-  return JSON.stringify(["local", workspaceRoot ?? null, relativePath]);
+/** 「文档」面板当前打开的那一篇：原文、草稿和读盘时的新鲜度基线。 */
+export type DocsDocState = {
+  relativePath: string;
+  status: "loading" | "ready" | "error";
+  /** status 为 error 时给用户看的说明。 */
+  message?: string;
+  /** 最近一次读盘 / 保存后的内容，用来判断草稿是否改过。 */
+  original: string;
+  draft: string;
+  /** 读取或保存时的 mtime / 字节数（磁盘完整大小），用于与磁盘现值比对。 */
+  mtimeMs: number;
+  size: number;
+  /** 文件超过读取上限，内容只是前一段：源码只读，避免保存时丢掉后半部分。 */
+  truncated: boolean;
+  /** 磁盘上已变化，等用户显式重新加载。 */
+  isStale: boolean;
+};
+
+export type DocsMode = "preview" | "source";
+
+/** 有未保存的改动：截断文件只读，不会有草稿。 */
+export function isDocsDocDirty(doc: DocsDocState | null | undefined): boolean {
+  return Boolean(doc && doc.status === "ready" && !doc.truncated && doc.draft !== doc.original);
 }
+
+/** 最近一次取回的 Markdown 清单（属于 `root`）。 */
+export type DocsListing = { root: string; files: readonly string[]; truncated: boolean; source: "git" | "walk" };
 
 type RightPanelContextValue = {
   isOpen: boolean;
@@ -99,44 +112,44 @@ type RightPanelContextValue = {
   /** 用重新读盘的结果替换 Tab 内容（同时清掉 stale 标记）。 */
   replaceTab: (tab: RightPanelTab) => void;
   /**
-   * 工作区文件浏览器的两个独立开关（见 `front-右侧面板与文件渲染规范.md`）：
-   * - `isFileTreeOpen`：是否进入工作区浏览态（操作栏 + 两栏）。由 `+` 菜单切换。
-   * - `isFileTreeCollapsed`：浏览态内左侧树栏是否收起（操作栏与内容仍在）。由操作栏折叠按钮切换。
-   */
-  isFileTreeOpen: boolean;
-  isFileTreeCollapsed: boolean;
-  openFileTree: () => void;
-  closeFileTree: () => void;
-  toggleFileTree: () => void;
-  toggleFileTreeCollapsed: () => void;
-  /**
-   * 文件树的展开层级与目录缓存。
+   * 「文档」面板的状态（见 `front-文档面板规范.md`）。
    *
-   * 必须提升到 Provider：树组件在「收起树栏」和「切到对象 Tab」时会被整体卸载，
-   * 状态留在行组件里的话回来后所有目录都会塌回根层，每次都要重新点开。
+   * 必须放在 Provider：面板会随切换标签、收起右栏反复卸载，草稿、选中文件和展开层级留在组件里就会丢。
    */
+  docsSelectedPath: string | null;
+  /** 选中一篇文档（树点击、交付卡 / 聊天链接）。有未保存草稿时先弹「保存 / 不保存 / 取消」。 */
+  selectDocsPath: (path: string | null) => void;
+  docsDoc: DocsDocState | null;
+  setDocsDoc: (update: DocsDocState | null | ((current: DocsDocState | null) => DocsDocState | null)) => void;
+  /** 预览 / 源码；每次打开新文档重置为预览。 */
+  docsMode: DocsMode;
+  setDocsMode: (mode: DocsMode) => void;
+  docsTreeCollapsed: boolean;
+  toggleDocsTreeCollapsed: () => void;
+  /** 右栏展开到盖住聊天区，用于专心阅读。 */
+  docsExpanded: boolean;
+  toggleDocsExpanded: () => void;
+  docsFilter: DocsFilter;
+  setDocsFilter: (filter: DocsFilter) => void;
+  /** 展开的文件夹（相对路径），换工作区时清空。 */
   expandedDirs: ReadonlySet<string>;
   toggleDir: (relativePath: string) => void;
-  dirCache: ReadonlyMap<string, WorkspaceDirEntry[]>;
-  cacheDir: (relativePath: string, entries: WorkspaceDirEntry[], workspaceRoot?: string) => void;
-  /** 强制文件树重新拉取目录（清缓存 + 递增 key），展开层级保留。 */
-  fileTreeRefreshKey: number;
-  refreshFileTree: () => void;
+  docsListing: DocsListing | null;
+  setDocsListing: (listing: DocsListing | null) => void;
+  /** 递增即让文档面板重新取 Markdown 清单。 */
+  docsRefreshKey: number;
+  refreshDocs: () => void;
   /**
-   * 告知文件树当前的 workspace 根。根变了才清空展开层级与缓存（旧层级属于另一个根）。
-   * 「上次的根」必须记在 Provider 里：树组件会随树栏收起 / 切对象 Tab 反复挂载卸载，
-   * 记在组件里的话每次重挂都会误判成换根，把刚提升上来的展开状态清掉。
+   * 告知文档面板当前的工作区根。根变了才清空选中、草稿、展开层级和清单（旧的属于另一个根）。
+   * 「上次的根」记在 Provider 里：面板会反复挂载卸载，记在组件里每次重挂都会误判成换根。
    */
-  syncFileTreeRoot: (workspaceRoot: string | undefined) => void;
-  /**
-   * markdown / html 文件 Tab 当前看的是源码还是预览，按 Tab 记忆，切走再切回不丢。
-   *
-   * 必须放在 Provider：切换按钮在操作栏（渲染视图的兄弟节点），状态留在视图里的话
-   * 操作栏读不到，也会在切 Tab 卸载时丢掉。
-   */
-  isSourceShown: (tabId: string) => boolean;
-  setSourceShown: (tabId: string, shown: boolean) => void;
-  syncTerminalTabs: (sessionId: string, terminals: TerminalSessionSnapshot[]) => void;
+  syncDocsRoot: (workspaceRoot: string | undefined) => void;
+  /** 有未保存草稿时先问用户，确认离开（保存或丢弃）后才执行 `run`；没有草稿直接执行。 */
+  requestDocsLeave: (run: () => void) => void;
+  docsPendingLeave: { run: () => void } | null;
+  clearDocsPendingLeave: () => void;
+  /** 关闭 Tab 的入口：关闭「文档」且有草稿时先问用户。 */
+  requestCloseTab: (id: string) => void;
 };
 
 const RightPanelStateContext = createContext<RightPanelContextValue | null>(null);
@@ -158,38 +171,65 @@ export function RightPanelProvider({
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [tabs, setTabs] = useState<RightPanelTab[]>(() => initialTabs ?? createDefaultTabs());
   const [activeTabId, setActiveTabId] = useState<string | null>(() => (initialTabs ?? createDefaultTabs())[0]?.id ?? null);
-  const [isFileTreeOpen, setIsFileTreeOpen] = useState(false);
-  const [isFileTreeCollapsed, setIsFileTreeCollapsed] = useState(false);
   const [expandedDirs, setExpandedDirs] = useState<ReadonlySet<string>>(() => new Set<string>());
-  const [dirCache, setDirCache] = useState<ReadonlyMap<string, WorkspaceDirEntry[]>>(
-    () => new Map<string, WorkspaceDirEntry[]>(),
-  );
-  const [fileTreeRefreshKey, setFileTreeRefreshKey] = useState(0);
-  // known=false 表示还没有任何树挂载过，此时同步根不算「换根」，不该触发清空。
-  const [, setFileTreeRoot] = useState<{ known: boolean; root: string | undefined }>({
-    known: false,
-    root: undefined,
-  });
-  const [sourceByTab, setSourceByTab] = useState<ReadonlyMap<string, boolean>>(() => new Map<string, boolean>());
+  const [docsSelectedPath, setDocsSelectedPath] = useState<string | null>(null);
+  const [docsDoc, setDocsDocState] = useState<DocsDocState | null>(null);
+  const docsDocRef = useRef<DocsDocState | null>(null);
+  const [docsMode, setDocsMode] = useState<DocsMode>("preview");
+  const [docsTreeCollapsed, setDocsTreeCollapsed] = useState(false);
+  const [docsExpanded, setDocsExpanded] = useState(false);
+  const [docsFilter, setDocsFilter] = useState<DocsFilter>("all");
+  const [docsListing, setDocsListing] = useState<DocsListing | null>(null);
+  const [docsRefreshKey, setDocsRefreshKey] = useState(0);
+  const [docsPendingLeave, setDocsPendingLeave] = useState<{ run: () => void } | null>(null);
+  // known=false 表示还没有任何面板挂载过，此时同步根不算「换根」，不该触发清空。
+  const docsRootRef = useRef<{ known: boolean; root: string | undefined }>({ known: false, root: undefined });
+
+  const setDocsDoc = useCallback<RightPanelContextValue["setDocsDoc"]>((update) => {
+    // 先在 ref 上算出新值再 set，保证随后的同步读取（离开前的未保存判断）看到最新草稿。
+    const next = typeof update === "function" ? update(docsDocRef.current) : update;
+    docsDocRef.current = next;
+    setDocsDocState(next);
+  }, []);
+
+  const selectDocsPath = useCallback((path: string | null) => {
+    const current = docsDocRef.current;
+    const apply = () => {
+      setDocsSelectedPath(path);
+      setDocsDoc(null);
+      setDocsMode("preview");
+      if (path) {
+        setExpandedDirs((dirs) => {
+          const missing = ancestorDirs(path).filter((dir) => !dirs.has(dir));
+          return missing.length === 0 ? dirs : new Set([...dirs, ...missing]);
+        });
+      }
+    };
+    if (isDocsDocDirty(current)) {
+      // 同一篇不动它（草稿还在）；换到另一篇要先问。
+      if (path === current?.relativePath) return;
+      setDocsPendingLeave({ run: apply });
+      return;
+    }
+    apply();
+  }, [setDocsDoc]);
 
   const openTab = useCallback((tab: RightPanelTab) => {
+    // 「打开并选中」是一次性请求，不存进 Tab，免得 Tab 重放时重复选中。
+    const stored: RightPanelTab = tab.kind === "docs" && tab.select !== undefined ? { id: tab.id, kind: "docs", title: tab.title } : tab;
     setTabs((current) => {
-      const existingIndex = current.findIndex((item) => item.id === tab.id);
+      const existingIndex = current.findIndex((item) => item.id === stored.id);
       if (existingIndex === -1) {
-        return [...current, tab];
+        return [...current, stored];
       }
       const next = current.slice();
-      next[existingIndex] = tab;
+      next[existingIndex] = stored;
       return next;
     });
-    setActiveTabId(tab.id);
+    setActiveTabId(stored.id);
     setIsOpen(true);
-    // 打开对象 / 非工作区文件 Tab（Context/Reply 等）时退出工作区浏览态，展示它自己的整面板视图；
-    // 打开工作区文件则保持浏览态（shell 由 showShell 派生显示）。
-    if (!isWorkspaceFileTab(tab)) {
-      setIsFileTreeOpen(false);
-    }
-  }, []);
+    if (tab.kind === "docs" && tab.select !== undefined) selectDocsPath(tab.select);
+  }, [selectDocsPath]);
 
   const replaceTab = useCallback((tab: RightPanelTab) => {
     setTabs((current) => {
@@ -235,42 +275,17 @@ export function RightPanelProvider({
     });
   }, []);
 
-  const setActiveTab = useCallback(
-    (id: string) => {
-      setActiveTabId(id);
-      setIsOpen(true);
-      // 在 tab 栏点对象 Tab：先打开它自己的视图（退出工作区浏览态）；点文件 Tab 则保持/进入工作区 shell。
-      const target = tabs.find((tab) => tab.id === id);
-      if (target && !isWorkspaceFileTab(target)) {
-        setIsFileTreeOpen(false);
-      }
-    },
-    [tabs],
-  );
+  const setActiveTab = useCallback((id: string) => {
+    setActiveTabId(id);
+    setIsOpen(true);
+  }, []);
 
   const openPanel = useCallback(() => setIsOpen(true), []);
   const closePanel = useCallback(() => setIsOpen(false), []);
   const togglePanel = useCallback(() => setIsOpen((open) => !open), []);
 
-  // 进入工作区浏览态时确保面板打开、且左侧树栏展开（操作栏的折叠按钮稍后可再收起）。
-  const openFileTree = useCallback(() => {
-    setIsFileTreeOpen(true);
-    setIsFileTreeCollapsed(false);
-    setIsOpen(true);
-  }, []);
-  const closeFileTree = useCallback(() => setIsFileTreeOpen(false), []);
-  const toggleFileTree = useCallback(() => {
-    setIsFileTreeOpen((open) => {
-      const next = !open;
-      if (next) {
-        setIsFileTreeCollapsed(false);
-        setIsOpen(true);
-      }
-      return next;
-    });
-  }, []);
-  // 仅收起 / 展开左侧树栏；操作栏与内容保持不变（对齐 Cursor 的侧栏切换）。
-  const toggleFileTreeCollapsed = useCallback(() => setIsFileTreeCollapsed((collapsed) => !collapsed), []);
+  const toggleDocsTreeCollapsed = useCallback(() => setDocsTreeCollapsed((collapsed) => !collapsed), []);
+  const toggleDocsExpanded = useCallback(() => setDocsExpanded((expanded) => !expanded), []);
 
   const toggleDir = useCallback((relativePath: string) => {
     setExpandedDirs((current) => {
@@ -281,61 +296,46 @@ export function RightPanelProvider({
     });
   }, []);
 
-  const cacheDir = useCallback((relativePath: string, entries: WorkspaceDirEntry[], workspaceRoot?: string) => {
-    setDirCache((current) => {
-      const next = new Map(current);
-      next.set(workspaceDirCacheKey(relativePath, workspaceRoot), entries);
-      return next;
-    });
-  }, []);
+  const refreshDocs = useCallback(() => setDocsRefreshKey((key) => key + 1), []);
 
-  const refreshFileTree = useCallback(() => {
-    setDirCache(new Map<string, WorkspaceDirEntry[]>());
-    setFileTreeRefreshKey((key) => key + 1);
-  }, []);
+  const syncDocsRoot = useCallback((nextRoot: string | undefined) => {
+    const current = docsRootRef.current;
+    if (current.known && current.root === nextRoot) return;
+    docsRootRef.current = { known: true, root: nextRoot };
+    if (!current.known) return;
+    // 未保存的草稿不能随换根丢掉：先暂存，切回同一个根时恢复。
+    const leaving = docsDocRef.current;
+    if (current.root && leaving && leaving.status === "ready" && isDocsDocDirty(leaving)) {
+      stashDocsDraft(current.root, leaving.relativePath, { original: leaving.original, draft: leaving.draft, mtimeMs: leaving.mtimeMs, size: leaving.size });
+    }
+    // 新根下如果有暂存的草稿，直接重新选中那一篇（读盘后由 use-docs-draft 套回草稿）。
+    const restorePath = nextRoot ? latestStashedDocsPath(nextRoot) : null;
+    setExpandedDirs(new Set<string>(restorePath ? ancestorDirs(restorePath) : []));
+    setDocsSelectedPath(restorePath);
+    setDocsDoc(null);
+    setDocsMode("preview");
+    setDocsListing(null);
+    setDocsPendingLeave(null);
+    setDocsRefreshKey((key) => key + 1);
+  }, [setDocsDoc]);
 
-  const syncFileTreeRoot = useCallback((nextRoot: string | undefined) => {
-    setFileTreeRoot((current) => {
-      if (current.known && current.root === nextRoot) return current;
-      if (current.known) {
-        setExpandedDirs(new Set<string>());
-        setDirCache(new Map<string, WorkspaceDirEntry[]>());
-        setFileTreeRefreshKey((key) => key + 1);
-      }
-      return { known: true, root: nextRoot };
-    });
+  const requestDocsLeave = useCallback((run: () => void) => {
+    if (isDocsDocDirty(docsDocRef.current)) setDocsPendingLeave({ run });
+    else run();
   }, []);
+  const clearDocsPendingLeave = useCallback(() => setDocsPendingLeave(null), []);
 
-  const isSourceShown = useCallback((tabId: string) => sourceByTab.get(tabId) ?? false, [sourceByTab]);
-  const setSourceShown = useCallback((tabId: string, shown: boolean) => {
-    setSourceByTab((current) => {
-      const next = new Map(current);
-      next.set(tabId, shown);
-      return next;
+  const requestCloseTab = useCallback((id: string) => {
+    if (id !== "docs") {
+      closeTab(id);
+      return;
+    }
+    requestDocsLeave(() => {
+      setDocsDoc(null);
+      setDocsExpanded(false);
+      closeTab(id);
     });
-  }, []);
-
-  const syncTerminalTabs = useCallback((sessionId: string, terminals: TerminalSessionSnapshot[]) => {
-    setTabs((current) => {
-      const existingByTerminalId = new Map(
-        current.flatMap((tab) => tab.kind === "terminal" ? [[tab.terminalId, tab] as const] : []),
-      );
-      const visibleTerminalTabs: RightPanelTab[] = terminals.map((terminal) => {
-        const existing = existingByTerminalId.get(terminal.id);
-        return existing ?? {
-          id: `terminal:${terminal.id}`,
-          kind: "terminal",
-          title: terminalDisplayTitle(terminal.title),
-          terminalId: terminal.id,
-          sessionId,
-          shellName: terminal.shellName,
-        };
-      });
-      const next = [...current.filter((tab) => tab.kind !== "terminal" || tab.sessionId !== sessionId), ...visibleTerminalTabs];
-      setActiveTabId((activeId) => activeId && next.some((tab) => tab.id === activeId) ? activeId : null);
-      return next;
-    });
-  }, []);
+  }, [closeTab, requestDocsLeave, setDocsDoc]);
 
   const value = useMemo<RightPanelContextValue>(() => {
     const active = tabs.find((tab) => tab.id === activeTabId) ?? null;
@@ -352,22 +352,29 @@ export function RightPanelProvider({
       togglePanel,
       markFileTabStale,
       replaceTab,
-      isFileTreeOpen,
-      isFileTreeCollapsed,
-      openFileTree,
-      closeFileTree,
-      toggleFileTree,
-      toggleFileTreeCollapsed,
+      docsSelectedPath,
+      selectDocsPath,
+      docsDoc,
+      setDocsDoc,
+      docsMode,
+      setDocsMode,
+      docsTreeCollapsed,
+      toggleDocsTreeCollapsed,
+      docsExpanded,
+      toggleDocsExpanded,
+      docsFilter,
+      setDocsFilter,
       expandedDirs,
       toggleDir,
-      dirCache,
-      cacheDir,
-      fileTreeRefreshKey,
-      refreshFileTree,
-      syncFileTreeRoot,
-      isSourceShown,
-      setSourceShown,
-      syncTerminalTabs,
+      docsListing,
+      setDocsListing,
+      docsRefreshKey,
+      refreshDocs,
+      syncDocsRoot,
+      requestDocsLeave,
+      docsPendingLeave,
+      clearDocsPendingLeave,
+      requestCloseTab,
     };
   }, [
     isOpen,
@@ -381,22 +388,26 @@ export function RightPanelProvider({
     togglePanel,
     markFileTabStale,
     replaceTab,
-    isFileTreeOpen,
-    isFileTreeCollapsed,
-    openFileTree,
-    closeFileTree,
-    toggleFileTree,
-    toggleFileTreeCollapsed,
+    docsSelectedPath,
+    selectDocsPath,
+    docsDoc,
+    setDocsDoc,
+    docsMode,
+    docsTreeCollapsed,
+    toggleDocsTreeCollapsed,
+    docsExpanded,
+    toggleDocsExpanded,
+    docsFilter,
     expandedDirs,
     toggleDir,
-    dirCache,
-    cacheDir,
-    fileTreeRefreshKey,
-    refreshFileTree,
-    syncFileTreeRoot,
-    isSourceShown,
-    setSourceShown,
-    syncTerminalTabs,
+    docsListing,
+    docsRefreshKey,
+    refreshDocs,
+    syncDocsRoot,
+    requestDocsLeave,
+    docsPendingLeave,
+    clearDocsPendingLeave,
+    requestCloseTab,
   ]);
 
   return <RightPanelStateContext.Provider value={value}>{children}</RightPanelStateContext.Provider>;

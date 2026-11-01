@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ display: { title: "规则", description: "把 AGENTS.md 等规则文件放进上下文", scope: "session", defaultEnabled: true, canDisable: false }, pluginId: "actspace.context-rules", version: "0.1.0", name: "ActSpace Context rules", entry: { entryId: "context.rules", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: [], contributions: { services: ["context.source.rules"], tools: [], prompts: [], events: [] } });

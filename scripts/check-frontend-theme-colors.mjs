@@ -78,15 +78,8 @@ const LITERAL_ALLOWLIST = new Map([
   ["components/settings/SettingsPrimitives.tsx", [/bg-white/]],
 ]);
 
-const REQUIRED_LITERAL_EXCEPTIONS = new Map([
-  [
-    "components/right-panel/HtmlRenderView.tsx",
-    [
-      /theme === "dark" \? "#242522" : "#ffffff"/,
-      /theme === "dark" \? "#f1f1ed" : "#20201e"/,
-    ],
-  ],
-]);
+// HtmlRenderView 随功能减法 P3 删除后，不再有必须保留的字面量例外。
+const REQUIRED_LITERAL_EXCEPTIONS = new Map([]);
 
 let currentTarget = "desktop";
 function fail(message) {

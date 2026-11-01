@@ -254,7 +254,7 @@ async function parseCapabilities(manifests) {
     for (const capability of manifest.requiredCapabilities) owners.set(capability, { requiredBy: new Set([...(owners.get(capability)?.requiredBy ?? []), manifest.pluginId]), optionalBy: owners.get(capability)?.optionalBy ?? new Set() });
     for (const capability of manifest.optionalCapabilities) owners.set(capability, { requiredBy: owners.get(capability)?.requiredBy ?? new Set(), optionalBy: new Set([...(owners.get(capability)?.optionalBy ?? []), manifest.pluginId]) });
   }
-  return stableSort([...owners].map(([id, value]) => row("capability", id, "@actspace/cordis-adapter", value.requiredBy.size > 0 ? "active" : "optional", [sourceRef("packages/cordis-adapter/src/manifest.ts", "PluginHostRequirement")], { requiredBy: [...value.requiredBy].sort(), optionalBy: [...value.optionalBy].sort(), required: value.requiredBy.size > 0 })));
+  return stableSort([...owners].map(([id, value]) => row("capability", id, "@actspace/cordis-adapter", value.requiredBy.size > 0 ? "active" : "optional", [sourceRef("packages/composition/cordis-adapter/src/manifest.ts", "PluginHostRequirement")], { requiredBy: [...value.requiredBy].sort(), optionalBy: [...value.optionalBy].sort(), required: value.requiredBy.size > 0 })));
 }
 
 async function parsePackages() {
@@ -271,23 +271,23 @@ async function parsePackages() {
 
 async function parseComposition() {
   const bundleRows = [];
-  for (const path of ["packages/runtime/src/profiles/base.bundle.ts", "packages/runtime/src/profiles/kernel.bundle.ts"]) {
+  for (const path of ["packages/core/runtime/src/profiles/base.bundle.ts", "packages/core/runtime/src/profiles/kernel.bundle.ts"]) {
     const source = await readRelative(path);
     const match = source.match(/export const ([A-Z_]+) = Object\.freeze\(\{\s*id:\s*"([^"]+)",\s*version:\s*"([^"]+)",\s*entries:\s*Object\.freeze\(\[([^\]]*)\]\)/u);
     if (!match) throw new Error(`Could not parse bundle ${path}.`);
     bundleRows.push({ id: match[2], version: match[3], entries: quotedStrings(match[4]), sourceRefs: [sourceRef(path, match[1])] });
   }
-  const desktopBundleSource = await readRelative("packages/desktop-app/src/bundle.ts");
+  const desktopBundleSource = await readRelative("packages/host/desktop-app/src/bundle.ts");
   const desktopBundle = desktopBundleSource.match(/id:\s*"([^"]+)"[\s\S]*?version:\s*manifest\.version/u);
-  if (desktopBundle) bundleRows.push({ id: desktopBundle[1], version: "0.1.0", entries: ["desktop.app"], sourceRefs: [sourceRef("packages/desktop-app/src/bundle.ts", "DESKTOP_APP_BUNDLE")] });
-  bundleRows.push({ id: "actspace.headless", version: "0.1.0", entries: ["headless.runner"], sourceRefs: [sourceRef("packages/headless/src/manifest.ts", "manifest")] });
-  const profileSource = await readRelative("packages/runtime/src/profiles/composition.ts");
+  if (desktopBundle) bundleRows.push({ id: desktopBundle[1], version: "0.1.0", entries: ["desktop.app"], sourceRefs: [sourceRef("packages/host/desktop-app/src/bundle.ts", "DESKTOP_APP_BUNDLE")] });
+  bundleRows.push({ id: "actspace.headless", version: "0.1.0", entries: ["headless.runner"], sourceRefs: [sourceRef("packages/host/headless/src/manifest.ts", "manifest")] });
+  const profileSource = await readRelative("packages/core/runtime/src/profiles/composition.ts");
   const profiles = [
     { id: "actspace.headless", runtimeContract: "actspace.runtime.v2", orderedBundleIds: ["actspace.kernel", "actspace.base", "actspace.headless"] },
     { id: "actspace.desktop", runtimeContract: "actspace.runtime.v2", orderedBundleIds: ["actspace.kernel", "actspace.base", "actspace.desktop-app"] },
-  ].map((profile) => ({ ...profile, sourceRefs: [sourceRef("packages/runtime/src/profiles/composition.ts", "profileDefinitions")] }));
+  ].map((profile) => ({ ...profile, sourceRefs: [sourceRef("packages/core/runtime/src/profiles/composition.ts", "profileDefinitions")] }));
   if (!profileSource.includes("RUNTIME_PROFILE_IDS.headless") || !profileSource.includes("RUNTIME_PROFILE_IDS.desktop")) throw new Error("Could not parse runtime Profile declarations.");
-  return Object.freeze({ profiles, bundles: bundleRows.sort((a, b) => a.id.localeCompare(b.id)), patches: { supportedKinds: ["insert", "replace-config", "disable", "remove"], sourceRefs: [sourceRef("packages/bundle/src/index.ts", "PatchOperation"), sourceRef("packages/composition/src/compose.ts", "composeRuntime")] } });
+  return Object.freeze({ profiles, bundles: bundleRows.sort((a, b) => a.id.localeCompare(b.id)), patches: { supportedKinds: ["insert", "replace-config", "disable", "remove"], sourceRefs: [sourceRef("packages/composition/bundle/src/index.ts", "PatchOperation"), sourceRef("packages/composition/composition/src/compose.ts", "composeRuntime")] } });
 }
 
 async function parseVerification() {
@@ -398,10 +398,10 @@ export async function buildMatrix() {
   const composition = await parseComposition();
   const verification = await parseVerification();
   const sessions = [
-    row("session", "session.journal", "@actspace/session-journal", "active", ["packages/session/journal/src/index.ts#SessionJournal"], { scope: "session", required: true, responsibility: "codec registry, envelope validation, replay" }),
-    row("session", "session.storage", "@actspace/session-storage", "active", ["packages/session/storage/src/index.ts#SessionStorage", "packages/session/jsonl/src/storage.ts#JsonlSessionStorage"], { scope: "root", required: true, responsibility: "Backend-neutral inspect/list/create/open/flush ownership" }),
-    row("session", "session.store", "@actspace/session-persistence", "active", ["packages/session/persistence/src/session-store.ts#SessionStore"], { scope: "session", required: true, responsibility: "Session admission, recovery, fork and durability lifecycle" }),
-    row("session", "session.projection", "@actspace/session-projection", "optional", ["packages/session/projection/src/index.ts#SessionProjectionRegistry"], { scope: "session", required: false, responsibility: "read-only projection" }),
+    row("session", "session.journal", "@actspace/session-journal", "active", ["packages/session/session-journal/src/index.ts#SessionJournal"], { scope: "session", required: true, responsibility: "codec registry, envelope validation, replay" }),
+    row("session", "session.storage", "@actspace/session-storage", "active", ["packages/session/session-storage/src/index.ts#SessionStorage", "packages/session/session-persistence-jsonl/src/storage.ts#JsonlSessionStorage"], { scope: "root", required: true, responsibility: "Backend-neutral inspect/list/create/open/flush ownership" }),
+    row("session", "session.store", "@actspace/session-persistence", "active", ["packages/session/session-persistence/src/session-store.ts#SessionStore"], { scope: "session", required: true, responsibility: "Session admission, recovery, fork and durability lifecycle" }),
+    row("session", "session.projection", "@actspace/session-projection", "optional", ["packages/session/session-projection/src/index.ts#SessionProjectionRegistry"], { scope: "session", required: false, responsibility: "read-only projection" }),
   ];
   const matrixWithoutDigest = { schemaVersion: 1, generatorVersion: GENERATOR_VERSION, sourceRefs: Object.freeze({ events: EVENT_SOURCES, domainEvents: DOMAIN_EVENT_PATHS, services: SERVICE_SOURCE, manifests: MANIFEST_PATHS, composition: COMPOSITION_SOURCES, packages: PACKAGE_PATHS, verification: VERIFICATION_SOURCES }), services, events, sessions, capabilities, plugins, packages, composition, verification };
   const sourceDigest = createHash("sha256").update(canonical(sourceSnapshot)).digest("hex");

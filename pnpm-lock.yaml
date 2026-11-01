@@ -22,13 +22,16 @@ importers:
     dependencies:
       '@actspace/desktop-app':
         specifier: workspace:*
-        version: link:packages/desktop-app
+        version: link:packages/host/desktop-app
       '@actspace/english-learning':
         specifier: workspace:*
-        version: link:packages/english-learning
+        version: link:packages/english-learning/english-learning
+      '@actspace/session-transcript':
+        specifier: workspace:*
+        version: link:packages/session/session-transcript
       '@actspace/side-chat':
         specifier: workspace:*
-        version: link:packages/side-chat
+        version: link:packages/side-chat/side-chat
     devDependencies:
       esbuild:
         specifier: 0.21.5
@@ -38,49 +41,49 @@ importers:
     dependencies:
       '@actspace/agent-host':
         specifier: workspace:*
-        version: link:../../packages/agent-host
+        version: link:../../packages/host/agent-host
       '@actspace/agent-service':
         specifier: workspace:*
-        version: link:../../packages/agent-service
+        version: link:../../packages/core/agent-service
+      '@actspace/approval':
+        specifier: workspace:*
+        version: link:../../packages/approval/approval
       '@actspace/llm-pi-ai':
         specifier: workspace:*
-        version: link:../../packages/llm/pi-ai
+        version: link:../../packages/llm/llm-pi-ai
       '@actspace/llm-service':
         specifier: workspace:*
-        version: link:../../packages/llm/service
+        version: link:../../packages/llm/llm-service
       '@actspace/runtime':
         specifier: workspace:*
-        version: link:../../packages/runtime
+        version: link:../../packages/core/runtime
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../../packages/shared
-      '@actspace/tools-approval':
+        version: link:../../packages/util/shared
+      '@actspace/tool-fs-read':
         specifier: workspace:*
-        version: link:../../packages/tools/approval
-      '@actspace/tools-filesystem-read':
+        version: link:../../packages/fs/tool-fs-read
+      '@actspace/tool-fs-search':
         specifier: workspace:*
-        version: link:../../packages/tools/filesystem-read
-      '@actspace/tools-filesystem-search':
+        version: link:../../packages/fs/tool-fs-search
+      '@actspace/tool-fs-write':
         specifier: workspace:*
-        version: link:../../packages/tools/filesystem-search
-      '@actspace/tools-filesystem-write':
+        version: link:../../packages/fs/tool-fs-write
+      '@actspace/tool-image-generation':
         specifier: workspace:*
-        version: link:../../packages/tools/filesystem-write
-      '@actspace/tools-image-generation':
+        version: link:../../packages/image/tool-image-generation
+      '@actspace/tool-image-inspection':
         specifier: workspace:*
-        version: link:../../packages/tools/image-generation
-      '@actspace/tools-image-inspection':
+        version: link:../../packages/image/tool-image-inspection
+      '@actspace/tool-runtime':
         specifier: workspace:*
-        version: link:../../packages/tools/image-inspection
-      '@actspace/tools-runtime':
+        version: link:../../packages/core/tool-runtime
+      '@actspace/tool-shell':
         specifier: workspace:*
-        version: link:../../packages/tools/runtime
-      '@actspace/tools-shell-tools':
+        version: link:../../packages/shell/tool-shell
+      '@actspace/tool-web':
         specifier: workspace:*
-        version: link:../../packages/tools/shell-tools
-      '@actspace/tools-web-tools':
-        specifier: workspace:*
-        version: link:../../packages/tools/web-tools
+        version: link:../../packages/web/tool-web
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -96,76 +99,79 @@ importers:
     dependencies:
       '@actspace/agent-host':
         specifier: workspace:*
-        version: link:../../packages/agent-host
+        version: link:../../packages/host/agent-host
+      '@actspace/approval':
+        specifier: workspace:*
+        version: link:../../packages/approval/approval
       '@actspace/client':
         specifier: workspace:*
-        version: link:../../packages/client
+        version: link:../../packages/client/client
       '@actspace/desktop-app':
         specifier: workspace:*
-        version: link:../../packages/desktop-app
+        version: link:../../packages/host/desktop-app
       '@actspace/english-learning':
         specifier: workspace:*
-        version: link:../../packages/english-learning
+        version: link:../../packages/english-learning/english-learning
       '@actspace/llm-pi-ai':
         specifier: workspace:*
-        version: link:../../packages/llm/pi-ai
+        version: link:../../packages/llm/llm-pi-ai
       '@actspace/llm-service':
         specifier: workspace:*
-        version: link:../../packages/llm/service
+        version: link:../../packages/llm/llm-service
       '@actspace/official-skills':
         specifier: workspace:*
-        version: link:../../packages/official-skills
+        version: link:../../packages/skill/official-skills
       '@actspace/runtime':
         specifier: workspace:*
-        version: link:../../packages/runtime
+        version: link:../../packages/core/runtime
       '@actspace/sandbox':
         specifier: workspace:*
-        version: link:../../packages/sandbox/manager
+        version: link:../../packages/sandbox/sandbox
       '@actspace/session-journal':
         specifier: workspace:*
-        version: link:../../packages/session/journal
+        version: link:../../packages/session/session-journal
       '@actspace/session-projection':
         specifier: workspace:*
-        version: link:../../packages/session/projection
+        version: link:../../packages/session/session-projection
       '@actspace/session-storage':
         specifier: workspace:*
-        version: link:../../packages/session/storage
+        version: link:../../packages/session/session-storage
+      '@actspace/session-transcript':
+        specifier: workspace:*
+        version: link:../../packages/session/session-transcript
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../../packages/shared
+        version: link:../../packages/util/shared
       '@actspace/side-chat':
         specifier: workspace:*
-        version: link:../../packages/side-chat
-      '@actspace/tools-approval':
+        version: link:../../packages/side-chat/side-chat
+      '@actspace/tool-browser':
         specifier: workspace:*
-        version: link:../../packages/tools/approval
-      '@actspace/tools-browser-tools':
+        version: link:../../packages/browser/tool-browser
+      '@actspace/tool-fs-read':
         specifier: workspace:*
-        version: link:../../packages/tools/browser-tools
-      '@actspace/tools-filesystem-read':
+        version: link:../../packages/fs/tool-fs-read
+      '@actspace/tool-fs-search':
         specifier: workspace:*
-        version: link:../../packages/tools/filesystem-read
-      '@actspace/tools-filesystem-search':
+        version: link:../../packages/fs/tool-fs-search
+      '@actspace/tool-fs-write':
         specifier: workspace:*
-        version: link:../../packages/tools/filesystem-search
-      '@actspace/tools-filesystem-write':
+        version: link:../../packages/fs/tool-fs-write
+      '@actspace/tool-image-generation':
         specifier: workspace:*
-        version: link:../../packages/tools/filesystem-write
-      '@actspace/tools-image-generation':
+        version: link:../../packages/image/tool-image-generation
+      '@actspace/tool-image-inspection':
         specifier: workspace:*
-        version: link:../../packages/tools/image-generation
-      '@actspace/tools-image-inspection':
+        version: link:../../packages/image/tool-image-inspection
+      '@actspace/tool-runtime':
         specifier: workspace:*
-        version: link:../../packages/tools/image-inspection
-      '@actspace/tools-runtime':
+        version: link:../../packages/core/tool-runtime
+      '@actspace/tool-shell':
         specifier: workspace:*
-        version: link:../../packages/tools/runtime
-      '@actspace/tools-shell-tools':
+        version: link:../../packages/shell/tool-shell
+      '@actspace/tool-web':
         specifier: workspace:*
-        version: link:../../packages/tools/shell-tools
-      '@actspace/tools-web-tools':
-        specifier: workspace:*
-        version: link:../../packages/tools/web-tools
+        version: link:../../packages/web/tool-web
       '@radix-ui/react-context-menu':
         specifier: ^2.3.7
         version: 2.3.7(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -190,12 +196,6 @@ importers:
       '@tanstack/react-virtual':
         specifier: ^3.14.9
         version: 3.14.10(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@xterm/addon-fit':
-        specifier: 0.11.0
-        version: 0.11.0
-      '@xterm/xterm':
-        specifier: 6.0.0
-        version: 6.0.0
       dompurify:
         specifier: ^3.4.16
         version: 3.4.16
@@ -217,9 +217,6 @@ importers:
       micromark-extension-gfm:
         specifier: 3.0.0
         version: 3.0.0
-      node-pty:
-        specifier: 1.1.0
-        version: 1.1.0
       prosemirror-commands:
         specifier: ^1.7.2
         version: 1.7.2
@@ -257,7 +254,7 @@ importers:
         specifier: 8.21.0
         version: 8.21.0
     devDependencies:
-      '@actspace/core-agent-loop':
+      '@actspace/agent-loop':
         specifier: workspace:*
         version: link:../../packages/core/agent-loop
       '@tailwindcss/vite':
@@ -368,10 +365,10 @@ importers:
     dependencies:
       '@actspace/client':
         specifier: workspace:*
-        version: link:../../packages/client
+        version: link:../../packages/client/client
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../../packages/shared
+        version: link:../../packages/util/shared
       '@radix-ui/react-dialog':
         specifier: ^1.1.23
         version: 1.1.23(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -431,139 +428,39 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.19)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/agent-host:
+  packages/approval/approval:
     dependencies:
-      '@actspace/agent-service':
-        specifier: workspace:*
-        version: link:../agent-service
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/harness-evaluation':
+        version: link:../../composition/cordis-adapter
+      '@actspace/shared':
         specifier: workspace:*
-        version: link:../harness-evaluation
-      '@actspace/llm-pi-ai':
+        version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/approval/auto-review:
+    dependencies:
+      '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../llm/pi-ai
+        version: link:../../composition/cordis-adapter
       '@actspace/llm-service':
         specifier: workspace:*
-        version: link:../llm/service
-      '@actspace/sandbox':
-        specifier: workspace:*
-        version: link:../sandbox/manager
-      '@actspace/session-jsonl':
-        specifier: workspace:*
-        version: link:../session/jsonl
-      '@actspace/session-persistence':
-        specifier: workspace:*
-        version: link:../session/persistence
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@actspace/tools-approval':
-        specifier: workspace:*
-        version: link:../tools/approval
-      '@actspace/tools-filesystem-read':
-        specifier: workspace:*
-        version: link:../tools/filesystem-read
-      '@actspace/tools-filesystem-search':
-        specifier: workspace:*
-        version: link:../tools/filesystem-search
-      '@actspace/tools-filesystem-write':
-        specifier: workspace:*
-        version: link:../tools/filesystem-write
-      '@actspace/tools-image-generation':
-        specifier: workspace:*
-        version: link:../tools/image-generation
-      '@actspace/tools-image-inspection':
-        specifier: workspace:*
-        version: link:../tools/image-inspection
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../tools/runtime
-      '@actspace/tools-shell-tools':
-        specifier: workspace:*
-        version: link:../tools/shell-tools
-      '@actspace/tools-web-tools':
-        specifier: workspace:*
-        version: link:../tools/web-tools
-      ws:
-        specifier: 8.21.0
-        version: 8.21.0
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.2
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/agent-service:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/core-scope':
-        specifier: workspace:*
-        version: link:../core/scope
+        version: link:../../llm/llm-service
       '@actspace/session-journal':
         specifier: workspace:*
-        version: link:../session/journal
-      '@actspace/session-persistence':
-        specifier: workspace:*
-        version: link:../session/persistence
-      '@actspace/session-storage':
-        specifier: workspace:*
-        version: link:../session/storage
+        version: link:../../session/session-journal
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../shared
-      '@actspace/side-chat':
-        specifier: workspace:*
-        version: link:../side-chat
-    devDependencies:
-      '@actspace/boot':
-        specifier: workspace:*
-        version: link:../boot
-      '@actspace/bundle':
-        specifier: workspace:*
-        version: link:../bundle
-      '@actspace/composition':
-        specifier: workspace:*
-        version: link:../composition
-      '@actspace/session-jsonl':
-        specifier: workspace:*
-        version: link:../session/jsonl
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/auto-review:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/llm-service':
-        specifier: workspace:*
-        version: link:../llm/service
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../session/journal
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../shared
+        version: link:../../util/shared
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -575,21 +472,21 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/background-tasks:
+  packages/background-tasks/background-tasks:
     dependencies:
-      '@actspace/core-agent':
+      '@actspace/agent':
         specifier: workspace:*
-        version: link:../core/agent
+        version: link:../../core/agent
       '@actspace/session-persistence':
         specifier: workspace:*
-        version: link:../session/persistence
+        version: link:../../session/session-persistence
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../../util/shared
     devDependencies:
       '@actspace/session-journal':
         specifier: workspace:*
-        version: link:../session/journal
+        version: link:../../session/session-journal
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
@@ -600,26 +497,51 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/boot:
+  packages/background-tasks/tool-background-tasks:
     dependencies:
-      '@actspace/bundle':
+      '@actspace/background-tasks':
         specifier: workspace:*
-        version: link:../bundle
-      '@actspace/composition':
-        specifier: workspace:*
-        version: link:../composition
+        version: link:../background-tasks
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/core-scope':
-        specifier: workspace:*
-        version: link:../core/scope
-      '@actspace/diagnostics':
-        specifier: workspace:*
-        version: link:../diagnostics
+        version: link:../../composition/cordis-adapter
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+    devDependencies:
+      '@actspace/agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/session-journal
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../../session/session-persistence
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/browser/tool-browser:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -631,27 +553,11 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/bundle:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../cordis-adapter
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/client:
+  packages/client/client:
     dependencies:
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../../util/shared
       pathe:
         specifier: 2.0.3
         version: 2.0.3
@@ -666,7 +572,54 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/composition:
+  packages/composition/boot:
+    dependencies:
+      '@actspace/bundle':
+        specifier: workspace:*
+        version: link:../bundle
+      '@actspace/composition':
+        specifier: workspace:*
+        version: link:../composition
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+      '@actspace/diagnostics':
+        specifier: workspace:*
+        version: link:../../util/diagnostics
+      '@actspace/scope':
+        specifier: workspace:*
+        version: link:../../core/scope
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/composition/bundle:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../cordis-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/composition/composition:
     dependencies:
       '@actspace/bundle':
         specifier: workspace:*
@@ -676,7 +629,7 @@ importers:
         version: link:../cordis-adapter
       '@actspace/diagnostics':
         specifier: workspace:*
-        version: link:../diagnostics
+        version: link:../../util/diagnostics
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -688,239 +641,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/context/background-tasks:
-    dependencies:
-      '@actspace/background-tasks':
-        specifier: workspace:*
-        version: link:../../background-tasks
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/prompt':
-        specifier: workspace:*
-        version: link:../../prompt
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/context/compaction:
-    dependencies:
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/llm-service':
-        specifier: workspace:*
-        version: link:../../llm/service
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../../session/journal
-      '@actspace/session-persistence':
-        specifier: workspace:*
-        version: link:../../session/persistence
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/context/conversation:
-    dependencies:
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/context/disclosure:
-    dependencies:
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../../session/journal
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/context/engine:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/llm-service':
-        specifier: workspace:*
-        version: link:../../llm/service
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../../session/journal
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/context/rules:
-    dependencies:
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/prompt':
-        specifier: workspace:*
-        version: link:../../prompt
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/context/runtime:
-    dependencies:
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/prompt':
-        specifier: workspace:*
-        version: link:../../prompt
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/context/skills:
-    dependencies:
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/prompt':
-        specifier: workspace:*
-        version: link:../../prompt
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/context/system:
-    dependencies:
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/prompt':
-        specifier: workspace:*
-        version: link:../../prompt
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/context/tools:
-    dependencies:
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/cordis-adapter:
+  packages/composition/cordis-adapter:
     dependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.1
@@ -948,23 +669,292 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/context/context-background-tasks:
+    dependencies:
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks/background-tasks
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/context-compaction:
+    dependencies:
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../../llm/llm-service
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/session-journal
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../../session/session-persistence
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/context-conversation:
+    dependencies:
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/context-disclosure:
+    dependencies:
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/session-journal
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/context-engine:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../../llm/llm-service
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/session-journal
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/context-rules:
+    dependencies:
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/context-runtime:
+    dependencies:
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/context-skills:
+    dependencies:
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/context-system:
+    dependencies:
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/context-tools:
+    dependencies:
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/context/prompt:
+    dependencies:
+      '@actspace/agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../../llm/llm-service
+      '@actspace/scope':
+        specifier: workspace:*
+        version: link:../../core/scope
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/session-journal
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@actspace/skill':
+        specifier: workspace:*
+        version: link:../../skill/skill
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/core/agent:
     dependencies:
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/core-scope':
+        version: link:../../composition/cordis-adapter
+      '@actspace/scope':
         specifier: workspace:*
         version: link:../scope
       '@actspace/session-persistence':
         specifier: workspace:*
-        version: link:../../session/persistence
+        version: link:../../session/session-persistence
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
         specifier: workspace:*
-        version: link:../../tools/runtime
+        version: link:../tool-runtime
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -978,43 +968,285 @@ importers:
 
   packages/core/agent-loop:
     dependencies:
-      '@actspace/context-compaction':
-        specifier: workspace:*
-        version: link:../../context/compaction
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../../context/engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/core-agent':
+      '@actspace/agent':
         specifier: workspace:*
         version: link:../agent
-      '@actspace/core-scope':
+      '@actspace/context-compaction':
         specifier: workspace:*
-        version: link:../scope
+        version: link:../../context/context-compaction
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../../context/context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
       '@actspace/llm-service':
         specifier: workspace:*
-        version: link:../../llm/service
+        version: link:../../llm/llm-service
       '@actspace/prompt':
         specifier: workspace:*
-        version: link:../../prompt
+        version: link:../../context/prompt
+      '@actspace/scope':
+        specifier: workspace:*
+        version: link:../scope
       '@actspace/session-journal':
         specifier: workspace:*
-        version: link:../../session/journal
+        version: link:../../session/session-journal
       '@actspace/session-persistence':
         specifier: workspace:*
-        version: link:../../session/persistence
+        version: link:../../session/session-persistence
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
         specifier: workspace:*
-        version: link:../../tools/runtime
+        version: link:../tool-runtime
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/core/agent-service:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/scope':
+        specifier: workspace:*
+        version: link:../scope
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/session-journal
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../../session/session-persistence
+      '@actspace/session-storage':
+        specifier: workspace:*
+        version: link:../../session/session-storage
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@actspace/side-chat':
+        specifier: workspace:*
+        version: link:../../side-chat/side-chat
+    devDependencies:
+      '@actspace/boot':
+        specifier: workspace:*
+        version: link:../../composition/boot
+      '@actspace/bundle':
+        specifier: workspace:*
+        version: link:../../composition/bundle
+      '@actspace/composition':
+        specifier: workspace:*
+        version: link:../../composition/composition
+      '@actspace/session-persistence-jsonl':
+        specifier: workspace:*
+        version: link:../../session/session-persistence-jsonl
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/core/runtime:
+    dependencies:
+      '@actspace/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@actspace/agent-host':
+        specifier: workspace:*
+        version: link:../../host/agent-host
+      '@actspace/agent-loop':
+        specifier: workspace:*
+        version: link:../agent-loop
+      '@actspace/agent-service':
+        specifier: workspace:*
+        version: link:../agent-service
+      '@actspace/approval':
+        specifier: workspace:*
+        version: link:../../approval/approval
+      '@actspace/auto-review':
+        specifier: workspace:*
+        version: link:../../approval/auto-review
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks/background-tasks
+      '@actspace/boot':
+        specifier: workspace:*
+        version: link:../../composition/boot
+      '@actspace/bundle':
+        specifier: workspace:*
+        version: link:../../composition/bundle
+      '@actspace/composition':
+        specifier: workspace:*
+        version: link:../../composition/composition
+      '@actspace/context-background-tasks':
+        specifier: workspace:*
+        version: link:../../context/context-background-tasks
+      '@actspace/context-compaction':
+        specifier: workspace:*
+        version: link:../../context/context-compaction
+      '@actspace/context-conversation':
+        specifier: workspace:*
+        version: link:../../context/context-conversation
+      '@actspace/context-disclosure':
+        specifier: workspace:*
+        version: link:../../context/context-disclosure
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../../context/context-engine
+      '@actspace/context-rules':
+        specifier: workspace:*
+        version: link:../../context/context-rules
+      '@actspace/context-runtime':
+        specifier: workspace:*
+        version: link:../../context/context-runtime
+      '@actspace/context-skills':
+        specifier: workspace:*
+        version: link:../../context/context-skills
+      '@actspace/context-system':
+        specifier: workspace:*
+        version: link:../../context/context-system
+      '@actspace/context-tools':
+        specifier: workspace:*
+        version: link:../../context/context-tools
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/desktop-app':
+        specifier: workspace:*
+        version: link:../../host/desktop-app
+      '@actspace/diagnostics':
+        specifier: workspace:*
+        version: link:../../util/diagnostics
+      '@actspace/english-learning':
+        specifier: workspace:*
+        version: link:../../english-learning/english-learning
+      '@actspace/harness-control':
+        specifier: workspace:*
+        version: link:../../harness-evolution/harness-control
+      '@actspace/harness-hmr':
+        specifier: workspace:*
+        version: link:../../harness-evolution/harness-hmr
+      '@actspace/harness-stats':
+        specifier: workspace:*
+        version: link:../../harness-evolution/harness-stats
+      '@actspace/headless':
+        specifier: workspace:*
+        version: link:../../host/headless
+      '@actspace/llm-pi-ai':
+        specifier: workspace:*
+        version: link:../../llm/llm-pi-ai
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../../llm/llm-service
+      '@actspace/official-skills':
+        specifier: workspace:*
+        version: link:../../skill/official-skills
+      '@actspace/plugin-manager':
+        specifier: workspace:*
+        version: link:../../harness-evolution/plugin-manager
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../../context/prompt
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox
+      '@actspace/sandbox-nono':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox-nono
+      '@actspace/sandbox-seatbelt':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox-seatbelt
+      '@actspace/scope':
+        specifier: workspace:*
+        version: link:../scope
+      '@actspace/session-checkpoint-policy':
+        specifier: workspace:*
+        version: link:../../session/session-checkpoint-policy
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/session-journal
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../../session/session-persistence
+      '@actspace/session-persistence-jsonl':
+        specifier: workspace:*
+        version: link:../../session/session-persistence-jsonl
+      '@actspace/session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
+      '@actspace/session-projection-cache':
+        specifier: workspace:*
+        version: link:../../session/session-projection-cache
+      '@actspace/session-transcript':
+        specifier: workspace:*
+        version: link:../../session/session-transcript
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@actspace/side-chat':
+        specifier: workspace:*
+        version: link:../../side-chat/side-chat
+      '@actspace/subagent':
+        specifier: workspace:*
+        version: link:../../subagent/subagent
+      '@actspace/tool-background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks/tool-background-tasks
+      '@actspace/tool-browser':
+        specifier: workspace:*
+        version: link:../../browser/tool-browser
+      '@actspace/tool-fs-read':
+        specifier: workspace:*
+        version: link:../../fs/tool-fs-read
+      '@actspace/tool-fs-search':
+        specifier: workspace:*
+        version: link:../../fs/tool-fs-search
+      '@actspace/tool-fs-write':
+        specifier: workspace:*
+        version: link:../../fs/tool-fs-write
+      '@actspace/tool-image-generation':
+        specifier: workspace:*
+        version: link:../../image/tool-image-generation
+      '@actspace/tool-image-inspection':
+        specifier: workspace:*
+        version: link:../../image/tool-image-inspection
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../tool-runtime
+      '@actspace/tool-shell':
+        specifier: workspace:*
+        version: link:../../shell/tool-shell
+      '@actspace/tool-subagent':
+        specifier: workspace:*
+        version: link:../../subagent/tool-subagent
+      '@actspace/tool-todo':
+        specifier: workspace:*
+        version: link:../../todo/tool-todo
+      '@actspace/tool-web':
+        specifier: workspace:*
+        version: link:../../web/tool-web
+    devDependencies:
+      '@actspace/session-storage':
+        specifier: workspace:*
+        version: link:../../session/session-storage
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      esbuild:
+        specifier: 0.21.5
+        version: 0.21.5
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
@@ -1026,7 +1258,7 @@ importers:
     dependencies:
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../../cordis-adapter
+        version: link:../../composition/cordis-adapter
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1038,35 +1270,17 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/desktop-app:
+  packages/core/tool-runtime:
     dependencies:
-      '@actspace/agent-service':
+      '@actspace/approval':
         specifier: workspace:*
-        version: link:../agent-service
-      '@actspace/bundle':
-        specifier: workspace:*
-        version: link:../bundle
-      '@actspace/context-compaction':
-        specifier: workspace:*
-        version: link:../context/compaction
+        version: link:../../approval/approval
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/english-learning':
-        specifier: workspace:*
-        version: link:../english-learning
-      '@actspace/llm-service':
-        specifier: workspace:*
-        version: link:../llm/service
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../session/journal
-      '@actspace/session-persistence':
-        specifier: workspace:*
-        version: link:../session/persistence
+        version: link:../../composition/cordis-adapter
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../../util/shared
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1078,46 +1292,30 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/diagnostics:
+  packages/english-learning/english-learning:
     dependencies:
+      '@actspace/agent':
+        specifier: workspace:*
+        version: link:../../core/agent
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../cordis-adapter
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/english-learning:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/core-agent':
-        specifier: workspace:*
-        version: link:../core/agent
-      '@actspace/core-scope':
-        specifier: workspace:*
-        version: link:../core/scope
+        version: link:../../composition/cordis-adapter
       '@actspace/prompt':
         specifier: workspace:*
-        version: link:../prompt
+        version: link:../../context/prompt
+      '@actspace/scope':
+        specifier: workspace:*
+        version: link:../../core/scope
       '@actspace/session-journal':
         specifier: workspace:*
-        version: link:../session/journal
+        version: link:../../session/session-journal
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../../util/shared
     devDependencies:
       '@actspace/context-engine':
         specifier: workspace:*
-        version: link:../context/engine
+        version: link:../../context/context-engine
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
@@ -1128,26 +1326,17 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/harness-control:
+  packages/fs/tool-fs-read:
     dependencies:
-      '@actspace/boot':
-        specifier: workspace:*
-        version: link:../boot
-      '@actspace/bundle':
-        specifier: workspace:*
-        version: link:../bundle
-      '@actspace/composition':
-        specifier: workspace:*
-        version: link:../composition
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/session-jsonl':
+        version: link:../../composition/cordis-adapter
+      '@actspace/shared':
         specifier: workspace:*
-        version: link:../session/jsonl
-      '@actspace/session-persistence':
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
         specifier: workspace:*
-        version: link:../session/persistence
+        version: link:../../core/tool-runtime
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1159,21 +1348,96 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/harness-evaluation:
+  packages/fs/tool-fs-search:
     dependencies:
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../cordis-adapter
+        version: link:../../composition/cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/fs/tool-fs-write:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/harness-evolution/harness-control:
+    dependencies:
+      '@actspace/boot':
+        specifier: workspace:*
+        version: link:../../composition/boot
+      '@actspace/bundle':
+        specifier: workspace:*
+        version: link:../../composition/bundle
+      '@actspace/composition':
+        specifier: workspace:*
+        version: link:../../composition/composition
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../../session/session-persistence
+      '@actspace/session-persistence-jsonl':
+        specifier: workspace:*
+        version: link:../../session/session-persistence-jsonl
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/harness-evolution/harness-evaluation:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
       '@actspace/harness-control':
         specifier: workspace:*
         version: link:../harness-control
       '@actspace/sandbox':
         specifier: workspace:*
-        version: link:../sandbox/manager
+        version: link:../../sandbox/sandbox
     devDependencies:
       '@actspace/sandbox-nono':
         specifier: workspace:*
-        version: link:../sandbox/nono
+        version: link:../../sandbox/sandbox-nono
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
@@ -1184,14 +1448,14 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/harness-hmr:
+  packages/harness-evolution/harness-hmr:
     dependencies:
       '@actspace/boot':
         specifier: workspace:*
-        version: link:../boot
+        version: link:../../composition/boot
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../cordis-adapter
+        version: link:../../composition/cordis-adapter
       '@actspace/harness-control':
         specifier: workspace:*
         version: link:../harness-control
@@ -1206,14 +1470,14 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/harness-stats:
+  packages/harness-evolution/harness-stats:
     dependencies:
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../cordis-adapter
+        version: link:../../composition/cordis-adapter
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../../util/shared
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1225,23 +1489,142 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/headless:
+  packages/harness-evolution/plugin-manager:
+    dependencies:
+      '@actspace/bundle':
+        specifier: workspace:*
+        version: link:../../composition/bundle
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/harness-control':
+        specifier: workspace:*
+        version: link:../harness-control
+      '@actspace/harness-hmr':
+        specifier: workspace:*
+        version: link:../harness-hmr
+      '@actspace/official-skills':
+        specifier: workspace:*
+        version: link:../../skill/official-skills
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/host/agent-host:
     dependencies:
       '@actspace/agent-service':
         specifier: workspace:*
-        version: link:../agent-service
+        version: link:../../core/agent-service
+      '@actspace/approval':
+        specifier: workspace:*
+        version: link:../../approval/approval
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/core-agent-loop':
+        version: link:../../composition/cordis-adapter
+      '@actspace/harness-evaluation':
         specifier: workspace:*
-        version: link:../core/agent-loop
+        version: link:../../harness-evolution/harness-evaluation
+      '@actspace/llm-pi-ai':
+        specifier: workspace:*
+        version: link:../../llm/llm-pi-ai
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../../llm/llm-service
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox
       '@actspace/session-persistence':
         specifier: workspace:*
-        version: link:../session/persistence
+        version: link:../../session/session-persistence
+      '@actspace/session-persistence-jsonl':
+        specifier: workspace:*
+        version: link:../../session/session-persistence-jsonl
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../../util/shared
+      '@actspace/tool-fs-read':
+        specifier: workspace:*
+        version: link:../../fs/tool-fs-read
+      '@actspace/tool-fs-search':
+        specifier: workspace:*
+        version: link:../../fs/tool-fs-search
+      '@actspace/tool-fs-write':
+        specifier: workspace:*
+        version: link:../../fs/tool-fs-write
+      '@actspace/tool-image-generation':
+        specifier: workspace:*
+        version: link:../../image/tool-image-generation
+      '@actspace/tool-image-inspection':
+        specifier: workspace:*
+        version: link:../../image/tool-image-inspection
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+      '@actspace/tool-shell':
+        specifier: workspace:*
+        version: link:../../shell/tool-shell
+      '@actspace/tool-web':
+        specifier: workspace:*
+        version: link:../../web/tool-web
+      ws:
+        specifier: 8.21.0
+        version: 8.21.0
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.2
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/host/desktop-app:
+    dependencies:
+      '@actspace/agent-service':
+        specifier: workspace:*
+        version: link:../../core/agent-service
+      '@actspace/bundle':
+        specifier: workspace:*
+        version: link:../../composition/bundle
+      '@actspace/context-compaction':
+        specifier: workspace:*
+        version: link:../../context/context-compaction
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/english-learning':
+        specifier: workspace:*
+        version: link:../../english-learning/english-learning
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../../llm/llm-service
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/session-journal
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../../session/session-persistence
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1253,17 +1636,92 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/llm/pi-ai:
+  packages/host/headless:
+    dependencies:
+      '@actspace/agent-loop':
+        specifier: workspace:*
+        version: link:../../core/agent-loop
+      '@actspace/agent-service':
+        specifier: workspace:*
+        version: link:../../core/agent-service
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../../session/session-persistence
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/image/tool-image-generation:
     dependencies:
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/llm-service':
-        specifier: workspace:*
-        version: link:../service
+        version: link:../../composition/cordis-adapter
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../../shared
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/image/tool-image-inspection:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../../llm/llm-service
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/llm/llm-pi-ai:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../llm-service
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
       '@anthropic-ai/sdk':
         specifier: 0.91.1
         version: 0.91.1(zod@4.4.3)
@@ -1284,14 +1742,14 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/llm/service:
+  packages/llm/llm-service:
     dependencies:
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../../cordis-adapter
+        version: link:../../composition/cordis-adapter
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../../shared
+        version: link:../../util/shared
       undici:
         specifier: ^7.29.1
         version: 7.29.1
@@ -1306,7 +1764,11 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/official-skills:
+  packages/sandbox/sandbox:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1318,260 +1780,377 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/plugin-manager:
+  packages/sandbox/sandbox-nono:
     dependencies:
-      '@actspace/bundle':
-        specifier: workspace:*
-        version: link:../bundle
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/harness-control':
-        specifier: workspace:*
-        version: link:../harness-control
-      '@actspace/harness-hmr':
-        specifier: workspace:*
-        version: link:../harness-hmr
-      '@actspace/official-skills':
-        specifier: workspace:*
-        version: link:../official-skills
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../tools/runtime
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/prompt:
-    dependencies:
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../context/engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/core-agent':
-        specifier: workspace:*
-        version: link:../core/agent
-      '@actspace/core-scope':
-        specifier: workspace:*
-        version: link:../core/scope
-      '@actspace/llm-service':
-        specifier: workspace:*
-        version: link:../llm/service
-      '@actspace/official-skills':
-        specifier: workspace:*
-        version: link:../official-skills
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../session/journal
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../shared
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/runtime:
-    dependencies:
-      '@actspace/agent-host':
-        specifier: workspace:*
-        version: link:../agent-host
-      '@actspace/agent-service':
-        specifier: workspace:*
-        version: link:../agent-service
-      '@actspace/auto-review':
-        specifier: workspace:*
-        version: link:../auto-review
-      '@actspace/background-tasks':
-        specifier: workspace:*
-        version: link:../background-tasks
-      '@actspace/boot':
-        specifier: workspace:*
-        version: link:../boot
-      '@actspace/bundle':
-        specifier: workspace:*
-        version: link:../bundle
-      '@actspace/composition':
-        specifier: workspace:*
-        version: link:../composition
-      '@actspace/context-background-tasks':
-        specifier: workspace:*
-        version: link:../context/background-tasks
-      '@actspace/context-compaction':
-        specifier: workspace:*
-        version: link:../context/compaction
-      '@actspace/context-conversation':
-        specifier: workspace:*
-        version: link:../context/conversation
-      '@actspace/context-disclosure':
-        specifier: workspace:*
-        version: link:../context/disclosure
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../context/engine
-      '@actspace/context-rules':
-        specifier: workspace:*
-        version: link:../context/rules
-      '@actspace/context-runtime':
-        specifier: workspace:*
-        version: link:../context/runtime
-      '@actspace/context-skills':
-        specifier: workspace:*
-        version: link:../context/skills
-      '@actspace/context-system':
-        specifier: workspace:*
-        version: link:../context/system
-      '@actspace/context-tools':
-        specifier: workspace:*
-        version: link:../context/tools
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/core-agent':
-        specifier: workspace:*
-        version: link:../core/agent
-      '@actspace/core-agent-loop':
-        specifier: workspace:*
-        version: link:../core/agent-loop
-      '@actspace/core-scope':
-        specifier: workspace:*
-        version: link:../core/scope
-      '@actspace/desktop-app':
-        specifier: workspace:*
-        version: link:../desktop-app
-      '@actspace/diagnostics':
-        specifier: workspace:*
-        version: link:../diagnostics
-      '@actspace/english-learning':
-        specifier: workspace:*
-        version: link:../english-learning
-      '@actspace/harness-control':
-        specifier: workspace:*
-        version: link:../harness-control
-      '@actspace/harness-hmr':
-        specifier: workspace:*
-        version: link:../harness-hmr
-      '@actspace/harness-stats':
-        specifier: workspace:*
-        version: link:../harness-stats
-      '@actspace/headless':
-        specifier: workspace:*
-        version: link:../headless
-      '@actspace/llm-pi-ai':
-        specifier: workspace:*
-        version: link:../llm/pi-ai
-      '@actspace/llm-service':
-        specifier: workspace:*
-        version: link:../llm/service
-      '@actspace/official-skills':
-        specifier: workspace:*
-        version: link:../official-skills
-      '@actspace/plugin-manager':
-        specifier: workspace:*
-        version: link:../plugin-manager
-      '@actspace/prompt':
-        specifier: workspace:*
-        version: link:../prompt
+        version: link:../../composition/cordis-adapter
       '@actspace/sandbox':
         specifier: workspace:*
-        version: link:../sandbox/manager
-      '@actspace/sandbox-nono':
+        version: link:../sandbox
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/sandbox/sandbox-seatbelt:
+    dependencies:
+      '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../sandbox/nono
-      '@actspace/sandbox-seatbelt':
+        version: link:../../composition/cordis-adapter
+      '@actspace/sandbox':
         specifier: workspace:*
-        version: link:../sandbox/seatbelt
-      '@actspace/session-checkpoint-policy':
+        version: link:../sandbox
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/session/session-checkpoint-policy:
+    dependencies:
+      '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../session/checkpoint-policy
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../session/journal
-      '@actspace/session-jsonl':
-        specifier: workspace:*
-        version: link:../session/jsonl
+        version: link:../../composition/cordis-adapter
       '@actspace/session-persistence':
         specifier: workspace:*
-        version: link:../session/persistence
-      '@actspace/session-projection':
+        version: link:../session-persistence
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/session/session-journal:
+    dependencies:
+      '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../session/projection
-      '@actspace/session-projection-cache':
-        specifier: workspace:*
-        version: link:../session/projection-cache
+        version: link:../../composition/cordis-adapter
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../shared
-      '@actspace/side-chat':
+        version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/session/session-persistence:
+    dependencies:
+      '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../side-chat
+        version: link:../../composition/cordis-adapter
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session-journal
+      '@actspace/session-storage':
+        specifier: workspace:*
+        version: link:../session-storage
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+    devDependencies:
+      '@actspace/session-persistence-jsonl':
+        specifier: workspace:*
+        version: link:../session-persistence-jsonl
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/session/session-persistence-jsonl:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session-journal
+      '@actspace/session-storage':
+        specifier: workspace:*
+        version: link:../session-storage
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/session/session-projection:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session-journal
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/session/session-projection-cache:
+    dependencies:
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session-journal
+      '@actspace/session-projection':
+        specifier: workspace:*
+        version: link:../session-projection
+      '@actspace/session-storage':
+        specifier: workspace:*
+        version: link:../session-storage
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/session/session-storage:
+    dependencies:
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session-journal
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/session/session-transcript:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../../context/prompt
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../session-journal
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/shell/tool-shell:
+    dependencies:
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks/background-tasks
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/sandbox':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+    devDependencies:
+      '@actspace/sandbox-nono':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox-nono
+      '@actspace/sandbox-seatbelt':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox-seatbelt
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/side-chat/side-chat:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../../context/prompt
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/session-journal
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/skill/official-skills:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/skill/skill:
+    dependencies:
+      '@actspace/official-skills':
+        specifier: workspace:*
+        version: link:../official-skills
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/subagent/subagent:
+    dependencies:
+      '@actspace/agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@actspace/agent-loop':
+        specifier: workspace:*
+        version: link:../../core/agent-loop
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks/background-tasks
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/llm-service':
+        specifier: workspace:*
+        version: link:../../llm/llm-service
+      '@actspace/scope':
+        specifier: workspace:*
+        version: link:../../core/scope
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/session-journal
+      '@actspace/session-persistence':
+        specifier: workspace:*
+        version: link:../../session/session-persistence
+      '@actspace/session-persistence-jsonl':
+        specifier: workspace:*
+        version: link:../../session/session-persistence-jsonl
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/subagent/tool-subagent:
+    dependencies:
+      '@actspace/agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks/background-tasks
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
       '@actspace/subagent':
         specifier: workspace:*
         version: link:../subagent
-      '@actspace/tools-approval':
+      '@actspace/tool-runtime':
         specifier: workspace:*
-        version: link:../tools/approval
-      '@actspace/tools-background-tasks':
-        specifier: workspace:*
-        version: link:../tools/background-tasks
-      '@actspace/tools-browser-tools':
-        specifier: workspace:*
-        version: link:../tools/browser-tools
-      '@actspace/tools-filesystem-read':
-        specifier: workspace:*
-        version: link:../tools/filesystem-read
-      '@actspace/tools-filesystem-search':
-        specifier: workspace:*
-        version: link:../tools/filesystem-search
-      '@actspace/tools-filesystem-write':
-        specifier: workspace:*
-        version: link:../tools/filesystem-write
-      '@actspace/tools-image-generation':
-        specifier: workspace:*
-        version: link:../tools/image-generation
-      '@actspace/tools-image-inspection':
-        specifier: workspace:*
-        version: link:../tools/image-inspection
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../tools/runtime
-      '@actspace/tools-shell-tools':
-        specifier: workspace:*
-        version: link:../tools/shell-tools
-      '@actspace/tools-todo-tools':
-        specifier: workspace:*
-        version: link:../tools/todo-tools
-      '@actspace/tools-web-tools':
-        specifier: workspace:*
-        version: link:../tools/web-tools
+        version: link:../../core/tool-runtime
     devDependencies:
-      '@actspace/session-storage':
+      '@actspace/shared':
         specifier: workspace:*
-        version: link:../session/storage
+        version: link:../../util/shared
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4
-      esbuild:
-        specifier: 0.21.5
-        version: 0.21.5
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
@@ -1579,11 +2158,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/sandbox/manager:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
+  packages/test-support/test-support:
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1595,187 +2170,26 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/sandbox/nono:
+  packages/todo/tool-todo:
     dependencies:
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/sandbox':
+        version: link:../../composition/cordis-adapter
+      '@actspace/session-journal':
         specifier: workspace:*
-        version: link:../manager
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/sandbox/seatbelt:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/sandbox':
-        specifier: workspace:*
-        version: link:../manager
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/session/checkpoint-policy:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
+        version: link:../../session/session-journal
       '@actspace/session-persistence':
         specifier: workspace:*
-        version: link:../persistence
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/session/journal:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/session/jsonl:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../journal
-      '@actspace/session-storage':
-        specifier: workspace:*
-        version: link:../storage
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/session/persistence:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../journal
-      '@actspace/session-storage':
-        specifier: workspace:*
-        version: link:../storage
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-    devDependencies:
-      '@actspace/session-jsonl':
-        specifier: workspace:*
-        version: link:../jsonl
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/session/projection:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../journal
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/session/projection-cache:
-    dependencies:
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../journal
+        version: link:../../session/session-persistence
       '@actspace/session-projection':
         specifier: workspace:*
-        version: link:../projection
-      '@actspace/session-storage':
-        specifier: workspace:*
-        version: link:../storage
+        version: link:../../session/session-projection
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../../shared
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/session/storage:
-    dependencies:
-      '@actspace/session-journal':
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
         specifier: workspace:*
-        version: link:../journal
+        version: link:../../core/tool-runtime
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1787,26 +2201,11 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/shared:
-    devDependencies:
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/side-chat:
+  packages/util/diagnostics:
     dependencies:
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/prompt':
-        specifier: workspace:*
-        version: link:../prompt
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../session/journal
+        version: link:../../composition/cordis-adapter
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1818,41 +2217,16 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/subagent:
-    dependencies:
-      '@actspace/background-tasks':
-        specifier: workspace:*
-        version: link:../background-tasks
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../cordis-adapter
-      '@actspace/core-agent':
-        specifier: workspace:*
-        version: link:../core/agent
-      '@actspace/core-agent-loop':
-        specifier: workspace:*
-        version: link:../core/agent-loop
-      '@actspace/core-scope':
-        specifier: workspace:*
-        version: link:../core/scope
-      '@actspace/llm-service':
-        specifier: workspace:*
-        version: link:../llm/service
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../session/journal
-      '@actspace/session-jsonl':
-        specifier: workspace:*
-        version: link:../session/jsonl
-      '@actspace/session-persistence':
-        specifier: workspace:*
-        version: link:../session/persistence
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../tools/runtime
+  packages/util/shared:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/util/util:
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
@@ -1864,304 +2238,17 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
-  packages/test-support:
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/approval:
+  packages/web/tool-web:
     dependencies:
       '@actspace/cordis-adapter':
         specifier: workspace:*
-        version: link:../../cordis-adapter
+        version: link:../../composition/cordis-adapter
       '@actspace/shared':
         specifier: workspace:*
-        version: link:../../shared
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/background-tasks:
-    dependencies:
-      '@actspace/background-tasks':
+        version: link:../../util/shared
+      '@actspace/tool-runtime':
         specifier: workspace:*
-        version: link:../../background-tasks
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../runtime
-    devDependencies:
-      '@actspace/core-agent':
-        specifier: workspace:*
-        version: link:../../core/agent
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../../session/journal
-      '@actspace/session-persistence':
-        specifier: workspace:*
-        version: link:../../session/persistence
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/browser-tools:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../runtime
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/filesystem-read:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../runtime
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/filesystem-search:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../runtime
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/filesystem-write:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../runtime
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/image-generation:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../runtime
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/image-inspection:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/llm-service':
-        specifier: workspace:*
-        version: link:../../llm/service
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../runtime
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/runtime:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-approval':
-        specifier: workspace:*
-        version: link:../approval
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/shell-tools:
-    dependencies:
-      '@actspace/background-tasks':
-        specifier: workspace:*
-        version: link:../../background-tasks
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/sandbox':
-        specifier: workspace:*
-        version: link:../../sandbox/manager
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../runtime
-    devDependencies:
-      '@actspace/sandbox-nono':
-        specifier: workspace:*
-        version: link:../../sandbox/nono
-      '@actspace/sandbox-seatbelt':
-        specifier: workspace:*
-        version: link:../../sandbox/seatbelt
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/todo-tools:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/session-journal':
-        specifier: workspace:*
-        version: link:../../session/journal
-      '@actspace/session-persistence':
-        specifier: workspace:*
-        version: link:../../session/persistence
-      '@actspace/session-projection':
-        specifier: workspace:*
-        version: link:../../session/projection
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../runtime
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/tools/web-tools:
-    dependencies:
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../cordis-adapter
-      '@actspace/shared':
-        specifier: workspace:*
-        version: link:../../shared
-      '@actspace/tools-runtime':
-        specifier: workspace:*
-        version: link:../runtime
+        version: link:../../core/tool-runtime
       turndown:
         specifier: 7.2.4
         version: 7.2.4
@@ -2172,18 +2259,6 @@ importers:
       '@types/turndown':
         specifier: 5.0.6
         version: 5.0.6
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
-
-  packages/util:
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.3
-        version: 24.12.4
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
@@ -4383,12 +4458,6 @@ packages:
   '@vscode/l10n@0.0.18':
     resolution: {integrity: sha512-KYSIHVmslkaCDyw013pphY+d7x1qV8IZupYfeIfzNA+nsaWHbn5uPuQRvdRFsa9zFzGeudPuoGoZ1Op4jrJXIQ==}
 
-  '@xterm/addon-fit@0.11.0':
-    resolution: {integrity: sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g==}
-
-  '@xterm/xterm@6.0.0':
-    resolution: {integrity: sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg==}
-
   agent-base@6.0.2:
     resolution: {integrity: sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==}
     engines: {node: '>= 6.0.0'}
@@ -5743,9 +5812,6 @@ packages:
   nlcst-to-string@4.0.0:
     resolution: {integrity: sha512-YKLBCcUYKAg0FNlOBT6aI91qFmSiFKiluk655WzPF+DDMA02qIyy8uiRqI8QXtcFpEvll12LpL5MXqEmAZ+dcA==}
 
-  node-addon-api@7.1.1:
-    resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
-
   node-domexception@1.0.0:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
@@ -5760,9 +5826,6 @@ packages:
 
   node-mock-http@1.0.4:
     resolution: {integrity: sha512-8DY+kFsDkNXy1sJglUfuODx1/opAGJGyrTuFqEoN90oRc2Vk0ZbD4K2qmKXBBEhZQzdKHIVfEJpDU8Ak2NJEvQ==}
-
-  node-pty@1.1.0:
-    resolution: {integrity: sha512-20JqtutY6JPXTUnL0ij1uad7Qe1baT46lyolh2sSENDd4sTzKZ4nmAFkeAARDKwmlLjPx6XKRlwRUxwjOy+lUg==}
 
   node-releases@2.0.45:
     resolution: {integrity: sha512-iIbHXV9eBB2nB0wa7oTsrrXq+qQt+9SIlx9AX3T96YgobtEQfis5n6TJ6vV+3QP8DwdriEAcGhARaFCu37peBg==}
@@ -9071,10 +9134,6 @@ snapshots:
 
   '@vscode/l10n@0.0.18': {}
 
-  '@xterm/addon-fit@0.11.0': {}
-
-  '@xterm/xterm@6.0.0': {}
-
   agent-base@6.0.2:
     dependencies:
       debug: 4.4.3
@@ -10813,8 +10872,6 @@ snapshots:
     dependencies:
       '@types/nlcst': 2.0.3
 
-  node-addon-api@7.1.1: {}
-
   node-domexception@1.0.0: {}
 
   node-fetch-native@1.6.7: {}
@@ -10826,10 +10883,6 @@ snapshots:
       formdata-polyfill: 4.0.10
 
   node-mock-http@1.0.4: {}
-
-  node-pty@1.1.0:
-    dependencies:
-      node-addon-api: 7.1.1
 
   node-releases@2.0.45: {}
 

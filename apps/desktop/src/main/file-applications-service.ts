@@ -162,7 +162,9 @@ export async function openWorkspaceFile(
     }
     if (!input.applicationId) {
       const error = await (deps.openPath ?? shell.openPath)(path);
-      return error ? { ok: false, error: "open_failed", message: error } : { ok: true };
+      // 实测（2026-11-01，macOS）：没有关联应用的扩展名会让 shell.openPath 返回 "Failed to open path"，
+      // 系统不会自己弹框；目标已由 resolveTarget 确认存在，所以这个错误串按“没有可用应用”处理。
+      return error ? { ok: false, error: "no_application", message: error } : { ok: true };
     }
     // 应用 id 来自 renderer，只接受当前仍关联到这个文件的应用（含去重前的全部副本）。
     if ((deps.platform ?? process.platform) !== "darwin") return { ok: false, error: "not_registered", message: "Choosing an application is only available on macOS." };

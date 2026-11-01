@@ -10,6 +10,7 @@
 
 - `docs/REPO_COLLAB_GUIDE.md`：仓库级协作、提交、文档同步与测试约定。
 - `docs/ARCHITECTURE.md`：仓库整体结构、依赖边界和架构专题导航。
+- `packages/README.md`：`packages/` 的地图。改包、加插件前先读；每个能力目录有自己的 README，由 `pnpm check:docs` 校验。
 - `docs/design-docs/core-beliefs.md`：Agent-first 的工作原则和这个模板的设计出发点。
 
 ## 代码改完前要读
@@ -53,7 +54,7 @@
 
 ## 外部能力代码
 
-- `browser-bridge/`：Browser Use / Browser Bridge 代码（Go CLI + Chrome Extension + 协议层），是顶层 Host capability，不属于通用 workspace `plugins/` 目录。
+- `browser-bridge/`：Browser Use / Browser Bridge 代码（Go CLI + Chrome Extension + 协议层），是顶层 Host capability，不属于通用 workspace `plugins/` 目录。操控浏览器（`browser-tools`）和英语学习（`english-learning`）默认不加载，用户在 扩展 › 插件 中开启后重启生效；开关存在 `settings.tools.plugins`，可关闭与否、默认值来自 `PLUGIN_CATALOG` 的 `display`。
 - 旧 `plugins/fs-watch/`：已退役的历史路径；v2 不再加载或启动它。
 - `/Users/wakeup-jin/Desktop/code-project/side-project/agent-browser-bridge/`：Browser Bridge 最早期来源仓库；仅作历史上下文。
 

@@ -2,7 +2,7 @@
 
 > 状态：当前 v2 设计与实现事实。Subagent 是工具触发的一次性 child Session，不使用 v1 transcript sidecar，也不支持续跑。
 
-公共契约见 [`agent-spec-agent-and-subagent.md`](../agent-plugin-runtime/agent-spec-agent-and-subagent.md)，实现位于 `packages/subagent/`。
+公共契约见 [`agent-spec-agent-and-subagent.md`](../agent-plugin-runtime/agent-spec-agent-and-subagent.md)，实现位于 `packages/subagent/subagent/`。
 
 ## 定位
 

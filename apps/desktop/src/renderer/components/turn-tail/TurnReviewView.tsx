@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { IconButton } from "../ui/IconButton";
 import { Menu, MenuContent, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "../ui/Menu";
 import { useRightPanel, type RightPanelTab } from "../right-panel/RightPanelContext";
+import { useOpenWorkspacePath } from "../files/open-file-fallback-context";
 import { openTurnFile } from "./open-turn-file";
 import { TurnFileDiff } from "./TurnFileDiff";
 
@@ -25,6 +26,7 @@ function Counts({ additions, deletions }: { additions: number; deletions: number
 
 export function TurnReviewView({ tab }: { tab: Extract<RightPanelTab, { kind: "turnReview" }> }) {
   const { openTab } = useRightPanel();
+  const openPath = useOpenWorkspacePath();
   const files = tab.changes.files;
   const [index, setIndex] = useState(tab.index);
   const [split, setSplit] = useState(true);
@@ -37,7 +39,7 @@ export function TurnReviewView({ tab }: { tab: Extract<RightPanelTab, { kind: "t
 
   async function openWholeFile() {
     setError(null);
-    setError(await openTurnFile({ sessionId: tab.sessionId, workspaceRoot: tab.workspaceRoot, relativePath: file.path, openTab }));
+    setError(await openTurnFile({ sessionId: tab.sessionId, workspaceRoot: tab.workspaceRoot, relativePath: file.path, openTab, openPath }));
   }
 
   return (
@@ -79,7 +81,7 @@ export function TurnReviewView({ tab }: { tab: Extract<RightPanelTab, { kind: "t
             <WrapText size={15} />
           </IconButton>
           {file.deleted ? null : (
-            <IconButton label={`在侧边栏打开 ${file.path}`} tooltip="在侧边栏打开整个文件" tooltipSide="bottom" onClick={() => void openWholeFile()} data-review-tool="open-file">
+            <IconButton label={`打开 ${file.path}`} tooltip="打开整个文件" tooltipSide="bottom" onClick={() => void openWholeFile()} data-review-tool="open-file">
               <FileSearch size={15} />
             </IconButton>
           )}

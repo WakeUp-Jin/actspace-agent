@@ -49,7 +49,6 @@ function fixture() {
     // 每次订阅单独计数，同一个函数订阅两次也算两个。
     "events.sessionLive": (callback: (payload: unknown) => void) => { const entry = (payload: unknown) => callback(payload); live.add(entry); return () => { live.delete(entry); }; },
     "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
-    "visualize.list": async () => ({ items: [] }),
   });
   const emit = (sessionId: string, message: string) => act(() => { for (const listener of live) listener({ event: { sessionId, message } }); });
   return {

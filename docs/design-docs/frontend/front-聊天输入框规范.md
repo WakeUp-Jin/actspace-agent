@@ -286,12 +286,12 @@ placeholder 随模式改变，但不代替模式 chip 和运行时契约：
 - 无 Git repository 时显示无计数的 `Review`，点击进入右侧 Review Tab 的 Git 初始化空态。
 - 无未提交改动时不显示 Review strip，避免 Composer 常驻无效操作。
 - SubAgent transcript panel 打开期间不显示 Review strip，优先保证当前 panel 和 follow-up 输入的视觉关系；关闭 panel 后恢复。
-- 相邻 overflow `...` 只保留真实 Review quick actions，例如打开 `Last Turn` 或 `Uncommitted`；能力不可用时展示明确 disabled reason，不保留 AI Review 或无行为占位。
+- 相邻 overflow `...` 只保留真实 Review quick actions，例如打开 `Uncommitted`；能力不可用时展示明确 disabled reason，不保留 AI Review 或无行为占位。
 
 
 ## 状态行统计胶囊
 
-> 2026-10-14 实现（`components/composer/ComposerStatsPills.tsx`、`composer-stats.ts`；模型侧计时在宿主投影 `packages/session/projection/src/facts.ts`），交互原型 `composer-usage-dock-demo.html`。显示分支和数字格式逐条照 DeepSeek Harness `StatsPills.tsx`（详细模式）与 `token-format.ts`。
+> 2026-10-14 实现（`components/composer/ComposerStatsPills.tsx`、`composer-stats.ts`；模型侧计时在宿主投影 `packages/session/session-projection/src/facts.ts`），交互原型 `composer-usage-dock-demo.html`。显示分支和数字格式逐条照 DeepSeek Harness `StatsPills.tsx`（详细模式）与 `token-format.ts`。
 
 follow-up 状态行右侧、context 圆环左边，两个整会话累计的胶囊：
 

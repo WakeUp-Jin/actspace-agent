@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createCordisRoot, publishPluginArtifact, pluginId, entryId, serviceId } from '../../../packages/cordis-adapter/dist/index.js';
-import { composeRuntime } from '../../../packages/composition/dist/index.js';
-import { HarnessControl } from '../../../packages/harness-control/dist/index.js';
-import { SelectionStore } from '../../../packages/harness-control/dist/selection-store.js';
+import { createCordisRoot, publishPluginArtifact, pluginId, entryId, serviceId } from '../../../packages/composition/cordis-adapter/dist/index.js';
+import { composeRuntime } from '../../../packages/composition/composition/dist/index.js';
+import { HarnessControl } from '../../../packages/harness-evolution/harness-control/dist/index.js';
+import { SelectionStore } from '../../../packages/harness-evolution/harness-control/dist/selection-store.js';
 const [directory, phase] = process.argv.slice(2);
 const root = await createCordisRoot();
 const artifactRoot = join(directory, 'artifacts');

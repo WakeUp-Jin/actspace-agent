@@ -18,7 +18,7 @@
 | [Harness 统计](active/20261101-harness-stats.md) | 2026-11-01 T1–T12 已实现（未提交），自动化验证完成；待 Electron 真实 Host 验收后移入 completed。执行记录见 [exec-runs](../exec-runs/20261101-harness-stats/execution-summary.md)。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
-| [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 实施与自动化验证进行中；下一步完成制品核验、独立测试版实机安装授权后的 G1–G6 验收及缺陷修复。 |
+| [Chrome 扩展连接、启动与使用体验闭环](active/20260928-chrome-connect-experience.md) | 2026-11-01 随[功能减法](completed/20261101-feature-subtraction/README.md)暂停（浏览器改为可关插件，默认不加载）；是否删除由用户决定。 |
 | [自定义模型推理能力](active/20260912-custom-model-reasoning.md) | 已被[设置 › 模型重做](completed/20261021-model-provider-redesign.md)取代（思考档位改为每个模型声明的档位）；是否删除由用户决定。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton 已由设计 token 收口计划完成；DropdownMenu（及 Popover、Dialog、Select、ContextMenu）由 Desktop 前端重构 16 接手；剩 Switch、Textarea、Tabs 及对应迁移。 |
 
@@ -30,6 +30,8 @@
 
 ## 最近完成
 
+- [架构优化：功能减法](completed/20261101-feature-subtraction/README.md) + [插件结构](completed/20261101-plugin-structure/README.md)：P1–P5、S1–S4 完成（分支 `架构优化`，提 PR 合入 main，已合并 main 上的会话记录 Markdown）；删可视化回复、终端、HTML/CSV/代码渲染、文件树和 Review 的写操作与监听，新增文档面板；包改为 `packages/<能力>/<包>` 两级、唯一插件清单、扩展 › 插件页（浏览器与英语学习默认关）、23 份能力目录 README 及检查；desktop 2106 项测试与全仓检查通过；Codex 真机验收发现的 3 个问题已修复，见[执行摘要](../exec-runs/20261101-feature-subtraction/execution-summary.md)。
+- [会话记录 Markdown](completed/20261101-session-history-transcript.md)：新插件 `@actspace/session-transcript` 每轮结束写 `sessions-v2/<id>/transcript.md`，主会话提示词告诉 Agent 怎么读历史会话；读 transcript 不弹审批，`sessions-v2` 目录不放行；包测试与契约检查通过；Electron 手工检查 1–5 未执行，见[执行摘要](../exec-runs/20261101-session-history-transcript/execution-summary.md)。
 - [侧边对话](completed/20261021-side-chat.md)：插件 `@actspace/side-chat`、`openSideChat` IPC、右栏 `sideChat` tab、`/side` 与侧栏数量完成；desktop 1986 项测试与前端检查通过；Electron 实机 1–7 未执行，见[执行摘要](../exec-runs/20261021-side-chat/execution-summary.md)。
 - [压缩的前端回显（A1）](completed/20261025-compaction-display.md)：对话里压缩改为居中分隔线（条数、压缩前 → 约压缩后 tokens、耗时、「在轨迹中查看」），摘要只在轨迹看；后端在 `compaction/end` 记录触发方式与前后 token，轨迹概述补齐；desktop 2029 项测试通过，`?mock=compaction` 截图完成；Electron 未验证，见[执行摘要](../exec-runs/20261025-compaction-display/execution-summary.md)。
 - [工具沙箱的出沙箱与回退](completed/20261025-sandbox-escape-fallback.md)：T0–T6 完成（分支 `feat/sandbox-refactor`，提 PR 合入 main）；`full-access` 下 bash 不进沙箱，出沙箱改为 `sandbox_permissions` 加 `justification` 并每次批准，审批卡显示理由，被沙箱拦了在结果里提示；真实 Host 端到端、全仓检查与 Codex 验收通过（验收发现的完全权限提示过时已修复）；审批卡理由行与深色主题未经实机完整复验，见[执行摘要](../exec-runs/20261025-sandbox-escape-fallback/execution-summary.md)。

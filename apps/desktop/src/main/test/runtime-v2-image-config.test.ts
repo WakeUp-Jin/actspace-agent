@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { afterEach, expect, it, vi } from "vitest";
-import type { ToolExecutionContext } from "@actspace/tools-runtime";
+import type { ToolExecutionContext } from "@actspace/tool-runtime";
 import { createDesktopToolHostServices } from "../runtime-v2/tool-host-services";
-import { IMAGE_GENERATION_HOST_PORT_ID } from "@actspace/tools-image-generation";
+import { IMAGE_GENERATION_HOST_PORT_ID } from "@actspace/tool-image-generation";
 import type { DesktopRuntimeV2ModelPort } from "../runtime-v2/model-port";
 
 afterEach(() => vi.unstubAllGlobals());

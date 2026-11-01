@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { workspacesApi } from "../../api/workspaces";
 import { useRunTargetContext } from "../../target/run-target-context";
 import { fileExtension, FileTypeIcon } from "../files/FileTypeIcon";
+import { useOpenWorkspacePath } from "../files/open-file-fallback-context";
 import { useRightPanel } from "../right-panel/RightPanelContext";
 import { openTurnFile, showTurnFileMenu } from "./open-turn-file";
 import { OpenWithButton, type OpenWithOperation } from "./OpenWithButton";
 import { TURN_CARD_TILE_CLASS } from "./TurnChangesCard";
 import { basename, type TurnPresentedFile } from "./turn-tail-data";
-import { useFileApplications } from "./useFileApplications";
+import { canChooseApplication, useFileApplications } from "./useFileApplications";
 
 /**
  * 交付卡：Agent 用 `present` 声明的文件，两列网格（单个或窄于 620px 时一列），超过 4 个折叠。
@@ -36,10 +37,6 @@ const PHASE_TEXT: Record<Phase, string> = {
 export function cardDescription(description: string | undefined, fallback: string): string {
   const trimmed = description?.replace(/\s*(?:\([^()]*\)|（[^（）]*）)\s*$/u, "").trim();
   return trimmed ? trimmed : fallback;
-}
-
-function canChooseApplication(): boolean {
-  return typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
 }
 
 export function TurnDeliverables({ files, sessionId, workspaceRoot }: {
@@ -80,6 +77,7 @@ function PresentedFileCard({ file, sessionId, workspaceRoot }: {
   workspaceRoot?: string | null;
 }) {
   const { openTab } = useRightPanel();
+  const openPath = useOpenWorkspacePath();
   const isRemote = useRunTargetContext().target.kind === "remote";
   const native = !isRemote && Boolean(workspaceRoot);
   const chooseApplication = canChooseApplication();
@@ -127,7 +125,7 @@ function PresentedFileCard({ file, sessionId, workspaceRoot }: {
 
   async function preview() {
     setPhase(null);
-    setPreviewError(await openTurnFile({ sessionId, workspaceRoot, relativePath: file.path, openTab }));
+    setPreviewError(await openTurnFile({ sessionId, workspaceRoot, relativePath: file.path, openTab, openPath }));
   }
 
   async function showMenu() {
@@ -144,7 +142,7 @@ function PresentedFileCard({ file, sessionId, workspaceRoot }: {
         type="button"
         className="absolute inset-0 z-1 w-full cursor-pointer rounded-act-lg border-0 bg-transparent p-0 focus-visible:shadow-[inset_0_0_0_2px_var(--act-color-focus-ring)] focus-visible:outline-none"
         title={file.absolutePath ?? file.path}
-        aria-label={`在侧边栏预览 ${file.path}`}
+        aria-label={`打开 ${file.path}`}
         onClick={() => void preview()}
         onContextMenu={(event) => {
           event.preventDefault();
@@ -168,7 +166,7 @@ function PresentedFileCard({ file, sessionId, workspaceRoot }: {
             >
               {status ?? cardDescription(file.description, fileExtension(name).toUpperCase() || "文件")}
             </span>
-            {status ? null : <span className="hidden group-hover/card:inline">在侧边栏预览</span>}
+            {status ? null : <span className="hidden group-hover/card:inline">打开</span>}
           </span>
         </div>
         {native ? (

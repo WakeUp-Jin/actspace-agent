@@ -198,7 +198,8 @@ Tooltip 视觉必须来自基础 wrapper，不在业务组件里重复写浮层�
   - 所有标签页。
 - `apps/desktop/src/renderer/components/right-panel/RightPanelObjectMenu.tsx`
   - 新建右侧对象。
-- ~~`apps/desktop/src/renderer/components/right-panel/ReplyHtmlRenderView.tsx` 刷新文件列表~~：2026-09-26 已改为 `IconButton`。
+- ~~`ReplyHtmlRenderView.tsx` 刷新文件列表~~：2026-09-26 已改为 `IconButton`；该文件随「转成可视化 HTML」于 2026-11-01 删除。
+- ~~`HtmlRenderView.tsx` / `CsvRenderView.tsx` 的工具按钮~~：两个视图随文件打开收敛（功能减法 P3）于 2026-11-01 删除。
 
 ### P2：低频或已有文字，但可视情况补充
 

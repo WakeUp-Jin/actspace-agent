@@ -6,6 +6,7 @@ import { SettingsPage } from "../components/settings/SettingsPage";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/Dialog";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
+import { extensionPlugins } from "./fixtures/extensionsFixture";
 
 function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
   const base: AppSettings = {
@@ -258,6 +259,8 @@ describe("SettingsPage", () => {
       "quickOpen.updateShortcut": updateQuickOpenShortcut,
       "appearance.setUiZoom": setUiZoom,
       "appearance.setNativeTheme": setNativeTheme,
+      // 浏览器工具组与语音设置跟随插件是否已加载。
+      "plugins.list": async () => extensionPlugins({ "browser-tools": { loaded: true, enabled: true }, "english-learning": { loaded: true, enabled: true } }),
     });
   });
 

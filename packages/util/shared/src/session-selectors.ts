@@ -1,0 +1,669 @@
+import type {
+  AssistantMessagePayload,
+  ContextCompactionPayload,
+  ContextUsageSnapshot,
+  ErrorPayload,
+  EventId,
+  MessageBlock,
+  SessionDiffSummary,
+  SessionEvent,
+  SessionId,
+  ThinkingPayload,
+  ToolUiPreview,
+  TurnUsageSummary,
+  UserMessagePayload,
+  WorkspacePreparationPayload,
+} from "./session";
+import { convertUsageCostToUsd } from "./usage-cost";
+import { hasVisibleText } from "./visible-text";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isSessionEvent(value: unknown): value is SessionEvent {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.sessionId === "string" &&
+    typeof value.agentRunId === "string" &&
+    value.schemaVersion === 2 &&
+    typeof value.type === "string" &&
+    typeof value.timestamp === "string" &&
+    "payload" in value
+  );
+}
+
+function isToolUiPreview(value: unknown): value is ToolUiPreview {
+  return isRecord(value) && typeof value.kind === "string";
+}
+
+export function normalizeSessionEvents(records: unknown[]): SessionEvent[] {
+  const events: SessionEvent[] = [];
+
+  for (const record of records) {
+    if (isSessionEvent(record)) {
+      events.push(record);
+    }
+  }
+
+  return events;
+}
+
+function getDisplayTime(timestamp: string): string {
+  return timestamp;
+}
+
+function getOptionalString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function withRenderKey(block: MessageBlock, renderKey: string): MessageBlock {
+  return { ...block, renderKey };
+}
+
+function legacyToolResultBlock(event: SessionEvent, payload: Record<string, unknown>): MessageBlock {
+  const toolName = getOptionalString(payload, "toolName") ?? "Tool";
+  const summary = getOptionalString(payload, "summary");
+  const output =
+    getOptionalString(payload, "truncatedOutput") ??
+    getOptionalString(payload, "modelOutput") ??
+    getOptionalString(payload, "rawOutput") ??
+    "";
+  const ok = payload.ok !== false;
+
+  return {
+    kind: "tool",
+    id: event.id,
+    title: summary ?? toolName,
+    content: output,
+    createdAt: getDisplayTime(event.timestamp),
+    isError: !ok,
+  };
+}
+
+function messageBlockFromToolPreview(
+  eventId: EventId,
+  timestamp: string,
+  preview: ToolUiPreview,
+  isError?: boolean,
+  terminalStatus?: unknown
+): MessageBlock {
+  const status = terminalStatus === "running" ? "running" : terminalStatus === "denied" || terminalStatus === "aborted" || terminalStatus === "outcome-unknown" ? terminalStatus : isError ? "failed" : "completed";
+  switch (preview.kind) {
+    case "read":
+      return {
+        kind: "read",
+        id: eventId,
+        filePath: preview.filePath,
+        range: preview.range,
+        displayText: preview.displayText,
+        resultPreview: preview.resultPreview,
+        status,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "search":
+      return {
+        kind: "search",
+        id: eventId,
+        query: preview.query,
+        scope: preview.scope,
+        resultCount: preview.resultCount,
+        displayText: preview.displayText,
+        resultPreview: preview.resultPreview,
+        status,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "grep":
+      return {
+        kind: "grep",
+        id: eventId,
+        pattern: preview.pattern,
+        scope: preview.scope,
+        resultCount: preview.resultCount,
+        displayText: preview.displayText,
+        resultPreview: preview.resultPreview,
+        status,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "glob":
+      return {
+        kind: "glob",
+        id: eventId,
+        pattern: preview.pattern,
+        scope: preview.scope,
+        resultCount: preview.resultCount,
+        displayText: preview.displayText,
+        resultPreview: preview.resultPreview,
+        status,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "web_search":
+      return {
+        kind: "web_search",
+        id: eventId,
+        mode: preview.mode,
+        query: preview.query,
+        url: preview.url,
+        displayText: preview.displayText,
+        status,
+        createdAt: getDisplayTime(timestamp),
+        resultUrls: preview.resultUrls,
+        contentPreview: preview.contentPreview,
+      };
+    case "media_analysis":
+      return {
+        kind: "media_analysis",
+        id: eventId,
+        mediaName: preview.mediaName,
+        mediaKind: preview.mediaKind,
+        displayText: preview.displayText,
+        status,
+        createdAt: getDisplayTime(timestamp),
+        isError
+      };
+    case "image_generation":
+      return {
+        kind: "image_generation",
+        id: eventId,
+        status: preview.status,
+        promptPreview: preview.promptPreview,
+        requestedCount: preview.requestedCount,
+        generatedCount: preview.generatedCount,
+        model: preview.model,
+        size: preview.size,
+        displayText: preview.displayText,
+        images: preview.images,
+        warning: preview.warning,
+        errorMessage: preview.errorMessage,
+        createdAt: getDisplayTime(timestamp),
+      };
+    case "directory_list":
+      return {
+        kind: "directory_list",
+        id: eventId,
+        path: preview.path,
+        entryCount: preview.entryCount,
+        displayText: preview.displayText,
+        resultPreview: preview.resultPreview,
+        status,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "edit_diff":
+      return {
+        kind: "edit_diff",
+        id: eventId,
+        filePath: preview.filePath,
+        ...(preview.outputPath ? { outputPath: preview.outputPath } : {}),
+        ...(preview.outputRelativePath ? { outputRelativePath: preview.outputRelativePath } : {}),
+        additions: preview.additions,
+        deletions: preview.deletions,
+        diff: preview.diff,
+        collapsedLines: preview.collapsedLines,
+      generationProgress: preview.generationProgress,
+        status: preview.status ?? (isError ? "failed" : undefined),
+        approvalRequestId: preview.approvalRequestId,
+        errorMessage: preview.errorMessage,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "write":
+      return {
+        kind: "write_diff",
+        id: eventId,
+        filePath: preview.filePath,
+        ...(preview.outputPath ? { outputPath: preview.outputPath } : {}),
+        ...(preview.outputRelativePath ? { outputRelativePath: preview.outputRelativePath } : {}),
+        additions: preview.additions,
+        deletions: preview.deletions,
+        diff: preview.diff,
+        collapsedLines: preview.collapsedLines,
+      generationProgress: preview.generationProgress,
+        status: preview.status ?? (isError ? "failed" : undefined),
+        approvalRequestId: preview.approvalRequestId,
+        errorMessage: preview.errorMessage,
+        streamingContent: preview.streamingContent,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "present":
+      return {
+        kind: "present",
+        id: eventId,
+        files: preview.files,
+        displayText: preview.displayText,
+        status: preview.status ?? (isError ? "failed" : "completed"),
+        isError,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "delete": {
+      const status = preview.status ?? (isError ? "failed" : "completed");
+      return {
+        kind: "delete",
+        id: eventId,
+        filePath: preview.filePath,
+        ...(preview.outputPath ? { outputPath: preview.outputPath } : {}),
+        ...(preview.outputRelativePath ? { outputRelativePath: preview.outputRelativePath } : {}),
+        displayText: preview.displayText,
+        status,
+        isError,
+        approvalRequestId: preview.approvalRequestId,
+        createdAt: getDisplayTime(timestamp)
+      };
+    }
+    case "bash":
+      return {
+        kind: "bash",
+        id: eventId,
+        status: preview.status,
+        title: preview.title,
+        command: preview.command,
+        commandPreview: preview.commandPreview,
+        intent: preview.intent,
+        justification: preview.justification,
+        cwd: preview.cwd,
+        stdout: preview.stdout,
+        stderr: preview.stderr,
+        exitCode: preview.exitCode,
+        durationMs: preview.durationMs,
+        reason: preview.reason,
+        policyLabel: preview.policyLabel,
+        backgroundTaskId: preview.backgroundTaskId,
+        background: preview.background,
+        outputFilePath: preview.outputFilePath,
+        sandboxed: preview.sandboxed,
+        notExecuted: preview.notExecuted,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "agent":
+      return {
+        kind: "agent",
+        id: eventId,
+        description: preview.description,
+        status: preview.status,
+        subagentType: preview.subagentType,
+        agentKind: preview.agentKind,
+        model: preview.model,
+        background: preview.background,
+        displayText: preview.displayText,
+        summary: preview.summary,
+        recentEvents: preview.recentEvents,
+        transcriptRef: preview.transcriptRef,
+        stats: preview.stats,
+        error: preview.error,
+        display: preview.display,
+        createdAt: getDisplayTime(timestamp)
+      };
+    case "todo":
+      return {
+        kind: "todo",
+        id: eventId,
+        todos: preview.todos,
+        totalCount: preview.totalCount,
+        completedCount: preview.completedCount,
+        revision: preview.revision,
+        displayText: preview.displayText,
+        status: isError ? "failed" : "completed",
+        isError,
+        createdAt: getDisplayTime(timestamp),
+      };
+    case "generic":
+      return {
+        kind: "tool",
+        id: eventId,
+        title: preview.title,
+        content: preview.content,
+        artifacts: preview.artifacts,
+        createdAt: getDisplayTime(timestamp),
+        isError
+      };
+  }
+}
+
+function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
+  const payload = isRecord(event.payload) ? event.payload as ContextCompactionPayload : null;
+  if (
+    !payload ||
+    typeof payload.triggerTokens !== "number" ||
+    typeof payload.thresholdTokens !== "number" ||
+    typeof payload.beforeCount !== "number" ||
+    typeof payload.afterCount !== "number"
+  ) {
+    return [];
+  }
+
+  const status = payload.status ?? "compacted";
+  if (status === "skipped") return [];
+  if (status === "failed") {
+    return [{
+      kind: "context_compaction",
+      id: event.id,
+      status: "failed",
+      ...(payload.reason ? { errorMessage: payload.reason } : {}),
+      createdAt: getDisplayTime(event.timestamp),
+    }];
+  }
+
+  return [
+    {
+      kind: "context_compaction",
+      id: event.id,
+      status: "completed",
+      removedCount: payload.removedCount ?? Math.max(payload.beforeCount - payload.afterCount, 0),
+      ...(typeof payload.durationMs === "number" ? { durationMs: payload.durationMs } : {}),
+      ...(payload.compactionId ? { compactionId: payload.compactionId } : {}),
+      ...(payload.trigger ? { trigger: payload.trigger } : {}),
+      ...(typeof payload.beforeTokens === "number" ? { beforeTokens: payload.beforeTokens } : {}),
+      ...(typeof payload.afterTokens === "number" ? { afterTokens: payload.afterTokens } : {}),
+      ...(payload.beforeEstimated === true ? { beforeEstimated: true as const } : {}),
+      createdAt: getDisplayTime(event.timestamp),
+    }
+  ];
+}
+
+function workspacePreparationBlock(event: SessionEvent): MessageBlock[] {
+  const payload = isRecord(event.payload) ? event.payload as WorkspacePreparationPayload : null;
+  if (
+    !payload ||
+    payload.kind !== "worktree" ||
+    payload.status !== "completed" ||
+    typeof payload.sourceWorkspaceRoot !== "string" ||
+    typeof payload.workspaceRoot !== "string" ||
+    typeof payload.baseBranch !== "string" ||
+    typeof payload.branch !== "string" ||
+    typeof payload.baseCommit !== "string"
+  ) {
+    return [];
+  }
+
+  return [{
+    kind: "workspace_preparation",
+    id: event.id,
+    status: "completed",
+    sourceWorkspaceRoot: payload.sourceWorkspaceRoot,
+    workspaceRoot: payload.workspaceRoot,
+    baseBranch: payload.baseBranch,
+    branch: payload.branch,
+    baseCommit: payload.baseCommit,
+    durationMs: payload.durationMs,
+    environmentSetup: payload.environmentSetup,
+    createdAt: getDisplayTime(event.timestamp),
+  }];
+}
+
+function emptyTurnUsage(): TurnUsageSummary {
+  return { totalTokens: 0, inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, reasoningTokens: 0, routes: [], costUsd: 0, unpricedRequestCount: 0, costEstimated: false };
+}
+
+function tokenCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+/** 「提供方/模型」；投影拿不到时是 "default"，不展示。 */
+function usageRoute(provider: unknown, model: unknown): string | null {
+  const known = (value: unknown) => typeof value === "string" && value !== "" && value !== "default" ? value : null;
+  const modelName = known(model);
+  if (!modelName) return null;
+  const providerName = known(provider);
+  return providerName ? `${providerName}/${modelName}` : modelName;
+}
+
+export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
+  const lastAssistantEventIdByTurn = new Map<string, EventId>();
+  const latestTodoEventIdByRun = new Map<string, EventId>();
+  const usageByTurn = new Map<string, TurnUsageSummary>();
+
+  for (const event of events) {
+    if (event.type === "assistant_message" || event.type === "assistant_reply") {
+      lastAssistantEventIdByTurn.set(event.agentRunId, event.id);
+      continue;
+    }
+
+    if (event.type === "tool_result" && isRecord(event.payload)) {
+      const preview = event.payload.uiPreview;
+      if (isRecord(preview) && preview.kind === "todo") {
+        latestTodoEventIdByRun.set(event.agentRunId, event.id);
+      }
+    }
+
+    if (event.type !== "llm_usage" || !isRecord(event.payload)) continue;
+    const totalTokens = event.payload.totalTokens;
+    const cost = event.payload.cost;
+    if (typeof totalTokens !== "number" || !isRecord(cost)) continue;
+    const currency = cost.currency;
+    const total = cost.total;
+    if ((currency !== "USD" && currency !== "CNY") || typeof total !== "number") continue;
+
+    const current = usageByTurn.get(event.agentRunId) ?? emptyTurnUsage();
+    current.totalTokens += totalTokens;
+    current.inputTokens += tokenCount(event.payload.promptTokens);
+    current.outputTokens += tokenCount(event.payload.completionTokens);
+    // v2 投影把缓存写入记在 cacheMissTokens 上（见 packages/client/client/src/sessions/chat.ts）。
+    current.cacheReadTokens += tokenCount(event.payload.cacheHitTokens);
+    current.cacheWriteTokens += tokenCount(event.payload.cacheMissTokens);
+    current.reasoningTokens += tokenCount(event.payload.reasoningTokens);
+    const route = usageRoute(event.payload.provider, event.payload.model);
+    if (route && !current.routes.includes(route)) current.routes.push(route);
+    if (event.payload.costBasis === "unavailable") {
+      current.unpricedRequestCount += 1;
+    } else {
+      current.costUsd += convertUsageCostToUsd({ total, currency });
+      if (event.payload.costBasis === "estimated") current.costEstimated = true;
+    }
+    usageByTurn.set(event.agentRunId, current);
+  }
+
+  const renderKeyCounters = new Map<string, number>();
+  const nextRenderKey = (event: SessionEvent, slot: string, stableIdentity?: string): string => {
+    if (stableIdentity) {
+      return `turn:${event.agentRunId}:${slot}:${stableIdentity}`;
+    }
+
+    const counterKey = `${event.agentRunId}:${slot}`;
+    const index = renderKeyCounters.get(counterKey) ?? 0;
+    renderKeyCounters.set(counterKey, index + 1);
+    return `turn:${event.agentRunId}:${slot}:${index}`;
+  };
+
+  // 每个分支产出的块都带上来源事件的 identity（runId / sourceSeq），供 renderer 合并 durable 与 live 时使用。
+  return events.flatMap((event) => blocksForEvent(event).map((block) => withIdentity(block, event)));
+
+  function blocksForEvent(event: SessionEvent): MessageBlock[] {
+    switch (event.type) {
+      case "user_message": {
+        const payload = event.payload as UserMessagePayload;
+        // 任务通知只给模型消费；只有开启空闲唤醒那一轮的通知渲染成一行分隔行。
+        if (payload.source === "task_notification") {
+          const notice = payload.backgroundNotice;
+          return notice ? [{ kind: "background_notice", id: event.id, renderKey: nextRenderKey(event, "background-notice"), content: payload.content, createdAt: getDisplayTime(event.timestamp), ...notice }] : [];
+        }
+        return [
+          {
+            kind: "user",
+            id: event.id,
+            renderKey: nextRenderKey(event, "user"),
+            content: payload.content,
+            createdAt: getDisplayTime(event.timestamp),
+            attachments: payload.attachments,
+            ...(payload.fileReferences?.length ? { fileReferences: payload.fileReferences } : {}),
+            ...(payload.responseAnnotations?.length ? { responseAnnotations: payload.responseAnnotations } : {})
+          }
+        ];
+      }
+      case "assistant_message":
+      case "assistant_reply": {
+        const payload = event.payload as AssistantMessagePayload;
+        const usage = lastAssistantEventIdByTurn.get(event.agentRunId) === event.id
+          ? usageByTurn.get(event.agentRunId)
+          : undefined;
+        return [
+          {
+            kind: "assistant",
+            id: event.id,
+            renderKey: nextRenderKey(event, "assistant"),
+            content: payload.content,
+            createdAt: getDisplayTime(event.timestamp),
+            model: payload.model,
+            provider: payload.provider,
+            ...(usage ? { usage } : {}),
+          }
+        ];
+      }
+      case "thinking": {
+        const payload = event.payload as ThinkingPayload;
+        // Signature-only thinking events are provider replay state, not visible content.
+        if (!hasVisibleText(payload.content)) return [];
+        return [
+          {
+            kind: "thinking",
+            id: event.id,
+            renderKey: nextRenderKey(event, "thinking"),
+            title: payload.title ?? "Thinking",
+            content: payload.content,
+            createdAt: getDisplayTime(event.timestamp),
+            collapsedByDefault: payload.collapsedByDefault ?? true
+          }
+        ];
+      }
+      case "tool_result": {
+        const payload: Record<string, unknown> = isRecord(event.payload) ? event.payload : {};
+        const preview = payload.uiPreview;
+        if (!isToolUiPreview(preview)) {
+          const renderKey = nextRenderKey(event, "tool", getOptionalString(payload, "toolCallId"));
+          return [withRenderKey(legacyToolResultBlock(event, payload), renderKey)];
+        }
+        if (preview.kind === "todo" && latestTodoEventIdByRun.get(event.agentRunId) !== event.id) {
+          return [];
+        }
+        const renderKey = preview.kind === "todo"
+          ? `turn:${event.agentRunId}:todo`
+          : nextRenderKey(event, "tool", getOptionalString(payload, "toolCallId"));
+
+        return [withRenderKey(
+          messageBlockFromToolPreview(event.id, event.timestamp, preview, payload.ok === false, payload.status),
+          renderKey,
+        )];
+      }
+      case "diff_preview": {
+        const preview = event.payload;
+        if (!isToolUiPreview(preview)) return [];
+        return [withRenderKey(
+          messageBlockFromToolPreview(event.id, event.timestamp, preview),
+          nextRenderKey(event, "tool-preview"),
+        )];
+      }
+      case "error": {
+        const payload = event.payload as ErrorPayload;
+        return [
+          {
+            kind: "error",
+            id: event.id,
+            renderKey: nextRenderKey(event, "error"),
+            title: payload.code,
+            content: payload.message,
+            createdAt: getDisplayTime(event.timestamp),
+            recoverable: payload.recoverable
+          }
+        ];
+      }
+      case "agent_run_aborted":
+        return [
+          {
+            kind: "status",
+            id: event.id,
+            renderKey: nextRenderKey(event, "status"),
+            content: "Stopped",
+            createdAt: getDisplayTime(event.timestamp),
+            tone: "muted",
+          },
+        ];
+      case "agent_run_notice":
+        return [
+          {
+            kind: "status",
+            id: event.id,
+            renderKey: nextRenderKey(event, "status"),
+            content: getOptionalString(event.payload as Record<string, unknown>, "message") ?? "",
+            createdAt: getDisplayTime(event.timestamp),
+            tone: "muted",
+          },
+        ];
+      case "tool_call":
+      case "llm_usage":
+      case "context_snapshot":
+        return [];
+      case "context_compaction":
+        return contextCompactionBlock(event).map((block) =>
+          withRenderKey(block, nextRenderKey(event, "context-compaction")),
+        );
+      case "workspace_preparation":
+        return workspacePreparationBlock(event).map((block) =>
+          withRenderKey(block, nextRenderKey(event, "workspace-preparation")),
+        );
+    }
+  }
+}
+
+function withIdentity(block: MessageBlock, event: SessionEvent): MessageBlock {
+  return { ...block, runId: event.agentRunId, ...(event.turnId === undefined ? {} : { turnId: event.turnId }), ...(event.sourceSeq === undefined ? {} : { sourceSeq: event.sourceSeq }) };
+}
+
+export function getLatestContextSnapshot(events: SessionEvent[]): ContextUsageSnapshot | null {
+  for (let index = events.length - 1; index >= 0; index--) {
+    const event = events[index];
+    if (event.type === "context_snapshot") {
+      return event.payload as ContextUsageSnapshot;
+    }
+  }
+
+  return null;
+}
+
+export function createSessionDiffSummary(sessionId: SessionId, events: SessionEvent[]): SessionDiffSummary {
+  const files = new Map<string, SessionDiffSummary["files"][number]>();
+
+  for (const event of events) {
+    if (event.type !== "tool_result" && event.type !== "diff_preview") {
+      continue;
+    }
+
+    const preview: unknown =
+      event.type === "tool_result"
+        ? (event.payload as { uiPreview?: unknown }).uiPreview
+        : event.payload;
+
+    if (!isToolUiPreview(preview) || (preview.kind !== "edit_diff" && preview.kind !== "write")) {
+      continue;
+    }
+
+    // 失败/被拒/未完成的写入没有真实落盘变更，不进 Review 汇总（旧事件无 status，保持原行为）。
+    if (preview.status !== undefined && preview.status !== "completed") {
+      continue;
+    }
+
+    const existing = files.get(preview.filePath);
+    if (existing) {
+      existing.additions += preview.additions;
+      existing.deletions += preview.deletions;
+      existing.diff = `${existing.diff}\n${preview.diff}`;
+      existing.sourceEventIds.push(event.id);
+      continue;
+    }
+
+    files.set(preview.filePath, {
+      filePath: preview.filePath,
+      additions: preview.additions,
+      deletions: preview.deletions,
+      diff: preview.diff,
+      sourceEventIds: [event.id]
+    });
+  }
+
+  const fileList = [...files.values()];
+
+  return {
+    sessionId,
+    files: fileList,
+    totalAdditions: fileList.reduce((total, file) => total + file.additions, 0),
+    totalDeletions: fileList.reduce((total, file) => total + file.deletions, 0)
+  };
+}

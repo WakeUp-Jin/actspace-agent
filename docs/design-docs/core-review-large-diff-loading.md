@@ -150,10 +150,6 @@ Patch：请求集合始终只有 selectedFileId
 - 在 capped mode 中只会加载新 snapshot 的当前选中文件，不会展示全部文件。
 - 它不负责把空格渲染成圆点、把 Tab 渲染成箭头；可见空白字符不属于本轮产品范围。
 
-### Copy git apply command
-
-继续基于 generation 匹配的完整 scope patch 生成安全命令，与当前是否挂载全部 Diff 无关。Capped mode 不是只导出当前文件。
-
 ## 数据与进程边界
 
 ### Shared contract
@@ -216,7 +212,7 @@ Full content 使用独立请求和缓存，不再通过 `git diff --unified=1000
 - untracked：最大并发 8。
 - full-content：每批最多 4 个 object，单对象和总缓存都设硬上限。
 - renderer：正常滚动时存活 Diff row DOM 目标不超过 600，测试上限为 1,000。
-- 重试：worker 崩溃后最多重建一次；单文件读取失败进入 `failed` 并提供显式 Retry。通用 Git runner 不自动重放命令，避免 mutation 在 transport 失败时发生重复副作用。
+- 重试：worker 崩溃后最多重建一次；单文件读取失败进入 `failed` 并提供显式 Retry。通用 Git runner 不自动重放命令。
 - 记录 snapshot 时间、Git command 数、patch bytes、full-content bytes、峰值并发、解析时间、渲染 row 数、取消数和失败数。
 - 慢操作日志必须携带 snapshot id、scope 和阶段，不记录文件正文或完整 patch。
 

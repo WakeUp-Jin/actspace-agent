@@ -31,7 +31,7 @@ ActSpace 是一个桌面 Agent 应用。选定本地目录、连接模型后，�
 | 选择目录、隔离代码改动、继续之前的任务 | [工作区与 Worktree](../workspaces/)、[会话管理](../sessions/) |
 | 切换模型、了解上下文和费用 | [模型选择](../model-selection/)、[上下文与压缩](../context/)、[使用统计](../usage/) |
 | 读写文件、运行测试、收集网络资料 | [文件工具](../files-and-search/)、[Bash](../bash/)、[联网工具](../web-tools/) |
-| 审阅变更、预览文件、手动运行命令 | [代码审阅](../review/)、[文件预览](../file-preview/)、[交互式终端](../terminal/) |
+| 审阅变更、预览文件 | [代码审阅](../review/)、[文件预览](../file-preview/) |
 | 复用工作流程、委派研究、练习英语 | [Skills](../skills/)、[子 Agent](../subagents/)、[英语辅助学习](../english-learning/) |
 
 ## 产品理念

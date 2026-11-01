@@ -7,6 +7,8 @@ updatedAt: 2026-09-19
 draft: false
 ---
 
+Browser Use 是可选插件，默认不加载。先在“扩展 → 插件”里打开“操控浏览器”并重启，再按下面的步骤连接 Chrome。
+
 Browser Use 通过本地 Browser Bridge 连接 Chrome，提供标签页、页面读取、截图和交互工具。适合需要实际页面状态的任务，比如读取动态页面或检查本地网页。
 
 ## 准备浏览器连接

@@ -17,6 +17,11 @@ function query(key: string, workspaceRoot: string, relativePath: string): Promis
   return pending;
 }
 
+/** 只有 macOS 能列出文件的关联应用。 */
+export function canChooseApplication(): boolean {
+  return typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
+}
+
 export type FileApplicationsState = {
   applications: readonly WorkspaceFileApplication[];
   failed: boolean;

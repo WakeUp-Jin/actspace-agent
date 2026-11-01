@@ -4,7 +4,7 @@
 
 ## 1. Skill 告诉 Agent 怎样开发
 
-随安装包交付一份插件开发 Skill 及引用材料，名称为 `actspace-plugin-development`，已在 `packages/official-skills` 创建。下列清单保留总体职责；首版单文件工具契约见 10。
+随安装包交付一份插件开发 Skill 及引用材料，名称为 `actspace-plugin-development`，已在 `packages/skill/official-skills` 创建。下列清单保留总体职责；首版单文件工具契约见 10。
 
 Skill 必须提供：
 
@@ -23,9 +23,9 @@ V1 仅在用户明确提出新增或修改能力时进入开发流程。任务�
 
 当前并非完全没有管理模块，也不要求所有 Skill 都手动安装：
 
-- [discovery](../../../packages/prompt/src/skills/discovery.ts) 自动扫描项目的 `.actspace/skills`、`.agents/skills`、`.claude/skills`，以及用户数据和 home 下的约定目录；已有目录中的合法 Skill 可直接被发现。
+- [discovery](../../../packages/skill/skill/src/discovery.ts) 自动扫描项目的 `.actspace/skills`、`.agents/skills`、`.claude/skills`，以及用户数据和 home 下的约定目录；已有目录中的合法 Skill 可直接被发现。
 - [桌面管理实现](../../../apps/desktop/src/main/runtime-v2/fixed-renderer-skills.ts) 支持列出、将本地所选目录复制到用户 Skill 目录、卸载受管目录。[Skills 界面](../../../apps/desktop/src/renderer/components/extensions/SkillsSection.tsx) 已提供安装及启停入口。
-- 原默认扫描链缺少官方随包资源；本轮已通过 `@actspace/official-skills` 与 [Host prompt source](../../../packages/prompt/src/host-context.ts) 补齐。
+- 原默认扫描链缺少官方随包资源；本轮已通过 `@actspace/official-skills` 与 [Host prompt source](../../../packages/context/prompt/src/host-context.ts) 补齐。
 
 因此新增的是官方内容模块与来源接线，发现、目录展示、正文读取和启停继续扩展已有模块。
 
@@ -109,6 +109,6 @@ Agent 使用原有文件工具编辑工作区；Manager 不生成业务代码。
 
 ## 6. 交付依赖
 
-完整交付物包括 Skill、可读契约、模板源码、构建入口、版本对应关系和诊断说明。现有 [默认 Harness 构建脚本](../../../packages/runtime/scripts/build-default-harness.mjs) 处理内置闭包，不等于已具备任意工具候选构建服务。最终产物继续满足 [固定产物规则](../../../packages/cordis-adapter/src/plugin-artifact.ts)，不能把 DSH 的 package.json 模板原样作为 ActSpace 产物。
+完整交付物包括 Skill、可读契约、模板源码、构建入口、版本对应关系和诊断说明。现有 [默认 Harness 构建脚本](../../../packages/core/runtime/scripts/build-default-harness.mjs) 处理内置闭包，不等于已具备任意工具候选构建服务。最终产物继续满足 [固定产物规则](../../../packages/composition/cordis-adapter/src/plugin-artifact.ts)，不能把 DSH 的 package.json 模板原样作为 ActSpace 产物。
 
 实施前应以一个可编辑工具模板跑通安装版构建，确认运行时、打包器与类型资源的分发方式。该工作无需新的云账号或第三方密钥；真实模型体验验证使用现有配置，测试不得记录凭据。

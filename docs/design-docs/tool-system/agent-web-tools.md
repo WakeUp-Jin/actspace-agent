@@ -75,10 +75,10 @@ Desktop 从 `ModelRuntimeService.getToolEnvironment().searchCredentials` 创建 
 
 ## 实现与验证入口
 
-- `packages/tools/web-tools/src/plugin.ts`：工具定义、permission 和生命周期。
-- `packages/tools/web-tools/src/node-ports.ts`：供应商、多通道融合、抓取、SSRF 防线与缓存。
+- `packages/web/tool-web/src/plugin.ts`：工具定义、permission 和生命周期。
+- `packages/web/tool-web/src/node-ports.ts`：供应商、多通道融合、抓取、SSRF 防线与缓存。
 - `apps/desktop/src/main/runtime-v2/tool-host-services.ts`：Desktop 凭据注入。
 - `packages/core/agent/src/agent-mode-policy.ts`：模式暴露。
-- `packages/tools/web-tools/src/test/`：fake fetch、生命周期、重定向、多通道与失败边界。
+- `packages/web/tool-web/src/test/`：fake fetch、生命周期、重定向、多通道与失败边界。
 
 自动化不使用真实凭据；真实 Provider 与 Browser 验收属于不同门禁。

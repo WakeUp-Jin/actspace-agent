@@ -10,9 +10,9 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
 
 | 位置 | 作用 |
 | --- | --- |
-| `packages/shared/src/desktop-bridge/contract.ts` | **契约**：`desktopBridgeContract`，22 个域，每个成员一条 spec。唯一事实来源 |
-| `packages/shared/src/desktop-bridge/types.ts` | spec 构造函数（`invoke` / `invokeWithDefault` / `event` / `send` / `local`）与类型推导（`BridgeOf`、`SpecInput`、`SpecOutput`、`SpecPayload`） |
-| `packages/shared/src/desktop-bridge/build-bridge.ts` | `buildBridge(contract, transport, locals)`：按契约生成冻结的 bridge 对象。preload 和 mock 共用 |
+| `packages/util/shared/src/desktop-bridge/contract.ts` | **契约**：`desktopBridgeContract`，22 个域，每个成员一条 spec。唯一事实来源 |
+| `packages/util/shared/src/desktop-bridge/types.ts` | spec 构造函数（`invoke` / `invokeWithDefault` / `event` / `send` / `local`）与类型推导（`BridgeOf`、`SpecInput`、`SpecOutput`、`SpecPayload`） |
+| `packages/util/shared/src/desktop-bridge/build-bridge.ts` | `buildBridge(contract, transport, locals)`：按契约生成冻结的 bridge 对象。preload 和 mock 共用 |
 | `apps/desktop/src/preload/index.ts` | 用 `ipcRenderer` 作为 transport 调 `buildBridge`，`exposeInMainWorld("actspace", bridge)`。不写任何业务逻辑 |
 | `apps/desktop/src/main/ipc/registry.ts` | `createIpcRegistrar`：`ipc.handle(contract.域.成员, handler)` / `ipc.on(...)`，统一做 sender 校验、guard、middleware、错误包装 |
 | `apps/desktop/src/main/ipc/guards.ts` | `IPC_INPUT_GUARDS`：channel → 入参 guard，注册器按 channel 自动套用 |
@@ -54,7 +54,7 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
    - invoke 成员：`ipc.handle(contract.域.成员, (input, event) => …)`，入参和出参类型由契约推导；
    - send 成员：`ipc.on(contract.域.成员, (input, event) => …)`，`input` 是 `unknown`，listener 自己校验；
    - event 成员：main 用常量 `webContents.send(CONST.key, payload)` 发送。
-4. **guard**：入参涉及路径、文件、终端、设置写入或远端 Host 时，在 `IPC_INPUT_GUARDS` 里加 guard，并在 `apps/desktop/src/main/test/ipc-guards.test.ts` 补一个合法输入和一个非法输入（见 §5）。
+4. **guard**：入参涉及路径、文件、设置写入或远端 Host 时，在 `IPC_INPUT_GUARDS` 里加 guard，并在 `apps/desktop/src/main/test/ipc-guards.test.ts` 补一个合法输入和一个非法输入（见 §5）。
 5. **mock**：在 `mock/handlers.ts` 的默认实现里补上，或明确不补。不补时，调用会 reject `Mock bridge does not implement 域.成员`。
 6. **调用方**：通过 `<域>Api.成员` 使用。
 7. **检查**：`pnpm check:ipc-channels` 以契约为准，下列情况都会失败：
@@ -75,7 +75,7 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
   - 非信任 sender 发来的 invoke 被拒，guard 和 handler 都不执行；
   - send 成员遇到非信任 sender 时静默忽略。
 - guard 只检查类型和形状，不做业务判断。可选字段放行 `null`，因为 handler 统一用 `??` 兜底。
-- guard 拒绝时抛 `IpcInputError`，消息格式为「原因 (channel)」，例如 `Invalid terminal input (runtime-v2:fixed-renderer:terminal-write)`。
+- guard 拒绝时抛 `IpcInputError`，消息格式为「原因 (channel)」，例如 `Invalid session artifact (runtime-v2:fixed-renderer:read-session-artifact)`。
 - handler 抛出非 Error 值时，注册器把它包成 Error，因为 Electron 只能序列化 Error。Error 原样透传，不改原有文案。
 - guard 按 channel 查表，与在哪个文件注册无关，所以迁移注册位置不会漏掉 guard。`apps/desktop/src/main/test/ipc-guards.test.ts` 断言用例表的 channel 集合等于 `IPC_INPUT_GUARDS`。
 

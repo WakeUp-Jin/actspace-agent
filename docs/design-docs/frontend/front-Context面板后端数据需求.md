@@ -28,7 +28,7 @@
 
 ## 2. 当前读取契约
 
-类型真源是 `packages/shared/src/context-panel.ts`。不要复制旧 schemaVersion 1 示例；三个只读入口已接入 Main/IPC：
+类型真源是 `packages/util/shared/src/context-panel.ts`。不要复制旧 schemaVersion 1 示例；三个只读入口已接入 Main/IPC：
 
 | 接口 | 输入要点 | 返回与边界 |
 | --- | --- | --- |

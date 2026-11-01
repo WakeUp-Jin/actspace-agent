@@ -5,16 +5,16 @@
 ## 当前状态
 
 - [`agent-tool-permission-model.md`](./agent-tool-permission-model.md)：权限模型事实源；支持 `default/auto-review/full-access`，once 与 Desktop 文件、限定 Bash Session Grant 已实施。
-- [`agent-沙箱设计.md`](./agent-沙箱设计.md)：沙箱设计（2026-10-25 确认）；第一期工具沙箱已实施（Harness 插件 `sandbox` + nono / Seatbelt 后端）；第二期评估沙箱已实施（nono `run` 域名白名单 + `packages/harness-evaluation`，开发环境与 CLI 可用，不在默认组合里）；Windows 在第三期。
+- [`agent-沙箱设计.md`](./agent-沙箱设计.md)：沙箱设计（2026-10-25 确认）；第一期工具沙箱已实施（Harness 插件 `sandbox` + nono / Seatbelt 后端）；第二期评估沙箱已实施（nono `run` 域名白名单 + `packages/harness-evolution/harness-evaluation`，开发环境与 CLI 可用，不在默认组合里）；Windows 在第三期。
 - [`permission-runtime-foundation`](../../exec-plans/completed/permission-runtime-foundation.md)：权限 Runtime、文件/Bash once、mode、Journal 与 Host 直接切换计划，自动化实施已完成。
 - [`session-scope-grants`](../../exec-plans/completed/session-scope-grants.md)：Desktop 文件 Session Grant、恢复、管理与撤销计划；真实 Electron 主题/重启矩阵保留人工验收。
 
 ## 当前事实源
 
 - [`../agent-plugin-runtime/agent-spec-tool-runtime-abi.md`](../agent-plugin-runtime/agent-spec-tool-runtime-abi.md)：definition、permission、approval、prepared execution、checkpoint、result 与 recovery 契约；
-- `packages/tools/runtime/`：Tool Registry、PermissionEngine、prepared execution、Lease、redaction 与 ordered commit；
-- `packages/tools/filesystem-read/`、`packages/tools/filesystem-search/`、`packages/tools/filesystem-write/`、`packages/tools/shell-tools/`、`packages/tools/web-tools/`、`packages/tools/image-generation/`、`packages/tools/image-inspection/`：文件、Bash、Web、图片等 concrete capability；
-- `packages/tools/approval/`：Host-neutral ApprovalBroker 契约；
+- `packages/core/tool-runtime/`：Tool Registry、PermissionEngine、prepared execution、Lease、redaction 与 ordered commit；
+- `packages/fs/tool-fs-read/`、`packages/fs/tool-fs-search/`、`packages/fs/tool-fs-write/`、`packages/shell/tool-shell/`、`packages/web/tool-web/`、`packages/image/tool-image-generation/`、`packages/image/tool-image-inspection/`：文件、Bash、Web、图片等 concrete capability；
+- `packages/approval/approval/`：Host-neutral ApprovalBroker 契约；
 - `apps/desktop/src/main/runtime-v2/approval-broker.ts`：Desktop 审批适配；
 - `apps/cli/src/runtime-v2/approval.ts`：CLI 交互式和非交互式审批适配。
 
@@ -62,7 +62,7 @@ checkpoint 之前失败可以安全报告 not-started；checkpoint 之后如果�
 
 ## Bash 当前边界
 
-`packages/tools/shell-tools/src/command-rules.ts` 在执行前拒绝：
+`packages/shell/tool-shell/src/command-rules.ts` 在执行前拒绝：
 
 - 控制字符和不支持的 Unicode whitespace；
 - 当前分类器无法安全解析的 pipe、redirection、shell expansion；

@@ -1,5 +1,5 @@
 import { access, readFile, readdir } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 const repoRoot = process.env.ACTSPACE_PACKAGE_BOUNDARY_ROOT
   ? resolve(process.env.ACTSPACE_PACKAGE_BOUNDARY_ROOT)
@@ -116,6 +116,9 @@ for (const [name, { manifest, dir, kind }] of manifests) {
     }
   }
   if (kind === "package") {
+    const segments = relative(join(repoRoot, "packages"), dir).split(sep);
+    if (segments.length !== 2) failures.push(`${name}: packages must sit exactly at packages/<capability>/<package>, found packages/${segments.join("/")}`);
+    else if (name.startsWith("@actspace/") && segments[1] !== name.slice("@actspace/".length)) failures.push(`${name}: directory name must equal the package name without @actspace/, found ${segments[1]}`);
     for (const dependency of dependencyNames(manifest)) {
       if (manifests.get(dependency)?.kind === "app") failures.push(`${name}: reusable packages cannot depend on application ${dependency}`);
     }

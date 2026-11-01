@@ -57,7 +57,7 @@ requestId 是模型请求身份；llmCallId 兼容字段映射实际 requestId�
 
 ## 参数与预览
 
-`packages/client/src/sessions/tool-card.ts` 提供 `toolPreview` 的纯转换，读取 Host Journal projection 的 ToolView 与结构化 detail；实时和回放共用同一终态映射。Desktop Main 不再维护独立的 renderer tool preview 兼容层。
+`packages/client/client/src/sessions/tool-card.ts` 提供 `toolPreview` 的纯转换，读取 Host Journal projection 的 ToolView 与结构化 detail；实时和回放共用同一终态映射。Desktop Main 不再维护独立的 renderer tool preview 兼容层。
 
 - Read/List/Grep/Glob：参数明确后显示路径或查询摘要；结果到达才显示条目数量。
 - Bash：参数生成时显示稳定占位，prepared 后一次显示 command 摘要；审批与执行状态继续实时更新，结果展示 stdout/stderr。
@@ -93,7 +93,7 @@ Journal 保留原有 assistant/chunk 容器；新增工具 kind 时保存 callId
 
 ## 实施补充与验收
 
-- `packages/tools/runtime/src/scheduler.ts` 在每个并行 body 结束后立即提交结果，OrderedToolCommitQueue 保留原来的调用顺序。`onExecutionStarted` 位于实际 executor 调用前，不在整批 stage 阶段提前触发。
+- `packages/core/tool-runtime/src/scheduler.ts` 在每个并行 body 结束后立即提交结果，OrderedToolCommitQueue 保留原来的调用顺序。`onExecutionStarted` 位于实际 executor 调用前，不在整批 stage 阶段提前触发。
 - CLI Host 过滤新增的工具内部事件，只把原有 text/reasoning/run 事件发到通用 live DTO，避免将工具参数重新串成正文。
 - Shared selector 和 ToolLogLine 补齐失败、拒绝、中止状态；终态先到、重复结果和迟到审批不会覆盖已完成结果。
 - 真实 AgentLoop fixture 贯穿 Main adapter、App 与 Journal rehydrate，覆盖无 delta、无 started、正文 JSON、逐工具完成和终态优先。

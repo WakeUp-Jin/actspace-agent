@@ -58,14 +58,14 @@ type FileScope = "workspace" | "all";
 
 | 模块 | 所有权 |
 | --- | --- |
-| `packages/shared` | `PermissionMode`、Grant 与跨进程权限 DTO |
-| `packages/tools/approval` | `ApprovalBroker` 请求/响应端口，不保存状态 |
-| `packages/tools/runtime` | `PermissionEngine`、边界评估、决策合并、Grant 匹配、审批和重检 |
-| `packages/tools/filesystem-read`、`filesystem-search`、`filesystem-write` | 各自的文件资源提取和独立 permission audience、Grant 建议 |
-| `packages/tools/shell-tools` | Bash 资源提取和命令风险评估；不复用文件 Grant audience |
-| `packages/session/journal` | 权限事件 strict codec |
-| `packages/session/projection` | 当前 mode 与有效 Session Grant 投影 |
-| `packages/runtime` | Session、Agent、Projection 与 Tool Environment 组装 |
+| `packages/util/shared` | `PermissionMode`、Grant 与跨进程权限 DTO |
+| `packages/approval/approval` | `ApprovalBroker` 请求/响应端口，不保存状态 |
+| `packages/core/tool-runtime` | `PermissionEngine`、边界评估、决策合并、Grant 匹配、审批和重检 |
+| `packages/fs/tool-fs-read`、`filesystem-search`、`filesystem-write` | 各自的文件资源提取和独立 permission audience、Grant 建议 |
+| `packages/shell/tool-shell` | Bash 资源提取和命令风险评估；不复用文件 Grant audience |
+| `packages/session/session-journal` | 权限事件 strict codec |
+| `packages/session/session-projection` | 当前 mode 与有效 Session Grant 投影 |
+| `packages/core/runtime` | Session、Agent、Projection 与 Tool Environment 组装 |
 | Desktop main | 审批、模式变更和撤销 IPC |
 | Renderer | 请求展示与受限用户 decision |
 | CLI | `default/full-access` 与 `once/deny`；首版不启用 Session Grant |
@@ -179,6 +179,8 @@ Runtime 合同已暴露 `GrantLifetime`。Desktop 接受 `once | session | deny`
 | Bash | 工具风险 `ask`；可消费符合条件的前缀授权 | 不提供外部目录 Grant | 通过 hard guard 后 `allow` | Desktop 支持限定前缀 |
 
 敏感分类和 hard deny 始终优先于该表。
+
+Host 可读路径例外：工具环境可带 `isHostReadablePath`，命中的路径在读操作时跳过 workspace scope 审批，写和删除不受影响。当前唯一来源是会话记录：`<dataRoot>/sessions-v2/<id>/transcript.md`（不含 `sessions-v2` 目录本身，避免目录搜索读到 Journal），见[会话记录 Markdown](../agent-runtime/agent-session-transcript.md)。
 
 ## 8. 文件 canonicalization
 
@@ -526,12 +528,12 @@ Session Grant 自动化另外覆盖 exact/subtree 路径段匹配、多资源全
 
 ## 2026-10 自动审批与查询会话授权
 
-`auto-review` 沿用 default 的文件范围，先检查硬规则与已有 Grant；剩余 ask 交给 `packages/auto-review` 的 `approval.auto-review` 服务。插件只有一次无工具 LLM 判断，输出 `{approved:boolean, reason?:string|null}`。Runtime 在 30 秒内接受 true 后仍执行资源/模式/取消复验；false、缺失插件、坏格式、错误、超时回原人工卡片。插件不发 Grant、不执行工具。切回 default 即停止自动判断。未配置自动审批 route 的 Host 会回人工，CLI 入口仍只显式提供 default/full-access。
+`auto-review` 沿用 default 的文件范围，先检查硬规则与已有 Grant；剩余 ask 交给 `packages/approval/auto-review` 的 `approval.auto-review` 服务。插件只有一次无工具 LLM 判断，输出 `{approved:boolean, reason?:string|null}`。Runtime 在 30 秒内接受 true 后仍执行资源/模式/取消复验；false、缺失插件、坏格式、错误、超时回原人工卡片。插件不发 Grant、不执行工具。切回 default 即停止自动判断。未配置自动审批 route 的 Host 会回人工，CLI 入口仍只显式提供 default/full-access。
 
 Desktop「模型与生成 → 自动审批模型」默认为跟随会话模型，可指定已有连接模型。不可用时不改用别的模型。固定 prompt 位于插件 `src/prompt.ts`；上下文取原始 user/message 与 assistant/message 的文本（保留人类答复的提议上下文）、近期 24 条调用/状态、完整当前参数与资源、实际工作区及沙箱不保证隔离的事实。普通工具结果与 reasoning 不发送；原始用户上下文超过 64k 字符或总输入超过 96k 字符回人工，不静默截断授权。判断期间 journal 改变则丢弃判断。当前无独立人工问答工具，未来如增加必须明确其可信用户答复来源后接入。
 
 现有 `tool/result` 仅增加两个可选字段：`approvalMode: auto | manual | session` 与 `approvalReason?: string | null`。它们表示实际审批路径；自动不允许/失败后人工允许记 manual，并附简短回退说明。工具执行失败仍记录。缺字段的旧事件继续读取；这些字段不产生恢复授权，也不增加事件类型。自动判断未完成就崩溃时沿用现有工具恢复语义。
 
-查询名单与限制以 [shell-tools README](../../../packages/tools/shell-tools/README.md) 为准。git -C 与明确查询目标做 realpath 工作区校验；未知选项、外部目标、敏感文件、跟随链接参数、复合命令不提供新会话建议。目录型查询的深层内容与项目脚本不构成文件系统隔离，本次不增强 sandbox。
+查询名单与限制以 [shell-tools README](../../../packages/shell/tool-shell/README.md) 为准。git -C 与明确查询目标做 realpath 工作区校验；未知选项、外部目标、敏感文件、跟随链接参数、复合命令不提供新会话建议。目录型查询的深层内容与项目脚本不构成文件系统隔离，本次不增强 sandbox。
 
 参考：Codex guardian 的 action/context 分离、Claude Code 2.1.302 本地制品对原始用户消息与普通工具输出的区别处理，以及 tmp/deepseek-harness 的 experimental/auto-review 接入位置；只借鉴职责与上下文取舍，不复制外部执行权限设置。

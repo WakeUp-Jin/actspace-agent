@@ -44,6 +44,7 @@ import {
 } from "@actspace/shared/runtime-v2";
 import type { AppDataRoots } from "../app-paths";
 import { createIpcRegistrar, type IpcRegistrar } from "../ipc/registry";
+import { registerDisabledBrowserBridgeIpc } from "../plugins/optional-plugin-stubs";
 import { desktopBridgeContract as contract } from "@actspace/shared/desktop-bridge";
 import type { PendingApprovalRegistry } from "../approval-registry";
 import { showArtifactContextMenu, showResolvedArtifactContextMenu } from "../artifact-context-menu-service";
@@ -61,7 +62,6 @@ import { isDelegatedSession, sideChatParentId } from "@actspace/shared/session-l
 import { createWorkspaceAccessDeps, registeredWorkspaceRoot, resolveWorkspaceAccess, workspaceRegistryOptions, WORKSPACE_NOT_REGISTERED } from "../workspace-access";
 import { getWorkspaceGitContext } from "../workspace-git-context-service";
 import { openWorkspaceInIde } from "../workspace-ide-service";
-import { initializeGitRepository } from "../review-git-service";
 import { commitAndPushWorkspaceChanges, commitWorkspaceChanges, createWorkspaceBranch, getWorkspaceEnvironment, pushWorkspaceBranch, switchWorkspaceBranch } from "../workspace-environment-service";
 import { listWorkspaceOpenTools, openWorkspaceInTool } from "../workspace-open-service";
 import type { ProviderNetworkService } from "./provider-network-service";
@@ -75,7 +75,6 @@ import {
   projectSubagentList,
   toolPreview,
 } from "@actspace/client/sessions";
-import { listVisualizationsV2, visualizeReplyV2 } from "./fixed-renderer-visualization";
 
 export type FixedRendererIpcOptions = {
   readonly registry: DesktopRuntimeV2Registry;
@@ -87,7 +86,8 @@ export type FixedRendererIpcOptions = {
   readonly providerNetwork: ProviderNetworkService;
   readonly pricingCatalog?: import("../model-catalog-service").ModelCatalogService;
   readonly approvals: PendingApprovalRegistry;
-  readonly browserBridge: BrowserBridgeService;
+  /** Absent when the 操控浏览器 plugin is switched off; the browser channels are then stubs. */
+  readonly browserBridge?: BrowserBridgeService;
   readonly quickOpen: QuickOpenShortcutController;
   readonly localUpdate: LocalUpdateService;
   readonly getMainWindow: () => BrowserWindow | undefined;
@@ -368,6 +368,33 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   };
 }
 
+function registerBrowserBridgeIpc(ipc: IpcRegistrar, browserBridge: BrowserBridgeService): void {
+  ipc.handle(contract.browserBridge.getStatus, () => browserBridge.getStatus());
+  ipc.handle(contract.browserBridge.connect, () => browserBridge.connect());
+  ipc.handle(contract.browserBridge.useSourceExtension, (repoRoot) => browserBridge.useSourceExtension(repoRoot));
+  ipc.handle(contract.browserBridge.prepareUpdate, () => browserBridge.prepareUpdate());
+  ipc.handle(contract.browserBridge.disconnect, () => browserBridge.disconnect());
+  ipc.handle(contract.browserBridge.selectInstance, (instanceId) => browserBridge.selectInstance(instanceId));
+  ipc.handle(contract.browserBridge.openExtensions, async () => {
+    if (process.platform === "darwin") {
+      return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        const child = spawn("open", ["-a", "Google Chrome", "chrome://extensions"], { stdio: "ignore" });
+        child.once("error", (error) => resolve({ ok: false, error: error.message }));
+        child.once("exit", (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: "Chrome 扩展页未能打开。" }));
+      });
+    }
+    return { ok: false, error: "请在 Chrome 地址栏打开 chrome://extensions。" };
+  });
+  ipc.handle(contract.browserBridge.revealExtensionDirectory, async () => {
+    const status = await browserBridge.getStatus();
+    if (!status.extensionDir || !status.installed) return { ok: false, error: "请先准备扩展组件。" };
+    shell.showItemInFolder(status.extensionDir);
+    return { ok: true };
+  });
+  ipc.handle(contract.browserBridge.installFromRepo, (input) => browserBridge.buildAndInstall(input.repoRoot));
+  ipc.handle(contract.browserBridge.installNativeHost, () => browserBridge.installNativeHost());
+}
+
 function registerFixedRendererSettings(options: FixedRendererIpcOptions, ipc: IpcRegistrar): void {
   ipc.handle(contract.settings.get, (): AppSettings => options.settings.get());
   ipc.handle(contract.settings.getV4, (): SettingsV4Snapshot => options.settings.getV4());
@@ -525,10 +552,6 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       return { shown: false, error: "invalid_target" as const };
     }
   });
-  ipc.handle(contract.review.initGit, async (input = {}) => {
-    const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
-    return initializeGitRepository({ ...input, workspaceRoot }, options.roots);
-  });
 
   ipc.handle(contract.workspaces.getEnvironment, async (input = {}) => {
     const workspaceRoot = await resolveWorkspaceAccess({ workspaceRoot: input.workspaceRoot ?? options.roots.defaultWorkspaceRoot }, workspaceAccess);
@@ -593,30 +616,8 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
   ipc.handle(contract.approvals.submit, (input) => options.approvals.decide(input.requestId, input.decision, input.decision === "session" ? input.suggestionId : undefined));
 
-  ipc.handle(contract.browserBridge.getStatus, () => options.browserBridge.getStatus());
-  ipc.handle(contract.browserBridge.connect, () => options.browserBridge.connect());
-  ipc.handle(contract.browserBridge.useSourceExtension, (repoRoot) => options.browserBridge.useSourceExtension(repoRoot));
-  ipc.handle(contract.browserBridge.prepareUpdate, () => options.browserBridge.prepareUpdate());
-  ipc.handle(contract.browserBridge.disconnect, () => options.browserBridge.disconnect());
-  ipc.handle(contract.browserBridge.selectInstance, (instanceId) => options.browserBridge.selectInstance(instanceId));
-  ipc.handle(contract.browserBridge.openExtensions, async () => {
-    if (process.platform === "darwin") {
-      return new Promise<{ ok: boolean; error?: string }>((resolve) => {
-        const child = spawn("open", ["-a", "Google Chrome", "chrome://extensions"], { stdio: "ignore" });
-        child.once("error", (error) => resolve({ ok: false, error: error.message }));
-        child.once("exit", (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: "Chrome 扩展页未能打开。" }));
-      });
-    }
-    return { ok: false, error: "请在 Chrome 地址栏打开 chrome://extensions。" };
-  });
-  ipc.handle(contract.browserBridge.revealExtensionDirectory, async () => {
-    const status = await options.browserBridge.getStatus();
-    if (!status.extensionDir || !status.installed) return { ok: false, error: "请先准备扩展组件。" };
-    shell.showItemInFolder(status.extensionDir);
-    return { ok: true };
-  });
-  ipc.handle(contract.browserBridge.installFromRepo, (input) => options.browserBridge.buildAndInstall(input.repoRoot));
-  ipc.handle(contract.browserBridge.installNativeHost, () => options.browserBridge.installNativeHost());
+  if (options.browserBridge) registerBrowserBridgeIpc(ipc, options.browserBridge);
+  else registerDisabledBrowserBridgeIpc(ipc);
 
   ipc.handle(contract.skills.list, async (input = {}) => listFixedRendererSkills({
     dataRoot: options.roots.dataRoot,
@@ -660,8 +661,6 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     return projectSubagentTranscript(snapshot, journal);
   });
 
-  ipc.handle(contract.visualize.convertReply, (input) => visualizeReplyV2(input, options.roots, options.registry));
-  ipc.handle(contract.visualize.list, (input) => listVisualizationsV2(input.sessionId, options.roots, options.registry));
 }
 
 async function toSessionListItem(item: RuntimeV2SessionListItem, registry: DesktopRuntimeV2Registry): Promise<SessionListItem> {

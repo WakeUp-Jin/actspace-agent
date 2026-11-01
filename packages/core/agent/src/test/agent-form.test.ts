@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AgentScope } from "@actspace/core-scope";
-import type { ToolRuntime } from "@actspace/tools-runtime";
+import { AgentScope } from "@actspace/scope";
+import type { ToolRuntime } from "@actspace/tool-runtime";
 import { activateMainAgentFormTools, mainAgentFormComposition, MAIN_AGENT_FORM } from "../agent-form.js";
 import { AGENT_MODE_TOOLS, allowedAgentModeTools } from "../agent-mode-policy.js";
 

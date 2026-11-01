@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdir, open, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createCoreCodecRegistry, createSessionHeader } from '@actspace/session-journal';
-import { ContextEngine } from '../../../packages/context/engine/dist/index.js';
+import { ContextEngine } from '../../../packages/context/context-engine/dist/index.js';
 
 const option = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
 const root = resolve(option('root') ?? '.');

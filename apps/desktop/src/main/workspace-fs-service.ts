@@ -2,28 +2,31 @@
  * 工作区文件浏览器的 main 侧服务。
  *
  * 职责（见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`）：
- * - `listWorkspaceDir`：懒加载一层目录（忽略名单 + 条目上限 + 目录在前排序）。
- * - `readWorkspaceFile`：读单文件（大小上限 + 二进制识别 + 图片 data URL + renderKind 判定 + text 类语言推断）。
+ * - `listWorkspaceMarkdownFiles`：一次取回工作区全部 Markdown 的相对路径清单（git 仓库走 `git ls-files`，否则有上限的递归遍历）。
+ * - `writeWorkspaceMarkdownFile`：把「文档」面板里编辑的内容写回一个已存在的 Markdown 文件。
+ * - `readWorkspaceFile`：读单文件（markdown 文本 + 图片 data URL + renderKind 判定；其余 external 只返回 stat）。
  * - `statWorkspaceFile`：只取 size / mtime，供右侧面板做已打开 Tab 的新鲜度重校验。
  *
  * 安全：renderer 不碰 FS，全部经此服务；**浏览器入口强约束在 workspaceRoot 内**，
  * 故意不复用读类工具放开越界的 resolveReadablePath（面向用户的可点界面不应暴露整盘）。
  */
 
-import { open, readFile, readdir, stat } from "node:fs/promises";
-import { basename, extname, relative, resolve, sep } from "node:path";
+import { randomBytes } from "node:crypto";
+import { open, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
 import type {
-  WorkspaceDirEntry,
   WorkspaceFileRenderKind,
-  WorkspaceListDirInput,
-  WorkspaceListDirResult,
+  WorkspaceListMarkdownFilesResult,
   WorkspaceReadFileInput,
   WorkspaceReadFileResult,
   WorkspaceStatFileInput,
   WorkspaceStatFileResult,
+  WorkspaceWriteMarkdownFileInput,
+  WorkspaceWriteMarkdownFileResult,
 } from "@actspace/shared";
 import type { AppDataRoots } from "./app-paths";
+import { runGitCommand, type GitRunner } from "./git/run-git";
 import { isPathInside, realpathOfNearestExisting, realpathOrNull } from "./workspace-access";
 
 /** 一次性铺开会拖垮 UI 的大目录，直接从树里隐藏。 */
@@ -38,7 +41,12 @@ const IGNORED_DIR_NAMES = new Set([
   ".DS_Store",
 ]);
 
-const MAX_ENTRIES = 1000;
+/** Markdown 清单最多返回多少篇、非 git 遍历最多访问多少个目录项；超过就停止并标 truncated。 */
+export const MARKDOWN_LIST_MAX_FILES = 5000;
+export const MARKDOWN_WALK_MAX_ENTRIES = 50_000;
+const GIT_LIST_TIMEOUT_MS = 15_000;
+const GIT_LIST_MAX_OUTPUT_CHARS = 8 * 1024 * 1024;
+
 // 上限定义在契约层：renderer 的截断提示条要复述同一个数（见 shared/ipc.ts）。
 const MAX_TEXT_BYTES = WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -52,149 +60,7 @@ const IMAGE_MIME_BY_EXT: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-/**
- * text 类扩展名 → highlight.js 语言 id（确定性映射，不做 highlightAuto）。
- *
- * 这里的**值域**必须与 renderer 侧 `right-panel/highlight.ts` 的按需注册表一致，
- * 否则文件会静默回退成纯文本。两侧各有一条单测锁住该约束。
- * 纯数据文本（`.txt` / `.log`）故意不给语言：误高亮比不高亮更干扰阅读。
- */
-const LANGUAGE_BY_EXT: Record<string, string> = {
-  // TypeScript / JavaScript
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".mts": "typescript",
-  ".cts": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  // 样式
-  ".css": "css",
-  ".scss": "scss",
-  ".less": "less",
-  // 标记 / 模板（Vue、Svelte、Astro 的单文件组件用 xml 语法最接近）
-  ".vue": "xml",
-  ".svelte": "xml",
-  ".astro": "xml",
-  ".xml": "xml",
-  ".xsl": "xml",
-  ".plist": "xml",
-  ".mdx": "markdown",
-  // 配置 / 序列化
-  ".yaml": "yaml",
-  ".yml": "yaml",
-  ".json": "json",
-  ".jsonc": "json",
-  ".json5": "json",
-  ".jsonl": "json",
-  ".ndjson": "json",
-  ".toml": "toml",
-  ".ini": "ini",
-  ".cfg": "ini",
-  ".conf": "ini",
-  ".properties": "ini",
-  // Shell / 脚本
-  ".sh": "bash",
-  ".bash": "bash",
-  ".zsh": "bash",
-  ".fish": "bash",
-  ".ps1": "powershell",
-  ".bat": "dos",
-  ".cmd": "dos",
-  // 通用编程语言
-  ".py": "python",
-  ".pyi": "python",
-  ".go": "go",
-  ".rs": "rust",
-  ".java": "java",
-  ".kt": "kotlin",
-  ".kts": "kotlin",
-  ".c": "c",
-  ".h": "c",
-  ".cpp": "cpp",
-  ".cc": "cpp",
-  ".cxx": "cpp",
-  ".hpp": "cpp",
-  ".hh": "cpp",
-  ".cs": "csharp",
-  ".rb": "ruby",
-  ".php": "php",
-  ".swift": "swift",
-  ".dart": "dart",
-  ".lua": "lua",
-  ".r": "r",
-  ".pl": "perl",
-  ".pm": "perl",
-  ".ex": "elixir",
-  ".exs": "elixir",
-  ".scala": "scala",
-  ".sql": "sql",
-  // 基础设施 / 构建
-  // highlight.js 不内置 HCL / Terraform 语法（第三方包才有），用 ini 近似：
-  // `#` 注释、字符串和 `key = value` 都能正确着色，block 头行退化为纯文本，不会误标关键字。
-  ".tf": "ini",
-  ".tfvars": "ini",
-  ".hcl": "ini",
-  ".gradle": "gradle",
-  ".cmake": "cmake",
-  ".make": "makefile",
-  ".mk": "makefile",
-  ".dockerfile": "dockerfile",
-  ".vim": "vim",
-  // 数据 / 协议
-  ".graphql": "graphql",
-  ".gql": "graphql",
-  ".proto": "protobuf",
-  // 补丁
-  ".diff": "diff",
-  ".patch": "diff",
-};
-
-/**
- * 无扩展名 / dotfile 的 basename 兜底（小写精确匹配，优先于扩展名）。
- *
- * 必要性：`extname(".gitignore")` 返回空串，`extname("Dockerfile")` 也是空串，
- * 只靠扩展名这类文件永远拿不到语言。Go 的 `go.mod` / `go.sum` 也只有 basename 能判准。
- */
-const LANGUAGE_BY_BASENAME: Record<string, string> = {
-  dockerfile: "dockerfile",
-  containerfile: "dockerfile",
-  makefile: "makefile",
-  gnumakefile: "makefile",
-  justfile: "makefile",
-  "cmakelists.txt": "cmake",
-  "go.mod": "go",
-  "go.sum": "go",
-  "go.work": "go",
-  ".npmrc": "ini",
-  ".yarnrc": "ini",
-  ".editorconfig": "ini",
-  ".env": "bash",
-  ".bashrc": "bash",
-  ".zshrc": "bash",
-  ".profile": "bash",
-  ".prettierrc": "json",
-  ".babelrc": "json",
-  ".eslintrc": "json",
-  ".gitignore": "plaintext",
-  ".gitattributes": "plaintext",
-  ".dockerignore": "plaintext",
-  ".npmignore": "plaintext",
-  ".prettierignore": "plaintext",
-  codeowners: "plaintext",
-};
-
-/** basename 前缀 → 语言：覆盖 `.env.local`、`Dockerfile.dev` 这类带后缀变体。 */
-const LANGUAGE_BY_BASENAME_PREFIX: ReadonlyArray<readonly [string, string]> = [
-  [".env.", "bash"],
-  ["dockerfile.", "dockerfile"],
-  ["makefile.", "makefile"],
-];
-
 const MARKDOWN_EXTS = new Set([".md", ".markdown"]);
-const HTML_EXTS = new Set([".html", ".htm"]);
-const CSV_EXTS = new Set([".csv", ".tsv"]);
 
 function resolveRoot(input: { workspaceRoot?: string }, roots: AppDataRoots): string {
   return resolve(input.workspaceRoot ?? roots.defaultWorkspaceRoot);
@@ -224,36 +90,8 @@ async function toInsideRoot(root: string, relativePath: string): Promise<{ abs: 
 
 function renderKindOf(ext: string): WorkspaceFileRenderKind {
   if (MARKDOWN_EXTS.has(ext)) return "markdown";
-  if (HTML_EXTS.has(ext)) return "html";
   if (ext in IMAGE_MIME_BY_EXT) return "image";
-  if (CSV_EXTS.has(ext)) return "csv";
-  return "text";
-}
-
-/**
- * 推断 highlight.js 语言 id。
- * 顺序：basename 精确匹配 → basename 前缀 → 扩展名；都不命中返回 undefined（渲染回退纯等宽）。
- * basename 优先于扩展名，因为 `CMakeLists.txt` 这类文件的扩展名会给出错误答案。
- */
-export function languageOf(relativePath: string): string | undefined {
-  const name = basename(relativePath).toLowerCase();
-  const exact = LANGUAGE_BY_BASENAME[name];
-  if (exact) return exact;
-  for (const [prefix, language] of LANGUAGE_BY_BASENAME_PREFIX) {
-    if (name.startsWith(prefix)) return language;
-  }
-  return LANGUAGE_BY_EXT[extname(name)];
-}
-
-/** 单测用：语言映射的全部值域，供 renderer 侧注册表比对，防止两侧漂移。 */
-export function listMappedLanguages(): string[] {
-  return [
-    ...new Set([
-      ...Object.values(LANGUAGE_BY_EXT),
-      ...Object.values(LANGUAGE_BY_BASENAME),
-      ...LANGUAGE_BY_BASENAME_PREFIX.map(([, language]) => language),
-    ]),
-  ].sort();
+  return "external";
 }
 
 /**
@@ -266,65 +104,6 @@ function sliceToLastCompleteLine(buffer: Buffer): string {
   return usable.toString("utf8");
 }
 
-export async function listWorkspaceDir(
-  input: WorkspaceListDirInput,
-  roots: AppDataRoots,
-): Promise<WorkspaceListDirResult> {
-  const root = resolveRoot(input, roots);
-  const normalized = normalizeRelative(input.relativePath);
-  const inside = await toInsideRoot(root, normalized);
-  if (!inside) {
-    return { root, relativePath: normalized, entries: [], error: "escapes_root" };
-  }
-
-  let dirEntries;
-  try {
-    const stats = await stat(inside.abs);
-    if (!stats.isDirectory()) {
-      return { root, relativePath: inside.rel, entries: [], error: "not_a_directory" };
-    }
-    dirEntries = await readdir(inside.abs, { withFileTypes: true });
-  } catch {
-    return { root, relativePath: inside.rel, entries: [], error: "not_found" };
-  }
-
-  const visible = dirEntries.filter((entry) => {
-    if (entry.isDirectory()) return !IGNORED_DIR_NAMES.has(entry.name);
-    return !IGNORED_DIR_NAMES.has(entry.name);
-  });
-
-  const tooMany = visible.length > MAX_ENTRIES;
-  const capped = tooMany ? visible.slice(0, MAX_ENTRIES) : visible;
-
-  const entries: WorkspaceDirEntry[] = await Promise.all(
-    capped.map(async (entry) => {
-      const childRel = inside.rel ? `${inside.rel}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) {
-        return { name: entry.name, relativePath: childRel, kind: "dir" as const };
-      }
-      let size: number | undefined;
-      try {
-        size = (await stat(resolve(inside.abs, entry.name))).size;
-      } catch {
-        size = undefined;
-      }
-      return { name: entry.name, relativePath: childRel, kind: "file" as const, size };
-    }),
-  );
-
-  entries.sort((a, b) => {
-    if (a.kind !== b.kind) return a.kind === "dir" ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-
-  return {
-    root,
-    relativePath: inside.rel,
-    entries,
-    ...(tooMany ? { error: "too_many_entries" as const } : {}),
-  };
-}
-
 export async function readWorkspaceFile(
   input: WorkspaceReadFileInput,
   roots: AppDataRoots,
@@ -333,7 +112,7 @@ export async function readWorkspaceFile(
   const normalized = normalizeRelative(input.relativePath);
   const inside = await toInsideRoot(root, normalized);
   if (!inside) {
-    return { relativePath: normalized, renderKind: "text", size: 0, mtimeMs: 0, error: "escapes_root" };
+    return { relativePath: normalized, renderKind: "external", size: 0, mtimeMs: 0, error: "escapes_root" };
   }
 
   let size: number;
@@ -341,12 +120,12 @@ export async function readWorkspaceFile(
   try {
     const stats = await stat(inside.abs);
     if (stats.isDirectory()) {
-      return { relativePath: inside.rel, renderKind: "text", size: 0, mtimeMs: 0, error: "not_a_file" };
+      return { relativePath: inside.rel, renderKind: "external", size: 0, mtimeMs: 0, error: "not_a_file" };
     }
     size = stats.size;
     mtimeMs = stats.mtimeMs;
   } catch {
-    return { relativePath: inside.rel, renderKind: "text", size: 0, mtimeMs: 0, error: "not_found" };
+    return { relativePath: inside.rel, renderKind: "external", size: 0, mtimeMs: 0, error: "not_found" };
   }
 
   const ext = extname(inside.rel).toLowerCase();
@@ -368,15 +147,15 @@ export async function readWorkspaceFile(
     };
   }
 
-  // markdown / html / csv / text 都按 UTF-8 文本读。
+  // external 不读内容：由 renderer 交给系统默认应用打开，这里只给 stat。
+  if (renderKind === "external") {
+    return { relativePath: inside.rel, renderKind, size, mtimeMs };
+  }
+
+  // markdown 按 UTF-8 文本读。
   // 超限不再整体拒绝：只读上限内的完整行并标 truncated，让大文件至少前半段可读。
   const truncated = size > MAX_TEXT_BYTES;
   const buffer = truncated ? await readHead(inside.abs, MAX_TEXT_BYTES) : await readFile(inside.abs);
-
-  // 纯文本类做二进制识别：含 NUL 字节判定二进制，不把乱码塞进 Tab。
-  if (renderKind === "text" && buffer.includes(0)) {
-    return { relativePath: inside.rel, renderKind, size, mtimeMs, error: "binary" };
-  }
 
   const result: WorkspaceReadFileResult = {
     relativePath: inside.rel,
@@ -387,12 +166,6 @@ export async function readWorkspaceFile(
   };
   if (truncated) {
     result.truncated = true;
-  }
-  if (renderKind === "text") {
-    const language = languageOf(inside.rel);
-    if (language) {
-      result.language = language;
-    }
   }
   return result;
 }
@@ -431,5 +204,133 @@ export async function statWorkspaceFile(
     return { relativePath: inside.rel, size: stats.size, mtimeMs: stats.mtimeMs };
   } catch {
     return { relativePath: inside.rel, size: 0, mtimeMs: 0, error: "not_found" };
+  }
+}
+
+const MARKDOWN_NAME = /\.(?:md|markdown)$/i;
+
+function byPath(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** 扩展名大小写不敏感（`README.MD`、`a.Markdown` 也算）。 */
+const GIT_MARKDOWN_PATHSPECS = [":(icase)*.md", ":(icase)*.markdown"];
+const GIT_LIST_OPTIONS = { timeoutMs: GIT_LIST_TIMEOUT_MS, maxOutputChars: GIT_LIST_MAX_OUTPUT_CHARS, env: { LC_ALL: "C" } };
+
+async function listMarkdownViaGit(root: string, runGit: GitRunner): Promise<{ files: string[]; truncated: boolean } | null> {
+  const result = await runGit(
+    ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...GIT_MARKDOWN_PATHSPECS],
+    { cwd: root, ...GIT_LIST_OPTIONS },
+  );
+  // 不是仓库、没有 git、超时：都退回遍历。
+  if (result.startError || result.timedOut || result.exitCode !== 0) return null;
+  // 已被 git 跟踪、但磁盘上已经删掉的文件仍在 `--cached` 里，要排除掉（点开只会读取失败）。
+  const deleted = new Set<string>();
+  const deletedResult = await runGit(["ls-files", "-z", "--deleted", "--", ...GIT_MARKDOWN_PATHSPECS], { cwd: root, ...GIT_LIST_OPTIONS });
+  if (!deletedResult.startError && !deletedResult.timedOut && deletedResult.exitCode === 0) {
+    for (const name of deletedResult.stdout.split("\0")) if (name.length > 0) deleted.add(name);
+  }
+  const names = result.stdout.split("\0").filter((name) => !deleted.has(name));
+  // 输出被截断时最后一项可能只有半截路径，丢掉。
+  if (result.truncated) names.pop();
+  // 再按扩展名核对一次，保证两种来源的判定口径一致（都不区分大小写）。
+  const unique = [...new Set(names.filter((name) => name.length > 0 && MARKDOWN_NAME.test(name)))].sort(byPath);
+  const overLimit = unique.length > MARKDOWN_LIST_MAX_FILES;
+  return { files: overLimit ? unique.slice(0, MARKDOWN_LIST_MAX_FILES) : unique, truncated: overLimit || result.truncated };
+}
+
+async function walkMarkdown(root: string): Promise<{ files: string[]; truncated: boolean }> {
+  const files: string[] = [];
+  let visited = 0;
+  let truncated = false;
+  // 显式栈 + 按名字排序，截断时保留的是稳定的「前一部分」。不跟随 symlink：Dirent 对 symlink 既不是目录也不是文件。
+  const stack: string[] = [""];
+  while (stack.length > 0 && !truncated) {
+    const rel = stack.pop() as string;
+    let entries;
+    try {
+      entries = await readdir(rel ? resolve(root, rel) : root, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    entries.sort((a, b) => byPath(a.name, b.name));
+    const subdirs: string[] = [];
+    for (const entry of entries) {
+      visited += 1;
+      if (visited > MARKDOWN_WALK_MAX_ENTRIES) {
+        truncated = true;
+        break;
+      }
+      const childRel = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        if (IGNORED_DIR_NAMES.has(entry.name) || entry.name.startsWith(".")) continue;
+        subdirs.push(childRel);
+      } else if (entry.isFile() && MARKDOWN_NAME.test(entry.name)) {
+        if (files.length >= MARKDOWN_LIST_MAX_FILES) {
+          truncated = true;
+          break;
+        }
+        files.push(childRel);
+      }
+    }
+    for (let index = subdirs.length - 1; index >= 0; index -= 1) stack.push(subdirs[index]);
+  }
+  return { files: files.sort(byPath), truncated };
+}
+
+/**
+ * 一次取回工作区里全部 Markdown 的相对路径（不读内容）。
+ * git 仓库：`git ls-files --cached --others --exclude-standard`，遵守 `.gitignore` 且包含未跟踪的新文件；
+ * 否则退回有上限的递归遍历（跳过忽略名单和所有 `.` 开头的目录，不跟随 symlink）。
+ * `workspaceRoot` 必须是绝对路径，其访问权限由调用方（IPC handler）先校验。
+ */
+export async function listWorkspaceMarkdownFiles(
+  workspaceRoot: string,
+  deps: { runGit: GitRunner } = { runGit: runGitCommand },
+): Promise<WorkspaceListMarkdownFilesResult> {
+  if (!isAbsolute(workspaceRoot)) return { ok: false, error: "escapes_root" };
+  const root = resolve(workspaceRoot);
+  try {
+    if (!(await stat(root)).isDirectory()) return { ok: false, error: "not_a_directory" };
+  } catch {
+    return { ok: false, error: "not_found" };
+  }
+  const viaGit = await listMarkdownViaGit(root, deps.runGit);
+  if (viaGit) return { ok: true, ...viaGit, source: "git" };
+  return { ok: true, ...(await walkMarkdown(root)), source: "walk" };
+}
+
+/**
+ * 把内容写回一个**已存在**的工作区 Markdown 文件（不新建）。
+ * 先对相对路径和 realpath 都核对 `.md` / `.markdown`，越界（含经 symlink 指到 root 外）一律拒绝；
+ * 写临时文件再 rename，中途失败不会留下半截文件。不做 mtime 冲突检测（以人为准）。
+ */
+export async function writeWorkspaceMarkdownFile(
+  input: WorkspaceWriteMarkdownFileInput,
+): Promise<WorkspaceWriteMarkdownFileResult> {
+  if (!isAbsolute(input.workspaceRoot)) return { ok: false, error: "escapes_root" };
+  const root = resolve(input.workspaceRoot);
+  const inside = await toInsideRoot(root, normalizeRelative(input.relativePath));
+  if (!inside) return { ok: false, error: "escapes_root" };
+  if (!MARKDOWN_NAME.test(inside.rel) || !MARKDOWN_NAME.test(inside.abs)) return { ok: false, error: "not_markdown" };
+
+  let mode: number;
+  try {
+    const stats = await stat(inside.abs);
+    if (!stats.isFile()) return { ok: false, error: "not_found" };
+    mode = stats.mode & 0o777;
+  } catch {
+    return { ok: false, error: "not_found" };
+  }
+
+  const temp = `${inside.abs}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
+  try {
+    await writeFile(temp, input.content, { encoding: "utf8", mode, flag: "wx" });
+    await rename(temp, inside.abs);
+    const written = await stat(inside.abs);
+    return { ok: true, mtimeMs: written.mtimeMs, size: written.size };
+  } catch {
+    await unlink(temp).catch(() => undefined);
+    return { ok: false, error: "write_failed" };
   }
 }

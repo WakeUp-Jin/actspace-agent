@@ -36,6 +36,7 @@ export function SplitView({
   leftWidth,
   leftHidden = false,
   rightWidth,
+  rightExpanded = false,
   leftBounds,
   rightBounds,
   minMainWidth,
@@ -58,6 +59,8 @@ export function SplitView({
   /** 完全隐藏左侧 pane 与分隔条；Sidebar 折叠到 hidden 态时使用。 */
   leftHidden?: boolean;
   rightWidth: number;
+  /** 右栏撑满主区（「文档」面板的展开态）：主区折成 0 宽但保持挂载，聊天状态不丢。 */
+  rightExpanded?: boolean;
   leftBounds: SplitPanelBounds;
   rightBounds: SplitPanelBounds;
   minMainWidth: number;
@@ -228,8 +231,11 @@ export function SplitView({
   ]);
 
   const effectiveLeftWidth = leftHidden ? 0 : leftWidth;
+  const expanded = rightExpanded && rightOpen;
   let columns: string;
-  if (leftHidden) {
+  if (expanded) {
+    columns = leftHidden ? `0px minmax(0, 1fr)` : `${leftWidth}px 0px minmax(0, 1fr)`;
+  } else if (leftHidden) {
     columns = rightOpen ? `minmax(0, 1fr) ${rightWidth}px` : `minmax(0, 1fr)`;
   } else {
     columns = rightOpen
@@ -273,10 +279,10 @@ export function SplitView({
           </div>
         </>
       )}
-      <div className={SPLIT_VIEW_PANE_CLASS}>{main}</div>
+      <div className={`${SPLIT_VIEW_PANE_CLASS}${expanded ? " invisible" : ""}`} aria-hidden={expanded || undefined}>{main}</div>
       {rightOpen ? (
         <>
-          <div
+          {expanded ? null : <div
             className={`${SPLIT_SEPARATOR_CLASS} left-[calc(100%_-_var(--split-right-width))]`}
             role="separator"
             tabIndex={0}
@@ -290,7 +296,7 @@ export function SplitView({
             onPointerDown={(event) => handlePointerDown("right", event)}
           >
             <span aria-hidden="true" className={separatorLineClass} />
-          </div>
+          </div>}
           <div className={SPLIT_VIEW_PANE_CLASS}>{right}</div>
         </>
       ) : null}

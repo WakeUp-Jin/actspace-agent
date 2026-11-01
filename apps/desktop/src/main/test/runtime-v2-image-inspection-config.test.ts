@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { expect, it, vi } from "vitest";
 import { EMPTY_LLM_USAGE, type LlmService } from "@actspace/llm-service";
-import { IMAGE_INSPECTION_HOST_PORT_ID } from "@actspace/tools-image-inspection";
-import type { ToolExecutionContext } from "@actspace/tools-runtime";
+import { IMAGE_INSPECTION_HOST_PORT_ID } from "@actspace/tool-image-inspection";
+import type { ToolExecutionContext } from "@actspace/tool-runtime";
 import { IMAGE_INSPECTION_CREDENTIAL_REF } from "../runtime-v2/credential-resolver";
 import type { DesktopRuntimeV2ModelPort } from "../runtime-v2/model-port";
 import { createDesktopToolHostServices } from "../runtime-v2/tool-host-services";

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, realpath, rm } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
-import type { ToolArtifactOwner, ToolArtifactRef } from "@actspace/tools-runtime";
+import type { ToolArtifactOwner, ToolArtifactRef } from "@actspace/tool-runtime";
 
 type ArtifactMetadata = ToolArtifactRef & {
   readonly schemaVersion: 1;

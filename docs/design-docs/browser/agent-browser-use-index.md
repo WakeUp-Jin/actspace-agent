@@ -1,12 +1,14 @@
 # Browser Use 设计专题入口
 
+> 插件状态：默认不加载，在 扩展 › 插件 中开启后重启生效。
+
 Browser Use 接入用户真实 Chrome。当前实现是 11 个模型工具通过 Unix socket 调用 Go command engine，再由 Chrome Extension 执行 Chrome API / CDP 原语。命令 registry 是命令 ID、schema、风险和实现状态的机器事实来源。
 
 ## 当前职责
 
 | 层 | 负责 |
 | --- | --- |
-| `packages/tools/browser-tools` | 工具定义与注册、action 风险判断、结果脱敏与裁剪、Turn transport |
+| `packages/browser/tool-browser` | 工具定义与注册、action 风险判断、结果脱敏与裁剪、Turn transport |
 | Desktop Host | 组件准备、实例发现与验证、绑定 socket、向 Runtime 提供 Browser capability |
 | Go command engine | 62 条 canonical command、参数校验、Session/tab ownership、CUA/DOM CUA/Locator、等待与批处理 |
 | Injected Locator runtime | 页面内定位、accessible name、open Shadow DOM、actionability、文本与表单语义 |
@@ -40,4 +42,4 @@ Browser capability ready 后注册 9 个分类工具和 `browser_help`、`browse
 4. [Bridge 设计](agent-browser-bridge-design.md)：Host、安装、实例路由与宿主边界。
 5. [当前连接体验执行计划](../../exec-plans/active/20260928-chrome-connect-experience.md)：首次连接、安装打包与真实 Chrome 的未完成验收。
 
-源码入口：`packages/tools/browser-tools/src/plugin.ts`、`node-capability.ts`，`packages/core/agent/src/agent-mode-policy.ts`，`browser-bridge/apps/cli/internal/commands/registry.go`。命令变化先更新 Go registry，再运行 `node scripts/check-browser-command-registry.mjs`。该检查验证生成 metadata 和文档标题 parity，不替代真实 Chrome 验收。
+源码入口：`packages/browser/tool-browser/src/plugin.ts`、`node-capability.ts`，`packages/core/agent/src/agent-mode-policy.ts`，`browser-bridge/apps/cli/internal/commands/registry.go`。命令变化先更新 Go registry，再运行 `node scripts/check-browser-command-registry.mjs`。该检查验证生成 metadata 和文档标题 parity，不替代真实 Chrome 验收。

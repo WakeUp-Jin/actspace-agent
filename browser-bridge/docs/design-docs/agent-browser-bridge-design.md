@@ -220,7 +220,7 @@ CLI 不应只提供传统的一大段 `--help` 文本，而应提供渐进式、
 推荐落点：
 
 - `packages/agent-core`：浏览器工具定义、参数校验、用户可见 summary、错误适配、权限流程。
-- `packages/shared`：如果需要前端消费稳定结构，再补共享契约；不提前把 bridge 私有结构泄漏给 renderer。
+- `packages/util/shared`：如果需要前端消费稳定结构，再补共享契约；不提前把 bridge 私有结构泄漏给 renderer。
 - main process：只负责必要的环境配置和本地可执行路径发现，不承载浏览器业务逻辑。
 - renderer：只消费结构化工具事件，不关心 extension、socket 和 Native Messaging。
 

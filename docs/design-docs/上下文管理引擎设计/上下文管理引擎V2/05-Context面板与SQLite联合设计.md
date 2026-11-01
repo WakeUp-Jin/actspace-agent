@@ -12,8 +12,8 @@
 
 以下为实施前核对事实，不是当前行为。当前 `describeContextPanel` 已委托 ContextPanelService，历史索引已升级 schema 9：
 
-- `packages/context/engine/src/instances.ts` 以 Session + logicalAgentScopeId 保存长期实例；一次提交替换不可变 view，不要求外部一直持有同一可变对象。
-- `packages/agent-service/src/application.ts` 已同时提供 `readContextProjection` 和有界 `readSessionEventBatch`；`sessionQuerySources` 当前枚举全库。
+- `packages/context/context-engine/src/instances.ts` 以 Session + logicalAgentScopeId 保存长期实例；一次提交替换不可变 view，不要求外部一直持有同一可变对象。
+- `packages/core/agent-service/src/application.ts` 已同时提供 `readContextProjection` 和有界 `readSessionEventBatch`；`sessionQuerySources` 当前枚举全库。
 - `apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts` 的 `describeContextPanel` 仍返回 null；旧 `describeContext` 即使已有 managed 投影仍读取 Session 历史。
 - 实施前的 SQLite schema 8 已有 catalog、Usage、搜索及各自水位，没有 Context 历史索引。`usage-read-model.ts` 串行处理查询；单 Session 同步跨多个读取批次、最后才提交事务。
 - `use-context-panel.ts` 依赖 Session revision 拉取，不能保证索引稍后完成或无新 Journal 事件的 Context 变化会刷新。
@@ -37,7 +37,7 @@ flowchart TB
 
 引擎管理来源刷新、受控切片更新、生命周期、转换和只读投影；前端布局不进入引擎。模型/工具输出先持久化至 Session，插件随后 reconcile。SQLite 不参与 Agent Loop、恢复、权限判定或 Context 组装。
 
-保持 `packages/context/{engine,system,runtime,rules,skills,conversation,tools,disclosure,compaction}` 物理插件包；不新增 UI 专用领域插件。`packages/shared` 放跨进程类型，不放 SQLite 或业务持久化。纯 Context 分类/清单生成逻辑归 engine，公开导出供 Runtime 转发和 Worker 复用；Desktop 通过公开包入口/既有 Runtime loader 消费，不相对导入 sibling src。
+保持 `packages/context/{engine,system,runtime,rules,skills,conversation,tools,disclosure,compaction}` 物理插件包；不新增 UI 专用领域插件。`packages/util/shared` 放跨进程类型，不放 SQLite 或业务持久化。纯 Context 分类/清单生成逻辑归 engine，公开导出供 Runtime 转发和 Worker 复用；Desktop 通过公开包入口/既有 Runtime loader 消费，不相对导入 sibling src。
 
 Desktop 复用现有查询服务、Worker 和数据库文件，在内部拆出 Context 投影/查询模块；不复制一套 Worker 生命周期。新增一个轻量面板门面组合当前投影与历史结果，IPC 只校验并转发。改动涉及超过 8 个源码文件和跨层契约，按联合计划执行，不当作单 handler 修补。
 
@@ -71,7 +71,7 @@ Runtime 增加 `sessionQuerySource(sessionId)`，只读取指定会话并执行�
 
 ## 4. 面板契约与刷新
 
-以 `packages/shared/src/context-panel.ts` 为最终契约。现有 schemaVersion 1 升为 2，main、renderer、mock 同步迁移，保留 `describeContext` 给 Composer 的轻量契约。
+以 `packages/util/shared/src/context-panel.ts` 为最终契约。现有 schemaVersion 1 升为 2，main、renderer、mock 同步迁移，保留 `describeContext` 给 Composer 的轻量契约。
 
 | 字段/对象 | 约定 |
 | --- | --- |

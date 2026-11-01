@@ -1,6 +1,6 @@
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { emitNotification, serialDispatch, waterfallDispatch, type DispatchCarrier } from "@actspace/cordis-adapter";
-import { carrierKeyOf, isScopeCarrier, scopeActiveOf, scopeTarget, type AgentScope, type ScopeKey } from "@actspace/core-scope";
+import { carrierKeyOf, isScopeCarrier, scopeActiveOf, scopeTarget, type AgentScope, type ScopeKey } from "@actspace/scope";
 
 /** Live Agent subject carried by Agent-subject events. */
 export type AgentSubject = Readonly<Record<string, unknown>> & {

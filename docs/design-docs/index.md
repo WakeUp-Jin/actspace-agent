@@ -49,10 +49,12 @@
 ## 根层入口
 
 - `core-beliefs.md`：Agent-first 的工作原则和模板设计出发点。
+- [架构优化](架构优化/README.md)：2026-11-01 立项，2026-11-02 两步都已实施（分支 `架构优化`，未合入 main，Electron 实机检查待执行）。第一步「功能减法」，见 [01 功能减法设计](架构优化/01-功能减法设计.md)（删除 HTML / 代码 / CSV 渲染、可视化回复、终端、文件树和 Review 的操作与监听；浏览器能力与英语学习默认不加载），计划见 [20261101-feature-subtraction](../exec-plans/completed/20261101-feature-subtraction/README.md)；第二步「插件结构」见 [02 插件结构设计](架构优化/02-插件结构设计.md)（`packages/<能力>/<包>` 两级目录、全局 / 会话两类插件、manifest 的 `display`、唯一插件清单、扩展 › 插件页、README 规范与检查），计划见 [20261101-plugin-structure](../exec-plans/completed/20261101-plugin-structure/README.md)，插件页 demo 见 [plugins-page-demo](frontend/plugins-page-demo.html)。
+- [文档面板规范](frontend/front-文档面板规范.md)：2026-11-01 确认并实施（功能减法 P4）；只含 Markdown 的目录树取代工作区文件树，聊天 → 正文 → 文件树，绿点标出本会话改过的文档；demo 见 [md-file-tree-demo](frontend/md-file-tree-demo.html)（方案 A）。
 - [ActSpace 产品概念思路（初稿）](ActSpace产品概念思路初稿.md)：产品形象：定位、信念“唯变所适，每一个问题都有它的空间”、故事线、Agent / 场景 / Actor / Actor 名册 / 空间、意象与气质；视觉方向待定。
 - `core-storage-and-observability.md`：本地存储、workspace root 和可观测性边界。
 - [ActSpace 数据存储结构与职责](core-data-storage-design.md)：当前四块存储结构、接纳与落盘写入图、按用途读取图；区分完整事实、当前内存、SQLite 查询缓存和全局配置，明确冷读与检查点限制。
-- `core-review-change-sources.md`：Git-first Review Workbench 单一事实源，覆盖六种 scope、upstream Branch、结构化 diff、Review Options、Git actions 与验收边界。
+- `core-review-change-sources.md`：Git-first Review Workbench 单一事实源，覆盖五种只读 scope、upstream Branch、结构化 diff、Review Options、刷新时机与验收边界。
 - `core-review-large-diff-loading.md`：Review Standard/capped 双模式、批量 patch、完整文件正文、虚拟渲染和性能验收规范。
 - `agent-index.md`：Agent Runtime 和全部 Agent 专题的总入口。
 - `website-introduction-site-design.md`：`apps/site` 官网、公开文档、博客、更新页、内容归属和静态部署边界；视觉规范见 `apps/site/DESIGN.md`。
@@ -66,7 +68,7 @@
 | 目录 | 内容边界 | 入口或代表文档 |
 |---|---|---|
 | `agent-plugin-runtime/` | v2 后端插件化重构的总体架构、研究证据、已确认决策、目标边界、包结构与公共契约 | `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`、`docs/design-docs/agent-plugin-runtime/README.md` |
-| `agent-runtime/` | Agent 形态、工作模式与 Journal 观测数据契约 | `docs/design-docs/agent-runtime/agent-forms-and-modes.md`、`docs/design-docs/agent-runtime/agent-observability-trace-model.md` |
+| `agent-runtime/` | Agent 形态、工作模式、Journal 观测数据契约与会话记录 Markdown | `docs/design-docs/agent-runtime/agent-forms-and-modes.md`、`docs/design-docs/agent-runtime/agent-observability-trace-model.md`、[会话记录 Markdown](agent-runtime/agent-session-transcript.md) |
 | `model-context/` | 当前模型供应商、模型能力、request snapshot、token usage 和 Context Projection | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md` |
 | `上下文管理引擎设计/` | V2 生命周期与物理拆包已有实现；Context 面板与 SQLite 联合实现已完成，联合验收保留未覆盖及性能限制 | [V2 设计](上下文管理引擎设计/上下文管理引擎V2/README.md)、[第一版数据结构规范](上下文管理引擎设计/Context数据结构和模型输入数据结构的设计规范.md)、[第一版插件拆分](上下文管理引擎设计/上下文管理引擎的插件拆分和上下文的插件拆分.md)、[渐进式披露](上下文管理引擎设计/agent-progressive-disclosure.md)、[压缩提示词](上下文管理引擎设计/agent-compaction-prompt.md)、[第一版执行计划](../exec-plans/completed/20261006-context-management-engine/README.md) |
 | `tool-system/` | 当前 Skill、Web/图片工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md`、`docs/design-docs/tool-system/agent-image-inspection-tool.md` |

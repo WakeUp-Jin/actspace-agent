@@ -16,13 +16,13 @@ const forbidden = [
   "NODE_SEA_BLOB",
 ];
 const allowedCurrentReferences = new Map([
-  ["packages/runtime/src/profiles/composition.ts", new Set(["session.jsonl"])],
+  ["packages/core/runtime/src/profiles/composition.ts", new Set(["session.jsonl"])],
 ]);
 const roots = [
   "apps/cli/src/cli.ts",
   "apps/cli/src/runtime-v2",
-  "packages/runtime/src",
-  "packages/shared/src/runtime-v2",
+  "packages/core/runtime/src",
+  "packages/util/shared/src/runtime-v2",
   "apps/desktop/src/main/index.ts",
   "apps/desktop/src/main/runtime-v2",
   "apps/desktop/src/preload/index.ts",

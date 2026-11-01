@@ -11,9 +11,9 @@
 
 | 变更 | 影响文件 | 说明 |
 |------|----------|------|
-| 共享契约与规则阈值 | `packages/shared/src/harness-stats.ts`、`runtime-v2/fixed-renderer.ts`、`desktop-bridge/contract.ts` | 面板和第二期 Agent 查询用同一套类型和阈值 |
-| 挂载层观察口 | `packages/cordis-adapter/src/harness-observer.ts`、`cordis-tree.ts` | 所有插件不改代码就能被统计；没有观察者时原样挂载 |
-| 运行时统计 Host 插件包 | `packages/harness-stats/*`、`runtime/src/startup/boot.ts`、`harness-control`、`boot/harness-mount.ts` | 服务 / 监听 / 依赖 / 加载按小时汇总写进 `harness-stats/YYYY-MM.jsonl`；`ACTSPACE_HARNESS_STATS=0` 关闭 |
+| 共享契约与规则阈值 | `packages/util/shared/src/harness-stats.ts`、`runtime-v2/fixed-renderer.ts`、`desktop-bridge/contract.ts` | 面板和第二期 Agent 查询用同一套类型和阈值 |
+| 挂载层观察口 | `packages/composition/cordis-adapter/src/harness-observer.ts`、`cordis-tree.ts` | 所有插件不改代码就能被统计；没有观察者时原样挂载 |
+| 运行时统计 Host 插件包 | `packages/harness-evolution/harness-stats/*`、`runtime/src/startup/boot.ts`、`harness-control`、`boot/harness-mount.ts` | 服务 / 监听 / 依赖 / 加载按小时汇总写进 `harness-stats/YYYY-MM.jsonl`；`ACTSPACE_HARNESS_STATS=0` 关闭 |
 | 会话日志汇总（Schema v15） | `apps/desktop/src/main/runtime-v2/harness-stats-{schema,projection}.ts`、`read-model-sync.ts` | 与使用统计同一次读取、同一事务；按小时 × 版本 × 模式 × 模型汇总 |
 | 统计文件、选择记录、归档 | `harness-stats-runtime-ingest.ts`、`harness-stats-archive.ts` | 按字节游标增量读；会话删除后统计保留 |
 | 查询、版本对比、12 条规则 | `harness-stats-query.ts` | 按 tab 的 SQL 聚合，在 Worker 中执行 |
@@ -52,6 +52,7 @@
 - `pnpm test`：前 6 步通过；`test:current-docs` 失败，原因与本次改动无关（旧验收文档引用的截图被 `.gitignore` 忽略，新 worktree 里没有这些文件，失败列表里没有本次的文档）。之后的步骤单独跑：见下方。
 - 剩余测试链：contract-matrix、renderer-bridge、harness-events、harness-recovery、agent-host:process、ipc-channels 全部通过；`test:frontend-tokens` 有 1 条失败，与本次无关（`PurposePicker.tsx` 原生按钮从 3 降到 2，可以收紧基线；该文件本次没改，来自 main）。
 - `pnpm -r --no-bail --if-present test`：全部包通过（合计 3,740 个测试；desktop 267 个文件 / 2,113 个测试）。第一次跑时 `apps/cli` 的 `runtime-v2.test.ts` 失败（临时运行多留了 `harness-stats/`），已修复，见执行过程。
+- **合并 main（PR #27 架构优化）之后重跑**：`pnpm typecheck`、`check:packages`、`check-package-readmes` 通过；`pnpm -r --no-bail --if-present test` 全部通过（合计 3,784 个测试；desktop 262 个文件 / 2,133 个测试）；根目录检查链除 `test:current-docs`（同上，截图未入库）外全部通过，`test:frontend-tokens` 在新 main 上也通过了。
 - `apps/desktop`：两个 tsconfig 的 `tsc --noEmit` 通过；全量 vitest 通过；Harness 统计相关的 main / renderer 测试 24 个全部通过。
 - `@actspace/harness-stats`：16 个测试通过，typecheck 通过。
 - `check:ipc-channels`、`test:ipc-channels`、`check:renderer-bridge`、`check:frontend-tokens`、`check:packages`、`check:harness-events`、`test:contract-matrix`：通过。

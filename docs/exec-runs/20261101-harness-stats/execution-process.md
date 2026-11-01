@@ -13,7 +13,7 @@
 
 ### 步骤 1：T1 共享类型与常量
 
-- **操作**：新建 `packages/shared/src/harness-stats.ts`：查询输入（时间、模式、模型、工作区、会话类型、版本）、7 个 tab 的结果类型、直方图档位、12 条规则阈值 `HARNESS_FLAG_RULES`；fixed renderer 契约加 `harnessStats.query / getStatus / cancel`。
+- **操作**：新建 `packages/util/shared/src/harness-stats.ts`：查询输入（时间、模式、模型、工作区、会话类型、版本）、7 个 tab 的结果类型、直方图档位、12 条规则阈值 `HARNESS_FLAG_RULES`；fixed renderer 契约加 `harnessStats.query / getStatus / cancel`。
 - **验证**：`pnpm -s typecheck:contracts` 通过。
 
 ### 步骤 2：T2–T4 运行时采集（Sonnet 子智能体并行）
@@ -45,6 +45,12 @@
 - **结果**：17 个会话、147,180 条事件，汇总约 1.07 秒；每个 tab 查询 0–8ms，结果 ≤ 15KB。本机数据里没有压缩、后台任务、`applied` 事件和 bash 环境明细，相应指标为 0 属实。
 - **修正**：见“遇到的问题”。
 - **服务调用开销**：Proxy 包装每次约 0.56µs，100 次约多 0.06ms。
+
+### 步骤 7：合并 main（PR #27 架构优化）
+
+- **操作**：main 把包搬成 `packages/<能力>/<包>` 两级结构、统一包名、引入唯一插件清单 `PLUGIN_CATALOG`。`@actspace/harness-stats` 是 Host 直接创建的库，移到 `packages/harness-evolution/harness-stats`，在该目录 README 和总地图登记（类别：库）；`core/runtime` 的 `tsconfig.build.json` 引用和 `source-registry.mjs` 的 `PACKAGE_PATHS` 按新路径补上。
+- **冲突处理**：`boot` 两个文件采用 main 的新包名（`@actspace/scope`），保留 `HarnessMountObserver`；`runtime/boot.ts` 同时保留 main 的 `disabledPlugins` 和本分支的 `harnessStats` 选项；桥接契约保留 `harnessStats`，随 main 删除 `terminal`；`WorkbenchLayout`、mock handlers 两边的导入和状态都保留；`harness-stats-boot.test.ts` 改用显式的 Host 工具端口列表（main 删了 `TOOL_PLUGIN_TRANSPORT`）；锁文件和契约矩阵重新生成。
+- **验证**：`pnpm typecheck`、`check:packages`、`check-package-readmes` 通过；测试结果见执行摘要。
 
 ## 遇到的问题
 

@@ -1,5 +1,7 @@
 # Browser Use 命令面分类详解
 
+> 插件状态：默认不加载，在 扩展 › 插件 中开启后重启生效。
+
 ## 当前状态
 
 本文档完整记录 Browser Use 62 条 canonical command 的分类、用途和关键行为边界。当前机器事实来源为 `browser-bridge/apps/cli/internal/commands/registry.go` 与 `schemas.go`；模型可以通过 `browser_help` 查询实际 schema。

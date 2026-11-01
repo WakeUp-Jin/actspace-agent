@@ -14,13 +14,13 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 export const CHANNEL_SOURCES = [
-  { file: "packages/shared/src/runtime-v2/fixed-renderer.ts", constant: "RUNTIME_V2_FIXED_RENDERER_CHANNELS" },
-  { file: "packages/shared/src/performance.ts", constant: "PERFORMANCE_CHANNELS" },
-  { file: "packages/shared/src/english-learning.ts", constant: "ENGLISH_LEARNING_CHANNELS" },
-  { file: "packages/shared/src/host-protocol/connections.ts", constant: "HOST_IPC" },
+  { file: "packages/util/shared/src/runtime-v2/fixed-renderer.ts", constant: "RUNTIME_V2_FIXED_RENDERER_CHANNELS" },
+  { file: "packages/util/shared/src/performance.ts", constant: "PERFORMANCE_CHANNELS" },
+  { file: "packages/util/shared/src/english-learning.ts", constant: "ENGLISH_LEARNING_CHANNELS" },
+  { file: "packages/util/shared/src/host-protocol/connections.ts", constant: "HOST_IPC" },
 ];
 
-export const CONTRACT_SOURCE = { file: "packages/shared/src/desktop-bridge/contract.ts", constant: "desktopBridgeContract" };
+export const CONTRACT_SOURCE = { file: "packages/util/shared/src/desktop-bridge/contract.ts", constant: "desktopBridgeContract" };
 
 const MAIN_ROOT = "apps/desktop/src/main";
 const PRELOAD_ROOT = "apps/desktop/src/preload";

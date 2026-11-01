@@ -123,10 +123,10 @@ flowchart TD
 
 实施前的静态证据（以下描述保留作为问题来源，不再代表重构后实现）：
 
-- `packages/session/journal/src/journal.ts` 的 `#events` 保留事件数组，与 `#surface` 分开。`append()` 构造 `nextEvents = [...this.#events, event]`，调用全量 `validateSessionEvents` 并计算有效事件；`events` getter 还复制一次数组。数组复制不表示每次深拷贝全部历史正文，但仍随事件数量增加引用复制与遍历工作。
-- `packages/session/journal/src/invariant-validator.ts` 的 `validateSessionEvents()` 遍历所给事件序列。把前端查询迁至 SQLite 不会自动消除这一执行写入路径成本。
-- `packages/session/projection/src/facts.ts` 的用量总数使用增量替换公式，但 `selected` 保存按请求记录、`requests` 保存关联；更新中存在对象展开和 `Object.values(selected).some(...)`。因此“总数增量”不等于“所有中间状态和每次更新都固定成本”。
-- `packages/runtime/src/session/session-controller.ts` 已对 live model 应用水位后的事件，但读取 `journal.events` 的数组复制和 Journal 自身成本仍独立存在。
+- `packages/session/session-journal/src/journal.ts` 的 `#events` 保留事件数组，与 `#surface` 分开。`append()` 构造 `nextEvents = [...this.#events, event]`，调用全量 `validateSessionEvents` 并计算有效事件；`events` getter 还复制一次数组。数组复制不表示每次深拷贝全部历史正文，但仍随事件数量增加引用复制与遍历工作。
+- `packages/session/session-journal/src/invariant-validator.ts` 的 `validateSessionEvents()` 遍历所给事件序列。把前端查询迁至 SQLite 不会自动消除这一执行写入路径成本。
+- `packages/session/session-projection/src/facts.ts` 的用量总数使用增量替换公式，但 `selected` 保存按请求记录、`requests` 保存关联；更新中存在对象展开和 `Object.values(selected).some(...)`。因此“总数增量”不等于“所有中间状态和每次更新都固定成本”。
+- `packages/core/runtime/src/session/session-controller.ts` 已对 live model 应用水位后的事件，但读取 `journal.events` 的数组复制和 Journal 自身成本仍独立存在。
 
 这些是代码形态证据，不是性能测量；尚未证明在用户当前数据规模下构成可感知瓶颈。
 

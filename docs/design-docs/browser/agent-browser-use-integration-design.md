@@ -1,5 +1,7 @@
 # Browser Use 集成设计
 
+> 插件状态：默认不加载，在 扩展 › 插件 中开启后重启生效。
+
 ## 当前状态
 
 本文档定义 Browser 工具、Go Bridge 与 Chrome Extension 的当前集成边界。62 条 canonical command 由 Go registry 管理；capability ready 时注册 11 个工具，模型可见集合由 Agent mode 白名单、registry 和调用范围共同决定。连接、启动、打包与真实 Chrome 验收见 `docs/exec-plans/active/20260928-chrome-connect-experience.md`。
@@ -9,7 +11,7 @@
 ### 选定方案：薄集成 + 长连接 Socket + Go Bridge 承担高层逻辑
 
 ```
-packages/tools/browser-tools       Go command engine          Injected JS          Chrome Extension
+packages/browser/tool-browser       Go command engine          Injected JS          Chrome Extension
 ───────────────────             ─────────────────          ───────────          ────────────────
 11 个稳定注册工具（模式过滤）    62 条 canonical registry   Locator Runtime      Native Messaging
 approval + preview              CUA / DOM CUA / Locator    DOM 状态与读写        chrome.debugger
@@ -39,7 +41,7 @@ BridgeClient                    waits / events / sessions  TS 构建 + go:embed 
 ### 层 1：Runtime 集成层
 
 ```
-packages/tools/browser-tools/src/
+packages/browser/tool-browser/src/
   ├── definitions.ts       ← 9 个分类工具 + help + run
   ├── plugin.ts            ← 工具注册、permission 与 executor 入口
   ├── generated-actions.ts ← 从 Go registry 生成的 action metadata

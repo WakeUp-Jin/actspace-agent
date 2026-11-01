@@ -24,8 +24,8 @@ export type RunTargetCapabilities = {
   readonly branchSwitch: Capability;
   /** 打开会话中的文件：本机从工作区读，远端经 Host 下载。 */
   readonly localFileOpen: Capability;
-  /** 终端等开发面板（WorkbenchLayout 的 developmentEnabled）。 */
-  readonly terminal: Capability;
+  /** 文档、改动、子 Agent、后台任务等工作区面板（WorkbenchLayout 的 developmentEnabled）。 */
+  readonly workspacePanels: Capability;
   /** Review 面板、改动摘要条、工作区标题栏控件。 */
   readonly review: Capability;
   /** 本机 Agent 只收图片；远端会话的附件经 Host 上传，图片和文件都收。Chat 形态另由 Composer 放开文件。 */
@@ -46,7 +46,7 @@ export function capabilitiesOf(target: RunTarget, env: { readonly gitStatus?: Wo
       newWorktree: gitReady ? enabled : off(env.gitStatus === "no_head" ? "需要先创建提交" : "当前工作区不是可用的 Git 仓库"),
       branchSwitch: gitHasBranch ? enabled : off("当前工作区不是 Git 仓库"),
       localFileOpen: enabled,
-      terminal: enabled,
+      workspacePanels: enabled,
       review: enabled,
       attachments: { images: true, files: false },
     };
@@ -56,7 +56,7 @@ export function capabilitiesOf(target: RunTarget, env: { readonly gitStatus?: Wo
     newWorktree: off(reason),
     branchSwitch: off(reason),
     localFileOpen: off(reason),
-    terminal: off(reason),
+    workspacePanels: off(reason),
     review: off(reason),
     attachments: target.kind === "remote" ? { images: true, files: true } : { images: false, files: false },
   };

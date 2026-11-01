@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 
 // 与桌面端相同：@actspace/shared 直接走源码，改 shared 不用先 build。
-const shared = resolve(__dirname, "../../packages/shared/src");
+const shared = resolve(__dirname, "../../packages/util/shared/src");
 export const sharedAliases = {
   "@actspace/shared/model-catalog-data": `${shared}/generated/model-catalog.generated.ts`,
   "@actspace/shared/host-protocol": `${shared}/host-protocol/index.ts`,

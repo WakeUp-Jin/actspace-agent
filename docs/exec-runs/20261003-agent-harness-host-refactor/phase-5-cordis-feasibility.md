@@ -20,7 +20,7 @@ Cordis 提供插件实例、服务隔离、依赖响应、事件过滤和副作�
 
 依赖为本仓库实际安装版本：`@deepseek-ai/cordis` 4.0.1、Loader 1.0.2、Include 1.0.6、Group 1.0.1、Timer 1.1.3。测试直接运行真实 Context / Loader，不 mock 其生命周期。
 
-新增文件：[incremental-harness-probe.spec.ts](../../../packages/cordis-adapter/tests/incremental-harness-probe.spec.ts)。
+新增文件：[incremental-harness-probe.spec.ts](../../../packages/composition/cordis-adapter/tests/incremental-harness-probe.spec.ts)。
 
 | 编号 | 场景 | 实测结果 | 设计含义 |
 | --- | --- | --- | --- |
@@ -51,9 +51,9 @@ pnpm --filter @actspace/boot exec vitest run tests/harness-mount.spec.ts tests/h
 
 1. `cordis-plugin-loader/src/config/entry.ts`：替换 name/inject/group 时释放旧 Fiber；启动失败后重新启动旧插件。`group.ts` 对未变化条目保留实例。
 2. `cordis-plugin-loader/src/config/isolate.ts`：命名 realm 映射服务 symbol；它没有本项目 Run/lease 的业务概念。
-3. [harness-mount.ts](../../../packages/boot/src/harness-mount.ts) 每次准备均调用独立树装载；[harness-generations.ts](../../../packages/boot/src/harness-generations.ts) 当前按完整组合记录 users 并回收。
+3. [harness-mount.ts](../../../packages/composition/boot/src/harness-mount.ts) 每次准备均调用独立树装载；[harness-generations.ts](../../../packages/composition/boot/src/harness-generations.ts) 当前按完整组合记录 users 并回收。
 4. [scope.ts](../../../packages/core/scope/src/scope.ts) 用 Cordis `Context.filter` 做祖先链投递。跨组合共享插件的事件归属不能仅靠共享服务地址解决；需要复核作用域结构，而非另建事件系统。
-5. [filesystem-read/plugin.ts](../../../packages/tools/filesystem-read/src/plugin.ts) 在 apply 中向注入的 `tools.runtime` 注册工具，清理时撤销注册。因此实例可受其他插件写入影响；仅比较模块、配置及直接注入声明不足以证明共享安全。
+5. [filesystem-read/plugin.ts](../../../packages/fs/tool-fs-read/src/plugin.ts) 在 apply 中向注入的 `tools.runtime` 注册工具，清理时撤销注册。因此实例可受其他插件写入影响；仅比较模块、配置及直接注入声明不足以证明共享安全。
 6. 默认 Harness 已包含多个 behavior entry；多个入口属于同一固定产物，并不等于只有一个运行实例。后续复用身份还需考虑固定产物及其导入闭包，不能只比较入口名称。
 
 ## 后续设计建议（尚未实施）

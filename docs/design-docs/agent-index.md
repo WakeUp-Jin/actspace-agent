@@ -1,6 +1,6 @@
 # Agent 设计文档
 
-本入口汇总 `packages/runtime` 与各领域 workspace package、Agent Run/Turn/LLM Call、模型与上下文、工具系统、权限和协作形态相关的当前 v2 设计原则。这里回答“为什么这么设计、边界在哪里、哪些方案被排除”；具体实施步骤放在 `docs/exec-plans/`。
+本入口汇总 `packages/core/runtime` 与各领域 workspace package、Agent Run/Turn/LLM Call、模型与上下文、工具系统、权限和协作形态相关的当前 v2 设计原则。这里回答“为什么这么设计、边界在哪里、哪些方案被排除”；具体实施步骤放在 `docs/exec-plans/`。
 
 Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；本入口保留在根层，因为它需要跨越全部 Agent 专题。
 
@@ -32,6 +32,7 @@ Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；�
 
 - `agent-plugin-runtime/agent-task-run-lifecycle.md`：Task 调度、Run 执行与 Harness 租约生命周期。
 - `agent-runtime/agent-observability-trace-model.md`：Journal 派生的 Agent Run / Turn / request / tool Journal 观测契约。
+- `agent-runtime/agent-session-transcript.md`：每个会话派生一份精简 `transcript.md`，系统提示词告诉 Agent 怎么读历史会话；读取不弹审批。
 
 ## 模型与上下文
 

@@ -41,7 +41,6 @@ const settingsApiStub = {
   "settings.get": async () => defaultSettings,
   "tasks.command": async (input: { sessionId: string }) => ({ snapshot: { sessionId: input.sessionId, revision: 0, paused: false, tasks: [], queue: [], runs: [] } }),
   "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
-  "visualize.list": async () => ({ items: [] }),
   "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
 };
 function createWorkspaceRegistryFixture(createdAt: string): WorkspaceListResult {
