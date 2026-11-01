@@ -1,4 +1,4 @@
-import type { ApprovalRequest } from "@actspace/tools-approval";
+import type { ApprovalRequest } from "@actspace/approval";
 import { describe, expect, it } from "vitest";
 import { CliV2ApprovalBroker } from "../runtime-v2/approval";
 import { ScriptedLineInput } from "./terminal-test-input";

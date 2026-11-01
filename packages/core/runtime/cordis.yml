@@ -1,0 +1,46 @@
+- id: actspace-runtime
+  name: "@actspace/runtime/cordis"
+  inject: [actspace.host]
+- id: session-journal
+  name: "@actspace/session-journal/plugin"
+  inject: [actspace.host.session.codecs]
+- id: session-persistence
+  name: "@actspace/session-persistence/plugin"
+  inject: [session.journal, session.storage]
+- id: session-jsonl
+  name: "@actspace/session-persistence-jsonl/plugin"
+  inject: [actspace.host.session, session.journal]
+- id: session-projection
+  name: "@actspace/session-projection/plugin"
+- id: session-runtime
+  name: "@actspace/runtime/session"
+  inject: [actspace.host.session, session.journal, session.store, session.projection]
+- id: session-checkpoint-policy
+  name: "@actspace/session-checkpoint-policy/plugin"
+  inject: [session.runtime]
+- id: llm-service
+  name: "@actspace/llm-service/plugin"
+  inject: [actspace.host.llm]
+- id: todo-projection
+  name: "@actspace/runtime/todo-projection"
+  inject: [session.projection]
+- id: core-agent
+  name: "@actspace/agent/plugin"
+- id: agent-runtime
+  name: "@actspace/runtime/agent-runtime"
+  inject: [actspace.host.llm, actspace.host.prompt, actspace.host.agent, actspace.host.subagents, actspace.host.background-tasks, actspace.host.sandbox, agent.registry, session.runtime, llm.auxiliary-requests, session.checkpoint, session.journal, session.projection, actspace.host.tools.filesystem-read, actspace.host.tools.filesystem-search, actspace.host.tools.filesystem-write, actspace.host.tools.shell-tools, actspace.host.tools.web-tools, actspace.host.tools.image-generation, actspace.host.tools.image-inspection, actspace.host.session]
+- id: headless-runner
+  name: "@actspace/headless/plugin"
+  inject: [actspace.host.headless, session.runtime, agent.runtime]
+- id: agent-host
+  name: "@actspace/agent-host/plugin"
+  inject: [session.runtime, agent.runtime]
+- id: desktop-app
+  name: "@actspace/desktop-app/plugin"
+  inject: [session.runtime, agent.runtime, llm.service]
+- id: english-learning
+  name: "@actspace/english-learning/plugin"
+  inject: [agent.registry, session.runtime]
+- id: side-chat
+  name: "@actspace/side-chat/plugin"
+  inject: [session.runtime]

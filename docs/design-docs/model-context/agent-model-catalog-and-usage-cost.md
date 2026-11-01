@@ -9,10 +9,10 @@
 
 2026-09-06 历史问题快照（下列旧路径与缺陷用于解释修复动机，现行实现已迁至 pi-ai-adapter 与对应价格投影，不应据此恢复旧 wire engine）：
 
-- `packages/llm/pi-ai/src/pi-ai-wire-engine.ts` 的 `createModel` 将四类 token 单价固定为零；`mapUsage` 又将 SDK 计算出的 `cost.total` 标记成 `provider-reported`。这不是供应商实际返回的账单金额。
-- `packages/llm/pi-ai/src/legacy-proxy-wire-engine.ts` 缺少价格计算，费用保持空值。两条请求路径需要共用计价规则。
+- `packages/llm/llm-pi-ai/src/pi-ai-wire-engine.ts` 的 `createModel` 将四类 token 单价固定为零；`mapUsage` 又将 SDK 计算出的 `cost.total` 标记成 `provider-reported`。这不是供应商实际返回的账单金额。
+- `packages/llm/llm-pi-ai/src/legacy-proxy-wire-engine.ts` 缺少价格计算，费用保持空值。两条请求路径需要共用计价规则。
 - `apps/desktop/src/main/runtime-v2/legacy-llm-adapter.ts` 未将已解析模型的价格传入请求；现有 `model-runtime-service.ts` 已处理价格倍率，接入时必须避免乘两次。
-- `packages/runtime/src/projection/durable-session.ts` 维护 durable provider usage，`packages/client/src/sessions/usage-aggregates.ts` 负责展示聚合；工具活动不混入 provider usage，缺失价格仍显示未知。
+- `packages/core/runtime/src/projection/durable-session.ts` 维护 durable provider usage，`packages/client/client/src/sessions/usage-aggregates.ts` 负责展示聚合；工具活动不混入 provider usage，缺失价格仍显示未知。
 - 本地脱敏样本中，144 条 assistant 记录为零费用且标记为供应商来源，另有 3 条没有费用。这是所检查样本的结果，不代表全部使用历史。
 
 ## 参考 pi，明确移植边界
@@ -50,8 +50,8 @@ models.dev / OpenRouter public API
              使用统计页面
 ```
 
-- `packages/shared`：JSON-safe 目录、价格和 IPC 契约，以及生成的静态模型数据；不放网络、文件系统或 Electron 代码。
-- `packages/llm/service`：规范化计费用量和纯费用计算；不读取用户目录，不负责刷新。
+- `packages/util/shared`：JSON-safe 目录、价格和 IPC 契约，以及生成的静态模型数据；不放网络、文件系统或 Electron 代码。
+- `packages/llm/llm-service`：规范化计费用量和纯费用计算；不读取用户目录，不负责刷新。
 - Desktop Host：目录缓存、后台 worker、更新状态、连接身份匹配、请求价格解析与生命周期。扩展现有 OpenRouter 目录接入，避免形成两个独立价格事实源。
 - CLI Host：按现有连接端点及最终模型使用随包目录离线计价；首版未新增 CLI 自定义费率配置入口。首版不启动刷新服务，也不依赖桌面进程或读取其内存缓存。
 - Journal：保存当次请求实际使用的价格依据；目录变化只能影响后续请求。
@@ -59,7 +59,7 @@ models.dev / OpenRouter public API
 
 ## 目录契约
 
-新增 `packages/shared/src/model-catalog.ts` 定义契约，生成数据放在 `packages/shared/src/generated/model-catalog.generated.ts`，通过独立的 `@actspace/shared/model-catalog-data` 公开入口消费，避免 renderer 因导入 shared 根入口而打包整份目录。生成脚本为 `scripts/generate-model-catalog.mjs`，不引入新运行时或第三方服务。
+新增 `packages/util/shared/src/model-catalog.ts` 定义契约，生成数据放在 `packages/util/shared/src/generated/model-catalog.generated.ts`，通过独立的 `@actspace/shared/model-catalog-data` 公开入口消费，避免 renderer 因导入 shared 根入口而打包整份目录。生成脚本为 `scripts/generate-model-catalog.mjs`，不引入新运行时或第三方服务。
 
 | 字段 | 约束 |
 | --- | --- |
@@ -92,14 +92,14 @@ models.dev / OpenRouter public API
 3. **模型目录**：按连接模板的 `catalogProvider` 精确匹配；去掉日期后缀能匹配上的只作为建议（「像是 … 的日期版本」），用户点「沿用」后写入 `overrides.canonical`。
 4. **未知**：上下文、价格为空，思考为 `null`（不发思考参数）。
 
-- 纯函数 `resolveEffectiveModel`（`packages/shared/src/model-layers.ts`），main 的 `ModelStoreService.getModelSnapshot()` 统一调用一次并写回 `definition.pricing` 与 capabilities，运行时、对话框、设置页读同一份。
+- 纯函数 `resolveEffectiveModel`（`packages/util/shared/src/model-layers.ts`），main 的 `ModelStoreService.getModelSnapshot()` 统一调用一次并写回 `definition.pricing` 与 capabilities，运行时、对话框、设置页读同一份。
 - 目录没有思考档位数据，思考档位由 `model-thinking-profiles.ts` 按模型 id 规则匹配；`effectiveToCapabilities` 把档位映射回 `ModelCapabilities`，对话框不用改。
 - **价格 = 参考价 × 连接倍率**。参考价是服务商数据或目录价；倍率只在这里乘一次（`ratesScaled: true`）。用户在模型上手填的价格（USD / 百万 token）就是最终价，不乘倍率。
 - 价格为空时费用显示未知；不再有「只统计 Token」模式。
 
 ## DeepSeek 固定高峰估算
 
-按用户确认的产品策略，官方 `api.deepseek.com` 端点使用固定高峰 USD 估算，不按每日峰谷时段切换。官方模型档案集中在 `packages/shared/src/deepseek-model-facts.ts`，由设置页、模型定义与请求价格解析共同消费。
+按用户确认的产品策略，官方 `api.deepseek.com` 端点使用固定高峰 USD 估算，不按每日峰谷时段切换。官方模型档案集中在 `packages/util/shared/src/deepseek-model-facts.ts`，由设置页、模型定义与请求价格解析共同消费。
 
 | 官方模型 / 请求时间（北京时间） | 输入未命中 | 输出 | 缓存读取（USD/百万 token） |
 |---|---:|---:|---:|
@@ -180,7 +180,7 @@ Session 与全局统计保留全部辅助请求的请求数、Token 与费用；
 
 ## 实现入口与验证边界
 
-目录归一化、端点匹配位于 `packages/shared/src/model-catalog-normalize.ts`、`model-pricing.ts`；费用计算器位于 `packages/llm/service/src/usage-cost.ts`。目录宿主在 `apps/desktop/src/main/model-catalog-service.ts`，worker 随 Electron main 产物构建。
+目录归一化、端点匹配位于 `packages/util/shared/src/model-catalog-normalize.ts`、`model-pricing.ts`；费用计算器位于 `packages/llm/llm-service/src/usage-cost.ts`。目录宿主在 `apps/desktop/src/main/model-catalog-service.ts`，worker 随 Electron main 产物构建。
 
 桌面统计通过 `UsageReadModelService` 和 SQLite Worker 分批投影 Journal，收到宿主 durable 通知后失效；未变更时筛选和分页不会重读 Journal。活动行保存完整历史，时间窗只在查询时过滤。SQLite schema 10 通过现有派生库重建机制淘汰旧的截断索引及其游标，回放 Journal 补回历史；此过程会重建同库的目录与 Context 派生数据，不修改 Session 原始事实。旧 JSON `UsageSourceCache` 同步升级到版本 2，拒绝复用版本 1 的截断结果。首次升级需承担重建成本，之后沿用增量读取，不承诺即时完成。
 

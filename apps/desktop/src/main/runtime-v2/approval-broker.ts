@@ -1,4 +1,4 @@
-import type { ApprovalBroker, ApprovalDecision, ApprovalRequest } from "@actspace/tools-approval";
+import type { ApprovalBroker, ApprovalDecision, ApprovalRequest } from "@actspace/approval";
 import type { ApprovalResourceSummary } from "@actspace/shared/runtime-v2";
 import type { DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2ApprovalRequest } from "./host-ports";
 

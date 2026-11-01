@@ -68,13 +68,13 @@ Host 记录应用与续跑意图，按该会话的授权策略处理
 
 核心证据：
 
-- [HarnessControl](../../../packages/harness-control/src/service.ts)：初始化 main、基线检查、候选与启用、租约获取。
-- [HarnessGenerations](../../../packages/boot/src/harness-generations.ts)：独立版本准备、引用计数、retired 清理。
-- [固定产物](../../../packages/cordis-adapter/src/plugin-artifact.ts)：发布到 artifactId 目录、校验和模块导入。
-- [Cordis 插件树](../../../packages/cordis-adapter/src/cordis-tree.ts)、[挂载入口](../../../packages/boot/src/harness-mount.ts)：实例隔离与整体释放。
-- [ToolRegistry](../../../packages/tools/runtime/src/registry.ts)、[工具租约](../../../packages/tools/runtime/src/activation-lease.ts)、[工具清理实例](../../../packages/tools/filesystem-read/src/plugin.ts)。
-- [ManagedRuns](../../../packages/runtime/src/harness/managed-runs.ts)、[运行时接线](../../../packages/runtime/src/harness/agent-runtime-plugin.ts)、[SessionRunManager](../../../packages/agent-service/src/run-manager.ts)、[TaskLedger](../../../packages/agent-service/src/task-ledger.ts)。
-- [跨版本执行测试](../../../packages/agent-service/src/test/harness-run.test.ts)、[生命周期测试](../../../packages/boot/tests/harness-generations.spec.ts)。
+- [HarnessControl](../../../packages/harness-evolution/harness-control/src/service.ts)：初始化 main、基线检查、候选与启用、租约获取。
+- [HarnessGenerations](../../../packages/composition/boot/src/harness-generations.ts)：独立版本准备、引用计数、retired 清理。
+- [固定产物](../../../packages/composition/cordis-adapter/src/plugin-artifact.ts)：发布到 artifactId 目录、校验和模块导入。
+- [Cordis 插件树](../../../packages/composition/cordis-adapter/src/cordis-tree.ts)、[挂载入口](../../../packages/composition/boot/src/harness-mount.ts)：实例隔离与整体释放。
+- [ToolRegistry](../../../packages/core/tool-runtime/src/registry.ts)、[工具租约](../../../packages/core/tool-runtime/src/activation-lease.ts)、[工具清理实例](../../../packages/fs/tool-fs-read/src/plugin.ts)。
+- [ManagedRuns](../../../packages/core/runtime/src/harness/managed-runs.ts)、[运行时接线](../../../packages/core/runtime/src/harness/agent-runtime-plugin.ts)、[SessionRunManager](../../../packages/core/agent-service/src/run-manager.ts)、[TaskLedger](../../../packages/core/agent-service/src/task-ledger.ts)。
+- [跨版本执行测试](../../../packages/core/agent-service/src/test/harness-run.test.ts)、[生命周期测试](../../../packages/composition/boot/tests/harness-generations.spec.ts)。
 
 ## 会话局部选择与可复用版本
 

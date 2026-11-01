@@ -285,8 +285,8 @@ LlmInput
 - [渐进式披露](agent-progressive-disclosure.md)
 - [设计原则](agent-plugin-design-principles.md)
 - [Session 业务与存储边界](../agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)
-- [Surface](../../../packages/session/journal/src/surface.ts)、[Codec registry](../../../packages/session/journal/src/codec-registry.ts)、[SessionHandle](../../../packages/session/persistence/src/session.ts)
-- [LLM 消息](../../../packages/llm/service/src/message.ts)、[LLM 请求](../../../packages/llm/service/src/service.ts)
+- [Surface](../../../packages/session/session-journal/src/surface.ts)、[Codec registry](../../../packages/session/session-journal/src/codec-registry.ts)、[SessionHandle](../../../packages/session/session-persistence/src/session.ts)
+- [LLM 消息](../../../packages/llm/llm-service/src/message.ts)、[LLM 请求](../../../packages/llm/llm-service/src/service.ts)
 
 ## 实施接线
 

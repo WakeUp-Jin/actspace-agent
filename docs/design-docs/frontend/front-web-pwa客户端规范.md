@@ -70,7 +70,7 @@ ActSpace 新增一个浏览器客户端 `apps/web`：
         │  wss://<host>/rpc   JSON-RPC 2.0，token 在连接后用 auth.resume 传
         ▼
 服务器
-  agent-host  HostGateway(packages/agent-host/src/server.ts)
+  agent-host  HostGateway(packages/host/agent-host/src/server.ts)
     GET /*     返回 webRoot 下的静态文件，未知路径回退 index.html（D1）
     WS  /rpc   现有 RPC，不新增业务方法（§9 的会话活动推送除外）
 ```
@@ -82,10 +82,10 @@ ActSpace 新增一个浏览器客户端 `apps/web`：
 
 | 复用 | 来源 |
 | --- | --- |
-| RPC 客户端（请求 id、超时、大帧分页、事件顺序） | `@actspace/client/host` 的 `HostClient`（`packages/client/src/host/client.ts`），它接受浏览器 `WebSocket` |
+| RPC 客户端（请求 id、超时、大帧分页、事件顺序） | `@actspace/client/host` 的 `HostClient`（`packages/client/client/src/host/client.ts`），它接受浏览器 `WebSocket` |
 | 协议常量和类型 | `@actspace/shared/host-protocol`、`@actspace/shared/runtime-v2` |
 | 会话投影、消息块、工具摘要 | `@actspace/client/sessions`（`projectChatWindow`、`ClientSessionStore`、`toolPreview`），`@actspace/shared/session-selectors`（`createMessageBlocks`） |
-| 消息块类型 | `@actspace/shared` 的 `MessageBlock`（`packages/shared/src/session.ts`） |
+| 消息块类型 | `@actspace/shared` 的 `MessageBlock`（`packages/util/shared/src/session.ts`） |
 | 流式折叠 | `@actspace/client/live`（D3 新增） |
 | 模型推理档位 | `@actspace/shared/model-catalog-data`；判定方式与桌面端远端路径一致（`apps/desktop/src/renderer/components/composer/use-composer-model.ts`） |
 

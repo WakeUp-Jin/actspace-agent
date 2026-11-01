@@ -9,7 +9,7 @@
 ### 选定方案：薄集成 + 长连接 Socket + Go Bridge 承担高层逻辑
 
 ```
-packages/tools/browser-tools       Go command engine          Injected JS          Chrome Extension
+packages/browser/tool-browser       Go command engine          Injected JS          Chrome Extension
 ───────────────────             ─────────────────          ───────────          ────────────────
 11 个稳定注册工具（模式过滤）    62 条 canonical registry   Locator Runtime      Native Messaging
 approval + preview              CUA / DOM CUA / Locator    DOM 状态与读写        chrome.debugger
@@ -39,7 +39,7 @@ BridgeClient                    waits / events / sessions  TS 构建 + go:embed 
 ### 层 1：Runtime 集成层
 
 ```
-packages/tools/browser-tools/src/
+packages/browser/tool-browser/src/
   ├── definitions.ts       ← 9 个分类工具 + help + run
   ├── plugin.ts            ← 工具注册、permission 与 executor 入口
   ├── generated-actions.ts ← 从 Go registry 生成的 action metadata

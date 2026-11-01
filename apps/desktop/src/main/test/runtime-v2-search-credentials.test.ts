@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { WEB_TOOLS_HOST_PORT_ID } from "@actspace/tools-web-tools";
+import { WEB_TOOLS_HOST_PORT_ID } from "@actspace/tool-web";
 import type { DesktopRuntimeV2ModelPort } from "../runtime-v2/model-port";
 import { createDesktopToolHostServices } from "../runtime-v2/tool-host-services";
 

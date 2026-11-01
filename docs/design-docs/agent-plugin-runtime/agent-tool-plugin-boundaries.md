@@ -8,15 +8,15 @@ Tool Runtime 只拥有注册、参数验证、权限准入、prepared execution�
 
 | 包 | 工具 | Host port |
 |---|---|---|
-| `@actspace/tools-filesystem-read` | read_file、list_directory | `actspace.host.tools.filesystem-read` |
-| `@actspace/tools-filesystem-search` | grep、glob | `actspace.host.tools.filesystem-search` |
-| `@actspace/tools-filesystem-write` | edit_file、write_file、delete_file | `actspace.host.tools.filesystem-write` |
-| `@actspace/tools-shell-tools` | bash | `actspace.host.tools.shell-tools`、`actspace.host.background-tasks` |
-| `@actspace/tools-background-tasks` | task_list、task_output、task_stop、task_wait | `actspace.host.background-tasks` |
-| `@actspace/tools-web-tools` | web、web_search、web_fetch | `actspace.host.tools.web-tools` |
-| `@actspace/tools-image-generation` | generate_image | `actspace.host.tools.image-generation` |
-| `@actspace/tools-image-inspection` | inspect_image | `actspace.host.tools.image-inspection` |
-| `@actspace/tools-todo-tools` | todo_read、todo_write | Session / Projection 服务 |
+| `@actspace/tool-fs-read` | read_file、list_directory | `actspace.host.tools.filesystem-read` |
+| `@actspace/tool-fs-search` | grep、glob | `actspace.host.tools.filesystem-search` |
+| `@actspace/tool-fs-write` | edit_file、write_file、delete_file | `actspace.host.tools.filesystem-write` |
+| `@actspace/tool-shell` | bash | `actspace.host.tools.shell-tools`、`actspace.host.background-tasks` |
+| `@actspace/tool-background-tasks` | task_list、task_output、task_stop、task_wait | `actspace.host.background-tasks` |
+| `@actspace/tool-web` | web、web_search、web_fetch | `actspace.host.tools.web-tools` |
+| `@actspace/tool-image-generation` | generate_image | `actspace.host.tools.image-generation` |
+| `@actspace/tool-image-inspection` | inspect_image | `actspace.host.tools.image-inspection` |
+| `@actspace/tool-todo` | todo_read、todo_write | Session / Projection 服务 |
 
 `browser-tools` 保留原有 Browser Bridge Host 边界。文件工具之间不复用注册、permission audience 或 Host factory；小型路径校验 helper 保存在各自包内，均复用 Tool Runtime 的 canonical resource 契约。
 

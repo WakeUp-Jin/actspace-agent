@@ -70,7 +70,7 @@
 ### Usage 语义
 
 - 本轮用量按 run 聚合该轮全部 `llm_usage`（`createMessageBlocks`），只挂到该 turn 最后一条可见 Assistant 回复；包括工具调用前后的多次模型请求和失败重试（`llm/retry`）的真实消耗。
-- `llm_usage` 由 `packages/client/src/sessions/chat.ts` 从 `step/end` 和 `llm/retry` 投影，每次请求一条；没有 usage 的 `step/end`（中断、失败）不记。`assistant/message` 带的是同一份 usage，不重复计。
+- `llm_usage` 由 `packages/client/client/src/sessions/chat.ts` 从 `step/end` 和 `llm/retry` 投影，每次请求一条；没有 usage 的 `step/end`（中断、失败）不记。`assistant/message` 带的是同一份 usage，不重复计。
 - 提供方 / 模型取每次请求计价快照里的 `providerId/apiModel`；request context 里的 route 常是 `default`，拿不到真实值时整行不显示。
 - 外部接口返回 CNY 时按 `7.2 CNY = 1 USD` 转成 USD；费用最多显示 6 位小数，避免低成本调用被舍成 `$0.00`。
 - 花费按请求的计价口径汇总：全部能算出价格时显示金额，有按参考价预估的请求时后面标灰色「预估」；有请求算不出价格时不给偏小的数，显示「部分未知」（其余请求有价格）或「未知」。

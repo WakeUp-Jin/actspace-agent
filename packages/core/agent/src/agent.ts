@@ -1,5 +1,5 @@
 import type { AgentDescriptor } from "./descriptor.js";
-import type { AgentScope } from "@actspace/core-scope";
+import type { AgentScope } from "@actspace/scope";
 import type { SessionHandle } from "@actspace/session-persistence";
 import type { AgentSubject } from "./dispatch.js";
 

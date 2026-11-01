@@ -6,9 +6,9 @@
 
 生产 Profile identity 为 `actspace.headless`、`actspace.desktop` 与 `actspace.host`。CLI 的业务命令为 `run`，通过 headless Profile 完成一次请求；Desktop 通过自己的 App Bundle 承担会话应用操作。每个 Host 进程持有自己的 root，不能把架构图理解成跨进程单例。
 
-- `packages/headless` 提供 `headless.runner`；CLI 调用 `run()` 并负责输出与退出。
-- `packages/desktop-app` 提供 `desktop.app`；`DesktopAppService` 包含会话创建/恢复/分支、Task 提交与命令、abort、flush、metadata 和辅助文本调用。
-- `packages/agent-host` 提供远端 `host.application`；bootstrap 通过 CLI 注入的 Runtime 端口启动，负责网关、订阅、维护与资源回收。
+- `packages/host/headless` 提供 `headless.runner`；CLI 调用 `run()` 并负责输出与退出。
+- `packages/host/desktop-app` 提供 `desktop.app`；`DesktopAppService` 包含会话创建/恢复/分支、Task 提交与命令、abort、flush、metadata 和辅助文本调用。
+- `packages/host/agent-host` 提供远端 `host.application`；bootstrap 通过 CLI 注入的 Runtime 端口启动，负责网关、订阅、维护与资源回收。
 - Runtime Boot 返回启动结果与生命周期操作，不重新聚合出另一套通用业务 facade。
 - Host 适配器通过包的公开 exports 和本进程 Context 接入应用 Service。Context、Fiber 与 Service 实例不序列化到 IPC、renderer 或 Journal。
 
@@ -16,7 +16,7 @@
 
 `@actspace/runtime` 的 `bootProfileRuntime()` 返回 `BootedRuntimeProfile`：Context/root、manifest、state/diagnostics、restart 请求与 shutdown。内部调用 `bootDshCordis()`；无 `bootProfile`、`BootedProfile` 或 `bootRuntime` 转发别名，不提供 Session/run 业务 façade。
 
-源码：`packages/runtime/src/startup/boot.ts`、`packages/boot/src/dsh-boot.ts`。
+源码：`packages/core/runtime/src/startup/boot.ts`、`packages/composition/boot/src/dsh-boot.ts`。
 
 ## 3. Composition 与 Loader
 
@@ -49,7 +49,7 @@ Runtime Profile 生命周期为 `booting → ready → quiescing → disposed`�
 
 CLI 在单次命令 finally 中等待 Profile shutdown；Desktop 退出还需协调 Terminal、Host 扩展与 Electron 资源。真实 reload/quit/flush、Provider 和发行制品验收继续保留在各任务摘要。
 
-独立 Host 的 `HostLifecycle` 管理 ready/draining/blocked，正常停止等待任务、子 Run 和后台 shell，强停设置截止。bootstrap 停止上传维护并等待在途清理，随后 shutdown Runtime，注销订阅并关闭网关/admin。启动失败逆序回收已取得资源，保留原始错误与清理错误。源码位于 `packages/agent-host/src/{bootstrap,lifecycle}.ts`，Runtime 不通过反向依赖泄漏进该包。
+独立 Host 的 `HostLifecycle` 管理 ready/draining/blocked，正常停止等待任务、子 Run 和后台 shell，强停设置截止。bootstrap 停止上传维护并等待在途清理，随后 shutdown Runtime，注销订阅并关闭网关/admin。启动失败逆序回收已取得资源，保留原始错误与清理错误。源码位于 `packages/host/agent-host/src/{bootstrap,lifecycle}.ts`，Runtime 不通过反向依赖泄漏进该包。
 
 ## 6. 固定边界与验证
 
@@ -64,7 +64,7 @@ CLI 在单次命令 finally 中等待 Profile shutdown；Desktop 退出还需协
 
 ## 清理后的源码位置
 
-`packages/runtime/src/startup/` 拥有启动、诊断与退出；`session/` 拥有会话控制和服务装配；`harness/` 拥有默认组合、Run 配置绑定和工厂接线。`profiles/` 保留声明式组合，`projection/` 保留 Host 投影转换。公开入口统一从根 index 和 package exports 消费，不保留 runtime/ 中间转发目录。
+`packages/core/runtime/src/startup/` 拥有启动、诊断与退出；`session/` 拥有会话控制和服务装配；`harness/` 拥有默认组合、Run 配置绑定和工厂接线。`profiles/` 保留声明式组合，`projection/` 保留 Host 投影转换。公开入口统一从根 index 和 package exports 消费，不保留 runtime/ 中间转发目录。
 
 ManagedRuns 仅绑定配置、调度器与租约，不再构造 session-long Loop/Inbox 外观或另存 SessionHandle。应用操作直接调用 AgentService 的 submit/designate/cancel；同步活动状态读取的是调度快照，不是第二个任务所有者。
 

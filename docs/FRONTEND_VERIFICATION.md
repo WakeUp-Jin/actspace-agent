@@ -155,7 +155,7 @@ pnpm dev
 
 启动器先完成依赖与本轮 Electron main/preload 构建，成功后才启动并行 watch、renderer 和 Electron。即使磁盘已有旧的 `dist-electron`，本轮构建失败也会停止启动。`dev:electron:run` 是内部运行阶段，文件存在检查不能替代上述构建屏障；请从 `pnpm dev` / `pnpm dev:log` 启动。
 
-对 Runtime 内置行为包做修复后，单独构建该 package 仍不足以验证 Desktop：执行实现会被打入 `packages/runtime/dist/default-harness/`。隔离验收启动器若直接运行已构建入口，必须先重建 Runtime Harness（依赖已构建时运行 `pnpm --filter @actspace/runtime build`），确认对应制品包含本轮改动，再正常重启应用。只检查源文件或依赖包 `dist` 不能证明运行中的 Harness 已更新；旧制品的失败记录要保留并注明实际版本。
+对 Runtime 内置行为包做修复后，单独构建该 package 仍不足以验证 Desktop：执行实现会被打入 `packages/core/runtime/dist/default-harness/`。隔离验收启动器若直接运行已构建入口，必须先重建 Runtime Harness（依赖已构建时运行 `pnpm --filter @actspace/runtime build`），确认对应制品包含本轮改动，再正常重启应用。只检查源文件或依赖包 `dist` 不能证明运行中的 Harness 已更新；旧制品的失败记录要保留并注明实际版本。
 
 macOS 开发启动不会直接暴露依赖目录里的默认 `Electron.app`。启动器会在系统临时目录缓存一份当前 workspace 专属的开发 runtime，并为它设置唯一的应用名、bundle ID 与可执行文件名。启动日志中的 `[dev-runtime]` JSON 是本次运行的事实来源，例如：
 

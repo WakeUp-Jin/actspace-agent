@@ -10,9 +10,9 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
 
 | 位置 | 作用 |
 | --- | --- |
-| `packages/shared/src/desktop-bridge/contract.ts` | **契约**：`desktopBridgeContract`，22 个域，每个成员一条 spec。唯一事实来源 |
-| `packages/shared/src/desktop-bridge/types.ts` | spec 构造函数（`invoke` / `invokeWithDefault` / `event` / `send` / `local`）与类型推导（`BridgeOf`、`SpecInput`、`SpecOutput`、`SpecPayload`） |
-| `packages/shared/src/desktop-bridge/build-bridge.ts` | `buildBridge(contract, transport, locals)`：按契约生成冻结的 bridge 对象。preload 和 mock 共用 |
+| `packages/util/shared/src/desktop-bridge/contract.ts` | **契约**：`desktopBridgeContract`，22 个域，每个成员一条 spec。唯一事实来源 |
+| `packages/util/shared/src/desktop-bridge/types.ts` | spec 构造函数（`invoke` / `invokeWithDefault` / `event` / `send` / `local`）与类型推导（`BridgeOf`、`SpecInput`、`SpecOutput`、`SpecPayload`） |
+| `packages/util/shared/src/desktop-bridge/build-bridge.ts` | `buildBridge(contract, transport, locals)`：按契约生成冻结的 bridge 对象。preload 和 mock 共用 |
 | `apps/desktop/src/preload/index.ts` | 用 `ipcRenderer` 作为 transport 调 `buildBridge`，`exposeInMainWorld("actspace", bridge)`。不写任何业务逻辑 |
 | `apps/desktop/src/main/ipc/registry.ts` | `createIpcRegistrar`：`ipc.handle(contract.域.成员, handler)` / `ipc.on(...)`，统一做 sender 校验、guard、middleware、错误包装 |
 | `apps/desktop/src/main/ipc/guards.ts` | `IPC_INPUT_GUARDS`：channel → 入参 guard，注册器按 channel 自动套用 |

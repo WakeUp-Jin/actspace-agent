@@ -61,7 +61,7 @@ ACTSPACE_DATA_DIR="$FE_ACCEPTANCE_DATA_DIR" pnpm dev:log
 
 **E-U/H：真实 Electron + 平时目录/历史目录**：
 
-- 未设置覆盖变量时运行 `pnpm dev:log`，使用默认平时目录；macOS 当前默认为 `~/Library/Application Support/ActSpace`（以[数据目录解析代码](../../../packages/shared/src/data-root.ts)为准）。
+- 未设置覆盖变量时运行 `pnpm dev:log`，使用默认平时目录；macOS 当前默认为 `~/Library/Application Support/ActSpace`（以[数据目录解析代码](../../../packages/util/shared/src/data-root.ts)为准）。
 - 平时使用自定义目录或历史副本时，在同一个启动命令中显式传入其绝对路径作为 `ACTSPACE_DATA_DIR`。
 - U/H 与 T 顺序运行；切换目录先正常退出上一实例，记录新的应用 PID、数据目录与窗口，避免把另一实例的结果混入。
 

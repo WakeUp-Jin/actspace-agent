@@ -29,7 +29,7 @@
 - **工具对外 `name`** 一律 **snake_case**，例如 `read_file`, `write_file`, `edit_file`, `list_directory`, `web_search`, `web_fetch`。单词工具（`bash`, `grep`, `glob`）保持单词无分隔符。
   - 这是本仓库的命名约定；不得把它写成所有供应商协议强制的格式。
   - 历史上 `edit-file` 是 kebab-case 异类，已在 2026-05 统一为 `edit_file`。
-- **目录名**（`packages/tools/<capability>/src/<dir>/`）一律 **kebab-case**，例如 `edit-file-diff/`, `read-file/`, `web-search/`。这是仓库整体的目录命名风格，与工具 `name` 独立。
+- **目录名**（`packages/<能力>/tool-<名>/src/<dir>/`）一律 **kebab-case**，例如 `edit-file-diff/`, `read-file/`, `web-search/`。这是仓库整体的目录命名风格，与工具 `name` 独立。
 - **ToolUiPreview.kind** 也用 snake_case，例如 `edit_diff`, `directory_list`, `web_search`。
 - **JS/TS 变量与函数名** 使用 camelCase，例如 `editFileDiffDefinition`、`createWebSearchTool`。
 - 新增工具时三处都要照例：kebab 目录 + snake_case `name` + snake_case `ToolUiPreview.kind` + camelCase 导出名。
@@ -53,7 +53,7 @@
 
 Core 的工具参数使用独立 `tool-call-delta`，不能复用正文 `assistant-delta`。AgentLoop 在 tool/call append 后发 prepared，在 Tools 真正调用 executor 前发 started，在 tool/result append 后发 finished。审批继续由现有 approvalRegistry 生产。Desktop `FixedRendererStreamAdapter` 经既有 agentStream IPC 发布 typed preview；通用 Session live/revision 不转发工具参数原文。
 
-实时适配器与历史 Client 投影共用 `packages/client/src/sessions/tool-card.ts` 的纯 preview builder。参数阶段只显示稳定占位；prepared 一次补齐，finished 覆盖结果。正文中的合法 JSON 保持原文。
+实时适配器与历史 Client 投影共用 `packages/client/client/src/sessions/tool-card.ts` 的纯 preview builder。参数阶段只显示稳定占位；prepared 一次补齐，finished 覆盖结果。正文中的合法 JSON 保持原文。
 
 ToolRuntime 并行 body 结束后立即提交结果；OrderedToolCommitQueue 保留调用顺序，后发先完成的结果仍等待前序提交，但不再等待整批 body 完成。Renderer 收到单个 finished 立即收尾，也允许 finished 直接创建工具条目，迟到的参数、进度和审批不能回退终态。
 
@@ -90,7 +90,7 @@ Read/List/Grep/Glob/Search 等轻量组件在失败时保留动作、目标和�
 - `ToolUiPreview.kind`: `glob`
 - `ToolUiPreview.pattern`: glob pattern。
 - `ToolUiPreview.scope`: 搜索根目录。
-- 展示示例：`Glob **/*.ts in packages/runtime`。
+- 展示示例：`Glob **/*.ts in packages/core/runtime`。
 
 ### `edit_file`
 
@@ -104,7 +104,7 @@ Read/List/Grep/Glob/Search 等轻量组件在失败时保留动作、目标和�
 - `new_string: ""` 的长期语义是删除唯一匹配文本内容，不是删除文件；多处匹配仍必须提供更多上下文或显式 `replace_all`。
 - 删除整行时，如果 `old_string` 恰好从行首匹配且匹配后紧跟换行，executor 会连同该换行一起删除，避免留下空白行；行内文本删除不得吞掉后续换行。
 - `ToolUiPreview.additions` / `deletions` 必须只统计 unified diff hunk 内的真实 `+` / `-` 行，不统计 `---` / `+++` 文件头，也不能漏算内容本身以 `---` 或 `+++` 开头的变更行。
-- 当前路径由 `packages/tools/filesystem-write/src/node-ports.ts` 生成 diff 和统计；统计经 `tool/result.data.detail` 中 label=`result` 的结构化值进入 `packages/client/src/sessions/tool-card.ts`，diff 文本来自该结果的 `modelOutput`。不能恢复已退役的 scheduler `postProcess` / `ToolResult.structured` 接口。
+- 当前路径由 `packages/fs/tool-fs-write/src/node-ports.ts` 生成 diff 和统计；统计经 `tool/result.data.detail` 中 label=`result` 的结构化值进入 `packages/client/client/src/sessions/tool-card.ts`，diff 文本来自该结果的 `modelOutput`。不能恢复已退役的 scheduler `postProcess` / `ToolResult.structured` 接口。
 - `ToolUiPreview.status`: `pending` / `running` / `completed` / `failed` / `denied`（与 `delete` 一致）。失败/拒绝时错误说明放 `errorMessage` 字段，**不**复用 `diff` 字段承载错误文本。
 - 越界写入审批：目标路径在 workspace 外时权限检查器返回 `ask`，前端复用 `FileDiffBlock` 渲染审批卡片（`status: pending` + `approvalRequestId` + `reason`），用户 `Allow` / `Skip`；拒绝后展示 `Denied edit xxx.md`。
 - 前端使用 `FileDiffBlock` 折叠式组件，与 `write_file` 共享同一组件，无 icon，左边缘与 Read / Grep 等工具行对齐。
@@ -175,8 +175,8 @@ Read/List/Grep/Glob/Search 等轻量组件在失败时保留动作、目标和�
 
 ## 新增工具检查清单
 
-- 工具声明、执行器与权限契约放在对应 `packages/tools/<capability>/`，在 manifest/组合中接入；不注册到已删除的 engine extractor。
-- Journal `tool/call`、`tool/result` 保留执行事实；Client `packages/client/src/sessions/tool-card.ts` 统一生成 `ToolUiPreview`，`chat.ts` 负责历史消息投影。
+- 工具声明、执行器与权限契约放在对应 `packages/<能力>/tool-<名>/`，在 manifest/组合中接入；不注册到已删除的 engine extractor。
+- Journal `tool/call`、`tool/result` 保留执行事实；Client `packages/client/client/src/sessions/tool-card.ts` 统一生成 `ToolUiPreview`，`chat.ts` 负责历史消息投影。
 - Desktop `apps/desktop/src/main/runtime-v2/fixed-renderer-stream-adapter.ts` 负责把实时事实转换为既有 typed stream IPC；子任务活动在相邻 `subagent-activity.ts` 聚合。
 - 参数生成、prepared、running 和 finished 使用同一展示语义；终态不可被迟到进度覆盖。Renderer 消费 typed preview，不解析原始参数 JSON。
 - 流式文本保持独立；需要参数生成进度时使用明确字段，不另造事件总线，不把部分参数当作执行结果。

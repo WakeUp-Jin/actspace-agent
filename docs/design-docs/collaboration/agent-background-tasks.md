@@ -22,7 +22,7 @@
 | D5 | 子智能体完成通知内联最终文本（UTF-8 超过 8KB 截断并附子会话引用）；`task_wait` 已报告或 `task_stop` 停掉的任务不再发通知；`task_output` 只读，照常通知 |
 | D6 | 后台子智能体与父回合的中断信号解耦；Host 关闭时停止；重启后标记 `lost` 并提醒模型；每会话最多 4 个运行中的后台子智能体（Bash 维持 8 个） |
 | D7 | 不做「前台转后台」按钮，子智能体只支持一开始 `background: true` |
-| D8 | 新上下文插件 `packages/context/background-tasks`：每轮开始更新一次清单，只列运行中任务、写绝对开始时间；全部结束写收尾文本；子智能体不注入 |
+| D8 | 新上下文插件 `packages/context/context-background-tasks`：每轮开始更新一次清单，只列运行中任务、写绝对开始时间；全部结束写收尾文本；子智能体不注入 |
 | D9 | 卡片状态沿用现有状态（子智能体：运行中/已完成/失败/已停止；Bash：运行/成功/失败/取消），后台只多一个「后台」标签；Bash 原来三种后台徽标合并为这一个标签 |
 | D10 | 空闲唤醒的那一轮在聊天里以一行细分隔行开头：`⟲ 后台任务 · <kind>: <标题> · <状态>`，可展开看通知原文 |
 | — | 子智能体工具这期不变（只读四件套、不嵌套） |
@@ -43,7 +43,7 @@ Harness 侧（随 Harness 装载）                    Host 侧（随 Runtime �
 
 ### 统一登记表
 
-新包 `packages/background-tasks`（`@actspace/background-tasks`），纯逻辑，不依赖具体工具：
+新包 `packages/background-tasks/background-tasks`（`@actspace/background-tasks`），纯逻辑，不依赖具体工具：
 
 ```ts
 type BackgroundTaskKind = "bash" | "agent";
@@ -126,7 +126,7 @@ type BackgroundTaskTerminal = { status: Exclude<BackgroundTaskStatus, "running" 
 
 ### 四个工具
 
-插件 `packages/tools/background-tasks`（`actspace.background-tasks`），工具定义在 Harness，数据来自 Host 登记表。权限一律 allow；模式白名单 plan 与 agent 都加入（plan 模式下可后台 `explore`）。
+插件 `packages/background-tasks/tool-background-tasks`（`actspace.background-tasks`），工具定义在 Harness，数据来自 Host 登记表。权限一律 allow；模式白名单 plan 与 agent 都加入（plan 模式下可后台 `explore`）。
 
 | 工具 | 参数 | 返回 |
 |---|---|---|
@@ -139,7 +139,7 @@ type BackgroundTaskTerminal = { status: Exclude<BackgroundTaskStatus, "running" 
 
 ### 上下文插件
 
-`packages/context/background-tasks`，owner `actspace.context-background-tasks`，服务 `context.source.background-tasks`，加入 `CONTEXT_PLUGIN_PACKAGES`、`DEFAULT_HARNESS_ENTRIES` 与 `agent-factory-plugin` 的 `createSources`。只对 `descriptor.kind === "main"` 生效。
+`packages/context/context-background-tasks`，owner `actspace.context-background-tasks`，服务 `context.source.background-tasks`，加入 `CONTEXT_PLUGIN_PACKAGES`、`DEFAULT_HARNESS_ENTRIES` 与 `agent-factory-plugin` 的 `createSources`。只对 `descriptor.kind === "main"` 生效。
 
 - 每轮开始（`context.request.turnId` 变化）读一次 `list(sessionId, activeOnly)` 生成文本，本轮内复用同一文本；引擎的 supplement 去重保证文本没变就不重复写入，压缩后由引擎 `refresh` 重新挂到末尾。
 - 有运行中任务：

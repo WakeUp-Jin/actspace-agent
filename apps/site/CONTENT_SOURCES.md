@@ -18,8 +18,8 @@
 | [模型选择与思考设置](src/content/docs/model-selection.md) | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md`、`docs/design-docs/model-context/agent-model-catalog-and-usage-cost.md` |
 | [上下文与压缩](src/content/docs/context.md) | `docs/design-docs/model-context/agent-token-usage-and-context-state.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md`、`packages/compaction/README.md`、`packages/compaction/src/plugin.ts` |
 | [Token、缓存与费用](src/content/docs/usage.md) | `docs/design-docs/frontend/front-usage-statistics-refresh.md`、`docs/design-docs/model-context/agent-model-catalog-and-usage-cost.md` |
-| [文件读写与检索](src/content/docs/files-and-search.md) | `packages/tools/filesystem-read/src/plugin.ts`、`docs/design-docs/index.md`、`docs/exec-plans/completed/20260913-tool-artifact-provider-image-ux.md` |
-| [Bash 与后台任务](src/content/docs/bash.md) | `packages/tools/shell-tools/src/node-ports.ts`、`docs/design-docs/execution-safety/README.md` |
+| [文件读写与检索](src/content/docs/files-and-search.md) | `packages/fs/tool-fs-read/src/plugin.ts`、`docs/design-docs/index.md`、`docs/exec-plans/completed/20260913-tool-artifact-provider-image-ux.md` |
+| [Bash 与后台任务](src/content/docs/bash.md) | `packages/shell/tool-shell/src/node-ports.ts`、`docs/design-docs/execution-safety/README.md` |
 | [权限与审批](src/content/docs/tools-and-approvals.md) | `docs/design-docs/execution-safety/README.md`、`docs/design-docs/frontend/front-聊天输入框规范.md` |
 | [联网搜索与网页读取](src/content/docs/web-tools.md) | `docs/design-docs/tool-system/agent-web-tools.md`、`apps/desktop/src/renderer/components/settings/SettingsPage.tsx` |
 | [Browser Use](src/content/docs/browser.md) | `browser-bridge/README.md`、`browser-bridge/skill/SKILL.md`、`docs/design-docs/browser/agent-browser-use-index.md` |
@@ -27,7 +27,7 @@
 | [文件预览](src/content/docs/file-preview.md) | `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`、`docs/exec-plans/completed/20260913-tool-artifact-provider-image-ux.md` |
 | [代码审阅与 Git 操作](src/content/docs/review.md) | `docs/design-docs/core-review-change-sources.md` |
 | [Skills](src/content/docs/skills.md) | `docs/design-docs/tool-system/agent-skill-loading.md` |
-| [子 Agent 与 Explore](src/content/docs/subagents.md) | `packages/subagent/src/preset.ts`、`docs/design-docs/collaboration/agent-subagent-runtime.md`、`docs/exec-plans/completed/20260915-readonly-subagents.md` |
+| [子 Agent 与 Explore](src/content/docs/subagents.md) | `packages/subagent/subagent/src/preset.ts`、`docs/design-docs/collaboration/agent-subagent-runtime.md`、`docs/exec-plans/completed/20260915-readonly-subagents.md` |
 | [英语辅助学习](src/content/docs/english-learning.md) | `docs/design-docs/agent-plugin-runtime/agent-english-learning.md` |
 | [设置与本地数据](src/content/docs/settings-and-data.md) | `apps/desktop/src/renderer/components/settings/SettingsNav.tsx`、`apps/desktop/src/renderer/components/settings/SettingsPage.tsx`、`README.md` |
 | [常见问题](src/content/docs/troubleshooting.md) | `README.md`、`docs/design-docs/frontend/front-聊天输入框规范.md`、`docs/design-docs/frontend/front-workspace-git-worktree-context.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md` |

@@ -291,7 +291,7 @@ placeholder 随模式改变，但不代替模式 chip 和运行时契约：
 
 ## 状态行统计胶囊
 
-> 2026-10-14 实现（`components/composer/ComposerStatsPills.tsx`、`composer-stats.ts`；模型侧计时在宿主投影 `packages/session/projection/src/facts.ts`），交互原型 `composer-usage-dock-demo.html`。显示分支和数字格式逐条照 DeepSeek Harness `StatsPills.tsx`（详细模式）与 `token-format.ts`。
+> 2026-10-14 实现（`components/composer/ComposerStatsPills.tsx`、`composer-stats.ts`；模型侧计时在宿主投影 `packages/session/session-projection/src/facts.ts`），交互原型 `composer-usage-dock-demo.html`。显示分支和数字格式逐条照 DeepSeek Harness `StatsPills.tsx`（详细模式）与 `token-format.ts`。
 
 follow-up 状态行右侧、context 圆环左边，两个整会话累计的胶囊：
 

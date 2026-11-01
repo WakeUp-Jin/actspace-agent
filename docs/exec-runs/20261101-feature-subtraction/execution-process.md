@@ -187,6 +187,43 @@
 | `pnpm --filter @actspace/desktop build` | 通过 |
 | 残留 grep（`initGit`、`setFileViewed`、`applyMutation`、已删服务名、`lastTurn`、`copyGitApply`） | `apps/desktop/src`、`test-fixtures`、`packages/shared/src`、`scripts` 无命中（`apps/web` 里的 `lastTurn` 是无关局部变量） |
 
+### S1 包搬家与改名
+
+- **操作**：按 `docs/exec-plans/active/20261101-plugin-structure/s1-package-move.md` 实施，一次性脚本 `tmp/s1-move.mjs`（不进 git）。
+  - 搬目录：设计 §4 表里的 62 个现有包全部对上（P1–P5 没有删包）。其中 `core/agent`、`core/agent-loop`、`core/scope` 目录不变，实际搬了 59 个，改名 16 个（`core-agent`→`agent`、`core-agent-loop`→`agent-loop`、`core-scope`→`scope`、`tools-runtime`→`tool-runtime`、`session-jsonl`→`session-persistence-jsonl`、`tools-filesystem-*`→`tool-fs-*`、`tools-shell-tools`→`tool-shell`、`tools-web-tools`→`tool-web`、`tools-image-*`→`tool-image-*`、`tools-todo-tools`→`tool-todo`、`tools-background-tasks`→`tool-background-tasks`、`tools-approval`→`approval`、`tools-browser-tools`→`tool-browser`）。先 `git mv` 到 `packages/.mv/<n>`，再到终点，避开 `packages/subagent` → `packages/subagent/subagent` 这种终点在起点之下的情况。搬前删掉旧目录里的 `node_modules`、`dist`、`tsbuildinfo`。
+  - 相对路径：按旧位置解析每个出包的 `./`、`../` 字面量，映射到新位置后重算（297 处、83 个文件，主要是 `tsconfig*.json` 的 `extends` / `references`；第一级包多一层 `../`；`session-jsonl/src/test/storage.test.ts` 的 `../../../storage/...` → `../../../session-storage/...`）。
+  - 包名与路径字符串：单次正则（长名优先，结尾边界 `(?![\w-])`）替换 531 处包名、977 处 `packages/<旧>` 路径，涉及 320 个文件。跳过 `docs/histories`、`docs/exec-runs`、`docs/exec-plans/completed`、`docs/learnings`、两套计划目录、`docs/design-docs/架构优化`、`pnpm-lock.yaml`。`packages/tools/README.md`（旧 `tools/` 目录唯一剩下的文件）删除，目录随之消失；其余旧能力目录 README 先留着，S4 重写。
+  - 新包 `@actspace/tool-subagent`（`packages/subagent/tool-subagent`）：`harness-subagent-tools.ts` 用 `git mv` 成 `src/plugin.ts`；`manifest.ts`（plugin id `actspace.subagent-tools`，Entry id `subagent-tools`，provides `tools.subagents`，injects 与 `DEFAULT_HARNESS_ENTRIES` 那行一致）、`index.ts`、`src/test/lifecycle.test.ts`（2 个用例：manifest 与 `inject` 一致；注册 `agent` / `explore`，dispose 后工具消失）。`defaultHarnessEntrySource` 里 `subagent-tools` 改为 `@actspace/tool-subagent/plugin`；`@actspace/runtime` 加依赖和 tsconfig 引用。
+  - 新包 `@actspace/skill`（`packages/skill/skill`，纯库）：`catalog.ts`、`discovery.ts`、`discovery.test.ts` 用 `git mv` 搬来，`index.ts` 导出两者；`@actspace/prompt` 的 `index.ts` 不再重导出，`host-context.ts`、`core-contributors.ts`、`skills/contributor.ts`、`output-choice.test.ts` 改从 `@actspace/skill` 导入；prompt 的依赖由 `official-skills` 换成 `skill`（prompt 源码本来就不直接用 `official-skills`）。
+  - 根配置：`pnpm-workspace.yaml` 只留 `apps/*` 和 `packages/*/*`；`build-default-harness.mjs` 的 `external` 与 `default-harness.ts` 的 `hostModules` 里的 `@actspace/scope` 由包名替换覆盖，已核对。
+  - 生成文件：`node scripts/generate-desktop-build-graph.mjs`（62 个 Desktop 依赖项目，生成脚本顺带按字母序重排了 `runtime` 等包的 `tsconfig.build.json` 引用）；`pnpm gen:contract-matrix`（`scripts/contract-matrix/source-registry.mjs` 补 `tool-subagent` 的 manifest 与两个新包的 `package.json`）。`cordis.yml` 的包名由替换覆盖，与 `TRUSTED_LOADER_ENTRIES` 一致（`test:agent-host:process` 真实启动 Host 通过）。
+  - 检查脚本：`check-package-boundaries.mjs` 新增两条规则（包必须正好在 `packages/<能力>/<包>`；目录名等于包名去掉 `@actspace/`），`scripts/test/package-boundaries.test.mjs` 的夹具改成两级目录并新增一个覆盖这两条规则的用例。`check-current-docs.mjs`、`check-package-cutover.mjs`、`check-v2-legacy-removal.mjs` 里的路径由替换覆盖，无需手改。
+  - 文档：`packages/README.md` 目录表、`README.md`、`docs/ARCHITECTURE.md`、工具预览设计指南里的路径改成新结构（完整的总地图与各能力 README 留给 S4）。`docs/exec-runs/`、`docs/exec-plans/completed/`、自进化设计文档里 22 条因搬家失效的 Markdown 链接目标已改到新路径（只改链接目标，不改文字），否则 `check:current-docs` 会比基线多 22 条。
+  - 新增 `docs/histories/2026-11/20261101-2300-package-layout.md`。
+- **影响文件**：`git diff -M --name-status HEAD`：925 个 rename（其中 737 个相似度 100%）、175 个修改、62 个新增 / 53 个删除。新增里 11 个是两个新包的文件（7 个源文件和 `package.json`，4 个 `tsconfig*.json`）；其余新增各对应一个删除，是很短、因相对路径整体改变而相似度低于 50% 的 `tsconfig*.json`（约 51 对）和只有一行的 `todo-projection-plugin.ts`，git 把它们记成删加对；另有 `packages/tools/README.md` 一个纯删除。
+- **已持久化 Harness 产物里的 `sharedModules`（步骤 4 的结论）**：写进磁盘了，但不加旧 specifier 兼容。`publishPluginArtifact` 把 `sharedModules`（specifier、绝对 `file:` URL、integrity）写进 `artifact.json`，并把产物 JS 里的外部 import 改写成这些绝对 URL；`verifyPluginArtifact` 每次恢复都重读这些 URL 并校对 integrity，`checkHarnessCompatibility` 还要求产物里的 `sharedModules` 与当前 Host 的逐项相等。所以旧产物在包目录搬走（URL 失效）或 dist 重建（integrity 变）时本来就会失效，改 specifier 只是其中一个原因，给旧 specifier 登记别名救不了它。默认 Harness 每次启动由 `prepareDefaultHarnessArtifact` 从构建产物重新发布，只有用户演进出来的固定（pinned）选择会因 `hostContractDigest` 不一致得到 `RESTART_REQUIRED`，这是原有行为。没有加 `LEGACY_SHARED_MODULE_SPECIFIERS`，也没有补测试。
+- **决定与偏离**：
+  - `defaultHarnessEntrySource` 原来对剩余条目用 `@actspace/tools-${id}/plugin` 拼名字，改名后拼不出来。改成显式映射表（`tools-runtime`、`tools-approval`、七个工具 Entry、`browser-tools`、`background-tasks`、`subagent-tools` 各一行），并对未知 Entry id 抛错而不是猜名字。整张映射仍由 S2 删除。`tool-contracts.test.ts` 里同样拼名字的 `it.each` 改成直接写新包名。
+  - 计划第 3 步说 `apps/desktop/src/main/runtime-v2/fixed-renderer-skills.ts` 要改成从 `@actspace/skill` 导入，实际这个文件只导入 `@actspace/official-skills`，自己带一套读取逻辑，既没用过 `@actspace/prompt` 的 catalog / discovery，也没有别的外部调用方，所以没有改它。
+  - 替换脚本把 4 个 DeepSeek Harness 来源注释（`apps/desktop/src/renderer/components/files/*.tsx|ts` 里的 `packages/client/ui-primitives/...`）也当成本仓库路径改成了 `packages/client/client/ui-primitives/...`，发现后已还原这 4 个文件。
+  - 搬完后 pnpm 没有刷新 `node_modules/.pnpm/node_modules/@actspace/` 里按旧路径建的隐式提升链接（cordis 加载器的裸 `import()` 靠它解析），Host 进程测试因此在启动时报 `loader entries failed to apply`。删掉 `node_modules/.pnpm/node_modules` 和 `node_modules/.modules.yaml` 后 `pnpm install --offline` 重建即可。这只影响搬家后的本地环境，全新检出不受影响。
+  - 清空 `dist` 之后第一次 `build:deps:dev` 会在 `agent-service` 的测试文件上报找不到 `boot`、`composition`、`session-persistence-jsonl`：它的 `tsconfig.json` 把测试也编译，而构建图只看 `dependencies` 不看 `devDependencies`，所以靠别的包先建好 dist 才能过，重跑一次即通过。这是原有的顺序依赖，S1 不改它。
+  - 没有跑 `scripts/release-package.sh` 的完整打包。用 `pnpm --filter @actspace/desktop --prod deploy --legacy --offline` 验证了部署：桌面端依赖里带上了 `tool-subagent` 和 `skill`，脚本里没有按旧路径找原生模块或资源的写法。
+- **验证**（先 `pnpm install`，再 `pnpm --filter @actspace/desktop build:deps:dev`；`pnpm test` 是一串命令，遇到已知基线失败（`test:current-docs`）会停，所以用 `tmp/s1-test-all.sh` 把每一步都跑完）：
+
+| 命令 | 结果 |
+|---|---|
+| `pnpm install` | 通过（69 个 workspace 项目） |
+| `pnpm typecheck` | 通过 |
+| `pnpm test` 逐步 | 全部通过，除 `test:current-docs`（基线：363 条，全在 `docs/exec-runs/`，无新增）；`pnpm -r --if-present test` 通过（含 `apps/desktop` 2093 通过 / 7 跳过、`shared` 180、`client` 56、`core/runtime` 85、`agent-service` 66、新包 `tool-subagent` 2、`skill` 2） |
+| `test:contract-matrix` | 通过（重新生成后） |
+| `test:package-boundaries` | 通过（含新增的布局用例） |
+| `test:agent-host:process` | 通过（7 个，真实起 Host 进程，需先 `pnpm --filter @actspace/agent-cli build`） |
+| `check:packages` / `check:desktop-build-graph` / `check:ipc-channels` / `check:renderer-bridge` | 通过（68 个 workspace manifest） |
+| `check:docs` / `check:current-docs` | 仍是 363 条已知失败，无新增（搬家后一度是 385，修了 22 条链接目标） |
+| `pnpm --filter @actspace/desktop build` | 通过 |
+| 残留 grep（`@actspace/tools-`、`core-agent`、`core-scope`、`session-jsonl`） | `apps`、`packages`、`scripts`、`.github` 无命中；`ls packages/*/package.json` 无匹配（第一级没有包） |
+
 ## 遇到的问题
 
 - P1：计划没列 `chat-presentation-recovery.test.tsx`，它断言「+」菜单项等于 `["可视化回复", "上下文"]`，删入口后失败，已改为 `["上下文"]`。另有 `RightPanel.tsx`、`RightPanelObjectMenu.tsx` 里提到 Reply / 可视化回复的注释和提示文字，一并改掉。
@@ -207,6 +244,8 @@
 - P5：计划说 10 个 App 测试 mock 带 `review.initGit`，实际只有 1 个测试文件加 1 个夹具（`test-fixtures/session-background-runs.tsx`）还含它。
 - P5：计划没列 `app-streaming-user-message`、`composer-toolbar`、`review-diff-virtualization` 的改动；强制刷新后，凡是断言挂载时读 `getSnapshot` 的用例都要改成 `refreshSnapshot`；工具栏焦点测试原来用「提交或推送」当最后一个按钮，改用「显示文件列表」。
 
+- S1：替换脚本把 4 个 DeepSeek Harness 来源注释里的 `packages/client/ui-primitives/...` 误改成 `packages/client/client/ui-primitives/...`，已还原；搬家后 pnpm 没刷新 `.pnpm/node_modules/@actspace/` 的隐式提升链接，Host 进程测试启动失败，重建后恢复；`build:deps:dev` 在清空 dist 后第一次会因 `agent-service` 测试文件缺依赖产物而失败，重跑通过（原有顺序依赖）。详见 S1 小节。
+
 ## 跳过或推迟的事项
 
 - P1：Space 演示里的 mock「可视化回复」标签留待 Space 演示后续处理（见 P1 决定）。磁盘上旧的 `visualizations.json` 不读不删。
@@ -221,3 +260,4 @@
 - P5：资源复测没有跑。`docs/exec-runs/20261008-review-resource-test/component-benchmark.cjs` 写死了另一个检出路径和 `/tmp` 夹具，并依赖已删的 `ReviewWorkspaceWatcher` 与 `scheduleInvalidation`，现在无法运行；目录下其他基准脚本同理。没有另建新基准。
 - P5：Electron 实机检查留给用户：每轮结束后输入框 +N/−M 更新、打开「改动」面板时数字和 diff 更新、手动刷新、顶部菜单提交后数字更新、外部改文件后不自动变化、非 Git 目录文案、五个 scope 切换与分支 / 提交子视图。
 - P5：已知限制：旧的磁盘 `view-state.json` 不读不删；`agent-contract-matrix.generated.md` 仍是旧基线，留给 S1 重新生成；`pnpm check:current-docs` 仍是 363 条已知失败。
+- S1：Electron 实机检查留给用户：用已有数据目录启动、打开旧会话、新建会话发一条消息、运行一条 Bash。没有跑 `scripts/release-package.sh` 的完整打包，只验证了 `pnpm deploy`。旧能力目录（`context/`、`session/`、`llm/`、`sandbox/`）里的 README 仍按旧包目录写，`packages/README.md` 只改了路径，整体重写留给 S4。`scripts/refactor-stats.mjs` 的分区现在按能力目录统计（`packages/<能力>`），没有改。

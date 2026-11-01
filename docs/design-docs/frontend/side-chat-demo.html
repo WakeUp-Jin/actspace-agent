@@ -303,11 +303,11 @@ const PERMS = [
 const SUGGESTIONS = ["对比一下 auto-review 和 subagent 的插件写法", "boot.ts 里如果漏注册会怎样报错？", "帮我把 manifest 的注释改清楚一点"];
 
 const REPLIES = [
-  { tools: [["读取", "packages/auto-review/src/plugin.ts"], ["读取", "packages/subagent/src/plugin.ts"]],
+  { tools: [["读取", "packages/approval/auto-review/src/plugin.ts"], ["读取", "packages/subagent/subagent/src/plugin.ts"]],
     text: "接着主会话里聊到的插件结构：两者 manifest 写法一样，区别在 plugin.ts。auto-review 直接 `ctx.provide` 一个服务就结束；subagent 的 plugin.ts 只导出构造器，真正的工具注册放在 runtime 的 `harness-subagent-tools.ts` 里。所以「插件包 = 规则 + 服务」，「挂到 Harness 上」这一步仍然在 runtime 里手写。" },
-  { tools: [["搜索", "DEFAULT_HARNESS_ENTRIES"], ["读取", "packages/runtime/src/startup/boot.ts"]],
+  { tools: [["搜索", "DEFAULT_HARNESS_ENTRIES"], ["读取", "packages/core/runtime/src/startup/boot.ts"]],
     text: "如果只加了包、没写进 `DEFAULT_HARNESS_ENTRIES`，启动不会报错，插件只是不会被加载；如果写进去了但依赖的服务没人提供，装配阶段会在 inject 解析时报缺少服务。前面主会话那张装配顺序图里，第 3 步就是这次检查。" },
-  { tools: [["读取", "packages/session/journal/src/fork.ts"]],
+  { tools: [["读取", "packages/session/session-journal/src/fork.ts"]],
     text: "fork 的边界校验有三条：边界不能超过已落盘的 Journal；会话不能处于不可访问状态；边界处不能有没收尾的请求或工具调用。所以侧边对话要选「上一轮结束」的位置，而不是当前最新的序号。" },
 ];
 
@@ -337,7 +337,7 @@ function renderMain() {
   for (const t of S.mainExtra) {
     h += `<div class="u">${esc(t.u)}</div>`;
     h += t.done ? `<div class="a"><p>${fmt(t.a)}</p></div>`
-                : `<div class="a"><div class="tool"><span class="spin"></span><b>读取</b><span class="mono">packages/runtime/src/harness/default-harness-definition.ts</span></div><p class="caret">正在梳理</p></div>`;
+                : `<div class="a"><div class="tool"><span class="spin"></span><b>读取</b><span class="mono">packages/core/runtime/src/harness/default-harness-definition.ts</span></div><p class="caret">正在梳理</p></div>`;
   }
   $("main-thread").innerHTML = h;
   $("main-scroll").scrollTop = 1e6;
@@ -385,9 +385,9 @@ function send(id, text) {
   const wantsWrite = /改|修改|写入|删除/.test(text);
   let reply;
   if (wantsWrite && c.perm === "ro") {
-    reply = { tools: [["编辑", "packages/auto-review/src/manifest.ts", "blocked"]], text: "当前是只读模式，这次修改被拦下了。把输入框下方的权限切到「需审批」后再发一次，我改之前会先问你。" };
+    reply = { tools: [["编辑", "packages/approval/auto-review/src/manifest.ts", "blocked"]], text: "当前是只读模式，这次修改被拦下了。把输入框下方的权限切到「需审批」后再发一次，我改之前会先问你。" };
   } else if (wantsWrite) {
-    reply = { tools: [["编辑", "packages/auto-review/src/manifest.ts"]], text: "已经把 manifest 里 contributions 的注释改清楚了（演示，没有真的改文件）。这次修改只发生在侧边对话里，主会话不知道。" };
+    reply = { tools: [["编辑", "packages/approval/auto-review/src/manifest.ts"]], text: "已经把 manifest 里 contributions 的注释改清楚了（演示，没有真的改文件）。这次修改只发生在侧边对话里，主会话不知道。" };
   } else {
     reply = REPLIES[S.replyIdx++ % REPLIES.length];
   }

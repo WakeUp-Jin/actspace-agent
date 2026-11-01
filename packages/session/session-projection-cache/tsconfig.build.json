@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./../session-journal/tsconfig.build.json"
+    },
+    {
+      "path": "./../session-projection/tsconfig.build.json"
+    },
+    {
+      "path": "./../session-storage/tsconfig.build.json"
+    },
+    {
+      "path": "./../../util/shared/tsconfig.build.json"
+    }
+  ]
+}

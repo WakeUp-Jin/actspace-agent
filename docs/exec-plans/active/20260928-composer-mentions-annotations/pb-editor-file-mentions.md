@@ -18,7 +18,7 @@
 - `AGENTS.md`、`docs/FRONTEND.md`、`docs/FRONTEND_VERIFICATION.md`、`docs/SECURITY.md`、`docs/design-docs/frontend/front-主题与配色规范.md`、`docs/design-docs/frontend/front-聊天输入框规范.md`、`docs/design-docs/frontend/front-composer-slash-command.md`。
 - 设计文档第 6、7 节，以及顶部「实施决策修订」。
 - 执行过程里的「M0.2 编辑器 PoC」结论（jsdom 限制与测试写法）。
-- 代码：`Composer.tsx`（`renderComposerInput`、输入高度测量的 `useLayoutEffect`、`navigateInputHistory`、`finishSlashSelection`、`handlePasteImages`、`switchAgentForm`）、`composer-slash-commands.ts`、`apps/desktop/src/main/workspace-fs-service.ts`（忽略目录列表 `IGNORED_DIR_NAMES`）、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`（`handle` + `assertTrustedSender`、`registeredWorkspaceRoot`）、`packages/shared/src/runtime-v2/fixed-renderer.ts`（通道常量）、`apps/desktop/src/preload/index.ts`（`FIXED_RENDERER_INVOKE_CHANNELS`、`exposeInMainWorld`）、`apps/desktop/src/global.d.ts`。
+- 代码：`Composer.tsx`（`renderComposerInput`、输入高度测量的 `useLayoutEffect`、`navigateInputHistory`、`finishSlashSelection`、`handlePasteImages`、`switchAgentForm`）、`composer-slash-commands.ts`、`apps/desktop/src/main/workspace-fs-service.ts`（忽略目录列表 `IGNORED_DIR_NAMES`）、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`（`handle` + `assertTrustedSender`、`registeredWorkspaceRoot`）、`packages/util/shared/src/runtime-v2/fixed-renderer.ts`（通道常量）、`apps/desktop/src/preload/index.ts`（`FIXED_RENDERER_INVOKE_CHANNELS`、`exposeInMainWorld`）、`apps/desktop/src/global.d.ts`。
 
 ## 关键设计
 
@@ -103,8 +103,8 @@ type SearchWorkspaceFilesResult =
 
 本节保留未来 PB.3 的目标文件与通道名。PB 尚未实施，下面的 `workspace-file-search-service.ts`、IPC 通道和测试路径不能作为现行代码入口；当前实现仍以本节顶部的计划状态和现有源码为准。
 
-- `packages/shared/src/ipc.ts`：新增上面三个类型。
-- `packages/shared/src/runtime-v2/fixed-renderer.ts`：新增通道 `searchWorkspaceFiles: "runtime-v2:fixed-renderer:search-workspace-files"`。
+- `packages/util/shared/src/ipc.ts`：新增上面三个类型。
+- `packages/util/shared/src/runtime-v2/fixed-renderer.ts`：新增通道 `searchWorkspaceFiles: "runtime-v2:fixed-renderer:search-workspace-files"`。
 - 新增 `apps/desktop/src/main/workspace-file-search-service.ts`：`createWorkspaceFileSearchService()`，内含索引构建、缓存、匹配排序。
 - `fixed-renderer-ipc.ts`：在 `registerFixedRendererHostCapabilities` 里用 `handle` 注册，root 经 `registeredWorkspaceRoot`。
 - `preload/index.ts`：`FIXED_RENDERER_INVOKE_CHANNELS` 加 `"workspace:search-files"`，`exposeInMainWorld` 加 `searchWorkspaceFiles`；`global.d.ts` 声明为可选方法。

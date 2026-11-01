@@ -53,7 +53,7 @@ if (!process.argv.includes('--child')) {
   const requireApp = createRequire(join(appRoot, 'package.json'));
   const runtimeRequire = createRequire(requireApp.resolve('@actspace/runtime'));
   const { createSessionHeader } = await import(pathToFileURL(runtimeRequire.resolve('@actspace/session-journal')).href);
-  const providerEntry = runtimeRequire.resolve('@actspace/session-jsonl');
+  const providerEntry = runtimeRequire.resolve('@actspace/session-persistence-jsonl');
   const { JsonlQueryReader } = await import(pathToFileURL(join(dirname(providerEntry), 'query-reader.js')).href);
   const reader = new JsonlQueryReader();
   const root = await mkdtemp(join(tmpdir(), 'usage-package-probe-'));

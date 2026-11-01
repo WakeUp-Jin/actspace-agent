@@ -39,7 +39,7 @@ export const MOCK_DOCS_FILES: readonly string[] = [
   "docs/design-docs/frontend/front-聊天输入框规范.md",
   "docs/design-docs/frontend/front-文档面板规范.md",
   "docs/exec-plans/active/架构优化-减法.md",
-  "packages/official-skills/plugin-dev/SKILL.md",
+  "packages/skill/official-skills/plugin-dev/SKILL.md",
   "packages/browser-tools/README.md",
 ];
 

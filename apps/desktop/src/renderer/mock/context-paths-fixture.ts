@@ -3,8 +3,8 @@ import { MOCK_WORKSPACE_ROOT } from "./fixtures";
 
 const DIRS = [
   "apps/desktop/src/main/ipc", "apps/desktop/src/main/runtime-v2", "apps/desktop/src/renderer/components/right-panel/context",
-  "apps/desktop/src/renderer/mock", "docs/design-docs/frontend", "packages/agent-service/src", "packages/context/disclosure/src",
-  "packages/context/engine/src", "packages/core/agent-loop/src", "packages/shared/src",
+  "apps/desktop/src/renderer/mock", "docs/design-docs/frontend", "packages/core/agent-service/src", "packages/context/context-disclosure/src",
+  "packages/context/context-engine/src", "packages/core/agent-loop/src", "packages/util/shared/src",
 ];
 const FILES = ["index.ts", "types.ts", "state.ts", "policy.ts", "paths.ts", "plugin.ts", "compaction.ts", "source.ts", "context-panel.ts", "guards.ts",
   "handlers.ts", "loop.ts", "README.md", "ContextPanel.tsx", "ContextStats.tsx", "task-ledger.ts", "artifact-store.ts", "context-paths.ts"];

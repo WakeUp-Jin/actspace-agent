@@ -1,0 +1,181 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./../agent/tsconfig.build.json"
+    },
+    {
+      "path": "./../../host/agent-host/tsconfig.build.json"
+    },
+    {
+      "path": "./../agent-loop/tsconfig.build.json"
+    },
+    {
+      "path": "./../agent-service/tsconfig.build.json"
+    },
+    {
+      "path": "./../../approval/approval/tsconfig.build.json"
+    },
+    {
+      "path": "./../../approval/auto-review/tsconfig.build.json"
+    },
+    {
+      "path": "./../../background-tasks/background-tasks/tsconfig.build.json"
+    },
+    {
+      "path": "./../../composition/boot/tsconfig.build.json"
+    },
+    {
+      "path": "./../../composition/bundle/tsconfig.build.json"
+    },
+    {
+      "path": "./../../composition/composition/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/context-background-tasks/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/context-compaction/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/context-conversation/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/context-disclosure/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/context-engine/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/context-rules/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/context-runtime/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/context-skills/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/context-system/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/context-tools/tsconfig.build.json"
+    },
+    {
+      "path": "./../../composition/cordis-adapter/tsconfig.build.json"
+    },
+    {
+      "path": "./../../host/desktop-app/tsconfig.build.json"
+    },
+    {
+      "path": "./../../util/diagnostics/tsconfig.build.json"
+    },
+    {
+      "path": "./../../english-learning/english-learning/tsconfig.build.json"
+    },
+    {
+      "path": "./../../harness-evolution/harness-control/tsconfig.build.json"
+    },
+    {
+      "path": "./../../harness-evolution/harness-hmr/tsconfig.build.json"
+    },
+    {
+      "path": "./../../host/headless/tsconfig.build.json"
+    },
+    {
+      "path": "./../../llm/llm-pi-ai/tsconfig.build.json"
+    },
+    {
+      "path": "./../../llm/llm-service/tsconfig.build.json"
+    },
+    {
+      "path": "./../../skill/official-skills/tsconfig.build.json"
+    },
+    {
+      "path": "./../../harness-evolution/plugin-manager/tsconfig.build.json"
+    },
+    {
+      "path": "./../../context/prompt/tsconfig.build.json"
+    },
+    {
+      "path": "./../../sandbox/sandbox/tsconfig.build.json"
+    },
+    {
+      "path": "./../../sandbox/sandbox-nono/tsconfig.build.json"
+    },
+    {
+      "path": "./../../sandbox/sandbox-seatbelt/tsconfig.build.json"
+    },
+    {
+      "path": "./../scope/tsconfig.build.json"
+    },
+    {
+      "path": "./../../session/session-checkpoint-policy/tsconfig.build.json"
+    },
+    {
+      "path": "./../../session/session-journal/tsconfig.build.json"
+    },
+    {
+      "path": "./../../session/session-persistence/tsconfig.build.json"
+    },
+    {
+      "path": "./../../session/session-persistence-jsonl/tsconfig.build.json"
+    },
+    {
+      "path": "./../../session/session-projection/tsconfig.build.json"
+    },
+    {
+      "path": "./../../session/session-projection-cache/tsconfig.build.json"
+    },
+    {
+      "path": "./../../util/shared/tsconfig.build.json"
+    },
+    {
+      "path": "./../../side-chat/side-chat/tsconfig.build.json"
+    },
+    {
+      "path": "./../../subagent/subagent/tsconfig.build.json"
+    },
+    {
+      "path": "./../../background-tasks/tool-background-tasks/tsconfig.build.json"
+    },
+    {
+      "path": "./../../browser/tool-browser/tsconfig.build.json"
+    },
+    {
+      "path": "./../../fs/tool-fs-read/tsconfig.build.json"
+    },
+    {
+      "path": "./../../fs/tool-fs-search/tsconfig.build.json"
+    },
+    {
+      "path": "./../../fs/tool-fs-write/tsconfig.build.json"
+    },
+    {
+      "path": "./../../image/tool-image-generation/tsconfig.build.json"
+    },
+    {
+      "path": "./../../image/tool-image-inspection/tsconfig.build.json"
+    },
+    {
+      "path": "./../tool-runtime/tsconfig.build.json"
+    },
+    {
+      "path": "./../../shell/tool-shell/tsconfig.build.json"
+    },
+    {
+      "path": "./../../subagent/tool-subagent/tsconfig.build.json"
+    },
+    {
+      "path": "./../../todo/tool-todo/tsconfig.build.json"
+    },
+    {
+      "path": "./../../web/tool-web/tsconfig.build.json"
+    }
+  ]
+}

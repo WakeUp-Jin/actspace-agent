@@ -22,9 +22,9 @@ ActSpace 的正式开发知识位于仓库 `docs/`。官网文档面向使用者
 | `apps/desktop` | Electron 主进程、preload 与界面 |
 | `apps/cli` | 命令行入口和输出契约 |
 | `apps/site` | 官网、公开文档、博客与更新页 |
-| `packages/runtime` | 运行时启动、应用组合和生命周期 |
+| `packages/core/runtime` | 运行时启动、应用组合和生命周期 |
 | `packages/core`、`session`、`llm`、`tools` 等 | Agent、日志、模型、工具等独立领域包 |
-| `packages/shared` | 跨进程和跨包契约 |
+| `packages/util/shared` | 跨进程和跨包契约 |
 | `browser-bridge` | Go CLI、Chrome 扩展和浏览器协议 |
 
 应用通过运行时与领域包协作，renderer 不直接访问文件系统，凭据由 Host 管理。变更前先确认对应专题约束，不从历史示例推断当前接口。

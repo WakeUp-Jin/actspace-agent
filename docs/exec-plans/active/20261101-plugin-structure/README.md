@@ -52,7 +52,7 @@ pnpm --filter @actspace/desktop build
 
 ## 进度
 
-- [ ] S1 包搬家与改名。
+- [x] S1 包搬家与改名。
 - [ ] S2 插件清单与展示信息。
 - [ ] S3 插件开关与插件页。
 - [ ] S4 README 与文档。

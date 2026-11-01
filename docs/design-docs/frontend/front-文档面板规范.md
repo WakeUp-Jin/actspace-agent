@@ -159,7 +159,7 @@
 | Markdown 预览正文、Mermaid、分块渲染 | `components/right-panel/MarkdownRenderView.tsx`（导出 `MarkdownPreviewBody`） |
 | 交付卡 / 聊天链接 → 文档面板 | `components/files/open-workspace-path.ts` |
 | 展开面板盖住聊天区 | `components/SplitView.tsx`（`rightExpanded`）、`components/WorkbenchLayout.tsx`（含文档标签自己的默认宽度 720px） |
-| 主进程 IPC | `workspaces.listMarkdownFiles`、`workspaces.writeMarkdownFile`：`apps/desktop/src/main/workspace-fs-service.ts`、`main/runtime-v2/desktop-shell-ipc.ts`、`main/ipc/guards.ts`；契约在 `packages/shared/src/desktop-bridge/contract.ts`、`ipc.ts`、`runtime-v2/fixed-renderer.ts` |
+| 主进程 IPC | `workspaces.listMarkdownFiles`、`workspaces.writeMarkdownFile`：`apps/desktop/src/main/workspace-fs-service.ts`、`main/runtime-v2/desktop-shell-ipc.ts`、`main/ipc/guards.ts`；契约在 `packages/util/shared/src/desktop-bridge/contract.ts`、`ipc.ts`、`runtime-v2/fixed-renderer.ts` |
 | 浏览器 mock 数据 | `mock/docs-fixture.ts`、`mock/handlers.ts` |
 | 测试 | `test/docs-panel.test.tsx`、`docs-tree-model.test.ts`、`markdown-source-editor.test.tsx`、`markdown-render-view.test.tsx`、`split-view-expanded.test.tsx`；主进程 `main/test/workspace-fs-service.test.ts` 等 |
 

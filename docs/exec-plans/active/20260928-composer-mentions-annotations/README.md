@@ -47,7 +47,7 @@ PA 与 PB 都只依赖 P0，彼此文件范围基本不重叠（冲突点只有 
 ```sh
 pnpm --filter @actspace/shared test
 pnpm --filter @actspace/client test
-pnpm --filter @actspace/core-agent-loop test
+pnpm --filter @actspace/agent-loop test
 pnpm --filter @actspace/desktop test        # 基线已知失败：workspace-git-context-service「non-repository」1 条
 pnpm --filter @actspace/desktop typecheck
 pnpm check:frontend-tokens

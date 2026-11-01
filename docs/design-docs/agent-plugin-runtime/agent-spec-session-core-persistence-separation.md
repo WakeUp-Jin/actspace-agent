@@ -11,7 +11,7 @@
 | `@actspace/session-journal` | 事件、Codec、顺序和关系校验、Surface、语义 replay |
 | `@actspace/session-storage` | 不含文件路径的存储契约；提供一致快照、写入所有权与持久化屏障 |
 | `@actspace/session-persistence` | SessionStore、Handle、Coordinator、write-behind、业务恢复和 fork；显式注入存储 |
-| `@actspace/session-jsonl` | JSONL 生产实现；文件布局、writer、fsync、文件租约和物理修复 |
+| `@actspace/session-persistence-jsonl` | JSONL 生产实现；文件布局、writer、fsync、文件租约和物理修复 |
 | `@actspace/session-projection` | 投影注册、fold、checkpoint；不持有存储 |
 | `@actspace/session-projection-cache` | 通过存储契约重建冷读投影、分页和工具索引 |
 | `runtime/session` | 把 Session 业务接入 Host 的会话列表、观察、导出及生命周期 |
@@ -22,7 +22,7 @@ Host Cordis 树装配：`session.journal` → `session.storage` → `session.sto
 
 ## 2. 公共存储契约
 
-以 `packages/session/storage/src/index.ts` 为接口来源：
+以 `packages/session/session-storage/src/index.ts` 为接口来源：
 
 - Provider：`identity`、`inspect(sessionId)`、`listSessionIds()`、`create(header)`、`open(sessionId, access)`、`discard(handle)`、`close()`。
 - 会话 Handle：`header`、`access`、`read()`、`append(events)`、`flush()`、`assertOwned()`、`close()`。

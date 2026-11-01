@@ -5,7 +5,7 @@ Browser Bridge 的主线实现位于仓库顶层 `browser-bridge/`，属于 Host
 ## 职责边界
 
 ```text
-Agent → packages/tools/browser-tools → Unix socket
+Agent → packages/browser/tool-browser → Unix socket
       → Go command engine → Extension primitive RPC
       → chrome.debugger / Chrome APIs → 用户真实 Chrome
 ```

@@ -10,7 +10,7 @@
 
 ## 当前实现映射（2026-11-01 P5 后）
 
-- 共享契约：`packages/shared/src/review.ts`。
+- 共享契约：`packages/util/shared/src/review.ts`。
 - 查询、缓存与失效：`apps/desktop/src/main/review-coordinator.ts`。
 - Composer 顶部 Review 摘要：`apps/desktop/src/renderer/components/review/use-review-summary.ts`。
 - Git 只读查询：`apps/desktop/src/main/review-git-engine.ts`（后台线程 `review-git-worker-client.ts` 保留，只承担用户触发的 diff 解析和 `cat-file`）。

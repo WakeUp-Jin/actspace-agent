@@ -9,11 +9,11 @@
     "outDir": "dist-electron",
     "baseUrl": ".",
     "paths": {
-      "@actspace/shared/model-catalog-data": ["../../packages/shared/dist/generated/model-catalog.generated.d.ts"],
-      "@actspace/shared": ["../../packages/shared/dist/index.d.ts"],
-      "@actspace/shared/*": ["../../packages/shared/dist/*"],
-      "@actspace/runtime": ["../../packages/runtime/dist/index.d.ts"],
-      "@actspace/runtime/*": ["../../packages/runtime/dist/*/index.d.ts"]
+      "@actspace/shared/model-catalog-data": ["../../packages/util/shared/dist/generated/model-catalog.generated.d.ts"],
+      "@actspace/shared": ["../../packages/util/shared/dist/index.d.ts"],
+      "@actspace/shared/*": ["../../packages/util/shared/dist/*"],
+      "@actspace/runtime": ["../../packages/core/runtime/dist/index.d.ts"],
+      "@actspace/runtime/*": ["../../packages/core/runtime/dist/*/index.d.ts"]
     },
     "rootDir": "src",
     "types": [

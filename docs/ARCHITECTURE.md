@@ -8,14 +8,14 @@
 
 - `apps/desktop`：Electron main、preload、renderer 所在的桌面端应用。
 - `apps/cli`：通过 managed ESM loader 暴露 v2 `run` 命令、stdin 输入和 stdout/stderr 契约。
-- `packages/runtime`：Host-facing ESM runtime，通过唯一 `bootProfileRuntime` 装配 Host 服务与 Harness 候选，显式编排排空执行、关闭 Session 和释放插件树；Headless/Desktop 包提供应用服务。
-- `packages/core/`、`packages/session/`、`packages/llm/`、`packages/prompt/`、`packages/tools/`、`packages/subagent/`、`packages/context/*`：独立领域 workspace packages，每个可装载包拥有自己的 Plugin Entry 与生命周期测试；Context 领域目录下的 engine、来源、披露和压缩策略分别独立装配。
-- `packages/english-learning`：Desktop 内置英语辅助学习插件，拥有单会话双语提示词与英文语音队列；凭据、临时文件和系统播放由 Desktop Host 提供。详见[设计](design-docs/agent-plugin-runtime/agent-english-learning.md)。
-- `packages/agent-service`：Host 共同任务服务，拥有持久内容队列、单会话调度与结构化 Run 工厂契约。详见[Task/Run 生命周期](design-docs/agent-plugin-runtime/agent-task-run-lifecycle.md)。
-- `packages/agent-host`：独立 Node Host 接入、认证、观察与文件传输；bootstrap/lifecycle 拥有装配、维护和退出，CLI 注入 Runtime 端口；应用操作复用 AgentApplication，任务仍由 AgentService 调度。CLI 提供 `host` 启动与管理命令，Desktop Main 持有远端连接。当前验证边界见 [Host 指南](design-docs/agent-plugin-runtime/agent-host-guide.md)和 [P4 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)。
-- `packages/harness-control`：Host 级固定 Harness 选择服务，负责 Patch 准备、独立授权、持久启用、恢复与回退；执行者只能经它异步获取租约。详见 [P3 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-3.md)。
-- `packages/session/storage`：存储中性 provider/handle 契约；`session/jsonl` 提供物理实现，`session/persistence` 负责 Session 业务语义。读写、列表、恢复、fork 与缓存均通过注入后端，详见[存储规范](design-docs/agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
-- `packages/shared`：IPC contracts、session schema、跨进程共享类型。
+- `packages/core/runtime`：Host-facing ESM runtime，通过唯一 `bootProfileRuntime` 装配 Host 服务与 Harness 候选，显式编排排空执行、关闭 Session 和释放插件树；Headless/Desktop 包提供应用服务。
+- `packages/<能力>/<包>`（两级结构，目录名即包名去掉 `@actspace/`，如 `packages/core/`、`packages/session/`、`packages/llm/`、`packages/context/`、`packages/fs/`、`packages/shell/`、`packages/subagent/`）：独立领域 workspace packages，每个可装载包拥有自己的 Plugin Entry 与生命周期测试；Context 领域目录下的 engine、来源、披露和压缩策略分别独立装配。
+- `packages/english-learning/english-learning`：Desktop 内置英语辅助学习插件，拥有单会话双语提示词与英文语音队列；凭据、临时文件和系统播放由 Desktop Host 提供。详见[设计](design-docs/agent-plugin-runtime/agent-english-learning.md)。
+- `packages/core/agent-service`：Host 共同任务服务，拥有持久内容队列、单会话调度与结构化 Run 工厂契约。详见[Task/Run 生命周期](design-docs/agent-plugin-runtime/agent-task-run-lifecycle.md)。
+- `packages/host/agent-host`：独立 Node Host 接入、认证、观察与文件传输；bootstrap/lifecycle 拥有装配、维护和退出，CLI 注入 Runtime 端口；应用操作复用 AgentApplication，任务仍由 AgentService 调度。CLI 提供 `host` 启动与管理命令，Desktop Main 持有远端连接。当前验证边界见 [Host 指南](design-docs/agent-plugin-runtime/agent-host-guide.md)和 [P4 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)。
+- `packages/harness-evolution/harness-control`：Host 级固定 Harness 选择服务，负责 Patch 准备、独立授权、持久启用、恢复与回退；执行者只能经它异步获取租约。详见 [P3 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-3.md)。
+- `packages/session/session-storage`：存储中性 provider/handle 契约；`session/jsonl` 提供物理实现，`session/persistence` 负责 Session 业务语义。读写、列表、恢复、fork 与缓存均通过注入后端，详见[存储规范](design-docs/agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
+- `packages/util/shared`：IPC contracts、session schema、跨进程共享类型。
 - `apps/web`：浏览器 / PWA 客户端（React + Vite），手机和电脑浏览器经 WebSocket `/rpc` 连接一台 Agent Host，查看会话、审批与发送消息；可由 Host 的 `webRoot` 同源托管。设计见 [front-web-pwa客户端规范](design-docs/frontend/front-web-pwa客户端规范.md)。
 - `apps/site`：Astro 静态官网、公开文档、博客与从 release 文档生成的更新页。
 - `browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层。
@@ -27,22 +27,22 @@
 ## 包分层与依赖边界
 
 - `apps/desktop`
-  - 可以依赖 `packages/shared`
+  - 可以依赖 `packages/util/shared`
   - 通过 `@actspace/runtime/loader` 动态加载 ESM Runtime
   - renderer 不能直接访问文件系统
 - `apps/cli`
-  - 可以依赖 `packages/shared`
+  - 可以依赖 `packages/util/shared`
   - 通过 managed loader 加载 `@actspace/runtime`
   - 负责 argv/stdin、TTY、stdout/stderr 和退出码，不实现第二套 Agent 内核
-- `packages/runtime` 与领域 packages
+- `packages/core/runtime` 与领域 packages
   - 仅通过公开 exports 暴露 ESM Runtime API
   - `runtime` 负责 Host 装配、Harness 选择接线、Projection 与 `BootedRuntimeProfile`；领域语义由独立 package 提供。`agent-service` 持有任务接纳与调度，Headless/Desktop 服务消费同一应用接口；存储布局不泄漏进 Session 业务
-- `packages/shared`
+- `packages/util/shared`
   - 只放跨进程共享契约和类型
   - 不依赖 `desktop` 或旧版 Agent Core
 
 - `apps/web`
-  - 只依赖 `packages/shared` 与 `@actspace/client`（`host`、`sessions`、`live` 子入口），通过 Host 协议访问 `packages/agent-host`，不加载 Runtime、不访问文件系统
+  - 只依赖 `packages/util/shared` 与 `@actspace/client`（`host`、`sessions`、`live` 子入口），通过 Host 协议访问 `packages/host/agent-host`，不加载 Runtime、不访问文件系统
   - 不依赖 `apps/desktop` 源码；与 desktop 共用的实时流折叠逻辑在 `@actspace/client/live`，desktop 侧只保留 re-export
   - 构建产物是静态文件，由 Host 静态托管（`webRoot`）或 Vite 开发服务器提供
 
@@ -102,8 +102,8 @@ runtime --(Host capability)--> browser-bridge
 - 桌面端首版采用 `Electron + React + TypeScript + Vite`。
 - 交互基础组件优先采用 `Radix UI` primitives，而不是直接依赖重样式组件库。
 - 本地数据优先使用 `jsonl` 文件存储，直接落盘到用户电脑。
-- 工程骨架已落地为 `apps/{desktop,cli,site,web} + packages/runtime + 多个领域 workspace packages + packages/shared` 的单仓结构。
-- 桌面端主模型由前端模型选择器驱动，模型注册表定义在 `packages/shared/src/model-config.ts`，并由 IPC 契约 re-export。
+- 工程骨架已落地为 `apps/{desktop,cli,site,web} + packages/core/runtime + 多个领域 workspace packages + packages/util/shared` 的单仓结构。
+- 桌面端主模型由前端模型选择器驱动，模型注册表定义在 `packages/util/shared/src/model-config.ts`，并由 IPC 契约 re-export。
 - 密钥不进入 renderer 或 Session Journal，Host 只通过 credential resolver 向 Runtime 提供短生命周期凭据。
 - 开发态启动需要先确保 `shared`、领域 packages、`runtime` 有可消费产物，再启动 Electron main/preload 的 watch 与 renderer。
 - 更细的产品级技术选型以根目录 `README.md` 中的“技术栈”小节为准。

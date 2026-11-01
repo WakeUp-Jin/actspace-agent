@@ -218,7 +218,7 @@
             "callId": "call-1-1-1",
             "name": "read_file",
             "arguments": {
-              "file_path": "packages/session/journal/src/core-codecs.ts",
+              "file_path": "packages/session/session-journal/src/core-codecs.ts",
               "limit": 80
             }
           },
@@ -254,7 +254,7 @@
         "callId": "call-1-1-1",
         "name": "read_file",
         "arguments": {
-          "file_path": "packages/session/journal/src/core-codecs.ts",
+          "file_path": "packages/session/session-journal/src/core-codecs.ts",
           "limit": 80
         },
         "assistantMessageId": "assistant-1-1"

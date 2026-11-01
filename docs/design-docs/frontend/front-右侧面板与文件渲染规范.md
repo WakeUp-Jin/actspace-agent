@@ -346,7 +346,7 @@ Context Tab 回答三个问题：现在占了多少、由哪些条目组成、�
 
 ### 数据来源
 
-- 面板主数据走 `sessions.describeContextPanel({ sessionId })`，返回 `ContextPanelView`，类型定义在 `packages/shared/src/context-panel.ts`，形状与后端数据需求 §2 一致。这个查询由 Context 引擎 V2 的后端实现。实现之前，main 一律返回 `null`。
+- 面板主数据走 `sessions.describeContextPanel({ sessionId })`，返回 `ContextPanelView`，类型定义在 `packages/util/shared/src/context-panel.ts`，形状与后端数据需求 §2 一致。这个查询由 Context 引擎 V2 的后端实现。实现之前，main 一律返回 `null`。
 - 返回 `null` 时，renderer 用现有数据拼一个过渡视图：
   - ① 来自 `sessions.describeContext` 的 `ContextState`。
   - ② 来自会话 projection 的 `activity` 和 `usage`，这部分已经是真实数据。

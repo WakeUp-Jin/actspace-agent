@@ -239,8 +239,8 @@ Compaction 不删除 Journal 历史，而是为有效 Session Surface 追加 rep
 
 - `packages/context/src/assembly.ts`：contributor 排序、required / optional 语义；
 - `packages/context/src/request-snapshot.ts`：snapshot 冻结与 secret-like 字段拒绝；
-- `packages/runtime/src/projection/durable-session.ts`：durable usage 聚合；
-- `packages/runtime/src/projection/durable-session.ts`：Host Context 与 Usage facts；`packages/client/src/sessions/selectors.ts`：Client Context 与 Usage projection；
+- `packages/core/runtime/src/projection/durable-session.ts`：durable usage 聚合；
+- `packages/core/runtime/src/projection/durable-session.ts`：Host Context 与 Usage facts；`packages/client/client/src/sessions/selectors.ts`：Client Context 与 Usage projection；
 - `packages/compaction/src/plugin.ts`：Surface compaction transaction；
 - `packages/compaction/src/policy.ts`：默认 compaction policy。
 

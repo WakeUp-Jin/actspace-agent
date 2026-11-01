@@ -108,8 +108,8 @@ ActSpace 当前已经具备一部分基础能力：
 | 图片 / 文件附件 | `Composer.tsx`、`composer-attachment-service.ts`、`ComposerAttachment` | 独立 attachment tile | 保持独立，增加和 mention / annotation 共存的布局规则 |
 | 助手 Markdown | `messages/MarkdownProse.tsx`、`messages/AssistantReply.tsx` | `react-markdown` + GFM + highlight | 增加可选 selection layer / marker layer，不替换 Markdown renderer |
 | 用户消息 | `messages/UserMessage.tsx` | `content` + `attachments` | 增加已发送 reference summary 的非编辑投影 |
-| 发送契约 | `packages/shared/src/ipc.ts`、`App.tsx` | `SubmitTaskInput` 的 userInput、附件与结构化引用 | 结构化编辑状态归 Composer；实际提交使用共享 Task 契约 |
-| Session payload | `packages/shared/src/session.ts`、`packages/client/src/sessions/chat.ts`、selectors | user message payload 有 content / attachments | 增加可选 reference / annotation payload |
+| 发送契约 | `packages/util/shared/src/ipc.ts`、`App.tsx` | `SubmitTaskInput` 的 userInput、附件与结构化引用 | 结构化编辑状态归 Composer；实际提交使用共享 Task 契约 |
+| Session payload | `packages/util/shared/src/session.ts`、`packages/client/client/src/sessions/chat.ts`、selectors | user message payload 有 content / attachments | 增加可选 reference / annotation payload |
 | 文件安全边界 | main / Host / Tool Runtime | 已有 workspace、realpath、permission 约束 | mention resolve 必须复用同一边界 |
 
 ### 4.2 不改动的基础能力
@@ -235,7 +235,7 @@ type ComposerContentPayload = {
 
 `plainText` 的 mention 降级文本建议为 `@relative/path`，但不能作为安全身份来源。发送链路必须以 `fileReferences` 重新解析并校验。
 
-当前提交使用共享 `SubmitTaskInput`（`packages/shared/src/runtime-v2/tasks.ts`），结构化引用为 fileReferences 和 responseAnnotations；Composer document 属于编辑器状态，不作为另一套 Runtime 输入契约。稳定 submissionId 支持失败核对和去重，完整任务语义只在[Task/Run 规范](../agent-plugin-runtime/agent-task-run-lifecycle.md)维护。
+当前提交使用共享 `SubmitTaskInput`（`packages/util/shared/src/runtime-v2/tasks.ts`），结构化引用为 fileReferences 和 responseAnnotations；Composer document 属于编辑器状态，不作为另一套 Runtime 输入契约。稳定 submissionId 支持失败核对和去重，完整任务语义只在[Task/Run 规范](../agent-plugin-runtime/agent-task-run-lifecycle.md)维护。
 
 ### 6.4 Markdown 行为
 

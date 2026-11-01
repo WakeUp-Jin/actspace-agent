@@ -1,16 +1,16 @@
-import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox } from "@actspace/core-agent";
-import { AgentScope } from "@actspace/core-scope";
+import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox } from "@actspace/agent";
+import { AgentScope } from "@actspace/scope";
 import { createCoreCodecRegistry, createSessionHeader } from "@actspace/session-journal";
 import { SessionHandle } from "@actspace/session-persistence";
 import { RequestAssembler } from "@actspace/prompt";
 import { LlmRouteRegistry, LlmService, EMPTY_LLM_USAGE, type LlmStreamEvent } from "@actspace/llm-service";
-import { ToolRuntime, type ToolBodyResult, type ToolPermissionContract } from "@actspace/tools-runtime";
+import { ToolRuntime, type ToolBodyResult, type ToolPermissionContract } from "@actspace/tool-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { AgentLoop, type AgentLoopLiveEvent } from "./loop.js";
 
 /** Same real loop fixture is consumed by Core, Main adapter and renderer regressions. */
 export async function runToolStreamFixture(options: {
-  toolEnvironment?: Partial<import("@actspace/tools-runtime").ToolPreparedEnvironment>;
+  toolEnvironment?: Partial<import("@actspace/tool-runtime").ToolPreparedEnvironment>;
   stream?: () => AsyncIterable<LlmStreamEvent>;
   retryPolicy?: import("@actspace/llm-service").LlmRetryPolicy;
   credential?: import("@actspace/llm-service").LlmCredential;
@@ -25,7 +25,7 @@ export async function runToolStreamFixture(options: {
   extraToolCall?: boolean;
   onTools?: (tools: readonly import("@actspace/llm-service").LlmToolDefinition[]) => void;
   deltas?: boolean;
-  resolveArtifact?: import("@actspace/tools-runtime").SessionArtifactResolver;
+  resolveArtifact?: import("@actspace/tool-runtime").SessionArtifactResolver;
   thinkingEnabled?: boolean;
   reasoningEffort?: import("@actspace/shared").ModelReasoningEffort;
   onRequest?: (options: import("@actspace/llm-service").LlmRequestOptions) => void;

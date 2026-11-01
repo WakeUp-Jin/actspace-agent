@@ -119,7 +119,7 @@ test('service serializes catalog queries, prunes deletions, and rejects after di
 });
 
 test('SQL activity matches JSON projection costs and dimensions with mixed currencies and connections', async t => {
-  const { projectIndexedUsageActivity } = require('../../../packages/client/dist/sessions.cjs');
+  const { projectIndexedUsageActivity } = require('../../../packages/client/client/dist/sessions.cjs');
   const send = await fixture(t);
   const rows = [
     { ...row('known'), model: 'model', providerId: 'provider', connectionId: 'a', costAmount: 2, costCurrency: 'USD', costUsd: 2, historicalUnverified: true },
@@ -137,7 +137,7 @@ test('SQL activity matches JSON projection costs and dimensions with mixed curre
 });
 
 test('SQL activity preserves unknown token counts separately from explicit zero and tool rows', async t => {
-  const { projectIndexedUsageActivity } = require('../../../packages/client/dist/sessions.cjs');
+  const { projectIndexedUsageActivity } = require('../../../packages/client/client/dist/sessions.cjs');
   const send = await fixture(t);
   const unknown = { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, totalTokens: null };
   const zero = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0, totalTokens: 0 };
@@ -181,8 +181,8 @@ test('multi-message replacement is atomic and a failing last chunk restores the 
 });
 
 async function journalFixture(t) {
-  const { JsonlQueryReader } = await import('../../../packages/session/jsonl/dist/query-reader.js');
-  const { createSessionHeader } = await import('../../../packages/session/journal/dist/header.js');
+  const { JsonlQueryReader } = await import('../../../packages/session/session-persistence-jsonl/dist/query-reader.js');
+  const { createSessionHeader } = await import('../../../packages/session/session-journal/dist/header.js');
   const { appendFile } = await import('node:fs/promises');
   const root = await mkdtemp(join(tmpdir(), 'usage-journal-test-'));
   const path = join(root, 'journal.jsonl');
@@ -236,7 +236,7 @@ test('auxiliary requests index seven main plus two vision calls once and survive
     records.push(['assistant/message', { requestId: `main${i}`, finishReason: 'stop', usage: { inputTokens: 100, outputTokens: 20 } }], ['step/end', { stepId: `step${i}`, reason: 'completed', usage: { inputTokens: 100, outputTokens: 20 } }]);
   }
   await f.append(records);
-  const { projectSessionUsageActivities } = require('../../../packages/client/dist/sessions.cjs');
+  const { projectSessionUsageActivities } = require('../../../packages/client/client/dist/sessions.cjs');
   const expected = projectSessionUsageActivities({ sessionId: 's', throughJournalSeq: f.summary().throughJournalSeq, workspaceRoot: '/workspace', metadata: { title: 's' } }, f.journal);
   const compare = async service => {
     const result = await service.getActivity({ range: 'total', requestRowsPage: { limit: 500 } });
@@ -288,7 +288,7 @@ test('auxiliary start/end and retries span batches with partial, cancelled, zero
     ['llm/auxiliary-start', third],
   ]);
   result = await f.service().getActivity({ range: 'total' });
-  const { projectSessionUsageActivities } = require('../../../packages/client/dist/sessions.cjs');
+  const { projectSessionUsageActivities } = require('../../../packages/client/client/dist/sessions.cjs');
   const expected = projectSessionUsageActivities({ sessionId: 's', throughJournalSeq: f.summary().throughJournalSeq, workspaceRoot: '/workspace', metadata: { title: 's' } }, f.journal);
   assert.deepEqual(normalizeRows(result.rows), normalizeRows(expected));
   assert.equal(result.summary.requestCount, 3);
@@ -332,7 +332,7 @@ test('Session-owned auxiliary facts survive restart and replay an existing schem
 
 test('real provider batches match the original projection, resume across queries and survive Worker restart', async t => {
   const fixture = await journalFixture(t);
-  const { projectSessionUsageActivities } = require('../../../packages/client/dist/sessions.cjs');
+  const { projectSessionUsageActivities } = require('../../../packages/client/client/dist/sessions.cjs');
   const service = fixture.service();
   const requests = Array.from({ length: 300 }, (_, i) => [
     ['turn/start', { turnId: `t${i}`, agentRunId: `run${i}` }],
@@ -435,7 +435,7 @@ test('renamed catalog metadata updates existing activity rows and title FTS with
 
 test('rollups preserve exact sliding boundaries, status filters, null costs and deletions', async t => {
   const send = await fixture(t);
-  const { projectIndexedUsageActivity } = require('../../../packages/client/dist/sessions.cjs');
+  const { projectIndexedUsageActivity } = require('../../../packages/client/client/dist/sessions.cjs');
   const now = Date.now();
   const rows = Array.from({ length: 600 }, (_, i) => ({ ...row(`rollup-${i}`), startedAt: new Date(now - (i % 3 === 0 ? 25 : i % 3 === 1 ? 23 : 0) * 3600000 - i * 20).toISOString(), status: i % 7 === 0 ? 'error' : 'success', model: `m${i % 3}`, providerId: 'provider', costUsd: i % 4 ? 1 : null, costAmount: i % 4 ? 1 : null, costCurrency: 'USD', historicalUnverified: i % 2 === 0 }));
   const sources = [source(rows)];
@@ -638,7 +638,7 @@ test('history-only query does not construct Usage and later Usage sync does not 
 
 test('SQL statistics retains the complete legacy snapshot shape and cost/token semantics', async t => {
   const send = await fixture(t);
-  const { projectIndexedUsageStatistics } = require('../../../packages/client/dist/sessions.cjs');
+  const { projectIndexedUsageStatistics } = require('../../../packages/client/client/dist/sessions.cjs');
   const rows = [
     { ...row('a'), model:'m1', providerId:'p1', costUsd:0, tokens:{inputTokens:10,outputTokens:2,cacheReadTokens:3,cacheWriteTokens:4,reasoningTokens:1,totalTokens:12} },
     { ...row('b'), model:'m2', providerId:'p2', agentRunId:'run2', costUsd:0.05, status:'error' },
@@ -704,7 +704,7 @@ test('deleting a Session removes both query watermarks and cursors', async t => 
 
 test('title search uses exact compact aggregates for partial and complete catalog matches', async t => {
   const send=await fixture(t);
-  const { projectIndexedUsageActivity }=require('../../../packages/client/dist/sessions.cjs');
+  const { projectIndexedUsageActivity }=require('../../../packages/client/client/dist/sessions.cjs');
   const rows=Array.from({length:240},(_,i)=>({...row(`title-${i}`,i%2?'s':'other'),model:`m${i%3}`,providerId:`p${i%5}`,status:i%7?'success':'error',costUsd:i%4?0.25:null,costAmount:i%4?0.25:null,costCurrency:i%9?'USD':'EUR',historicalUnverified:i%11===0}));
   const sources=['s','other'].map(id=>({...source(rows.filter(row=>row.sessionId===id),id),title:id==='s'?'shared nebula':'shared galaxy'}));
   await send({type:'sync',sources});
@@ -743,7 +743,7 @@ test('exact model/provider filters combine with phrase, range and status', async
   assert.deepEqual(result.rows.map(row=>row.activityId),['a']);
   assert.equal(result.summary.requestCount,1);
   assert.equal(result.tabCounts.requests,4);
-  const legacy=require('../../../packages/client/dist/sessions.cjs').projectIndexedUsageActivity([source(rows)],{...input,search:undefined});
+  const legacy=require('../../../packages/client/client/dist/sessions.cjs').projectIndexedUsageActivity([source(rows)],{...input,search:undefined});
   assert.deepEqual(result.summary,legacy.summary);
 });
 

@@ -293,7 +293,7 @@ type WorkspacePreparationPayload = {
 
 ### 会话定位（locator）
 
-- 远端会话的 key 是 `host:` 加 `base64url(JSON.stringify([hostId, sessionId]))`。编码和解码只有一份，在 `packages/shared/src/session-locator.ts`（`encodeSessionLocator` / `decodeSessionLocator`），main 和 renderer 共用。
+- 远端会话的 key 是 `host:` 加 `base64url(JSON.stringify([hostId, sessionId]))`。编码和解码只有一份，在 `packages/util/shared/src/session-locator.ts`（`encodeSessionLocator` / `decodeSessionLocator`），main 和 renderer 共用。
 - 解码是严格的：不以 `host:` 开头时返回 null（本机会话）。以 `host:` 开头但形状、类型、长度（不超过 128）或 round-trip 任何一项不符，就抛 `InvalidSessionLocatorError`。
 - renderer 用 `locateSession(key)`，返回 `local`、`remote { hostId, sessionId }` 或 `invalid { key }`。它不抛错，以免渲染时白屏。损坏的 key 不按本机处理，本机专属能力都不能用在它身上（`isLocalSession` 对它返回 false）。
 

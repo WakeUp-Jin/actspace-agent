@@ -68,7 +68,7 @@ Runtime 按插件、Scope 与 Agent mode 提供 generate_image
 | 概念 | V0 值 | 说明 |
 |---|---|---|
 | 工具名 | `generate_image` | 给 LLM 与 ToolRuntime 使用，snake_case |
-| 工具目录 | `packages/tools/image-generation/` | 仓库目录使用 kebab-case |
+| 工具目录 | `packages/image/tool-image-generation/` | 仓库目录使用 kebab-case |
 | `ToolUiPreview.kind` | `image_generation` | Client 投影语义，供 renderer 使用 |
 | 接入协议 | `openai-compatible` | V0 只有一份连接配置，不建立图片 provider registry |
 | 默认模型名称 | `gpt-image-2` | 用户可在设置页覆盖，但不作为单次工具参数 |
@@ -372,9 +372,9 @@ run log 可以记录：
 
 ## 15. 当前实现位置
 
-- `packages/tools/image-generation/src/plugin.ts`：工具定义、注册和生命周期。
-- `packages/tools/image-generation/src/node-ports.ts`：Provider 请求、响应解析、下载与 artifact 保存。
-- `packages/tools/image-inspection/src/`：独立的图片分析工具和 LLM adapter。
+- `packages/image/tool-image-generation/src/plugin.ts`：工具定义、注册和生命周期。
+- `packages/image/tool-image-generation/src/node-ports.ts`：Provider 请求、响应解析、下载与 artifact 保存。
+- `packages/image/tool-image-inspection/src/`：独立的图片分析工具和 LLM adapter。
 - `apps/desktop/src/main/runtime-v2/tool-host-services.ts`：Host 分别提供生成与分析端口；生成凭据在每次调用时读取。
 - `apps/cli/src/runtime-v2/host-adapter.ts`：CLI Host 接线；是否提供具体能力由 Host 服务及组合决定，不假设 Desktop 设置会自动进入 CLI。
 - `apps/desktop/src/main/settings-service.ts`、`session-artifact-service.ts`：设置和会话产物边界。

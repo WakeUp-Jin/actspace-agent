@@ -14,16 +14,16 @@
 
 ## 2. 当前实现证据
 
-以下入口按 2026-10-06 的 Context 与 Session 绑定实现校准。独立插件位于 `packages/english-learning/`。
+以下入口按 2026-10-06 的 Context 与 Session 绑定实现校准。独立插件位于 `packages/english-learning/english-learning/`。
 
 | 现有入口 | 可以复用的事实 |
 | --- | --- |
 | `packages/core/agent-loop/src/loop.ts` | 每次模型请求通过 Context 来源注册表组装；请求包含 `sessionId`；成功轮次写入 `turn/end` |
-| `packages/prompt/src/assembler.ts`、`request-snapshot.ts` | 提示词分节、渲染文本、来源记录和请求快照有现成契约 |
-| `packages/prompt/src/extensions.ts` | 扩展按 Session 与明确 main 身份筛选，保留精确 scope 注册能力 |
-| `packages/runtime/src/session/session-controller.ts` | 取得已打开的 Session，与单个 Run 生命周期解耦 |
-| `packages/runtime/src/session/session-plugin.ts` | `session/event` 携带事件 Envelope，Session ID 通过 dispatch carrier 传递 |
-| `packages/desktop-app/src/bundle.ts` | Desktop 应用 Bundle 可以组合独立插件 manifest |
+| `packages/context/prompt/src/assembler.ts`、`request-snapshot.ts` | 提示词分节、渲染文本、来源记录和请求快照有现成契约 |
+| `packages/context/prompt/src/extensions.ts` | 扩展按 Session 与明确 main 身份筛选，保留精确 scope 注册能力 |
+| `packages/core/runtime/src/session/session-controller.ts` | 取得已打开的 Session，与单个 Run 生命周期解耦 |
+| `packages/core/runtime/src/session/session-plugin.ts` | `session/event` 携带事件 Envelope，Session ID 通过 dispatch carrier 传递 |
+| `packages/host/desktop-app/src/bundle.ts` | Desktop 应用 Bundle 可以组合独立插件 manifest |
 | `apps/desktop/src/renderer/components/extensions/CapabilitiesSection.tsx` | 已拆开 Browser Bridge 与英语辅助学习各自的可用性判断 |
 | `apps/desktop/src/main/settings-service.ts` | 已有非敏感设置与 main-only 凭据存储；可扩展语音配置 |
 
@@ -59,7 +59,7 @@
 
 ## 4. 插件与 Host 边界
 
-新增一个独立 workspace package：`packages/english-learning`，包名 `@actspace/english-learning`，plugin ID `actspace.english-learning`，Entry ID 和服务 ID 均为 `english-learning`。它拥有 manifest、behavior、公开 exports、固定提示词、队列和生命周期测试；首版不拆出第二个独立 Speech 服务包。
+新增一个独立 workspace package：`packages/english-learning/english-learning`，包名 `@actspace/english-learning`，plugin ID `actspace.english-learning`，Entry ID 和服务 ID 均为 `english-learning`。它拥有 manifest、behavior、公开 exports、固定提示词、队列和生命周期测试；首版不拆出第二个独立 Speech 服务包。
 
 ```text
 扩展卡片 ── typed IPC ── Desktop 控制入口 ── 英语辅助学习插件
@@ -160,7 +160,7 @@ Provider 参数参考 [MiniMax 同步语音接口](https://platform.minimaxi.com
 
 ## 9. 控制契约与状态
 
-新增 shared 契约 `packages/shared/src/english-learning.ts`，只放跨进程 DTO。插件内部 Host port 类型通过插件公开 exports 暴露，不放 Electron 实现。
+新增 shared 契约 `packages/util/shared/src/english-learning.ts`，只放跨进程 DTO。插件内部 Host port 类型通过插件公开 exports 暴露，不放 Electron 实现。
 
 | IPC / 服务操作 | 输入与结果 |
 | --- | --- |

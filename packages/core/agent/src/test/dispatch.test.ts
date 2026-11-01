@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentScope, carrierKeyOf, scopeContext } from "@actspace/core-scope";
+import { AgentScope, carrierKeyOf, scopeContext } from "@actspace/scope";
 import { createCordisRoot } from "@actspace/cordis-adapter";
 import { createAgentEventDispatcher } from "../dispatch.js";
 

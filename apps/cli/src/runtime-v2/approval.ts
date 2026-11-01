@@ -1,4 +1,4 @@
-import type { ApprovalBroker, ApprovalDecision, ApprovalRequest } from "@actspace/tools-approval";
+import type { ApprovalBroker, ApprovalDecision, ApprovalRequest } from "@actspace/approval";
 import type { TerminalLineInput } from "../terminal-input";
 
 export class CliV2ApprovalBroker implements ApprovalBroker {

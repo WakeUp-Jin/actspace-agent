@@ -56,15 +56,15 @@ V1 不要求等 Run 1 结束后才能提交 H1。提交时旧租约受保护，�
 
 两候选竞争同一基线时，后提交者需要重新准备，不盲目覆盖。构建和长期检查不占用提交队列，无关会话照常运行。重复 changeId 与相同内容复用已有结果；相同 ID 对应不同内容拒绝。
 
-目前 [AgentService](../../../packages/agent-service/src/service.ts) 创建 SessionRunManager 时固定传入 harnessId，[ManagedRuns](../../../packages/runtime/src/harness/managed-runs.ts) 仍固定 main。V1 需要让新 Run 准入时解析当前会话绑定，配合 Control 闸门取得确定租约。普通执行、压缩、能力查询和已有子 Agent 入口都要遵守所属会话/Run 的版本边界；在途 Run 发起的子任务不能无意混入新版本。不能只改一个 UI 选择字段。
+目前 [AgentService](../../../packages/core/agent-service/src/service.ts) 创建 SessionRunManager 时固定传入 harnessId，[ManagedRuns](../../../packages/core/runtime/src/harness/managed-runs.ts) 仍固定 main。V1 需要让新 Run 准入时解析当前会话绑定，配合 Control 闸门取得确定租约。普通执行、压缩、能力查询和已有子 Agent 入口都要遵守所属会话/Run 的版本边界；在途 Run 发起的子任务不能无意混入新版本。不能只改一个 UI 选择字段。
 
 ## 4. 挂载与释放复用 Cordis
 
-首版物理替换单位是 Harness generation。逻辑修改可以只有一个工具条目，但候选仍通过现有流程挂载完整 Harness 子树。[HarnessGenerations](../../../packages/boot/src/harness-generations.ts) 在 prepare 时挂载候选，activate 发布新选择；被替代的 generation 等最后一个旧租约释放后再 dispose。
+首版物理替换单位是 Harness generation。逻辑修改可以只有一个工具条目，但候选仍通过现有流程挂载完整 Harness 子树。[HarnessGenerations](../../../packages/composition/boot/src/harness-generations.ts) 在 prepare 时挂载候选，activate 发布新选择；被替代的 generation 等最后一个旧租约释放后再 dispose。
 
 因此候选失败可以释放候选并保留原选择；提交后旧 Run 自然完成或由用户停止，生命周期按正常路径清理。不需要为版本切换新增强制排空协议。
 
-工具注册、事件、定时器和后台资源必须通过 ctx.effect、注册 handle 等方式托管。复用 [工具租约](../../../packages/tools/runtime/src/activation-lease.ts) 的 beginDrain/dispose，释放时停止新调用并等待已有调用结束。Cordis 不会自动撤销已写文件、网络请求或未托管后台任务。
+工具注册、事件、定时器和后台资源必须通过 ctx.effect、注册 handle 等方式托管。复用 [工具租约](../../../packages/core/tool-runtime/src/activation-lease.ts) 的 beginDrain/dispose，释放时停止新调用并等待已有调用结束。Cordis 不会自动撤销已写文件、网络请求或未托管后台任务。
 
 新旧实例可以共存，模板初始化不得争抢共享独占资源或用模块级可变全局量保存会话状态。版本目录与 Scope 不是安全沙箱；候选准备本身会执行初始化，必须先满足 Host 执行许可。释放实例也不等于清除 ESM 模块或删除产物。
 

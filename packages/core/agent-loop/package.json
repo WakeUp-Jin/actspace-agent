@@ -1,5 +1,5 @@
 {
-  "name": "@actspace/core-agent-loop",
+  "name": "@actspace/agent-loop",
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
@@ -38,14 +38,14 @@
   },
   "dependencies": {
     "@actspace/cordis-adapter": "workspace:*",
-    "@actspace/core-agent": "workspace:*",
-    "@actspace/core-scope": "workspace:*",
+    "@actspace/agent": "workspace:*",
+    "@actspace/scope": "workspace:*",
     "@actspace/session-journal": "workspace:*",
     "@actspace/session-persistence": "workspace:*",
     "@actspace/context-engine": "workspace:*",
     "@actspace/prompt": "workspace:*",
     "@actspace/llm-service": "workspace:*",
-    "@actspace/tools-runtime": "workspace:*",
+    "@actspace/tool-runtime": "workspace:*",
     "@actspace/context-compaction": "workspace:*",
     "@actspace/shared": "workspace:*"
   },

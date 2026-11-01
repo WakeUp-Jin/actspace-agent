@@ -46,11 +46,11 @@ DSH 也把 `toolName` 作为某些错误对象的字段，但它仍然代表同�
 
 | 层 | 修复前行为 | 结果 |
 |---|---|---|
-| `packages/tools/runtime/src/definition.ts` | `toolId` 必须以 `pluginId/` 开头 | 内部身份带 `/` |
+| `packages/core/tool-runtime/src/definition.ts` | `toolId` 必须以 `pluginId/` 开头 | 内部身份带 `/` |
 | 2026-08-29 旧 `core-tools` 与 Browser definitions | 曾生成 `actspace.core-tools/read_file` 等值 | 所有 Core/Browser 工具进入问题路径 |
 | `packages/core/agent-loop/src/loop.ts` | LLM definition 继续暴露 `definition.toolId` | 模型 schema 收到 namespaced 值 |
-| `packages/llm/pi-ai/src/legacy-proxy-wire-engine.ts` | `function.name`、Responses `name`、Anthropic `name` 均使用 `tool.toolId` | Provider 收到非法函数名 |
-| `packages/llm/pi-ai/src/pi-ai-wire-engine.ts` | pi-ai schema 使用 `tool.toolId` | pi-ai 路径同样受影响 |
+| `packages/llm/llm-pi-ai/src/legacy-proxy-wire-engine.ts` | `function.name`、Responses `name`、Anthropic `name` 均使用 `tool.toolId` | Provider 收到非法函数名 |
+| `packages/llm/llm-pi-ai/src/pi-ai-wire-engine.ts` | pi-ai schema 使用 `tool.toolId` | pi-ai 路径同样受影响 |
 
 DeepSeek 返回的错误正是这一链路的直接结果：`actspace.core-tools/read_file` 不符合 `^[a-zA-Z0-9_-]+$`。
 

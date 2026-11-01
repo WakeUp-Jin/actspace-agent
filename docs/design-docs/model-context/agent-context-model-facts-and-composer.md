@@ -98,12 +98,12 @@ ActSpace 的非敏感模型配置继续写入 `<userData>/settings.json`：
 
 ## 10. 代码事实入口
 
-- `packages/shared/src/model-config.ts`
-- `packages/shared/src/settings.ts`
+- `packages/util/shared/src/model-config.ts`
+- `packages/util/shared/src/settings.ts`
 - `apps/desktop/src/main/settings-service.ts`
 - `apps/desktop/src/main/model-store-service.ts`
 - `packages/core/agent-loop/src/loop.ts`
-- `packages/prompt/src/request-snapshot.ts`
-- `packages/runtime/src/projection/durable-session.ts` 与 `packages/client/src/sessions/selectors.ts`
+- `packages/context/prompt/src/request-snapshot.ts`
+- `packages/core/runtime/src/projection/durable-session.ts` 与 `packages/client/client/src/sessions/selectors.ts`
 - `apps/desktop/src/renderer/components/ContextPopup.tsx`
 - `apps/desktop/src/renderer/components/right-panel/context/ContextPanel.tsx`（2026-10-11 取代 `ContextRenderView.tsx`）

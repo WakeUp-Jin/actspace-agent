@@ -1,4 +1,4 @@
-import { createNodeBrowserCapability, type BrowserCapability } from "@actspace/tools-browser-tools";
+import { createNodeBrowserCapability, type BrowserCapability } from "@actspace/tool-browser";
 import type { DesktopRuntimeV2BrowserPort } from "./host-ports";
 
 export async function createDesktopBrowserCapability(

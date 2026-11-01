@@ -80,7 +80,7 @@ Chrome DevTools Protocol 是所有浏览器操作的最底层。页面操作主�
 - `browser-bridge/apps/cli/internal/locator/runtime-src/`：accessible name、Shadow DOM、定位与页面操作语义；构建产物由 Go embed。
 - `browser-bridge/apps/cli/session.go`、`events.go`：Session 状态与事件路由。
 - `browser-bridge/apps/chrome-extension/src/background.js`：Chrome/CDP primitive 与 Native Messaging。
-- `packages/tools/browser-tools/src/node-capability.ts`：Socket adapter、batch preflight、结果与 artifact 转换。
+- `packages/browser/tool-browser/src/node-capability.ts`：Socket adapter、batch preflight、结果与 artifact 转换。
 
 修改命令时先更新 Go registry，再通过 `node scripts/check-browser-command-registry.mjs` 校验 metadata 与文档标题。Registry 的 implemented 状态不等于所有真实浏览器场景已验收；当前验收缺口见 [连接体验计划](../../exec-plans/active/20260928-chrome-connect-experience.md)。
 

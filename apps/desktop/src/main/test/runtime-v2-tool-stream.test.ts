@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 import type { RuntimeStreamEvent } from "@actspace/shared";
-import { runToolStreamFixture } from "@actspace/core-agent-loop/testing";
+import { runToolStreamFixture } from "@actspace/agent-loop/testing";
 import { SessionReadModel } from "@actspace/runtime";
 import { projectChatEvents } from "@actspace/client/sessions";
 import { FixedRendererStreamAdapter } from "../runtime-v2/fixed-renderer-stream-adapter";

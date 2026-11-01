@@ -60,8 +60,8 @@ Skill、查询、编辑解释“怎样产生候选”；Manager 解释“怎样�
 | Plugin Manager | 新增插件模块 | 同一模块提供 Harness 侧工具代理和稳定 Host 侧管理服务；拥有工作区、构建、来源记录和候选流程 |
 | HMR | 新增插件模块 | 稳定 Host 侧协调显式应用、选择与绑定提交、状态和恢复；不承担自动续跑 |
 | 工作区、源码快照和构建入口 | Manager 内的新逻辑与存储 | 复用原有文件编辑工具和固定产物发布器；无需每项各建一个 Cordis 插件 |
-| HarnessControl | 扩展已有 packages/harness-control | 增加从确定版本准备新分支的操作，并衔接授权、持久选择和恢复；不创建第二套 Control |
-| 固定产物与 Patch | 复用并按契约需要扩展现有适配层 | packages/cordis-adapter 与 packages/composition 继续拥有发布、校验、导入和组合解析；新构建入口产出其接受的格式 |
+| HarnessControl | 扩展已有 packages/harness-evolution/harness-control | 增加从确定版本准备新分支的操作，并衔接授权、持久选择和恢复；不创建第二套 Control |
+| 固定产物与 Patch | 复用并按契约需要扩展现有适配层 | packages/composition/cordis-adapter 与 packages/composition/composition 继续拥有发布、校验、导入和组合解析；新构建入口产出其接受的格式 |
 | 会话绑定与执行接线 | 扩展已有 Runtime / AgentService 路径 | 将 ManagedRuns、压缩、能力查询和既有子 Agent 路径从固定 main 改为解析该会话的选择；绑定存储的具体位置仍需固定 |
 | Cordis / HarnessGenerations / ToolRuntime | 主要复用现有生命周期 | 新模板正确注册和清理；按验收暴露的缺口补现有适配逻辑，不预设重写 Cordis 或另建工具表 |
 | 应用与验证状态展示 | 扩展已有 Host 协议和 UI 投影 | 显示构建、候选、已选择、实际使用和验证结果；不以新增创造模式为前置 |
@@ -87,11 +87,11 @@ Skill、查询、编辑解释“怎样产生候选”；Manager 解释“怎样�
 
 | 当前事实 | 本方案的增量 |
 |---|---|
-| [固定产物](../../../packages/cordis-adapter/src/plugin-artifact.ts)按 artifactId 发布，校验内容后通过文件 URL 导入 | 可编辑源码快照、模板交付和通用工具产物构建 |
-| [Patch](../../../packages/bundle/src/index.ts) 支持 insert / replace 等操作 | Manager 将新增/修改意图转为经过核验的 Patch |
-| [HarnessControl](../../../packages/harness-control/src/service.ts)已有候选、授权、选择、回退 | 接模型工具；新增会话分支初始化与绑定，不能直接改全局 main |
-| [Generations](../../../packages/boot/src/harness-generations.ts)已有新旧实例共存、引用计数和清理 | HMR 协调选择与绑定提交，旧 Run 继续持有旧租约，新 Run 使用新选择 |
-| [ManagedRuns](../../../packages/runtime/src/harness/managed-runs.ts)仍固定获取 main | 所有会话执行与能力查询统一解析会话绑定 |
+| [固定产物](../../../packages/composition/cordis-adapter/src/plugin-artifact.ts)按 artifactId 发布，校验内容后通过文件 URL 导入 | 可编辑源码快照、模板交付和通用工具产物构建 |
+| [Patch](../../../packages/composition/bundle/src/index.ts) 支持 insert / replace 等操作 | Manager 将新增/修改意图转为经过核验的 Patch |
+| [HarnessControl](../../../packages/harness-evolution/harness-control/src/service.ts)已有候选、授权、选择、回退 | 接模型工具；新增会话分支初始化与绑定，不能直接改全局 main |
+| [Generations](../../../packages/composition/boot/src/harness-generations.ts)已有新旧实例共存、引用计数和清理 | HMR 协调选择与绑定提交，旧 Run 继续持有旧租约，新 Run 使用新选择 |
+| [ManagedRuns](../../../packages/core/runtime/src/harness/managed-runs.ts)仍固定获取 main | 所有会话执行与能力查询统一解析会话绑定 |
 
 “替换条目版本”是逻辑变更。V1 准备新 Harness generation，选择新 generation，旧租约退出后清理旧树；不宣称已有逐插件就地切换。提交不必等待旧 Run 结束，也不改变它；同一 Session 的后续用户任务启动新 Run 时读取新选择。
 
@@ -99,6 +99,6 @@ Skill、查询、编辑解释“怎样产生候选”；Manager 解释“怎样�
 
 支持新增与修改受支持的工具插件，参数处理、组合调用、输出加工等应落在允许修改的 Harness 范围内。Host 端口、凭据、权限裁决、持久化 Codec、管理服务自身不作为自进化对象。
 
-工具执行逻辑可能委托给 Host；例如 [filesystem-read](../../../packages/tools/filesystem-read/src/plugin.ts) 的文件读取由 Host port 提供。修改 Harness 包不能自动改变 Host 能力。inspect 应明确哪些源码可编辑、哪些需求超出范围。
+工具执行逻辑可能委托给 Host；例如 [filesystem-read](../../../packages/fs/tool-fs-read/src/plugin.ts) 的文件读取由 Host port 提供。修改 Harness 包不能自动改变 Host 能力。inspect 应明确哪些源码可编辑、哪些需求超出范围。
 
 不建立后台全量失败挖掘、完整自动评估平台、Actor 名册或多智能体协作。最脆弱的前提是可编辑源码与依赖可完整交付；若某插件只有不可重建产物，保留其可调用能力并拒绝“原插件修改”，允许用户另行提出基于公开接口的扩展。

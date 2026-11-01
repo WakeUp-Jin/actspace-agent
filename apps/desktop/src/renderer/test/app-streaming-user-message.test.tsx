@@ -1,7 +1,7 @@
 import type { FixtureRunInput, FixtureCompactionInput, FixtureCompactionResult } from "./task-host-fixture";
 import { taskHostFixture } from "./task-host-fixture";
 import { FixedRendererStreamAdapter } from "../../main/runtime-v2/fixed-renderer-stream-adapter";
-import { runToolStreamFixture } from "@actspace/core-agent-loop/testing";
+import { runToolStreamFixture } from "@actspace/agent-loop/testing";
 import { SessionReadModel } from "@actspace/runtime";
 import { recordProjectionFixture } from "./projection-fixture";
 import { projectChatSession } from "@actspace/client/sessions";

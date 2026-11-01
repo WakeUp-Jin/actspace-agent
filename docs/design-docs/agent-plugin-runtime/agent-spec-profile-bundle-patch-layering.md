@@ -72,7 +72,7 @@ Patch 不做隐式 deep merge，不按 package version、数组位置或 module 
 
 ## 4. 唯一解析结果
 
-`ResolvedComposition` 保存 Profile/Bundle/manifest、Entry、admission、Patch 结果、Host ceiling、诊断及配置摘要。`BootManifest` 在其上要求 `loaderConfig` 和 `startupRequirements`。准确字段与可选性由 `packages/composition/src/types.ts` 定义，不在文档重复维护另一份接口。
+`ResolvedComposition` 保存 Profile/Bundle/manifest、Entry、admission、Patch 结果、Host ceiling、诊断及配置摘要。`BootManifest` 在其上要求 `loaderConfig` 和 `startupRequirements`。准确字段与可选性由 `packages/composition/composition/src/types.ts` 定义，不在文档重复维护另一份接口。
 
 `digest` 必须覆盖 Profile、Bundle identity、Manifest/Entry、Patch results、Service/Codec admission、Host capability ceiling 和最终 Loader config。只读结果创建后不可修改，也不能在 Boot 中重新解析同一输入得到另一份配置。
 
@@ -115,7 +115,7 @@ flowchart TD
 1. **Authoring source**：作为 Profile/Bundle 的声明输入，被 Composer 解析成 `ResolvedComposition`。
 2. **Loader transport**：当 Cordis Loader 只接受文件路径时，由 Boot 根据已解析结果生成一次受控的、不可变的 Loader config，再通过同一个 Loader 加载。
 
-它不再是独立的运行时真源。`apps/cli/cordis.yml`、`packages/runtime/cordis.yml` 和测试 fixture 必须明确标注其角色；默认 CLI 不得出现“Composition digest 来自 A、Loader entries 来自 B”的组合。
+它不再是独立的运行时真源。`apps/cli/cordis.yml`、`packages/core/runtime/cordis.yml` 和测试 fixture 必须明确标注其角色；默认 CLI 不得出现“Composition digest 来自 A、Loader entries 来自 B”的组合。
 
 ## 7. Host capability ceiling
 
@@ -196,8 +196,8 @@ P1-C 不迁移 Session 数据、不改 Tool executor、不实现 CLI chat、不�
 - [DSH 风格 Runtime 插件组装规范](agent-spec-dsh-plugin-assembly-and-agent-startup.md)
 - [插件 Runtime ABI](./agent-spec-plugin-runtime-abi.md)
 - [核心 Service 分层规范](./agent-spec-service-definition-provider-consumer.md)
-- `packages/bundle/src/index.ts`
-- `packages/composition/src/compose.ts`
-- `packages/runtime/src/profiles/composition.ts`
-- `packages/runtime/src/startup/boot.ts`
+- `packages/composition/bundle/src/index.ts`
+- `packages/composition/composition/src/compose.ts`
+- `packages/core/runtime/src/profiles/composition.ts`
+- `packages/core/runtime/src/startup/boot.ts`
 - `apps/cli/src/runtime-v2/host-adapter.ts`

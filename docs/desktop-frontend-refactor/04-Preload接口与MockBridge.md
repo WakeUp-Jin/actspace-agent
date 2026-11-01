@@ -58,7 +58,7 @@
 ### 2.1 契约
 
 ```ts
-// packages/shared/src/desktop-bridge/contract.ts
+// packages/util/shared/src/desktop-bridge/contract.ts
 export const desktopBridgeContract = {
   sessions: {
     listPage:      invoke<ListSessionPageInput, SessionPage>(CH.listSessionPage),

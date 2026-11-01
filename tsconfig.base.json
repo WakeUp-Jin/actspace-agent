@@ -12,16 +12,16 @@
     "baseUrl": ".",
     "paths": {
       "@actspace/shared": [
-        "packages/shared/src"
+        "packages/util/shared/src"
       ],
       "@actspace/shared/*": [
-        "packages/shared/src/*"
+        "packages/util/shared/src/*"
       ],
       "@actspace/cordis-adapter": [
-        "packages/cordis-adapter/src"
+        "packages/composition/cordis-adapter/src"
       ],
       "@actspace/cordis-adapter/*": [
-        "packages/cordis-adapter/src/*"
+        "packages/composition/cordis-adapter/src/*"
       ]
     }
   }
