@@ -35,7 +35,7 @@ App 只负责把这些 store 装配起来、把事件接到对应的 store，以
 | `R/app/providers.tsx` | `AppProviders`：按固定顺序挂所有 Provider |
 | `C/sessions/session.ts` | `ClientSessionStore`：`applyEnvelope`、`applySnapshot`、`select`、`markError`、`get`、`peek`、`evict`、`cellIds`、`subscribe` |
 
-（`R` = `apps/desktop/src/renderer`，`C` = `packages/client/src`，`S` = `packages/shared/src`。）
+（`R` = `apps/desktop/src/renderer`，`C` = `packages/client/client/src`，`S` = `packages/util/shared/src`。）
 
 不引入状态库。每个 store 是一个带 `subscribe` 的小对象，React 侧用 `useSyncExternalStore` 读取。
 

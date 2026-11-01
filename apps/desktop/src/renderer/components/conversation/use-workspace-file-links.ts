@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef } from "react";
 import { localExecutionRoot } from "../../target/run-target";
-import { workspacesApi } from "../../api/workspaces";
 import { openRemoteFile } from "../../hooks/remoteArtifact";
 import { useActiveSession } from "../../session/active-session-context";
 import { useRunTargetContext } from "../../target/run-target-context";
 import { useRightPanel } from "../right-panel/RightPanelContext";
-import { isHtmlFilePath, openHtmlInBrowser } from "../right-panel/open-html-in-browser";
-import { readFailureTab, tabFromFile } from "../right-panel/workspaceFileTab";
+import { useOpenWorkspacePath } from "../files/open-file-fallback-context";
+import { readFailureTab } from "../right-panel/workspaceFileTab";
 import type { ReadMessageBlock } from "./render-message";
 
 /** 工作区内的相对路径：非空、不是 `.`、不是绝对路径（含 Windows 盘符）、不含 `..`。 */
@@ -21,7 +20,7 @@ export function isSafeWorkspaceRelativePath(filePath: string): boolean {
 /**
  * 会话里点文件（读文件工具行、回复里的文件链接）在右侧面板打开：
  * 远端会话从 Host 读，本机从当前工作区读；读不到时打开一个说明失败的 Tab。
- * 本机 HTML 文件交给系统浏览器打开，不在面板里渲染。
+ * 本机文件走统一打开路由：Markdown / 图片在面板里打开，其余交给系统默认应用。
  */
 export function useWorkspaceFileLinks() {
   const { sessionId } = useActiveSession();
@@ -29,6 +28,7 @@ export function useWorkspaceFileLinks() {
   const workspaceRoot = localExecutionRoot(target, selectedWorkspaceRoot)?.trim();
   const isRemoteTarget = target.kind === "remote";
   const { openTab } = useRightPanel();
+  const openPath = useOpenWorkspacePath();
   const owner = useRef(0);
   useEffect(() => {
     owner.current += 1;
@@ -46,18 +46,11 @@ export function useWorkspaceFileLinks() {
       return;
     }
     if (!workspaceRoot || !isSafeWorkspaceRelativePath(relativePath)) return;
-    if (isHtmlFilePath(relativePath)) {
-      const error = await openHtmlInBrowser(workspaceRoot, relativePath);
-      if (error) openIfCurrent(readFailureTab(relativePath, relativePath.split(/[\\/]/).pop() || relativePath, { workspaceRoot }, error));
-      return;
+    const result = await openPath({ workspaceRoot, relativePath, openTab: openIfCurrent });
+    if (result.ok === false && result.reason === "error") {
+      openIfCurrent(readFailureTab(relativePath, relativePath.split(/[\\/]/).pop() || relativePath, { workspaceRoot }, result.message));
     }
-    try {
-      openIfCurrent(tabFromFile(await workspacesApi.readFile({ workspaceRoot, relativePath }), { workspaceRoot }));
-    } catch {
-      const title = relativePath.split(/[\\/]/).pop() || relativePath;
-      openIfCurrent(readFailureTab(relativePath, title, { workspaceRoot }));
-    }
-  }, [isRemoteTarget, sessionId, openTab, workspaceRoot]);
+  }, [isRemoteTarget, sessionId, openTab, openPath, workspaceRoot]);
   const openWorkspaceFile = useCallback((path: string) => {
     const normalizedPath = path.replace(/^file:\/\//i, "").replace(/\\/g, "/");
     const root = workspaceRoot?.replace(/\\/g, "/").replace(/\/+$/, "");

@@ -139,7 +139,7 @@ DSH 的 Boot 只负责：
 5. 检查插件是否 ACTIVE；
 6. 失败时销毁整个 Context。
 
-详细实现见 [app-boot/src/index.ts](/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/tmp/deepseek-harness/packages/boot/app-boot/src/index.ts:764)。
+详细实现见 [app-boot/src/index.ts](/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/tmp/deepseek-harness/packages/composition/boot/app-boot/src/index.ts:764)。
 
 Boot 最终返回的是：
 
@@ -279,13 +279,13 @@ await agent.whenIdle()
 await sessions.flush(agent.session)
 ```
 
-见 [headless runner](/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/tmp/deepseek-harness/packages/bundle/headless/src/index.ts:111)。
+见 [headless runner](/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/tmp/deepseek-harness/packages/composition/bundle/headless/src/index.ts:111)。
 
 ### Web
 
 Web 插件则消费 WebServer、SystemPrompt、ShellEnv 等服务，并自己注册静态文件服务和界面相关能力：
 
-[web-app plugin](/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/tmp/deepseek-harness/packages/bundle/web-app/src/index.ts:139)。
+[web-app plugin](/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent/tmp/deepseek-harness/packages/composition/bundle/web-app/src/index.ts:139)。
 
 也就是说：
 

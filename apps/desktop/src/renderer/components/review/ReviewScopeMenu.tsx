@@ -19,7 +19,6 @@ export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect 
   const [branchError, setBranchError] = useState<string | null>(null);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const simple: Array<{ label: string; value: ReviewSelection; disabled?: boolean }> = [
-    { label: "最近一轮", value: { kind: "lastTurn", sessionId: sessionId ?? "" }, disabled: !sessionId },
     { label: "未提交", value: { kind: "uncommitted" } },
     { label: "未暂存", value: { kind: "unstaged" } },
     { label: "已暂存", value: { kind: "staged" } },

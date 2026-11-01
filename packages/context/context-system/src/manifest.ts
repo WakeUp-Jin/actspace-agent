@@ -1,0 +1,2 @@
+import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
+export const manifest = defineBuiltinPluginManifest({ display: { title: "系统说明", description: "把 ActSpace 的基本说明放进上下文", scope: "session", defaultEnabled: true, canDisable: false }, pluginId: "actspace.context-system", version: "0.1.0", name: "ActSpace Context system", entry: { entryId: "context.system", behavior: "./plugin.js" }, host: { required: [], optional: [] }, frontend: null, injects: [], contributions: { services: ["context.source.system"], tools: [], prompts: [], events: [] } });

@@ -62,7 +62,6 @@ function install(input: { items: SessionListItem[]; page: (args: { sessionId: st
       return { snapshot: { sessionId: command.sessionId, revision: 1, paused: false, tasks: [], queue: [], runs: [] } };
     },
     "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
-    "visualize.list": async () => ({ items: [] }),
   });
   createMessageBlocks.mockClear();
   return c;

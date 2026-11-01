@@ -81,12 +81,12 @@ question: <转义的问题>
 
 ## 实现与验证入口
 
-- `packages/tools/image-inspection/src/plugin.ts`：schema、注册、permission。
-- `packages/tools/image-inspection/src/node-ports.ts`：artifact 校验、父执行身份传递、输出与失败。
-- `packages/tools/image-inspection/src/llm-image-inspector.ts`：视觉请求、逐尝试生命周期与重试。
-- `packages/runtime/src/session/auxiliary-request-recorder.ts`：Session 归属、持久化屏障及终结幂等。
+- `packages/image/tool-image-inspection/src/plugin.ts`：schema、注册、permission。
+- `packages/image/tool-image-inspection/src/node-ports.ts`：artifact 校验、父执行身份传递、输出与失败。
+- `packages/image/tool-image-inspection/src/llm-image-inspector.ts`：视觉请求、逐尝试生命周期与重试。
+- `packages/core/runtime/src/session/auxiliary-request-recorder.ts`：Session 归属、持久化屏障及终结幂等。
 - `apps/desktop/src/main/runtime-v2/tool-host-services.ts`：Desktop 模型解析和 Host 端口。
 - `packages/core/agent/src/agent-mode-policy.ts`：模式工具白名单。
-- `packages/tools/image-inspection/src/test/`：生命周期与 Node 端口测试。
+- `packages/image/tool-image-inspection/src/test/`：生命周期与 Node 端口测试。
 
 真实验收应另行覆盖配置不可用、正常观察、取消、损坏图片、跨会话拒绝和 Provider 失败；不能仅凭源码检查声明这些交互已通过。

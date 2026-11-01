@@ -178,7 +178,7 @@ flowchart LR
 - **评分**：候选只写结果文件（CLI `--out`），v1 在沙箱退出后读取并校验。第二期不打分，只返回结果；打分属于自进化 V2，且放在沙箱外。
 - **超时与资源**：默认 10 分钟；超时与取消复用第一期的进程组终止与残留检查。内存、CPU 上限 nono 做不了，报告 `unsupported`，第二期不实现。
 - **不可用时**：Seatbelt 做不了域名白名单，没有可用的 nono 时评估沙箱不可用，直接拒绝评估，不转审批：评估跑的是整个 Harness，风险比单条 bash 大得多。
-- **接入点**：自进化 V1 已经实现（`packages/plugin-manager`、`packages/harness-hmr`，见[自进化的方案设计](../自进化的方案设计/README.md)），流程是 build → prepare → apply。自进化 V2 把评估插在 prepare 与 apply 之间：评估通过才允许 apply。
+- **接入点**：自进化 V1 已经实现（`packages/harness-evolution/plugin-manager`、`packages/harness-evolution/harness-hmr`，见[自进化的方案设计](../自进化的方案设计/README.md)），流程是 build → prepare → apply。自进化 V2 把评估插在 prepare 与 apply 之间：评估通过才允许 apply。
 
 ## 7. 排除的方案
 

@@ -10,7 +10,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const cliDir = path.join(repoRoot, "browser-bridge/apps/cli");
 const generatedPath = path.join(
   repoRoot,
-  "packages/tools/browser-tools/src/generated-actions.ts",
+  "packages/browser/tool-browser/src/generated-actions.ts",
 );
 const commandSurfacePath = path.join(
   repoRoot,

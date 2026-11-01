@@ -65,7 +65,7 @@ Lifecycle test 只证明该 Entry 的边界，不证明完整 Runtime shutdown�
 
 ### 4. Runtime integration
 
-`packages/runtime` 必须直接覆盖：
+`packages/core/runtime` 必须直接覆盖：
 
 - Boot partial failure 的逆序清理；
 - Host 装配返回 ready `BootedRuntimeProfile`，Harness generation 可并存并由租约管理；
@@ -76,7 +76,7 @@ Lifecycle test 只证明该 Entry 的边界，不证明完整 Runtime shutdown�
 - `dispose()` 幂等和并发调用；
 - restart-required 状态。
 
-当前仓库的 `packages/runtime` 已有 Profile composition、Host service 和 Agent runtime lifecycle tests；真实宿主 quit/shutdown 仍需由 Electron/CLI process smoke 补足。不得把“无测试文件但退出码为 0”计为完整 Runtime 覆盖。
+当前仓库的 `packages/core/runtime` 已有 Profile composition、Host service 和 Agent runtime lifecycle tests；真实宿主 quit/shutdown 仍需由 Electron/CLI process smoke 补足。不得把“无测试文件但退出码为 0”计为完整 Runtime 覆盖。
 
 ### 5. Host integration
 

@@ -14,7 +14,7 @@
 
 ## 2. 已交付的读取接口
 
-类型真源：`packages/shared/src/context-panel.ts`；Desktop bridge：`packages/shared/src/desktop-bridge/contract.ts`。Renderer 通过现有 `sessionsApi` 调用，不直接访问文件或数据库。这里只交付 Desktop IPC，没有新增 Web/远端接口。
+类型真源：`packages/util/shared/src/context-panel.ts`；Desktop bridge：`packages/util/shared/src/desktop-bridge/contract.ts`。Renderer 通过现有 `sessionsApi` 调用，不直接访问文件或数据库。这里只交付 Desktop IPC，没有新增 Web/远端接口。
 
 ### 概要
 

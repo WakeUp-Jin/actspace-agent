@@ -69,7 +69,7 @@ Desktop 启动必须初始化：
 
 ## 当前主要缺口
 
-- `packages/runtime` 的直接 lifecycle / shutdown 测试仍需补强；当前主要由 CLI 和 Host integration 间接覆盖。
+- `packages/core/runtime` 的直接 lifecycle / shutdown 测试仍需补强；当前主要由 CLI 和 Host integration 间接覆盖。
 - 真实 Provider、Browser、DMG、签名与公证受当前网络或宿主能力限制，仍未形成最终发布证据。
 - Renderer 主 bundle 及部分大型组件需要后续性能和可维护性拆分，但不属于本轮文档真相修复。
 

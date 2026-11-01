@@ -17,9 +17,9 @@
 ## 必读
 
 - `AGENTS.md`、`docs/SECURITY.md`、`docs/CODING_BEHAVIOR.md`。
-- 代码：`packages/shared/src/ipc.ts`（`RunAgentInput`，约 134 行）、`packages/shared/src/session.ts`（`UserMessagePayload` 约 185 行、`MessageBlock` user 约 696 行）、`packages/shared/src/chat-attachments.ts`（`RunAgentPreparationFailure`）、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`（`agent:run` handler 约 222 行、`toRunContent` 约 759 行）、`packages/core/agent-loop/src/loop.ts`（`toLlmContent` 约 393 行）、`packages/client/src/sessions/chat.ts`（`projectSurfaceNode` 约 185 行、`contentText` / `attachmentViews`）、`packages/shared/src/session-selectors.ts`（`createMessageBlocks` 约 371 行）、`packages/shared/src/session-transcript.ts`、`apps/desktop/src/main/artifact-context-menu-service.ts`（realpath 双重校验的参考写法）。
+- 代码：`packages/util/shared/src/ipc.ts`（`RunAgentInput`，约 134 行）、`packages/util/shared/src/session.ts`（`UserMessagePayload` 约 185 行、`MessageBlock` user 约 696 行）、`packages/util/shared/src/chat-attachments.ts`（`RunAgentPreparationFailure`）、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`（`agent:run` handler 约 222 行、`toRunContent` 约 759 行）、`packages/core/agent-loop/src/loop.ts`（`toLlmContent` 约 393 行）、`packages/client/client/src/sessions/chat.ts`（`projectSurfaceNode` 约 185 行、`contentText` / `attachmentViews`）、`packages/util/shared/src/session-selectors.ts`（`createMessageBlocks` 约 371 行）、`packages/util/shared/src/session-transcript.ts`、`apps/desktop/src/main/artifact-context-menu-service.ts`（realpath 双重校验的参考写法）。
 
-## 契约（以 `packages/shared/src/composer-content.ts` 为唯一真源）
+## 契约（以 `packages/util/shared/src/composer-content.ts` 为唯一真源）
 
 ```ts
 export const COMPOSER_REFERENCE_LIMITS = {
@@ -94,7 +94,7 @@ The user referenced this workspace file. It has not been read; use read tools if
 
 ### P0.1 shared 类型、校验与块读写
 
-- 新增 `packages/shared/src/composer-content.ts`，从 `packages/shared/src/index.ts` 导出。
+- 新增 `packages/util/shared/src/composer-content.ts`，从 `packages/util/shared/src/index.ts` 导出。
 - 函数：
   - `normalizeWorkspaceRelativePath(path: string): string | null`：统一 `\` 为 `/`，去掉开头的 `./`；拒绝空串、绝对路径（`/`、盘符、`\\`）、`file://` 等 URL、NUL 字符、任意 `..` 段、超长。
   - `validateFileReferences(refs: unknown): { ok: true; value: FileReference[] } | { ok: false; issue: ComposerReferenceIssue }`：逐条规范化、按 `relativePath` 去重并保持顺序、检查数量。
@@ -103,8 +103,8 @@ The user referenced this workspace file. It has not been read; use read tools if
   - `readFileReferenceBlocks(content: unknown): FileReference[]`、`readResponseExcerptBlocks(content: unknown): ResponseAnnotationReference[]`：从 surface content 里宽松读取，不合法的块跳过。
   - `renderFileReferencesForModel(refs)`、`renderResponseExcerptForModel(ann)`：生成上面的模型文本。
   - `formatComposerReferenceIssue(issue): string`：中文错误文案，比如「文件“src/a.ts”不存在或已被移动」「引用的回复已不在当前会话中」。
-- 修改 `packages/shared/src/ipc.ts`、`session.ts`、`chat-attachments.ts` 按上面的契约加字段。
-- 测试 `packages/shared/src/test/composer-content.test.ts`，至少覆盖：
+- 修改 `packages/util/shared/src/ipc.ts`、`session.ts`、`chat-attachments.ts` 按上面的契约加字段。
+- 测试 `packages/util/shared/src/test/composer-content.test.ts`，至少覆盖：
   - 路径：`src/a.ts` 通过；`./src/a.ts` → `src/a.ts`；`src\\a.ts` → `src/a.ts`；`/etc/passwd`、`C:\\x`、`../x`、`a/../../x`、`file:///x`、含 NUL、超长 全部拒绝。
   - 文件引用去重、超过 20 条返回 `too_many_references`。
   - 批注：`start >= end`、非整数、空白文本、8001 码点文本、2001 码点评论、21 条 均返回对应 code；emoji / 中文按码点计长度。
@@ -138,15 +138,15 @@ The user referenced this workspace file. It has not been read; use read tools if
 - 压缩摘要（`packages/compaction/src/summarizer.ts`）目前对非 runtime-context 块整体 `JSON.stringify`，新块会原样保留在摘要输入里，不改；补一条测试确认新块不会被当成 runtime-context 过滤掉。
 - 测试：在 `packages/core/agent-loop/src/test/` 增加用例，构造带两种新块的用户 surface，断言发给 LLM 的 content 文本与 golden 一致，且 `request/context` 快照中包含这段文本（证明 context 用量计入）。
 
-验证：`pnpm --filter @actspace/core-agent-loop test`、`pnpm --filter @actspace/compaction test`（若该包无测试脚本则在执行过程中注明）。
+验证：`pnpm --filter @actspace/agent-loop test`、`pnpm --filter @actspace/compaction test`（若该包无测试脚本则在执行过程中注明）。
 
 ### P0.4 历史投影与 transcript
 
-- `packages/client/src/sessions/chat.ts` 的 `projectSurfaceNode`：user 分支在 payload 中加 `fileReferences: readFileReferenceBlocks(node.content)`、`responseAnnotations: readResponseExcerptBlocks(node.content)`，为空时不写字段。`contentText` 已经忽略未知块类型，不改，并用测试锁住「正文不含引用内容」。
-- `packages/shared/src/session-selectors.ts` 的 `createMessageBlocks`：user 分支透传两个字段。
-- `packages/shared/src/session-transcript.ts`：在 Attachments 之后追加 `Referenced files:` 路径列表和 `Quoted replies: N`（只写数量，不重复选中原文）。
+- `packages/client/client/src/sessions/chat.ts` 的 `projectSurfaceNode`：user 分支在 payload 中加 `fileReferences: readFileReferenceBlocks(node.content)`、`responseAnnotations: readResponseExcerptBlocks(node.content)`，为空时不写字段。`contentText` 已经忽略未知块类型，不改，并用测试锁住「正文不含引用内容」。
+- `packages/util/shared/src/session-selectors.ts` 的 `createMessageBlocks`：user 分支透传两个字段。
+- `packages/util/shared/src/session-transcript.ts`：在 Attachments 之后追加 `Referenced files:` 路径列表和 `Quoted replies: N`（只写数量，不重复选中原文）。
 - 测试：
-  - `packages/client/src/test/`：旧 journal fixture 投影结果与改动前完全一致；新 fixture（正文 + 2 个文件引用 + 1 个批注 + 1 张图片）投影出正确的 content / attachments / fileReferences / responseAnnotations。
+  - `packages/client/client/src/test/`：旧 journal fixture 投影结果与改动前完全一致；新 fixture（正文 + 2 个文件引用 + 1 个批注 + 1 张图片）投影出正确的 content / attachments / fileReferences / responseAnnotations。
   - `session-selectors`、`session-transcript` 对应测试补新字段用例。
 
 验证：`pnpm --filter @actspace/client test`、`pnpm --filter @actspace/shared test`。

@@ -5,7 +5,11 @@ import { registerPerformanceIpc } from "./performance-ipc";
 import { ModelCatalogService } from "./model-catalog-service";
 import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
-import { app, BrowserWindow, globalShortcut, safeStorage, webContents, net, screen } from "electron";
+import { BROWSER_PLUGIN_ID, disabledPluginIds, ENGLISH_LEARNING_PLUGIN_ID, resolvePluginSwitches } from "./plugins/plugin-switches";
+import { registerPluginsIpc } from "./plugins/plugins-ipc";
+import { registerDisabledEnglishLearningIpc } from "./plugins/optional-plugin-stubs";
+import { loadRuntimeV2Module } from "./runtime-v2/runtime-loader";
+import { app, BrowserWindow, globalShortcut, safeStorage, net, screen } from "electron";
 import { presentQuickOpenWindow } from "./quick-open-window";
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -23,8 +27,6 @@ import { ModelStoreService } from "./model-store-service";
 import { ModelRuntimeService } from "./model-runtime-service";
 import { DesktopRuntimeV2Registry } from "./runtime-v2/runtime-registry";
 import { registerRuntimeV2DesktopShell } from "./runtime-v2/desktop-shell-ipc";
-import { TerminalSessionService } from "./terminal/terminal-session-service";
-import { createNodePtyBackend } from "./terminal/node-pty-terminal-backend";
 import { ProviderNetworkService } from "./runtime-v2/provider-network-service";
 import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
 import { registerFixedRendererIpc, type FixedRendererIpcRegistration } from "./runtime-v2/fixed-renderer-ipc";
@@ -41,13 +43,13 @@ let mainWindow: BrowserWindow | undefined;
 let runtimeV2Registry: DesktopRuntimeV2Registry | undefined;
 let disposePerformanceIpc: (() => void) | undefined;
 let disposeEnglishLearningIpc: (() => void) | undefined;
+let disposePluginsIpc: (() => void) | undefined;
 let speechPlayback: DesktopSpeechPlayback | undefined;
 let disposeRuntimeV2DesktopShell: (() => void) | undefined;
 let remoteDesktop: RemoteDesktopAdapter | undefined;
 let remoteHosts: RemoteHostRegistry | undefined;
 let disposeRemoteHostIpc: (() => void) | undefined;
 let fixedRendererIpc: FixedRendererIpcRegistration | undefined;
-let terminalSessionService: TerminalSessionService | undefined;
 let settingsService: SettingsService | undefined;
 let pricingCatalog: ModelCatalogService | undefined;
 let modelRuntimeService: ModelRuntimeService | undefined;
@@ -154,8 +156,6 @@ async function createMainWindow(): Promise<BrowserWindow> {
   attachNavigationGuards(win, createAppUrlMatcher({ devServerUrl: DEV_SERVER_URL, indexHtmlPath }));
   attachWindowLifecycle(win, {
     onClosed: () => { if (mainWindow === win) mainWindow = undefined; },
-    closeOwnedTerminals: async (ownerId) => { await terminalSessionService?.closeOwner(ownerId); },
-    log: (message, details) => void logMain(message, details),
   });
   if (DEV_SERVER_URL) await win.loadURL(DEV_SERVER_URL);
   else await win.loadFile(indexHtmlPath);
@@ -179,13 +179,19 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
       .catch((error) => void logMain("quick open presentation failed", { error: String(error) }));
   }, quickOpenSettings.accelerator);
   await logMain("v2 quick open initialized", quickOpenShortcutController.activate(quickOpenSettings));
-  browserBridgeService = new BrowserBridgeService({
+  // Startup switches: fixed for this process. A switched-off plugin is not created, polled or installed;
+  // changing the setting only takes effect after a restart (see plugin-switches.ts).
+  const runtimeModule = await loadRuntimeV2Module();
+  const startupSwitches = resolvePluginSwitches(settingsService.getV4().settings, runtimeModule.PLUGIN_CATALOG);
+  const browserEnabled = startupSwitches.get(BROWSER_PLUGIN_ID) === true;
+  const englishLearningEnabled = startupSwitches.get(ENGLISH_LEARNING_PLUGIN_ID) === true;
+  browserBridgeService = browserEnabled ? new BrowserBridgeService({
     dataRoot: roots.dataRoot,
     bundledRoot: app.isPackaged && !process.env.ACTSPACE_DEV_APP_ID
       ? join(process.resourcesPath, "app", "browser-components")
       : join(roots.logRoot, "..", "dist", "browser-components"),
     log: (message, details) => void logMain(message, details),
-  });
+  }) : undefined;
   localUpdateService = new LocalUpdateService({
     dataRoot: roots.dataRoot,
     appPath: app.getPath("exe"),
@@ -196,10 +202,11 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   const packagedResources = app.isPackaged && !process.env.ACTSPACE_DEV_APP_ID;
   const nonoPath = resolveDesktopNonoPath({ packaged: packagedResources, resourcesPath: process.resourcesPath, repoRoot: join(roots.logRoot, ".."), env: process.env });
   await logMain("sandbox nono resolved", { nonoPath: nonoPath ?? null });
-  const speech = new DesktopSpeechPlayback(roots.tmpRoot, settingsService);
+  const speech = englishLearningEnabled ? new DesktopSpeechPlayback(roots.tmpRoot, settingsService) : undefined;
   speechPlayback = speech;
   runtimeV2Registry = new DesktopRuntimeV2Registry({
     speech,
+    disabledPlugins: disabledPluginIds(startupSwitches),
     roots,
     models: modelRuntimeService,
     approvals: approvalRegistry,
@@ -209,34 +216,10 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     chatCompactionTriggerRatio: () => settingsService?.getV4().settings.general.taskDefaults.chatCompactionTriggerRatio ?? 0.8,
     log: (message, details) => void logMain(message, details),
   });
-  const terminalNativeAvailable = hasNodePty();
-  if (terminalNativeAvailable) {
-    terminalSessionService = new TerminalSessionService({
-      readSession: async (sessionId) => {
-        try {
-          const snapshot = await runtimeV2Registry!.inspectSession(sessionId);
-          return { workspaceRoot: snapshot.workspaceRoot ?? roots.workspaceRoot };
-        } catch {
-          return null;
-        }
-      },
-      resolveWorkspaceRoot: async (workspaceRoot) => workspaceRoot ?? roots.workspaceRoot,
-      createBackend: createNodePtyBackend,
-      sendEvent: (ownerId, event) => {
-        const owner = webContents.fromId(ownerId);
-        if (owner && !owner.isDestroyed()) {
-          owner.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalEvent, event);
-        }
-      },
-      log: (message, details) => void logMain(message, details),
-    });
-  }
   disposeRuntimeV2DesktopShell = registerRuntimeV2DesktopShell({
     roots,
     getMainWindow,
     listSessions: async () => runtimeV2Registry?.listSessions() ?? [],
-    terminal: terminalSessionService,
-    terminalAvailable: terminalNativeAvailable,
   }).dispose;
   await runtimeV2Registry.boot();
   const syncBrowser = async () => {
@@ -264,9 +247,12 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
       scheduleBrowserSync(Math.round(base * (0.9 + Math.random() * 0.2)));
     }
   };
-  scheduleBrowserSync(1_000);
+  if (browserBridgeService) scheduleBrowserSync(1_000);
   disposePerformanceIpc = registerPerformanceIpc(getMainWindow);
-  disposeEnglishLearningIpc = registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow });
+  disposeEnglishLearningIpc = englishLearningEnabled
+    ? registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow })
+    : registerDisabledEnglishLearningIpc({ getMainWindow: () => getMainWindow() ?? null });
+  disposePluginsIpc = registerPluginsIpc({ getMainWindow, catalog: runtimeModule.PLUGIN_CATALOG, startupSwitches, settings: settingsService });
   remoteHosts = new RemoteHostRegistry(roots.dataRoot);
   await remoteHosts.open();
   disposeRemoteHostIpc = registerRemoteHostIpc(remoteHosts, getMainWindow, async sessionId => { await remoteDesktop?.activate(sessionId); });
@@ -328,7 +314,6 @@ app.on("before-quit", (event) => {
       pricingCatalog?.dispose();
       await providerNetworkService?.dispose();
       quickOpenShortcutController?.dispose();
-      terminalSessionService?.disposeAll();
     } catch (error) {
       await logMain("v2 shutdown incomplete", { error: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -337,6 +322,7 @@ app.on("before-quit", (event) => {
       localUpdateService?.dispose();
       disposePerformanceIpc?.();
       disposeEnglishLearningIpc?.();
+      disposePluginsIpc?.();
       await speechPlayback?.dispose();
       clearTimeout(timeout);
       disposeRuntimeV2DesktopShell?.();
@@ -345,12 +331,3 @@ app.on("before-quit", (event) => {
     }
   })();
 });
-
-function hasNodePty(): boolean {
-  try {
-    require.resolve("node-pty");
-    return true;
-  } catch {
-    return false;
-  }
-}

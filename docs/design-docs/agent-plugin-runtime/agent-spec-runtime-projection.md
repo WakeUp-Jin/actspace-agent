@@ -531,9 +531,9 @@ Runtime 重启后不恢复旧 live progress。Session repair 根据 Journal：
   "finishedAt": "2026-08-22T10:00:00.014Z",
   "durationMs": 14,
   "argsSummary": {
-    "text": "Read packages/runtime/src/index.ts",
+    "text": "Read packages/core/runtime/src/index.ts",
     "fields": [
-      { "name": "path", "value": "packages/runtime/src/index.ts", "redacted": false }
+      { "name": "path", "value": "packages/core/runtime/src/index.ts", "redacted": false }
     ]
   },
   "modelOutput": [
@@ -833,7 +833,7 @@ Session Projection Cache 保存 reducer state、stateVersion、checkpoint seq、
 
 ### Registry 原子提交与恢复
 
-`packages/session/projection/src/registry.ts` 是唯一 Host registry。所有 definition 成功后才提交新状态与水位；checkpoint 保存内部 reducer state 而非展示 value。`replayTail` 先验证尾部连续性，再折叠有效事务与 pending，不生成中间 view 或实时通知；实时事件走 apply。未知 required 事件不伪装成可写会话。
+`packages/session/session-projection/src/registry.ts` 是唯一 Host registry。所有 definition 成功后才提交新状态与水位；checkpoint 保存内部 reducer state 而非展示 value。`replayTail` 先验证尾部连续性，再折叠有效事务与 pending，不生成中间 view 或实时通知；实时事件走 apply。未知 required 事件不伪装成可写会话。
 
 2026-10-18：Runtime 完成 definition 注册后调用 `seal()`，不再保留第二份完整重放正文，保留最近 512 条事件指纹和 pending transaction。已知重复幂等；冲突或超过保留范围、无法证明一致的旧重复要求 resync。未封口 registry 为兼容晚注册仍可保留历史，不能把生产封口行为泛化为所有实例。`checkpoint` 是派生状态对象，不表示启用了新的 JSON 检查点文件。
 

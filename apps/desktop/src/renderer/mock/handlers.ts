@@ -23,6 +23,8 @@ import { MOCK_REPLY, MOCK_SIDE_CHAT_REPLY, playReply, type ReplyPlayback } from 
 import { MOCK_CONTEXT_PATHS, MOCK_CONTEXT_PATHS_REVISION, mockContextPanelView, mockContextState } from "./context-panel-fixture";
 import { mockContextPathsPage } from "./context-paths-fixture";
 import { createModelConnectionsMock } from "./model-connections-fixture";
+import { mockPluginList } from "./plugins-fixture";
+import { mockListMarkdownFiles, mockReadMarkdown, mockStatMarkdown, mockWriteMarkdown } from "./docs-fixture";
 
 /** 按域覆盖 mock 实现；未覆盖的成员用默认实现，默认也没有的成员调用时 reject。 */
 export type MockHandlers = { [D in keyof DesktopBridge]?: Partial<DesktopBridge[D]> };
@@ -115,7 +117,6 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       importComposerImage: async () => ({ ok: false, error: { code: "write_failed", message: "浏览器 mock 模式不保存图片。" } }),
       getPathForFile: (file) => file.name,
     },
-    visualize: { list: async () => ({ items: [] }) },
     workspaces: {
       list: async () => db.workspaces,
       setVisibility: async ({ workspaceId, hidden }) => {
@@ -132,8 +133,11 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         db.workspaces = { ...db.workspaces, items: [...db.workspaces.items, { id: workspaceId, kind: "folder", label: name, path: workspaceRoot, order: db.workspaces.items.length, createdAt: now, updatedAt: now }] };
         return { ok: true, workspaceId, workspaceRoot };
       },
-      listDir: async ({ workspaceRoot }) => ({ root: workspaceRoot ?? db.bootstrap.workspaceRoot, relativePath: "", entries: [] }),
-      statFile: async ({ relativePath }) => ({ relativePath, size: 0, mtimeMs: 0, error: "not_found" }),
+      // 「文档」面板的数据来自内存里的示例目录（mock/docs-fixture.ts），预览、编辑、保存都能在浏览器里检查。
+      listMarkdownFiles: async () => mockListMarkdownFiles(),
+      readFile: async ({ relativePath }) => mockReadMarkdown(relativePath),
+      statFile: async ({ relativePath }) => mockStatMarkdown(relativePath),
+      writeMarkdownFile: async ({ relativePath, content }) => mockWriteMarkdown(relativePath, content),
       // 浏览器 mock 没有真实的关联应用；给几个示例应用，让交付卡的下拉菜单可以检查。
       listFileApplications: async () => ({
         applications: [
@@ -196,7 +200,6 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
     },
     usage: { getStatus: async () => null, cancel: async () => undefined, getStatistics: async () => null, getActivity: async () => null },
     // 浏览器里没有 pty：列表为空，其余操作在 UI 上不会出现（终端入口只在开发功能开启时显示）。
-    terminal: { list: async () => ({ terminals: [] }) },
     settings: {
       get: async () => db.settings,
       update: async (patch) => {
@@ -209,6 +212,9 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         if (expectedRevision !== latest.revision) return { ok: false, code: "revision_conflict", latest, message: "设置已在别处修改。" };
         const revision = `mock-${Number(latest.revision.replace("mock-", "")) + 1}`;
         db.settingsV4 = { ...latest, revision, settings: { ...latest.settings, [namespace]: { ...latest.settings[namespace], ...patch } } };
+        if (namespace === "tools" && "plugins" in patch) {
+          db.settingsV4.settings.tools.plugins = { ...latest.settings.tools.plugins, ...patch.plugins };
+        }
         if (namespace === "tools" && "searchProviders" in patch) {
           db.settingsV4.settings.tools.searchProviders = { ...latest.settings.tools.searchProviders, ...patch.searchProviders };
         }
@@ -242,6 +248,7 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
     modelConnections: createModelConnectionsMock(),
     englishLearning: { getState: async () => mockEnglishLearningState() },
     browserBridge: { getStatus: async () => mockBrowserBridgeStatus() },
+    plugins: { list: async () => mockPluginList(db.settingsV4.settings) },
     skills: { list: async () => ({ items: [], warnings: [] }) },
     updates: { getState: async () => mockLocalUpdateState() },
     appearance: {

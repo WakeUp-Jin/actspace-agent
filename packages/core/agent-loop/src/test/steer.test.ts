@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MainAgentInbox } from "@actspace/core-agent";
+import { MainAgentInbox } from "@actspace/agent";
 import type { LlmMessage } from "@actspace/llm-service";
 import type { AgentLoop } from "../loop.js";
 import { runToolStreamFixture } from "../testing.js";

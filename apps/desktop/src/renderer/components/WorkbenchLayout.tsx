@@ -41,6 +41,10 @@ import { NewSpaceDialog } from "./space/dialogs/NewSpaceDialog";
 import { SpaceDemoHelpButton } from "./space/dialogs/SpaceDemoHelpDialog";
 import { useSpacePanelBinding } from "./space/use-space-panel-binding";
 import { TrajectoryNavigationProvider } from "./trajectory/TrajectoryNavigation";
+import { OpenFileFallbackProvider } from "./files/open-file-fallback-context";
+
+/** 「文档」标签的右栏默认宽度；窗口放不下时由 rightMaxWidth 截断。 */
+const DOCS_RIGHT_DEFAULT_WIDTH = 720;
 
 export function WorkbenchLayout({
   sessions,
@@ -69,13 +73,17 @@ export function WorkbenchLayout({
   const { target, capabilities, selectedWorkspaceRoot } = useRunTargetContext();
   const executionRoot = localExecutionRoot(target, selectedWorkspaceRoot);
   const reviewEnabled = capabilities.review.enabled;
-  const terminalEnabled = capabilities.terminal.enabled;
+  const workspacePanelsEnabled = capabilities.workspacePanels.enabled;
   const {
     isOpen: isRightPanelOpen,
     openPanel: openRightPanel,
     closePanel: closeRightPanel,
     openTab,
+    activeTab: activeRightTab,
+    docsExpanded,
   } = useRightPanel();
+  // 「文档」标签自己记一个宽度：正文 + 260px 文件树放不进默认的 390px 右栏，拖宽它不该改掉其他标签的宽度。
+  const [docsRightWidth, setDocsRightWidth] = useState(DOCS_RIGHT_DEFAULT_WIDTH);
   const [view, setView] = useState<SidebarView>("chat");
   const [returnFocusRequest, setReturnFocusRequest] = useState(0);
   // 所有 Space 分支都挂在 SPACE_DEMO_ENABLED 上：生产构建里它是常量 false，演示代码整块删掉。
@@ -161,7 +169,7 @@ export function WorkbenchLayout({
     openTab({
       id: `review:${executionRoot ?? ""}`,
       kind: "review",
-      title: "Review",
+      title: "改动",
       workspaceRoot: executionRoot,
       scope: "uncommitted",
       refreshKey,
@@ -369,14 +377,14 @@ export function WorkbenchLayout({
   );
   const rightPanel = isSpace ? <SpaceRightPanel /> : (
     <RightPanel
-      developmentEnabled={composerMode !== "chat" && terminalEnabled}
+      developmentEnabled={composerMode !== "chat" && workspacePanelsEnabled}
       contextState={effectiveContextState}
       contextRevision={projectionCell?.snapshot?.throughJournalSeq}
       sessionId={activeSessionId}
       workspaceRoot={executionRoot}
       fileRevalidateKey={fileRevalidateKey}
+      agentEditedPaths={agentEditedPaths}
       onOpenReview={openReviewTab}
-      onReviewChanged={onReviewChanged}
       onSendToAgent={onSend ? (text) => onSend(text, {
         model: selectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID,
         mode: composerMode ?? "agent",
@@ -389,15 +397,18 @@ export function WorkbenchLayout({
   // 有右栏的视图：普通会话，以及 Space 演示里除名册以外的页面。
   const hasRightPanel = view === "chat" || (isSpace && spacePanelAvailable);
   const rightPanelShown = view === "chat" ? isRightPanelOpen : hasRightPanel && spacePanelOpen;
+  const docsTabActive = view === "chat" && activeRightTab?.kind === "docs";
+  const effectiveRightWidth = docsTabActive ? Math.min(Math.max(docsRightWidth, RIGHT_MIN_WIDTH), rightMaxWidth) : rightWidth;
 
   return (
     <TrajectoryNavigationProvider onShowTrajectory={showSessionTrajectory}>
+      <OpenFileFallbackProvider>
       <WindowChromeBar
         leftMode={chromeLeftMode}
         rightOpen={rightPanelShown}
         title={chromeTitle}
         leftPaneWidth={displayedLeftWidth}
-        rightPaneWidth={rightWidth}
+        rightPaneWidth={effectiveRightWidth}
         compactLayout={isCompactLayout}
         onToggleLeft={toggleSidebarMode}
         onToggleRight={toggleRightPanel}
@@ -419,7 +430,7 @@ export function WorkbenchLayout({
             <>
               {isRightPanelOpen ? (
                 <RightPanelObjectMenu
-                  developmentEnabled={composerMode !== "chat" && terminalEnabled}
+                  developmentEnabled={composerMode !== "chat" && workspacePanelsEnabled}
                   sessionId={activeSessionId}
                   onOpenReview={openReviewTab}
                 />
@@ -440,12 +451,13 @@ export function WorkbenchLayout({
         onLeftKeyResize={keyResizeLeftPanel}
         onLeftResize={resizeLeftPanel}
         onLeftSeparatorDoubleClick={toggleSidebarMode}
-        onRightResize={resizeRightPanel}
-        onRightSeparatorDoubleClick={resetRightWidth}
+        onRightResize={docsTabActive ? setDocsRightWidth : resizeRightPanel}
+        onRightSeparatorDoubleClick={docsTabActive ? () => setDocsRightWidth(DOCS_RIGHT_DEFAULT_WIDTH) : resetRightWidth}
         right={rightPanelShown && !isCompactLayout ? rightPanel : undefined}
         rightBounds={{ minWidth: RIGHT_MIN_WIDTH, maxWidth: rightMaxWidth }}
         rightSeparatorLabel="调整预览面板宽度"
-        rightWidth={rightWidth}
+        rightWidth={effectiveRightWidth}
+        rightExpanded={docsExpanded && activeRightTab?.kind === "docs" && rightPanelShown && !isCompactLayout}
       />
       {(isCompactLayout ? !compactSidebarOpen : isSidebarHidden) ? <PerformancePanel compact /> : null}
       {isCompactLayout && compactSidebarOpen ? (
@@ -475,6 +487,7 @@ export function WorkbenchLayout({
         </div>
       ) : null}
       {SPACE_DEMO_ENABLED ? <NewSpaceDialog open={newSpaceOpen} onOpenChange={setNewSpaceOpen} onCreated={() => handleSelectView("space")} /> : null}
+      </OpenFileFallbackProvider>
     </TrajectoryNavigationProvider>
   );
 }

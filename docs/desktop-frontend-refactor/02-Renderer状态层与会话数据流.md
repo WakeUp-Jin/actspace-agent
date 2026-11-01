@@ -58,7 +58,7 @@ window.actspace ────┤                                                 
 
 - **正文以 App 的 `messages` 为准**（`App.tsx:2187-2203`）：durable 块 + 本地流式块 + 压缩失败块 + 后台 bash 状态覆写。
 - **projection cell 对正文没有决定权**：`selectSurfaceMessages` 只取 `.length` 作为 `durableSurfaceMessageCount`（`WorkbenchLayout.tsx:218`、`:576`）；`selectComposer` 只取 `phase`；`selectTrajectory` / `selectRequestContextEstimate` 分别给轨迹视图和 Context 面板。
-- **本地流式重建不是遗留代码**：`@actspace/client` 的 `ClientLiveOverlay`（`packages/client/src/sessions/live-overlay.ts`）只有 `kind / message / callId / phase`，没有文本 delta 和工具进度，暂时替代不了 `onAgentStream`。
+- **本地流式重建不是遗留代码**：`@actspace/client` 的 `ClientLiveOverlay`（`packages/client/client/src/sessions/live-overlay.ts`）只有 `kind / message / callId / phase`，没有文本 delta 和工具进度，暂时替代不了 `onAgentStream`。
 
 ## 2. 问题清单
 
@@ -98,7 +98,7 @@ type BlockIdentity =
 type TurnKey = { runId: string };      // 一个 turn 的 durable 块与 live 块按 runId 对齐
 ```
 
-- durable 块由 projection 产出时带 `sourceSeq` 和 `runId`；live 块带 `runId`。（2026-10-05 核实：数据源头已有这两个值——journal envelope 的 `seq` 与 `data.agentRunId`；只是 `projectChatWindow` 把 seq 拼进了 `id: "v2-${seq}"`（`packages/client/src/sessions/chat.ts:606`），`createMessageBlocks` 把 runId 拼进了 `renderKey: "turn:${agentRunId}:…"`（`packages/shared/src/session-selectors.ts:406-415`），`MessageBlock` 类型上没有对应字段。）
+- durable 块由 projection 产出时带 `sourceSeq` 和 `runId`；live 块带 `runId`。（2026-10-05 核实：数据源头已有这两个值——journal envelope 的 `seq` 与 `data.agentRunId`；只是 `projectChatWindow` 把 seq 拼进了 `id: "v2-${seq}"`（`packages/client/client/src/sessions/chat.ts:606`），`createMessageBlocks` 把 runId 拼进了 `renderKey: "turn:${agentRunId}:…"`（`packages/util/shared/src/session-selectors.ts:406-415`），`MessageBlock` 类型上没有对应字段。）
 - 合并规则只有一条：**某个 runId 一旦在 durable 里出现 `run_completed`（或已持久化到对应 part），该 runId 的 live 块整体让位**。
 - 事件序号使用 envelope 自带的 `seq`，不再从 id 字符串解析。
 
@@ -107,7 +107,7 @@ type TurnKey = { runId: string };      // 一个 turn 的 durable 块与 live �
 - 写入者 A：`sessionStore.subscribe`（`:888-892`）——store cell 变化就 `setSessionRecord(selectChatSession(cell))`，**整体替换**。
 - 写入者 B：`readSessionPage`（`:1346-1352`）、`loadEarlierMessages`（`:1376-1382`）——手工把旧 `events` 与新页合并，再 `createMessageBlocks(events)` **全量重算**。
 
-两者交错时，A 的整体替换会冲掉 B 合并进来的 earlier 页。并且 store 的 `applyEnvelope` 已经按 seq 合并窗口、保留 earlier 页（`packages/client/src/sessions/session.ts:101-110`），B 的手工合并是重复劳动。
+两者交错时，A 的整体替换会冲掉 B 合并进来的 earlier 页。并且 store 的 `applyEnvelope` 已经按 seq 合并窗口、保留 earlier 页（`packages/client/client/src/sessions/session.ts:101-110`），B 的手工合并是重复劳动。
 
 此外：
 
@@ -248,7 +248,7 @@ function selectTranscript(cell: SessionCell, live: LiveRunState | undefined, loc
 3. 压缩失败块、后台 bash 状态覆写作为最后一层装饰。
 4. 纯函数，单测覆盖：正常流式、恢复中的 run、durable 先到 / live 先到、重复 user 消息、超长会话分页。
 
-实现方式（02-2 已拍板方案一）：`MessageBlock` 新增可选字段 `runId`、`sourceSeq`，由 `packages/client` 的 `projectChatWindow` 与 `packages/shared` 的 `createMessageBlocks` 从已收到的 envelope 填充；只是新增可选字段，renderer 本地计算，不改 Runtime / Host / Session 协议。`renderKey` 保留，仅用于 DOM 复用，不再参与去重。
+实现方式（02-2 已拍板方案一）：`MessageBlock` 新增可选字段 `runId`、`sourceSeq`，由 `packages/client/client` 的 `projectChatWindow` 与 `packages/util/shared` 的 `createMessageBlocks` 从已收到的 envelope 填充；只是新增可选字段，renderer 本地计算，不改 Runtime / Host / Session 协议。`renderKey` 保留，仅用于 DOM 复用，不再参与去重。
 
 ### 3.3 Context 取代 prop 钻取
 

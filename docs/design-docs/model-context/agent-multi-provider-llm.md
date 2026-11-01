@@ -13,7 +13,7 @@
 
 相关当前实现文档：
 
-- `packages/runtime/`、`packages/llm/` 与 `docs/design-docs/agent-plugin-runtime/`：当前 v2 Runtime、LLM 领域包与插件边界事实。
+- `packages/core/runtime/`、`packages/llm/` 与 `docs/design-docs/agent-plugin-runtime/`：当前 v2 Runtime、LLM 领域包与插件边界事实。
 - `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置中心的信息架构、模型统一流程和持久化边界；旧设置页仅作迁移追溯。
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：模型 usage、价格快照和成本统计。
 
@@ -463,7 +463,7 @@ Kairos 已随 v2 唯一切换移除，不再是当前设置导航或模型分配
 → available 后安装默认模型
 ```
 
-联网搜索服务属于 `packages/tools/web-tools` 的 Host 搜索通道，不与 LLM Model Registry 混合；它们在设置 UI 中归入“工具 → 联网能力”，不再占用独立顶层入口。
+联网搜索服务属于 `packages/web/tool-web` 的 Host 搜索通道，不与 LLM Model Registry 混合；它们在设置 UI 中归入“工具 → 联网能力”，不再占用独立顶层入口。
 
 “添加连接”只展示尚未配置的三家受支持服务商，不展示尚未实现的供应商。
 

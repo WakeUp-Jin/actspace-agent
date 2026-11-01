@@ -37,5 +37,5 @@
 - [上下文管理引擎的插件拆分和上下文的插件拆分](上下文管理引擎的插件拆分和上下文的插件拆分.md)
 
 - [渐进式披露设计](agent-progressive-disclosure.md)：已确认的活跃与睡眠路径、压缩周期计数和整理流程。
-- [LLM 当前请求类型](../../../packages/llm/service/src/service.ts)：`PrepareLlmRequest`。
-- [LLM 当前消息类型](../../../packages/llm/service/src/message.ts)：`LlmMessage`、`LlmContentBlock`、`LlmToolDefinition`。
+- [LLM 当前请求类型](../../../packages/llm/llm-service/src/service.ts)：`PrepareLlmRequest`。
+- [LLM 当前消息类型](../../../packages/llm/llm-service/src/message.ts)：`LlmMessage`、`LlmContentBlock`、`LlmToolDefinition`。

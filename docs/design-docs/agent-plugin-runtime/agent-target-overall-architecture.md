@@ -29,12 +29,12 @@ flowchart TD
 | 模块 | 职责与边界 | 源码 |
 | --- | --- | --- |
 | CLI 适配器 | 参数、输出/退出、managed Runtime 加载与 Host ports | `apps/cli/src/runtime-v2/{host,host-adapter,host-command}.ts` |
-| 独立 Host | 认证、网关、文件、订阅、维护；drain/强停/诊断 | `packages/agent-host/src/{bootstrap,lifecycle}.ts` |
+| 独立 Host | 认证、网关、文件、订阅、维护；drain/强停/诊断 | `packages/host/agent-host/src/{bootstrap,lifecycle}.ts` |
 | Desktop Host | Electron、Main-only 凭据、IPC、本机能力与远端连接 | `apps/desktop/src/main/runtime-v2/` |
-| Runtime / Boot | Profile composition、可信 codec 发现、Cordis 装配和 shutdown | `packages/runtime/`、`packages/boot/` |
-| Harness 控制 | 固定产物、候选验证、授权启用、恢复与选择 | `packages/harness-control/` |
-| 应用和调度 | AgentApplication 应用操作、AgentService 任务调度、ManagedRuns 持有运行实例 | `packages/agent-service/`、`packages/runtime/src/harness/managed-runs.ts` |
-| 客户端策略 | Desktop 标题/辅助文本；Headless 单次任务/信号/退出 | `packages/desktop-app/`、`packages/headless/` |
+| Runtime / Boot | Profile composition、可信 codec 发现、Cordis 装配和 shutdown | `packages/core/runtime/`、`packages/composition/boot/` |
+| Harness 控制 | 固定产物、候选验证、授权启用、恢复与选择 | `packages/harness-evolution/harness-control/` |
+| 应用和调度 | AgentApplication 应用操作、AgentService 任务调度、ManagedRuns 持有运行实例 | `packages/core/agent-service/`、`packages/core/runtime/src/harness/managed-runs.ts` |
+| 客户端策略 | Desktop 标题/辅助文本；Headless 单次任务/信号/退出 | `packages/host/desktop-app/`、`packages/host/headless/` |
 | Harness 领域 | Loop、Prompt、Context、LLM、Tools、Compaction、Subagent | 对应独立 package |
 | Session | 接纳、持久化、checkpoint、投影 | `packages/session/` 及 Runtime Session controller |
 | 固定 renderer | 展示 DTO，提交意图，不执行插件代码 | `apps/desktop/src/renderer/` |

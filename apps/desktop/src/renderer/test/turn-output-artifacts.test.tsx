@@ -42,8 +42,8 @@ function ActiveTabTitleProbe() {
 }
 
 function ActiveFileProbe() {
-  const { activeTab } = useRightPanel();
-  return <div data-testid="active-file-tab">{activeTab?.kind === "markdown" ? `${activeTab.relativePath}:${activeTab.source}` : ""}</div>;
+  const { activeTab, docsSelectedPath } = useRightPanel();
+  return <div data-testid="active-file-tab">{activeTab?.kind === "docs" ? `docs:${docsSelectedPath}` : ""}</div>;
 }
 
 describe("image generation presentation", () => {
@@ -303,15 +303,9 @@ describe("generic tool result presentation", () => {
     expect(screen.getByRole("button", { name: "Show result for Read docs/ARCHITECTURE.md" })).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("opens a safe workspace read in the existing right-panel file tab", async () => {
-    const readWorkspaceFile = vi.fn(async () => ({
-      relativePath: "docs/ARCHITECTURE.md",
-      renderKind: "markdown" as const,
-      size: 20,
-      mtimeMs: 1,
-      content: "# Architecture",
-    }));
-    setupBridge({ "workspaces.readFile": readWorkspaceFile });
+  it("opens a safe workspace Markdown read in the docs panel and selects the file", async () => {
+    const statWorkspaceFile = vi.fn(async () => ({ relativePath: "docs/ARCHITECTURE.md", size: 20, mtimeMs: 1 }));
+    setupBridge({ "workspaces.statFile": statWorkspaceFile });
     render(
       <RightPanelProvider>
         <TestConversationView
@@ -330,8 +324,8 @@ describe("generic tool result presentation", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^Worked/ }));
     await userEvent.click(screen.getByRole("button", { name: "Read docs/ARCHITECTURE.md" }));
-    expect(readWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/ARCHITECTURE.md" });
-    expect(screen.getByTestId("active-file-tab")).toHaveTextContent("docs/ARCHITECTURE.md:# Architecture");
+    expect(statWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/ARCHITECTURE.md" });
+    expect(screen.getByTestId("active-file-tab")).toHaveTextContent("docs:docs/ARCHITECTURE.md");
   });
 
   // 15 T6：是否经 Host 读取由 RunTargetContext 的 target 决定，不再各自解析会话 key。

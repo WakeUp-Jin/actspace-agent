@@ -2,28 +2,17 @@ import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import { attachWindowLifecycle, installProcessErrorLogging } from "../main-lifecycle";
 
-function fakeWindow(id: number) {
-  return Object.assign(new EventEmitter(), { webContents: { id } });
+function fakeWindow() {
+  return new EventEmitter();
 }
 
 describe("main window lifecycle", () => {
-  it("closes the window's terminals with the id captured before webContents is destroyed", async () => {
-    const win = fakeWindow(42);
-    const closeOwnedTerminals = vi.fn(async () => undefined);
+  it("runs onClosed when the window closes", () => {
+    const win = fakeWindow();
     const onClosed = vi.fn();
-    attachWindowLifecycle(win, { onClosed, closeOwnedTerminals, log: vi.fn() });
-    (win as { webContents: { id: number } }).webContents = { id: -1 };
+    attachWindowLifecycle(win, { onClosed });
     win.emit("closed");
     expect(onClosed).toHaveBeenCalledTimes(1);
-    expect(closeOwnedTerminals).toHaveBeenCalledWith(42);
-  });
-
-  it("logs instead of throwing when terminal cleanup fails", async () => {
-    const win = fakeWindow(3);
-    const log = vi.fn();
-    attachWindowLifecycle(win, { onClosed: vi.fn(), closeOwnedTerminals: async () => { throw new Error("pty gone"); }, log });
-    win.emit("closed");
-    await vi.waitFor(() => expect(log).toHaveBeenCalledWith("window terminal cleanup failed", { ownerId: 3, error: "pty gone" }));
   });
 });
 

@@ -33,7 +33,10 @@ export type DesktopRuntimeV2RegistryOptions = {
   readonly roots: DesktopRuntimeV2Roots;
   readonly models: DesktopRuntimeV2ModelPort;
   readonly approvals: DesktopRuntimeV2ApprovalPort;
-  readonly browser: DesktopRuntimeV2BrowserPort;
+  /** Absent when the 操控浏览器 plugin is switched off: no capability, no Browser Bridge reconfigure. */
+  readonly browser?: DesktopRuntimeV2BrowserPort;
+  /** Plugin ids switched off for this process (startup values; see resolvePluginSwitches). */
+  readonly disabledPlugins?: readonly string[];
   readonly nonoPath?: string;
   readonly disabledSkillIds?: () => readonly string[];
   readonly chatCompactionTriggerRatio?: () => number;
@@ -79,11 +82,12 @@ export class DesktopRuntimeV2Registry {
   }
 
   async #refreshBrowser(): Promise<boolean> {
-    if (this.#profile === undefined) return false;
-    const desired = (await this.options.browser.getStatus()).bridgeReady === true;
-    const desiredSocket = desired ? this.options.browser.socketPath : undefined;
+    const browser = this.options.browser;
+    if (this.#profile === undefined || browser === undefined) return false;
+    const desired = (await browser.getStatus()).bridgeReady === true;
+    const desiredSocket = desired ? browser.socketPath : undefined;
     if (desired === this.#browserReady && desiredSocket === this.#browserSocketPath) {
-      this.options.browser.setRuntimeReady?.(desired);
+      browser.setRuntimeReady?.(desired);
       return true;
     }
     const app = this.requireApp();
@@ -94,19 +98,19 @@ export class DesktopRuntimeV2Registry {
       await this.dispose(true);
       this.#bootPromise = undefined;
       await this.boot();
-      this.options.browser.setRuntimeReady?.(this.#browserReady);
+      browser.setRuntimeReady?.(this.#browserReady);
       return true;
     } catch (error) {
-      this.options.browser.setRuntimeReady?.(false);
+      browser.setRuntimeReady?.(false);
       this.options.log?.("browser runtime reconfigure failed", { error: error instanceof Error ? error.message : String(error) });
       if (this.#profile === undefined) {
         try {
-          this.options.browser.setBootRecoveryMode?.(true);
+          browser.setBootRecoveryMode?.(true);
           this.#bootPromise = undefined;
           await this.boot();
         } catch (recoveryError) {
           this.options.log?.("browser runtime recovery failed", { error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError) });
-        } finally { this.options.browser.setBootRecoveryMode?.(false); }
+        } finally { browser.setBootRecoveryMode?.(false); }
       }
       return false;
     } finally {
@@ -431,7 +435,7 @@ export class DesktopRuntimeV2Registry {
   }
 
   #bindLearningNotifications(): void {
-    if (this.#profile === undefined || this.#stopLearningNotifications || this.#learningListeners.size === 0) return;
+    if (this.#profile === undefined || this.#stopLearningNotifications || this.#learningListeners.size === 0 || !this.#profile.context.get?.("english-learning")) return;
     this.#stopLearningNotifications = this.englishLearning().subscribe((state) => {
       for (const listener of this.#learningListeners) listener(state);
     });
@@ -543,7 +547,7 @@ export class DesktopRuntimeV2Registry {
 
   #emitRuntimeLive(update: import("@actspace/runtime").AgentLoopLiveEvent): void {
     if (update.kind === "run-state" && ["completed", "failed", "aborted", "step-limit"].includes(update.message)) {
-      void this.options.browser.endTurn?.(update.sessionId, update.turnId).catch((error: unknown) => this.options.log?.("browser turn cleanup failed", { error: String(error) }));
+      void this.options.browser?.endTurn?.(update.sessionId, update.turnId).catch((error: unknown) => this.options.log?.("browser turn cleanup failed", { error: String(error) }));
     }
     if (update.workspaceRoot) this.#streamWorkspaces.set(update.sessionId, update.workspaceRoot);
     this.#rendererStream.accept(update);
@@ -562,6 +566,7 @@ export class DesktopRuntimeV2Registry {
         models: this.options.models,
         approvals: this.options.approvals,
         browser: this.options.browser,
+        disabledPlugins: this.options.disabledPlugins,
         nonoPath: this.options.nonoPath,
         disabledSkillIds: this.options.disabledSkillIds,
         chatCompactionTriggerRatio: this.options.chatCompactionTriggerRatio ?? (() => 0.8),

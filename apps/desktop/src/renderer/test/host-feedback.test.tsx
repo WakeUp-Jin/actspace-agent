@@ -76,7 +76,7 @@ it.each([
     "sessions.list": async () => [{ id, hostId: "server", hostName: "Cloud", connectionState: "offline", title: "Remote session", workspaceRoot: "/tmp/workspace", agentRunCount: 0, updatedAt: "2026-10-04T00:00:00Z" }],
     "sessions.getPage": page, "approvals.listPending": async () => [],
     "events.sessionLive": () => () => {}, "events.agentStream": () => () => {},
-    "review.getSnapshot": async () => ({ ok: false }), "visualize.list": async () => ({ items: [] }),
+    "review.getSnapshot": async () => ({ ok: false }),
     "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
   });
   render(<App />);
@@ -174,7 +174,7 @@ it("creates the first remote Session on the selected Host and records its worksp
     "hosts.call": async () => ({ state: "ready", workspaces: [{ id: "w1", name: "api", path: "/srv/api" }, { id: "w2", name: "web", path: "/srv/web" }], models: [{ id: "m", name: "Model" }], defaultModel: "m" }),
     "tasks.submit": submit, "tasks.command": async () => ({ snapshot: { sessionId: id, revision: 1, paused: false, queue: [], tasks: [], runs: [] } }),
     "events.sessionLive": () => () => {}, "events.agentStream": () => () => {},
-    "review.getSnapshot": async () => ({ ok: false }), "visualize.list": async () => ({ items: [] }),
+    "review.getSnapshot": async () => ({ ok: false }),
     "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
   });
   const user = userEvent.setup();
@@ -215,7 +215,7 @@ it("opens 设置 › 远端 Host from 连接远端机器… when no Host is conf
     "sessions.list": async () => [], "approvals.listPending": async () => [],
     "hosts.list": async () => [], "events.hostsChanged": () => () => {}, "events.hostEvent": () => () => {}, "events.hostUploadProgress": () => () => {}, "hosts.activate": async () => {},
     "events.sessionLive": () => () => {}, "events.agentStream": () => () => {},
-    "review.getSnapshot": async () => ({ ok: false }), "visualize.list": async () => ({ items: [] }),
+    "review.getSnapshot": async () => ({ ok: false }),
     "appearance.setUiZoom": () => {}, "appearance.setNativeTheme": () => {}, "events.shuttingDown": () => () => {},
   });
   const user = userEvent.setup();

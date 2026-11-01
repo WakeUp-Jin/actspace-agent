@@ -96,7 +96,7 @@ http://127.0.0.1:5173/
 | `compaction` | 三个会话：「会话列表改游标分页」48 条消息后有一次已提交的自动压缩（182.4K → 约 9.1K tokens · 23s）；打开「压缩进行中」后停在压缩中；打开「压缩失败」后约 0.4s 压缩失败 | A1 压缩分隔线三态、两侧扫光、窄窗换行、「在轨迹中查看」选中轨迹压缩行、轨迹概述的触发方式 / 压缩消息数 / Token、浅深主题 | 手动 `/compact` 任务流程、重试后的真实压缩（mock 不处理压缩操作） |
 | `background-tasks` | 一个会话三轮：第 1 轮后台 `pnpm test` 与后台 `agent` 调研；第 2、3 轮由完成通知唤醒（无用户消息，以「后台任务 · …」分隔行开头）；第 3 轮另起一个仍在运行的后台 `pnpm dev` | Bash / 子 Agent 卡片的「后台」标签与状态（成功、已完成、运行中）、唤醒分隔行展开看通知原文、浅深主题 | 真实唤醒调度、`task_*` 工具输出、子 Agent 面板里的子会话内容（mock 没有子会话） |
 
-mock 中没有实现的成员调用时 reject `Mock bridge does not implement 域.成员`，包括终端创建、新建工作树和 Git 写操作。界面上看到的报错属于 mock 的边界，不是缺陷。如需新增场景，按规范 §7 处理，并同步更新本表。
+mock 中没有实现的成员调用时 reject `Mock bridge does not implement 域.成员`，包括新建工作树和 Git 写操作。界面上看到的报错属于 mock 的边界，不是缺陷。如需新增场景，按规范 §7 处理，并同步更新本表。
 
 #### ModelPicker pinned 组件验收
 
@@ -155,7 +155,7 @@ pnpm dev
 
 启动器先完成依赖与本轮 Electron main/preload 构建，成功后才启动并行 watch、renderer 和 Electron。即使磁盘已有旧的 `dist-electron`，本轮构建失败也会停止启动。`dev:electron:run` 是内部运行阶段，文件存在检查不能替代上述构建屏障；请从 `pnpm dev` / `pnpm dev:log` 启动。
 
-对 Runtime 内置行为包做修复后，单独构建该 package 仍不足以验证 Desktop：执行实现会被打入 `packages/runtime/dist/default-harness/`。隔离验收启动器若直接运行已构建入口，必须先重建 Runtime Harness（依赖已构建时运行 `pnpm --filter @actspace/runtime build`），确认对应制品包含本轮改动，再正常重启应用。只检查源文件或依赖包 `dist` 不能证明运行中的 Harness 已更新；旧制品的失败记录要保留并注明实际版本。
+对 Runtime 内置行为包做修复后，单独构建该 package 仍不足以验证 Desktop：执行实现会被打入 `packages/core/runtime/dist/default-harness/`。隔离验收启动器若直接运行已构建入口，必须先重建 Runtime Harness（依赖已构建时运行 `pnpm --filter @actspace/runtime build`），确认对应制品包含本轮改动，再正常重启应用。只检查源文件或依赖包 `dist` 不能证明运行中的 Harness 已更新；旧制品的失败记录要保留并注明实际版本。
 
 macOS 开发启动不会直接暴露依赖目录里的默认 `Electron.app`。启动器会在系统临时目录缓存一份当前 workspace 专属的开发 runtime，并为它设置唯一的应用名、bundle ID 与可执行文件名。启动日志中的 `[dev-runtime]` JSON 是本次运行的事实来源，例如：
 
@@ -215,9 +215,8 @@ Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的
 | Composer：inline ↔ stacked、`+` 面板、模型、模式 chip | composer / composer-toolbar / composer-palette | ✓ | ✓ |
 | 中文输入法 | composer-ime | — | ✓（必须真机） |
 | 外链点击不导航主窗口 | window-security（window-navigation* 补全） | — | ✓（系统浏览器是否打开需真机） |
-| macOS 关窗再打开，无孤儿 pty | — | — | ✓（`ps` 核对） |
 | 退出后无残留子进程 | — | — | ✓ |
-| CSP 开启后 mermaid / 高亮 / HTML 预览 / xterm 正常 | — | — | 本轮不加主文档 CSP（11 J1=A），暂不适用 |
+| CSP 开启后 mermaid / 高亮 / HTML 预览正常 | — | — | 本轮不加主文档 CSP（11 J1=A），暂不适用 |
 | 浅色 / 深色、480px 窄窗 | — | ✓ | ✓ |
 | 键盘走查（`+` 面板、运行位置菜单、Settings 对话框） | ui-layering* | ✓ | ✓ |
 

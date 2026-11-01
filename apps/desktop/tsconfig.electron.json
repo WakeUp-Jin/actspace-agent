@@ -9,11 +9,11 @@
     "outDir": "dist-electron",
     "baseUrl": ".",
     "paths": {
-      "@actspace/shared/model-catalog-data": ["../../packages/shared/dist/generated/model-catalog.generated.d.ts"],
-      "@actspace/shared": ["../../packages/shared/dist/index.d.ts"],
-      "@actspace/shared/*": ["../../packages/shared/dist/*"],
-      "@actspace/runtime": ["../../packages/runtime/dist/index.d.ts"],
-      "@actspace/runtime/*": ["../../packages/runtime/dist/*/index.d.ts"]
+      "@actspace/shared/model-catalog-data": ["../../packages/util/shared/dist/generated/model-catalog.generated.d.ts"],
+      "@actspace/shared": ["../../packages/util/shared/dist/index.d.ts"],
+      "@actspace/shared/*": ["../../packages/util/shared/dist/*"],
+      "@actspace/runtime": ["../../packages/core/runtime/dist/index.d.ts"],
+      "@actspace/runtime/*": ["../../packages/core/runtime/dist/*/index.d.ts"]
     },
     "rootDir": "src",
     "types": [
@@ -35,12 +35,6 @@
     "src/main/review-git-engine.ts",
     "src/main/review-git-worker-client.ts",
     "src/main/review-git-worker.ts",
-    "src/main/review-view-state-service.ts",
-    "src/main/terminal/terminal-session-service.ts",
-    "src/main/terminal/terminal-backend.ts",
-    "src/main/terminal/node-pty-terminal-backend.ts",
-    "src/main/terminal/shell-environment-service.ts",
-    "src/main/terminal/terminal-process-cleanup.ts",
     "src/main/runtime-v2",
     "src/preload/index.ts"
   ]

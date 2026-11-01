@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import assert from 'node:assert/strict';
 const require=createRequire(import.meta.url);
-const { projectIndexedUsageActivity }=require('../../../packages/client/dist/sessions.cjs');
+const { projectIndexedUsageActivity }=require('../../../packages/client/client/dist/sessions.cjs');
 const option=name=>process.argv.find(value=>value.startsWith(`--${name}=`))?.slice(name.length+3);
 const rows=Number(option('rows')??100000),sessions=Number(option('sessions')??100);
 const root=await mkdtemp(join(tmpdir(),'usage-json-baseline-')),path=join(root,'index.json');

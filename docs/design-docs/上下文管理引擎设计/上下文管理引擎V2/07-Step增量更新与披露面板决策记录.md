@@ -140,7 +140,7 @@ SQLite 服务还负责会话目录、搜索、Usage 筛选与统计等查询；�
 
 `packages/session/session-projection-cache/src/index.ts` 的 cachedSnapshot 从 storage domain 内存表 get；JSON 后端可把每个 Session 的检查点保存为独立 JSON 文件。write 先捕获投影检查点、等待 live Session flush，再写缓存，防止缓存领先于事实。
 
-创建、turn/end、dispose 有强制写入点；其余由显式配置的事件数/时间节流。续查已在 `packages/bundle/base/cordis.patch.yml` 核实基础组合配置为 200 事件 / 5000ms；实际部署仍可覆盖，并未验证运行进程配置。投影恢复接口支持用兼容检查点作为种子并应用后续事件；无效检查点需要重建。注意：这不保证实际调用者只读取日志尾部，具体冷读取路线见 §4.5。
+创建、turn/end、dispose 有强制写入点；其余由显式配置的事件数/时间节流。续查已在 `packages/composition/bundle/base/cordis.patch.yml` 核实基础组合配置为 200 事件 / 5000ms；实际部署仍可覆盖，并未验证运行进程配置。投影恢复接口支持用兼容检查点作为种子并应用后续事件；无效检查点需要重建。注意：这不保证实际调用者只读取日志尾部，具体冷读取路线见 §4.5。
 
 这解释了“数据存在 JSON 文件”和“日常读取来自内存”可以同时成立。文件是持久备份，服务中的内存表承担热读。
 
@@ -218,13 +218,13 @@ SQLite 服务还负责会话目录、搜索、Usage 筛选与统计等查询；�
 ## 8. 源码核对入口
 
 - `packages/core/agent-loop/src/loop.ts`：Step 收尾、checkpoint、reconcile、Step 安全点压缩及请求容量检查。
-- `packages/context/engine/src/engine.ts`、`instances.ts`、`reducers.ts`、`projection.ts`：组装、长期身份、更新框架和缓存。
-- `packages/prompt/src/context-source-support.ts`、`plugin.ts`：来源转换与按 Turn 的加载缓存。
-- `packages/context/disclosure/src/plugin.ts`：读取事实、hydrate、路径导航和睡眠索引。
-- `packages/agent-service/src/application.ts`：内存 Context 查询端口。
-- `packages/runtime/src/session/session-controller.ts`：查询来源 durable 水位限制。
+- `packages/context/context-engine/src/engine.ts`、`instances.ts`、`reducers.ts`、`projection.ts`：组装、长期身份、更新框架和缓存。
+- `packages/context/prompt/src/context-source-support.ts`、`plugin.ts`：来源转换与按 Turn 的加载缓存。
+- `packages/context/context-disclosure/src/plugin.ts`：读取事实、hydrate、路径导航和睡眠索引。
+- `packages/core/agent-service/src/application.ts`：内存 Context 查询端口。
+- `packages/core/runtime/src/session/session-controller.ts`：查询来源 durable 水位限制。
 - `apps/desktop/src/main/runtime-v2/context-panel-service.ts`：面板两路聚合、版本和分页。
 - `apps/desktop/src/main/runtime-v2/usage-read-model.ts`：Context 按需同步、结果缓存和受限回退。
 - `apps/desktop/src/main/runtime-v2/context-history-projection.ts`、`context-history-query.ts`：SQLite Context 表构建和查询。
-- `packages/session/jsonl/src/query-reader-worker.ts`：文件游标、有界读取。
+- `packages/session/session-persistence-jsonl/src/query-reader-worker.ts`：文件游标、有界读取。
 - `apps/desktop/src/renderer/components/right-panel/context/use-context-panel.ts`：前端合并刷新、单在途和隐藏释放。

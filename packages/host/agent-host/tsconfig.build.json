@@ -1,0 +1,64 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./../../core/agent-service/tsconfig.build.json"
+    },
+    {
+      "path": "./../../approval/approval/tsconfig.build.json"
+    },
+    {
+      "path": "./../../composition/cordis-adapter/tsconfig.build.json"
+    },
+    {
+      "path": "./../../harness-evolution/harness-evaluation/tsconfig.build.json"
+    },
+    {
+      "path": "./../../llm/llm-pi-ai/tsconfig.build.json"
+    },
+    {
+      "path": "./../../llm/llm-service/tsconfig.build.json"
+    },
+    {
+      "path": "./../../sandbox/sandbox/tsconfig.build.json"
+    },
+    {
+      "path": "./../../session/session-persistence/tsconfig.build.json"
+    },
+    {
+      "path": "./../../session/session-persistence-jsonl/tsconfig.build.json"
+    },
+    {
+      "path": "./../../util/shared/tsconfig.build.json"
+    },
+    {
+      "path": "./../../fs/tool-fs-read/tsconfig.build.json"
+    },
+    {
+      "path": "./../../fs/tool-fs-search/tsconfig.build.json"
+    },
+    {
+      "path": "./../../fs/tool-fs-write/tsconfig.build.json"
+    },
+    {
+      "path": "./../../image/tool-image-generation/tsconfig.build.json"
+    },
+    {
+      "path": "./../../image/tool-image-inspection/tsconfig.build.json"
+    },
+    {
+      "path": "./../../core/tool-runtime/tsconfig.build.json"
+    },
+    {
+      "path": "./../../shell/tool-shell/tsconfig.build.json"
+    },
+    {
+      "path": "./../../web/tool-web/tsconfig.build.json"
+    }
+  ]
+}

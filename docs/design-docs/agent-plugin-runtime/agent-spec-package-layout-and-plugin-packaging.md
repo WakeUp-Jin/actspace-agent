@@ -13,9 +13,9 @@ ActSpace v2 采用 DSH 风格的领域包结构，但不复制 DSH 的 `vendor/`
 1. `vendor/` 不进入 ActSpace v2。Cordis 使用精确锁定的 DSH 发布包；只有未来明确维护 fork 时才允许引入 `vendor/`。
 2. 不建立承载所有源码的顶层 `harness/` 总目录。Runtime 内部的 `src/harness/` 按执行装配职责分组；`boot` 与 `harness-control` 分别提供组合装配与选择服务，应用操作由 `agent-service` 及 App Service 提供。
 3. 不建立通用 `plugins/` 目录。插件是 Runtime ABI 中的身份、manifest、behavior entry、codec entry 和生命周期，不是文件夹名称。
-4. 采用 DSH 的领域分组：`core`、`session`、`llm`、`context`、`prompt`、`tools`、`subagent`、`compaction`、`desktop-app` 和 `client`。
+4. 采用领域分组，`packages/` 是两级结构 `packages/<能力>/<包>`，目录名即包名去掉 `@actspace/`。当前的能力目录、每个目录里的包以及依赖方向，以 [packages/README.md](../../../packages/README.md) 为准；该地图和各目录 README 由 `scripts/check-package-readmes.mjs` 校验。
 5. 每个可装载、可替换或可独立验证的领域包都必须拥有自己的 package boundary 和 Cordis Plugin Entry。Session、LLM、Prompt、Agent Loop 不是“插件之外的特殊代码”，而是默认 Profile 中的核心语义插件。
-6. 具体能力插件按领域放置，例如 `packages/tools/filesystem-read`、`packages/tools/browser-tools`，不放入一个含义模糊的 `packages/plugins`。
+6. 具体能力插件按领域放置，例如 `packages/fs/tool-fs-read`、`packages/browser/tool-browser`，不放入一个含义模糊的 `packages/plugins`。
 7. Browser Bridge 是独立的 Go + Chrome Extension Host capability，顶层目录使用 `browser-bridge/`，不伪装成同进程 TypeScript 插件，也不放入通用 `plugins/`。
 8. Desktop 的页面、样式、布局和现有固定前端信息架构不改变。只允许调整 Host、IPC、投影和 Runtime 加载边界。
 9. 可运行、打包或部署的产品入口统一进入 `apps/desktop`、`apps/cli`、`apps/site`；`packages/` 只保留可复用库、领域包、Plugin ABI package 和共享契约，且不得反向依赖 `apps/`。
@@ -42,7 +42,7 @@ flowchart TD
 
 顶层结构由[仓库架构](../../ARCHITECTURE.md)维护；完整 package、exports 与 manifest 清单由[契约矩阵](agent-contract-matrix.generated.md)生成，避免维护第二张会过期的目录树。
 
-Host、Task 和 Harness 分别有 `agent-host`、`agent-service`、`harness-control` 包；`runtime/src/startup`、`session`、`harness` 按装配职责分组。`session/storage` 提供中性后端契约，`jsonl` 是生产实现；这些目录不构成通用插件总目录。
+Host、Task 和 Harness 分别有 `agent-host`、`agent-service`、`harness-control` 包；`runtime/src/startup`、`session`、`harness` 按装配职责分组。`session-storage` 提供中性后端契约，`session-persistence-jsonl` 是生产实现；这些目录不构成通用插件总目录。哪些包是插件、哪些是库，由 `packages/core/runtime/src/plugin-catalog.ts` 的插件清单决定，包地图见 [packages/README.md](../../../packages/README.md)。
 
 ## 4. 什么是一个真实插件包
 
@@ -72,28 +72,28 @@ packages/<domain>/<package>/
 
 核心语义包和具体能力包都遵循同一 ABI。区别只在默认组合中的 required/optional 状态和可替换级别：
 
-- `packages/session/journal` 是 required core plugin；
-- `packages/llm/pi-ai` 是可替换 Provider plugin；
-- `packages/tools/browser-tools` 是 optional capability plugin；
+- `packages/session/session-journal` 是 required core plugin；
+- `packages/llm/llm-pi-ai` 是可替换 Provider plugin；
+- `packages/browser/tool-browser` 是 optional capability plugin；
 - `browser-bridge/` 是由 Browser Tools Provider 管理的外部 Host capability，不是第二套 Loader。
 
 ## 5. 依赖边界
 
 ```mermaid
 flowchart LR
-    D["apps/desktop"] --> DA["packages/desktop-app"]
-    C["apps/cli"] --> HL["packages/headless"]
+    D["apps/desktop"] --> DA["packages/host/desktop-app"]
+    C["apps/cli"] --> HL["packages/host/headless"]
     S["apps/site"] --> PUBLIC["公开 docs / roadmap / release notes"]
-    DA --> AS["packages/agent-service"]
+    DA --> AS["packages/core/agent-service"]
     HL --> AS
-    R["packages/runtime"] --> AS
+    R["packages/core/runtime"] --> AS
     R --> B["boot / bundle / composition / diagnostics"]
     B --> CA["cordis-adapter"]
     R --> CORE["core / session / llm / context / prompt / tools / subagent"]
     CORE --> PLUG["domain plugin packages"]
     PLUG --> CAP["Host capability ceiling"]
     CAP --> BB["browser-bridge"]
-    D --> SH["packages/shared + packages/client"]
+    D --> SH["packages/util/shared + packages/client/client"]
 ```
 
 约束如下：
@@ -124,15 +124,15 @@ flowchart LR
 
 | 迁移前路径 | 当前目标包 | 迁移原则 |
 |---|---|---|
-| `src/plugin/` | `packages/cordis-adapter/`、`packages/composition/`、`packages/boot/` | 将 ABI、来源和生命周期基础设施拆开，不保留大一统 plugin 目录 |
-| `src/composition/`、`src/profiles/` | `packages/bundle/`、`packages/composition/` | Profile/Bundle/Patch 仍共用 composer，但不拥有领域插件实现 |
+| `src/plugin/` | `packages/composition/cordis-adapter/`、`packages/composition/composition/`、`packages/composition/boot/` | 将 ABI、来源和生命周期基础设施拆开，不保留大一统 plugin 目录 |
+| `src/composition/`、`src/profiles/` | `packages/composition/bundle/`、`packages/composition/composition/` | Profile/Bundle/Patch 仍共用 composer，但不拥有领域插件实现 |
 | `src/session/`、`src/projection/` | `packages/session/*` | Journal、raw JSONL、projection 成为独立 Session plugin packages |
 | `src/llm/` | `packages/llm/*` | Service、pi-ai 和 fallback transport 分离 |
-| `src/prompt/`、`src/scope/`、`src/skills/` | `packages/prompt/`、`packages/context/`、`packages/core/scope/` | Context 与 Prompt 所有权分开 |
-| `src/tools/`、`src/plugins/core-tools/` | `packages/tools/runtime/`、`packages/tools/filesystem-read/`、`packages/tools/filesystem-search/`、`packages/tools/filesystem-write/`、`packages/tools/shell-tools/`、`packages/tools/web-tools/`、`packages/tools/image-generation/`、`packages/tools/image-inspection/` | Tool Runtime 契约和具体 executor 分开 |
-| `src/plugins/browser-tools/` | `packages/tools/browser-tools/` | Browser 具体工具成为领域插件，不使用通用 plugins 目录 |
-| `src/agent/` | `packages/core/agent/`、`packages/core/agent-loop/`、`packages/subagent/` | Registry、Loop、Subagent 按独立替换边界拆分 |
-| `src/runtime/`、`src/boot/` | `packages/runtime/`、`packages/boot/` | Runtime 提供生产 BootedRuntimeProfile，App Bundle 拥有产品操作；packages/boot 提供 Harness/Run 生命周期契约，不再提供旧 Profile 启动门面 |
+| `src/prompt/`、`src/scope/`、`src/skills/` | `packages/context/prompt/`、`packages/context/`、`packages/core/scope/` | Context 与 Prompt 所有权分开 |
+| `src/tools/`、`src/plugins/core-tools/` | `packages/core/tool-runtime/`、`packages/fs/tool-fs-read/`、`packages/fs/tool-fs-search/`、`packages/fs/tool-fs-write/`、`packages/shell/tool-shell/`、`packages/web/tool-web/`、`packages/image/tool-image-generation/`、`packages/image/tool-image-inspection/` | Tool Runtime 契约和具体 executor 分开 |
+| `src/plugins/browser-tools/` | `packages/browser/tool-browser/` | Browser 具体工具成为领域插件，不使用通用 plugins 目录 |
+| `src/agent/` | `packages/core/agent/`、`packages/core/agent-loop/`、`packages/subagent/subagent/` | Registry、Loop、Subagent 按独立替换边界拆分 |
+| `src/runtime/`、`src/boot/` | `packages/core/runtime/`、`packages/composition/boot/` | Runtime 提供生产 BootedRuntimeProfile，App Bundle 拥有产品操作；packages/composition/boot 提供 Harness/Run 生命周期契约，不再提供旧 Profile 启动门面 |
 | `browser-bridge/` | `browser-bridge/` | 顶层使用产品能力名称，保留独立 Go/Extension 构建边界 |
 
 旧 v1 Session 只保留一份迁移参考数据，不由新 Runtime 读取或导入。新格式只使用 `sessions-v2/<id>/journal.jsonl`。

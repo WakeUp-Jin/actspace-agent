@@ -54,7 +54,7 @@
 
 ## 下一阶段交接与人工验证
 
-先审阅 [adapter API](../../../packages/cordis-adapter/README.md) 和 [boot API](../../../packages/boot/README.md)。需要复核时在根目录执行上表命令；测试会自动创建并清理临时产物，不需要操作用户会话或调用模型。
+先审阅 [adapter API](../../../packages/composition/cordis-adapter/README.md) 和 [boot API](../../../packages/composition/boot/README.md)。需要复核时在根目录执行上表命令；测试会自动创建并清理临时产物，不需要操作用户会话或调用模型。
 
 P2 先写独立详细计划，再把真实任务实际开始/结束接到 acquire/release，并统一 Desktop/Headless 的任务管理。P3 负责 Patch 显式启用与审批接入。P1 不代表真实 Loop 已可替换、不代表旧新真实 Run 共存已经验收。
 

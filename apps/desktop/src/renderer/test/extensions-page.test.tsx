@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ExtensionsPage } from "../components/extensions/ExtensionsPage";
-import { extensionsSettings, extensionSkills, extensionBrowserStatus } from "./fixtures/extensionsFixture";
+import { extensionsSettings, extensionSkills, extensionBrowserStatus, extensionPlugins } from "./fixtures/extensionsFixture";
 import { setupBridge } from "./helpers/bridge";
 
 describe("ExtensionsPage", () => {
@@ -22,6 +22,7 @@ describe("ExtensionsPage", () => {
       "settings.get": vi.fn(async () => extensionsSettings()), "settings.update": updateSettings,
       "skills.list": listSkills, "skills.install": installSkill, "skills.uninstall": uninstallSkill,
       "browserBridge.getStatus": vi.fn(async () => extensionBrowserStatus),
+      "plugins.list": vi.fn(async () => extensionPlugins({ "browser-tools": { loaded: true, enabled: true } })),
     });
   });
 
@@ -32,12 +33,12 @@ describe("ExtensionsPage", () => {
   it("shows Chrome connection without requiring a source path and navigates tabs with the keyboard", async () => {
     const user = userEvent.setup();
     render(<ExtensionsPage />);
-    expect(await screen.findByRole("heading", { name: "Chrome 浏览器" })).toBeVisible();
-    expect(screen.getByText("已连接，可以在对话中使用 Chrome")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "会话插件" })).toBeVisible();
+    expect(await screen.findByText("已连接，可以在对话中使用 Chrome")).toBeVisible();
     expect(screen.queryByText("源码路径")).not.toBeInTheDocument();
     await user.type(screen.getByRole("searchbox"), "missing");
-    expect(screen.getByText("没有找到匹配的能力。")).toBeVisible();
-    await user.click(screen.getByRole("tab", { name: "能力" }));
+    expect(screen.getByText("没有找到匹配的插件。")).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "插件" }));
     await user.keyboard("{ArrowRight}{ArrowRight}");
     expect(screen.getByRole("tab", { name: "MCP" })).toHaveFocus();
     expect(screen.getByRole("heading", { name: "MCP 暂未接入" })).toBeVisible();
@@ -56,7 +57,7 @@ describe("ExtensionsPage", () => {
     await waitFor(() => expect(updateSettings).toHaveBeenCalledWith({ skills: { disabled: ["writing"] } }));
     expect(toggle).toHaveAttribute("aria-checked", "false");
     expect(onSettingsChange).toHaveBeenCalled();
-    await user.click(screen.getByRole("tab", { name: "能力" }));
+    await user.click(screen.getByRole("tab", { name: "插件" }));
     await user.click(screen.getByRole("tab", { name: "Skills" }));
     expect(screen.getByRole("searchbox")).toHaveValue("润色");
     expect(screen.getByRole("switch", { name: "主 Agent 使用 writing" })).toHaveAttribute("aria-checked", "false");

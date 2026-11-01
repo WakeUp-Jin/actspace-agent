@@ -6,8 +6,8 @@ import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import { createCoreCodecRegistry } from '@actspace/session-journal';
-import { SessionStore } from '../../../packages/session/persistence/dist/index.js';
-import { JsonlSessionStorage } from '../../../packages/session/jsonl/dist/index.js';
+import { SessionStore } from '../../../packages/session/session-persistence/dist/index.js';
+import { JsonlSessionStorage } from '../../../packages/session/session-persistence-jsonl/dist/index.js';
 
 const require = createRequire(import.meta.url);
 const playwrightPath = process.env.ACTSPACE_PLAYWRIGHT_MODULE;

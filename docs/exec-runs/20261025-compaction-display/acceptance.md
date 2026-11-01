@@ -32,7 +32,7 @@
 
 **期望**：计划要求读取“最近一条带 usage 的 assistant/message”，拿不到有效记录才省略。
 
-**根因**：[latestRequestUsage](../../../packages/context/engine/src/compaction.ts#L115)只取最近一条 `assistant/message`，遇到缺失/无有效数值立即返回null，没有向前寻找有效usage。`compactionTokens(null, …)`随后返回空对象，Journal中永久缺失两个字段；前端按字段缺失省略显示，属于下游正常行为。
+**根因**：[latestRequestUsage](../../../packages/context/context-engine/src/compaction.ts#L115)只取最近一条 `assistant/message`，遇到缺失/无有效数值立即返回null，没有向前寻找有效usage。`compactionTokens(null, …)`随后返回空对象，Journal中永久缺失两个字段；前端按字段缺失省略显示，属于下游正常行为。
 
 **确定性复现（生产类，内存Session；非CU）**：
 
@@ -54,7 +54,7 @@
 
 1. [AgentLoop](../../../packages/core/agent-loop/src/loop.ts#L279)为了让新工具结果参与安全触发，使用 `max(完整内容估算 − output, 实测input + 新工具结果估算)` 构造usage。这一触发策略本身有合理目的。
 2. 此对象直接传给 `autoCompact` / `maybeCompact`，协调器把它作为 `cause.usage`。
-3. [协调器](../../../packages/context/engine/src/compaction.ts#L98)优先用cause.usage，[compactionTokens](../../../packages/context/engine/src/compaction.ts#L126)直接求和写beforeTokens，未保留“估算压力”与“实测用量”的区别。
+3. [协调器](../../../packages/context/context-engine/src/compaction.ts#L98)优先用cause.usage，[compactionTokens](../../../packages/context/context-engine/src/compaction.ts#L126)直接求和写beforeTokens，未保留“估算压力”与“实测用量”的区别。
 4. [完成条](../../../apps/desktop/src/renderer/components/messages/CompactCommandBlock.tsx#L65)只给after加“约”，因此前值呈现为实测口径。
 
 **确定性复现（生产AgentLoop + 生产协调器，确定性LLM适配器；非CU、非真实Provider）**：

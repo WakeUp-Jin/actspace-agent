@@ -121,12 +121,6 @@
     "usage": "Bash 与后台任务：命令执行结果",
     "status": "missing"
   },
-  "terminal.png": {
-    "number": 20,
-    "instruction": "右侧终端标签与启动后的 shell 提示符",
-    "usage": "交互式终端：打开终端后的初始界面",
-    "status": "ready"
-  },
   "file-preview.png": {
     "number": 21,
     "instruction": "文件页签、Markdown 预览与工作区文件树",

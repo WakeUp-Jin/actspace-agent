@@ -1,0 +1,1126 @@
+import type {
+  ModelDefinition,
+  ModelKey,
+} from "./model-config";
+import type { ModelPurpose, ModelUnavailabilityReason } from "./model-resolver";
+import type { ProviderId } from "./provider-config";
+import type { InstalledModelSettings } from "./settings";
+
+export type BootstrapState = {
+  appVersion: string;
+  dataRoot: string;
+  sessionRoot: string;
+  logRoot: string;
+  tmpRoot: string;
+  workspaceRoot: string;
+};
+
+export {
+  ALL_MODEL_LIST,
+  DEFAULT_MODEL_ID,
+  MODEL_LIST,
+  MODEL_REGISTRY,
+  BUILTIN_MODEL_LIST,
+  BUILTIN_MODEL_REGISTRY,
+  DEFAULT_MODEL_KEY,
+  LEGACY_MODEL_KEY_MAP,
+  isPublicModelId,
+  legacyModelIdFromKey,
+  normalizeModelKey,
+  resolveModelDefinition,
+  resolveModelDefinitionByApiModel,
+  type ModelApi,
+  type ModelDefinition,
+  type ModelId,
+  type ModelInputKind,
+  type ModelKey,
+  type ModelProvider,
+  type ModelReasoningEffort,
+  type ModelSelectionId,
+  type ModelSpec,
+  type ModelVisibility,
+  resolveModelSpec,
+} from "./model-config";
+
+// ─── IPC 输入类型 ───
+
+export type ComposerMode = "chat" | "plan" | "agent";
+export type { MainAgentForm } from "./runtime-v2/runtime";
+
+export type SessionRunLocation = "this_mac" | "worktree";
+
+export type TurnExecutionContextInput = {
+  runLocation: SessionRunLocation;
+  workspaceId?: string;
+  sourceWorkspaceRoot: string;
+  /** This Mac 下是目标 checkout；Worktree 下是 base branch。 */
+  branch?: string;
+};
+
+export type GitBranchItem = {
+  name: string;
+  current: boolean;
+  /** 存在时表示该 branch 已被某个 worktree checkout。 */
+  checkedOutPath?: string;
+};
+
+export type WorkspaceGitContextStatus =
+  | "ready"
+  | "not_repository"
+  | "no_head"
+  | "git_not_found"
+  | "failed";
+
+export type WorkspaceGitContextInput = {
+  workspaceRoot?: string;
+};
+
+export type WorkspaceGitContext = {
+  status: WorkspaceGitContextStatus;
+  workspaceRoot: string;
+  repositoryRoot?: string;
+  currentBranch?: string;
+  detachedCommit?: string;
+  headCommit?: string;
+  branches: GitBranchItem[];
+  error?: string;
+};
+
+export type WorkspaceCreateFolderInput = {
+  parentRoot: string;
+  name: string;
+};
+
+export type WorkspaceCreateFolderResult =
+  | { ok: true; workspaceId: string; workspaceRoot: string }
+  | { ok: false; error: string };
+
+// ─── 多供应商与模型管理 IPC（Plan 0 只锁契约，Plan 2/3/5 接实现） ───
+
+export type InstalledModelView = {
+  definition: ModelDefinition;
+  settings: InstalledModelSettings;
+  unavailableReasons: Partial<Record<ModelPurpose, ModelUnavailabilityReason>>;
+};
+
+export type ModelsListUsableInput = { purpose: ModelPurpose };
+
+export type UsableModelView = {
+  key: ModelKey;
+  label: string;
+  provider: ProviderId;
+  apiModel: string;
+  connectionId?: string;
+  connectionLabel?: string;
+  contextWindow: number | null;
+  thinkingDefault: boolean;
+  capabilities: ModelDefinition["capabilities"];
+  pricing?: ModelDefinition["pricing"];
+};
+
+export type ModelsListUsableResult = { models: UsableModelView[] };
+
+export type SelectFilesResult = {
+  canceled: boolean;
+  attachments: import("./session").ComposerAttachment[];
+};
+
+export type SelectImagesResult = SelectFilesResult;
+
+export type ImportComposerImageInput = {
+  name: string;
+  mimeType?: string;
+  bytes: Uint8Array;
+};
+
+export type ImportComposerImageResult =
+  | { ok: true; attachment: import("./session").ComposerAttachment }
+  | {
+      ok: false;
+      error: {
+        code: "empty" | "too_large" | "unsupported_format" | "decode_failed" | "write_failed";
+        message: string;
+      };
+    };
+
+export type SkillListInput = {
+  workspaceRoot?: string;
+};
+
+export type SelectWorkspaceDirectoryInput = {
+  /** Only workspace adoption registers the chosen folder; auxiliary directory picks do not. */
+  registerWorkspace?: boolean;
+};
+
+export type SelectWorkspaceDirectoryResult = {
+  canceled: boolean;
+  workspaceRoot?: string;
+};
+
+export type AbortAgentRunInput = {
+  sessionId: string;
+  agentRunId: string;
+};
+
+/** `hostId`：远端审批所在的 Host，main 按它路由（15 T10）；本机审批不带。 */
+export type ApprovalDecideInput =
+  | { requestId: string; hostId?: string; decision: "once" | "deny" }
+  | { requestId: string; hostId?: string; decision: "session"; suggestionId: string };
+
+export type ApprovalDecideResult = {
+  ok: boolean;
+  reason?: string;
+};
+
+export type ApprovalListPendingInput = {
+  sessionId?: string;
+};
+
+export type PendingApprovalInfo = {
+  requestId: string;
+  /** 远端审批所在的 Host；本机审批没有。 */
+  hostId?: string;
+  /** Live recovery facts; absent on older hosts, never inferred from stale history. */
+  recovery?: {
+    agentRunId: string;
+    toolCallId: string;
+    preview: import("./session").ToolUiPreview;
+    approvalScope?: "browser_session";
+  };
+  toolName: string;
+  summary: string;
+  reason: string;
+  riskLevel?: string;
+  command?: string;
+  createdAt: number;
+  expiresAt: number;
+  grantSuggestions?: readonly import("./runtime-v2/permission").GrantSuggestion[];
+  supportedLifetimes?: readonly import("./runtime-v2/permission").GrantLifetime[];
+};
+
+export type SessionListItem = {
+  hostId?: string;
+  hostName?: string;
+  connectionState?: import("./host-protocol").HostConnectionState;
+  /** Runtime session admission facts used by optional session capabilities. */
+  accessState?: "read-write" | "degraded" | "browse-only" | "corrupt";
+  isChildSession?: boolean;
+  /** Query-only hint. False avoids recovering inactive background history for badges. */
+  hasPendingTasks?: boolean;
+  id: string;
+  title: string;
+  updatedAt: string;
+  agentRunCount: number;
+  agentForm?: import("./runtime-v2/runtime").MainAgentForm;
+  agentMode?: ComposerMode;
+  agentModeRevision?: number;
+  /** workspace registry 的稳定 id；旧 session 可能缺失。 */
+  workspaceId?: string;
+  /** 创建会话时的工作区根目录；旧 session 缺这个字段时由前端视作 default workspace。 */
+  workspaceRoot?: string;
+  /** Worktree 会话的隔离执行上下文；普通会话缺省。 */
+  worktree?: import("./session").SessionWorktreeContext;
+  /** 用户是否把该会话钉到 Pinned 分区。 */
+  pinned?: boolean;
+  /** 用户是否把该会话归档。 */
+  archived?: boolean;
+  /** 侧边对话所属的主会话；左侧会话栏不单独列出这类会话。 */
+  sideChatParentId?: string;
+  /** 主会话下未归档的侧边对话数量；0 时省略。 */
+  sideChatCount?: number;
+};
+
+export type SessionListPageInput = { hostId?: string; workspaceRoot?: string; pinned?: boolean; after?: string; search?: string; limit?: number };
+export type SessionListPage = { nextCursor?: string; items: SessionListItem[]; groups: { hostId?: string; workspaceRoot: string; pinned: boolean; hasMore: boolean }[]; indexing: boolean; failed: number; readModel?: UsageReadModelInfo };
+
+export type SessionListInput = {
+  /** 缺省为 false：普通会话列表只返回未归档会话。 */
+  archived?: boolean;
+};
+
+export type SessionRecord = {
+  meta: import("./session").SessionMeta;
+  events: import("./session").SessionEvent[];
+  messageBlocks?: import("./session").MessageBlock[];
+  contextSnapshot?: import("./session").ContextUsageSnapshot | null;
+  contextState?: import("./session").ContextState | null;
+  diffSummary?: import("./session").SessionDiffSummary;
+};
+
+export type SessionGetInput = {
+  sessionId: string;
+};
+
+export type SessionPreviewInput = {
+  sessionId: string;
+};
+
+export type SessionPreviewResult = {
+  sessionId: string;
+  workspaceId?: string;
+  workspaceRoot?: string;
+  model?: string;
+  /** 旧 session / renderer 兼容字段。 */
+  modelId?: string;
+  /** 新写入的 provider-qualified 模型身份。 */
+  modelKey?: ModelKey;
+  contextSnapshot?: import("./session").ContextUsageSnapshot | null;
+};
+
+export type SubAgentTranscriptGetInput = {
+  transcriptRef: import("./session").SubAgentTranscriptRef;
+};
+
+/**
+ * 按需重建某会话的完整 Context（含各 bucket 的内容预览），供右侧 Context 完整视图实时展示。
+ *
+ * Host 根据 Session 请求事实与当前 Surface 生成内容预览，不调用 LLM。
+ */
+export type DescribeContextInput = {
+  sessionId: string;
+};
+
+// ─── 顶部 Environment 与本地 Git 操作 ───
+
+export type WorkspaceEnvironmentGetInput = {
+  workspaceRoot?: string;
+};
+
+export type WorkspaceEnvironmentSnapshot = {
+  workspaceRoot: string;
+  workspaceLabel: string;
+  locationKind: "this_mac" | "worktree";
+  git: {
+    available: boolean;
+    repository: boolean;
+    branch?: string;
+    branches: GitBranchItem[];
+    detached: boolean;
+    hasHead: boolean;
+    upstream?: string;
+    remotes: string[];
+  };
+};
+
+export type WorkspaceGitErrorCode =
+  | "invalid_workspace"
+  | "git_not_found"
+  | "not_repository"
+  | "detached_head"
+  | "invalid_branch"
+  | "branch_checked_out"
+  | "nothing_to_commit"
+  | "remote_required"
+  | "no_remote"
+  | "command_failed";
+
+export type WorkspaceGitCreateBranchInput = {
+  workspaceRoot?: string;
+  branchName: string;
+};
+
+export type WorkspaceGitSwitchBranchInput = {
+  workspaceRoot?: string;
+  branchName: string;
+};
+
+export type WorkspaceGitCommitInput = {
+  workspaceRoot?: string;
+  message?: string;
+  includeUnstagedChanges?: boolean;
+  branchName?: string;
+};
+
+export type WorkspaceGitPushInput = {
+  workspaceRoot?: string;
+  remote?: string;
+};
+
+export type WorkspaceGitCommitAndPushInput = WorkspaceGitCommitInput & {
+  remote?: string;
+};
+
+export type WorkspaceGitMutationResult = {
+  ok: boolean;
+  action: "create_branch" | "switch_branch" | "commit" | "push" | "commit_and_push";
+  phase: "branch" | "commit" | "push";
+  workspaceRoot: string;
+  branch?: string;
+  branchCreated?: boolean;
+  commitCreated?: boolean;
+  commitHash?: string;
+  pushed?: boolean;
+  remote?: string;
+  upstreamSet?: boolean;
+  remotes?: string[];
+  error?: WorkspaceGitErrorCode;
+  message?: string;
+};
+
+export type WorkspaceOpenToolId = "vscode" | "cursor" | "finder" | "terminal" | "iterm2";
+
+export type WorkspaceOpenTool = {
+  id: WorkspaceOpenToolId;
+  label: string;
+  available: boolean;
+  iconDataUrl?: string;
+};
+
+export type WorkspaceOpenToolsResult = {
+  tools: WorkspaceOpenTool[];
+};
+
+export type WorkspaceOpenInput = {
+  workspaceRoot?: string;
+  toolId: WorkspaceOpenToolId;
+  /**
+   * 要打开的目标（相对 workspaceRoot）；不传则打开根目录本身。
+   *
+   * 越界路径按 `escapes_root` 拒绝——这个入口来自右侧面板的可点 UI，
+   * 和文件浏览器同一条边界，不能因为「只是调用 /usr/bin/open」就放开整盘。
+   */
+  relativePath?: string;
+};
+
+export type WorkspaceOpenResult = {
+  ok: boolean;
+  workspaceRoot: string;
+  toolId: WorkspaceOpenToolId;
+  /** 回显实际打开的相对路径；打开根目录时为 undefined。 */
+  relativePath?: string;
+  error?: "invalid_workspace" | "unsupported_platform" | "not_installed" | "open_failed" | "escapes_root";
+  message?: string;
+};
+
+// ─── 工作区文件浏览器（见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`）───
+
+/**
+ * 取回工作区里全部 Markdown 的相对路径清单（「文档」面板用，见 `docs/design-docs/frontend/front-文档面板规范.md`）。
+ * 只有路径，不读内容；renderer 在本地把清单组装成树。renderer 不直接读 FS，全部经此 IPC。
+ */
+export type WorkspaceListMarkdownFilesInput = {
+  /** 工作区根的绝对路径。 */
+  workspaceRoot: string;
+};
+
+export type WorkspaceListMarkdownFilesResult =
+  | {
+      ok: true;
+      /** 相对 workspaceRoot 的 POSIX 路径，已去重、按路径排序。 */
+      files: string[];
+      /** 超过 5000 篇或遍历项数上限，清单只是前一部分。 */
+      truncated: boolean;
+      /** git 仓库用 `git ls-files`（遵守 .gitignore）；否则是有上限的递归遍历。 */
+      source: "git" | "walk";
+    }
+  | { ok: false; error: "not_found" | "not_a_directory" | "escapes_root" };
+
+/** 写回一个已存在的工作区 Markdown 文件（「文档」面板的源码编辑保存）。不新建文件。 */
+export type WorkspaceWriteMarkdownFileInput = {
+  workspaceRoot: string;
+  relativePath: string;
+  content: string;
+};
+
+export type WorkspaceWriteMarkdownFileResult =
+  | { ok: true; mtimeMs: number; size: number }
+  | { ok: false; error: "not_found" | "escapes_root" | "not_markdown" | "write_failed" };
+
+/** 读取单个工作区文件，供右侧面板复用现有渲染视图打开。 */
+export type WorkspaceReadFileInput = {
+  workspaceRoot?: string;
+  relativePath: string;
+};
+
+/** markdown / image 在应用内渲染；external 只返回 stat，由调用方交给系统打开。 */
+export type WorkspaceFileRenderKind = "markdown" | "image" | "external";
+
+/**
+ * 文本预览的字节上限：超过就只返回上限内的完整行并置 `truncated`。
+ *
+ * 放在契约层是因为两侧都要用同一个数：main 用它决定读多少，renderer 要在提示条里
+ * 复述「仅显示前 X」。各留一份的话，改了 main 的上限就会让提示文案说谎。
+ */
+export const WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES = 2 * 1024 * 1024;
+
+export type WorkspaceReadFileResult = {
+  relativePath: string;
+  renderKind: WorkspaceFileRenderKind;
+  /** markdown：UTF-8 文本；image / external：空。 */
+  content?: string;
+  /** image：data URL（base64）；其余空。 */
+  dataUrl?: string;
+  /** 文件字节数（磁盘上的完整大小，不因截断而变小）。 */
+  size: number;
+  /**
+   * 文本超过大小上限，`content` 只含上限内的完整行。
+   * 消费方必须显式告知用户内容不完整，不能当完整文件对待。
+   */
+  truncated?: boolean;
+  /** 最后修改时间（epoch 毫秒），供右侧面板判断已打开的 Tab 是否过期；错误分支为 0。 */
+  mtimeMs: number;
+  error?: "not_found" | "not_a_file" | "too_large" | "escapes_root";
+};
+
+/**
+ * 只取文件的大小与 mtime，不读内容。
+ * 右侧面板用它在「Tab 激活 / 窗口重获焦点 / turn 结束」三个时机做 O(1) 新鲜度重校验，
+ * 不做轮询；详见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`。
+ */
+export type WorkspaceStatFileInput = {
+  workspaceRoot?: string;
+  relativePath: string;
+};
+
+export type WorkspaceStatFileResult = {
+  relativePath: string;
+  size: number;
+  mtimeMs: number;
+  error?: "not_found" | "not_a_file" | "escapes_root";
+};
+
+/**
+ * 工作区文件的关联应用（交付卡的「用应用打开」下拉）。只有 macOS 会列出应用；
+ * 其他平台返回空列表，前端退回「默认打开 + 在文件夹中显示」。
+ */
+export type WorkspaceFileApplication = {
+  /** 应用包的绝对路径；打开时原样传回，main 会对照当前关联列表再校验一次。 */
+  id: string;
+  name: string;
+  default: boolean;
+  /** 32×32 PNG data URL。 */
+  iconDataUrl?: string;
+};
+
+export type WorkspaceFileApplicationsInput = {
+  workspaceRoot?: string;
+  relativePath: string;
+};
+
+export type WorkspaceFileApplicationsResult = {
+  applications: WorkspaceFileApplication[];
+  error?: "invalid_target" | "query_failed";
+};
+
+export type WorkspaceOpenFileInput = {
+  workspaceRoot?: string;
+  relativePath: string;
+  /** open：用 applicationId 指定的应用打开，不传则用系统默认应用；reveal：在 Finder / 文件夹中显示。 */
+  action: "open" | "reveal";
+  applicationId?: string;
+};
+
+export type WorkspaceOpenFileResult = {
+  ok: boolean;
+  /** no_application：系统里没有任何应用能打开这个文件（`shell.openPath` 返回了错误串），renderer 据此弹兜底对话框。 */
+  error?: "invalid_target" | "not_registered" | "open_failed" | "no_application";
+  message?: string;
+};
+
+/** 读取当前会话引用的 v2 图片 Artifact。字段名为兼容固定 renderer 保留，artifactPath 实际承载 Artifact ID。 */
+export type SessionArtifactReadInput = {
+  sessionId: string;
+  artifactPath: string;
+};
+
+export type SessionArtifactReadResult = {
+  name: string;
+  relativePath: string;
+  mimeType?: "image/png" | "image/jpeg" | "image/webp";
+  size: number;
+  dataUrl?: string;
+  error?:
+    | "invalid_session"
+    | "escapes_root"
+    | "not_found"
+    | "not_a_file"
+    | "too_large"
+    | "unsupported_format"
+    | "read_failed";
+};
+
+/** 在桌面端为受控 Artifact 打开原生右键菜单。路径必须由 main 重新解析。 */
+export type ArtifactContextMenuInput =
+  | {
+      kind: "session_image";
+      sessionId: string;
+      artifactPath: string;
+    }
+  | {
+      kind: "workspace_file";
+      workspaceRoot?: string;
+      relativePath: string;
+    };
+
+export type ArtifactContextMenuResult = {
+  shown: boolean;
+  error?: "invalid_target" | "not_found" | "not_a_file";
+};
+
+export type WorkspaceEntryKind = "folder";
+
+export type WorkspaceEntry = {
+  id: string;
+  kind: WorkspaceEntryKind;
+  label: string;
+  path: string;
+  hidden?: boolean;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkspaceRegistry = {
+  version: 1;
+  items: WorkspaceEntry[];
+};
+
+export type WorkspaceListResult = WorkspaceRegistry;
+
+export type WorkspaceIdInput = {
+  workspaceId: string;
+};
+
+export type WorkspaceOpenInIdeResult = {
+  ok: boolean;
+  error?: "workspace_not_found" | "workspace_hidden" | "directory_not_found" | "open_failed";
+};
+
+export type WorkspaceVisibilityInput = WorkspaceIdInput & {
+  hidden: boolean;
+};
+
+export type WorkspaceVisibilityResult = {
+  ok: boolean;
+  error?: "workspace_not_found";
+};
+
+export type SessionCreateInput = {
+  runLocation?: SessionRunLocation;
+  /** Local checkout target, or the base branch of a new worktree. */
+  branch?: string;
+  /** Remote ownership is fixed when the Session is created. */
+  hostId?: string;
+  title?: string;
+  agentForm?: import("./runtime-v2/runtime").MainAgentForm;
+  agentMode?: ComposerMode;
+  /** workspace registry 的稳定 id；与 workspaceRoot 一起写入 session meta。 */
+  workspaceId?: string;
+  /** 创建时指定 workspace 根目录；不传由主进程从 BootstrapState 自动注入。 */
+  workspaceRoot?: string;
+};
+
+export type SessionForkInput = {
+  sessionId: string;
+  /** 从这一轮的助手回复分叉：保留到该轮结束；不传则整个会话分叉。 */
+  turnId?: string;
+};
+
+/** 从主会话分出侧边对话：截到上一轮结束，默认 Plan 模式。 */
+export type SideChatOpenInput = { parentSessionId: string };
+export type SideChatOpenResult = {
+  /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */
+  session: import("./runtime-v2").RuntimeV2DesktopSessionProjection;
+  inheritedTurnCount: number;
+  /** 分出时主会话正在运行，那一轮没有带过来。 */
+  runningTurnExcluded: boolean;
+};
+export type SideChatListInput = { parentSessionId: string };
+
+export type SessionPinInput = {
+  sessionId: string;
+  pinned: boolean;
+};
+
+export type SessionPinResult = {
+  ok: boolean;
+  error?: string;
+};
+
+export type SessionRenameInput = {
+  sessionId: string;
+  title: string;
+};
+
+export type SessionRenameResult = {
+  ok: boolean;
+  error?: string;
+};
+
+export type SessionWorkspaceInput = {
+  sessionId: string;
+  workspaceId?: string;
+  workspaceRoot?: string;
+};
+
+export type SessionWorkspaceResult = {
+  ok: boolean;
+  error?: string;
+};
+
+export type SessionPermissionModeInput = {
+  sessionId: string;
+  mode: import("./runtime-v2/permission").PermissionMode;
+};
+
+export type SessionAgentModeInput = {
+  sessionId: string;
+  mode: ComposerMode;
+  expectedRevision?: number;
+};
+
+export type SessionAgentModeResult = {
+  ok: boolean;
+  mode?: ComposerMode;
+  revision?: number;
+  error?: string;
+};
+
+export type SessionPermissionModeResult = {
+  ok: boolean;
+  mode?: import("./runtime-v2/permission").PermissionMode;
+  error?: string;
+};
+
+export type SessionGrantRevokeInput = { sessionId: string; grantId: string };
+export type SessionGrantRevokeResult = { ok: boolean; error?: string };
+
+export type SessionArchiveInput = {
+  sessionId: string;
+  archived: boolean;
+};
+
+export type SessionArchiveResult = {
+  ok: boolean;
+  error?: string;
+};
+
+export type SessionArchiveManyInput = {
+  sessionIds: string[];
+};
+
+export type SessionArchiveManyResult = {
+  ok: boolean;
+  archivedSessionIds: string[];
+  failedSessionIds: string[];
+};
+
+export type UsageStatisticsRange = "day" | "week" | "month" | "total";
+
+/**
+ * Usage 统计的取数范围。
+ *
+ * - `"session"`：单个 session 的 events 聚合（兼容旧用法，必须传 `sessionId`）；
+ * - `"global"`（默认）：跨所有普通对话 session 的全部历史 LLM/工具事件汇总，
+ *   `sessionId` 字段被忽略。
+ *
+ * 出于向后兼容考虑，旧调用 `{ sessionId: "..." }` 在不指定 `scope` 时仍按 `"session"` 模式执行。
+ */
+export type UsageStatisticsScope = "session" | "global";
+
+export type UsageStatisticsGetInput = {
+  requestId?: string;
+  search?: string;
+  /** Exact activity filters, combined with kind/status/search. */
+  model?: string;
+  providerId?: string;
+  kind?: UsageActivityKind;
+  /** 仅当 scope==="session" 时必填；scope==="global" 时忽略。 */
+  sessionId?: string;
+  range?: UsageStatisticsRange;
+  /** Optional event-level activity status filter; omitted / "all" keeps every status. */
+  status?: "all" | "success" | "error" | "aborted" | "unknown";
+  /** 默认 "global"（无 sessionId）或 "session"（有 sessionId）。 */
+  scope?: UsageStatisticsScope;
+  /** 底部会话明细表分页；默认第一页，每页 10 条。 */
+  requestRowsPage?: UsageStatisticsRequestRowsPageInput;
+};
+
+export type UsageStatisticsSummary = {
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  cacheHitTokens: number;
+  cacheMissTokens: number;
+  reasoningTokens: number;
+  toolCallCount: number;
+  conversationCount: number;
+  costUsd: number;
+  cacheEfficiencyPercent: number;
+};
+
+export type UsageStatisticsModelEntry = {
+  name: string;
+  provider?: string;
+  totalTokens: number;
+  percent: number;
+  callCount: number;
+  costUsd: number;
+};
+
+export type UsageStatisticsToolEntry = {
+  name: string;
+  callCount: number;
+  percent: number;
+  failedCount: number;
+  averageDurationMs?: number;
+};
+
+/**
+ * 单日单模型的明细，仅用于 UI 热力图 hover tooltip 的 "MODEL BREAKDOWN" 区。
+ * 不进入主统计区——主区按"整段时间窗"展示模型分布。
+ */
+export type UsageStatisticsDailyModelBreakdown = {
+  name: string;
+  totalTokens: number;
+  percent: number;
+};
+
+export type UsageStatisticsDailyRow = {
+  date: string;
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  cacheHitTokens: number;
+  reasoningTokens: number;
+  conversationCount: number;
+  toolCallCount: number;
+  costUsd: number;
+  /**
+   * 当日按 model 拆分的 token 明细，按 totalTokens 降序。
+   * - `percent` 是"在该日 totalTokens 内的占比"，不是全段时间窗内的占比；
+   * - 没有 llm_usage 事件的日期会得到空数组。
+   */
+  modelBreakdown: UsageStatisticsDailyModelBreakdown[];
+};
+
+export type UsageStatisticsRequestRow = {
+  /** Latest llm_usage timestamp in this Agent Run. */
+  timestamp: string;
+  sessionId: string;
+  agentRunId: string;
+  workspaceId?: string;
+  workspaceRoot?: string;
+  /** Primary model in this Agent Run, chosen by largest token share. */
+  model: string;
+  /** 旧 usage 兼容字段。 */
+  modelId?: string;
+  /** 新 usage 的 provider-qualified 模型身份。 */
+  modelKey?: ModelKey;
+  provider?: string;
+  /** Number of llm_usage calls folded into this turn row. */
+  modelCallCount: number;
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  cacheHitTokens: number;
+  cacheMissTokens: number;
+  reasoningTokens: number;
+  costUsd: number;
+};
+
+export type UsageStatisticsRequestRowsPageInput = {
+  page?: number;
+  /** Optional bounded page size for large ledgers; renderer values are clamped by Main. */
+  limit?: number;
+  /** Opaque cursor returned by the previous page. */
+  cursor?: string;
+};
+
+export type UsageStatisticsRequestRowsPage = {
+  page: number;
+  pageSize: number;
+  totalRows: number;
+  totalPages: number;
+  nextCursor?: string | null;
+};
+
+export type UsageQueryProgress = {
+  requestId: string;
+  phase: "queued" | "checking" | "syncing" | "rebuilding" | "querying" | "fallback" | "cancelled";
+  completedSessions: number;
+  totalSessions: number;
+  eventsRead: number;
+};
+
+export type UsageReadModelInfo = {
+  readonly source: "sqlite" | "session";
+  readonly status: "ready" | "fallback";
+  readonly failedSources?: number;
+  readonly reason?: string;
+};
+
+export type UsageStatisticsSnapshot = {
+  readModel?: UsageReadModelInfo;
+  /** "session"=单会话；"global"=跨所有 session 的全部历史。 */
+  scope: UsageStatisticsScope;
+  /** 仅 scope==="session" 时为对应 session id；global 时为 null。 */
+  sessionId: string | null;
+  /** 仅 scope==="session" 时为对应 session 标题；global 时通常为 "全部数据"。 */
+  title: string;
+  range: UsageStatisticsRange;
+  generatedAt: string;
+  periodStart?: string;
+  periodEnd?: string;
+  /** 参与聚合的数据源条数（global 时是 session 个数；session 时固定为 1）。 */
+  sourceCount?: number;
+  summary: UsageStatisticsSummary;
+  modelDistribution: UsageStatisticsModelEntry[];
+  toolDistribution: UsageStatisticsToolEntry[];
+  dailyRows: UsageStatisticsDailyRow[];
+  /** 当前页会话明细。完整账本仍参与 summary / distribution / daily 聚合。 */
+  requestRows: UsageStatisticsRequestRow[];
+  requestRowsPage: UsageStatisticsRequestRowsPage;
+};
+
+/** Journal-derived activity granularity used by the Maka-style Usage page. */
+export type UsageActivityKind = "llm_request" | "tool_invocation";
+
+export type UsageActivityStatus = "running" | "success" | "error" | "aborted" | "unknown";
+
+export type UsageActivityCostBasis = "priced" | "estimated" | "unavailable";
+
+export type UsageActivityTokens = {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  reasoningTokens: number | null;
+  totalTokens: number | null;
+};
+
+export type UsageActivityRow = {
+  sessionTitle?: string;
+  /** Stable across cold Journal rebuilds. */
+  activityId: string;
+  kind: UsageActivityKind;
+  sessionId: string;
+  agentRunId: string;
+  turnId?: string;
+  stepId?: string;
+  requestId?: string;
+  callId?: string;
+  /** Auxiliary attempts remain separate from main Agent requests. */
+  purpose?: "image-inspection" | "auto-review" | "session-title" | "compaction";
+  logicalRequestId?: string;
+  routeId?: string;
+  retryId?: string;
+  retryOfRequestId?: string;
+  providerId?: string;
+  /** Provider connection is optional because older Journal snapshots do not carry it. */
+  connectionId?: string;
+  modelKey?: ModelKey;
+  model?: string;
+  toolName?: string;
+  workspaceRoot?: string;
+  startedAt: string;
+  endedAt?: string;
+  durationMs?: number;
+  attempt?: number;
+  tokens: UsageActivityTokens;
+  costUsd: number | null;
+  costBasis: UsageActivityCostBasis;
+  costAmount?: number | null;
+  costCurrency?: "USD" | null;
+  costProvenance?: import("./model-catalog").UsageCostProvenance;
+  historicalUnverified?: boolean;
+  status: UsageActivityStatus;
+  /** Header/call event sequence, useful for evidence links and diagnostics. */
+  sourceEventSeq: number;
+  relatedEventSeqs: number[];
+};
+
+export type UsageActivitySummary = {
+  activityCount: number;
+  requestCount: number;
+  toolCount: number;
+  successCount: number;
+  errorCount: number;
+  abortedCount: number;
+  runningCount: number;
+  unknownCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  reasoningTokens: number;
+  totalTokens: number;
+  /** LLM requests whose corresponding token fact was not reported; explicit zero remains known. */
+  unknownTokenRequestCounts: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    reasoning: number;
+    total: number;
+  };
+  costUsd: number | null;
+  costUnavailableCount: number;
+};
+
+export type UsageActivitySourceWatermark = {
+  sessionId: string;
+  throughJournalSeq: number;
+};
+
+export type UsageActivityRowsPage = {
+  page: number;
+  pageSize: number;
+  totalRows: number;
+  totalPages: number;
+  nextCursor?: string | null;
+};
+
+export type UsageCostSummary = {
+  costUsd: number;
+  knownCostRequestCount: number;
+  unknownCostRequestCount: number;
+  unverifiedHistoricalRequestCount: number;
+};
+export type UsageActivityAggregate = {
+  key: string;
+  label: string;
+  providerId?: string;
+  connectionId?: string;
+  count: number;
+  errorCount: number;
+  totalTokens: number;
+  /** LLM requests in this provider/model group with unknown total token usage. Always zero for tools. */
+  unknownTokenRequestCount: number;
+  durationMs: number;
+  costSummary: UsageCostSummary;
+};
+export type UsageActivitySnapshot = {
+  readModel?: UsageReadModelInfo;
+  /** Counts for the selected time window before text/status filtering. */
+  tabCounts?: { requests: number; providers: number; models: number; tools: number };
+  costSummary?: UsageCostSummary;
+  aggregates?: { providers: UsageActivityAggregate[]; models: UsageActivityAggregate[]; tools: UsageActivityAggregate[] };
+
+  schemaVersion: 1;
+  scope: UsageStatisticsScope;
+  sessionId: string | null;
+  title: string;
+  range: UsageStatisticsRange;
+  generatedAt: string;
+  sourceCount: number;
+  /** Bounded diagnostic sample, not a recovery or freshness authority. */
+  sourceWatermarks: UsageActivitySourceWatermark[];
+  sourceWatermarksTruncated?: boolean;
+  summary: UsageActivitySummary;
+  /** Current page, sorted newest activity first. */
+  rows: UsageActivityRow[];
+  rowsPage: UsageActivityRowsPage;
+};
+
+export type ProviderBalanceDisplay = {
+  amount: string;
+  currency: string;
+};
+
+/** 余额 / 额度可读取的供应商。 */
+export type BalanceProviderId = Extract<ProviderId, "deepseek" | "kimi" | "openrouter">;
+
+/** 通用供应商余额快照；按 provider 区分来源，UI 每个 provider 渲染一张卡。 */
+export type ProviderBalanceSnapshot = {
+  provider: BalanceProviderId;
+  isConfigured: boolean;
+  isAvailable: boolean | null;
+  generatedAt: string;
+  displayBalance: ProviderBalanceDisplay | null;
+};
+
+export type LocalUpdateErrorCode =
+  | "invalid_source"
+  | "not_packaged"
+  | "not_macos"
+  | "not_writable"
+  | "missing_source"
+  | "already_running"
+  | "spawn_failed";
+
+export type LocalUpdateProgressPhase =
+  | "idle"
+  | "starting"
+  | "building"
+  | "ready_to_replace"
+  | "waiting_for_exit"
+  | "replacing"
+  | "succeeded"
+  | "failed";
+
+export type LocalUpdateProgress = {
+  phase: LocalUpdateProgressPhase;
+  message: string;
+  startedAt?: string;
+  updatedAt?: string;
+  finishedAt?: string;
+};
+
+export type LocalUpdateState = {
+  sourceRoot: string | null;
+  sourceValid: boolean;
+  sourceError?: LocalUpdateErrorCode;
+  appExecutablePath?: string;
+  appIsPackaged?: boolean;
+  appPath: string | null;
+  installParent: string | null;
+  canUpdate: boolean;
+  reason?: string;
+  logPath: string;
+  running: boolean;
+  lastStartedAt?: string;
+  progress: LocalUpdateProgress;
+};
+
+export type AppShutdownNotice = {
+  reason: "normal" | "local_update";
+};
+
+export type LocalUpdateSelectSourceResult = {
+  canceled: boolean;
+  state: LocalUpdateState;
+};
+
+export type LocalUpdateStartResult = {
+  ok: boolean;
+  state: LocalUpdateState;
+  error?: LocalUpdateErrorCode;
+  message?: string;
+};
+
+export type AppBootstrapStateInput = {
+  appVersion: string;
+  dataRoot: string;
+  sessionRoot?: string;
+  logRoot?: string;
+  tmpRoot?: string;
+  workspaceRoot?: string;
+};
+
+export function createBootstrapState(input: AppBootstrapStateInput): BootstrapState {
+  return {
+    appVersion: input.appVersion,
+    dataRoot: input.dataRoot,
+    sessionRoot: input.sessionRoot ?? `${input.dataRoot}/sessions`,
+    logRoot: input.logRoot ?? `${input.dataRoot}/logs`,
+    tmpRoot: input.tmpRoot ?? `${input.dataRoot}/tmp`,
+    workspaceRoot: input.workspaceRoot ?? input.dataRoot
+  };
+}
+
+/** One row of the 扩展 › 插件 page (`plugins.list`), computed in main from the plugin catalog, the startup switches and settings. */
+export interface PluginListItem {
+  /** Catalog Entry id; also the key of `settings.tools.plugins`. */
+  id: string;
+  title: string;
+  description: string;
+  scope: "global" | "session";
+  /** Capability directory under `packages/`, such as `context`. */
+  directory: string;
+  canDisable: boolean;
+  /** Whether the plugin was loaded at this launch. */
+  loaded: boolean;
+  /** The switch value in settings (what the next launch will load). */
+  enabled: boolean;
+}

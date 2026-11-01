@@ -3,12 +3,12 @@ import { mkdtemp, mkdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { createNodeToolPorts as createReadPorts } from "@actspace/tools-filesystem-read";
-import { createNodeToolPorts as createSearchPorts } from "@actspace/tools-filesystem-search";
-import { createNodeBashToolPorts } from "@actspace/tools-shell-tools";
-import { runToolStreamFixture } from "@actspace/core-agent-loop/testing";
+import { createNodeToolPorts as createReadPorts } from "@actspace/tool-fs-read";
+import { createNodeToolPorts as createSearchPorts } from "@actspace/tool-fs-search";
+import { createNodeBashToolPorts } from "@actspace/tool-shell";
+import { runToolStreamFixture } from "@actspace/agent-loop/testing";
 import { DesktopArtifactStore } from "../runtime-v2/artifact-store";
-import type { ToolExecutionContext } from "@actspace/tools-runtime";
+import type { ToolExecutionContext } from "@actspace/tool-runtime";
 import type { LlmMessage } from "@actspace/llm-service";
 
 it("runs large Bash output through storage, the next request, and paginated read/search", async () => {

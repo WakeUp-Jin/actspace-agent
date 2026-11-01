@@ -1,8 +1,6 @@
-import { useContext, useMemo, useRef, useState } from "react";
-import { Copy, Eye, Loader2, MoreHorizontal, Wand2 } from "lucide-react";
-import { visualizeApi } from "../../api/visualize";
+import { useContext, useMemo, useState } from "react";
+import { Copy, MoreHorizontal } from "lucide-react";
 import { cn } from "../ui/cn";
-import { useRightPanel } from "../right-panel/RightPanelContext";
 import { SessionActionsContext } from "../../session/session-actions-context";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
@@ -58,19 +56,6 @@ async function copyToClipboard(value: string) {
   }
 }
 
-type VisualizeState = "idle" | "generating" | "ready" | "error";
-
-/** 从回复正文里抽一个简短标题，给可视化 Tab 用。剥掉常见 Markdown 记号，取首个非空行。 */
-function deriveVisualizeTitle(content: string): string {
-  const firstLine =
-    content
-      .split("\n")
-      .map((line) => line.trim())
-      .find((line) => line.length > 0) ?? "回复";
-  const stripped = firstLine.replace(/^#+\s*/, "").replace(/[*_`>#~]/g, "").trim() || "回复";
-  return `可视化 · ${stripped.length > 16 ? `${stripped.slice(0, 16)}…` : stripped}`;
-}
-
 export function TurnActions({
   assistantMessages,
   sessionId,
@@ -87,10 +72,6 @@ export function TurnActions({
   turnActive?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [visualizeState, setVisualizeState] = useState<VisualizeState>("idle");
-  const [visualizeError, setVisualizeError] = useState<string | null>(null);
-  const visualizeHtmlRef = useRef<string | null>(null);
-  const { openTab } = useRightPanel();
   const onForkSession = useContext(SessionActionsContext)?.onForkSession;
   const latestAssistantMessage = assistantMessages[assistantMessages.length - 1];
   const copyText = useMemo(
@@ -112,65 +93,6 @@ export function TurnActions({
   const forkDisabled = turnActive || !onForkSession || !sessionId || !forkTurnId;
   const forkLabel = turnActive ? "请等待当前轮次结束后再分叉" : "分叉会话";
 
-  const visualizeTabId = `viz:${latestAssistantMessage.id}`;
-
-  function focusVisualizeTab(html: string) {
-    openTab({
-      id: visualizeTabId,
-      kind: "html",
-      title: deriveVisualizeTitle(copyText),
-      html,
-      trust: "chat",
-    });
-  }
-
-  /**
-   * 可视化转换：成本敏感，绝不每次点击都调模型。
-   * - 本地已有结果（ready）且非重生成 → 直接聚焦 Tab，零 IPC。
-   * - 否则走 IPC；main 侧按 messageId+sourceHash 命中缓存即不调模型。
-   */
-  async function handleVisualize(regenerate: boolean) {
-    setMenuOpen(false);
-    if (visualizeState === "generating") {
-      return;
-    }
-    if (!regenerate && visualizeState === "ready" && visualizeHtmlRef.current) {
-      focusVisualizeTab(visualizeHtmlRef.current);
-      return;
-    }
-    if (!sessionId) {
-      setVisualizeState("error");
-      setVisualizeError("当前环境不支持可视化转换。");
-      return;
-    }
-
-    setVisualizeState("generating");
-    setVisualizeError(null);
-    try {
-      const result = await visualizeApi.convertReply({
-        sessionId,
-        messageId: latestAssistantMessage.id,
-        content: copyText,
-        regenerate,
-      });
-      visualizeHtmlRef.current = result.html;
-      setVisualizeState("ready");
-      focusVisualizeTab(result.html);
-    } catch (error) {
-      setVisualizeState("error");
-      setVisualizeError(error instanceof Error ? error.message : "可视化转换失败");
-    }
-  }
-
-  const visualizeLabel =
-    visualizeState === "ready"
-      ? "查看可视化（已生成）"
-      : visualizeState === "generating"
-        ? "正在生成可视化…"
-        : visualizeState === "error"
-          ? (visualizeError ?? "可视化失败，点击重试")
-          : "用主模型把这条回复转成可视化 HTML";
-
   return (
     <div className={cn(TURN_ACTIONS_CLASS, !revealAlways && TURN_ACTIONS_HOVER_REVEAL_CLASS)} data-turn-actions-reveal={revealAlways ? "always" : "hover"}>
       <Tooltip>
@@ -185,26 +107,6 @@ export function TurnActions({
           </button>
         </TooltipTrigger>
         <TooltipContent>复制回复</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            className={TURN_ACTION_TRIGGER_CLASS}
-            type="button"
-            aria-label={visualizeState === "ready" ? "查看可视化" : "可视化这条回复"}
-            aria-disabled={visualizeState === "generating"}
-            onClick={() => void handleVisualize(false)}
-          >
-            {visualizeState === "generating" ? (
-              <Loader2 size={16} strokeWidth={2.2} className="animate-spin" />
-            ) : visualizeState === "ready" ? (
-              <Eye size={16} strokeWidth={2} />
-            ) : (
-              <Wand2 size={16} strokeWidth={2} />
-            )}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{visualizeLabel}</TooltipContent>
       </Tooltip>
       <Menu open={menuOpen} onOpenChange={setMenuOpen}>
         <Tooltip>
@@ -221,9 +123,6 @@ export function TurnActions({
           <MenuItem disabled={forkDisabled} title={forkLabel} onSelect={() => { if (!forkDisabled) onForkSession(sessionId, forkTurnId); }}>分叉会话</MenuItem>
           <MenuItem onSelect={() => void handleCopy(copyText)}>复制消息</MenuItem>
           <MenuItem onSelect={() => void handleCopy(latestAssistantMessage.id)}>复制请求 ID</MenuItem>
-          {visualizeState === "ready" || visualizeState === "error" ? (
-            <MenuItem onSelect={() => void handleVisualize(true)}>重新生成可视化</MenuItem>
-          ) : null}
         </MenuContent>
       </Menu>
       <span className={TURN_ACTIONS_END_CLASS}>

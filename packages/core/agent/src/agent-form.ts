@@ -1,5 +1,5 @@
-import type { AgentScope } from "@actspace/core-scope";
-import type { ToolRuntime } from "@actspace/tools-runtime";
+import type { AgentScope } from "@actspace/scope";
+import type { ToolRuntime } from "@actspace/tool-runtime";
 import { createHash } from "node:crypto";
 
 export type AgentFormToolMember = Readonly<{

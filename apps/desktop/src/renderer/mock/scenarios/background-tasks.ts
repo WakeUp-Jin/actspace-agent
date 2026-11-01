@@ -80,8 +80,8 @@ export function backgroundTasksScenario({ db }: MockClock): MockHandlers {
 const TEST_OUTPUT = [
   "$ pnpm test",
   "Scope: 14 of 15 workspace projects",
-  " ✓ packages/shared  test/message-blocks.test.ts (38 tests) 212ms",
-  " ✓ packages/background-tasks  test/registry.test.ts (14 tests) 182ms",
+  " ✓ packages/util/shared  test/message-blocks.test.ts (38 tests) 212ms",
+  " ✓ packages/background-tasks/background-tasks  test/registry.test.ts (14 tests) 182ms",
   " ✓ apps/desktop  test/background-tasks-panel.test.tsx (6 tests) 118ms",
   "",
   " Test Files  86 passed (86)",

@@ -93,7 +93,7 @@ _Turn ended: aborted [#31]_
 ## 模块边界
 
 ```text
-@actspace/session-transcript（新插件包，packages/session/transcript）
+@actspace/session-transcript（新插件包，packages/session/session-transcript）
   render.ts   纯函数：reduceTranscript / foldTranscript / renderTranscript
   paths.ts    transcriptPath、isSessionTranscriptReadPath
   prompt.ts   提醒式提示词 <session-history>

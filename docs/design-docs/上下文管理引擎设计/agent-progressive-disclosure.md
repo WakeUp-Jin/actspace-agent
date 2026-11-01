@@ -177,8 +177,8 @@ flowchart TD
 
 2026-10-06 实现确认：
 
-- `packages/tools/filesystem-read/src/node-ports.ts`：`read_file` 支持 `offset`、`limit`，默认 200 行；同一路径和范围可命中未变化缓存，支持 `force`。
-- `packages/tools/shell-tools/src/node-ports.ts`：Bash 内联正文上限 8,000 字符，超限时保存输出 artifact；磁盘输出另有安全上限。
+- `packages/fs/tool-fs-read/src/node-ports.ts`：`read_file` 支持 `offset`、`limit`，默认 200 行；同一路径和范围可命中未变化缓存，支持 `force`。
+- `packages/shell/tool-shell/src/node-ports.ts`：Bash 内联正文上限 8,000 字符，超限时保存输出 artifact；磁盘输出另有安全上限。
 - `packages/context/src/conversion.ts`：将文本 artifact 解析为可读路径，并提示用分页读取或搜索访问。
 - 本轮检查的工具运行层和 Agent Loop 中未发现“全部工具统一限制为 2,000 字符”的规则。
 

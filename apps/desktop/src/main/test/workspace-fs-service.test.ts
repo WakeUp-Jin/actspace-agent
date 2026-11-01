@@ -1,15 +1,18 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import hljs from "highlight.js";
 import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
 import {
-  listMappedLanguages,
-  listWorkspaceDir,
+  MARKDOWN_LIST_MAX_FILES,
+  MARKDOWN_WALK_MAX_ENTRIES,
+  listWorkspaceMarkdownFiles,
   readWorkspaceFile,
   statWorkspaceFile,
+  writeWorkspaceMarkdownFile,
 } from "../workspace-fs-service";
+import type { GitRunner } from "../git/run-git";
 import type { AppDataRoots } from "../agent-run";
 
 const created: string[] = [];
@@ -35,38 +38,187 @@ async function makeWorkspace(): Promise<AppDataRoots> {
 const PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
-describe("listWorkspaceDir", () => {
-  it("lists directories before files, each sorted, and ignores noise dirs", async () => {
-    const roots = await makeWorkspace();
-    await mkdir(join(roots.workspaceRoot, "node_modules"), { recursive: true });
-    await mkdir(join(roots.workspaceRoot, ".git"), { recursive: true });
-    await mkdir(join(roots.workspaceRoot, "src"), { recursive: true });
-    await mkdir(join(roots.workspaceRoot, "docs"), { recursive: true });
-    await writeFile(join(roots.workspaceRoot, "z.txt"), "z", "utf8");
-    await writeFile(join(roots.workspaceRoot, "a.txt"), "a", "utf8");
+async function put(root: string, relativePath: string, content = "# x"): Promise<void> {
+  const abs = join(root, relativePath);
+  await mkdir(join(abs, ".."), { recursive: true });
+  await writeFile(abs, content, "utf8");
+}
 
-    const result = await listWorkspaceDir({}, roots);
+const notRepo: GitRunner = async () => ({ stdout: "", stderr: "fatal: not a git repository", exitCode: 128, timedOut: false, truncated: false });
 
-    expect(result.error).toBeUndefined();
-    expect(result.entries.map((entry) => entry.name)).toEqual(["docs", "src", "a.txt", "z.txt"]);
-    expect(result.entries.find((entry) => entry.name === "node_modules")).toBeUndefined();
-    expect(result.entries.find((entry) => entry.name === ".git")).toBeUndefined();
-    expect(result.entries[0].kind).toBe("dir");
-    expect(result.entries.find((entry) => entry.name === "a.txt")?.size).toBe(1);
+describe("listWorkspaceMarkdownFiles", () => {
+  it("lists tracked and untracked markdown in a git repo and honours .gitignore", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    execFileSync("git", ["init", "-q"], { cwd: workspaceRoot });
+    await put(workspaceRoot, "README.md");
+    await put(workspaceRoot, "docs/guide.markdown");
+    await put(workspaceRoot, "docs/中文 文档.md");
+    await put(workspaceRoot, "notes/ignored.md");
+    await put(workspaceRoot, "node_modules/pkg/README.md");
+    await put(workspaceRoot, "src/index.ts", "export {}");
+    await put(workspaceRoot, ".gitignore", "notes/\nnode_modules/\n");
+    execFileSync("git", ["add", "README.md", ".gitignore"], { cwd: workspaceRoot });
+    await put(workspaceRoot, "new-untracked.md");
+
+    const result = await listWorkspaceMarkdownFiles(workspaceRoot);
+
+    expect(result).toEqual({
+      ok: true,
+      source: "git",
+      truncated: false,
+      files: ["README.md", "docs/guide.markdown", "docs/中文 文档.md", "new-untracked.md"],
+    });
   });
 
-  it("rejects path traversal without touching the filesystem", async () => {
-    const roots = await makeWorkspace();
-    const result = await listWorkspaceDir({ relativePath: "../.." }, roots);
-    expect(result.error).toBe("escapes_root");
-    expect(result.entries).toEqual([]);
+  it("walks a non-git directory, skipping noise dirs, dot dirs and symlinks", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    const outside = await mkdtemp(join(tmpdir(), "actspace-fs-outside-"));
+    created.push(outside);
+    await put(outside, "secret.md");
+    await put(workspaceRoot, "b/two.md");
+    await put(workspaceRoot, "a.md");
+    await put(workspaceRoot, "node_modules/x/README.md");
+    await put(workspaceRoot, ".hidden/h.md");
+    await put(workspaceRoot, "dist/out.md");
+    await put(workspaceRoot, "code.ts", "export {}");
+    await symlink(outside, join(workspaceRoot, "link-dir"));
+    await symlink(join(outside, "secret.md"), join(workspaceRoot, "link.md"));
+    // 没有可用的 git 时同样走遍历。
+    const noGit: GitRunner = async () => ({ stdout: "", stderr: "", exitCode: null, timedOut: false, truncated: false, startError: { code: "ENOENT", message: "git missing" } });
+
+    expect(await listWorkspaceMarkdownFiles(workspaceRoot, { runGit: noGit })).toEqual({ ok: true, source: "walk", truncated: false, files: ["a.md", "b/two.md"] });
+    expect(await listWorkspaceMarkdownFiles(workspaceRoot, { runGit: notRepo })).toEqual({ ok: true, source: "walk", truncated: false, files: ["a.md", "b/two.md"] });
   });
 
-  it("reports not_a_directory for a file path", async () => {
+  it("excludes git-tracked markdown files that were deleted on disk", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    execFileSync("git", ["init", "-q"], { cwd: workspaceRoot });
+    execFileSync("git", ["config", "user.email", "t@example.com"], { cwd: workspaceRoot });
+    execFileSync("git", ["config", "user.name", "t"], { cwd: workspaceRoot });
+    await put(workspaceRoot, "keep.md");
+    await put(workspaceRoot, "gone.md");
+    execFileSync("git", ["add", "keep.md", "gone.md"], { cwd: workspaceRoot });
+    execFileSync("git", ["commit", "-q", "-m", "init"], { cwd: workspaceRoot });
+    await rm(join(workspaceRoot, "gone.md"));
+
+    expect(await listWorkspaceMarkdownFiles(workspaceRoot)).toEqual({ ok: true, source: "git", truncated: false, files: ["keep.md"] });
+  });
+
+  it("matches markdown extensions case-insensitively for git and walk sources", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    execFileSync("git", ["init", "-q"], { cwd: workspaceRoot });
+    await put(workspaceRoot, "README.MD");
+    await put(workspaceRoot, "docs/Guide.Markdown");
+    await put(workspaceRoot, "docs/lower.md");
+    await put(workspaceRoot, "code.ts", "export {}");
+    const expected = ["README.MD", "docs/Guide.Markdown", "docs/lower.md"];
+
+    const viaGit = await listWorkspaceMarkdownFiles(workspaceRoot);
+    expect(viaGit).toMatchObject({ ok: true, source: "git" });
+    expect(viaGit.ok && [...viaGit.files].sort()).toEqual([...expected].sort());
+    const walked = await listWorkspaceMarkdownFiles(workspaceRoot, { runGit: notRepo });
+    expect(walked).toMatchObject({ ok: true, source: "walk" });
+    expect(walked.ok && [...walked.files].sort()).toEqual([...expected].sort());
+
+    const calls: string[][] = [];
+    const spy: GitRunner = async (args) => {
+      calls.push(args);
+      return { stdout: "", stderr: "", exitCode: 0, timedOut: false, truncated: false };
+    };
+    await listWorkspaceMarkdownFiles(workspaceRoot, { runGit: spy });
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    for (const args of calls) expect(args).toEqual(expect.arrayContaining([":(icase)*.md", ":(icase)*.markdown"]));
+    expect(calls.some((args) => args.includes("--deleted"))).toBe(true);
+  });
+
+  it("truncates to the file cap for both sources", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    const names = Array.from({ length: MARKDOWN_LIST_MAX_FILES + 3 }, (_, index) => `d/${String(index).padStart(5, "0")}.md`);
+    const fakeGit: GitRunner = async (args) => ({ stdout: args.includes("--deleted") ? "" : [...names, ...names].join("\0") + "\0", stderr: "", exitCode: 0, timedOut: false, truncated: false });
+    const viaGit = await listWorkspaceMarkdownFiles(workspaceRoot, { runGit: fakeGit });
+    expect(viaGit).toMatchObject({ ok: true, source: "git", truncated: true });
+    expect(viaGit.ok && viaGit.files).toHaveLength(MARKDOWN_LIST_MAX_FILES);
+
+    await Promise.all(names.slice(0, MARKDOWN_LIST_MAX_FILES + 1).map((name) => put(workspaceRoot, name)));
+    const walked = await listWorkspaceMarkdownFiles(workspaceRoot, { runGit: notRepo });
+    expect(walked).toMatchObject({ ok: true, source: "walk", truncated: true });
+    expect(walked.ok && walked.files).toHaveLength(MARKDOWN_LIST_MAX_FILES);
+  });
+
+  it("keeps the visited-entry cap at 50000 and reports an untruncated small walk", async () => {
+    expect(MARKDOWN_WALK_MAX_ENTRIES).toBe(50_000);
+    const { workspaceRoot } = await makeWorkspace();
+    await put(workspaceRoot, "a.md");
+    expect(await listWorkspaceMarkdownFiles(workspaceRoot, { runGit: notRepo })).toMatchObject({ truncated: false });
+  });
+
+  it("rejects relative roots, missing roots and files", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    await put(workspaceRoot, "f.md");
+    expect(await listWorkspaceMarkdownFiles("../..")).toEqual({ ok: false, error: "escapes_root" });
+    expect(await listWorkspaceMarkdownFiles(join(workspaceRoot, "missing"))).toEqual({ ok: false, error: "not_found" });
+    expect(await listWorkspaceMarkdownFiles(join(workspaceRoot, "f.md"))).toEqual({ ok: false, error: "not_a_directory" });
+  });
+});
+
+describe("writeWorkspaceMarkdownFile", () => {
+  it("overwrites an existing markdown file atomically and reports the new stat", async () => {
     const roots = await makeWorkspace();
-    await writeFile(join(roots.workspaceRoot, "f.txt"), "hi", "utf8");
-    const result = await listWorkspaceDir({ relativePath: "f.txt" }, roots);
-    expect(result.error).toBe("not_a_directory");
+    const workspaceRoot = roots.workspaceRoot;
+    await put(workspaceRoot, "docs/a.md", "old");
+
+    const result = await writeWorkspaceMarkdownFile({ workspaceRoot, relativePath: "docs/a.md", content: "# 新内容\n" });
+
+    expect(result).toMatchObject({ ok: true, size: Buffer.byteLength("# 新内容\n") });
+    expect(await readFile(join(workspaceRoot, "docs/a.md"), "utf8")).toBe("# 新内容\n");
+    expect((await readdir(join(workspaceRoot, "docs"))).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+    const stat = await statWorkspaceFile({ workspaceRoot, relativePath: "docs/a.md" }, roots);
+    expect(result.ok && result.mtimeMs).toBe(stat.mtimeMs);
+  });
+
+  it("accepts uppercase markdown extensions", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    await put(workspaceRoot, "README.MD", "old");
+    expect(await writeWorkspaceMarkdownFile({ workspaceRoot, relativePath: "README.MD", content: "new" })).toMatchObject({ ok: true });
+    expect(await readFile(join(workspaceRoot, "README.MD"), "utf8")).toBe("new");
+  });
+
+  it("rejects non-markdown, missing and directory targets without creating files", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    await put(workspaceRoot, "code.ts", "x");
+    await mkdir(join(workspaceRoot, "dir.md"));
+    expect(await writeWorkspaceMarkdownFile({ workspaceRoot, relativePath: "code.ts", content: "y" })).toEqual({ ok: false, error: "not_markdown" });
+    expect(await writeWorkspaceMarkdownFile({ workspaceRoot, relativePath: "missing.md", content: "y" })).toEqual({ ok: false, error: "not_found" });
+    expect(await writeWorkspaceMarkdownFile({ workspaceRoot, relativePath: "dir.md", content: "y" })).toEqual({ ok: false, error: "not_found" });
+    expect(await readFile(join(workspaceRoot, "code.ts"), "utf8")).toBe("x");
+    expect((await readdir(workspaceRoot)).sort()).toEqual(["code.ts", "dir.md"]);
+  });
+
+  it("rejects traversal, symlinks that leave the root, and markdown symlinks to non-markdown targets", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    const outside = await mkdtemp(join(tmpdir(), "actspace-fs-outside-"));
+    created.push(outside);
+    await put(outside, "secret.md", "secret");
+    await put(workspaceRoot, "plain.txt", "plain");
+    await symlink(outside, join(workspaceRoot, "escape"));
+    await symlink(join(outside, "secret.md"), join(workspaceRoot, "link.md"));
+    await symlink(join(workspaceRoot, "plain.txt"), join(workspaceRoot, "to-text.md"));
+
+    expect(await writeWorkspaceMarkdownFile({ workspaceRoot, relativePath: "../x.md", content: "y" })).toEqual({ ok: false, error: "escapes_root" });
+    expect(await writeWorkspaceMarkdownFile({ workspaceRoot, relativePath: "escape/secret.md", content: "y" })).toEqual({ ok: false, error: "escapes_root" });
+    expect(await writeWorkspaceMarkdownFile({ workspaceRoot, relativePath: "link.md", content: "y" })).toEqual({ ok: false, error: "escapes_root" });
+    expect(await writeWorkspaceMarkdownFile({ workspaceRoot, relativePath: "to-text.md", content: "y" })).toEqual({ ok: false, error: "not_markdown" });
+    expect(await writeWorkspaceMarkdownFile({ workspaceRoot: "relative", relativePath: "a.md", content: "y" })).toEqual({ ok: false, error: "escapes_root" });
+    expect(await readFile(join(outside, "secret.md"), "utf8")).toBe("secret");
+    expect(await readFile(join(workspaceRoot, "plain.txt"), "utf8")).toBe("plain");
+  });
+
+  it("follows a symlink that stays inside the root and keeps the link", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    await put(workspaceRoot, "real.md", "old");
+    await symlink(join(workspaceRoot, "real.md"), join(workspaceRoot, "alias.md"));
+    expect(await writeWorkspaceMarkdownFile({ workspaceRoot, relativePath: "alias.md", content: "new" })).toMatchObject({ ok: true });
+    expect(await readFile(join(workspaceRoot, "real.md"), "utf8")).toBe("new");
   });
 });
 
@@ -77,25 +229,22 @@ describe("readWorkspaceFile", () => {
     const result = await readWorkspaceFile({ relativePath: "readme.md" }, roots);
     expect(result.renderKind).toBe("markdown");
     expect(result.content).toBe("# Hi\n\ntext");
-    expect(result.language).toBeUndefined();
   });
 
-  it("infers highlight language for code/config files", async () => {
+  it("returns only stat for files that are not rendered in-app", async () => {
     const roots = await makeWorkspace();
     await writeFile(join(roots.workspaceRoot, "a.ts"), "export const x = 1;", "utf8");
-    await writeFile(join(roots.workspaceRoot, "b.yaml"), "key: value", "utf8");
-    await writeFile(join(roots.workspaceRoot, "c.unknownext"), "plain", "utf8");
-
-    const ts = await readWorkspaceFile({ relativePath: "a.ts" }, roots);
-    expect(ts.renderKind).toBe("text");
-    expect(ts.language).toBe("typescript");
-
-    const yaml = await readWorkspaceFile({ relativePath: "b.yaml" }, roots);
-    expect(yaml.language).toBe("yaml");
-
-    const unknown = await readWorkspaceFile({ relativePath: "c.unknownext" }, roots);
-    expect(unknown.renderKind).toBe("text");
-    expect(unknown.language).toBeUndefined();
+    await writeFile(join(roots.workspaceRoot, "b.html"), "<p>x</p>", "utf8");
+    await writeFile(join(roots.workspaceRoot, "c.csv"), "a,b\n1,2\n", "utf8");
+    await writeFile(join(roots.workspaceRoot, "d.bin"), Buffer.from([0x68, 0x00, 0x69]));
+    for (const name of ["a.ts", "b.html", "c.csv", "d.bin"]) {
+      const result = await readWorkspaceFile({ relativePath: name }, roots);
+      expect(result.renderKind, name).toBe("external");
+      expect(result.error, name).toBeUndefined();
+      expect(result.content, name).toBeUndefined();
+      expect(result.size, name).toBeGreaterThan(0);
+      expect(result.mtimeMs, name).toBeGreaterThan(0);
+    }
   });
 
   it("returns an image as a base64 data URL", async () => {
@@ -107,21 +256,14 @@ describe("readWorkspaceFile", () => {
     expect(result.content).toBeUndefined();
   });
 
-  it("flags binary text files", async () => {
-    const roots = await makeWorkspace();
-    await writeFile(join(roots.workspaceRoot, "blob.bin"), Buffer.from([0x68, 0x00, 0x69]));
-    const result = await readWorkspaceFile({ relativePath: "blob.bin" }, roots);
-    expect(result.error).toBe("binary");
-  });
-
   it("truncates oversized text to whole lines instead of rejecting the file", async () => {
     const roots = await makeWorkspace();
     // 每行 10 字节，写到刚好超过上限，确保截断点落在行中间。
     const line = "0123456789\n".slice(0, 11);
     const big = line.repeat(Math.ceil(WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES / line.length) + 100);
-    await writeFile(join(roots.workspaceRoot, "huge.log"), big, "utf8");
+    await writeFile(join(roots.workspaceRoot, "huge.md"), big, "utf8");
 
-    const result = await readWorkspaceFile({ relativePath: "huge.log" }, roots);
+    const result = await readWorkspaceFile({ relativePath: "huge.md" }, roots);
 
     expect(result.error).toBeUndefined();
     expect(result.truncated).toBe(true);
@@ -142,74 +284,6 @@ describe("readWorkspaceFile", () => {
     const result = await readWorkspaceFile({ relativePath: "big.png" }, roots);
     expect(result.error).toBe("too_large");
     expect(result.dataUrl).toBeUndefined();
-  });
-
-  it("resolves language from basename for dotfiles and extension-less files", async () => {
-    const roots = await makeWorkspace();
-    await writeFile(join(roots.workspaceRoot, "Dockerfile"), "FROM node:22", "utf8");
-    await writeFile(join(roots.workspaceRoot, "Makefile"), "all:\n\techo hi", "utf8");
-    await writeFile(join(roots.workspaceRoot, ".gitignore"), "dist\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, ".npmrc"), "registry=x\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, ".env.local"), "A=1\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, "go.mod"), "module x\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, "LICENSE"), "MIT\n", "utf8");
-
-    const expected: Array<[string, string | undefined]> = [
-      ["Dockerfile", "dockerfile"],
-      ["Makefile", "makefile"],
-      [".gitignore", "plaintext"],
-      [".npmrc", "ini"],
-      [".env.local", "bash"],
-      ["go.mod", "go"],
-      ["LICENSE", undefined],
-    ];
-    for (const [name, language] of expected) {
-      const result = await readWorkspaceFile({ relativePath: name }, roots);
-      expect(result.language, name).toBe(language);
-    }
-  });
-
-  it("covers the newly mapped extensions", async () => {
-    const roots = await makeWorkspace();
-    const cases: Array<[string, string]> = [
-      ["a.astro", "xml"],
-      ["a.vue", "xml"],
-      ["a.java", "java"],
-      ["a.cpp", "cpp"],
-      ["a.rb", "ruby"],
-      ["a.tf", "ini"],
-      ["a.proto", "protobuf"],
-      ["a.patch", "diff"],
-      ["a.ini", "ini"],
-      ["a.ps1", "powershell"],
-    ];
-    for (const [name] of cases) {
-      await writeFile(join(roots.workspaceRoot, name), "x\n", "utf8");
-    }
-    for (const [name, language] of cases) {
-      const result = await readWorkspaceFile({ relativePath: name }, roots);
-      expect(result.language, name).toBe(language);
-    }
-  });
-
-  it("leaves plain data files unhighlighted on purpose", async () => {
-    const roots = await makeWorkspace();
-    await writeFile(join(roots.workspaceRoot, "notes.txt"), "hi\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, "app.log"), "hi\n", "utf8");
-    expect((await readWorkspaceFile({ relativePath: "notes.txt" }, roots)).language).toBeUndefined();
-    expect((await readWorkspaceFile({ relativePath: "app.log" }, roots)).language).toBeUndefined();
-  });
-
-  it("routes csv/tsv to the csv render kind without a language", async () => {
-    const roots = await makeWorkspace();
-    await writeFile(join(roots.workspaceRoot, "data.csv"), "a,b\n1,2\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, "data.tsv"), "a\tb\n1\t2\n", "utf8");
-
-    const csv = await readWorkspaceFile({ relativePath: "data.csv" }, roots);
-    expect(csv.renderKind).toBe("csv");
-    expect(csv.content).toBe("a,b\n1,2\n");
-    expect(csv.language).toBeUndefined();
-    expect((await readWorkspaceFile({ relativePath: "data.tsv" }, roots)).renderKind).toBe("csv");
   });
 
   it("returns mtime so the right panel can detect stale tabs", async () => {
@@ -256,15 +330,6 @@ describe("statWorkspaceFile", () => {
   });
 });
 
-describe("language mapping integrity", () => {
-  // 防漂移锁（main 侧一端）：映射表里写的每个语言 id 都必须是 highlight.js 真实存在的语言，
-  // 否则文件会静默回退成纯文本。renderer 侧 `right-panel/highlight.ts` 有对应的另一端。
-  it("only maps languages that highlight.js actually provides", () => {
-    const missing = listMappedLanguages().filter((language) => !hljs.getLanguage(language));
-    expect(missing).toEqual([]);
-  });
-});
-
 describe("workspace root containment", () => {
   it("rejects symlinks that point outside the root but follows ones that stay inside", async () => {
     const roots = await makeWorkspace();
@@ -277,7 +342,6 @@ describe("workspace root containment", () => {
     await symlink(join(outside, "secret.txt"), join(roots.dataRoot, "secret-link.txt"));
     await symlink(join(roots.dataRoot, "docs"), join(roots.dataRoot, "docs-link"));
 
-    expect((await listWorkspaceDir({ relativePath: "escape" }, roots)).error).toBe("escapes_root");
     expect((await readWorkspaceFile({ relativePath: "escape/secret.txt" }, roots)).error).toBe("escapes_root");
     expect((await readWorkspaceFile({ relativePath: "secret-link.txt" }, roots)).error).toBe("escapes_root");
     expect((await statWorkspaceFile({ relativePath: "secret-link.txt" }, roots)).error).toBe("escapes_root");
@@ -293,12 +357,12 @@ describe("workspace root containment", () => {
 
   it("does not treat names starting with .. as escaping the root", async () => {
     const roots = await makeWorkspace();
-    await writeFile(join(roots.dataRoot, "..foo"), "dots", "utf8");
+    await writeFile(join(roots.dataRoot, "..foo.md"), "dots", "utf8");
 
-    const result = await readWorkspaceFile({ relativePath: "..foo" }, roots);
+    const result = await readWorkspaceFile({ relativePath: "..foo.md" }, roots);
 
     expect(result.error).toBeUndefined();
     expect(result.content).toBe("dots");
-    expect((await statWorkspaceFile({ relativePath: "..foo" }, roots)).error).toBeUndefined();
+    expect((await statWorkspaceFile({ relativePath: "..foo.md" }, roots)).error).toBeUndefined();
   });
 });

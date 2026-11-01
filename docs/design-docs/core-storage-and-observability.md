@@ -39,7 +39,7 @@ Desktop 以这个 canonical root 作为 Electron `userData`，并解析以下根
 
 ## 存储接口与当前 JSONL 实现
 
-Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；创建、读写、列表、恢复、fork 和投影缓存经同一后端。JSONL 的目录、writer lease、fsync 和物理修复归 `@actspace/session-jsonl`。独立内存实现验证契约可替换；SQLite/MySQL 作为 Session 事实存储后端尚未实现。当前 `runtime-v2/usage-read-model.sqlite` 仅为 Usage/历史查询派生索引，通过 Provider 的有界事件读取同步，不能据此推导为已支持 SQLite Session 后端；状态见[SQLite 专题](筛选存储改版V2-增加SQLite/README.md)。详见[存储规范](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
+Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；创建、读写、列表、恢复、fork 和投影缓存经同一后端。JSONL 的目录、writer lease、fsync 和物理修复归 `@actspace/session-persistence-jsonl`。独立内存实现验证契约可替换；SQLite/MySQL 作为 Session 事实存储后端尚未实现。当前 `runtime-v2/usage-read-model.sqlite` 仅为 Usage/历史查询派生索引，通过 Provider 的有界事件读取同步，不能据此推导为已支持 SQLite Session 后端；状态见[SQLite 专题](筛选存储改版V2-增加SQLite/README.md)。详见[存储规范](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
 
 下列是默认 JSONL 后端的物理布局，不是所有后端必须使用的公共格式：
 
@@ -49,8 +49,7 @@ Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；�
 ├── artifacts/
 ├── recovery/
 ├── .writer-lock/          # 仅持有 writer lease 时存在
-├── transcript.md          # 会话记录 Markdown，派生视图，不是 Session 事实源
-└── visualizations.json    # Desktop 可选派生缓存，不是 Session 事实源
+└── transcript.md          # 会话记录 Markdown，派生视图，不是 Session 事实源
 ```
 
 其中：
@@ -59,8 +58,8 @@ Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；�
 - `artifacts/` 是 Session persistence 预留的受管目录，不代表所有 concrete tool artifact 当前都物理存放在这里；
 - `recovery/` 保存 torn-tail repair 前的 forensic 副本和失效 writer lock；
 - `.writer-lock/owner.json` 保存当前 writer lease，关闭 Session 后移除；
+- 旧版本可能在会话目录里留下 `visualizations.json`（已移除的「转成可视化 HTML」功能的缓存）。现在不读不写，可以直接删除。
 - `transcript.md` 由 `@actspace/session-transcript` 在每轮结束时从 Journal 重写，只含对话正文和一行工具结果，供 Agent 读取历史会话；可删除并重新生成，见[会话记录 Markdown](agent-runtime/agent-session-transcript.md)；
-- `visualizations.json` 保存 Desktop 对 Assistant 回复生成的自包含 HTML，可删除并重新生成，不参与 Agent 历史恢复。
 
 v2 不创建或读取以下 v1 文件：
 
@@ -193,13 +192,13 @@ Main 侧实现位于 `apps/desktop/src/main/settings/`。`settings-service.ts` �
 
 ## 代码事实入口
 
-- `packages/session/persistence/src/session.ts`：Session 业务 handle、flush 与 close；
-- `packages/session/persistence/src/recovery.ts`：语义中断恢复；`packages/session/jsonl/src/repair.ts`：物理 torn-tail repair；
-- `packages/session/jsonl/src/writer-lease.ts`：单 writer lease；
-- `packages/runtime/src/session/session-controller.ts`：Host-facing Session 操作；
-- `packages/runtime/src/projection/durable-session.ts`：durable snapshot；
+- `packages/session/session-persistence/src/session.ts`：Session 业务 handle、flush 与 close；
+- `packages/session/session-persistence/src/recovery.ts`：语义中断恢复；`packages/session/session-persistence-jsonl/src/repair.ts`：物理 torn-tail repair；
+- `packages/session/session-persistence-jsonl/src/writer-lease.ts`：单 writer lease；
+- `packages/core/runtime/src/session/session-controller.ts`：Host-facing Session 操作；
+- `packages/core/runtime/src/projection/durable-session.ts`：durable snapshot；
 - `apps/desktop/src/main/app-paths.ts`：Desktop data / log / tmp root；
-- `packages/runtime/src/projection/durable-session.ts`：Host durable facts、Surface、工具和 request context 派生；`packages/client/src/sessions/`：Client Chat、Trajectory、Tool Card 与 usage selectors；
+- `packages/core/runtime/src/projection/durable-session.ts`：Host durable facts、Surface、工具和 request context 派生；`packages/client/client/src/sessions/`：Client Chat、Trajectory、Tool Card 与 usage selectors；
 - `apps/desktop/src/main/runtime-v2/artifact-store.ts`：Desktop artifact integrity 与 owner 校验。
 
 ## 可重建的会话浏览缓存

@@ -33,7 +33,7 @@
 
 以下是对已确认方向的细化，供本次文档审阅：
 
-当前实现入口：`packages/context/engine/src/instances.ts` 管理 `Session + logicalAgentScopeId` 实例，`packages/context/engine/src/reducers.ts` 管理受 owner/fields 约束的事件 reducer，`packages/context/engine/src/projection.ts` 生成 Host/UI 只读投影；`packages/context/*` 下的类型插件提供各自来源，`packages/core/agent-loop/src/loop.ts` 使用稳定 Agent 身份创建请求，并在已有实例时走 durable reconcile。
+当前实现入口：`packages/context/context-engine/src/instances.ts` 管理 `Session + logicalAgentScopeId` 实例，`packages/context/context-engine/src/reducers.ts` 管理受 owner/fields 约束的事件 reducer，`packages/context/context-engine/src/projection.ts` 生成 Host/UI 只读投影；`packages/context/*` 下的类型插件提供各自来源，`packages/core/agent-loop/src/loop.ts` 使用稳定 Agent 身份创建请求，并在已有实例时走 durable reconcile。
 
 Host/IPC 接线已经由 Runtime 的 `context.engine.getProjection`、Desktop App 的 `readContextProjection` 和 fixed renderer `sessions.describeContext` 串起；旧轻量入口返回 `ContextState`；面板通过 `sessions.describeContextPanel` / `listContextEntries` / `readContextEntry` 查询 schemaVersion 2 投影，由 Main 的 ContextPanelService 聚合当前引擎与 SQLite 历史索引，不会把 Context 实例暴露给 renderer。
 

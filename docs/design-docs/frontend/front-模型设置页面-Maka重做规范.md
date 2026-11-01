@@ -11,7 +11,7 @@
 - **状态**：已确认，已实现（2026-10-21，含当晚的连接详情 V3），Electron 实机验收待做。
 - **适用范围**：ActSpace Desktop 设置中心的「模型」页面：用途表、连接列表、添加连接（选模板 → 填 Key → 弹窗勾选模型）、连接详情与模型管理。
 - **上位规范**：`front-设置中心重构规范.md`、`front-全局视觉语言规范.md`、`front-主题与配色规范.md`。
-- **数据契约**：`packages/shared/src/model-layers.ts`（有效值解析）、`provider-templates.ts`（模板表）、`model-connections.ts`（IPC 契约）。
+- **数据契约**：`packages/util/shared/src/model-layers.ts`（有效值解析）、`provider-templates.ts`（模板表）、`model-connections.ts`（IPC 契约）。
 - **参考证据**：`tmp/maka/apps/desktop/src/renderer/settings/providers-panel.tsx`、`provider-catalog-page.tsx`、`provider-connection-detail.tsx`、`settings-route-header.tsx`、`settings-rows.tsx`。
 
 本文是 ActSpace 模型页面的具体实现规范。它参考 Maka 的页面语法和交互，不复制 ActSpace 不具备的 Runtime Host、账号订阅和远程能力。

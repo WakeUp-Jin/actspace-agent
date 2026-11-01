@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ReviewFileContents,
   ReviewFileDiff,
-  ReviewMutation,
-  ReviewMutationResult,
   ReviewSelection,
   ReviewSnapshot,
 } from "@actspace/shared";
@@ -219,12 +217,15 @@ export function useReviewWorkspaceStore(input: {
   }, [input.sessionId, input.workspaceRoot]);
 
   useEffect(() => {
-    void loadSnapshot(stateRef.current.selection);
+    // 没有实时监听：每次挂载都强制刷新，避免读到旧缓存。
+    void loadSnapshot(stateRef.current.selection, true);
   }, [input.workspaceRoot, input.sessionId, loadSnapshot]);
 
   useEffect(() => {
     return eventsApi.reviewChanged((notification) => {
-      if (notification.workspaceId !== stateRef.current.snapshot?.workspaceId) return;
+      const snapshot = stateRef.current.snapshot;
+      if (notification.workspaceId !== snapshot?.workspaceId) return;
+      if (notification.generation === snapshot.generation) return;
       setState((current) => ({ ...current, feedback: "变更已更新，正在刷新审查视图…", diffs: new Map(), fileRequests: new Map(), fileContents: new Map() }));
       void loadSnapshot(stateRef.current.selection);
     });
@@ -296,30 +297,13 @@ export function useReviewWorkspaceStore(input: {
     void loadSnapshot(stateRef.current.selection, true, next);
   }, [loadSnapshot]);
 
-  const setViewed = useCallback(async (fileId: string, viewed: boolean) => {
-    const snapshot = stateRef.current.snapshot;
-    if (!snapshot) return;
-    setState((current) => ({ ...current, snapshot: current.snapshot ? { ...current.snapshot, files: current.snapshot.files.map((file) => file.id === fileId ? { ...file, viewed } : file) } : null }));
-    const result = await reviewApi.setFileViewed({ workspaceRoot: input.workspaceRoot, sessionId: input.sessionId ?? undefined, snapshotId: snapshot.id, expectedGeneration: snapshot.generation, fileId, viewed });
-    if (result.ok === false) setState((current) => ({ ...current, feedback: result.message }));
-  }, [input.sessionId, input.workspaceRoot]);
-
-  const applyMutation = useCallback(async (mutation: Omit<ReviewMutation, "snapshotId" | "expectedGeneration">): Promise<ReviewMutationResult | null> => {
-    const snapshot = stateRef.current.snapshot;
-    if (!snapshot) return null;
-    const result = await reviewApi.applyMutation({ workspaceRoot: input.workspaceRoot, sessionId: input.sessionId ?? undefined, mutation: { ...mutation, snapshotId: snapshot.id, expectedGeneration: snapshot.generation } });
-    setState((current) => ({ ...current, feedback: mutationFeedback(result) }));
-    if (result.status === "success" || result.status === "partialSuccess" || result.status === "stale") void loadSnapshot(stateRef.current.selection);
-    return result;
-  }, [input.sessionId, input.workspaceRoot, loadSnapshot]);
-
   const patchState = useCallback((patch: Partial<ReviewWorkspaceState>) => {
     setState((current) => ({ ...current, ...patch }));
     const preferencePatch = displayPreferencePatch(patch);
     if (Object.keys(preferencePatch).length > 0) saveDisplayPreference(preferencePatch);
   }, []);
 
-  return { state, setSelection, refresh, selectFile, toggleFile, setAllExpanded, retryDiff, expandContext, loadFileContents, toggleWhitespace, setViewed, applyMutation, patchState };
+  return { state, setSelection, refresh, selectFile, toggleFile, setAllExpanded, retryDiff, expandContext, loadFileContents, toggleWhitespace, patchState };
 }
 
 function loadDisplayPreferences(): Pick<ReviewWorkspaceState, "diffMode" | "wrap" | "ignoreWhitespaceChanges" | "wordDiff" | "loadFullFiles" | "richPreview"> {
@@ -347,11 +331,4 @@ function displayPreferencePatch(patch: Partial<ReviewWorkspaceState>): Record<st
     if (key in patch) result[key] = patch[key];
   }
   return result;
-}
-
-function mutationFeedback(result: ReviewMutationResult): string {
-  if (result.status === "success") return "审查操作已完成。";
-  if (result.status === "partialSuccess") return "部分审查操作已完成，请检查剩余失败项。";
-  if (result.status === "stale") return result.message ?? "操作执行前变更内容已更新，请刷新后重试。";
-  return result.message ?? result.failedSteps[0]?.message ?? "审查操作失败。";
 }

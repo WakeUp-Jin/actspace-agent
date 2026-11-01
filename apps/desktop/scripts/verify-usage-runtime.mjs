@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { createCoreCodecRegistry } from '@actspace/session-journal';
-import { SessionStore } from '../../../packages/session/persistence/dist/index.js';
+import { SessionStore } from '../../../packages/session/session-persistence/dist/index.js';
 const require = createRequire(import.meta.url);
 const { ModelCatalogService } = require('../dist-electron/main/model-catalog-service.js');
 const { resolveModelPricing } = require('@actspace/shared');

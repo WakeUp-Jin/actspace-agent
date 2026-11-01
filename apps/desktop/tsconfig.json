@@ -11,8 +11,8 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@actspace/shared": ["../../packages/shared/dist/index.d.ts"],
-      "@actspace/shared/*": ["../../packages/shared/dist/*"]
+      "@actspace/shared": ["../../packages/util/shared/dist/index.d.ts"],
+      "@actspace/shared/*": ["../../packages/util/shared/dist/*"]
     },
     "types": [
       "vite/client",

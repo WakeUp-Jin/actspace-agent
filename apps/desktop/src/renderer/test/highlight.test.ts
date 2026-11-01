@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { listMappedLanguages } from "../../main/workspace-fs-service";
 import {
   highlightToLines,
   isSupportedLanguage,
@@ -7,14 +6,6 @@ import {
 } from "../components/right-panel/highlight";
 
 describe("按需注册的语言覆盖面", () => {
-  // 防漂移锁（renderer 侧一端）：main 按扩展名 / basename 派发的每个语言，
-  // 这个实例都必须能高亮，否则文件会静默回退成纯文本，且没人会发现。
-  // main 侧另有一条测试保证这些 id 是 highlight.js 真实存在的语言。
-  it("覆盖 main 侧映射用到的全部语言", () => {
-    const missing = listMappedLanguages().filter((language) => !isSupportedLanguage(language));
-    expect(missing).toEqual([]);
-  });
-
   it("只注册用得到的语言，不把全量语法拖进来", () => {
     const registered = listRegisteredLanguages();
     // 全量 highlight.js 是 192 种；这里应该远小于它。

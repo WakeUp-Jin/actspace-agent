@@ -186,7 +186,7 @@ size?: "sm" | "md" | "lg" | "icon";
 | 形态 | 例子 | 归属 |
 |---|---|---|
 | 菜单项、列表行 | Composer 命令菜单项、模型列表项 | `Menu`，随 09 迁移；消息操作菜单项已改为 `MenuItem`（2026-10-06） |
-| 下拉触发器 | Composer 模式 / 模型选择器、可视化回复文件选择器 | Composer 随 09 迁移；文件选择器见技术债。`SettingsSelect` 已改用 `ui/Select`（2026-10-06） |
+| 下拉触发器 | Composer 模式 / 模型选择器 | Composer 随 09 迁移。`SettingsSelect` 已改用 `ui/Select`（2026-10-06） |
 | 分段控件 | 右侧面板「预览 / 源码」切换 | `Tabs` / SegmentedControl |
 | 整块可点的卡片 | 子 Agent 卡片、任务输入卡、右侧面板启动器方块 | 业务组件自身 |
 | 与 36px 输入框同排的表单控件 | API Key 显隐切换、自定义连接模型行内操作 | 与 Input / Textarea 基础组件一起收口 |
@@ -238,7 +238,7 @@ Menu、ContextMenu、Select 共用 `menu-styles.ts` 的外观：面板 `rounded-
 
 例外按「文件 + 规则」登记在检查脚本的 `UI_ONLY_ALLOWLIST`，现在只有一条：`composer/ResponseAnnotationPill.tsx` 保留 Radix HoverCard（悬停预览），卡片里有可操作的按钮，所以标成 `role="dialog"`（`docs/exec-runs/20261005-desktop-fe-00-overall/pauses.md` P2）。
 
-还没迁移的手写弹层（RightPanel 标签溢出菜单、ReplyHtmlRenderView 的文件列表、设置页 ModelMultiSelector、Composer 内的菜单）见 [技术债](../../exec-plans/tech-debt-tracker.md) 和 09。
+还没迁移的手写弹层（RightPanel 标签溢出菜单、设置页 ModelMultiSelector、Composer 内的菜单）见 [技术债](../../exec-plans/tech-debt-tracker.md) 和 09。
 
 ## 按钮收口与检查
 

@@ -9,9 +9,9 @@ import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { createRequire } from 'node:module';
-const require = createRequire(realpathSync(resolve(process.env.ACTSPACE_HOST_TEST_PACKAGE ?? 'packages/agent-host/package.json')));
+const require = createRequire(realpathSync(resolve(process.env.ACTSPACE_HOST_TEST_PACKAGE ?? 'packages/host/agent-host/package.json')));
 const { WebSocket } = require('ws');
-const { HostClient } = await import(process.env.ACTSPACE_HOST_TEST_CLIENT ?? '../../packages/client/dist/host/client.js');
+const { HostClient } = await import(process.env.ACTSPACE_HOST_TEST_CLIENT ?? '../../packages/client/client/dist/host/client.js');
 const exec = promisify(execFile), cli = resolve(process.env.ACTSPACE_HOST_TEST_CLI ?? 'apps/cli/dist/cli.js');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(read, accept, label) {

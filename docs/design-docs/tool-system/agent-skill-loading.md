@@ -1,6 +1,6 @@
 # Agent Skill 设计与加载规范
 
-当前 v2 Skill 发现、catalog 与按需正文加载规范，2026-10-05 对照 `packages/prompt/src/skills/` 校准。
+当前 v2 Skill 发现、catalog 与按需正文加载规范，2026-10-05 对照 `packages/context/prompt/src/skills/` 校准。
 
 ## 目标与内容
 
@@ -52,9 +52,9 @@ Host 在构建运行所需的 prompt source 时调用 `discoverSkills()`。`core
 
 ## 所有权与安全
 
-- `packages/prompt/src/host-context.ts`：读取 Host / workspace 指令，发现 Skills，形成 prompt source。
-- `packages/prompt/src/skills/`：扫描、catalog、prompt contributor。
-- `packages/runtime/src/harness/agent-factory-plugin.ts`：在 Harness 内装配 contributor，按 Agent mode 选择来源。
+- `packages/context/prompt/src/host-context.ts`：读取 Host / workspace 指令，发现 Skills，形成 prompt source。
+- `packages/context/prompt/src/skills/`：扫描、catalog、prompt contributor。
+- `packages/core/runtime/src/harness/agent-factory-plugin.ts`：在 Harness 内装配 contributor，按 Agent mode 选择来源。
 - 文件工具：按统一 Tool Runtime 的读取权限执行正文与资源读取。
 - Host：负责来源目录与凭据边界；renderer 不直接读本地 Skill 文件。
 
@@ -62,4 +62,4 @@ Host 在构建运行所需的 prompt source 时调用 `discoverSkills()`。`core
 
 ## 验证入口
 
-`packages/prompt/src/test/discovery.test.ts`、`host-context.test.ts` 与 contributor 测试覆盖根目录优先级、去重、目录注入、显式正文及 Chat 隔离。脚本执行的真实权限和副作用仍由工具验收负责。
+`packages/context/prompt/src/test/discovery.test.ts`、`host-context.test.ts` 与 contributor 测试覆盖根目录优先级、去重、目录注入、显式正文及 Chat 隔离。脚本执行的真实权限和副作用仍由工具验收负责。

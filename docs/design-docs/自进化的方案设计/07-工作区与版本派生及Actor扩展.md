@@ -53,7 +53,7 @@ H2: slot csv → artifact C，parent = H0
 会话甲选择 H1，会话乙选择 H2，默认基座仍为 H0。
 ```
 
-当前 [Patch 解析](../../../packages/composition/src/harness-patch.ts) 不允许同一 composition 对同一 pluginId 混用多个 artifact。默认内置产物又可能包含多个 behavior，因此首版从内置多条目包派生单个工具时推荐赋予派生插件独立 pluginId，以原 entryId 作为替换槽位；用来源记录表达与原插件的关系。不能复制整个 manifest 却留下重复服务或无关行为。
+当前 [Patch 解析](../../../packages/composition/composition/src/harness-patch.ts) 不允许同一 composition 对同一 pluginId 混用多个 artifact。默认内置产物又可能包含多个 behavior，因此首版从内置多条目包派生单个工具时推荐赋予派生插件独立 pluginId，以原 entryId 作为替换槽位；用来源记录表达与原插件的关系。不能复制整个 manifest 却留下重复服务或无关行为。
 
 同一插件条目可能提供多个工具。替换必须保留承诺保留的工具和依赖契约；不是只实现目标工具就视为兼容。必需服务缺失、冲突注册或不支持的 Host / Codec 变化在准备时拒绝。
 

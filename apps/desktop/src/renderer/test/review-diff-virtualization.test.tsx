@@ -18,7 +18,7 @@ describe("Review diff virtualization", () => {
       generation: 1,
       fileId: file.id,
       path: file.path,
-      hunks: [{ id: "hunk", header: "@@ -1,4500 +1,4500 @@", oldStart: 1, oldLines: 4_500, newStart: 1, newLines: 4_500, lines, patchFingerprint: "hunk" }],
+      hunks: [{ id: "hunk", header: "@@ -1,4500 +1,4500 @@", oldStart: 1, oldLines: 4_500, newStart: 1, newLines: 4_500, lines }],
       oldContentAvailable: true,
       newContentAvailable: true,
       partial: false,
@@ -44,8 +44,6 @@ describe("Review diff virtualization", () => {
         onExpandContext={vi.fn()}
         onRetryDiff={vi.fn()}
         onVisibleFiles={vi.fn()}
-        onViewed={vi.fn()}
-        onMutation={vi.fn()}
       />,
     );
 
@@ -116,7 +114,6 @@ describe("Review diff virtualization", () => {
     const text = fileSummary();
     const image = { ...fileSummary(), id: "image", path: "pixel.png", renderKind: "image" as const };
     const failed = { ...fileSummary(), id: "failed", path: "failed.txt" };
-    const mutation = vi.fn();
     const view = render(
       <ReviewDiffCanvas
         workspaceRoot="/fixture" files={[text, image, failed]}
@@ -126,7 +123,7 @@ describe("Review diff virtualization", () => {
         expandedFileIds={new Set([text.id, image.id, failed.id])} selectedFileId={null}
         mode="unified" wrap={false} wordDiff={false} richPreview={true} loadFullFiles={false} singleFileMode={true}
         onToggleFile={vi.fn()} onSelectFile={vi.fn()} onExpandContext={vi.fn()}
-        onRetryDiff={vi.fn()} onVisibleFiles={vi.fn()} onViewed={vi.fn()} onMutation={mutation}
+        onRetryDiff={vi.fn()} onVisibleFiles={vi.fn()}
       />,
     );
     try {
@@ -147,8 +144,7 @@ describe("Review diff virtualization", () => {
       expect(view.container.querySelector("[data-review-content-width]")?.getAttribute("data-review-content-width")).toBe("max(100%, 480ch)");
       expect(view.container.querySelectorAll("[data-review-horizontal-scroll]")).toHaveLength(1);
       expect(view.container.querySelector<HTMLElement>("[data-review-row='line']")?.style.width).toBe("100%");
-      fireEvent.click(screen.getByRole("button", { name: "暂存 pixel.png" }));
-      expect(mutation).toHaveBeenCalledWith({ action: "stage", scope: "file", source: "workingTree", path: "pixel.png" });
+      expect(screen.queryByRole("button", { name: /暂存|还原|已查看/ })).toBeNull();
       expect(screen.getByRole("button", { name: "重试" })).toBeEnabled();
     } finally {
       view.unmount();
@@ -179,8 +175,6 @@ function renderCanvas(file: ReviewFileSummary, diff: ReviewFileDiff, wrap: boole
       onExpandContext={vi.fn()}
       onRetryDiff={vi.fn()}
       onVisibleFiles={vi.fn()}
-      onViewed={vi.fn()}
-      onMutation={vi.fn()}
     />,
   );
 }
@@ -199,7 +193,6 @@ function singleLineDiff(file: ReviewFileSummary, text: string): ReviewFileDiff {
       newStart: 1,
       newLines: 1,
       lines: [{ id: "line", kind: "addition", newLine: 1, text }],
-      patchFingerprint: "hunk",
     }],
     oldContentAvailable: true,
     newContentAvailable: true,
@@ -219,24 +212,10 @@ function fileSummary(): ReviewFileSummary {
     renderKind: "text",
     source: "workingTree",
     diffLoadStatus: "ready",
-    viewed: false,
     fingerprint: "file",
   };
 }
 
 function capabilities(): ReviewCapabilities {
-  return {
-    canStageFile: true,
-    canStageHunk: true,
-    canUnstageFile: false,
-    canUnstageHunk: false,
-    canRevertFile: true,
-    canRevertHunk: true,
-    canLoadFullFile: true,
-    canOpenFile: true,
-    canCommit: false,
-    canPush: false,
-    canCreatePullRequest: false,
-    disabledReasons: {},
-  };
+  return { canLoadFullFile: true };
 }

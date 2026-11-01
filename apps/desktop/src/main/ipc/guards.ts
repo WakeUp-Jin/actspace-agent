@@ -79,7 +79,8 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
     const action = (input as Record<string, unknown>).action;
     return action === "open" || action === "reveal" ? null : "Invalid workspace file action";
   }],
-  [contract.workspaces.listDir, shape({ workspaceRoot: "string?", relativePath: "string?" }, "Invalid workspace directory")],
+  [contract.workspaces.listMarkdownFiles, shape({ workspaceRoot: "string" }, "Invalid workspace")],
+  [contract.workspaces.writeMarkdownFile, shape({ workspaceRoot: "string", relativePath: "string", content: "string" }, "Invalid workspace Markdown file")],
   [contract.sessions.readArtifact, shape({ sessionId: "string", artifactPath: "string" }, "Invalid session artifact")],
   [contract.sessions.openSideChat, shape({ parentSessionId: "string" }, "Invalid side chat parent")],
   [contract.sessions.listSideChats, shape({ parentSessionId: "string" }, "Invalid side chat parent")],
@@ -109,8 +110,6 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
   [contract.sessions.setWorkspace, shape({ sessionId: "string", workspaceId: "string?", workspaceRoot: "string?" }, "Invalid session workspace")],
   [contract.dialogs.selectWorkspaceDirectory, optionalShape({ registerWorkspace: "boolean?" }, "Invalid directory request")],
   // 终端
-  [contract.terminal.create, shape({ sessionId: "string", cols: "number", rows: "number" }, "Invalid terminal request")],
-  [contract.terminal.write, shape({ terminalId: "string", data: "string" }, "Invalid terminal input")],
   // 设置写入
   [contract.settings.update, shape({}, "Invalid settings update")],
   [contract.settings.updateV4, shape({ expectedRevision: "string", namespace: "string", patch: "record" }, "Invalid settings update")],

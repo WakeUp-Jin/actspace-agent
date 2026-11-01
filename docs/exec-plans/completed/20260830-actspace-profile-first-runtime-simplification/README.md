@@ -36,15 +36,15 @@
 
 当前生产代码仍通过 `RuntimeHandle` 连接 Host 与 Runtime，关键路径包括：
 
-- [`packages/runtime/src/startup/boot.ts`](../../../../packages/runtime/src/startup/boot.ts)
+- [`packages/runtime/src/startup/boot.ts`](../../../../packages/core/runtime/src/startup/boot.ts)
 - `packages/runtime/src/runtime/runtime-handle.ts`（迁移前源码，已删除）
 - `packages/runtime/src/runtime/runtime-facade.ts`（迁移前源码，已删除）
 - [`apps/cli/src/runtime-v2/host-adapter.ts`](../../../../apps/cli/src/runtime-v2/host-adapter.ts)
 - [`apps/cli/src/runtime-v2/run.ts`](../../../../apps/cli/src/runtime-v2/run.ts)
 - [`apps/desktop/src/main/runtime-v2/desktop-host-adapter.ts`](../../../../apps/desktop/src/main/runtime-v2/desktop-host-adapter.ts)
 - [`apps/desktop/src/main/runtime-v2/runtime-registry.ts`](../../../../apps/desktop/src/main/runtime-v2/runtime-registry.ts)
-- [`packages/headless/src/plugin.ts`](../../../../packages/headless/src/plugin.ts)
-- [`packages/headless/src/runner.ts`](../../../../packages/headless/src/runner.ts)
+- [`packages/headless/src/plugin.ts`](../../../../packages/host/headless/src/plugin.ts)
+- [`packages/headless/src/runner.ts`](../../../../packages/host/headless/src/runner.ts)
 
 本计划新增的 Desktop Runtime Bundle：
 

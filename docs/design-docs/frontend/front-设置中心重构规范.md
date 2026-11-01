@@ -467,7 +467,7 @@ UI 归属如下：
 
 ### 7.3 Usage 查询模型
 
-查询字段、分页与筛选以[使用统计规范](front-usage-statistics-refresh.md)及 `packages/shared/src/ipc.ts` 为准。活动投影从 Journal 重建，每次模型请求按 request ID 形成独立行，重试保留关联；工具调用独立计数。此处不重复维护目标伪 DTO。
+查询字段、分页与筛选以[使用统计规范](front-usage-statistics-refresh.md)及 `packages/util/shared/src/ipc.ts` 为准。活动投影从 Journal 重建，每次模型请求按 request ID 形成独立行，重试保留关联；工具调用独立计数。此处不重复维护目标伪 DTO。
 
 ## 8. 持久化存储设计
 
@@ -516,7 +516,7 @@ ActSpace：main-only 凭据、Session Journal 单一事实源
 
 `settings.json` 保存非敏感、可序列化、可版本迁移的应用和 Runtime 配置。P0 将物理写入切换到 `version: 4`，仍保留现有 `version` 字段命名，避免为了模仿参考项目而额外引入 `schemaVersion` 重命名迁移。
 
-namespace 的页面归属见 §7.1；完整字段、默认值与校验只在 `packages/shared/src/settings.ts` 和 SettingsService 中维护，不在本文复制 JSON 示例。
+namespace 的页面归属见 §7.1；完整字段、默认值与校验只在 `packages/util/shared/src/settings.ts` 和 SettingsService 中维护，不在本文复制 JSON 示例。
 
 ### 8.4 目标设置结构
 
@@ -760,9 +760,9 @@ Usage UI
 - [`SettingsPrimitives.tsx`](../../../apps/desktop/src/renderer/components/settings/SettingsPrimitives.tsx)
 - [`models/`](../../../apps/desktop/src/renderer/components/settings/models/)（「模型」页：用途、连接与模型，见 [模型页规范](front-模型设置页面-Maka重做规范.md)）
 - [`UsageStatisticsPage.tsx`](../../../apps/desktop/src/renderer/components/UsageStatisticsPage.tsx)
-- [`packages/shared/src/settings.ts`](../../../packages/shared/src/settings.ts)
-- [`packages/shared/src/ipc.ts`](../../../packages/shared/src/ipc.ts)
-- [`durable-session.ts`](../../../packages/runtime/src/projection/durable-session.ts) 与 [`usage-aggregates.ts`](../../../packages/client/src/sessions/usage-aggregates.ts)
+- [`packages/util/shared/src/settings.ts`](../../../packages/util/shared/src/settings.ts)
+- [`packages/util/shared/src/ipc.ts`](../../../packages/util/shared/src/ipc.ts)
+- [`durable-session.ts`](../../../packages/core/runtime/src/projection/durable-session.ts) 与 [`usage-aggregates.ts`](../../../packages/client/client/src/sessions/usage-aggregates.ts)
 
 ### Maka 参考实现
 

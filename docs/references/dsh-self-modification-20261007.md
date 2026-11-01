@@ -12,7 +12,7 @@
 |---|---|---|
 | 模型入口 | 查询能力、请求安装或启停 | `tool-cordis`、`plugin-manager/src/tools.ts` |
 | 持久配置控制 | 安装包、修改 Profile、刷新包解析表、提交配置重组 | `PluginManager`、`PluginPackages`、app-boot |
-| 配置与代码更新 | 协调更新队列；分别处理配置变化和模块缓存替换 | `packages/boot/hmr`，服务 `ctx.hmr` |
+| 配置与代码更新 | 协调更新队列；分别处理配置变化和模块缓存替换 | `packages/composition/boot/hmr`，服务 `ctx.hmr` |
 | 插件树装载 | 对配置条目做增删改、导入模块、创建或更新实例 | `vendor/include`、`vendor/loader` |
 | 插件生命周期 | 依赖注入、执行插件、释放资源、重新激活 | `vendor/cordis` 的 Registry / Fiber |
 | Agent 消费 | 读取当前工具视图，组装下一步模型请求 | `core/tools`、`core/agent-loop` |
@@ -42,7 +42,7 @@ flowchart TD
 |---|---|---|
 | `cordis_inspect_list` | 列出 Host 与 Client 检查 Provider 及其方法、输入输出 schema | `packages/extensions/tool-cordis/src/index.ts` |
 | `cordis_inspect_query` | 按需读取 Service、Event、Config、Tool、前端 Slots 与主题等信息；不执行业务方法 | 同上；Host Provider 位于 `src/providers.ts` |
-| `plugin_manager` | 列插件/Bundle、启停、安装、移除及版本豁免管理 | `packages/boot/plugin-manager/src/tools.ts` |
+| `plugin_manager` | 列插件/Bundle、启停、安装、移除及版本豁免管理 | `packages/composition/boot/plugin-manager/src/tools.ts` |
 
 它们并非三个自动优化算法，而是让 Agent 认识运行时并修改插件组合的工具入口。Creator 的开发指导补齐了如何编写、安装、验证的流程。
 
@@ -62,7 +62,7 @@ flowchart TD
 | 前端 | 插件可包含 Host 与 Client 部分，通过 Slot 等公开接口扩展 UI |
 | 任意内核源码原位改写 | 不是这三个工具承诺的操作；它们管理可安装扩展和组合，不能等同于任意改写正在执行的内核 |
 
-关键证据：`packages/preset/agent-preset/skills/editing-cordis-compositions/SKILL.md`、`packages/boot/plugin-manager/README.md`、插件开发技能的 `references/host-plugin.md` 和 `references/practices.md`。
+关键证据：`packages/preset/agent-preset/skills/editing-cordis-compositions/SKILL.md`、`packages/composition/boot/plugin-manager/README.md`、插件开发技能的 `references/host-plugin.md` 和 `references/practices.md`。
 
 ## 持久性、生效与权限
 
@@ -73,7 +73,7 @@ flowchart TD
 - 安装的 Host 代码在进程内执行，位于 workspace 沙箱之外。官方说明把这视为明确的 Host 权限操作。
 - 本地目录安装可链接工作目录；不能把它等同于 ActSpace 的内容固定产物与 digest 选择机制。
 
-实现证据：`packages/boot/plugin-manager/src/tools.ts`、`src/index.ts` 的 `installBundle` 与 `change` 路径、`src/operations.ts` 和 `src/patch.ts`。
+实现证据：`packages/composition/boot/plugin-manager/src/tools.ts`、`src/index.ts` 的 `installBundle` 与 `change` 路径、`src/operations.ts` 和 `src/patch.ts`。
 
 ## 当前路径一：运行中安装新插件
 
@@ -93,11 +93,11 @@ flowchart TD
 
 | 调用点 | 源码位置 |
 |---|---|
-| 新包刷新并重组；已安装包返回重启 | `packages/boot/plugin-manager/src/index.ts:573` |
+| 新包刷新并重组；已安装包返回重启 | `packages/composition/boot/plugin-manager/src/index.ts:573` |
 | 串行提交、刷新包表、重组入口 | 同上 `:775` |
-| 刷新仅发布解析表，不重载模块 | `packages/boot/app-boot/src/profile-resolution/service.ts:79` |
-| 完整 patch 层重算 | `packages/boot/app-boot/src/profile-context.ts:63` |
-| 根 Include 更新与诊断等待 | `packages/boot/app-boot/src/index.ts:274` |
+| 刷新仅发布解析表，不重载模块 | `packages/composition/boot/app-boot/src/profile-resolution/service.ts:79` |
+| 完整 patch 层重算 | `packages/composition/boot/app-boot/src/profile-context.ts:63` |
+| 根 Include 更新与诊断等待 | `packages/composition/boot/app-boot/src/index.ts:274` |
 | Include 拦截自身重启并更新子树 | `vendor/include/src/index.ts:190` |
 | Loader 按条目 id 更新子树 | `vendor/loader/src/config/group.ts:48` |
 | 新条目导入与实例化 | `vendor/loader/src/config/entry.ts:223` |
@@ -110,7 +110,7 @@ flowchart TD
 
 **源码修改需要真正的模块替换。** 同一个模块 URL 再次 `import()` 通常会命中缓存，仅更新配置或重新调用 `apply()` 不能保证读取新代码。
 
-DSH 实际使用 `packages/boot/hmr` 的 `@deepseek-ai/dsh-hmr`。其 `partialReload()` 处理：
+DSH 实际使用 `packages/composition/boot/hmr` 的 `@deepseek-ai/dsh-hmr`。其 `partialReload()` 处理：
 
 1. 沿已加载模块依赖图定位受影响的插件入口，保存原实现及各实例的父 Context、配置和 Loader 条目。
 2. 备份并清除相关 Node 内部 ESM `loadCache`；同时清除相关 CommonJS `require.cache`，防止读到旧实现。
@@ -119,7 +119,7 @@ DSH 实际使用 `packages/boot/hmr` 的 `@deepseek-ai/dsh-hmr`。其 `partialRe
 5. 用旧实例的父 Context 和配置执行 `registry.plugin(newPlugin, config)`，重新建立实例，并把 Loader Entry 指向新 Fiber；等待新实例激活。
 6. 激活失败时清理已激活的替代实例，恢复缓存，并尝试重新注册旧实现；成功后更新模块记录并发出 `hmr/reload`。
 
-核心源码为 `packages/boot/hmr/src/index.ts:525`：缓存清除 `:603`，先导入 `:631`，实例替换 `:661`，失败恢复 `:702`。
+核心源码为 `packages/composition/boot/hmr/src/index.ts:525`：缓存清除 `:603`，先导入 `:631`，实例替换 `:661`，失败恢复 `:702`。
 
 这解释了“运行时修改后再运行”的实际手段：**替换模块，并卸载、重建受影响的插件实例。** 已经运行的函数栈不会被改写；插件内存状态也没有通用的自动迁移。重新挂载旧实现不等于旧实例一直不中断，更不等于撤销已经写出的文件或网络操作；恢复旧实现也可能失败并记录诊断。
 
@@ -135,7 +135,7 @@ DSH 实际使用 `packages/boot/hmr` 的 `@deepseek-ai/dsh-hmr`。其 `partialRe
 
 Base Bundle 把 `hmr.config.root` 设为 `[]`，默认保留配置监听，**未启用源码目录监听**。要监听源码需配置诸如 `root: ["."]`；默认忽略 `node_modules` 等路径。HMR 需要 Node loader internals（`--expose-internals`）。Headless、SDK、ACP Bundle 还默认禁用该项，可由后续 Patch 覆盖。浏览器 Client 模块图有独立加载机制，不能直接套用 Host 的 ESM 缓存流程。
 
-证据：`packages/bundle/base/cordis.patch.yml:27`、`packages/boot/hmr/README.md`、`packages/boot/hmr/src/index.ts:305`。
+证据：`packages/composition/bundle/base/cordis.patch.yml:27`、`packages/composition/boot/hmr/README.md`、`packages/composition/boot/hmr/src/index.ts:305`。
 
 ## Cordis 为什么可以卸载再挂载
 
@@ -203,7 +203,7 @@ Host 源码是返回插件的 JavaScript async 函数体，Runner 用 `node:vm` 
 本轮在参考仓库使用已有依赖执行：
 
 ```sh
-pnpm exec vitest run packages/boot/hmr/tests/modules.spec.ts packages/boot/hmr/tests/reconciliation.spec.ts packages/boot/hmr/tests/coordination.spec.ts packages/extensions/cordis-host-runner/tests/versioning.spec.ts
+pnpm exec vitest run packages/composition/boot/hmr/tests/modules.spec.ts packages/composition/boot/hmr/tests/reconciliation.spec.ts packages/composition/boot/hmr/tests/coordination.spec.ts packages/extensions/cordis-host-runner/tests/versioning.spec.ts
 ```
 
 结果：4 个文件、42 项测试通过。覆盖模块替换与失败恢复、配置重组、更新队列、旧动态版本失败与显式恢复等。模块替换测试使用真实 Cordis / Loader 和受控的 Node 缓存、模拟导入；配置监听测试也有模拟 watcher。这是实现级测试证据，不是操作真实 DSH 界面或真实 Node 文件监听的端到端验收，亦未验证模型自主编写插件的效果。

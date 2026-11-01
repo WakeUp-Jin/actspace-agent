@@ -10,16 +10,16 @@ import { LlmRuntimeError, redactLlmText, type LlmFailure } from "@actspace/llm-s
 import { DEFAULT_LLM_RETRY_POLICY, retryDelay, retryPolicySnapshot } from "@actspace/llm-service";
 import type { RequestAssembler } from "@actspace/prompt";
 import type { PreparedRequestMetadata } from "@actspace/prompt";
-import type { AgentScope } from "@actspace/core-scope";
+import type { AgentScope } from "@actspace/scope";
 import type { SessionHandle } from "@actspace/session-persistence";
-import type { ToolCallInput, ToolPreparedEnvironment } from "@actspace/tools-runtime";
-import type { ToolRuntime } from "@actspace/tools-runtime";
-import type { ToolExecutionResult } from "@actspace/tools-runtime";
-import { allowedAgentModeTools, createAgentEventDispatcher, defaultAgentSubject, type AgentDescriptor, type AgentSubject, type AgentEventDispatcher } from "@actspace/core-agent";
+import type { ToolCallInput, ToolPreparedEnvironment } from "@actspace/tool-runtime";
+import type { ToolRuntime } from "@actspace/tool-runtime";
+import type { ToolExecutionResult } from "@actspace/tool-runtime";
+import { allowedAgentModeTools, createAgentEventDispatcher, defaultAgentSubject, type AgentDescriptor, type AgentSubject, type AgentEventDispatcher } from "@actspace/agent";
 import type { ContextCompactor } from "@actspace/context-engine";
-import { AgentRuntimeError } from "@actspace/core-agent";
-import type { MainAgentInbox } from "@actspace/core-agent";
-import type { RunTurnResult } from "@actspace/core-agent";
+import { AgentRuntimeError } from "@actspace/agent";
+import type { MainAgentInbox } from "@actspace/agent";
+import type { RunTurnResult } from "@actspace/agent";
 import { type CordisContext, type AgentLoopIntervention, type AgentNotification } from "@actspace/cordis-adapter";
 
 export type RunTurnInput = { readonly content: RuntimeV2JsonValue; readonly messageId?: string; readonly agentRunId?: string; readonly model?: string; readonly mode?: RuntimeV2AgentMode; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly keepPendingOnAbort?: boolean; readonly selectedSkillIds?: readonly string[];
@@ -47,7 +47,7 @@ export type AgentLoopLiveEvent = LiveIdentity & (
   | { readonly kind: "compaction-started" }
   | { readonly kind: "compaction-finished"; readonly removedCount: number; readonly durationMs: number; readonly compactionId?: string; readonly trigger?: "manual" | "auto"; readonly beforeTokens?: number; readonly afterTokens?: number; readonly beforeEstimated?: true }
   | { readonly kind: "compaction-failed"; readonly message: string }
-  | { readonly kind: "inbox-claimed"; readonly messageId: string; readonly source?: import("@actspace/core-agent").InboxSource }
+  | { readonly kind: "inbox-claimed"; readonly messageId: string; readonly source?: import("@actspace/agent").InboxSource }
 );
 type WithoutSession<T> = T extends unknown ? Omit<T, "sessionId"> : never;
 

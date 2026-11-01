@@ -270,6 +270,7 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
       bash: { alwaysAsk: bash.alwaysAsk === true },
       showFileChangeStats: tools.showFileChangeStats !== false,
       deepseekFetchEnabled: tools.deepseekFetchEnabled === true,
+      ...sanitizePluginSwitches(tools.plugins),
       searchProviders: Object.fromEntries(SEARCH_PROVIDER_IDS.map((id) => {
         const provider = isRecord(searchProviders[id]) ? searchProviders[id] : {};
         return [id, { enabled: id === "deepseek" ? provider.enabled === true : provider.enabled !== false }];
@@ -360,4 +361,11 @@ export function hasRemovedDuckCodingSettings(raw: Record<string, unknown>): bool
 export function hasRequiredSettingsSections(raw: Record<string, unknown>): boolean {
   return ["providers", "installedModels", "customModels", "taskModels", "imageGeneration", "agent", "skills"]
     .every((key) => isRecord(raw[key]));
+}
+
+/** Keeps only boolean switches; an empty result is omitted so a missing key keeps meaning "manifest default". */
+function sanitizePluginSwitches(value: unknown): { plugins?: Record<string, boolean> } {
+  if (!isRecord(value)) return {};
+  const plugins = Object.fromEntries(Object.entries(value).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"));
+  return Object.keys(plugins).length > 0 ? { plugins } : {};
 }
