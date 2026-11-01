@@ -17,6 +17,7 @@ import type { CompactionPlugin } from "@actspace/context-compaction";
 import type { RuntimeSessionController } from "../session/session-controller.js";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
+import { isSessionTranscriptReadPath } from "@actspace/session-transcript";
 import { projectPermissionMode, applySessionGrantEvent } from "@actspace/session-projection";
 import { isBackgroundWake } from "@actspace/shared/runtime-v2";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
@@ -74,11 +75,15 @@ export function apply(ctx: CordisContext): AgentFactoryService {
   };
   const extensions = (sessionId: string, scopeId: string, kind: "main" | "subagent") => () => (ctx.get?.("actspace.host.prompt") as PromptHostPort | undefined)?.extensions?.list(sessionId, scopeId, kind) ?? [];
 
+  // Session transcripts are readable without a workspace-scope approval; Journals stay gated.
+  const sessionDataRoot = (ctx.get?.("actspace.host.session") as { readonly dataRoot?: string } | undefined)?.dataRoot;
+  const isHostReadablePath = sessionDataRoot ? (canonicalPath: string) => isSessionTranscriptReadPath(sessionDataRoot, canonicalPath) : undefined;
   const toolEnvironmentFor = (session: import("@actspace/session-persistence").SessionHandle) => {
     activeSessions.set(session.header.sessionId, session);
     const configuredMode = host.toolEnvironment.permissionMode;
     return Object.freeze({
       ...host.toolEnvironment,
+      ...(isHostReadablePath ? { isHostReadablePath } : {}),
       autoReview: async (input: import("@actspace/tools-runtime").AutoReviewInput) => {
         const reviewer = ctx.get?.("approval.auto-review") as AutoReviewer | undefined;
         if (!reviewer) throw new Error("Auto reviewer unavailable");

@@ -37,6 +37,13 @@ describe("permission engine", () => {
     expect(evaluateGlobalBoundary("full-access", "/workspace", [file("/outside/file.txt")])).toEqual({ kind: "pass" });
   });
 
+  it("lets Host-readable paths skip the workspace scope only for reads", () => {
+    const readable = (path: string) => path === "/data/sessions-v2/s1/transcript.md";
+    expect(evaluateGlobalBoundary("default", "/workspace", [file("/data/sessions-v2/s1/transcript.md")], readable)).toEqual({ kind: "pass" });
+    expect(evaluateGlobalBoundary("default", "/workspace", [file("/data/sessions-v2/s1/journal.jsonl")], readable)).toMatchObject({ kind: "ask" });
+    expect(evaluateGlobalBoundary("default", "/workspace", [file("/data/sessions-v2/s1/transcript.md", "write")], readable)).toMatchObject({ kind: "ask" });
+  });
+
   it("keeps sensitive files once-only and protected resources denied in every mode", () => {
     expect(evaluateGlobalBoundary("full-access", "/workspace", [file("/outside/.env")])).toMatchObject({
       kind: "ask",
