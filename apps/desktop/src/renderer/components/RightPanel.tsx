@@ -47,7 +47,6 @@ export function RightPanel({
   fileRevalidateKey,
   agentEditedPaths,
   onOpenReview,
-  onReviewChanged,
   onSendToAgent,
 }: {
   developmentEnabled?: boolean;
@@ -60,7 +59,6 @@ export function RightPanel({
   /** 当前会话里 Agent 写过 / 改过的文件路径（绝对或工作区相对），「文档」面板据此标绿点。 */
   agentEditedPaths?: readonly string[];
   onOpenReview?: () => void;
-  onReviewChanged?: () => void;
   onSendToAgent?: (text: string) => void;
 }) {
   const { activeTab } = useRightPanel();
@@ -89,7 +87,6 @@ export function RightPanel({
           fileRevalidateKey={fileRevalidateKey}
           editedPaths={editedPaths}
           onOpenReview={onOpenReview}
-          onReviewChanged={onReviewChanged}
           onSendToAgent={onSendToAgent}
         />
       </div>
@@ -145,7 +142,6 @@ function RightPanelBody({
   fileRevalidateKey,
   editedPaths,
   onOpenReview,
-  onReviewChanged,
   onSendToAgent,
 }: {
   developmentEnabled: boolean;
@@ -157,7 +153,6 @@ function RightPanelBody({
   fileRevalidateKey?: number;
   editedPaths: ReadonlySet<string>;
   onOpenReview?: () => void;
-  onReviewChanged?: () => void;
   onSendToAgent?: (text: string) => void;
 }) {
   if (!tab) {
@@ -182,7 +177,6 @@ function RightPanelBody({
         workspaceRoot={tab.workspaceRoot ?? workspaceRoot}
         sessionId={sessionId}
         refreshKey={tab.refreshKey}
-        onReviewChanged={onReviewChanged}
       />
     );
   }

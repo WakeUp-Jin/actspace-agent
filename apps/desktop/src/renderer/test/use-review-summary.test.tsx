@@ -23,24 +23,37 @@ function snapshot(workspaceId: string, additions: number): ReviewGetSnapshotResu
       totals: { files: 0, additions, deletions: 0, changedLines: additions, estimatedChangedBytes: 0 },
       loadPolicy: { mode: "all-files" },
       warnings: [],
-      capabilities: { stage: true, unstage: true, revert: true, commit: true },
+      capabilities: { canLoadFullFile: true },
     },
   } as unknown as ReviewGetSnapshotResult;
 }
 
-/** 每次 getSnapshot 都挂起，由用例决定何时、以什么结果完成。 */
+/** getSnapshot（读缓存）和 refreshSnapshot（强制刷新）都挂起，由用例决定何时、以什么结果完成。 */
 function deferredBridge() {
   const calls: Deferred[] = [];
-  const getSnapshot = vi.fn(() => new Promise<ReviewGetSnapshotResult>((resolve, reject) => calls.push({ resolve, reject })));
-  const handle = setupBridge({ "review.getSnapshot": getSnapshot });
-  const notify = (workspaceId: string) => act(() => handle.emit("reviewChanged", { workspaceId, generation: 2, reason: "watch" }));
+  const started = vi.fn((_input: unknown) => undefined);
+  const pending = (input: unknown) => {
+    started(input);
+    return new Promise<ReviewGetSnapshotResult>((resolve, reject) => calls.push({ resolve, reject }));
+  };
+  const getSnapshot = vi.fn((input: unknown) => pending(input));
+  const refreshSnapshot = vi.fn((input: unknown) => pending(input));
+  const handle = setupBridge({ "review.getSnapshot": getSnapshot, "review.refreshSnapshot": refreshSnapshot });
+  const notify = (workspaceId: string) => act(() => handle.emit("reviewChanged", { workspaceId, generation: 2, reason: "refresh" }));
   const settle = async (index: number, result: ReviewGetSnapshotResult) => {
     await act(async () => { calls[index]!.resolve(result); });
   };
-  return { calls, getSnapshot, notify, settle };
+  return { calls, started, getSnapshot, refreshSnapshot, notify, settle };
 }
 
 describe("useReviewSummary", () => {
+  it("forces a refresh on the first load so a stale cache is never shown", async () => {
+    const bridge = deferredBridge();
+    renderHook(() => useReviewSummary({ workspaceRoot: "/tmp/current", sessionId: null }));
+    expect(bridge.refreshSnapshot).toHaveBeenCalledTimes(1);
+    expect(bridge.getSnapshot).not.toHaveBeenCalled();
+  });
+
   it("ignores change notifications from other workspaces", async () => {
     const bridge = deferredBridge();
     const { result } = renderHook(() => useReviewSummary({ workspaceRoot: "/tmp/current", sessionId: null }));
@@ -49,10 +62,10 @@ describe("useReviewSummary", () => {
     expect(result.current.reviewSummary).toMatchObject({ status: "changes", additions: 3 });
 
     for (let index = 0; index < 20; index += 1) bridge.notify("ws-other");
-    expect(bridge.getSnapshot).toHaveBeenCalledTimes(1);
+    expect(bridge.started).toHaveBeenCalledTimes(1);
 
     bridge.notify("ws-current");
-    expect(bridge.getSnapshot).toHaveBeenCalledTimes(2);
+    expect(bridge.started).toHaveBeenCalledTimes(2);
   });
 
   it("keeps one request in flight and coalesces later changes into a single follow-up", async () => {
@@ -62,12 +75,12 @@ describe("useReviewSummary", () => {
 
     bridge.notify("ws-current");
     for (let index = 0; index < 10; index += 1) bridge.notify("ws-current");
-    expect(bridge.getSnapshot).toHaveBeenCalledTimes(2);
+    expect(bridge.started).toHaveBeenCalledTimes(2);
 
     await bridge.settle(1, snapshot("ws-current", 2));
-    expect(bridge.getSnapshot).toHaveBeenCalledTimes(3);
+    expect(bridge.started).toHaveBeenCalledTimes(3);
     await bridge.settle(2, snapshot("ws-current", 3));
-    expect(bridge.getSnapshot).toHaveBeenCalledTimes(3);
+    expect(bridge.started).toHaveBeenCalledTimes(3);
   });
 
   it("does not lose a change that arrives before the first snapshot reveals the workspace identity", async () => {
@@ -76,7 +89,7 @@ describe("useReviewSummary", () => {
     bridge.notify("session-root:abc");
     bridge.notify("ws-unrelated");
     await bridge.settle(0, snapshot("session-root:abc", 1));
-    expect(bridge.getSnapshot).toHaveBeenCalledTimes(2);
+    expect(bridge.started).toHaveBeenCalledTimes(2);
     await bridge.settle(1, snapshot("session-root:abc", 4));
     expect(result.current.reviewSummary).toMatchObject({ additions: 4 });
   });
@@ -101,15 +114,46 @@ describe("useReviewSummary", () => {
     );
     rerender({ root: "/tmp/b" });
     expect(result.current.reviewSummary).toEqual({ status: "loading" });
-    expect(bridge.getSnapshot).toHaveBeenCalledTimes(2);
-    expect(bridge.getSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/b" }));
+    expect(bridge.started).toHaveBeenCalledTimes(2);
+    // 切换目标时强制刷新。
+    expect(bridge.refreshSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({ workspaceRoot: "/tmp/b" }));
 
     await bridge.settle(1, snapshot("ws-b", 2));
     await bridge.settle(0, snapshot("ws-a", 9));
     expect(result.current.reviewSummary).toMatchObject({ additions: 2 });
 
     bridge.notify("ws-a");
-    expect(bridge.getSnapshot).toHaveBeenCalledTimes(2);
+    expect(bridge.started).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshReviewSummary forces refreshSnapshot, and only reads the cache when asked", async () => {
+    const bridge = deferredBridge();
+    const { result } = renderHook(() => useReviewSummary({ workspaceRoot: "/tmp/current", sessionId: null }));
+    await bridge.settle(0, snapshot("ws-current", 1));
+    expect(bridge.refreshSnapshot).toHaveBeenCalledTimes(1);
+
+    // 模拟 Agent 一轮结束：App 调用 refreshReviewSummary()。
+    act(() => { void result.current.refreshReviewSummary(); });
+    expect(bridge.refreshSnapshot).toHaveBeenCalledTimes(2);
+    await bridge.settle(1, snapshot("ws-current", 2));
+
+    act(() => { void result.current.refreshReviewSummary(false); });
+    expect(bridge.getSnapshot).toHaveBeenCalledTimes(1);
+    await bridge.settle(2, snapshot("ws-current", 2));
+  });
+
+  it("escalates a queued follow-up to a forced refresh when any queued request was forced", async () => {
+    const bridge = deferredBridge();
+    const { result } = renderHook(() => useReviewSummary({ workspaceRoot: "/tmp/current", sessionId: null }));
+    await bridge.settle(0, snapshot("ws-current", 1));
+
+    act(() => { void result.current.refreshReviewSummary(false); });
+    act(() => { void result.current.refreshReviewSummary(); });
+    expect(bridge.started).toHaveBeenCalledTimes(2);
+    await bridge.settle(1, snapshot("ws-current", 2));
+    expect(bridge.started).toHaveBeenCalledTimes(3);
+    expect(bridge.refreshSnapshot).toHaveBeenCalledTimes(2);
+    await bridge.settle(2, snapshot("ws-current", 3));
   });
 
   it("shows a failure and recovers on the next explicit refresh", async () => {

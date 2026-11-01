@@ -1,7 +1,7 @@
-import { useState, type RefObject } from "react";
-import { ArrowRightFromLine, ChevronDown, Clipboard, Columns2, Eye, File, FileDiff, Folder, GitPullRequestArrow, Image, ListCollapse, ListTree, MoreHorizontal, RefreshCw, Search } from "lucide-react";
+import { useState } from "react";
+import { ArrowRightFromLine, ChevronDown, Columns2, Eye, File, FileDiff, Folder, Image, ListCollapse, ListTree, MoreHorizontal, RefreshCw, Search } from "lucide-react";
 import type { ReviewFileSummary, ReviewSelection, ReviewSnapshot } from "@actspace/shared";
-import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "../ui/Menu";
+import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/Popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import type { ReviewDiffMode } from "./review-store";
@@ -10,9 +10,9 @@ import { ReviewScopeMenu } from "./ReviewScopeMenu";
 const ICON = "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-act-sm border-0 bg-transparent text-text-muted hover:bg-surface-subtle hover:text-text-main disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40 [cursor:pointer]";
 const ICON_SLOT = "inline-flex h-4 w-4 shrink-0 items-center justify-center";
 
-type ToolbarMenu = "scope" | "options" | "jump" | "git";
+type ToolbarMenu = "scope" | "options" | "jump";
 
-export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, files, filesVisible, diffMode, splitAvailable, singleFileMode, wrap, ignoreWhitespaceChanges, wordDiff, loadFullFiles, richPreview, allExpanded, onSelectScope, onRefresh, onToggleAll, onJump, onDiffMode, onToggleFiles, onWrap, onWhitespace, onWordDiff, onLoadFullFiles, onRichPreview, onCopyApply, onCommitOrPush, onCreatePr, gitTriggerRef }: {
+export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, files, filesVisible, diffMode, splitAvailable, singleFileMode, wrap, ignoreWhitespaceChanges, wordDiff, loadFullFiles, richPreview, allExpanded, onSelectScope, onRefresh, onToggleAll, onJump, onDiffMode, onToggleFiles, onWrap, onWhitespace, onWordDiff, onLoadFullFiles, onRichPreview }: {
   snapshot: ReviewSnapshot | null;
   selection: ReviewSelection;
   workspaceRoot?: string;
@@ -39,17 +39,12 @@ export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, f
   onWordDiff: () => void;
   onLoadFullFiles: () => void;
   onRichPreview: () => void;
-  onCopyApply: () => void;
-  onCommitOrPush: () => void;
-  onCreatePr: () => void;
-  /** 「提交或推送」按钮。弹出的对话框关闭后焦点回到它，因为打开对话框的菜单项已经不在了。 */
-  gitTriggerRef: RefObject<HTMLButtonElement>;
 }) {
   const [menu, setMenu] = useState<ToolbarMenu | null>(null);
   const [jumpQuery, setJumpQuery] = useState("");
   // 每个弹层只管自己：点另一个弹层的按钮时，新弹层先打开，旧弹层随后关闭，不能把新的一起关掉。
   const openChange = (name: ToolbarMenu) => (open: boolean) => setMenu((current) => (open ? name : current === name ? null : current));
-  const scopeLabel = selection.kind === "lastTurn" ? "最近一轮" : selection.kind === "uncommitted" ? "未提交" : selection.kind === "unstaged" ? "未暂存" : selection.kind === "staged" ? "已暂存" : selection.kind === "commit" ? "已提交" : "分支";
+  const scopeLabel = selection.kind === "uncommitted" ? "未提交" : selection.kind === "unstaged" ? "未暂存" : selection.kind === "staged" ? "已暂存" : selection.kind === "commit" ? "已提交" : "分支";
   const jumpFiles = files.filter((file) => file.path.toLocaleLowerCase().includes(jumpQuery.toLocaleLowerCase())).slice(0, 12);
   const hasFiles = files.length > 0;
   const fileActionHint = hasFiles ? null : "当前审查范围内没有变更文件";
@@ -99,8 +94,6 @@ export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, f
               <Option checked={richPreview} label="启用富预览" icon={<Image size={13} />} onToggle={onRichPreview} />
               <Option checked={wordDiff} label="显示词级差异" icon={<FileDiff size={13} />} onToggle={onWordDiff} />
               <Option checked={!ignoreWhitespaceChanges} label={ignoreWhitespaceChanges ? "显示空白差异" : "隐藏空白差异"} icon={<Eye size={13} />} onToggle={onWhitespace} />
-              <MenuSeparator />
-              <MenuItem disabled={!snapshot} onSelect={onCopyApply}><span className={ICON_SLOT}><Clipboard size={13} /></span>复制 git apply 命令</MenuItem>
             </MenuContent>
           </Menu>
         </div>
@@ -116,17 +109,6 @@ export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, f
         </div>
         <Tooltip><TooltipTrigger asChild><button type="button" className={`${ICON} ${diffMode === "split" ? "bg-selected text-text-main" : ""}`} aria-label={diffMode === "split" ? "切换为单栏差异" : "切换为并排差异"} aria-pressed={diffMode === "split"} aria-disabled={!hasFiles || !splitAvailable} onClick={() => { if (hasFiles && splitAvailable) onDiffMode(diffMode === "split" ? "unified" : "split"); }}><Columns2 size={15} /></button></TooltipTrigger><TooltipContent>{splitHint}</TooltipContent></Tooltip>
         <Tooltip><TooltipTrigger asChild><button type="button" className={`${ICON} ${filesVisible ? "bg-selected text-text-main" : ""}`} aria-label={filesVisible ? "隐藏文件列表" : "显示文件列表"} aria-pressed={filesVisible} aria-disabled={!hasFiles} onClick={() => { if (hasFiles) onToggleFiles(); }}><Folder size={15} /></button></TooltipTrigger><TooltipContent>{fileActionHint ?? (filesVisible ? "隐藏文件列表" : "显示文件列表")}</TooltipContent></Tooltip>
-        <div className="shrink-0">
-          <Menu open={menu === "git"} onOpenChange={openChange("git")}>
-            <MenuTrigger asChild>
-              <button ref={gitTriggerRef} type="button" className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-act-sm border border-line bg-surface px-2 text-act-xs font-medium text-text-main hover:bg-surface-subtle"><GitPullRequestArrow size={14} />提交或推送<ChevronDown size={12} /></button>
-            </MenuTrigger>
-            <MenuContent align="end" className="w-[190px]">
-              <MenuItem onSelect={onCommitOrPush}>提交或推送</MenuItem>
-              <MenuItem onSelect={onCreatePr}>创建 PR</MenuItem>
-            </MenuContent>
-          </Menu>
-        </div>
       </div>
       {snapshot?.comparison ? <div className="flex min-h-7 items-center gap-2 border-t border-line/70 px-3 text-act-xxs text-text-faint"><span className="truncate">{snapshot.comparison.from}</span><span>→</span><span className="truncate">{snapshot.comparison.to}</span></div> : null}
     </div>

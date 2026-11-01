@@ -2,42 +2,38 @@
 
 ## 文档状态
 
-- 状态：功能基线与大 Diff 的加载调度、批量 Git、完整正文和虚拟渲染已实现。disposable Git mutation 和真实远端操作仍由用户手动验收。
-- 事实源：本文件定义 Review 的 scope、结构化 diff、工具栏、显示选项、Git actions、刷新和安全边界。
+- 状态：功能基线与大 Diff 的加载调度、批量 Git、完整正文和虚拟渲染已实现。2026-11-01 功能精简（P5）起 Review 只查看：删除暂存 / 取消暂存 / 还原、已查看、复制 apply 命令、创建 PR、Review 内提交对话框、「最近一轮」范围、实时文件监听。动手操作 git 的入口只留顶部工作区菜单。
+- 事实源：本文件定义 Review 的 scope、结构化 diff、工具栏、显示选项、刷新和安全边界。
 - 性能事实源：`docs/design-docs/core-review-large-diff-loading.md` 定义 Standard/capped 双模式、批量请求、完整正文和虚拟渲染边界。
-- 产品边界：Review 是人工 Git 审阅工作台，不包含 AI Review、Review 专用模型、findings、独立审查任务或评论回注 Agent。
+- 产品边界：Review 是只读的人工 Git 审阅工作台（标签名「改动」），不包含 AI Review、Review 专用模型、findings、独立审查任务或评论回注 Agent。
 - 视觉关联：右侧对象系统见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`；布局见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色见 `docs/design-docs/frontend/front-主题与配色规范.md`。
 
-## 当前实现映射（2026-10-05 路径核对）
+## 当前实现映射（2026-11-01 P5 后）
 
 - 共享契约：`packages/shared/src/review.ts`。
 - 查询、缓存与失效：`apps/desktop/src/main/review-coordinator.ts`。
-- 外部变更监听与 Git 忽略过滤：`apps/desktop/src/main/review-workspace-watcher.ts`、`apps/desktop/src/main/review-ignore-filter.ts`。
 - Composer 顶部 Review 摘要：`apps/desktop/src/renderer/components/review/use-review-summary.ts`。
-- Git 查询与 mutation：`apps/desktop/src/main/review-git-engine.ts`。
-- Last Turn：`review-git-engine.ts` 保留 `loadLastTurn` / `loadLastTurnFileDiff` 注入端口，但当前 `desktop-shell-ipc.ts` 未注入，查询返回 unavailable；不能把六种 scope 的目标契约当作六种均已接通。
-- PR capability：`apps/desktop/src/main/review-pr-service.ts`。
+- Git 只读查询：`apps/desktop/src/main/review-git-engine.ts`（后台线程 `review-git-worker-client.ts` 保留，只承担用户触发的 diff 解析和 `cat-file`）。
 - Renderer：`apps/desktop/src/renderer/components/review/`。
 
 ## 定位
 
-Review 连续回答三个问题：
+Review 连续回答两个问题：
 
 1. 当前选择的 Git 范围里改了什么？
 2. 用户怎样快速定位、比较和阅读这些变化？
-3. 用户怎样在明确 capability 与 stale guard 下执行 stage、unstage、revert、commit、push 或 Create PR？
 
-Review 保持为右侧对象 Tab。它不替换聊天区，不接管整个窗口，也不重复实现一套会话或模型运行时。
+Review 只负责“看清改动”，不动手操作 git；提交、推送、新建分支在顶部工作区菜单。Review 保持为右侧对象 Tab。它不替换聊天区，不接管整个窗口，也不重复实现一套会话或模型运行时。
 
 ## Codex 参考与采用边界
 
 采用可观察的交互模型：
 
-- Scope：`Last Turn`、`Uncommitted`、`Unstaged`、`Staged`、`Committed`、`Branch`。
-- 工具栏：Scope 与非零统计在左，Review options、折叠、跳转、Diff 模式、Files、Commit or push 在同一行右侧。
+- Scope：`Uncommitted`、`Unstaged`、`Staged`、`Committed`、`Branch`。
+- 工具栏：Scope 与非零统计在左，Review options、折叠、跳转、Diff 模式、Files 在同一行右侧。
 - Branch 关系单独显示为 `local → upstream`，例如 `main → origin/main`。
-- Review options 包含 Refresh、word wrap、full-file loading、rich preview、word diff、white space 和 Copy git apply command。
-- Review options 使用稳定的 Lucide 语义图标：word wrap=`ArrowRightFromLine`、full files=`File`、rich preview=`Image`、word diff=`FileDiff`、white space=`Eye`、copy apply=`Clipboard`；Files 工具栏入口使用 `Folder`。Toggle 的语义图标固定留在左侧，启用勾选显示在右侧。
+- Review options 包含 Refresh、word wrap、full-file loading、rich preview、word diff、white space。
+- Review options 使用稳定的 Lucide 语义图标：word wrap=`ArrowRightFromLine`、full files=`File`、rich preview=`Image`、word diff=`FileDiff`、white space=`Eye`；Files 工具栏入口使用 `Folder`。Toggle 的语义图标固定留在左侧，启用勾选显示在右侧。
 
 不复制 Codex 私有 bundle 代码、类名、颜色或不可验证的内部状态结构。具体 Git 命令由 ActSpace 自己的安全边界决定。
 
@@ -45,17 +41,17 @@ Review 保持为右侧对象 Tab。它不替换聊天区，不接管整个窗口
 
 ### Git-first
 
-Git repository state 是默认事实来源。`Last Turn` 是 Agent 行为视角，只覆盖最近 turn 能证明的文件变化，不能伪装成完整 workspace 状态。
+Git repository state 是默认事实来源。“这一轮 Agent 改了什么”由回复尾部的本轮改动卡（`TurnReviewView`）提供，不在 Review 范围里。
 
 ### Main-owned Git
 
-Renderer 只发送稳定 selection、snapshot id 和用户意图。Main 重新解析 registered workspace，使用固定 argv 调用 Git。Renderer 不运行 Git、不拼 shell、不解析 raw file header。
+Renderer 只发送稳定 selection 和 snapshot id。Main 重新解析 registered workspace，使用固定 argv 调用 Git。Renderer 不运行 Git、不拼 shell、不解析 raw file header。
 
 ### 工作区注册与 Git 仓库的边界
 
 工作区注册只把用户选用的目录加入应用数据目录中的 `workspaces.json`，不创建 `.git`、不运行 `git init`，也不提交文件。用户选择“添加工作区”或“使用现有文件夹”时，目录选择 IPC 显式传入 `registerWorkspace: true`；选父目录或能力配置目录时不注册。
 
-Desktop Host 在创建会话前注册其工作区，在启动完成前从持久化会话摘要补齐旧工作区。恢复操作合并已有条目，保留稳定 ID 和隐藏偏好。Review 和环境只读查询允许已注册目录或持久化本地会话持有的执行目录，经 realpath 授权检查；不因收到路径就自动注册。Git mutation 仍保留注册准入。非 Git 目录返回不可用状态，初始化 Git 仍是独立的用户操作。
+Desktop Host 在创建会话前注册其工作区，在启动完成前从持久化会话摘要补齐旧工作区。恢复操作合并已有条目，保留稳定 ID 和隐藏偏好。Review 和环境只读查询允许已注册目录或持久化本地会话持有的执行目录，经 realpath 授权检查；不因收到路径就自动注册。非 Git 目录返回不可用状态（界面显示“当前目录不是 Git 仓库”），Review 不提供初始化 Git。
 
 未注册工作树的 Review 身份由授权后的 canonical root 派生为 `session-root:<sha256>`，其 ID 与 root 必须成对传递，显式 ID/root 冲突必须拒绝。刷新、snapshot、diff 和内容查询沿用相同身份；刷新不得丢弃 root 后再将派生 ID 当 registry ID 解析。跨会话绑定的面板继续使用自身目标。
 
@@ -65,11 +61,11 @@ Desktop Host 在创建会话前注册其工作区，在启动完成前从持久�
 
 ### 状态与能力显式化
 
-Snapshot 返回 capability matrix。UI 不根据 scope 名字猜 stage、revert、commit 或 load full file 是否可用。
+Snapshot 返回 `capabilities: { canLoadFullFile }`。UI 不根据 scope 名字猜 load full file 是否可用。
 
-### Mutation 绑定 generation
+### 查询绑定 generation
 
-写操作携带 snapshot generation；hunk 写操作额外携带 patch fingerprint。工作区变化后拒绝旧动作并要求刷新。
+文件 diff 和完整正文请求携带 snapshot generation；`refreshSnapshot` 是唯一递增 generation 的路径，旧 generation 的请求返回 `stale_generation`，Renderer 自愈重载。
 
 ## 共享契约
 
@@ -77,7 +73,6 @@ Snapshot 返回 capability matrix。UI 不根据 scope 名字猜 stage、revert�
 
 ```ts
 type ReviewSelection =
-  | { kind: "lastTurn"; sessionId: string; turnId?: string }
   | { kind: "uncommitted" }
   | { kind: "unstaged" }
   | { kind: "staged" }
@@ -87,14 +82,15 @@ type ReviewSelection =
 
 ### Scope 语义
 
-| Selection | 内容 | 展示关系 | Mutation |
-| --- | --- | --- | --- |
-| `lastTurn` | 最近完成 turn 的文件工具变化 | turn baseline → turn result | 只读 |
-| `uncommitted` | HEAD 到 working tree，含 staged、unstaged、untracked | HEAD → Working tree | 文件级 stage/revert |
-| `unstaged` | index 到 working tree | Index → Working tree | stage/revert |
-| `staged` | HEAD 到 index | HEAD → Index | unstage/revert |
-| `commit` | 指定 commit 引入的变化 | parent → commit | 只读 |
-| `branch` | 本地分支相对 upstream 的本地独有提交 | `local → upstream` | 只读 |
+| Selection | 内容 | 展示关系 |
+| --- | --- | --- |
+| `uncommitted` | HEAD 到 working tree，含 staged、unstaged、untracked | HEAD → Working tree |
+| `unstaged` | index 到 working tree | Index → Working tree |
+| `staged` | HEAD 到 index | HEAD → Index |
+| `commit` | 指定 commit 引入的变化 | parent → commit |
+| `branch` | 本地分支相对 upstream 的本地独有提交 | `local → upstream` |
+
+所有 scope 都是只读。
 
 `Committed` 和 `Branch` 是带子视图的菜单项。Committed 子视图通过 main 查询当前 `HEAD` 的最近提交日志，展示 commit subject 和相对时间；选择一项后 Renderer 只回传 main 已提供的 SHA，不提供自由输入 ref 的提交表单。Branch 只能选择 main 返回的、已经配置 upstream 的本地分支。
 
@@ -144,7 +140,7 @@ type ReviewSnapshot = {
 
 ### ReviewCapabilities
 
-包含 file/hunk stage、unstage、revert、load full file、open file、commit、push、Create PR 与 disabled reasons。不存在 `runAgentReview` capability。
+只有 `canLoadFullFile`。不存在 `runAgentReview` capability，也没有 stage / revert / commit 等写操作 capability。
 
 ## Git 查询规则
 
@@ -163,19 +159,25 @@ type ReviewSnapshot = {
 
 ### Refresh
 
-增加 generation、清空 snapshot/file-diff cache，并重新执行当前 selection。Refresh 不 fetch remote。
+（`refreshSnapshot`）增加 generation、清空 snapshot/file-diff cache，并重新执行当前 selection，同时向 Renderer 广播 `reviewChanged`（`reason: "refresh"`）。Refresh 不 fetch remote。
 
-### 外部变更自动刷新
+### 刷新时机
 
-- 进入过 Review 的已授权工作区安装递归文件监听，包含 linked worktree 的外置 Git 目录和共同 refs；`.lock` 等 Git 中间文件不算变化。
-- Coordinator 用 500ms 固定窗口合并事件：窗口由第一个事件开启、不顺延，持续变化时每个工作区最多约每秒两次通知，停止后最后一批变化一定会通知。Refresh 和 mutation 不经过这个窗口，仍即时增加 generation。
-- 窗口内只有工作区文件变化时，先用一次 `git check-ignore -z --stdin` 核对；全部被 Git 忽略（构建产物、依赖目录等）就不增加 generation。已跟踪文件即使匹配忽略规则也不会被判为忽略。
-- 以下情况一律刷新、不做过滤：Git 元数据、任意 `.gitignore`、事件没有文件名、单个窗口超过 2,000 条路径、`check-ignore` 失败或超时（如非仓库、子模块）。宁可多刷新一次，也不漏掉真实变更。
-- Renderer 只处理与自身 snapshot `workspaceId` 一致的通知；工作树可能使用 session-root 身份，不能由路径推算。Composer 摘要在首个快照返回前只为在途请求记一次补查，同一目标最多一个请求在途，结果不变时不更新界面。
+没有实时文件监听，也没有 Git 忽略过滤。Review 的数据和输入框的 +N/−M 只在下面这些时机刷新，都走 `refreshSnapshot`（强制，丢弃缓存重新读 Git）：
+
+- 每轮 Agent 结束（`agent_run_finished` / `aborted` / `failed`）后，输入框摘要强制刷新。
+- 打开「改动」面板：面板挂载时 `loadSnapshot(selection, true)`，同时强制刷新输入框摘要。
+- 手动刷新：Review options 里的「刷新」。
+- 顶部工作区菜单提交、推送、新建分支之后（`onWorkspaceChanged`）。
+- 切换工作区或会话。
+
+在这些时机之外，用户在终端或外部编辑器改文件，不会自动反映；点刷新即可。
+
+Renderer 只处理与自身 snapshot `workspaceId` 一致的通知，且 `notification.generation` 与当前 snapshot 相同时跳过（避免 diff 闪一下）；工作树可能使用 session-root 身份，不能由路径推算。Composer 摘要在首个快照返回前只为在途请求记一次补查，同一目标最多一个请求在途，排队的补查里只要有一次是强制就按强制，结果不变时不更新界面。
 
 ### Enable word wrap
 
-只影响 renderer 长行布局，不重新查询 Git。关闭时整个 Diff Canvas 是唯一横向滚动容器，所有代码行同步横移；单个代码行不得创建自己的滚动条。文件标题、file/hunk 操作、图片和状态提示使用 Canvas 的实际可视宽度，并在横向滚动时保持可见，不能按长代码内容宽度居中或把操作推到屏外。开启时 Canvas 收回到可视宽度，代码按行内宽度折行。
+只影响 renderer 长行布局，不重新查询 Git。关闭时整个 Diff Canvas 是唯一横向滚动容器，所有代码行同步横移；单个代码行不得创建自己的滚动条。文件标题、图片和状态提示使用 Canvas 的实际可视宽度，并在横向滚动时保持可见，不能按长代码内容宽度居中或把操作推到屏外。开启时 Canvas 收回到可视宽度，代码按行内宽度折行。
 
 ### Load full files / Don't load full files
 
@@ -199,22 +201,12 @@ type ReviewSnapshot = {
 - Standard 和 capped mode 都有效；capped mode 仍只加载当前选中文件。
 - 该选项不负责把空格或 Tab 渲染成可见符号；可见空白字符不属于当前 Review Options。
 
-### Copy git apply command
-
-Main 基于已加载、generation 匹配的 snapshot 生成 binary/full-index patch，写入应用临时目录，并只返回：
-
-```sh
-git apply -- '<validated temporary patch path>'
-```
-
-包含 untracked 文件、Last Turn、空 patch 或超出上限时拒绝生成，并给出明确原因。Renderer 只负责把 main 返回的命令复制到剪贴板。
-
 ## 工具栏与布局
 
 主工具栏固定为一行：
 
 ```text
-[Scope⌄] [+N] [-N]    […] [Collapse] [Jump] [Diff mode] [Files] [Commit or push⌄]
+[Scope⌄] [+N] [-N]    […] [Collapse] [Jump] [Diff mode] [Files]
 ```
 
 - additions 为 0 时不显示 `+0`。
@@ -223,29 +215,11 @@ git apply -- '<validated temporary patch path>'
 - Branch 的 `local → upstream` 放在主工具栏下方的轻量 metadata 行，不创建第二排 action toolbar。
 - Changed Files 按 Review 容器宽度响应：宽度不小于 `560px` 时停靠在 Diff 右侧，不使用遮罩；更窄时切换为独占 Review 内容区的文件列表，选中文件后自动返回 Diff。
 - split diff 只在 Review 容器宽度不小于 `640px` 时可用；判断依据是 Review 自身宽度，不是 `window.innerWidth`。
-- Scope、Options、Jump 和 Commit 菜单通过顶层 portal 定位，不能作为横向滚动 toolbar 的子元素，否则会被 `overflow` 裁切成“点击无反应”。
+- Scope、Options 和 Jump 菜单通过顶层 portal 定位，不能作为横向滚动 toolbar 的子元素，否则会被 `overflow` 裁切成“点击无反应”。
 - Diff Canvas 同时拥有纵向虚拟列表和横向滚动位置；虚拟行共享根据结构化 Diff 预估的稳定内容宽度，避免长行进入或离开挂载窗口时横向范围跳变。
 - 非代码内容的可视宽度复用 Canvas 的尺寸观察，宽度单独变化时也必须更新；不能依赖纵向虚拟范围变化才重绘。横向粘附容器放在共享宽行内部，避免引入第二个滚动条或影响虚拟行纵向定位。
 - Files、Jump、Expand 与 split 在当前 snapshot 不具备数据或宽度条件时显示明确 disabled 状态，不执行空操作。
 - Review Tab 的关闭由右侧对象 Tab chrome 负责，不在 Review 工具栏重复增加关闭按钮。
-
-## Git Mutation
-
-- `unstaged` file/hunk 可以 stage。
-- `staged` file/hunk 可以 unstage。
-- revert 前必须明确确认；untracked 文件优先进入系统废纸篓。
-- mutation 成功或部分成功后增加 generation 并刷新。
-- Commit/Push 复用 workspace environment 的既有状态机。
-- Create PR 由 main 检查 `gh`、GitHub remote、认证、当前分支、upstream 和已有 PR。
-
-## Viewed 状态
-
-Viewed 是本机 UI 偏好，保存在 app data 下有上限的 sidecar：
-
-- key 包含 workspace、selection、path 和 file fingerprint。
-- 不写入 Git、不写入 session JSONL。
-- 不保存 Diff、文件正文或密钥。
-- 文件 fingerprint 改变后默认回到未阅。
 
 ## 大变更与失败状态
 
@@ -255,15 +229,16 @@ Viewed 是本机 UI 偏好，保存在 app data 下有上限的 sidecar：
 - Git 命令与 patch 解析运行在专用 Review worker；tracked full content 使用最多 4 个 blob 的 `cat-file --batch`，不逐文件 `git show`。
 - 单文件 patch 上限 1 MiB；untracked summary/full content 上限 2 MiB。
 - 单文件请求支持 `idle`、`loading`、`ready`、`partial`、`failed` 与 Retry；generation 变化会取消或忽略旧结果。
-- Snapshot 支持 `empty`、`partial`、`notAvailable`、`failed`、`stale` 和 mutation `partialSuccess`。
+- Snapshot 支持 `empty`、`partial`、`notAvailable`、`failed`、`stale`。
 - Git 错误裁剪并脱敏；不向 renderer 暴露任意命令执行能力。
 
 ## 验证要求
 
 自动化至少覆盖：
 
-- 六种 scope、Branch upstream、ahead/behind、repo 子目录和复杂路径。
-- full-file loading、word diff 数据、copy apply patch、stage/unstage/revert stale guard。
+- 五种 scope、Branch upstream、ahead/behind、repo 子目录和复杂路径。
+- full-file loading、word diff 数据、`refreshSnapshot` 递增 generation 并广播、stale guard。
+- Review 不改动索引和工作区（引擎测试断言只读）。
 - toolbar 单行结构、零值统计隐藏、portal 菜单、Files 停靠/窄宽独占布局、Review Tab 与聊天共存。
 - shared build、desktop typecheck、targeted/full Vitest、主题检查和 `git diff --check`。
 
@@ -271,12 +246,11 @@ Viewed 是本机 UI 偏好，保存在 app data 下有上限的 sidecar：
 
 - 浅色/深色主题与 390–640px 右侧面板视觉；核心 Electron 验收已覆盖 620px 停靠 Files、菜单和按钮命中，390px 降级另有 renderer regression 覆盖。
 - Branch 展示真实 `local → origin/*`。
-- disposable repo 的 stage/revert/commit。
-- 真实 Push/Create PR；自动化通过不等于真实远端验收通过。
+- 每轮结束、打开面板、手动刷新、顶部菜单提交后 +N/−M 的刷新。
 
 ## 明确不做
 
 - 不提供 AI Review、Review 模型、findings、Review activity 或 detached review task。
-- 不自动 fetch、pull、push、commit 或应用任何修改。
+- 不提供暂存、还原、已查看、创建 PR、复制 apply 命令、初始化 Git 和「最近一轮」范围；不自动 fetch、pull、push、commit 或应用任何修改。
 - 不同步远端 PR review comments。
 - 不让 renderer 执行任意 Git、shell 或文件系统命令。

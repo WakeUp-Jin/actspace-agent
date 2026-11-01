@@ -44,3 +44,5 @@ Review snapshot generation
 - stale 后自动重试 revert，用户实际确认的内容已经改变。
 - 用 path 作为唯一 identity，rename 或 delete/add 会错误继承 viewed、comment 或 action 状态。
 - 测试只断言返回字符串，没有检查真实 Git index 与 working tree。
+
+2026-11 Review mutation 已移除（功能减法 P5），本条仅作历史教训保留；顶部工作区菜单的 commit/push 不受影响。

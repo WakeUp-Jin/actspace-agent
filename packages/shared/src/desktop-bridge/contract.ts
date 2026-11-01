@@ -79,18 +79,12 @@ export const desktopBridgeContract = {
     openInTool: invoke<S.WorkspaceOpenInput, S.WorkspaceOpenResult>(CH.openWorkspaceInTool),
   },
   review: {
-    initGit: invoke<S.ReviewInitGitInput, S.ReviewInitGitResult>(CH.initGitRepository),
     getSnapshot: invoke<S.ReviewGetSnapshotInput, S.ReviewGetSnapshotResult>(CH.getReviewSnapshot),
     refreshSnapshot: invoke<S.ReviewGetSnapshotInput, S.ReviewGetSnapshotResult>(CH.refreshReviewSnapshot),
     getFileDiffs: invoke<S.ReviewGetFileDiffsInput, S.ReviewGetFileDiffsResult>(CH.getReviewFileDiffs),
     getFileContents: invoke<S.ReviewGetFileContentsInput, S.ReviewGetFileContentsResult>(CH.getReviewFileContents),
-    applyMutation: invoke<S.ReviewApplyMutationInput, S.ReviewMutationResult>(CH.applyReviewMutation),
-    setFileViewed: invoke<S.ReviewSetFileViewedInput, S.ReviewSetFileViewedResult>(CH.setReviewFileViewed),
     listBranches: invoke<S.ReviewWorkspaceInput, S.ReviewListBranchesResult>(CH.listReviewBranches),
     listCommits: invoke<S.ReviewWorkspaceInput, S.ReviewListCommitsResult>(CH.listReviewCommits),
-    copyGitApplyCommand: invoke<S.ReviewCopyApplyCommandInput, S.ReviewCopyApplyCommandResult>(CH.copyReviewGitApplyCommand),
-    getPullRequestCapability: invoke<S.ReviewWorkspaceInput & { baseBranch?: string }, S.ReviewPullRequestCapabilityResult>(CH.getReviewPullRequestCapability),
-    createPullRequest: invoke<S.ReviewCreatePullRequestInput, S.ReviewCreatePullRequestResult>(CH.createReviewPullRequest),
   },
   sessions: {
     listPage: invokeWithDefault<S.SessionListPageInput, S.SessionListPage>(CH.listSessionPage, {}),

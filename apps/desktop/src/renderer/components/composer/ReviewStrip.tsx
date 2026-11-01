@@ -26,7 +26,7 @@ export function ReviewStrip({ summary, onOpenReview }: ReviewStripProps) {
     showCounts
       ? `审查待处理变更 +${summary.additions ?? 0} -${summary.deletions ?? 0}`
       : summary.reason === "not_a_repository"
-        ? "查看工作区变更；Git 仓库尚未初始化"
+        ? "查看工作区变更；当前目录不是 Git 仓库"
         : "查看工作区变更";
 
   return (

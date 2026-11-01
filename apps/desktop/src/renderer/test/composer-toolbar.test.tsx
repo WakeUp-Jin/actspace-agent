@@ -52,7 +52,7 @@ describe("ReviewStrip", () => {
   it("says when the workspace is not a Git repository", () => {
     renderStrip({ status: "notAvailable", reason: "not_a_repository" });
 
-    expect(screen.getByRole("button", { name: "查看工作区变更；Git 仓库尚未初始化" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "查看工作区变更；当前目录不是 Git 仓库" })).toBeEnabled();
   });
 
   it("falls back to a plain label and disables the button while loading", () => {

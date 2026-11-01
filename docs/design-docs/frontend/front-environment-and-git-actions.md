@@ -164,7 +164,7 @@ renderer UI
 ## 错误与空状态
 
 - Git 不存在：显示 `Git is not available on this Mac`。
-- 非 Git repository：Changes 和 Commit/Push 不可用；允许用户通过现有 Review 空态显式初始化 Git。
+- 非 Git repository：Changes 和 Commit/Push 不可用；Review 空态只提示「当前目录不是 Git 仓库」，不再提供初始化 Git 入口（2026-11-01 P5 删除）。
 - detached HEAD：允许查看 Changes；统一 Git panel 通过 `New branch` 在提交前创建分支，独立 Push 仍不可用。
 - clean workspace：Changes 显示 Clean，Commit disabled。
 - 无 remote：Push 返回 `No Git remote configured`。

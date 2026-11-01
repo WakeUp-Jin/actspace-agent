@@ -286,7 +286,7 @@ placeholder 随模式改变，但不代替模式 chip 和运行时契约：
 - 无 Git repository 时显示无计数的 `Review`，点击进入右侧 Review Tab 的 Git 初始化空态。
 - 无未提交改动时不显示 Review strip，避免 Composer 常驻无效操作。
 - SubAgent transcript panel 打开期间不显示 Review strip，优先保证当前 panel 和 follow-up 输入的视觉关系；关闭 panel 后恢复。
-- 相邻 overflow `...` 只保留真实 Review quick actions，例如打开 `Last Turn` 或 `Uncommitted`；能力不可用时展示明确 disabled reason，不保留 AI Review 或无行为占位。
+- 相邻 overflow `...` 只保留真实 Review quick actions，例如打开 `Uncommitted`；能力不可用时展示明确 disabled reason，不保留 AI Review 或无行为占位。
 
 
 ## 状态行统计胶囊

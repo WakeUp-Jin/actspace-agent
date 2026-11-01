@@ -10,7 +10,7 @@
 
 ## 文档范围
 
-本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件打开与渲染、Markdown 渲染栈和 Context 面板；工作区 Markdown 的树、阅读与编辑见[文档面板规范](front-文档面板规范.md)。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
+本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件打开与渲染、Markdown 渲染栈和 Context 面板；工作区 Markdown 的树、阅读与编辑见[文档面板规范](front-文档面板规范.md)。Review 作为右侧对象 Tab 直接在面板内展示；五种 scope、upstream Branch、结构化 diff 和 Review Options 统一见 `docs/design-docs/core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
 
 ## 交互模型
 
@@ -59,7 +59,7 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `Docs`：「文档」面板（工作区 Markdown 的树 + 预览 / 源码编辑），单一实例，id 固定为 `docs`。Markdown 不再生成独立的文件 Tab。
 - `Image`：图片渲染。
 - `Text`：说明文字（读取失败、远端 Host 文本预览等），用 `CodeRenderView` 显示，见「代码视图能力」。本机工作区里的代码、HTML、CSV 等文件不再生成 Tab，见「文件打开路由与兜底对话框」。
-- `Review`（界面名称「改动」）：完整代码审阅工作台入口；支持 Git-first scope 与 `Last Turn` Agent 视角，具体契约见 `docs/design-docs/core-review-change-sources.md`。
+- `Review`（界面名称「改动」）：完整代码审阅工作台入口；只查看改动（2026-11-01 起不含暂存、还原、已查看、复制 apply、创建 PR 和「最近一轮」），具体契约见 `docs/design-docs/core-review-change-sources.md`。
 - `Context`：Context 面板；见本文「Context 面板」一节。
 - `sideChat`：侧边对话；见「侧边对话」一节。
 
@@ -390,7 +390,7 @@ Context Tab 回答三个问题：现在占了多少、由哪些条目组成、�
 ## 首版边界
 
 - 应用内只渲染 `md`（在「文档」面板里）和 `图片`；其余文件交给系统默认应用（见「文件打开路由与兜底对话框」）。
-- Git-first Review 作为第二主线；无 Git 时提示创建 Git repository，`Last Turn` 当前未接通数据源，显示不可用状态；不能用聊天工具 diff 冒充该 scope 已实现。
+- Git-first Review 作为第二主线；无 Git 时显示「当前目录不是 Git 仓库」。
 - 其他类型后续再补，不抢首版设计重点。
 
 ## Review / Diff 展示边界
@@ -398,10 +398,10 @@ Context Tab 回答三个问题：现在占了多少、由哪些条目组成、�
 - 聊天区继续保留单次工具调用或编辑动作的局部 diff；Review Workbench 负责跨文件、跨 scope 的完整审阅。
 - Composer、Environment 和右侧对象菜单都可以打开 Review；入口去重到同一 workspace Review 实例。
 - 完整 Review 直接渲染在右侧对象面板，聊天主区和 Composer 保持可用。
-- `Uncommitted`、`Unstaged`、`Staged`、`Committed`、`Branch` 使用真实 Git 数据；`Last Turn` 当前未注入查询实现，必须如实显示不可用。
+- `Uncommitted`、`Unstaged`、`Staged`、`Committed`、`Branch` 使用真实 Git 数据。
 - Review 内部以单列 Diff Canvas 为主；Changed Files 在 Review 容器不小于 `560px` 时停靠于右侧，更窄时切换为独占内容区的文件列表。它不使用遮罩覆盖 Diff；大 diff 继续按单文件与 capped 策略加载。
 - 不换行时，Diff Canvas 是唯一的横向滚动所有者，行号、增删标记和代码随 Canvas 同步移动；禁止给每个 `<code>` 行单独设置横向滚动。开启 word wrap 后 Canvas 回到面板宽度并由代码列折行。
-- unified/split、上下文折叠、Jump to file、viewed、Review Options 和 Git actions 的完整规则以 `docs/design-docs/core-review-change-sources.md` 为准。
+- unified/split、上下文折叠、Jump to file、Review Options 的完整规则以 `docs/design-docs/core-review-change-sources.md` 为准。
 
 ## Subagents（2026-09-06）
 

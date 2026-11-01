@@ -63,11 +63,7 @@ const settingsApiStub = {
   "providers.clearKey": async () => ({ ok: true }),
   "sessions.describeContext": async () => null,
   "review.getSnapshot": async () => createReviewChanges(0, 0),
-  "review.initGit": async () => ({
-    ok: true,
-    alreadyRepository: true,
-    workspaceRoot: "/tmp/workspace",
-  }),
+  "review.refreshSnapshot": async () => createReviewChanges(0, 0),
   "workspaces.listMarkdownFiles": async () => ({ ok: true as const, files: [], truncated: false, source: "walk" as const }),
   "workspaces.readFile": async () => ({ relativePath: "", renderKind: "text" as const, size: 0, mtimeMs: 0, content: "" }),
   "sessions.archive": async () => ({ ok: true }),
@@ -159,25 +155,11 @@ function createReviewChanges(additions: number, deletions: number): ReviewGetSna
           renderKind: "text",
           source: "workingTree",
           diffLoadStatus: "idle",
-          viewed: false,
           fingerprint: "example-fingerprint",
         },
       ] : [],
       totals: { files: hasChanges ? 1 : 0, additions, deletions, changedLines: additions + deletions, estimatedChangedBytes: 0 },
-      capabilities: {
-        canStageFile: hasChanges,
-        canStageHunk: hasChanges,
-        canUnstageFile: false,
-        canUnstageHunk: false,
-        canRevertFile: hasChanges,
-        canRevertHunk: hasChanges,
-        canLoadFullFile: true,
-        canOpenFile: true,
-        canCommit: hasChanges,
-        canPush: false,
-        canCreatePullRequest: false,
-        disabledReasons: {},
-      },
+      capabilities: { canLoadFullFile: true },
       loadPolicy: { mode: "all-files" },
       queryOptions: { ignoreWhitespaceChanges: false },
       generatedAt: new Date().toISOString(),
@@ -456,7 +438,9 @@ describe("App streaming user message", () => {
     let reviewDeletions = 2;
     let resolveExecution: ((value: AgentRunResult) => void) | null =
       null;
-    const getReviewSnapshot = vi.fn(async () => createReviewChanges(reviewAdditions, reviewDeletions));
+    // 缓存读取故意一直返回旧数字：只有强制刷新（refreshSnapshot）才会读到最新值。
+    const getReviewSnapshot = vi.fn(async () => createReviewChanges(7, 2));
+    const refreshReviewSnapshot = vi.fn(async () => createReviewChanges(reviewAdditions, reviewDeletions));
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
       writable: true,
@@ -476,6 +460,7 @@ describe("App streaming user message", () => {
       "approvals.listPending": async () => [],
       ...settingsApiStub,
       "review.getSnapshot": getReviewSnapshot,
+      "review.refreshSnapshot": refreshReviewSnapshot,
       "events.agentStream": () => () => {},
       execute: () =>
         new Promise((resolve) => {
@@ -487,7 +472,7 @@ describe("App streaming user message", () => {
 
     expect(await screen.findByRole("button", { name: "审查待处理变更 +7 -2" })).toHaveTextContent("Review+7-2");
     await waitFor(() => {
-      expect(getReviewSnapshot).toHaveBeenCalledWith({
+      expect(refreshReviewSnapshot).toHaveBeenCalledWith({
         workspaceRoot: "/tmp/workspace",
         sessionId,
         selection: { kind: "uncommitted" },
@@ -517,6 +502,8 @@ describe("App streaming user message", () => {
     });
 
     expect(await screen.findByRole("button", { name: "审查待处理变更 +10 -1" })).toHaveTextContent("Review+10-1");
+    // 本轮结束强制刷新：读的是 refreshSnapshot，不是缓存。
+    expect(refreshReviewSnapshot.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it("wires the current session hover preview through the App bridge", async () => {
@@ -1882,6 +1869,7 @@ sessionId,
       "sessions.getSubAgentTranscript": async () => [{ ...transcriptEvent, type: "tool_result", payload: { toolCallId: "tool-read-app", status: "running", uiPreview: { kind: "read", filePath: "apps/desktop/src/renderer/App.tsx", displayText: "Read apps/desktop/src/renderer/App.tsx" } } }],
       ...settingsApiStub,
       "review.getSnapshot": getReviewSnapshot,
+      "review.refreshSnapshot": getReviewSnapshot,
       "events.agentStream": (callback) => {
         streamHandler = callback;
         return () => {

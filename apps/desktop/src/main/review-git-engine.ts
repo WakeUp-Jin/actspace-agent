@@ -3,7 +3,6 @@ import { execFile } from "node:child_process";
 import { lstat, open, readFile, realpath } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve, sep } from "node:path";
 import type {
-  ReviewApplyMutationInput,
   ReviewBranch,
   ReviewCapabilities,
   ReviewCommit,
@@ -21,7 +20,6 @@ import type {
   ReviewGetFileDiffResult,
   ReviewHunk,
   ReviewLine,
-  ReviewMutationResult,
   ReviewSelection,
   ReviewSnapshot,
   ReviewWarning,
@@ -30,10 +28,9 @@ import type {
 import { REVIEW_LOAD_LIMITS } from "@actspace/shared";
 import type {
   ResolvedReviewWorkspace,
-  ReviewMutationProvider,
   ReviewQueryProvider,
 } from "./review-coordinator";
-import { reviewSelectionKey } from "./review-view-state-service";
+import { reviewSelectionKey } from "./review-coordinator";
 
 const EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const SUMMARY_OUTPUT_LIMIT = 4 * 1024 * 1024;
@@ -60,15 +57,6 @@ export type ReviewGitEngineOptions = {
   runner?: ReviewGitCommandRunner;
   patchParser?: ReviewPatchParser;
   objectLoader?: ReviewGitObjectLoader;
-  trashFile?: (absolutePath: string) => Promise<void>;
-  loadLastTurn?: (
-    input: ResolvedReviewWorkspace & { selection: Extract<ReviewSelection, { kind: "lastTurn" }>; generation: number },
-  ) => Promise<ReviewSnapshot>;
-  loadLastTurnFileDiff?: (input: ResolvedReviewWorkspace & {
-    snapshot: ReviewSnapshot;
-    fileId: string;
-    generation: number;
-  }) => Promise<ReviewGetFileDiffResult>;
 };
 
 export type ReviewPatchParseInput = {
@@ -113,7 +101,6 @@ type SelectionCommand = {
   nameStatusArgs: string[];
   patchArgs: (path: string, contextLines?: number) => string[];
   patchArgsForPaths: (paths: string[], contextLines?: number) => string[];
-  patchAllArgs: string[];
   source: ReviewFileSource;
   comparison?: { from: string; to: string };
   warnings?: ReviewWarning[];
@@ -129,12 +116,10 @@ type ReviewContentSource =
   | { kind: "working"; path: string }
   | { kind: "object"; spec?: string };
 
-export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvider {
+export class ReviewGitEngine implements ReviewQueryProvider {
   private readonly runner: ReviewGitCommandRunner;
   private readonly patchParser: ReviewPatchParser;
   private readonly objectLoader: ReviewGitObjectLoader;
-  private readonly snapshots = new Map<string, ReviewSnapshot>();
-  private readonly fileDiffs = new Map<string, ReviewFileDiff[]>();
   private readonly preparedSnapshots = new Map<string, PreparedReviewSnapshot>();
 
   constructor(private readonly options: ReviewGitEngineOptions = {}) {
@@ -199,26 +184,6 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
     return commits;
   }
 
-  async createPatch(workspace: ResolvedReviewWorkspace, snapshot: ReviewSnapshot): Promise<string> {
-    const repository = await this.resolveRepository(workspace);
-    if (repository.ok === false) throw new Error(repository.message);
-    if (snapshot.selection.kind === "lastTurn") throw new Error("Last Turn cannot be exported as a Git patch.");
-    if (snapshot.selection.kind === "uncommitted") {
-      const untracked = await this.git(repository.context.repoRoot, [
-        "ls-files", "--others", "--exclude-standard", "-z", "--", repository.context.pathspec,
-      ], SUMMARY_OUTPUT_LIMIT);
-      if (gitSucceeded(untracked) && parseNulFields(untracked.stdout).length > 0) {
-        throw new Error("Copy git apply command is unavailable while untracked files are included.");
-      }
-    }
-    const command = await this.selectionCommand(repository.context, snapshot.selection, snapshot.queryOptions.ignoreWhitespaceChanges);
-    const patch = await this.git(repository.context.repoRoot, command.patchAllArgs, FILE_PATCH_LIMIT);
-    if (!gitSucceeded(patch)) throw new Error(sanitizeGitFailure(patch));
-    if (patch.truncated) throw new Error("The patch is too large to export safely.");
-    if (!patch.stdout.trim()) throw new Error("There is no patch to apply in this Review scope.");
-    return patch.stdout;
-  }
-
   async getSnapshot(input: ResolvedReviewWorkspace & {
     selection: ReviewSelection;
     generation: number;
@@ -226,11 +191,6 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
     signal?: AbortSignal;
   }): Promise<ReviewSnapshot> {
     const queryOptions = input.options ?? { ignoreWhitespaceChanges: false };
-    if (input.selection.kind === "lastTurn") {
-      if (this.options.loadLastTurn) return this.options.loadLastTurn({ ...input, selection: input.selection });
-      return unavailableSnapshot(input, "Last Turn is unavailable for this session.");
-    }
-
     const repository = await this.resolveRepository(input, input.signal);
     if (repository.ok === false) return unavailableSnapshot(input, repository.message, repository.code === "git_not_found");
 
@@ -300,13 +260,12 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
       status: files.length === 0 ? (warnings.length ? "partial" : "empty") : (warnings.length ? "partial" : "ready"),
       files,
       totals: { files: files.length, additions, deletions, changedLines, estimatedChangedBytes },
-      capabilities: capabilitiesFor(input.selection, files, repository.context.hasHead),
+      capabilities: capabilitiesFor(files),
       loadPolicy,
       queryOptions,
       generatedAt: new Date().toISOString(),
       ...(warnings.length ? { warnings } : {}),
     };
-    this.snapshots.set(snapshot.id, snapshot);
     this.preparedSnapshots.set(snapshot.id, { context: repository.context, command });
     return snapshot;
   }
@@ -336,18 +295,6 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
     generation: number;
     signal: AbortSignal;
   }): Promise<ReviewGetFileDiffsResult> {
-    if (input.snapshot.selection.kind === "lastTurn") {
-      if (this.options.loadLastTurnFileDiff) {
-        const outcomes = await Promise.all(input.requests.map(async (request): Promise<ReviewFileDiffOutcome> => {
-          const result = await this.options.loadLastTurnFileDiff!({ ...input, fileId: request.fileId });
-          return result.ok === true
-            ? { fileId: request.fileId, status: result.diff.partial ? "partial" : "ready", diff: result.diff }
-            : { fileId: request.fileId, status: "failed", code: result.code, message: result.message };
-        }));
-        return { ok: true, outcomes };
-      }
-      return { ok: false, code: "unsupported_scope", message: "Last Turn diff is provided by session history." };
-    }
     const prepared = this.preparedSnapshots.get(input.snapshot.id);
     if (!prepared) return { ok: false, code: "snapshot_not_found", message: "Prepared Review snapshot is unavailable." };
     if (input.signal.aborted) return { ok: false, code: "cancelled", message: "Review request was cancelled." };
@@ -387,7 +334,6 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
         try {
           const parsed = await this.patchParser({ snapshot: input.snapshot, files, patch: patch.stdout, generation: input.generation, truncated: patch.truncated });
           outcomes.push(...parsed);
-          this.rememberDiffOutcomes(parsed);
         } catch (error) {
           outcomes.push(...files.map((file) => ({ fileId: file.id, status: "failed" as const, code: "command_failed" as const, message: errorMessage(error) })));
         }
@@ -401,7 +347,6 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
       try {
         const [outcome] = await this.patchParser({ snapshot: input.snapshot, files: [item.file!], patch: patch.stdout, generation: input.generation, truncated: patch.truncated });
         if (!outcome) return { fileId: item.file!.id, status: "failed", code: "command_failed", message: "Review worker omitted the parsed file." };
-        this.rememberDiffOutcomes([outcome]);
         return outcome;
       } catch (error) {
         return { fileId: item.file!.id, status: "failed", code: "command_failed", message: errorMessage(error) };
@@ -419,7 +364,7 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
     signal: AbortSignal;
   }): Promise<ReviewGetFileContentsResult> {
     const prepared = this.preparedSnapshots.get(input.snapshot.id);
-    if (!prepared || input.snapshot.selection.kind === "lastTurn") {
+    if (!prepared) {
       return { ok: false, code: "unsupported_scope", message: "Full file content is unavailable for this Review snapshot." };
     }
     const filesById = new Map(input.snapshot.files.map((file) => [file.id, file]));
@@ -476,16 +421,6 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
       return { fileId, status: partial ? "partial" : "ready", contents };
     });
     return { ok: true, outcomes };
-  }
-
-  private rememberDiffOutcomes(outcomes: ReviewFileDiffOutcome[]): void {
-    for (const outcome of outcomes) {
-      if (outcome.status === "failed") continue;
-      const diff = outcome.diff;
-      const diffKey = fileDiffKey(diff.snapshotId, diff.fileId);
-      const loadedDiffs = this.fileDiffs.get(diffKey) ?? [];
-      this.fileDiffs.set(diffKey, [...loadedDiffs.filter((candidate) => candidate.patchFingerprint !== diff.patchFingerprint), diff]);
-    }
   }
 
   private async loadWorkingContent(context: RepositoryContext, path: string): Promise<ReviewFileContentSide> {
@@ -559,46 +494,14 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
     return workingSizes.reduce((total, size) => total + size, 0) + objectBytes;
   }
 
-  async applyMutation(input: ResolvedReviewWorkspace & ReviewApplyMutationInput): Promise<ReviewMutationResult> {
-    const snapshot = this.snapshots.get(input.mutation.snapshotId);
-    if (!snapshot) return rejected(input.mutation.expectedGeneration, "Review snapshot is not available.");
-    const repository = await this.resolveRepository(input);
-    if (repository.ok === false) return failed(input.mutation.expectedGeneration, repository.message);
-    const files = input.mutation.scope === "section"
-      ? snapshot.files
-      : snapshot.files.filter((file) => file.path === input.mutation.path);
-    if (files.length === 0) return rejected(input.mutation.expectedGeneration, "No matching Review files were found.");
-
-    const completedSteps: ReviewMutationResult["completedSteps"] = [];
-    const failedSteps: ReviewMutationResult["failedSteps"] = [];
-    for (const file of files) {
-      const result = input.mutation.scope === "hunk"
-        ? await this.mutateHunk(repository.context, snapshot, file, input)
-        : await this.mutateFile(repository.context, file, input);
-      completedSteps.push(...result.completedSteps);
-      failedSteps.push(...result.failedSteps);
-    }
-    const status = failedSteps.length === 0 ? "success" : completedSteps.length > 0 ? "partialSuccess" : "failed";
-    return { status, generation: input.mutation.expectedGeneration, completedSteps, failedSteps };
-  }
-
   invalidateWorkspace(workspaceId: string): void {
-    const snapshotIds = [...this.snapshots.values()]
-      .filter((snapshot) => snapshot.workspaceId === workspaceId)
-      .map((snapshot) => snapshot.id);
-    for (const snapshotId of snapshotIds) {
-      this.snapshots.delete(snapshotId);
-      this.preparedSnapshots.delete(snapshotId);
-      for (const key of this.fileDiffs.keys()) {
-        if (key.startsWith(`${snapshotId}:`)) this.fileDiffs.delete(key);
-      }
+    for (const [snapshotId, prepared] of [...this.preparedSnapshots]) {
+      if (prepared.context.workspaceId === workspaceId) this.preparedSnapshots.delete(snapshotId);
     }
   }
 
   dispose(): void {
-    this.snapshots.clear();
     this.preparedSnapshots.clear();
-    this.fileDiffs.clear();
   }
 
   private async resolveRepository(workspace: ResolvedReviewWorkspace, signal?: AbortSignal): Promise<
@@ -623,7 +526,7 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
 
   private async selectionCommand(
     context: RepositoryContext,
-    selection: Exclude<ReviewSelection, { kind: "lastTurn" }>,
+    selection: ReviewSelection,
     ignoreWhitespaceChanges = false,
     signal?: AbortSignal,
   ): Promise<SelectionCommand> {
@@ -721,79 +624,6 @@ export class ReviewGitEngine implements ReviewQueryProvider, ReviewMutationProvi
     }
   }
 
-  private async mutateFile(
-    context: RepositoryContext,
-    file: ReviewFileSummary,
-    input: ResolvedReviewWorkspace & ReviewApplyMutationInput,
-  ): Promise<Pick<ReviewMutationResult, "completedSteps" | "failedSteps">> {
-    const action = input.mutation.action;
-    if (action === "stage") return this.runSteps(context, file.path, [["add", "--", file.path]]);
-    if (action === "unstage") {
-      const args = context.hasHead ? ["restore", "--staged", "--", file.path] : ["rm", "--cached", "--", file.path];
-      return this.runSteps(context, file.path, [args]);
-    }
-    if (input.mutation.source === "index") {
-      if (!context.hasHead) return { completedSteps: [], failedSteps: [{ id: `revert:${file.path}`, status: "failed", message: "Staged revert requires HEAD." }] };
-      return this.runSteps(context, file.path, [
-        ["restore", "--staged", "--source=HEAD", "--", file.path],
-        ["restore", "--worktree", "--source=HEAD", "--", file.path],
-      ]);
-    }
-    if (file.status === "added") {
-      if (!this.options.trashFile) return { completedSteps: [], failedSteps: [{ id: `trash:${file.path}`, status: "failed", message: "Safe trash is unavailable." }] };
-      const absolutePath = resolve(context.repoRoot, file.path);
-      if (!isInside(context.workspaceRoot, absolutePath)) return { completedSteps: [], failedSteps: [{ id: `trash:${file.path}`, status: "failed", message: "Path is outside the workspace." }] };
-      try {
-        await this.options.trashFile(absolutePath);
-        return { completedSteps: [{ id: `trash:${file.path}`, status: "completed" }], failedSteps: [] };
-      } catch (error) {
-        return { completedSteps: [], failedSteps: [{ id: `trash:${file.path}`, status: "failed", message: errorMessage(error) }] };
-      }
-    }
-    return this.runSteps(context, file.path, [["restore", "--worktree", "--", file.path]]);
-  }
-
-  private async mutateHunk(
-    context: RepositoryContext,
-    snapshot: ReviewSnapshot,
-    file: ReviewFileSummary,
-    input: ResolvedReviewWorkspace & ReviewApplyMutationInput,
-  ): Promise<Pick<ReviewMutationResult, "completedSteps" | "failedSteps">> {
-    const hunk = this.fileDiffs.get(fileDiffKey(snapshot.id, file.id))
-      ?.flatMap((diff) => diff.hunks)
-      .find((candidate) => candidate.id === input.mutation.hunkId && candidate.patchFingerprint === input.mutation.patchFingerprint);
-    if (!hunk) {
-      return { completedSteps: [], failedSteps: [{ id: `hunk:${file.path}`, status: "failed", message: "Hunk patch is stale or unavailable." }] };
-    }
-    const patch = buildHunkPatch(file, hunk);
-    const args = input.mutation.action === "stage"
-      ? ["apply", "--cached", "--unidiff-zero", "-"]
-      : input.mutation.action === "unstage"
-        ? ["apply", "--cached", "--reverse", "--unidiff-zero", "-"]
-        : ["apply", "--reverse", "--unidiff-zero", "-"];
-    return this.runSteps(context, `hunk:${file.path}`, [args], patch);
-  }
-
-  private async runSteps(
-    context: RepositoryContext,
-    id: string,
-    steps: string[][],
-    input?: string,
-  ): Promise<Pick<ReviewMutationResult, "completedSteps" | "failedSteps">> {
-    const completedSteps: ReviewMutationResult["completedSteps"] = [];
-    const failedSteps: ReviewMutationResult["failedSteps"] = [];
-    for (let index = 0; index < steps.length; index += 1) {
-      const result = await this.git(context.repoRoot, steps[index], SUMMARY_OUTPUT_LIMIT, input);
-      const stepId = `${id}:${index + 1}`;
-      if (gitSucceeded(result)) completedSteps.push({ id: stepId, status: "completed" });
-      else {
-        failedSteps.push({ id: stepId, status: "failed", message: sanitizeGitFailure(result) });
-        break;
-      }
-    }
-    return { completedSteps, failedSteps };
-  }
-
   private git(cwd: string, args: string[], maxOutputChars: number, input?: string, signal?: AbortSignal): Promise<ReviewGitCommandResult> {
     return this.runner(args, { cwd, timeoutMs: 10_000, maxOutputChars, input, signal });
   }
@@ -816,7 +646,6 @@ function diffCommand(
     nameStatusArgs: [...common, "--name-status", "-z", "--", pathspec],
     patchArgs: (path, contextLines = 3) => [...common, `--unified=${Math.max(0, Math.floor(contextLines))}`, "--", path],
     patchArgsForPaths: (paths, contextLines = 3) => [...common, `--unified=${Math.max(0, Math.floor(contextLines))}`, "--", ...paths],
-    patchAllArgs: [...common, "--binary", "--full-index", "--", pathspec],
   };
 }
 
@@ -943,7 +772,6 @@ function toFileSummary(
     source,
     untracked: record.untracked,
     diffLoadStatus: "idle",
-    viewed: false,
     fingerprint,
   };
 }
@@ -956,16 +784,15 @@ export function parseReviewPatchHunks(patch: string, fileFingerprint: string): R
   let newLine = 0;
   const finish = () => {
     if (!current) return;
-    const patchFingerprint = hashParts(fileFingerprint, current.raw.join("\n"));
+    const hunkFingerprint = hashParts(fileFingerprint, current.raw.join("\n"));
     hunks.push({
-      id: hashParts(patchFingerprint, current.header),
+      id: hashParts(hunkFingerprint, current.header),
       header: current.header,
       oldStart: current.oldStart,
       oldLines: current.oldLines,
       newStart: current.newStart,
       newLines: current.newLines,
       lines: enrichWordDiffs(current.lines),
-      patchFingerprint,
     });
   };
   for (const line of lines) {
@@ -1063,45 +890,8 @@ function inlineWordDiff(oldText: string, newText: string): [ReviewWordDiff[], Re
   return [oldDiff, newDiff];
 }
 
-function buildHunkPatch(file: ReviewFileSummary, hunk: ReviewHunk): string {
-  const oldPath = file.previousPath ?? file.path;
-  const body = hunk.lines.map((line) => {
-    if (line.kind === "addition") return `+${line.text}`;
-    if (line.kind === "deletion") return `-${line.text}`;
-    if (line.kind === "noNewline") return line.text;
-    return ` ${line.text}`;
-  });
-  return [
-    `diff --git a/${oldPath} b/${file.path}`,
-    `--- a/${oldPath}`,
-    `+++ b/${file.path}`,
-    hunk.header,
-    ...body,
-    "",
-  ].join("\n");
-}
-
-function capabilitiesFor(selection: ReviewSelection, files: ReviewFileSummary[], hasHead: boolean): ReviewCapabilities {
-  const hasFiles = files.length > 0;
-  const unstaged = selection.kind === "unstaged";
-  const staged = selection.kind === "staged";
-  const uncommitted = selection.kind === "uncommitted";
-  return {
-    canStageFile: hasFiles && (unstaged || uncommitted),
-    canStageHunk: hasFiles && unstaged,
-    canUnstageFile: hasFiles && staged,
-    canUnstageHunk: hasFiles && staged,
-    canRevertFile: hasFiles && (unstaged || staged),
-    canRevertHunk: hasFiles && (unstaged || staged),
-    canLoadFullFile: hasFiles,
-    canOpenFile: hasFiles,
-    canCommit: hasFiles && staged,
-    canPush: hasHead,
-    canCreatePullRequest: hasHead,
-    disabledReasons: {
-      ...(!staged ? { commit: "Switch to Staged changes before committing." } : {}),
-    },
-  };
+function capabilitiesFor(files: ReviewFileSummary[]): ReviewCapabilities {
+  return { canLoadFullFile: files.length > 0 };
 }
 
 export function reviewLoadPolicy(fileCount: number, changedLines: number, changedBytes: number): ReviewSnapshot["loadPolicy"] {
@@ -1228,7 +1018,7 @@ function unavailableSnapshot(
     status: "notAvailable",
     files: [],
     totals: { files: 0, additions: 0, deletions: 0, changedLines: 0, estimatedChangedBytes: 0 },
-    capabilities: capabilitiesFor(input.selection, [], false),
+    capabilities: capabilitiesFor([]),
     loadPolicy: { mode: "all-files" },
     queryOptions: input.options ?? { ignoreWhitespaceChanges: false },
     generatedAt: new Date().toISOString(),
@@ -1299,22 +1089,10 @@ function hashParts(...parts: string[]): string {
   return hash.digest("hex");
 }
 
-function fileDiffKey(snapshotId: string, fileId: string): string {
-  return `${snapshotId}:${fileId}`;
-}
-
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
 function commandFailure(message: string): ReviewGitCommandResult {
   return { stdout: "", stderr: message, exitCode: 1, timedOut: false, truncated: false };
-}
-
-function rejected(generation: number, message: string): ReviewMutationResult {
-  return { status: "rejected", generation, completedSteps: [], failedSteps: [], message };
-}
-
-function failed(generation: number, message: string): ReviewMutationResult {
-  return { status: "failed", generation, completedSteps: [], failedSteps: [], message };
 }

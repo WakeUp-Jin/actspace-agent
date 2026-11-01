@@ -74,7 +74,7 @@ describe("runtime v2 desktop shell IPC", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
-  it.each([false, true])("invalidates real external writes and disposes watches (Session-only root: %s)", async (sessionOnly) => {
+  it.each([false, true])("refreshSnapshot reads outside writes, bumps the generation, and broadcasts reviewChanged (Session-only root: %s)", async (sessionOnly) => {
     handlers.clear();
     const root = await mkdtemp(join(tmpdir(), "review-external-write-"));
     const workspace = join(root, "workspace");
@@ -97,18 +97,24 @@ describe("runtime v2 desktop shell IPC", () => {
       getMainWindow: () => trusted.window as never,
       listSessions: async () => sessionOnly ? [{ workspaceRoot: workspace }] : [],
     });
-    const snapshot = () => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewSnapshot)!(trusted.event, { workspaceRoot: workspace, selection: { kind: "uncommitted" } }) as Promise<{ ok: boolean; snapshot: { generation: number; files: { path: string }[] } }>;
+    const invoke = (channel: string) => handlers.get(channel)!(trusted.event, { workspaceRoot: workspace, selection: { kind: "uncommitted" } }) as Promise<{ ok: boolean; snapshot: { generation: number; files: { path: string }[] } }>;
+    const snapshot = () => invoke(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewSnapshot);
+    const refresh = () => invoke(RUNTIME_V2_FIXED_RENDERER_CHANNELS.refreshReviewSnapshot);
     try {
       const before = await snapshot();
       expect(before.snapshot.files).toEqual([]);
       await writeFile(join(workspace, "sample.txt"), "before\nafter\n");
-      await vi.waitFor(() => expect(send).toHaveBeenCalledWith(RUNTIME_V2_FIXED_RENDERER_CHANNELS.reviewChanged, expect.objectContaining({ reason: "watch" })), { timeout: 2500 });
-      const after = await snapshot();
+      // 没有实时监听：不经过 refresh，读到的还是旧缓存，也没有任何广播。
+      await new Promise(resolve => setTimeout(resolve, 250));
+      expect(send).not.toHaveBeenCalled();
+      expect((await snapshot()).snapshot.files).toEqual([]);
+
+      const after = await refresh();
       expect(after.snapshot.generation).toBeGreaterThan(before.snapshot.generation);
       expect(after.snapshot.files.map(file => file.path)).toContain("sample.txt");
+      expect(send).toHaveBeenCalledWith(RUNTIME_V2_FIXED_RENDERER_CHANNELS.reviewChanged, expect.objectContaining({ generation: after.snapshot.generation, reason: "refresh" }));
       const count = send.mock.calls.length;
       await snapshot();
-      await new Promise(resolve => setTimeout(resolve, 250));
       expect(send).toHaveBeenCalledTimes(count);
       registration.dispose();
       await writeFile(join(workspace, "sample.txt"), "after dispose\n");

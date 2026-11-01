@@ -1,7 +1,6 @@
 export type ReviewSource = "git" | "session" | "snapshot" | "external";
 
 export type ReviewSelection =
-  | { kind: "lastTurn"; sessionId: string; turnId?: string }
   | { kind: "uncommitted" }
   | { kind: "unstaged" }
   | { kind: "staged" }
@@ -71,32 +70,8 @@ export type ReviewDiffQueryOptions = {
   ignoreWhitespaceChanges: boolean;
 };
 
-export type ReviewCapability =
-  | "stageFile"
-  | "stageHunk"
-  | "unstageFile"
-  | "unstageHunk"
-  | "revertFile"
-  | "revertHunk"
-  | "loadFullFile"
-  | "openFile"
-  | "commit"
-  | "push"
-  | "createPullRequest";
-
 export type ReviewCapabilities = {
-  canStageFile: boolean;
-  canStageHunk: boolean;
-  canUnstageFile: boolean;
-  canUnstageHunk: boolean;
-  canRevertFile: boolean;
-  canRevertHunk: boolean;
   canLoadFullFile: boolean;
-  canOpenFile: boolean;
-  canCommit: boolean;
-  canPush: boolean;
-  canCreatePullRequest: boolean;
-  disabledReasons: Partial<Record<ReviewCapability, string>>;
 };
 
 export type ReviewFileSummary = {
@@ -111,7 +86,6 @@ export type ReviewFileSummary = {
   source: ReviewFileSource;
   untracked?: boolean;
   diffLoadStatus: "idle" | "loading" | "ready" | "partial" | "failed";
-  viewed: boolean;
   fingerprint: string;
 };
 
@@ -143,7 +117,6 @@ export type ReviewHunk = {
   newLines: number;
   lines: ReviewLine[];
   collapsed?: ReviewCollapsedContext;
-  patchFingerprint: string;
 };
 
 export type ReviewFileDiff = {
@@ -257,77 +230,10 @@ export type ReviewGetFileContentsResult =
   | { ok: true; outcomes: ReviewFileContentsOutcome[] }
   | { ok: false; code: ReviewErrorCode; message: string; currentGeneration?: number };
 
-export type ReviewMutationAction = "stage" | "unstage" | "revert";
-export type ReviewMutationScope = "section" | "file" | "hunk";
-
-export type ReviewMutation = {
-  snapshotId: string;
-  expectedGeneration: number;
-  action: ReviewMutationAction;
-  scope: ReviewMutationScope;
-  source: "workingTree" | "index";
-  path?: string;
-  hunkId?: string;
-  patchFingerprint?: string;
-};
-
-export type ReviewMutationStep = {
-  id: string;
-  status: "completed" | "failed";
-  message?: string;
-};
-
-export type ReviewMutationResult = {
-  status: "success" | "partialSuccess" | "stale" | "rejected" | "failed";
-  generation: number;
-  completedSteps: ReviewMutationStep[];
-  failedSteps: ReviewMutationStep[];
-  message?: string;
-};
-
-export type ReviewApplyMutationInput = ReviewWorkspaceInput & {
-  mutation: ReviewMutation;
-};
-
-export type ReviewSetFileViewedInput = ReviewWorkspaceInput & {
-  snapshotId: string;
-  expectedGeneration: number;
-  fileId: string;
-  viewed: boolean;
-};
-
-export type ReviewSetFileViewedResult =
-  | { ok: true; viewed: boolean }
-  | { ok: false; code: ReviewErrorCode; message: string; currentGeneration?: number };
-
-export type ReviewPullRequestCapability = {
-  enabled: boolean;
-  reason?: "gh_missing" | "not_github" | "not_authenticated" | "detached_head" | "no_upstream" | "existing_pull_request" | "not_repository";
-  message?: string;
-  currentBranch?: string;
-  baseBranch?: string;
-  existingUrl?: string;
-};
-
-export type ReviewPullRequestCapabilityResult =
-  | { ok: true; capability: ReviewPullRequestCapability }
-  | { ok: false; code: ReviewErrorCode; message: string };
-
-export type ReviewCreatePullRequestInput = ReviewWorkspaceInput & {
-  title: string;
-  body: string;
-  baseBranch: string;
-  draft: boolean;
-};
-
-export type ReviewCreatePullRequestResult =
-  | { ok: true; url: string; alreadyExisted: boolean }
-  | { ok: false; code: ReviewErrorCode | "pull_request_unavailable"; message: string };
-
 export type ReviewChangeNotification = {
   workspaceId: string;
   generation: number;
-  reason: "refresh" | "mutation" | "workspace" | "git" | "watch";
+  reason: "refresh";
 };
 
 export type ReviewBranch = {
@@ -352,15 +258,6 @@ export type ReviewListCommitsResult =
   | { ok: true; commits: ReviewCommit[] }
   | { ok: false; code: ReviewErrorCode; message: string };
 
-export type ReviewCopyApplyCommandInput = ReviewWorkspaceInput & {
-  snapshotId: string;
-  expectedGeneration: number;
-};
-
-export type ReviewCopyApplyCommandResult =
-  | { ok: true; command: string; patchPath: string }
-  | { ok: false; code: ReviewErrorCode; message: string };
-
 export type ReviewErrorCode =
   | "invalid_workspace"
   | "not_a_repository"
@@ -374,15 +271,3 @@ export type ReviewErrorCode =
   | "invalid_range"
   | "command_failed"
   | "cancelled";
-
-export type ReviewInitGitInput = {
-  workspaceRoot?: string;
-};
-
-export type ReviewInitGitResult = {
-  ok: boolean;
-  alreadyRepository?: boolean;
-  workspaceRoot: string;
-  error?: "git_not_found" | "command_failed" | "invalid_workspace";
-  message?: string;
-};

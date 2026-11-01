@@ -285,7 +285,7 @@ export function WorkspaceChromeControls({
                 disabled={busy}
                 onClick={() => {
                   if (environment && !environment.git.repository) {
-                    setFeedback({ tone: "neutral", message: "请先在变更页面初始化 Git，再创建分支。" });
+                    setFeedback({ tone: "neutral", message: "当前目录不是 Git 仓库。" });
                     return;
                   }
                   setDialog({ kind: "branch" });

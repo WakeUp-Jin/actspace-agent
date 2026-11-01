@@ -158,6 +158,35 @@
 | 截图 | 浏览器 mock（`?mock=turn-deliverables`，打开右侧面板的「文档」），Chrome headless 经 CDP：`tmp/p4-docs-light.png`、`tmp/p4-docs-dark.png`、`tmp/p4-docs-source-dirty.png`（源码编辑加未保存圆点），不进 git |
 | `listMarkdownFiles` 耗时 | 本仓库 1989 篇 Markdown，git 路径冷启动 46.5ms、热 32–33ms（esbuild 打包后在 Node 里直接调用，不含 IPC） |
 
+### P5 Git Review 只留查看
+
+- **操作**：按 `p5-review-trim.md` 实施。
+  - 删除：`review-view-state-service`、`review-pr-service`、`review-git-service`、`review-workspace-watcher`、`review-ignore-filter` 及各自测试；`tsconfig.electron.json` 去掉对应条目。
+  - 契约：`review` 域只留 getSnapshot、refreshSnapshot、getFileDiffs、getFileContents、listBranches、listCommits；删 stage / revert / viewed / PR / copy-apply / initGit 共 6 个 channel（契约从 145 降到 139）。`ReviewCapabilities` 改成 `{ canLoadFullFile }`，去掉 `ReviewFileSummary.viewed`、`ReviewSelection.lastTurn`、`ReviewHunk.patchFingerprint`；`ReviewChangeNotification.reason` 只剩 `"refresh"`。
+  - main：`ReviewGitEngine` 只读（删 mutation、`createPatch`、lastTurn、旧 snapshot/diff 缓存）；`ReviewCoordinator` 只剩 `{ resolveWorkspace, queryProvider }`，`refreshSnapshot` 是唯一递增 generation 并广播 `reviewChanged` 的路径。
+  - renderer：去掉 Review 内的 git 菜单、提交 / PR 对话框、hunk 和文件级 stage / revert、viewed、copy apply、「最近一轮」；非 Git 目录文案改成「当前目录不是 Git 仓库」。
+  - 强制刷新：review store 挂载时 `loadSnapshot(sel, true)`；`reviewChanged` 通知 generation 与当前快照相同则跳过；`useReviewSummary.load(force)` 强制时走 `refreshSnapshot`，`refreshReviewSummary` 默认强制，切目标强制，排队中任一次强制则后续补查按强制。
+  - 文档：`core-review-change-sources.md` 重写相关章节并新增「刷新时机」；`core-review-large-diff-loading.md`、右侧面板 / 输入框 / Environment 规范、`ARCHITECTURE.md`、设计文档索引、站点 `review.md`、旧 learning 一并同步；更新日志追加；新增 `docs/histories/2026-11/20261101-2200-review-view-only.md`。
+- **影响文件**：删 5 个源文件和 5 个测试；改约 40 个（main、shared、renderer、测试、夹具、文档）。
+- **决定**：
+  - 去掉 coordinator 的公开 `invalidate()`，测试改用 `refreshSnapshot`，对应计划的「唯一递增 generation 的路径」。
+  - `onReviewChanged` 从面板 prop 链（`ReviewRenderView`、`RightPanel`、`WorkbenchLayout`）删掉，面板内已无人调用；`WorkbenchLayout` 自己的 `onReviewChanged` 仍用于打开改动 Tab 和顶部菜单。
+  - `ReviewHunk` 的指纹留作 `parseReviewPatchHunks` 内部局部量，只用于生成 id。
+  - `ReviewCapability` 联合类型整个删掉。
+  - 强制刷新自己的广播可能让摘要多排一次便宜的缓存读取，不再另加「忽略在途通知」规则。
+- **验证**（先跑 `pnpm --filter @actspace/desktop build:deps:dev`）：
+
+| 命令 | 结果 |
+|---|---|
+| `pnpm --filter @actspace/shared test` | 通过（180） |
+| `pnpm --filter @actspace/client test` | 通过（56） |
+| `pnpm --filter @actspace/desktop test` | 通过（2093 通过、7 跳过） |
+| `pnpm --filter @actspace/desktop typecheck` / `pnpm typecheck` | 通过 |
+| `pnpm check:ipc-channels` | 通过（契约 139 个 channel） |
+| `check:renderer-bridge` / `check:frontend-tokens` / `check:frontend-theme` / `check:packages` / `check:desktop-build-graph` | 通过；原生按钮基线用 `--update-native-button-baseline` 收紧（Review 各文件下降） |
+| `pnpm --filter @actspace/desktop build` | 通过 |
+| 残留 grep（`initGit`、`setFileViewed`、`applyMutation`、已删服务名、`lastTurn`、`copyGitApply`） | `apps/desktop/src`、`test-fixtures`、`packages/shared/src`、`scripts` 无命中（`apps/web` 里的 `lastTurn` 是无关局部变量） |
+
 ## 遇到的问题
 
 - P1：计划没列 `chat-presentation-recovery.test.tsx`，它断言「+」菜单项等于 `["可视化回复", "上下文"]`，删入口后失败，已改为 `["上下文"]`。另有 `RightPanel.tsx`、`RightPanelObjectMenu.tsx` 里提到 Reply / 可视化回复的注释和提示文字，一并改掉。
@@ -175,6 +204,8 @@
 - P4：截图里发现默认 390px 右栏放不下正文加 260px 文件树（正文只剩约 130px，操作栏被裁）。给文档 Tab 单独设了 720px 的默认宽度，面板窄时收起次要操作；同时发现 `.markdown-prose` 是 grid，宽表格的 `min-width` 会把整篇正文撑出面板，改成 `minmax(0, 1fr)` 并给表格加滚动容器。
 - P4：树里选中行的底色不显示：`bg-transparent` 和 `bg-selected` 同时在 class 里，前者生效。改成互斥。
 - P4：jsdom 里 `<mark>` 会让无障碍名称在高亮前后多出空格，测试里用 `\s*` 容忍。
+- P5：计划说 10 个 App 测试 mock 带 `review.initGit`，实际只有 1 个测试文件加 1 个夹具（`test-fixtures/session-background-runs.tsx`）还含它。
+- P5：计划没列 `app-streaming-user-message`、`composer-toolbar`、`review-diff-virtualization` 的改动；强制刷新后，凡是断言挂载时读 `getSnapshot` 的用例都要改成 `refreshSnapshot`；工具栏焦点测试原来用「提交或推送」当最后一个按钮，改用「显示文件列表」。
 
 ## 跳过或推迟的事项
 
@@ -187,3 +218,6 @@
 - P4：Space 演示里的「文件」「Review」标签文字（`SpaceReviewView`、`SpaceFilesView` 等）和 Composer 的 `ReviewStrip` 文字没改，它们不是右侧面板标签。站点 `file-preview.png` 截图仍是旧的文件树画面，已把图注改掉，截图需要在 Electron 里重拍。
 - P4：没有新建 `docs-panel.css`，只用 Tailwind token 类；计划里的 `getDocsDoc` 没有实现（不需要）。
 - P4：`pnpm --filter @actspace/site test` 通过（31）；`pnpm check:docs` / `check:current-docs` 仍是 363 条已知失败，全部在 `docs/exec-runs/`，无新增。
+- P5：资源复测没有跑。`docs/exec-runs/20261008-review-resource-test/component-benchmark.cjs` 写死了另一个检出路径和 `/tmp` 夹具，并依赖已删的 `ReviewWorkspaceWatcher` 与 `scheduleInvalidation`，现在无法运行；目录下其他基准脚本同理。没有另建新基准。
+- P5：Electron 实机检查留给用户：每轮结束后输入框 +N/−M 更新、打开「改动」面板时数字和 diff 更新、手动刷新、顶部菜单提交后数字更新、外部改文件后不自动变化、非 Git 目录文案、五个 scope 切换与分支 / 提交子视图。
+- P5：已知限制：旧的磁盘 `view-state.json` 不读不删；`agent-contract-matrix.generated.md` 仍是旧基线，留给 S1 重新生成；`pnpm check:current-docs` 仍是 363 条已知失败。

@@ -1,4 +1,4 @@
-import { Check, FileCode2, Search, X } from "lucide-react";
+import { FileCode2, Search, X } from "lucide-react";
 import type { ReviewFileSummary } from "@actspace/shared";
 
 const STATUS_COLOR: Record<ReviewFileSummary["status"], string> = {
@@ -10,13 +10,12 @@ const STATUS_COLOR: Record<ReviewFileSummary["status"], string> = {
   typeChanged: "text-warning",
 };
 
-export function ReviewFileTree({ files, selectedFileId, filter, onFilter, onSelect, onViewed, onClose }: {
+export function ReviewFileTree({ files, selectedFileId, filter, onFilter, onSelect, onClose }: {
   files: ReviewFileSummary[];
   selectedFileId: string | null;
   filter: string;
   onFilter: (filter: string) => void;
   onSelect: (fileId: string) => void;
-  onViewed: (fileId: string, viewed: boolean) => void;
   onClose?: () => void;
 }) {
   const filtered = files.filter((file) => file.path.toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
@@ -34,11 +33,8 @@ export function ReviewFileTree({ files, selectedFileId, filter, onFilter, onSele
           <div key={file.id} className={`group flex min-h-8 items-center gap-2 rounded-act-sm px-2 ${selectedFileId === file.id ? "bg-selected" : "hover:bg-surface-subtle"}`} role="treeitem" aria-selected={selectedFileId === file.id}>
             <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => onSelect(file.id)} title={file.path}>
               <FileCode2 size={14} className={STATUS_COLOR[file.status]} />
-              <span className={`min-w-0 flex-1 truncate font-mono text-act-xxs ${file.viewed ? "text-text-faint" : "text-text-main"}`}>{file.path}</span>
+              <span className="min-w-0 flex-1 truncate font-mono text-act-xxs text-text-main">{file.path}</span>
               {file.additions > 0 || file.deletions > 0 ? <span className="shrink-0 text-act-xxs tabular-nums">{file.additions > 0 ? <span className="text-success">+{file.additions}</span> : null}{file.additions > 0 && file.deletions > 0 ? " " : null}{file.deletions > 0 ? <span className="text-danger">-{file.deletions}</span> : null}</span> : null}
-            </button>
-            <button type="button" className={`inline-flex h-5 w-5 items-center justify-center rounded-act-sm ${file.viewed ? "text-success" : "text-text-faint opacity-0 group-hover:opacity-100 focus:opacity-100"}`} aria-label={`${file.viewed ? "标记为未查看" : "标记为已查看"} ${file.path}`} onClick={() => onViewed(file.id, !file.viewed)}>
-              <Check size={13} />
             </button>
           </div>
         ))}

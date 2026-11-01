@@ -385,7 +385,6 @@ export function WorkbenchLayout({
       fileRevalidateKey={fileRevalidateKey}
       agentEditedPaths={agentEditedPaths}
       onOpenReview={openReviewTab}
-      onReviewChanged={onReviewChanged}
       onSendToAgent={onSend ? (text) => onSend(text, {
         model: selectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID,
         mode: composerMode ?? "agent",

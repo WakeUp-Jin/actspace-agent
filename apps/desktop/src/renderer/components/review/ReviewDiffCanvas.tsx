@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Virtualizer } from "@tanstack/react-virtual";
-import { Check, ChevronDown, ChevronRight, ListPlus, ListTree, RotateCcw, Undo2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ListTree } from "lucide-react";
 import type {
   ReviewCapabilities,
   ReviewFileContents,
@@ -9,7 +9,6 @@ import type {
   ReviewFileSummary,
   ReviewHunk,
   ReviewLine,
-  ReviewMutation,
 } from "@actspace/shared";
 import type { ReviewDiffMode, ReviewFileRequestState } from "./review-store";
 import { workspacesApi } from "../../api/workspaces";
@@ -25,7 +24,7 @@ const UNIFIED_DIFF_GUTTER_COLUMNS = 16;
 const SPLIT_DIFF_GUTTER_COLUMNS = UNIFIED_DIFF_GUTTER_COLUMNS * 2;
 const MAX_STABLE_DIFF_COLUMNS = 480;
 
-export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fileContents, capabilities, expandedFileIds, selectedFileId, mode, wrap, wordDiff, richPreview, loadFullFiles, singleFileMode, onToggleFile, onSelectFile, onExpandContext, onRetryDiff, onVisibleFiles, onViewed, onMutation }: {
+export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fileContents, capabilities, expandedFileIds, selectedFileId, mode, wrap, wordDiff, richPreview, loadFullFiles, singleFileMode, onToggleFile, onSelectFile, onExpandContext, onRetryDiff, onVisibleFiles }: {
   workspaceRoot?: string;
   files: ReviewFileSummary[];
   diffs: Map<string, ReviewFileDiff>;
@@ -45,8 +44,6 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
   onExpandContext: (fileId: string) => void;
   onRetryDiff: (fileId: string) => void;
   onVisibleFiles: (fileIds: string[]) => void;
-  onViewed: (fileId: string, viewed: boolean) => void;
-  onMutation: (mutation: Omit<ReviewMutation, "snapshotId" | "expectedGeneration">) => void;
 }) {
   const parentRef = useRef<HTMLElement>(null);
   const [viewportWidth, setViewportWidth] = useState(600);
@@ -119,8 +116,6 @@ export function ReviewDiffCanvas({ workspaceRoot, files, diffs, fileRequests, fi
                   onSelect={() => onSelectFile(row.file.id)}
                   onExpandContext={() => onExpandContext(row.file.id)}
                   onRetry={() => onRetryDiff(row.file.id)}
-                  onViewed={() => onViewed(row.file.id, !row.file.viewed)}
-                  onMutation={onMutation}
                 />
               </div>
             </div>
@@ -157,7 +152,7 @@ function observeReviewElementRect(instance: Virtualizer<HTMLElement, Element>, c
   return () => observer.disconnect();
 }
 
-function RowView({ row, workspaceRoot, capabilities, selected, expanded, wrap, wordDiff, richPreview, loadFullFiles, onToggle, onSelect, onExpandContext, onRetry, onViewed, onMutation }: {
+function RowView({ row, workspaceRoot, capabilities, selected, expanded, wrap, wordDiff, richPreview, loadFullFiles, onToggle, onSelect, onExpandContext, onRetry }: {
   row: DiffRow;
   workspaceRoot?: string;
   capabilities: ReviewCapabilities;
@@ -171,8 +166,6 @@ function RowView({ row, workspaceRoot, capabilities, selected, expanded, wrap, w
   onSelect: () => void;
   onExpandContext: () => void;
   onRetry: () => void;
-  onViewed: () => void;
-  onMutation: (mutation: Omit<ReviewMutation, "snapshotId" | "expectedGeneration">) => void;
 }) {
   if (row.kind === "file") {
     const file = row.file;
@@ -183,12 +176,11 @@ function RowView({ row, workspaceRoot, capabilities, selected, expanded, wrap, w
         </button>
         <button type="button" className="min-w-0 flex-1 truncate text-left font-mono text-act-xs font-medium text-text-main" onClick={onSelect} title={file.path}>{file.path}</button>
         {file.additions > 0 || file.deletions > 0 ? <span className="text-act-xxs tabular-nums">{file.additions > 0 ? <span className="text-success">+{file.additions}</span> : null}{file.additions > 0 && file.deletions > 0 ? " " : null}{file.deletions > 0 ? <span className="text-danger">-{file.deletions}</span> : null}</span> : null}
-        <button type="button" className={`inline-flex h-6 w-6 items-center justify-center rounded-act-sm hover:bg-surface-subtle ${file.viewed ? "text-success" : "text-text-faint"}`} onClick={onViewed} aria-label={`${file.viewed ? "标记为未查看" : "标记为已查看"} ${file.path}`}><Check size={14} /></button>
-        <FileActions file={file} capabilities={capabilities} canExpandContext={Boolean(!loadFullFiles && expanded && capabilities.canLoadFullFile && file.renderKind === "text")} onExpandContext={onExpandContext} onMutation={onMutation} />
+        <FileActions file={file} canExpandContext={Boolean(!loadFullFiles && expanded && capabilities.canLoadFullFile && file.renderKind === "text")} onExpandContext={onExpandContext} />
       </div>
     );
   }
-  if (row.kind === "hunk") return <HunkHeader file={row.file} hunk={row.hunk} capabilities={capabilities} onMutation={onMutation} />;
+  if (row.kind === "hunk") return <HunkHeader hunk={row.hunk} />;
   if (row.kind === "line") return <DiffLine line={row.line} side={row.side} wrap={wrap} wordDiff={wordDiff} />;
   if (row.kind === "split-line") return <SplitDiffLine oldLine={row.oldLine} newLine={row.newLine} wrap={wrap} wordDiff={wordDiff} />;
   if (row.state === "image" && richPreview) return <ReviewImageDiff workspaceRoot={workspaceRoot} file={row.file} />;
@@ -322,19 +314,15 @@ function ReviewImageDiff({ workspaceRoot, file }: { workspaceRoot?: string; file
   return <div className="grid min-h-40 place-items-center bg-surface-subtle p-4"><img src={src} alt={`当前版本 ${file.path}`} className="max-h-[520px] max-w-full rounded-act-sm border border-line bg-surface object-contain" /></div>;
 }
 
-function FileActions({ file, capabilities, canExpandContext, onExpandContext, onMutation }: { file: ReviewFileSummary; capabilities: ReviewCapabilities; canExpandContext: boolean; onExpandContext: () => void; onMutation: (mutation: Omit<ReviewMutation, "snapshotId" | "expectedGeneration">) => void }) {
-  const source = file.source === "index" ? "index" : "workingTree";
+function FileActions({ file, canExpandContext, onExpandContext }: { file: ReviewFileSummary; canExpandContext: boolean; onExpandContext: () => void }) {
+  if (!canExpandContext) return null;
   return <div className="flex items-center gap-0.5">
-    {canExpandContext ? <button type="button" title="加载更多上下文" aria-label={`加载更多上下文： ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" onClick={onExpandContext}><ListTree size={13} /></button> : null}
-    {capabilities.canStageFile ? <button type="button" title="暂存文件" aria-label={`暂存 ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" onClick={() => onMutation({ action: "stage", scope: "file", source, path: file.path })}><ListPlus size={13} /></button> : null}
-    {capabilities.canUnstageFile ? <button type="button" title="取消暂存文件" aria-label={`取消暂存 ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" onClick={() => onMutation({ action: "unstage", scope: "file", source, path: file.path })}><Undo2 size={13} /></button> : null}
-    {capabilities.canRevertFile ? <button type="button" title="还原文件" aria-label={`还原 ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-danger-soft hover:text-danger" onClick={() => { if (window.confirm(`还原 ${file.path}？未跟踪的文件将移至废纸篓。`)) onMutation({ action: "revert", scope: "file", source, path: file.path }); }}><RotateCcw size={13} /></button> : null}
+    <button type="button" title="加载更多上下文" aria-label={`加载更多上下文： ${file.path}`} className="inline-flex h-6 w-6 items-center justify-center rounded-act-sm text-text-faint hover:bg-surface-subtle hover:text-text-main" onClick={onExpandContext}><ListTree size={13} /></button>
   </div>;
 }
 
-function HunkHeader({ file, hunk, capabilities, onMutation }: { file: ReviewFileSummary; hunk: ReviewHunk; capabilities: ReviewCapabilities; onMutation: (mutation: Omit<ReviewMutation, "snapshotId" | "expectedGeneration">) => void }) {
-  const source = file.source === "index" ? "index" : "workingTree";
-  return <div className="flex min-h-8 items-center gap-2 border-b border-line bg-info-soft px-3 font-mono text-act-xxs text-info"><span className="min-w-0 flex-1 truncate">{hunk.header}</span>{capabilities.canStageHunk ? <button type="button" className="rounded-act-sm px-2 py-1 font-sans text-act-xxs text-text-muted hover:bg-surface hover:text-text-main" onClick={() => onMutation({ action: "stage", scope: "hunk", source, path: file.path, hunkId: hunk.id, patchFingerprint: hunk.patchFingerprint })}>暂存此段变更</button> : null}{capabilities.canUnstageHunk ? <button type="button" className="rounded-act-sm px-2 py-1 font-sans text-act-xxs text-text-muted hover:bg-surface hover:text-text-main" onClick={() => onMutation({ action: "unstage", scope: "hunk", source, path: file.path, hunkId: hunk.id, patchFingerprint: hunk.patchFingerprint })}>取消暂存此段变更</button> : null}</div>;
+function HunkHeader({ hunk }: { hunk: ReviewHunk }) {
+  return <div className="flex min-h-8 items-center gap-2 border-b border-line bg-info-soft px-3 font-mono text-act-xxs text-info"><span className="min-w-0 flex-1 truncate">{hunk.header}</span></div>;
 }
 
 function SplitDiffLine({ oldLine, newLine, wrap, wordDiff }: { oldLine?: ReviewLine; newLine?: ReviewLine; wrap: boolean; wordDiff: boolean }) {

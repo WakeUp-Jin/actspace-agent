@@ -61,7 +61,6 @@ import { isDelegatedSession, sideChatParentId } from "@actspace/shared/session-l
 import { createWorkspaceAccessDeps, registeredWorkspaceRoot, resolveWorkspaceAccess, workspaceRegistryOptions, WORKSPACE_NOT_REGISTERED } from "../workspace-access";
 import { getWorkspaceGitContext } from "../workspace-git-context-service";
 import { openWorkspaceInIde } from "../workspace-ide-service";
-import { initializeGitRepository } from "../review-git-service";
 import { commitAndPushWorkspaceChanges, commitWorkspaceChanges, createWorkspaceBranch, getWorkspaceEnvironment, pushWorkspaceBranch, switchWorkspaceBranch } from "../workspace-environment-service";
 import { listWorkspaceOpenTools, openWorkspaceInTool } from "../workspace-open-service";
 import type { ProviderNetworkService } from "./provider-network-service";
@@ -523,10 +522,6 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     } catch {
       return { shown: false, error: "invalid_target" as const };
     }
-  });
-  ipc.handle(contract.review.initGit, async (input = {}) => {
-    const workspaceRoot = await registeredWorkspaceRoot(registryOptions, input.workspaceRoot);
-    return initializeGitRepository({ ...input, workspaceRoot }, options.roots);
   });
 
   ipc.handle(contract.workspaces.getEnvironment, async (input = {}) => {

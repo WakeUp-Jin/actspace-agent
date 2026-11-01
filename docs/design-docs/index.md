@@ -54,7 +54,7 @@
 - [ActSpace 产品概念思路（初稿）](ActSpace产品概念思路初稿.md)：产品形象：定位、信念“唯变所适，每一个问题都有它的空间”、故事线、Agent / 场景 / Actor / Actor 名册 / 空间、意象与气质；视觉方向待定。
 - `core-storage-and-observability.md`：本地存储、workspace root 和可观测性边界。
 - [ActSpace 数据存储结构与职责](core-data-storage-design.md)：当前四块存储结构、接纳与落盘写入图、按用途读取图；区分完整事实、当前内存、SQLite 查询缓存和全局配置，明确冷读与检查点限制。
-- `core-review-change-sources.md`：Git-first Review Workbench 单一事实源，覆盖六种 scope、upstream Branch、结构化 diff、Review Options、Git actions 与验收边界。
+- `core-review-change-sources.md`：Git-first Review Workbench 单一事实源，覆盖五种只读 scope、upstream Branch、结构化 diff、Review Options、刷新时机与验收边界。
 - `core-review-large-diff-loading.md`：Review Standard/capped 双模式、批量 patch、完整文件正文、虚拟渲染和性能验收规范。
 - `agent-index.md`：Agent Runtime 和全部 Agent 专题的总入口。
 - `website-introduction-site-design.md`：`apps/site` 官网、公开文档、博客、更新页、内容归属和静态部署边界；视觉规范见 `apps/site/DESIGN.md`。

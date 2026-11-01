@@ -35,7 +35,6 @@
     "src/main/review-git-engine.ts",
     "src/main/review-git-worker-client.ts",
     "src/main/review-git-worker.ts",
-    "src/main/review-view-state-service.ts",
     "src/main/runtime-v2",
     "src/preload/index.ts"
   ]

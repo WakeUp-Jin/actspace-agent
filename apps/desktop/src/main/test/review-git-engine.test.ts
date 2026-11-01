@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -106,7 +106,6 @@ describe("ReviewGitEngine", () => {
     expect(branch.files.map((file) => file.path)).toEqual(["branch.txt"]);
     expect(branch.comparison).toEqual({ from: "feature", to: "origin/main" });
     await expect(engine.listBranches(workspace(root))).resolves.toContainEqual({ branch: "feature", upstream: "origin/main", current: true, ahead: 1, behind: 0 });
-    await expect(engine.createPatch(workspace(root), branch)).resolves.toContain("branch.txt");
   });
 
   it("keeps quoted and spaced paths and scopes a repository subdirectory", async () => {
@@ -164,46 +163,7 @@ describe("ReviewGitEngine", () => {
     expect(commits[0]).toEqual(expect.objectContaining({ sha: appSha, authoredAt: expect.any(String) }));
   });
 
-  it("stages and unstages a file through mutation results", async () => {
-    const root = await makeRepo();
-    if (!gitAvailable) return;
-    await writeFile(join(root, "file.txt"), "before\n", "utf8");
-    await commitAll(root, "base");
-    await writeFile(join(root, "file.txt"), "after\n", "utf8");
-    const engine = new ReviewGitEngine();
-    const unstaged = await engine.getSnapshot({ ...workspace(root), selection: { kind: "unstaged" }, generation: 1 });
-
-    const stagedResult = await engine.applyMutation({
-      ...workspace(root),
-      mutation: {
-        snapshotId: unstaged.id,
-        expectedGeneration: 1,
-        action: "stage",
-        scope: "file",
-        source: "workingTree",
-        path: "file.txt",
-      },
-    });
-    expect(stagedResult.status).toBe("success");
-    expect(await git(root, ["diff", "--cached", "--name-only"])).toBe("file.txt");
-
-    const staged = await engine.getSnapshot({ ...workspace(root), selection: { kind: "staged" }, generation: 2 });
-    const unstagedResult = await engine.applyMutation({
-      ...workspace(root),
-      mutation: {
-        snapshotId: staged.id,
-        expectedGeneration: 2,
-        action: "unstage",
-        scope: "file",
-        source: "index",
-        path: "file.txt",
-      },
-    });
-    expect(unstagedResult.status).toBe("success");
-    expect(await git(root, ["diff", "--cached", "--name-only"])).toBe("");
-  });
-
-  it("stages one selected hunk while leaving the other unstaged", async () => {
+  it("reads a multi-hunk diff and full file contents without touching the index or working tree", async () => {
     const root = await makeRepo();
     if (!gitAvailable) return;
     const before = Array.from({ length: 20 }, (_, index) => `line ${index + 1}`).join("\n") + "\n";
@@ -212,10 +172,13 @@ describe("ReviewGitEngine", () => {
     const lines = before.trimEnd().split("\n");
     lines[1] = "line two changed";
     lines[17] = "line eighteen changed";
-    await writeFile(join(root, "file.txt"), `${lines.join("\n")}\n`, "utf8");
+    const after = `${lines.join("\n")}\n`;
+    await writeFile(join(root, "file.txt"), after, "utf8");
 
     const engine = new ReviewGitEngine();
     const snapshot = await engine.getSnapshot({ ...workspace(root), selection: { kind: "unstaged" }, generation: 1 });
+    expect(snapshot.capabilities).toEqual({ canLoadFullFile: true });
+    expect(snapshot.files[0]).not.toHaveProperty("viewed");
     const diffResult = await engine.getFileDiff({
       ...workspace(root),
       snapshot,
@@ -225,6 +188,8 @@ describe("ReviewGitEngine", () => {
     expect(diffResult.ok).toBe(true);
     if (!diffResult.ok) return;
     expect(diffResult.diff.hunks).toHaveLength(2);
+    expect(diffResult.diff.hunks[0]).not.toHaveProperty("patchFingerprint");
+    expect(diffResult.diff.patchFingerprint).toEqual(expect.any(String));
     const contents = await engine.getFileContents({
       ...workspace(root),
       snapshot,
@@ -237,22 +202,8 @@ describe("ReviewGitEngine", () => {
       expect(contents.outcomes[0]?.contents.target.text?.split("\n").length).toBeGreaterThanOrEqual(20);
     }
 
-    const result = await engine.applyMutation({
-      ...workspace(root),
-      mutation: {
-        snapshotId: snapshot.id,
-        expectedGeneration: 1,
-        action: "stage",
-        scope: "hunk",
-        source: "workingTree",
-        path: "file.txt",
-        hunkId: diffResult.diff.hunks[0]!.id,
-        patchFingerprint: diffResult.diff.hunks[0]!.patchFingerprint,
-      },
-    });
-
-    expect(result.status).toBe("success");
-    expect(await git(root, ["diff", "--cached", "--numstat"])).toContain("1\t1\tfile.txt");
-    expect(await git(root, ["diff", "--numstat"])).toContain("1\t1\tfile.txt");
+    expect(await git(root, ["diff", "--cached", "--name-only"])).toBe("");
+    expect(await git(root, ["diff", "--numstat"])).toContain("2\t2\tfile.txt");
+    expect(await readFile(join(root, "file.txt"), "utf8")).toBe(after);
   });
 });

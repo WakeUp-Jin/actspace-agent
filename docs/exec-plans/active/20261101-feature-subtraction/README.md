@@ -83,7 +83,7 @@ pnpm test:contract-matrix
 - [ ] P2 删除内置终端。
 - [ ] P3 文件打开收敛。
 - [ ] P4 文档面板。
-- [ ] P5 Git Review 只留查看。
+- [x] P5 Git Review 只留查看（2026-11-01）。
 - [x] P6 并入插件结构 S3（2026-11-01）。
 - [ ] 收尾：全量检查、Electron 实机检查、执行摘要、history、设计文档状态改为“已实施”，计划移入 `completed/`。
 
