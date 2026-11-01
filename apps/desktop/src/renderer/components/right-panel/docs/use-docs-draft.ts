@@ -127,13 +127,15 @@ export function useDocsDraft({
   );
 
   // 选中路径变化 → 读盘。面板重新挂载时，context 里已有同一篇就直接复用（保住草稿），新鲜度交给下面的重校验。
+  // 路径没变但文档被清空（再次选中同一篇，例如先在树里打开、再点聊天里指向它的链接）也要重读，否则一直停在加载中。
+  const docMissing = docsDoc === null;
   useEffect(() => {
     setSaveError(null);
     if (!enabled || !workspaceRoot || !docsSelectedPath) return;
     if (live.current.doc?.relativePath === docsSelectedPath) return;
     setDocsDoc(loadingDoc(docsSelectedPath));
     void load(docsSelectedPath, workspaceRoot);
-  }, [docsSelectedPath, workspaceRoot, enabled, load, setDocsDoc]);
+  }, [docsSelectedPath, docMissing, workspaceRoot, enabled, load, setDocsDoc]);
 
   const revalidate = useCallback(async () => {
     const { doc, root } = live.current;

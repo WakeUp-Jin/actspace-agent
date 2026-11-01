@@ -59,6 +59,7 @@ describe("ReviewGitEngine", () => {
 
     expect(snapshot.status).toBe("notAvailable");
     expect(snapshot.files).toEqual([]);
+    expect(snapshot.warnings).toContainEqual(expect.objectContaining({ kind: "unsupported", message: "当前目录不是 Git 仓库。" }));
   });
 
   it("reports a missing workspace folder instead of claiming Git is unavailable", async () => {
@@ -71,7 +72,7 @@ describe("ReviewGitEngine", () => {
     });
 
     expect(snapshot.status).toBe("notAvailable");
-    expect(snapshot.warnings).toContainEqual(expect.objectContaining({ message: "Workspace folder is no longer available." }));
+    expect(snapshot.warnings).toContainEqual(expect.objectContaining({ message: "工作区目录已不存在。" }));
   });
 
   it("separates uncommitted, unstaged, staged, commit and branch scopes", async () => {

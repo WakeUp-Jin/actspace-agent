@@ -218,6 +218,14 @@ describe("文档面板", () => {
     expect(await screen.findByRole("heading", { name: "Harness 自进化方案设计" })).toBeInTheDocument();
   });
 
+  it("已经打开的文档再从链接打开一次：重新读出正文，不停在加载中", async () => {
+    await renderDocs({ select: README });
+    expect(await screen.findByRole("heading", { name: "Harness 自进化方案设计" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "probe-open-docs" }));
+    expect(await screen.findByRole("heading", { name: "Harness 自进化方案设计" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("正在读取文档")).toBeNull();
+  });
+
   it("大纲列出 h2/h3，点击后滚动到对应标题；源码状态下大纲置灰", async () => {
     const user = userEvent.setup();
     const scrollIntoView = vi.fn();

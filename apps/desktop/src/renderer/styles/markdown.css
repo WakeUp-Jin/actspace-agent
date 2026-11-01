@@ -181,6 +181,21 @@
   overflow-x: auto;
 }
 
+/*
+ * 正文的 overflow-wrap: anywhere 会让单元格的最小宽度缩到一个字符，宽表格被挤成逐字竖排、永远不出横向滚动。
+ * 表格里改回按词换行：列至少容得下最长的词，放不下时由 .markdown-table-wrap 横向滚动。
+ */
+.markdown-table-wrap th,
+.markdown-table-wrap td {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* 有滚动容器兜底时不需要固定最小宽度：窄表格在窄面板（文件树展开时正文约 340px）里也要占满、不出横向滚动。 */
+.markdown-prose .markdown-table-wrap table {
+  min-width: 0;
+}
+
 /* 流式期间用固定列宽：自动布局每加一行就重排列宽，整张表跟着抖；结束后恢复自动布局。 */
 .markdown-prose[data-streaming="true"] table {
   table-layout: fixed;

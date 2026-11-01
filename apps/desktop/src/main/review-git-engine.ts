@@ -512,13 +512,13 @@ export class ReviewGitEngine implements ReviewQueryProvider {
     try {
       workspaceRoot = await realpath(resolve(workspace.workspaceRoot));
     } catch {
-      return { ok: false, code: "invalid_workspace", message: "Workspace folder is no longer available." };
+      return { ok: false, code: "invalid_workspace", message: "工作区目录已不存在。" };
     }
     const result = await this.git(workspaceRoot, ["rev-parse", "--show-toplevel"], 64 * 1024, undefined, signal);
-    if (gitMissing(result)) return { ok: false, code: "git_not_found", message: "Git is not available on this machine." };
-    if (!gitSucceeded(result)) return { ok: false, code: "not_a_repository", message: "Current workspace is not a Git repository." };
+    if (gitMissing(result)) return { ok: false, code: "git_not_found", message: "本机没有可用的 Git。" };
+    if (!gitSucceeded(result)) return { ok: false, code: "not_a_repository", message: "当前目录不是 Git 仓库。" };
     const repoRoot = await realpath(resolve(result.stdout.trim()));
-    if (!isInside(repoRoot, workspaceRoot)) return { ok: false, code: "invalid_workspace", message: "Workspace is outside the Git repository." };
+    if (!isInside(repoRoot, workspaceRoot)) return { ok: false, code: "invalid_workspace", message: "工作区不在 Git 仓库内。" };
     const pathspec = relative(repoRoot, workspaceRoot).split(sep).join("/") || ".";
     const head = await this.git(repoRoot, ["rev-parse", "--verify", "HEAD"], 64 * 1024, undefined, signal);
     return { ok: true, context: { ...workspace, workspaceRoot, repoRoot, pathspec, hasHead: gitSucceeded(head) } };

@@ -152,6 +152,15 @@ describe("Review workbench", () => {
     expect(scroll.scrollLeft).toBe(40);
   });
 
+  it("says the folder is not a Git repository instead of showing an empty review", async () => {
+    setupBridge(reviewBridge({ ...emptySnapshot(), status: "notAvailable", warnings: [{ kind: "unsupported", message: "当前目录不是 Git 仓库。" }] }));
+    render(<ReviewRenderView workspaceRoot="/tmp/workspace" />);
+
+    expect(await screen.findByRole("heading", { name: "当前目录不是 Git 仓库" })).toBeInTheDocument();
+    expect(screen.queryByText("暂无变更")).not.toBeInTheDocument();
+    expect(screen.queryByText("当前目录不是 Git 仓库。")).not.toBeInTheDocument();
+  });
+
   it("refreshes through the coordinator bridge when refreshKey changes", async () => {
     const bridge = reviewBridge(emptySnapshot());
     setupBridge(bridge);
