@@ -33,7 +33,7 @@
 - **导航防护**：主窗口拒绝一切新窗口（`setWindowOpenHandler` 返回 `deny`），顶层导航到非应用 URL 时取消（`will-navigate`）；两种情况都把 URL 交给 `openExternalSafely`。应用 URL 在生产是 dist 下 `index.html` 的精确 file URL，dev 是 dev server 的同源 URL。任何 webContents 都不允许挂 `<webview>`。
 - **外部打开白名单**：main 中打开外部 URL 一律经 `main/platform-actions.ts` 的 `openExternalSafely`，只放行 `https:`、`http:`、`mailto:`；`file:`、`javascript:`、自定义协议和无法解析的字符串直接丢弃。「在 Cursor 中打开」等平台动作也收在同一文件，只接受 main 已 realpath 校验过的本机路径。
 - **主文档 CSP**：目前没有。严格 CSP 会破坏 HTML 预览和 mermaid 样式，见「待补强」。
-- **生命周期**：窗口关闭时销毁该窗口拥有的终端；退出时 dispose Browser Bridge（终止在途子进程）和本地更新服务（只清定时器，更新脚本必须比应用活得久）；`uncaughtExceptionMonitor` / `unhandledRejection` 写入主进程日志，不改变 Electron 的默认处理。
+- **生命周期**：退出时 dispose Browser Bridge（终止在途子进程）和本地更新服务（只清定时器，更新脚本必须比应用活得久）；`uncaughtExceptionMonitor` / `unhandledRejection` 写入主进程日志，不改变 Electron 的默认处理。
 - Desktop 的 provider Key 只在 main 进程凭据存储和短生命周期 Runtime credential 中可见，不会泄露到 renderer。CLI 环境变量只属于 CLI Host 进程。
 - 本地更新只通过 main 进程 IPC 暴露结构化操作：选择源码目录、读取状态、启动更新。renderer 不传 shell 命令；main 会验证所选目录是 `name: "actspace"` 且包含 `package:desktop:dmg` 与 `scripts/release-package.sh`，并确认当前进程路径解析出的目标是 `Actspace.app` / `actspace.app` 且不是 `node_modules` 下的 Electron 开发 runtime 后，才写入 helper 脚本。helper 位于 `<userData>/tmp/local-update/`，日志写同目录 `update.log`，阶段状态写 `status.json`；main 只在 helper 报告 `ready_to_replace` / `waiting_for_exit` / `replacing` 后触发 app 退出，避免构建阶段提前关闭当前应用。helper 默认对本地更新构建启用 ad-hoc signing，并在替换前验证新 `.app` 的 bundle 元数据、主可执行文件和 code signature；替换后如果系统无法打开新 app，会尝试恢复旧版本。
 
@@ -119,7 +119,7 @@ nono 挡住了边界外的破坏，但边界内仍有需要人工兜底的风险
 - 数据分级、脱敏与保留策略。
 - 对外 API、Webhook、文件上传和沙箱执行的规则。
 - API Key 轮换与更完整的错误脱敏策略。
-- 子进程环境变量白名单。设置服务会把搜索服务 Key 等写进 `process.env`（`applyToEnv`），bash 工具、`rg`、git / gh、ssh、Browser Bridge、更新脚本等子进程都继承完整环境；只有终端 pty 经 `sanitizeEnvironment` 去掉了密钥类变量。清单见 `docs/exec-plans/tech-debt-tracker.md`。
+- 子进程环境变量白名单。设置服务会把搜索服务 Key 等写进 `process.env`（`applyToEnv`），bash 工具、`rg`、git / gh、ssh、Browser Bridge、更新脚本等子进程都继承完整环境。清单见 `docs/exec-plans/tech-debt-tracker.md`。
 - Browser Bridge「从源码目录安装」：`installBrowserBridgeFromRepo` 接受 renderer 传来的 `repoRoot`，只校验扩展 manifest 后就在该目录运行构建脚本。应改为由 main 弹系统对话框选目录，renderer 不再传路径。
 - 主文档 CSP。2026-10-06 实测（Electron 39）：严格策略（`script-src 'self'; style-src 'self'`）下应用启动正常，但 HTML 预览的 srcdoc iframe 会继承父文档策略、自身 meta 无法放宽，内联脚本、样式和桥脚本全部失效；mermaid SVG 内的 `<style>` 也会被拦。先把 HTML 预览改成不继承主文档策略的加载方式（例如自定义协议），并给 mermaid 样式找到 nonce / hash 或隔离方案，再由 main 用 `session.webRequest.onHeadersReceived` 注入 CSP（实测对 file:// 生效，与 meta 等效）。
 - 读类工具放开 workspace 边界后的「敏感路径 blocklist + 按需读审核」（见 `docs/exec-plans/tech-debt-tracker.md`）。

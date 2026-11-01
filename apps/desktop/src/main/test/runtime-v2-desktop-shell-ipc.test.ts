@@ -120,31 +120,10 @@ describe("runtime v2 desktop shell IPC", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
-  it("keeps Workspace and Review active while Terminal is unavailable", () => {
-    handlers.clear();
-    removeHandler.mockClear();
-    const registration = registerRuntimeV2DesktopShell({
-      roots: { dataRoot: "/data", sessionRoot: "/data/sessions-v2", logRoot: "/logs", tmpRoot: "/tmp", defaultWorkspaceRoot: "/workspace", workspaceRoot: "/workspace" },
-      terminalAvailable: false,
-      getMainWindow: () => undefined,
-      listSessions: async () => [],
-    });
-
-    expect(handlers.has(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaces)).toBe(true);
-    expect(handlers.has(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getReviewSnapshot)).toBe(true);
-    expect(handlers.has(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalCreate)).toBe(false);
-    expect([...handlers.keys()].every((channel) => channel.startsWith("runtime-v2:fixed-renderer:"))).toBe(true);
-
-    registration.dispose();
-    expect(removeHandler).toHaveBeenCalledWith(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaces);
-    expect(handlers.size).toBe(0);
-  });
-
   it("rejects calls when the main window is missing", async () => {
     handlers.clear();
     const registration = registerRuntimeV2DesktopShell({
       roots: { dataRoot: "/data", sessionRoot: "/data/sessions-v2", logRoot: "/logs", tmpRoot: "/tmp", defaultWorkspaceRoot: "/workspace", workspaceRoot: "/workspace" },
-      terminalAvailable: false,
       getMainWindow: () => undefined,
       listSessions: async () => [],
     });
@@ -164,7 +143,6 @@ describe("runtime v2 desktop shell IPC", () => {
     const trusted = trustedWindow();
     const registration = registerRuntimeV2DesktopShell({
       roots: { dataRoot, sessionRoot: join(dataRoot, "sessions-v2"), logRoot: join(dataRoot, "logs"), tmpRoot: join(dataRoot, "tmp"), defaultWorkspaceRoot: workspace, workspaceRoot: workspace },
-      terminalAvailable: false,
       getMainWindow: () => trusted.window as never,
       listSessions: async () => [{ workspaceRoot: worktree }],
     });

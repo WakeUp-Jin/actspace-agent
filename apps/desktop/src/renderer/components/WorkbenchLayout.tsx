@@ -69,7 +69,7 @@ export function WorkbenchLayout({
   const { target, capabilities, selectedWorkspaceRoot } = useRunTargetContext();
   const executionRoot = localExecutionRoot(target, selectedWorkspaceRoot);
   const reviewEnabled = capabilities.review.enabled;
-  const terminalEnabled = capabilities.terminal.enabled;
+  const workspacePanelsEnabled = capabilities.workspacePanels.enabled;
   const {
     isOpen: isRightPanelOpen,
     openPanel: openRightPanel,
@@ -369,7 +369,7 @@ export function WorkbenchLayout({
   );
   const rightPanel = isSpace ? <SpaceRightPanel /> : (
     <RightPanel
-      developmentEnabled={composerMode !== "chat" && terminalEnabled}
+      developmentEnabled={composerMode !== "chat" && workspacePanelsEnabled}
       contextState={effectiveContextState}
       contextRevision={projectionCell?.snapshot?.throughJournalSeq}
       sessionId={activeSessionId}
@@ -419,7 +419,7 @@ export function WorkbenchLayout({
             <>
               {isRightPanelOpen ? (
                 <RightPanelObjectMenu
-                  developmentEnabled={composerMode !== "chat" && terminalEnabled}
+                  developmentEnabled={composerMode !== "chat" && workspacePanelsEnabled}
                   sessionId={activeSessionId}
                   onOpenReview={openReviewTab}
                 />

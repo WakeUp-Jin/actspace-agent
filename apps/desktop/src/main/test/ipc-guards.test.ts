@@ -29,8 +29,6 @@ const CASES: Record<string, Case> = {
   "workspaces.getGitContext": { spec: contract.workspaces.getGitContext, valid: [undefined, {}, { workspaceRoot: "/w" }], invalid: [{ workspaceRoot: 1 }, "x"] },
   "sessions.setWorkspace": { spec: contract.sessions.setWorkspace, valid: [{ sessionId: "s", workspaceRoot: "/w" }, { sessionId: "s", workspaceId: "w1" }], invalid: [{ workspaceRoot: "/w" }] },
   "dialogs.selectWorkspaceDirectory": { spec: contract.dialogs.selectWorkspaceDirectory, valid: [undefined, { registerWorkspace: true }], invalid: [{ registerWorkspace: "true" }] },
-  "terminal.create": { spec: contract.terminal.create, valid: [{ sessionId: "s", cols: 80, rows: 24 }], invalid: [{ sessionId: "s", cols: Number.NaN, rows: 24 }, { sessionId: "s", cols: "80", rows: 24 }] },
-  "terminal.write": { spec: contract.terminal.write, valid: [{ terminalId: "t", data: "ls\r" }], invalid: [{ terminalId: "t", data: 1 }] },
   "settings.update": { spec: contract.settings.update, valid: [{}, { defaultModelId: null }], invalid: [null, [], "x"] },
   "settings.updateV4": { spec: contract.settings.updateV4, valid: [{ expectedRevision: "r1", namespace: "general", patch: {} }], invalid: [{ expectedRevision: "r1", namespace: "general" }, { expectedRevision: 1, namespace: "general", patch: {} }] },
   "settings.writeSystemPrompt": { spec: contract.settings.writeSystemPrompt, valid: [{ content: "" }], invalid: [{ content: null }] },

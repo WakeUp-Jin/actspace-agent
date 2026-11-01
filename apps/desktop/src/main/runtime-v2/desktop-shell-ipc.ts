@@ -20,15 +20,12 @@ import { ReviewViewStateService } from "../review-view-state-service";
 import { ReviewPullRequestService } from "../review-pr-service";
 import { ReviewWorkspaceWatcher } from "../review-workspace-watcher";
 import { createReviewIgnoredPathFilter } from "../review-ignore-filter";
-import type { TerminalSessionService } from "../terminal/terminal-session-service";
 
 type ShellOptions = {
   readonly roots: AppDataRoots;
   readonly getMainWindow: () => BrowserWindow | undefined;
   /** 本地会话列表，用来放行不在 registry 里的 worktree 会话路径。 */
   readonly listSessions: () => Promise<readonly { readonly workspaceRoot?: string | null }[]>;
-  readonly terminal?: TerminalSessionService;
-  readonly terminalAvailable?: boolean;
 };
 
 export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(): void } {
@@ -74,7 +71,6 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
     }
   });
 
-  const terminalAvailable = options.terminalAvailable === true && options.terminal !== undefined;
   const ipc = createIpcRegistrar({
     getWindow: options.getMainWindow,
     untrustedMessage: "Untrusted shell sender",
@@ -148,16 +144,6 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
     if (result.ok) await openExternalSafely(result.url);
     return result;
   });
-  if (terminalAvailable && options.terminal) {
-    ipc.handle(contract.terminal.create, (input, event) => options.terminal!.create(input.sessionId, event.sender.id, input.cols, input.rows));
-    ipc.handle(contract.terminal.list, (input, event) => ({ terminals: options.terminal!.list(input.sessionId, event.sender.id) }));
-    ipc.handle(contract.terminal.attach, (input, event) => options.terminal!.attach(input.terminalId, event.sender.id, input.cols, input.rows));
-    ipc.handle(contract.terminal.detach, (input, event) => options.terminal!.detach(input.terminalId, event.sender.id));
-    ipc.handle(contract.terminal.write, (input, event) => options.terminal!.write(input.terminalId, event.sender.id, input.data));
-    ipc.handle(contract.terminal.resize, (input, event) => options.terminal!.resize(input.terminalId, event.sender.id, input.cols, input.rows));
-    ipc.handle(contract.terminal.ack, (input, event) => options.terminal!.ack(input.terminalId, event.sender.id, input.bytes));
-    ipc.handle(contract.terminal.close, (input, event) => options.terminal!.close(input.terminalId, event.sender.id));
-  }
 
   return {
     dispose: () => {

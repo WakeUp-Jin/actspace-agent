@@ -48,7 +48,7 @@ describe("mock bridge", () => {
 
   it("rejects members without a mock implementation with a clear message", async () => {
     const { bridge } = open();
-    await expect(bridge.terminal.create({ sessionId: "s", cols: 80, rows: 24 })).rejects.toThrow("Mock bridge does not implement terminal.create");
+    await expect(bridge.updates.start()).rejects.toThrow("Mock bridge does not implement updates.start");
   });
 
   it("creates, lists, renames and forks sessions through the same projection path as Electron", async () => {

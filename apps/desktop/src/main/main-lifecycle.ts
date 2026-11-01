@@ -1,20 +1,13 @@
-type LifecycleWindow = { on(event: "closed", listener: () => void): unknown; readonly webContents: { readonly id: number } };
+type LifecycleWindow = { on(event: "closed", listener: () => void): unknown };
 type Log = (message: string, details?: Record<string, unknown>) => void;
 
 export type WindowLifecycleDeps = {
   readonly onClosed: () => void;
-  readonly closeOwnedTerminals: (ownerId: number) => Promise<void>;
-  readonly log: Log;
 };
 
-/** webContents is already destroyed when "closed" fires, so the terminal owner id is captured up front. */
 export function attachWindowLifecycle(win: LifecycleWindow, deps: WindowLifecycleDeps): void {
-  const ownerId = win.webContents.id;
   win.on("closed", () => {
     deps.onClosed();
-    void deps.closeOwnedTerminals(ownerId).catch((error: unknown) => {
-      deps.log("window terminal cleanup failed", { ownerId, error: error instanceof Error ? error.message : String(error) });
-    });
   });
 }
 

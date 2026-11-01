@@ -133,16 +133,6 @@ export const desktopBridgeContract = {
     getStatistics: invoke<S.UsageStatisticsGetInput, S.UsageStatisticsSnapshot | null>(CH.getUsageStatistics),
     getActivity: invoke<S.UsageStatisticsGetInput, S.UsageActivitySnapshot | null>(CH.getUsageActivity),
   },
-  terminal: {
-    create: invoke<S.TerminalCreateInput, S.TerminalSessionResult>(CH.terminalCreate),
-    list: invoke<S.TerminalListInput, S.TerminalListResult>(CH.terminalList),
-    attach: invoke<S.TerminalAttachInput, S.TerminalSessionResult>(CH.terminalAttach),
-    detach: invoke<S.TerminalDetachInput, S.TerminalOperationResult>(CH.terminalDetach),
-    write: invoke<S.TerminalWriteInput, S.TerminalOperationResult>(CH.terminalWrite),
-    resize: invoke<S.TerminalResizeInput, S.TerminalOperationResult>(CH.terminalResize),
-    ack: invoke<S.TerminalAckInput, S.TerminalOperationResult>(CH.terminalAck),
-    close: invoke<S.TerminalCloseInput, S.TerminalOperationResult>(CH.terminalClose),
-  },
   settings: {
     get: invoke<void, S.AppSettings>(CH.getSettings),
     update: invoke<S.SettingsUpdateInput, S.AppSettings>(CH.updateSettings),
@@ -228,7 +218,6 @@ export const desktopBridgeContract = {
   events: {
     agentStream: event<S.RuntimeStreamEvent>(CH.agentStream),
     sessionLive: event<RV2.RuntimeV2DesktopLiveEnvelope>(CH.sessionLiveEvent),
-    terminal: event<S.TerminalEvent>(CH.terminalEvent),
     reviewChanged: event<S.ReviewChangeNotification>(CH.reviewChanged),
     settingsChanged: event<S.SettingsV4ChangedNotification>(CH.settingsChangedV4),
     quickOpenRequested: event<void>(CH.quickOpenRequested),

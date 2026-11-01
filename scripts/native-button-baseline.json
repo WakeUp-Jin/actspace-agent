@@ -55,7 +55,6 @@
   "components/right-panel/RightPanelTabStrip.tsx": 4,
   "components/right-panel/BackgroundTasksPanel.tsx": 1,
   "components/right-panel/SubagentsPanel.tsx": 1,
-  "components/right-panel/TerminalRenderView.tsx": 1,
   "components/right-panel/WorkspaceFileTree.tsx": 2,
   "components/right-panel/WorkspaceOperationBar.tsx": 2,
   "components/right-panel/context/ContextBrowser.tsx": 1,

@@ -5,7 +5,7 @@ import { registerPerformanceIpc } from "./performance-ipc";
 import { ModelCatalogService } from "./model-catalog-service";
 import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
-import { app, BrowserWindow, globalShortcut, safeStorage, webContents, net, screen } from "electron";
+import { app, BrowserWindow, globalShortcut, safeStorage, net, screen } from "electron";
 import { presentQuickOpenWindow } from "./quick-open-window";
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -23,8 +23,6 @@ import { ModelStoreService } from "./model-store-service";
 import { ModelRuntimeService } from "./model-runtime-service";
 import { DesktopRuntimeV2Registry } from "./runtime-v2/runtime-registry";
 import { registerRuntimeV2DesktopShell } from "./runtime-v2/desktop-shell-ipc";
-import { TerminalSessionService } from "./terminal/terminal-session-service";
-import { createNodePtyBackend } from "./terminal/node-pty-terminal-backend";
 import { ProviderNetworkService } from "./runtime-v2/provider-network-service";
 import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
 import { registerFixedRendererIpc, type FixedRendererIpcRegistration } from "./runtime-v2/fixed-renderer-ipc";
@@ -47,7 +45,6 @@ let remoteDesktop: RemoteDesktopAdapter | undefined;
 let remoteHosts: RemoteHostRegistry | undefined;
 let disposeRemoteHostIpc: (() => void) | undefined;
 let fixedRendererIpc: FixedRendererIpcRegistration | undefined;
-let terminalSessionService: TerminalSessionService | undefined;
 let settingsService: SettingsService | undefined;
 let pricingCatalog: ModelCatalogService | undefined;
 let modelRuntimeService: ModelRuntimeService | undefined;
@@ -154,8 +151,6 @@ async function createMainWindow(): Promise<BrowserWindow> {
   attachNavigationGuards(win, createAppUrlMatcher({ devServerUrl: DEV_SERVER_URL, indexHtmlPath }));
   attachWindowLifecycle(win, {
     onClosed: () => { if (mainWindow === win) mainWindow = undefined; },
-    closeOwnedTerminals: async (ownerId) => { await terminalSessionService?.closeOwner(ownerId); },
-    log: (message, details) => void logMain(message, details),
   });
   if (DEV_SERVER_URL) await win.loadURL(DEV_SERVER_URL);
   else await win.loadFile(indexHtmlPath);
@@ -209,34 +204,10 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     chatCompactionTriggerRatio: () => settingsService?.getV4().settings.general.taskDefaults.chatCompactionTriggerRatio ?? 0.8,
     log: (message, details) => void logMain(message, details),
   });
-  const terminalNativeAvailable = hasNodePty();
-  if (terminalNativeAvailable) {
-    terminalSessionService = new TerminalSessionService({
-      readSession: async (sessionId) => {
-        try {
-          const snapshot = await runtimeV2Registry!.inspectSession(sessionId);
-          return { workspaceRoot: snapshot.workspaceRoot ?? roots.workspaceRoot };
-        } catch {
-          return null;
-        }
-      },
-      resolveWorkspaceRoot: async (workspaceRoot) => workspaceRoot ?? roots.workspaceRoot,
-      createBackend: createNodePtyBackend,
-      sendEvent: (ownerId, event) => {
-        const owner = webContents.fromId(ownerId);
-        if (owner && !owner.isDestroyed()) {
-          owner.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.terminalEvent, event);
-        }
-      },
-      log: (message, details) => void logMain(message, details),
-    });
-  }
   disposeRuntimeV2DesktopShell = registerRuntimeV2DesktopShell({
     roots,
     getMainWindow,
     listSessions: async () => runtimeV2Registry?.listSessions() ?? [],
-    terminal: terminalSessionService,
-    terminalAvailable: terminalNativeAvailable,
   }).dispose;
   await runtimeV2Registry.boot();
   const syncBrowser = async () => {
@@ -328,7 +299,6 @@ app.on("before-quit", (event) => {
       pricingCatalog?.dispose();
       await providerNetworkService?.dispose();
       quickOpenShortcutController?.dispose();
-      terminalSessionService?.disposeAll();
     } catch (error) {
       await logMain("v2 shutdown incomplete", { error: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -345,12 +315,3 @@ app.on("before-quit", (event) => {
     }
   })();
 });
-
-function hasNodePty(): boolean {
-  try {
-    require.resolve("node-pty");
-    return true;
-  } catch {
-    return false;
-  }
-}

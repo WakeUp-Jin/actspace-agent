@@ -195,7 +195,6 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
     },
     usage: { getStatus: async () => null, cancel: async () => undefined, getStatistics: async () => null, getActivity: async () => null },
     // 浏览器里没有 pty：列表为空，其余操作在 UI 上不会出现（终端入口只在开发功能开启时显示）。
-    terminal: { list: async () => ({ terminals: [] }) },
     settings: {
       get: async () => db.settings,
       update: async (patch) => {

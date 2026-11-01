@@ -1,8 +1,6 @@
-import { Eye, FolderTree, GitBranch, GitFork, Plus, SquareTerminal } from "lucide-react";
+import { Eye, FolderTree, GitBranch, GitFork, Plus } from "lucide-react";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 import { useRightPanel } from "./RightPanelContext";
-import { useOpenTerminal } from "./useOpenTerminal";
-import { preloadTerminalRenderView } from "./terminal-render-loader";
 import { useOpenSideChat } from "./side-chat/use-open-side-chat";
 
 /**
@@ -25,7 +23,6 @@ export function RightPanelObjectMenu({
   onOpenReview?: () => void;
 }) {
   const { openFileTree, openTab } = useRightPanel();
-  const { openTerminal, creatingTerminal } = useOpenTerminal(sessionId);
   const sideChat = useOpenSideChat(sessionId);
 
   return (
@@ -56,15 +53,6 @@ export function RightPanelObjectMenu({
                   Review
                 </MenuItem>
               ) : null}
-              <MenuItem
-                disabled={!sessionId || creatingTerminal}
-                // 鼠标移上或键盘移到这一项时预加载终端视图。
-                onFocus={() => void preloadTerminalRenderView()}
-                onSelect={() => void openTerminal()}
-              >
-                <SquareTerminal size={15} strokeWidth={2} />
-                {creatingTerminal ? "正在启动…" : "终端"}
-              </MenuItem>
             </>
           ) : null}
           <MenuItem onSelect={() => openTab({ id: "context", kind: "context", title: "上下文" })}>

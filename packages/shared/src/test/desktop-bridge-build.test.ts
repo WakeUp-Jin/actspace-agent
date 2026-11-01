@@ -51,11 +51,6 @@ describe("buildBridge", () => {
     listeners.get(contract.events.shuttingDown.channel)!({ reason: "update" });
     expect(notices).toEqual([{ reason: "normal" }, { reason: "update" }]);
 
-    const terminal = vi.fn();
-    bridge.events.terminal(terminal);
-    listeners.get(contract.events.terminal.channel)!(undefined);
-    expect(terminal).toHaveBeenCalledWith(undefined);
-
     stop();
     expect(unsubscribe).toHaveBeenCalledOnce();
   });

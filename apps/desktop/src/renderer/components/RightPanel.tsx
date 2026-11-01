@@ -1,19 +1,16 @@
 import { BackgroundTasksPanel } from "./right-panel/BackgroundTasksPanel";
 import { SubagentsPanel } from "./right-panel/SubagentsPanel";
-import { terminalDisplayTitle } from "./right-panel/terminal-title";
-import { Suspense, useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import {
   Eye,
   FolderTree,
   GitBranch,
   GitFork,
   Layers,
-  Loader2,
   MessageSquare,
-  SquareTerminal,
 } from "lucide-react";
 import type { SessionListItem } from "@actspace/shared";
-import type { ContextState, TerminalSessionSnapshot } from "@actspace/shared";
+import type { ContextState } from "@actspace/shared";
 import { CodeRenderView } from "./right-panel/CodeRenderView";
 import { ContextPanel } from "./right-panel/context/ContextPanel";
 import { CsvRenderView } from "./right-panel/CsvRenderView";
@@ -37,9 +34,6 @@ import {
 } from "./right-panel/RightPanelContext";
 import { useFileFreshness } from "./right-panel/useFileFreshness";
 import { WorkspaceOperationBar } from "./right-panel/WorkspaceOperationBar";
-import { cancelTerminalStart, useOpenTerminal } from "./right-panel/useOpenTerminal";
-import { LazyTerminalRenderView, preloadTerminalRenderView } from "./right-panel/terminal-render-loader";
-import { terminalApi } from "../api/terminal";
 
 const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-line bg-surface";
 // 右面板纵向三段（对齐 Cursor 右侧）：① tab 条（全宽）→ ② 工作区操作栏（全宽，仅浏览态出现）→ ③ 两栏 [内容 | 文件树]。
@@ -71,21 +65,8 @@ export function RightPanel({
   onReviewChanged?: () => void;
   onSendToAgent?: (text: string) => void;
 }) {
-  const { activeTab, isFileTreeOpen, isFileTreeCollapsed, syncTerminalTabs } = useRightPanel();
+  const { activeTab, isFileTreeOpen, isFileTreeCollapsed } = useRightPanel();
   useFileFreshness({ workspaceRoot, revalidateKey: fileRevalidateKey, enabled: developmentEnabled });
-
-  useEffect(() => {
-    if (!developmentEnabled) return;
-    if (!sessionId) {
-      syncTerminalTabs("", []);
-      return;
-    }
-    let cancelled = false;
-    void terminalApi.list({ sessionId }).then((result) => {
-      if (!cancelled) syncTerminalTabs(sessionId, result.terminals);
-    });
-    return () => { cancelled = true; };
-  }, [sessionId, syncTerminalTabs, developmentEnabled]);
 
   // 呈现由「当前 Tab」决定：
   // - 工作区文件 Tab → 进入 shell（树 + 文件预览区），多个文件 Tab 间切换只换 shell 内的内容；
@@ -149,83 +130,27 @@ function SideChatTabIcon({ status }: { status: SessionUiStatusKind | undefined }
 }
 
 function isDevelopmentTab(tab: RightPanelTab): boolean {
-  return isWorkspaceFileTab(tab) || ["review", "turnReview", "subagents", "backgroundTasks", "terminal", "terminalStarting", "terminalError"].includes(tab.kind);
+  return isWorkspaceFileTab(tab) || ["review", "turnReview", "subagents", "backgroundTasks"].includes(tab.kind);
 }
 
-// 展示部分在 RightPanelTabStrip；这里只管普通会话的 Tab 来源和终端的异步关闭。
+// 展示部分在 RightPanelTabStrip；这里只管普通会话的 Tab 来源。
 function RightPanelTabs({ developmentEnabled, sessionId }: { developmentEnabled: boolean; sessionId: string | null }) {
   const { tabs: allTabs, activeTabId, setActiveTab, closeTab, isFileTreeOpen } = useRightPanel();
   const sideChat = useSideChatRuntime();
   const tabs = allTabs.filter((tab) => isVisibleTab(tab, sessionId) && (developmentEnabled || !isDevelopmentTab(tab)));
-  const [closeErrors, setCloseErrors] = useState<Record<string, string>>({});
-  const [closingTabIds, setClosingTabIds] = useState<Set<string>>(() => new Set());
-
-  const closeRightTab = async (tab: RightPanelTab) => {
-    if (closingTabIds.has(tab.id)) return;
-    if (tab.kind === "terminalStarting") {
-      cancelTerminalStart(tab.requestId);
-    }
-    if (tab.kind === "terminal") {
-      setClosingTabIds((current) => new Set(current).add(tab.id));
-      try {
-        const result = await terminalApi.close({ terminalId: tab.terminalId });
-        if (result.ok === false) {
-          setCloseErrors((current) => ({ ...current, [tab.id]: result.error.message }));
-          setClosingTabIds((current) => {
-            const next = new Set(current);
-            next.delete(tab.id);
-            return next;
-          });
-          return;
-        }
-      } catch (error) {
-        setCloseErrors((current) => ({
-          ...current,
-          [tab.id]: error instanceof Error ? error.message : String(error),
-        }));
-        setClosingTabIds((current) => {
-          const next = new Set(current);
-          next.delete(tab.id);
-          return next;
-        });
-        return;
-      }
-    }
-    setCloseErrors((current) => {
-      const next = { ...current };
-      delete next[tab.id];
-      return next;
-    });
-    setClosingTabIds((current) => {
-      if (!current.has(tab.id)) return current;
-      const next = new Set(current);
-      next.delete(tab.id);
-      return next;
-    });
-    closeTab(tab.id);
-  };
-
   return (
     <RightPanelTabStrip
       label="右侧面板"
       emptyTitle={developmentEnabled && isFileTreeOpen ? "文件" : "对象"}
       activeId={activeTabId}
-      items={tabs.map((tab) => {
-        const isClosing = closingTabIds.has(tab.id);
-        return {
-          id: tab.id,
-          title: tab.title,
-          label: isClosing ? "正在关闭…" : tab.kind === "terminalStarting" ? "正在启动…" : tab.title,
-          closing: isClosing,
-          closeHint: closeErrors[tab.id],
-          ...(tab.kind === "sideChat" ? { icon: <SideChatTabIcon status={sideChat?.statuses[tab.sessionId]} />, closeVerb: "收起" } : {}),
-        };
-      })}
+      items={tabs.map((tab) => ({
+        id: tab.id,
+        title: tab.title,
+        label: tab.title,
+        ...(tab.kind === "sideChat" ? { icon: <SideChatTabIcon status={sideChat?.statuses[tab.sessionId]} />, closeVerb: "收起" } : {}),
+      }))}
       onSelect={setActiveTab}
-      onClose={(id) => {
-        const tab = tabs.find((item) => item.id === id);
-        if (tab) void closeRightTab(tab);
-      }}
+      onClose={closeTab}
     />
   );
 }
@@ -280,32 +205,6 @@ function RightPanelBody({
   }
 
   if (tab.kind === "turnReview") return <TurnReviewView tab={tab} />;
-
-  if (tab.kind === "terminal") {
-    return (
-      <Suspense fallback={<div className={RIGHT_PANEL_BODY_CLASS}>正在加载终端…</div>}>
-        <LazyTerminalRenderView
-          terminalId={tab.terminalId}
-          sessionId={tab.sessionId}
-          shellName={tab.shellName}
-          onRestart={(terminal: TerminalSessionSnapshot) => openTab({
-            ...tab,
-            title: terminalDisplayTitle(terminal.title),
-            terminalId: terminal.id,
-            shellName: terminal.shellName,
-          })}
-        />
-      </Suspense>
-    );
-  }
-
-  if (tab.kind === "terminalStarting") {
-    return <TerminalStartingView />;
-  }
-
-  if (tab.kind === "terminalError") {
-    return <TerminalErrorView message={tab.message} />;
-  }
 
   if (tab.kind === "html") {
     return <HtmlTab tab={tab} />;
@@ -374,7 +273,6 @@ function RightPanelLauncher({
   onOpenReview?: () => void;
 }) {
   const { openFileTree, openTab, tabs } = useRightPanel();
-  const { openTerminal, creatingTerminal } = useOpenTerminal(sessionId);
   const sideChat = useOpenSideChat(sessionId);
   const collapsedSideChats = useCollapsedSideChats(sessionId, tabs);
   const items: RightPanelLauncherItem[] = [];
@@ -430,19 +328,6 @@ function RightPanelLauncher({
     icon: <Eye size={15} strokeWidth={1.8} />,
     onClick: () => openTab({ id: "context", kind: "context", title: "上下文" }),
   });
-  if (developmentEnabled) {
-    items.push({
-      id: "terminal",
-      label: creatingTerminal ? "正在启动…" : "终端",
-      description: "在这个目录里开终端",
-      icon: <SquareTerminal size={15} strokeWidth={1.8} />,
-      disabled: !sessionId || creatingTerminal,
-      onClick: () => void openTerminal(),
-      onPointerEnter: () => void preloadTerminalRenderView(),
-      onFocus: () => void preloadTerminalRenderView(),
-    });
-  }
-
   return (
     <RightPanelLauncherList
       label="右侧面板对象"
@@ -480,30 +365,6 @@ function useCollapsedSideChats(sessionId: string | null, tabs: readonly RightPan
     .filter(({ item }) => !open.has(item.id));
 }
 
-function TerminalStartingView() {
-  return (
-    <section className="grid min-h-0 flex-1 place-items-center bg-surface px-6" aria-label="Terminal 正在启动">
-      <div className="flex max-w-[260px] flex-col items-center text-center">
-        <span className="mb-4 inline-flex h-9 w-9 items-center justify-center rounded-act-md border border-line bg-surface-subtle text-text-muted">
-          <Loader2 size={17} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
-        </span>
-        <h2 className="m-0 text-act-sm font-semibold text-text-main">正在启动终端</h2>
-        <p className="mb-0 mt-1.5 text-act-xxs leading-relaxed text-text-faint">正在读取本机 Shell 环境并连接当前工作区。</p>
-      </div>
-    </section>
-  );
-}
-
-function TerminalErrorView({ message }: { message: string }) {
-  return (
-    <section className="grid min-h-0 flex-1 place-items-center bg-surface px-6" aria-label="Terminal 启动失败">
-      <div className="max-w-[280px] rounded-act-md border border-line bg-surface-subtle px-4 py-3">
-        <h2 className="m-0 text-act-sm font-semibold text-text-main">Terminal 启动失败</h2>
-        <p className="mb-0 mt-1.5 text-act-xxs leading-relaxed text-text-muted" role="alert">{message}</p>
-      </div>
-    </section>
-  );
-}
 // 路径已统一移到工作区操作栏（②），各文件视图不再自带 path 工具条，避免相邻两行重复同一路径。
 function ImageRenderView({ src, relativePath }: { src: string; relativePath?: string }) {
   return (

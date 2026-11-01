@@ -59,10 +59,49 @@
 | `pnpm --filter @actspace/site test`（更新日志解析） | 通过（31） |
 | 残留检查：对 `apps/desktop/src`、`packages/shared/src` grep `visualiz`、`replyHtml`、`ReplyHtml` | 无命中 |
 
+### P2 删除内置终端
+
+- **操作**：按 `p2-terminal-removal.md` 删除内置终端。
+  - 先改名：`RunTargetCapabilities.terminal` → `workspacePanels`（`run-target.ts`、`WorkbenchLayout.tsx`、`run-target.test.ts`）。
+  - 删整文件/目录：`main/terminal/` 整个目录（6 个源文件 + `test/`）、renderer 6 个文件（`TerminalRenderView.tsx`、`terminal-render-loader.ts`、`terminal-theme.ts`、`terminal-title.ts`、`useOpenTerminal.ts`、`api/terminal.ts`）、3 个终端测试、`scripts/experiments/terminal-native-spike/`、`front-右侧终端与会话生命周期规范.md`、站点 `terminal.md` 和 `terminal.png`。
+  - main：`index.ts`（服务创建、`closeOwnedTerminals`、`disposeAll`、`hasNodePty()`、`webContents` import）、`main-lifecycle.ts`（`attachWindowLifecycle` 只剩 `onClosed`）、`desktop-shell-ipc.ts`（8 个 handler 和两个 options 字段）、`guards.ts`（2 条）、`tsconfig.electron.json`（5 条）。
+  - 契约：`contract.terminal`、`events.terminal`、`fixed-renderer.ts` 的 9 个 channel、`ipc.ts` 的 `TERMINAL_LIMITS` 和全部 `Terminal*` 类型。
+  - renderer：`RightPanel.tsx`（终端标签同步 effect、`closeRightTab` 的终端分支、三个终端 body 分支、启动页项、两个视图；终端关闭是唯一的异步关闭，所以 `closingTabIds` / `closeErrors` 状态一并去掉，关闭直接调 `closeTab`）、`RightPanelContext.tsx`、`RightPanelObjectMenu.tsx`、`mock/handlers.ts`、`native-button-baseline.json`。
+  - 依赖与打包：`apps/desktop/package.json` 删 `@xterm/addon-fit`、`@xterm/xterm`、`node-pty`；`pnpm-workspace.yaml` 删 `node-pty: true`；`pnpm install`（lock 减 31 行、4 个包）；`release-package.sh` 删 spawn-helper 检查块。
+  - 文档：`ARCHITECTURE`、前端规范（README、工作台布局、右侧面板、preload-bridge、新功能清单、chinese-ui）、`FRONTEND_VERIFICATION`、`SECURITY`、`QUALITY_SCORE`；站点 `CONTENT_SOURCES.md`、`bash` / `file-preview` / `first-task` / `what-is-actspace` / `sessions` / `troubleshooting` / `tools-and-approvals` / `agent-turn` / `settings-and-data`、`home-features.ts`、`screenshots.json`；更新日志追加；新增 `docs/histories/2026-11/20261101-1700-remove-builtin-terminal.md`。
+- **影响文件**：删约 40 个（含整目录），改约 50 个。
+- **决定**：
+  - 改名和删除没有拆成两个提交：用户要求每个子计划本地提交一次，这里不单独提交，改名在同一个工作区里先做先测。
+  - `RightPanelTabStrip` 的 `closing` / `closeHint` 属性现在没有调用方，保留（Space 右栏共用该组件），只改了注释。
+  - 首页 `home-features.ts` 的「终端」卡片改成指向 `bash` 页的「Bash」卡片；`Hero.astro`、`home-stage.ts` 里的营销动画文案描述的是 Agent 执行命令，不动。
+  - `desktop-bridge-contract-types.test.ts`、`mock-bridge.test.ts` 删终端断言；`mock-bridge.test.ts` 的「没有 mock 实现的成员会 reject」用例改用 `updates.start`。
+  - 旧文档里的历史描述（`desktop-frontend-refactor/`、`histories/`、`exec-runs/`、`design-docs/架构优化/01`）不改。`agent-contract-matrix.generated.md` 是生成文档且基线已过期，不手改（S1 重新生成）。
+  - Space 演示的 `SpaceTerminalView`（mock）不动，所以残留检查里仍有一处 `xterm` 字样的注释。
+- **验证**（先跑 `pnpm install` 与 `pnpm --filter @actspace/desktop build:deps:dev`）：
+
+| 命令 | 结果 |
+|---|---|
+| `pnpm --filter @actspace/shared test` | 通过（181） |
+| `pnpm --filter @actspace/client test` | 通过（56） |
+| `pnpm --filter @actspace/desktop test` | 通过（259 文件，2070 用例） |
+| `pnpm --filter @actspace/desktop typecheck` | 通过 |
+| `pnpm typecheck` | 通过（先发现 P1 遗留问题，见「遇到的问题」） |
+| `pnpm --filter @actspace/runtime test` | 通过（85） |
+| `pnpm check:ipc-channels` | 通过（契约 144 个 channel） |
+| `pnpm check:renderer-bridge` / `check:frontend-tokens` / `check:frontend-theme` | 通过 |
+| `pnpm check:packages` / `check:desktop-build-graph` | 通过 |
+| `pnpm check:docs` / `check:current-docs` | 仍是 363 条已知失败，全部在 `docs/exec-runs/`，无新增 |
+| `pnpm --filter @actspace/site test` / `pnpm check:site` | 通过（31）/ 0 errors |
+| `pnpm --filter @actspace/desktop build` | 通过 |
+| `bash -n scripts/release-package.sh` | 语法通过；未实测完整打包 |
+| 残留检查：`grep -rni "xterm\|node-pty\|terminalApi\|TerminalSession" apps packages scripts` | 只剩 `SpaceTerminalView.tsx`（Space mock，计划允许） |
 ## 遇到的问题
 
 - P1：计划没列 `chat-presentation-recovery.test.tsx`，它断言「+」菜单项等于 `["可视化回复", "上下文"]`，删入口后失败，已改为 `["上下文"]`。另有 `RightPanel.tsx`、`RightPanelObjectMenu.tsx` 里提到 Reply / 可视化回复的注释和提示文字，一并改掉。
+- P2：P1 提交遗留了一个未使用的 import（`packages/shared/src/ipc.ts` 的 `ModelId`，原来只被已删的可视化类型用到），`apps/web` 开了 `noUnusedLocals`，导致 `pnpm typecheck` 失败。已在 P2 里顺手删掉这个 import。
+- P2：计划列的 `main/test/main-lifecycle.test.ts` 两个终端用例随终端清理一起删，改成一个 `onClosed` 用例；`right-panel-object-menu.test.tsx` 的用例改名并改为断言菜单里没有「终端」；计划没列 `chat-presentation-recovery.test.tsx` 里的 `"终端"` 反向断言，也一并去掉。
 
 ## 跳过或推迟的事项
 
 - P1：Space 演示里的 mock「可视化回复」标签留待 Space 演示后续处理（见 P1 决定）。磁盘上旧的 `visualizations.json` 不读不删。
+- P2：`agent-contract-matrix.generated.md` 里仍含 node-pty 的依赖列表，基线已过期，留给 S1 重新生成。未实测完整打包（只做了 `bash -n`）。

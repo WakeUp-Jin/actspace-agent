@@ -12,21 +12,20 @@
 | [快速开始](src/content/docs/getting-started.md) | `README.md`、`package.json`、`apps/site/package.json` |
 | [完成第一个任务](src/content/docs/first-task.md) | `docs/design-docs/frontend/front-聊天输入框规范.md`、`docs/design-docs/core-review-change-sources.md`、`docs/design-docs/execution-safety/README.md` |
 | [工作区与 Git Worktree](src/content/docs/workspaces.md) | `docs/design-docs/frontend/front-workspace-git-worktree-context.md`、`docs/design-docs/frontend/front-左侧会话栏规范.md` |
-| [会话管理与分支](src/content/docs/sessions.md) | `docs/design-docs/frontend/front-左侧会话栏规范.md`、`docs/exec-plans/completed/20260915-progressive-session-loading.md`、`docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md` |
+| [会话管理与分支](src/content/docs/sessions.md) | `docs/design-docs/frontend/front-左侧会话栏规范.md`、`docs/exec-plans/completed/20260915-progressive-session-loading.md` |
 | [模式与输入](src/content/docs/modes-and-input.md) | `docs/design-docs/frontend/front-聊天输入框规范.md`、`apps/desktop/src/renderer/components/Composer.tsx` |
 | [配置模型](src/content/docs/configure-a-model.md) | `README.md`、`docs/design-docs/model-context/agent-multi-provider-llm.md`、`apps/desktop/src/renderer/components/settings/ProviderSettings.tsx`、`apps/desktop/src/renderer/components/settings/ModelSettings.tsx` |
 | [模型选择与思考设置](src/content/docs/model-selection.md) | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md`、`docs/design-docs/model-context/agent-model-catalog-and-usage-cost.md` |
 | [上下文与压缩](src/content/docs/context.md) | `docs/design-docs/model-context/agent-token-usage-and-context-state.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md`、`packages/compaction/README.md`、`packages/compaction/src/plugin.ts` |
 | [Token、缓存与费用](src/content/docs/usage.md) | `docs/design-docs/frontend/front-usage-statistics-refresh.md`、`docs/design-docs/model-context/agent-model-catalog-and-usage-cost.md` |
 | [文件读写与检索](src/content/docs/files-and-search.md) | `packages/tools/filesystem-read/src/plugin.ts`、`docs/design-docs/index.md`、`docs/exec-plans/completed/20260913-tool-artifact-provider-image-ux.md` |
-| [Bash 与后台任务](src/content/docs/bash.md) | `packages/tools/shell-tools/src/node-ports.ts`、`docs/design-docs/execution-safety/README.md`、`docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md` |
+| [Bash 与后台任务](src/content/docs/bash.md) | `packages/tools/shell-tools/src/node-ports.ts`、`docs/design-docs/execution-safety/README.md` |
 | [权限与审批](src/content/docs/tools-and-approvals.md) | `docs/design-docs/execution-safety/README.md`、`docs/design-docs/frontend/front-聊天输入框规范.md` |
 | [联网搜索与网页读取](src/content/docs/web-tools.md) | `docs/design-docs/tool-system/agent-web-tools.md`、`apps/desktop/src/renderer/components/settings/SettingsPage.tsx` |
 | [Browser Use](src/content/docs/browser.md) | `browser-bridge/README.md`、`browser-bridge/skill/SKILL.md`、`docs/design-docs/browser/agent-browser-use-index.md` |
 | [图片理解与生成](src/content/docs/images.md) | `docs/design-docs/tool-system/agent-image-inspection-tool.md`、`docs/design-docs/tool-system/agent-image-generation-tool.md`、`apps/desktop/src/renderer/components/settings/SettingsPage.tsx`、`docs/exec-plans/completed/20260913-tool-artifact-provider-image-ux.md` |
 | [文件预览](src/content/docs/file-preview.md) | `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`、`docs/exec-plans/completed/20260913-tool-artifact-provider-image-ux.md` |
 | [代码审阅与 Git 操作](src/content/docs/review.md) | `docs/design-docs/core-review-change-sources.md` |
-| [交互式终端](src/content/docs/terminal.md) | `docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md`、`apps/desktop/src/renderer/components/right-panel/TerminalRenderView.tsx` |
 | [Skills](src/content/docs/skills.md) | `docs/design-docs/tool-system/agent-skill-loading.md` |
 | [子 Agent 与 Explore](src/content/docs/subagents.md) | `packages/subagent/src/preset.ts`、`docs/design-docs/collaboration/agent-subagent-runtime.md`、`docs/exec-plans/completed/20260915-readonly-subagents.md` |
 | [英语辅助学习](src/content/docs/english-learning.md) | `docs/design-docs/agent-plugin-runtime/agent-english-learning.md` |

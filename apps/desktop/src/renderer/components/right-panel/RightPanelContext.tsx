@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { TerminalSessionSnapshot, WorkspaceDirEntry } from "@actspace/shared";
-import { terminalDisplayTitle } from "./terminal-title";
+import type { WorkspaceDirEntry } from "@actspace/shared";
 import type { TurnChanges } from "../turn-tail/turn-tail-data";
 
 /**
@@ -39,9 +38,6 @@ export type RightPanelTab = { id: string } & (
   | { kind: "review"; title: string; workspaceRoot?: string; scope: "uncommitted"; refreshKey?: number }
   // 某一轮的改动快照（轮尾改动卡点开）；index 是要选中的文件，revision 每次点击递增，让同一 Tab 重新跳到该文件。
   | { kind: "turnReview"; title: string; changes: TurnChanges; index: number; revision: number; sessionId: string | null; workspaceRoot?: string }
-  | { kind: "terminalStarting"; title: string; requestId: string; sessionId: string }
-  | { kind: "terminalError"; title: string; sessionId: string; message: string }
-  | { kind: "terminal"; title: string; terminalId: string; sessionId: string; shellName: string }
   // 侧边对话：只在它的主会话下显示。继承轮数等打开时才知道的事实随 tab 带着，重新打开时由会话窗口推算。
   | { kind: "sideChat"; title: string; sessionId: string; parentSessionId: string; inheritedTurnCount?: number; runningTurnExcluded?: boolean }
 );
@@ -135,7 +131,6 @@ type RightPanelContextValue = {
    */
   isSourceShown: (tabId: string) => boolean;
   setSourceShown: (tabId: string, shown: boolean) => void;
-  syncTerminalTabs: (sessionId: string, terminals: TerminalSessionSnapshot[]) => void;
 };
 
 const RightPanelStateContext = createContext<RightPanelContextValue | null>(null);
@@ -314,28 +309,6 @@ export function RightPanelProvider({
     });
   }, []);
 
-  const syncTerminalTabs = useCallback((sessionId: string, terminals: TerminalSessionSnapshot[]) => {
-    setTabs((current) => {
-      const existingByTerminalId = new Map(
-        current.flatMap((tab) => tab.kind === "terminal" ? [[tab.terminalId, tab] as const] : []),
-      );
-      const visibleTerminalTabs: RightPanelTab[] = terminals.map((terminal) => {
-        const existing = existingByTerminalId.get(terminal.id);
-        return existing ?? {
-          id: `terminal:${terminal.id}`,
-          kind: "terminal",
-          title: terminalDisplayTitle(terminal.title),
-          terminalId: terminal.id,
-          sessionId,
-          shellName: terminal.shellName,
-        };
-      });
-      const next = [...current.filter((tab) => tab.kind !== "terminal" || tab.sessionId !== sessionId), ...visibleTerminalTabs];
-      setActiveTabId((activeId) => activeId && next.some((tab) => tab.id === activeId) ? activeId : null);
-      return next;
-    });
-  }, []);
-
   const value = useMemo<RightPanelContextValue>(() => {
     const active = tabs.find((tab) => tab.id === activeTabId) ?? null;
     return {
@@ -366,7 +339,6 @@ export function RightPanelProvider({
       syncFileTreeRoot,
       isSourceShown,
       setSourceShown,
-      syncTerminalTabs,
     };
   }, [
     isOpen,
@@ -395,7 +367,6 @@ export function RightPanelProvider({
     syncFileTreeRoot,
     isSourceShown,
     setSourceShown,
-    syncTerminalTabs,
   ]);
 
   return <RightPanelStateContext.Provider value={value}>{children}</RightPanelStateContext.Provider>;

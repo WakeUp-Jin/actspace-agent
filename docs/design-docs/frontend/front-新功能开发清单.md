@@ -47,7 +47,7 @@
 | --- | --- | --- |
 | 组件、hook、store 只 import `R/api/<域>`，不碰 `window.actspace`，也不直接用 `getBridge()` | [Preload bridge 与 Mock 规范](front-preload-bridge与mock规范.md) §3 | `pnpm check:renderer-bridge` |
 | 新增 IPC 能力按 7 步走：channel 常量 → 契约成员 → main 注册 → guard → mock → 调用方 → 检查；preload 里不写业务逻辑 | 同上 §4 | `pnpm check:ipc-channels` |
-| 入参涉及路径、文件、终端、设置写入或远端 Host 的，加 guard，并补一个合法、一个非法输入的用例 | 同上 §5 | 评审 + `M/test/ipc-guards.test.ts` |
+| 入参涉及路径、文件、设置写入或远端 Host 的，加 guard，并补一个合法、一个非法输入的用例 | 同上 §5 | 评审 + `M/test/ipc-guards.test.ts` |
 | 不写 bridge 存在检查和「当前环境不支持」的降级分支 | 同上 §3 | 评审 |
 
 ## 6. 安全边界

@@ -260,7 +260,7 @@ describe("Review workbench", () => {
   });
 
   it("hides workspace controls and development objects on a remote run target", async () => {
-    // 15 T6：WorkbenchLayout 按 capabilities.review / terminal 判断，不再看有没有 hostId。
+    // 15 T6：WorkbenchLayout 按 capabilities.review / workspacePanels 判断，不再看有没有 hostId。
     const user = userEvent.setup();
     setupBridge(reviewBridge(emptySnapshot()));
     const props = { sessions: [], activeSessionId: null, title: "Remote", messages: [], contextSnapshot: null, selectedWorkspaceRoot: "/tmp/workspace" };

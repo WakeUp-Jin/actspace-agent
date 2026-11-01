@@ -93,7 +93,6 @@ runtime --(Host capability)--> browser-bridge
 - `docs/design-docs/tool-system/agent-image-generation-tool.md`：图片生成工具的 provider/key 边界、`generate_image` 参数、会话产物、上下文控制和多图预览规范。
 - `docs/design-docs/tool-system/agent-image-inspection-tool.md`：文本主模型按需委托 Kimi 或 OpenRouter Luna 分析图片的配置、路径安全、固定视觉提示词、稳定输出和验收边界。
 - `docs/design-docs/frontend/README.md`：前端工作台设计文档入口。
-- `docs/design-docs/frontend/front-右侧终端与会话生命周期规范.md`：右侧交互式 Terminal 的 Electron main / preload / renderer 边界、PTY 会话、输出背压、进程清理和 native 发布制品要求。
 - `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档，不作为主线架构事实来源。
 
 ## 当前已确认的实现方向

@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
  * - 整条右侧预留两个浮层 chrome 控件宽度，tab 不会被「+ / 折叠」按钮盖住造成重叠。
  *
  * 不读 `useRightPanel`：普通会话的右栏和 Space 的右栏（状态在 Space store 里）共用这一条。
- * 关闭终端这类异步动作由调用方处理，这里只显示 `closing` / `closeHint`。
+ * 异步关闭之类的动作由调用方处理，这里只显示 `closing` / `closeHint`。
  */
 
 export type RightPanelTabStripItem = {

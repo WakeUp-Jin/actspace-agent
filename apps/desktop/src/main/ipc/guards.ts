@@ -109,8 +109,6 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
   [contract.sessions.setWorkspace, shape({ sessionId: "string", workspaceId: "string?", workspaceRoot: "string?" }, "Invalid session workspace")],
   [contract.dialogs.selectWorkspaceDirectory, optionalShape({ registerWorkspace: "boolean?" }, "Invalid directory request")],
   // 终端
-  [contract.terminal.create, shape({ sessionId: "string", cols: "number", rows: "number" }, "Invalid terminal request")],
-  [contract.terminal.write, shape({ terminalId: "string", data: "string" }, "Invalid terminal input")],
   // 设置写入
   [contract.settings.update, shape({}, "Invalid settings update")],
   [contract.settings.updateV4, shape({ expectedRevision: "string", namespace: "string", patch: "record" }, "Invalid settings update")],

@@ -14,7 +14,7 @@ describe("capabilitiesOf", () => {
   });
   it("enables everything for a local Git workspace and keeps attachments to images", () => {
     const capabilities = capabilitiesOf(local, { gitStatus: "ready" });
-    for (const key of ["newWorktree", "branchSwitch", "localFileOpen", "terminal", "review"] as const) expect(capabilities[key]).toEqual({ enabled: true });
+    for (const key of ["newWorktree", "branchSwitch", "localFileOpen", "workspacePanels", "review"] as const) expect(capabilities[key]).toEqual({ enabled: true });
     expect(capabilities.attachments).toEqual({ images: true, files: false });
   });
 
@@ -23,7 +23,7 @@ describe("capabilitiesOf", () => {
     expect(capabilities.newWorktree.enabled).toBe(false);
     expect(capabilities.newWorktree.reason).toBeTruthy();
     expect(capabilities.branchSwitch.enabled).toBe(false);
-    expect(capabilities.terminal.enabled).toBe(true);
+    expect(capabilities.workspacePanels.enabled).toBe(true);
     expect(capabilitiesOf(local, { gitStatus: "no_head" }).branchSwitch.enabled).toBe(true);
     expect(capabilitiesOf(local, { gitStatus: "no_head" }).newWorktree).toEqual({ enabled: false, reason: "需要先创建提交" });
   });
@@ -35,7 +35,7 @@ describe("capabilitiesOf", () => {
   it("disables local-only actions on a remote target and says why", () => {
     const capabilities = capabilitiesOf(remote, { gitStatus: "ready" });
     expect(capabilities.newWorktree).toEqual({ enabled: false, reason: "远端机器暂不支持" });
-    for (const key of ["branchSwitch", "localFileOpen", "terminal", "review"] as const) expect(capabilities[key]).toEqual({ enabled: false, reason: "远端机器暂不支持" });
+    for (const key of ["branchSwitch", "localFileOpen", "workspacePanels", "review"] as const) expect(capabilities[key]).toEqual({ enabled: false, reason: "远端机器暂不支持" });
     expect(capabilities.attachments).toEqual({ images: true, files: true });
   });
 

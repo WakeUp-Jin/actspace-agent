@@ -88,21 +88,6 @@ fi
 
 find "${deploy_dir}" -type d -name test -prune -exec rm -rf {} +
 find "${deploy_dir}" \( -name "*.map" -o -name "*.d.ts" -o -name "*.d.mts" \) -type f -delete
-# pnpm deploy preserves native files but not always executable mode bits. node-pty
-# starts this helper through posix_spawn, so fail the package if it is not runnable.
-if [[ "${platform}" == "darwin" || "${platform}" == "linux" ]]; then
-  terminal_helper_count=0
-  while IFS= read -r helper; do
-    chmod 755 "${helper}"
-    [[ -x "${helper}" ]] || { echo "node-pty spawn-helper is not executable: ${helper}" >&2; exit 1; }
-    terminal_helper_count=$((terminal_helper_count + 1))
-  done < <(find -L "${deploy_dir}/node_modules/node-pty" -type f -name spawn-helper -print 2>/dev/null)
-  if [[ "${terminal_helper_count}" -eq 0 ]]; then
-    echo "node-pty spawn-helper was not found in the production deploy." >&2
-    exit 1
-  fi
-fi
-
 if [[ ! -d "${electron_runtime_dir}" ]]; then
   echo "Electron runtime not found at ${electron_runtime_dir}" >&2
   echo "Run pnpm install before packaging release assets." >&2

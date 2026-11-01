@@ -10,7 +10,7 @@
 
 ## 文档范围
 
-本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 面板和 HTML 沙箱安全。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。Terminal 在面板中的 Tab 语义由本文约束，PTY、会话生命周期、背压、进程清理与打包边界见 `front-右侧终端与会话生命周期规范.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
+本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 面板和 HTML 沙箱安全。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
 
 ## 交互模型
 
@@ -32,7 +32,6 @@
 当前固定展示四个入口，另有「侧边对话」入口与已收起列表（见「侧边对话」一节）：
 
 - `Files`：进入 Workspace 文件浏览态，不新增对象 Tab。
-- `Terminal`：创建或聚焦绑定当前会话 workspace / worktree 的交互式 shell；详见 `front-右侧终端与会话生命周期规范.md`。
 - `Review`：打开当前 workspace 的 Review，并创建/聚焦稳定的右侧 Review Tab。
 - `Context`：打开主 Agent 当前会话的 Context 面板 Tab（占用、路径、明细、趋势和事件，只读）。
 
@@ -65,13 +64,12 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `Text`：纯文本或代码文件查看（`CodeRenderView`，见「代码视图能力」）。
 - `Review`：完整代码审阅工作台入口；支持 Git-first scope 与 `Last Turn` Agent 视角，具体契约见 `docs/design-docs/core-review-change-sources.md`。
 - `Context`：Context 面板；见本文「Context 面板」一节。
-- `Terminal`：用户交互式 shell；Tab 只保存 terminalId / sessionId / title，不保存 PTY、xterm 实例或输出缓冲。
 - `sideChat`：侧边对话；见「侧边对话」一节。
 
 ## 「+ 新建对象」菜单（2026-05-30，2026-06-04 补 Review）
 
 - 隐藏标题栏 chrome 右段、右侧折叠（PanelRight）按钮**左侧**放一个 `+` 按钮（参考 Cursor 顶栏的 +）。
-- 点开是一个轻量菜单，可往右侧面板新增对象：`侧边对话`（排第一，仅本地运行目标）/ `工作区文件` / `Terminal` / `Review` / `Context`。非 Terminal 对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；Terminal 底层允许每会话多实例，标题按创建顺序区分。`工作区文件` 只切换工作区浏览态，不新增 Tab。
+- 点开是一个轻量菜单，可往右侧面板新增对象：`侧边对话`（排第一，仅本地运行目标）/ `工作区文件` / `Review` / `Context`。对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）。`工作区文件` 只切换工作区浏览态，不新增 Tab。
 - `Review` 入口复用 Composer 的 Review 打开逻辑，首次默认选择当前 workspace 的 Git `Uncommitted` scope；后续打开恢复该 workspace 最近 selection。
 - 菜单与右侧折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`。
 - **`+` 仅在右侧面板打开时显示**（`view === "chat" && isRightPanelOpen`）：`+` 的语义是「往面板里加对象」，面板关着时无意义；面板关闭时 chrome-right 只保留 PanelRight 折叠按钮。
