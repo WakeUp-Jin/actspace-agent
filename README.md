@@ -109,8 +109,8 @@ Host capability -> browser-bridge
 - `packages/core/runtime`：唯一 `bootProfileRuntime` 装配、Projection 与有序 shutdown；领域行为留在各自插件。
 - `packages/host/agent-host` / `client` / `agent-service`：进程与认证接入、客户端连接、内容队列与统一任务调度。
 - `packages/harness-evolution/harness-control`：组合准备、授权、启用与恢复；Run 固定当前组合，后续 Run 可采用新组合。
-- `packages/session/session-storage` / `jsonl` / `persistence`：存储中性契约、文件实现与 Session 业务语义，保留未来数据库接入边界。
-- `packages/<能力>/<包>`（`core`、`session`、`llm`、`context`、`fs`、`shell`、`web`、`image`、`todo`、`background-tasks`、`subagent`、`sandbox`、`approval`、`skill` 等能力目录，目录名即包名去掉 `@actspace/`）：领域 package 与真实 Plugin Entry；`packages/context/context-engine` 是上下文管理引擎，其余 `context-*` 是按类型拆分的 Context 插件包。
+- `packages/session/session-storage` / `session-persistence-jsonl` / `session-persistence`：存储中性契约、文件实现与 Session 业务语义，保留未来数据库接入边界。
+- `packages/<能力>/<包>`（`core`、`session`、`llm`、`context`、`fs`、`shell`、`web`、`image`、`todo`、`background-tasks`、`subagent`、`sandbox`、`approval`、`skill` 等能力目录，目录名即包名去掉 `@actspace/`）：领域 package 与真实 Plugin Entry；`packages/context/context-engine` 是上下文管理引擎，其余 `context-*` 是按类型拆分的 Context 插件包。完整的能力目录、包表和依赖方向见 [packages/README.md](packages/README.md)。
 - `packages/util/shared`：跨进程和 Host-facing 公共契约。
 - `browser-bridge`：独立 Go / Chrome Extension Host capability，不属于 pnpm workspace plugin 目录。
 

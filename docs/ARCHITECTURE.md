@@ -9,13 +9,13 @@
 - `apps/desktop`：Electron main、preload、renderer 所在的桌面端应用。
 - `apps/cli`：通过 managed ESM loader 暴露 v2 `run` 命令、stdin 输入和 stdout/stderr 契约。
 - `packages/core/runtime`：Host-facing ESM runtime，通过唯一 `bootProfileRuntime` 装配 Host 服务与 Harness 候选，显式编排排空执行、关闭 Session 和释放插件树；Headless/Desktop 包提供应用服务。
-- `packages/<能力>/<包>`（两级结构，目录名即包名去掉 `@actspace/`，如 `packages/core/`、`packages/session/`、`packages/llm/`、`packages/context/`、`packages/fs/`、`packages/shell/`、`packages/subagent/`）：独立领域 workspace packages，每个可装载包拥有自己的 Plugin Entry 与生命周期测试；Context 领域目录下的 engine、来源、披露和压缩策略分别独立装配。
+- `packages/<能力>/<包>`（两级结构，目录名即包名去掉 `@actspace/`，如 `packages/core/`、`packages/session/`、`packages/llm/`、`packages/context/`、`packages/fs/`、`packages/shell/`、`packages/subagent/`）：独立领域 workspace packages，每个可装载包拥有自己的 Plugin Entry 与生命周期测试；各能力目录的包表、依赖方向和新增插件步骤见[包地图](../packages/README.md)；Context 领域目录下的 engine、来源、披露和压缩策略分别独立装配。
 - 插件清单：内置插件只在 `packages/core/runtime/src/plugin-catalog.ts` 的 `PLUGIN_CATALOG` 登记一次，每个插件的 manifest 带中文 `display`。Host 的 `TRUSTED_LOADER_ENTRIES` 与 `packages/core/runtime/cordis.yml`（由 `pnpm generate:plugin-loader` 生成，勿手改）、默认 Harness 的 `DEFAULT_HARNESS_ENTRIES` 与构建入口都从清单计算；`pnpm check:packages` 校验清单与仓库一致。
 - `packages/english-learning/english-learning`：Desktop 内置英语辅助学习插件（默认不加载，在 扩展 › 插件 中开启），拥有单会话双语提示词与英文语音队列；凭据、临时文件和系统播放由 Desktop Host 提供。详见[设计](design-docs/agent-plugin-runtime/agent-english-learning.md)。
 - `packages/core/agent-service`：Host 共同任务服务，拥有持久内容队列、单会话调度与结构化 Run 工厂契约。详见[Task/Run 生命周期](design-docs/agent-plugin-runtime/agent-task-run-lifecycle.md)。
 - `packages/host/agent-host`：独立 Node Host 接入、认证、观察与文件传输；bootstrap/lifecycle 拥有装配、维护和退出，CLI 注入 Runtime 端口；应用操作复用 AgentApplication，任务仍由 AgentService 调度。CLI 提供 `host` 启动与管理命令，Desktop Main 持有远端连接。当前验证边界见 [Host 指南](design-docs/agent-plugin-runtime/agent-host-guide.md)和 [P4 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)。
 - `packages/harness-evolution/harness-control`：Host 级固定 Harness 选择服务，负责 Patch 准备、独立授权、持久启用、恢复与回退；执行者只能经它异步获取租约。详见 [P3 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-3.md)。
-- `packages/session/session-storage`：存储中性 provider/handle 契约；`session/jsonl` 提供物理实现，`session/persistence` 负责 Session 业务语义。读写、列表、恢复、fork 与缓存均通过注入后端，详见[存储规范](design-docs/agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
+- `packages/session/session-storage`：存储中性 provider/handle 契约；`session-persistence-jsonl` 提供物理实现，`session-persistence` 负责 Session 业务语义。读写、列表、恢复、fork 与缓存均通过注入后端，详见[存储规范](design-docs/agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
 - `packages/util/shared`：IPC contracts、session schema、跨进程共享类型。
 - `apps/web`：浏览器 / PWA 客户端（React + Vite），手机和电脑浏览器经 WebSocket `/rpc` 连接一台 Agent Host，查看会话、审批与发送消息；可由 Host 的 `webRoot` 同源托管。设计见 [front-web-pwa客户端规范](design-docs/frontend/front-web-pwa客户端规范.md)。
 - `apps/site`：Astro 静态官网、公开文档、博客与从 release 文档生成的更新页。

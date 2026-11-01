@@ -13,7 +13,7 @@ ActSpace v2 采用 DSH 风格的领域包结构，但不复制 DSH 的 `vendor/`
 1. `vendor/` 不进入 ActSpace v2。Cordis 使用精确锁定的 DSH 发布包；只有未来明确维护 fork 时才允许引入 `vendor/`。
 2. 不建立承载所有源码的顶层 `harness/` 总目录。Runtime 内部的 `src/harness/` 按执行装配职责分组；`boot` 与 `harness-control` 分别提供组合装配与选择服务，应用操作由 `agent-service` 及 App Service 提供。
 3. 不建立通用 `plugins/` 目录。插件是 Runtime ABI 中的身份、manifest、behavior entry、codec entry 和生命周期，不是文件夹名称。
-4. 采用 DSH 的领域分组：`core`、`session`、`llm`、`context`、`prompt`、`tools`、`subagent`、`compaction`、`desktop-app` 和 `client`。
+4. 采用领域分组，`packages/` 是两级结构 `packages/<能力>/<包>`，目录名即包名去掉 `@actspace/`。当前的能力目录、每个目录里的包以及依赖方向，以 [packages/README.md](../../../packages/README.md) 为准；该地图和各目录 README 由 `scripts/check-package-readmes.mjs` 校验。
 5. 每个可装载、可替换或可独立验证的领域包都必须拥有自己的 package boundary 和 Cordis Plugin Entry。Session、LLM、Prompt、Agent Loop 不是“插件之外的特殊代码”，而是默认 Profile 中的核心语义插件。
 6. 具体能力插件按领域放置，例如 `packages/fs/tool-fs-read`、`packages/browser/tool-browser`，不放入一个含义模糊的 `packages/plugins`。
 7. Browser Bridge 是独立的 Go + Chrome Extension Host capability，顶层目录使用 `browser-bridge/`，不伪装成同进程 TypeScript 插件，也不放入通用 `plugins/`。
@@ -42,7 +42,7 @@ flowchart TD
 
 顶层结构由[仓库架构](../../ARCHITECTURE.md)维护；完整 package、exports 与 manifest 清单由[契约矩阵](agent-contract-matrix.generated.md)生成，避免维护第二张会过期的目录树。
 
-Host、Task 和 Harness 分别有 `agent-host`、`agent-service`、`harness-control` 包；`runtime/src/startup`、`session`、`harness` 按装配职责分组。`session/storage` 提供中性后端契约，`jsonl` 是生产实现；这些目录不构成通用插件总目录。
+Host、Task 和 Harness 分别有 `agent-host`、`agent-service`、`harness-control` 包；`runtime/src/startup`、`session`、`harness` 按装配职责分组。`session-storage` 提供中性后端契约，`session-persistence-jsonl` 是生产实现；这些目录不构成通用插件总目录。哪些包是插件、哪些是库，由 `packages/core/runtime/src/plugin-catalog.ts` 的插件清单决定，包地图见 [packages/README.md](../../../packages/README.md)。
 
 ## 4. 什么是一个真实插件包
 

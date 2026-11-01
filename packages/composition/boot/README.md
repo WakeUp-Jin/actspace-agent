@@ -24,4 +24,4 @@
 
 插件可变状态属于 apply/fiber，模块全局变量跨相同产物实例共享。候选准备可能调用已批准的 Host 能力，插件不得借 prepare 修改全局策略或产生真实用户工具副作用；进程内 API 不提供安全沙箱。
 
-本阶段无选择持久化、崩溃恢复、磁盘 GC、运行中替换、RPC 或权限审批接入。Profile/Bundle/Patch 描述仍由 composition 负责。详见[执行摘要](../../docs/exec-runs/20261003-agent-harness-host-refactor/execution-summary.md)。
+本阶段无选择持久化、崩溃恢复、磁盘 GC、运行中替换、RPC 或权限审批接入。Profile/Bundle/Patch 描述仍由 composition 负责。详见[执行摘要](../../../docs/exec-runs/20261003-agent-harness-host-refactor/execution-summary.md)。

@@ -128,7 +128,7 @@ export const PLUGIN_PACKAGES_OUTSIDE_DEFAULT: readonly { readonly package: strin
   { package: "@actspace/harness-evaluation", reason: "评估候选 Harness 时单独装配" },
   { package: "@actspace/scope", reason: "只提供作用域类，由 Agent 注册表等包直接引用" },
   { package: "@actspace/subagent", reason: "子 Agent 调度库，由 tool-subagent 与运行时直接调用" },
-  { package: "@actspace/llm-pi-ai", reason: "模型适配库，由运行时直接构造适配器" },
+  { package: "@actspace/llm-pi-ai", reason: "模型适配库，由桌面端和远程 Host 直接构造适配器，运行时只重新导出" },
 ]);
 
 const byId = new Map(PLUGIN_CATALOG.map(entry => [entry.id, entry]));

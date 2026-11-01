@@ -10,6 +10,7 @@
 
 - `docs/REPO_COLLAB_GUIDE.md`：仓库级协作、提交、文档同步与测试约定。
 - `docs/ARCHITECTURE.md`：仓库整体结构、依赖边界和架构专题导航。
+- `packages/README.md`：`packages/` 的地图。改包、加插件前先读；每个能力目录有自己的 README，由 `pnpm check:docs` 校验。
 - `docs/design-docs/core-beliefs.md`：Agent-first 的工作原则和这个模板的设计出发点。
 
 ## 代码改完前要读

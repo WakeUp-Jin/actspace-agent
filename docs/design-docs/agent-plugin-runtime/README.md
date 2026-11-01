@@ -25,7 +25,7 @@ P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle
 
 | 主题 | 规范 |
 |---|---|
-| Plugin 与包边界 | [Plugin ABI](agent-spec-plugin-runtime-abi.md)、[Package layout](agent-spec-package-layout-and-plugin-packaging.md)、[包清单](agent-package-ledger.md) |
+| Plugin 与包边界 | [Plugin ABI](agent-spec-plugin-runtime-abi.md)、[Package layout](agent-spec-package-layout-and-plugin-packaging.md)、[包地图](../../../packages/README.md)、[包清单](agent-package-ledger.md) |
 | Session 与上下文 | [Session/Context](agent-spec-session-core-persistence-separation.md)、[Session Format v1](agent-spec-session-format-v1.md)、[DSH 事件模型](agent-spec-dsh-event-model.md)、[Prompt contributors](agent-spec-prompt-context-contributors.md) |
 | Agent 与 Loop | [Core 所有权](agent-target-agent-core.md)、[Agent/Subagent](agent-spec-agent-and-subagent.md)、[Scope](agent-spec-agent-scope-model.md)、[Loop surface](agent-spec-agent-loop-cordis-surface.md) |
 | Cordis Service 与事件 | [Service 所有权与契约](agent-spec-service-definition-provider-consumer.md)、[Cordis 原生事件 ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md) |

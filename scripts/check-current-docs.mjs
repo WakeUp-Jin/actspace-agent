@@ -67,6 +67,8 @@ const forbiddenCurrentClaims = [
   { pattern: /<userData>\/sessions\/<sessionId>/g, message: "仍描述 v1 Session 目录" },
   { pattern: /apps\/desktop\/src\/main\/(?:agent-run|desktop-agent-runtime)\.ts/g, message: "仍链接已删除的 Desktop v1 Runtime" },
   { pattern: /apps\/cli\/src\/runtime-adapter\.ts/g, message: "仍链接已删除的 CLI v1 adapter" },
+  { pattern: /@actspace\/(?:tools-|core-agent|core-scope|session-jsonl)/g, message: "仍使用插件结构调整前的旧包名", allowHistoricalLine: true },
+  { pattern: /packages\/(?:tools-[a-z-]+|core-(?:agent|scope)[a-z-]*|session-jsonl)(?:\/|\b)/g, message: "仍使用插件结构调整前的一级包路径", allowHistoricalLine: true },
 ];
 
 function lineNumber(source, index) {

@@ -267,6 +267,17 @@
 - 截图（浏览器 mock，`?mock=empty`）：`tmp/s3-plugins-light.png`、`tmp/s3-plugins-dark.png`，与 demo B 对照一致。
 - 验证：`pnpm install`、`pnpm typecheck` 通过；`pnpm -r --no-bail --if-present test` 全绿（desktop 2104 通过 / 7 跳过，runtime 98，agent-host 62，site 31）；根命令链（package-boundaries、plugin-catalog、contract-matrix、renderer-bridge、harness-events、harness-recovery、ipc-channels、frontend-tokens）、`check:packages`、`check:desktop-build-graph`、`check:frontend-tokens`、`check:frontend-theme`、`test:agent-host:process`、`@actspace/desktop build` 通过；`check:docs` / `check:current-docs` 仍是 363 条已知失败，全在 `docs/exec-runs/`。
 
+### S4 README 与文档
+
+- 总地图：重写 `packages/README.md`，含组织规则、23 个能力目录的表（目录、职责、包数、类别）、依赖方向、新增插件五步和检查命令。新增插件的步骤比计划多三处：`core/runtime` 的 `package.json` 依赖和 `tsconfig.build.json` 的 `references`、`scripts/contract-matrix/source-registry.mjs`、需要 Host 准入 manifest 时的 `admitOnHost`。
+- 能力目录 README：23 份，每份有包表（包、角色、类别、默认、职责）、包之间怎么连、入口与测试、怎么扩展；新写 19 份，原有的 4 份（`core`、`session`、`llm`、`context`）按新结构重写。`sandbox/` 带“新增一个沙箱后端”五步。
+- 内容来源：类别和默认开关来自 `PLUGIN_CATALOG` 与 `PLUGIN_PACKAGES_OUTSIDE_DEFAULT`（脚本核对）；provides / inject、Host 端口来自各包 manifest 和 `plugin.ts`；依赖方向来自 `package.json`（脚本 `tmp/s4-capdeps.mjs`、`tmp/s4-impl.mjs` 算出跨能力依赖，不进 git）。写的时候读源码改正了几处：`llm-pi-ai` 不是 `core/runtime` 构造的（桌面端和远程 Host 直接构造，运行时只重新导出），已同步改了插件清单里的原因文字；生成的图片是会话产物，不是工作区文件；后台任务登记表和子 Agent 提供方在 `agent-runtime` 里创建；`plugin-manager` 是 Harness 里对 Host 端 `PluginManager` 的代理。
+- `scripts/check-package-readmes.mjs`：地图列出全部能力目录且包数一致；每个目录 README 的包表和实际包一一对应；有 runtime 构建时，核对每个包的“类别”“默认”和地图的“类别”。CI 的文档步骤不构建 runtime，找不到 `dist/plugin-catalog.js` 时跳过类别检查并提示。接入 `scripts/check-docs.sh`（在 `check-current-docs` 之前），根脚本 `test:package-readmes`，并串进 `test`。`scripts/test/package-readmes.test.mjs` 9 个用例。
+- 负向验证：把 `todo/` README 里 `tool-todo` 的类别从“全局+会话”改成“会话”，`check:docs` 失败并指出该行；还原后通过。缺行、多行、包数不符、地图缺目录由单元测试覆盖。
+- 现行文档：`AGENTS.md`（加 `packages/README.md` 入口）、`README.md`、`CONTRIBUTING.md`（改包要同步 README）、`docs/ARCHITECTURE.md`（指向地图，修正 `session/jsonl` 等旧写法）、包结构规范（第 4 条改为指向地图，§3 改用包名）、`agent-plugin-runtime/README.md`（加包地图链接）。四个包 README 的 `../../docs` 链接少一层，已改为 `../../../docs`（`auto-review`、`boot`、`agent-service`、`agent-host`）。旧包名和旧路径在现行文档里本来就没有残留（S1 脚本已替换）。
+- `scripts/check-current-docs.mjs` 加两条禁用模式：旧包名（`@actspace/tools-`、`core-agent`、`core-scope`、`session-jsonl`）和旧一级包路径，都带 `allowHistoricalLine`。
+- 验证：`pnpm test:package-readmes`（9）、`node scripts/check-package-readmes.mjs`、`pnpm check:packages`（68）、`node scripts/check-plugin-catalog.mjs`、`pnpm generate:plugin-loader --check`、`pnpm run test:package-boundaries`、`pnpm run test:plugin-catalog`、`pnpm run test:contract-matrix`、`pnpm typecheck`、`pnpm --filter @actspace/runtime test`（98）通过；`pnpm check:docs` 的 README 检查通过，之后停在 `check-current-docs` 的 363 条已知失败（全部在 `docs/exec-runs/`，没有新增）。包 README 的相对链接用 `tmp/s4-links.mjs` 全部核对过。
+
 ## 遇到的问题
 
 - P1：计划没列 `chat-presentation-recovery.test.tsx`，它断言「+」菜单项等于 `["可视化回复", "上下文"]`，删入口后失败，已改为 `["上下文"]`。另有 `RightPanel.tsx`、`RightPanelObjectMenu.tsx` 里提到 Reply / 可视化回复的注释和提示文字，一并改掉。
@@ -291,6 +302,7 @@
 - S2：esbuild 在 todo 拆分后报 `No matching export applyTools`，原因是构建脚本还是旧的，改写 `build-default-harness.mjs` 后恢复；两个测试里字符串与品牌 `ServiceId` 比较报 TS2345，改用 `String(id)`；契约矩阵测试需先 `pnpm gen:contract-matrix`。
 
 - S3：`test:contract-matrix` 因文档改动失效，重新 `pnpm gen:contract-matrix` 后恢复；`PluginsSection` 的两个原生 button 被 `check:frontend-tokens` 拦下，重试改用 `Button`，折叠行是整行铺满的按钮，`Button` 不适用，基线登记 1 个；`docs/roadmap.md` 的已完成行有固定格式（站点解析），加备注会让站点测试失败，已还原，没有改 roadmap；桌面全量测试里 extensions-page 在负载下偶发失败（连接面板文字在插件列表之后才异步出现，原断言是同步的），改成 findByText 后稳定。
+- S4：`pnpm test` 根命令链停在 `test:current-docs`（363 条基线），新测试单独跑；`sed -i` 和复合命令被工作树保护拦下，改用 Edit 工具和分开的命令；`util/`、`test-support/` 的“没有使用方”靠 grep `package.json` 和源码导入确认。
 
 ## 跳过或推迟的事项
 
@@ -311,3 +323,7 @@
 - S3：Electron 实机检查留给用户：默认启动插件页两个开关都关、工具设置无浏览器组、常规设置无语音设置、Agent 工具列表无 `browser_*`；打开操控浏览器后出现“重启后开启”，重启后连接面板和 `browser_*` 回来并能连 Chrome；打开英语学习重启后选目标会话、双语回答、朗读与原来一致；关闭后重启语音设置消失，旧会话能打开。
 - S3：常驻开销检查（默认设置启动 Electron 60 秒内无浏览器状态轮询、`ps` 无 `abb`、数据目录无新写 Native Host 清单）没有在无头环境里跑，留给 Electron 实机。代码上已保证：开关关闭时 `BrowserBridgeService` 不创建。
 - S3：没有改站点「设置与数据」等页面里对「能力」页的零散提法（只改了 english-learning 的入口文字）；`docs/roadmap.md` 没改（格式限制）。
+- S4：类别检查依赖 runtime 构建；CI 的文档步骤不构建，会跳过类别和默认开关的核对，只查包表与目录是否一一对应。本地改了插件清单后要先 `pnpm --filter @actspace/runtime build`。
+- S4：各包自己的 README（如 `tool-shell`、`context-engine`）只修了链接，没有逐份重审内容；能力目录 README 里“怎么连”的依赖方向以当时的 `package.json` 为准，之后包依赖变了需要手工同步（脚本不核对依赖）。
+- S4：`docs/design-docs/架构优化/02-插件结构设计.md` 里的旧包名是对照表，保留；`agent-package-ledger.md`、`docs/exec-runs/` 里的旧名属于历史记录，没动。
+- S4：`pnpm check:docs` 的 363 条已知失败仍在，全部在 `docs/exec-runs/`，没有新增。
