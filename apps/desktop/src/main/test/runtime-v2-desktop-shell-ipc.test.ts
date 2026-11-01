@@ -139,14 +139,14 @@ describe("runtime v2 desktop shell IPC", () => {
     const worktree = join(dataRoot, "worktree");
     const outside = join(dataRoot, "outside");
     await Promise.all([workspace, worktree, outside].map((dir) => mkdir(dir)));
-    await Promise.all([workspace, worktree, outside].map((dir) => writeFile(join(dir, "a.txt"), dir)));
+    await Promise.all([workspace, worktree, outside].map((dir) => writeFile(join(dir, "a.md"), dir)));
     const trusted = trustedWindow();
     const registration = registerRuntimeV2DesktopShell({
       roots: { dataRoot, sessionRoot: join(dataRoot, "sessions-v2"), logRoot: join(dataRoot, "logs"), tmpRoot: join(dataRoot, "tmp"), defaultWorkspaceRoot: workspace, workspaceRoot: workspace },
       getMainWindow: () => trusted.window as never,
       listSessions: async () => [{ workspaceRoot: worktree }],
     });
-    const read = (workspaceRoot?: string) => Promise.resolve().then(() => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.readWorkspaceFile)!(trusted.event, { workspaceRoot, relativePath: "a.txt" }));
+    const read = (workspaceRoot?: string) => Promise.resolve().then(() => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.readWorkspaceFile)!(trusted.event, { workspaceRoot, relativePath: "a.md" }));
     try {
       expect(await read(workspace)).toMatchObject({ content: workspace });
       expect(await read()).toMatchObject({ content: workspace });
@@ -154,7 +154,7 @@ describe("runtime v2 desktop shell IPC", () => {
       await expect(read(outside)).rejects.toThrow("workspace_not_registered");
       await expect(read("/")).rejects.toThrow("workspace_not_registered");
       await expect(Promise.resolve().then(() => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.listWorkspaceDir)!(trusted.event, { workspaceRoot: outside }))).rejects.toThrow("workspace_not_registered");
-      await expect(Promise.resolve().then(() => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.statWorkspaceFile)!(trusted.event, { workspaceRoot: outside, relativePath: "a.txt" }))).rejects.toThrow("workspace_not_registered");
+      await expect(Promise.resolve().then(() => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.statWorkspaceFile)!(trusted.event, { workspaceRoot: outside, relativePath: "a.md" }))).rejects.toThrow("workspace_not_registered");
     } finally {
       registration.dispose();
       await rm(dataRoot, { recursive: true, force: true });

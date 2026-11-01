@@ -10,11 +10,13 @@ import { workspaceFileTabId, type RightPanelTab, type WorkspaceFileTarget } from
 
 export const READ_ERROR_TEXT: Record<NonNullable<WorkspaceReadFileResult["error"]>, string> = {
   too_large: "文件过大，暂不在此预览。",
-  binary: "二进制文件，暂不预览。",
   not_found: "文件不存在或已被移动。",
   not_a_file: "这是一个目录，不是文件。",
   escapes_root: "路径超出工作区范围，已拒绝读取。",
 };
+
+/** 应用内只渲染 Markdown 和图片；其他文件不生成预览标签。 */
+const EXTERNAL_FILE_TEXT = "这类文件不在应用内预览，请用系统默认应用打开。";
 
 export function tabFromFile(result: WorkspaceReadFileResult, target?: WorkspaceFileTarget): RightPanelTab {
   const id = workspaceFileTabId(result.relativePath, target);
@@ -36,22 +38,11 @@ export function tabFromFile(result: WorkspaceReadFileResult, target?: WorkspaceF
   switch (result.renderKind) {
     case "markdown":
       return { id, kind: "markdown", title, source: result.content ?? "", ...meta, ...truncated };
-    case "html":
-      return { id, kind: "html", title, html: result.content ?? "", trust: "file", ...meta, ...truncated };
     case "image":
       return { id, kind: "image", title, src: result.dataUrl ?? "", ...meta };
-    case "csv":
-      return { id, kind: "csv", title, content: result.content ?? "", ...meta, ...truncated };
     default:
-      return {
-        id,
-        kind: "text",
-        title,
-        content: result.content ?? "",
-        language: result.language,
-        ...meta,
-        ...truncated,
-      };
+      // external 由 open-workspace-path 交给系统打开，正常不会走到这里（例如重载一个旧标签时才会）。
+      return { id, kind: "text", title, content: EXTERNAL_FILE_TEXT, ...meta };
   }
 }
 

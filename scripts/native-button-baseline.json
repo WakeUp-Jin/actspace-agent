@@ -47,7 +47,6 @@
   "components/review/ReviewScopeMenu.tsx": 7,
   "components/review/ReviewToolbar.tsx": 8,
   "components/review/ReviewWorkspace.tsx": 6,
-  "components/right-panel/CsvRenderView.tsx": 2,
   "components/right-panel/OpenInAppMenu.tsx": 1,
   "components/right-panel/PreviewSourceToggle.tsx": 2,
   "components/right-panel/RightPanelLauncherList.tsx": 1,

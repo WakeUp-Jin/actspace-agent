@@ -1,6 +1,7 @@
 import { ChevronDown, ExternalLink, FolderOpen } from "lucide-react";
 import { useState } from "react";
 import type { WorkspaceFileApplication } from "@actspace/shared";
+import { ApplicationIcon, ApplicationLabel } from "../files/ApplicationLabel";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "../ui/Menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 
@@ -16,13 +17,6 @@ export type OpenWithOperation = { kind: "default" } | { kind: "application"; id:
 const SPLIT_CLASS = "inline-flex h-6 flex-none items-stretch overflow-hidden rounded-act-sm border-[0.5px] border-line-strong";
 const HALF_CLASS =
   "inline-flex items-center justify-center border-0 bg-transparent text-act-xxs leading-4 whitespace-nowrap enabled:hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:outline-none disabled:cursor-default";
-
-function ApplicationIcon({ source, size = 14 }: { source: string | undefined; size?: number }) {
-  const [failed, setFailed] = useState(false);
-  return !source || failed
-    ? <ExternalLink size={size} aria-hidden="true" />
-    : <img src={source} width={size} height={size} className="flex-none object-contain" alt="" draggable={false} onError={() => setFailed(true)} />;
-}
 
 export function OpenWithButton({ applications, failed, loading, pending, chooseApplication, onAction, onRefresh }: {
   applications: readonly WorkspaceFileApplication[];
@@ -79,8 +73,7 @@ export function OpenWithButton({ applications, failed, loading, pending, chooseA
       <MenuContent align="end" className="min-w-44">
         {chooseApplication ? applications.map((app) => (
           <MenuItem key={app.id} onSelect={() => onAction({ kind: "application", id: app.id })}>
-            <ApplicationIcon key={app.iconDataUrl} source={app.iconDataUrl} />
-            <span className="min-w-0 truncate">{app.id === preferred?.id ? `${app.name}（默认）` : app.name}</span>
+            <ApplicationLabel app={app} defaultId={preferred?.id} />
           </MenuItem>
         )) : (
           <MenuItem onSelect={() => onAction({ kind: "default" })}>

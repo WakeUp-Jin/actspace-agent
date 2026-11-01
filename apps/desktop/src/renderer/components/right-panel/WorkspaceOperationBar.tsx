@@ -61,11 +61,11 @@ export function WorkspaceOperationBar({
   const rootLabel = workspaceLabelOf(boundRoot);
   const isStale = Boolean(meta?.isStale);
   const isTruncated = Boolean(meta?.truncated);
-  // 只有「渲染态之外还有源码可看」的文件类型才给切换按钮：markdown 与 html。
+  // 只有「渲染态之外还有源码可看」的文件类型才给切换按钮：markdown。
   // 必须同时要求 path：浏览态下激活的可能是聊天生成的 markdown（内容区是占位页），
   // 那时按钮点了没有任何视图会响应。
   const dualViewTab =
-    path && activeTab && (activeTab.kind === "markdown" || activeTab.kind === "html") ? activeTab : null;
+    path && activeTab && activeTab.kind === "markdown" ? activeTab : null;
 
   const reload = () => {
     if (!path || !activeTab) return;

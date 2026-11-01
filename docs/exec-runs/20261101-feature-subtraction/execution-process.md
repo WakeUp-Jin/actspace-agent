@@ -95,13 +95,50 @@
 | `pnpm --filter @actspace/desktop build` | 通过 |
 | `bash -n scripts/release-package.sh` | 语法通过；未实测完整打包 |
 | 残留检查：`grep -rni "xterm\|node-pty\|terminalApi\|TerminalSession" apps packages scripts` | 只剩 `SpaceTerminalView.tsx`（Space mock，计划允许） |
+### P3 文件打开收敛
+
+- **操作**：按 `p3-file-open-convergence.md` 收敛文件打开方式。
+  - 步骤 1 实测（`tmp/spike-openpath/` 临时 Electron 脚本，不进 git）：对没有关联应用的 `probe.actspace-probe` 调用 `shell.openPath`，约 75ms 返回 `"Failed to open path"`，系统不弹框、不挂起。据此选用计划里的第一个分支（main 映射为 `no_application`），不预查 `listFileApplications`。只在 macOS 实测，其他平台未验证。
+  - main：`workspace-fs-service.ts` 删 `HTML_EXTS`、`CSV_EXTS`、全部语言映射表、`languageOf`、`listMappedLanguages`，`renderKindOf` 只返回 `markdown` / `image` / `external`；`readWorkspaceFile` 对 `external` 只返回 stat，不读内容、不做二进制检测；`file-applications-service.ts` 把 `openPath` 的错误串映射为 `no_application`。
+  - shared：`WorkspaceFileRenderKind` 改为三值，删 `WorkspaceReadFileResult.language` 和读文件的 `binary` 错误，`WorkspaceOpenFileResult.error` 加 `no_application`。
+  - 新增：`components/files/open-workspace-path.ts`（`classifyWorkspaceFile`、`openWorkspacePath`）、`open-file-fallback-context.tsx`（`OpenFileFallbackProvider`、`useOpenWorkspacePath`）、`OpenFileFallbackDialog.tsx`、`ApplicationLabel.tsx`（从 `OpenWithButton` 抽出的应用图标和名称行，交付卡下拉和兜底对话框共用）；`WorkbenchLayout` 挂 Provider；`canChooseApplication` 从 `TurnDeliverables` 移到 `useFileApplications.ts` 共用。
+  - 删除：`HtmlRenderView.tsx`、`CsvRenderView.tsx`、`open-html-in-browser.ts`、`html-render-view.test.tsx`、`csv-render-view.test.tsx`。
+  - renderer 修改：`workspaceFileTab.ts`、`RightPanelContext.tsx`（删 `html`、`csv` kind 和 `text.language`）、`RightPanel.tsx`（删两个视图分支和 `HtmlTab`）、`WorkspaceOperationBar.tsx`（`dualViewTab` 只剩 markdown）；`open-turn-file.ts`、`use-workspace-file-links.ts`、`WorkspaceFileTree.tsx`、`TurnReviewView.tsx`、`TurnDeliverables.tsx` 全部改走 `useOpenWorkspacePath()`，远端分支保持在最前面不变。`useFileFreshness.ts` 的重载逻辑沿用 `tabFromFile`，不需要改。
+  - 脚本：`scripts/check-frontend-theme-colors.mjs` 去掉 `HtmlRenderView` 的必需字面量例外；`scripts/native-button-baseline.json` 删 `CsvRenderView` 条目。
+  - mock：`turn-deliverables` 场景的 `readFile` 改为 markdown / external，并让 `docs/chart.json` 模拟「没有关联应用」、VS Code 模拟未安装，用来验收兜底对话框。
+  - 文档：`front-右侧面板与文件渲染规范.md`（改写文件渲染规则，新增「文件打开路由与兜底对话框」，删 CSV、HTML 沙箱两节和语言映射条目）、`front-工作台布局与面板交互规范.md`、`front-icon-button-tooltip-guidelines.md`、站点 `file-preview.md`；更新日志追加；新增 `docs/histories/2026-11/20261101-1240-file-open-convergence.md`。
+- **影响文件**：删 5 个，新增 4 个源文件和 2 个测试，改约 30 个。
+- **决定**：
+  - `tabFromFile` 遇到 `external` 返回一个说明性的 `text` 标签，而不是抛错或返回 null：重载旧标签（例如读取失败标签）时仍会走到它，正常打开路径在它之前已分流。
+  - `TurnDeliverables` 卡片和「打开整个文件」按钮的标签、悬停文字改为「打开」（原为「在侧边栏预览 / 打开」），避免对交给系统打开的文件说谎；对应测试的名称同步改。
+  - 没有 Provider 时（单测、独立挂载）`useOpenWorkspacePath()` 退回不弹对话框的路由。
+  - 测试里需要「读到文本内容」的用例（新鲜度、目标归属、文件树、IPC 沙箱）改用 `.md` 文件，因为其他扩展名不再读内容。
+- **验证**（先跑 `pnpm --filter @actspace/desktop build:deps:dev`）：
+
+| 命令 | 结果 |
+|---|---|
+| `pnpm --filter @actspace/shared test` | 通过（181） |
+| `pnpm --filter @actspace/client test` | 通过（56） |
+| `pnpm --filter @actspace/desktop test` | 通过（见「遇到的问题」里一次偶发的销毁后报错） |
+| `pnpm --filter @actspace/desktop typecheck` / `pnpm typecheck` | 通过 |
+| `pnpm check:ipc-channels` / `check:renderer-bridge` / `check:frontend-tokens` / `check:frontend-theme` | 通过 |
+| `pnpm check:docs` / `check:current-docs` | 仍是 363 条已知失败，全部在 `docs/exec-runs/`，无新增 |
+| `pnpm --filter @actspace/site test` / `pnpm check:site` | 通过（31）/ 0 errors |
+| 残留检查：`grep -rn "HtmlRenderView\|CsvRenderView\|open-html-in-browser\|languageOf" apps/desktop/src packages/shared/src` | 无命中 |
+| 兜底对话框截图 | 浏览器 mock（`?mock=turn-deliverables`，点 `docs/chart.json` 交付卡），Chrome headless 经 CDP 截浅色、深色各一张（`tmp/p3-fallback-light.png`、`tmp/p3-fallback-dark.png`，不进 git），两种主题都正常 |
+
 ## 遇到的问题
 
 - P1：计划没列 `chat-presentation-recovery.test.tsx`，它断言「+」菜单项等于 `["可视化回复", "上下文"]`，删入口后失败，已改为 `["上下文"]`。另有 `RightPanel.tsx`、`RightPanelObjectMenu.tsx` 里提到 Reply / 可视化回复的注释和提示文字，一并改掉。
 - P2：P1 提交遗留了一个未使用的 import（`packages/shared/src/ipc.ts` 的 `ModelId`，原来只被已删的可视化类型用到），`apps/web` 开了 `noUnusedLocals`，导致 `pnpm typecheck` 失败。已在 P2 里顺手删掉这个 import。
 - P2：计划列的 `main/test/main-lifecycle.test.ts` 两个终端用例随终端清理一起删，改成一个 `onClosed` 用例；`right-panel-object-menu.test.tsx` 的用例改名并改为断言菜单里没有「终端」；计划没列 `chat-presentation-recovery.test.tsx` 里的 `"终端"` 反向断言，也一并去掉。
+- P3：计划列的几个测试里，`workspace-file-freshness`、`workspace-file-target`、`workspace-file-tree`、`runtime-v2-desktop-shell-ipc` 用 `.txt` 文件当「能读到内容」的样例，`workspace-fs-service.test.ts` 的 `..foo` 和截断用例用 `.log`，改成 `.md` 之后才成立；计划没列 `runtime-v2-desktop-shell-ipc.test.ts` 和 `file-applications-service.test.ts`，一并改。
+- P3：`scripts/check-frontend-theme-colors.mjs` 里 `HtmlRenderView.tsx` 是必需的字面量例外，删文件后检查会直接崩溃（读不到文件）；`native-button-baseline.json` 里 `CsvRenderView` 条目也要删。计划没提这两处。
+- P3：`!result.ok` 在 renderer 里不能收窄带字面量的判别联合（该 tsconfig 没开严格空值检查），要写 `result.ok === false`。
+- P3：`pnpm --filter @actspace/desktop test` 有一次出现「环境销毁后捕获到错误」的偶发报错（1 个 Errors，所有用例仍通过），重跑两次没有复现；怀疑来自某个异步清理时序，未定位到具体文件。
 
 ## 跳过或推迟的事项
 
 - P1：Space 演示里的 mock「可视化回复」标签留待 Space 演示后续处理（见 P1 决定）。磁盘上旧的 `visualizations.json` 不读不删。
 - P2：`agent-contract-matrix.generated.md` 里仍含 node-pty 的依赖列表，基线已过期，留给 S1 重新生成。未实测完整打包（只做了 `bash -n`）。
+- P3：Windows / Linux 上 `shell.openPath` 对无关联应用文件的返回值未实测；Electron 实机（交付卡、聊天链接、读文件工具行点 `.md`、`.png`、`.html`、`.pdf`、`.ts`，以及兜底对话框三项）留给用户手工检查。`TurnChangesCard` 头部悬停文字「在侧边栏预览」仍对应打开本轮改动视图，没改。

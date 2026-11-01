@@ -102,9 +102,14 @@ export function turnDeliverablesScenario({ db }: MockClock): MockHandlers | void
       readFile: async ({ relativePath }) => {
         const content = relativePath === "docs/report.md" ? FILES[relativePath].replace("# 季度报告", "# 季度报告（终稿）") : FILES[relativePath];
         return content === undefined
-          ? { relativePath, renderKind: "text", size: 0, mtimeMs: 0, error: "not_found" }
-          : { relativePath, renderKind: relativePath.endsWith(".md") ? "markdown" : "text", content, size: content.length, mtimeMs: 0 };
+          ? { relativePath, renderKind: "external", size: 0, mtimeMs: 0, error: "not_found" }
+          : relativePath.endsWith(".md")
+            ? { relativePath, renderKind: "markdown", content, size: content.length, mtimeMs: 0 }
+            : { relativePath, renderKind: "external", size: content.length, mtimeMs: 0 };
       },
+      // 验收兜底对话框：这个文件模拟「系统没有任何关联应用」，VS Code 模拟未安装。
+      openFile: async ({ relativePath }) => (relativePath === "docs/chart.json" ? { ok: false, error: "no_application" } : { ok: true }),
+      listOpenTools: async () => ({ tools: [{ id: "vscode", label: "VS Code", available: false }] }),
     },
   };
 }

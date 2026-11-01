@@ -120,4 +120,8 @@
 
 ## 决策记录
 
-- 执行时填写：步骤 1 的实测结果与选用的分支。
+- 2026-11-01 步骤 1 实测：用 `tmp/spike-openpath/` 里的临时 Electron 脚本，对 `probe.actspace-probe`（没有任何关联应用的扩展名）调用 `shell.openPath`，约 75ms 返回字符串 `"Failed to open path"`，系统没有自己弹框。
+- 选用第一个分支：main 的 `openWorkspaceFile` 把 `openPath` 返回的非空错误串映射为新错误码 `no_application`，renderer 的 `openWorkspacePath` 把它转成 `no_app`，由 `OpenFileFallbackProvider` 弹兜底对话框。不需要在调用前预查 `listFileApplications`。目标文件已由 `resolveTarget` 确认存在，所以这个错误串按「没有可用应用」处理；`openPath` 抛异常和其他失败仍是 `open_failed`。
+- 只在 macOS 实测；Windows / Linux 上 `shell.openPath` 的行为未验证，错误串路径对它们同样适用。
+- `tabFromFile` 遇到 `external` 不报错，返回一个说明「这类文件不在应用内预览」的 `text` 标签，因为重载旧标签时仍会经过它；正常打开路径在调用它之前就已分流。
+- `TurnDeliverables` 卡片主体和本轮改动里「打开整个文件」按钮的标签改为「打开」，不再说「在侧边栏预览 / 打开」，因为非 Markdown / 图片文件现在交给系统打开。

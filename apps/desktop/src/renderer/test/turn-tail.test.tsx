@@ -72,7 +72,7 @@ describe("turn tail", () => {
 
     const reply = screen.getByText("已完成。");
     const changes = screen.getByRole("button", { name: "查看 src/app.ts 的改动" });
-    const deliverable = screen.getByRole("button", { name: "在侧边栏预览 docs/report.md" });
+    const deliverable = screen.getByRole("button", { name: "打开 docs/report.md" });
     expect(changes).toHaveTextContent("已编辑 app.ts");
     expect(reply.compareDocumentPosition(changes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(changes.compareDocumentPosition(deliverable) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -99,12 +99,12 @@ describe("turn tail", () => {
     bridge({ "workspaces.readFile": readFile });
     await renderTurn(turn(presentMessage));
 
-    await userEvent.click(screen.getByRole("button", { name: "在侧边栏预览 docs/report.md" }));
+    await userEvent.click(screen.getByRole("button", { name: "打开 docs/report.md" }));
     expect(readFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/report.md" });
     expect(screen.getByTestId("active-tab")).toHaveTextContent("markdown:report.md");
 
     readFile.mockResolvedValueOnce({ relativePath: "docs/report.md", renderKind: "text", size: 0, error: "not_found" } as never);
-    await userEvent.click(screen.getByRole("button", { name: "在侧边栏预览 docs/report.md" }));
+    await userEvent.click(screen.getByRole("button", { name: "打开 docs/report.md" }));
     expect(await screen.findByText("文件不存在或已被移动。")).toBeInTheDocument();
   });
 
@@ -139,7 +139,7 @@ describe("turn tail", () => {
     await renderTurn(turn(editMessage, presentMessage));
 
     fireEvent.contextMenu(screen.getByRole("button", { name: "查看 src/app.ts 的改动" }));
-    fireEvent.contextMenu(screen.getByRole("button", { name: "在侧边栏预览 docs/report.md" }));
+    fireEvent.contextMenu(screen.getByRole("button", { name: "打开 docs/report.md" }));
     await vi.waitFor(() => expect(showArtifactContextMenu).toHaveBeenCalledTimes(2));
     expect(showArtifactContextMenu).toHaveBeenNthCalledWith(1, { kind: "workspace_file", workspaceRoot: "/workspace", relativePath: "src/app.ts" });
     expect(showArtifactContextMenu).toHaveBeenNthCalledWith(2, { kind: "workspace_file", workspaceRoot: "/workspace", relativePath: "docs/report.md" });
@@ -157,7 +157,7 @@ describe("turn tail", () => {
       runTarget: { kind: "remote", hostId: "server", hostName: "Cloud" },
     });
 
-    const card = screen.getByRole("button", { name: "在侧边栏预览 docs/report.md" });
+    const card = screen.getByRole("button", { name: "打开 docs/report.md" });
     expect(document.querySelector("[data-open-with]")).toBeNull();
     await userEvent.click(card);
     expect(preview).toHaveBeenCalledWith({ hostId: "server", sessionId: "remote-1", artifactId: "artifact-1" });
@@ -179,7 +179,7 @@ describe("turn tail", () => {
 
     expect(screen.queryByRole("button", { name: "查看 src/app.ts 的改动" })).toBeNull();
     const tail = document.querySelector<HTMLElement>("[data-turn-tail]")!;
-    expect(within(tail).getByRole("button", { name: "在侧边栏预览 docs/report.md" })).toBeInTheDocument();
+    expect(within(tail).getByRole("button", { name: "打开 docs/report.md" })).toBeInTheDocument();
 
     enabled = true;
     await act(async () => { changed(); });
@@ -196,8 +196,8 @@ describe("turn review tab", () => {
   const tab = { id: "turn-review:s:t", kind: "turnReview" as const, title: "第 1 轮改动", changes, index: 1, revision: 1, sessionId: "session-1", workspaceRoot: "/workspace" };
 
   it("selects the clicked file, toggles split and wrap, and opens the whole file", async () => {
-    const readFile = vi.fn(async () => ({ relativePath: "src/util.ts", renderKind: "text" as const, content: "export {};", size: 10 }));
-    bridge({ "workspaces.readFile": readFile });
+    const openFile = vi.fn(async () => ({ ok: true }));
+    bridge({ "workspaces.openFile": openFile });
     render(<RightPanelProvider><TurnReviewView tab={tab} /><ActiveTabProbe /></RightPanelProvider>);
 
     expect(document.querySelector("[data-review-file]")).toHaveAttribute("data-review-file", "src/util.ts");
@@ -214,7 +214,8 @@ describe("turn review tab", () => {
     await userEvent.click(screen.getByRole("button", { name: "自动换行" }));
     expect(document.querySelector(".turn-diff-body")).toHaveAttribute("data-wrap", "true");
 
-    await userEvent.click(screen.getByRole("button", { name: "在侧边栏打开 src/app.ts" }));
-    expect(readFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "src/app.ts" });
+    await userEvent.click(screen.getByRole("button", { name: "打开 src/app.ts" }));
+    // .ts 不在应用内渲染：交给系统默认应用，不读文件。
+    expect(openFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "src/app.ts", action: "open" });
   });
 });

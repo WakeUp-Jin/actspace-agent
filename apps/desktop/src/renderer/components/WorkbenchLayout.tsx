@@ -41,6 +41,7 @@ import { NewSpaceDialog } from "./space/dialogs/NewSpaceDialog";
 import { SpaceDemoHelpButton } from "./space/dialogs/SpaceDemoHelpDialog";
 import { useSpacePanelBinding } from "./space/use-space-panel-binding";
 import { TrajectoryNavigationProvider } from "./trajectory/TrajectoryNavigation";
+import { OpenFileFallbackProvider } from "./files/open-file-fallback-context";
 
 export function WorkbenchLayout({
   sessions,
@@ -392,6 +393,7 @@ export function WorkbenchLayout({
 
   return (
     <TrajectoryNavigationProvider onShowTrajectory={showSessionTrajectory}>
+      <OpenFileFallbackProvider>
       <WindowChromeBar
         leftMode={chromeLeftMode}
         rightOpen={rightPanelShown}
@@ -475,6 +477,7 @@ export function WorkbenchLayout({
         </div>
       ) : null}
       {SPACE_DEMO_ENABLED ? <NewSpaceDialog open={newSpaceOpen} onOpenChange={setNewSpaceOpen} onCreated={() => handleSelectView("space")} /> : null}
+      </OpenFileFallbackProvider>
     </TrajectoryNavigationProvider>
   );
 }

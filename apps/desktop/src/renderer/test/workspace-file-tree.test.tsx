@@ -10,11 +10,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** 暴露当前激活 Tab 给断言：`kind|language|title`。 */
+/** 暴露当前激活 Tab 给断言：`kind||title`。 */
 function ActiveTabProbe() {
   const { activeTab } = useRightPanel();
-  const language = activeTab && "language" in activeTab ? (activeTab.language ?? "") : "";
-  return <div data-testid="active-tab">{activeTab ? `${activeTab.kind}|${language}|${activeTab.title}` : "none"}</div>;
+  return <div data-testid="active-tab">{activeTab ? `${activeTab.kind}||${activeTab.title}` : "none"}</div>;
 }
 
 function renderTree(workspaceRoot?: string) {
@@ -34,7 +33,7 @@ function installBridge(overrides: {
   setupBridge({
     "workspaces.listDir": overrides.listWorkspaceDir ?? (async () => ({ root: "/ws", relativePath: "", entries: [] })),
     "workspaces.readFile":
-      overrides.readWorkspaceFile ?? (async () => ({ relativePath: "", renderKind: "text", size: 0, mtimeMs: 0, content: "" })),
+      overrides.readWorkspaceFile ?? (async () => ({ relativePath: "", renderKind: "markdown", size: 0, mtimeMs: 0, content: "" })),
     "workspaces.openFile": overrides.openWorkspaceFile ?? (async () => ({ ok: true })),
   });
 }
@@ -45,16 +44,16 @@ describe("WorkspaceFileTree", () => {
     const pending = new Promise<WorkspaceReadFileResult>((resolve) => { finishRead = resolve; });
     const listWorkspaceDir = vi.fn(async (input: WorkspaceListDirInput): Promise<WorkspaceListDirResult> => ({
       root: input.workspaceRoot!, relativePath: "",
-      entries: [{ name: input.workspaceRoot === "/a" ? "old.txt" : "new.txt", relativePath: "same.txt", kind: "file" }],
+      entries: [{ name: input.workspaceRoot === "/a" ? "old.md" : "new.md", relativePath: "same.md", kind: "file" }],
     }));
     installBridge({ listWorkspaceDir, readWorkspaceFile: () => pending });
     const view = (root: string) => <RightPanelProvider><WorkspaceFileTree workspaceRoot={root} /><ActiveTabProbe /></RightPanelProvider>;
     const rendered = render(view("/a"));
-    await userEvent.click(await screen.findByText("old.txt"));
+    await userEvent.click(await screen.findByText("old.md"));
     rendered.rerender(view("/b"));
-    expect(await screen.findByText("new.txt")).toBeInTheDocument();
-    expect(screen.queryByText("old.txt")).not.toBeInTheDocument();
-    await act(async () => { finishRead({ relativePath: "same.txt", renderKind: "text", size: 1, mtimeMs: 1, content: "old" }); });
+    expect(await screen.findByText("new.md")).toBeInTheDocument();
+    expect(screen.queryByText("old.md")).not.toBeInTheDocument();
+    await act(async () => { finishRead({ relativePath: "same.md", renderKind: "markdown", size: 1, mtimeMs: 1, content: "old" }); });
     expect(screen.getByTestId("active-tab")).toHaveTextContent("none");
     expect(listWorkspaceDir).toHaveBeenCalledWith({ workspaceRoot: "/b", relativePath: "" });
   });
@@ -94,17 +93,9 @@ describe("WorkspaceFileTree", () => {
     expect(listWorkspaceDir).toHaveBeenLastCalledWith({ workspaceRoot: "/ws", relativePath: "src" });
   });
 
-  it("opens a code file as a text tab carrying the inferred language", async () => {
-    const readWorkspaceFile = vi.fn(
-      async (): Promise<WorkspaceReadFileResult> => ({
-        relativePath: "main.ts",
-        renderKind: "text",
-        size: 18,
-        mtimeMs: 1_700_000_000_000,
-        content: "export const x = 1;",
-        language: "typescript",
-      }),
-    );
+  it("hands a code file to the system default app instead of opening a tab", async () => {
+    const readWorkspaceFile = vi.fn(async (): Promise<WorkspaceReadFileResult> => ({ relativePath: "main.ts", renderKind: "external", size: 18, mtimeMs: 1 }));
+    const openWorkspaceFile = vi.fn(async (): Promise<WorkspaceOpenFileResult> => ({ ok: true }));
     installBridge({
       listWorkspaceDir: async () => ({
         root: "/ws",
@@ -112,20 +103,19 @@ describe("WorkspaceFileTree", () => {
         entries: [{ name: "main.ts", relativePath: "main.ts", kind: "file", size: 18 }],
       }),
       readWorkspaceFile,
+      openWorkspaceFile,
     });
 
     renderTree("/ws-selected");
-
     await userEvent.click(await screen.findByText("main.ts"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("active-tab")).toHaveTextContent("text|typescript|main.ts");
-    });
-    expect(readWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/ws-selected", relativePath: "main.ts" });
+    await waitFor(() => expect(openWorkspaceFile).toHaveBeenCalledWith({ workspaceRoot: "/ws-selected", relativePath: "main.ts", action: "open" }));
+    expect(readWorkspaceFile).not.toHaveBeenCalled();
+    expect(screen.getByTestId("active-tab")).toHaveTextContent("none");
   });
 
-  it("opens an HTML file in the system browser instead of rendering it in the panel", async () => {
-    const readWorkspaceFile = vi.fn(async (): Promise<WorkspaceReadFileResult> => ({ relativePath: "report.html", renderKind: "html", size: 10, mtimeMs: 0, content: "<p>x</p>" }));
+  it("hands an HTML file to the system (default browser) instead of rendering it in the panel", async () => {
+    const readWorkspaceFile = vi.fn(async (): Promise<WorkspaceReadFileResult> => ({ relativePath: "report.html", renderKind: "external", size: 10, mtimeMs: 0 }));
     const openWorkspaceFile = vi.fn(async (): Promise<WorkspaceOpenFileResult> => ({ ok: true }));
     installBridge({
       listWorkspaceDir: async () => ({ root: "/ws", relativePath: "", entries: [{ name: "report.html", relativePath: "report.html", kind: "file", size: 10 }] }),

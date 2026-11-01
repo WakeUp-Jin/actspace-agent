@@ -2,10 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import hljs from "highlight.js";
 import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
 import {
-  listMappedLanguages,
   listWorkspaceDir,
   readWorkspaceFile,
   statWorkspaceFile,
@@ -77,25 +75,22 @@ describe("readWorkspaceFile", () => {
     const result = await readWorkspaceFile({ relativePath: "readme.md" }, roots);
     expect(result.renderKind).toBe("markdown");
     expect(result.content).toBe("# Hi\n\ntext");
-    expect(result.language).toBeUndefined();
   });
 
-  it("infers highlight language for code/config files", async () => {
+  it("returns only stat for files that are not rendered in-app", async () => {
     const roots = await makeWorkspace();
     await writeFile(join(roots.workspaceRoot, "a.ts"), "export const x = 1;", "utf8");
-    await writeFile(join(roots.workspaceRoot, "b.yaml"), "key: value", "utf8");
-    await writeFile(join(roots.workspaceRoot, "c.unknownext"), "plain", "utf8");
-
-    const ts = await readWorkspaceFile({ relativePath: "a.ts" }, roots);
-    expect(ts.renderKind).toBe("text");
-    expect(ts.language).toBe("typescript");
-
-    const yaml = await readWorkspaceFile({ relativePath: "b.yaml" }, roots);
-    expect(yaml.language).toBe("yaml");
-
-    const unknown = await readWorkspaceFile({ relativePath: "c.unknownext" }, roots);
-    expect(unknown.renderKind).toBe("text");
-    expect(unknown.language).toBeUndefined();
+    await writeFile(join(roots.workspaceRoot, "b.html"), "<p>x</p>", "utf8");
+    await writeFile(join(roots.workspaceRoot, "c.csv"), "a,b\n1,2\n", "utf8");
+    await writeFile(join(roots.workspaceRoot, "d.bin"), Buffer.from([0x68, 0x00, 0x69]));
+    for (const name of ["a.ts", "b.html", "c.csv", "d.bin"]) {
+      const result = await readWorkspaceFile({ relativePath: name }, roots);
+      expect(result.renderKind, name).toBe("external");
+      expect(result.error, name).toBeUndefined();
+      expect(result.content, name).toBeUndefined();
+      expect(result.size, name).toBeGreaterThan(0);
+      expect(result.mtimeMs, name).toBeGreaterThan(0);
+    }
   });
 
   it("returns an image as a base64 data URL", async () => {
@@ -107,21 +102,14 @@ describe("readWorkspaceFile", () => {
     expect(result.content).toBeUndefined();
   });
 
-  it("flags binary text files", async () => {
-    const roots = await makeWorkspace();
-    await writeFile(join(roots.workspaceRoot, "blob.bin"), Buffer.from([0x68, 0x00, 0x69]));
-    const result = await readWorkspaceFile({ relativePath: "blob.bin" }, roots);
-    expect(result.error).toBe("binary");
-  });
-
   it("truncates oversized text to whole lines instead of rejecting the file", async () => {
     const roots = await makeWorkspace();
     // 每行 10 字节，写到刚好超过上限，确保截断点落在行中间。
     const line = "0123456789\n".slice(0, 11);
     const big = line.repeat(Math.ceil(WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES / line.length) + 100);
-    await writeFile(join(roots.workspaceRoot, "huge.log"), big, "utf8");
+    await writeFile(join(roots.workspaceRoot, "huge.md"), big, "utf8");
 
-    const result = await readWorkspaceFile({ relativePath: "huge.log" }, roots);
+    const result = await readWorkspaceFile({ relativePath: "huge.md" }, roots);
 
     expect(result.error).toBeUndefined();
     expect(result.truncated).toBe(true);
@@ -142,74 +130,6 @@ describe("readWorkspaceFile", () => {
     const result = await readWorkspaceFile({ relativePath: "big.png" }, roots);
     expect(result.error).toBe("too_large");
     expect(result.dataUrl).toBeUndefined();
-  });
-
-  it("resolves language from basename for dotfiles and extension-less files", async () => {
-    const roots = await makeWorkspace();
-    await writeFile(join(roots.workspaceRoot, "Dockerfile"), "FROM node:22", "utf8");
-    await writeFile(join(roots.workspaceRoot, "Makefile"), "all:\n\techo hi", "utf8");
-    await writeFile(join(roots.workspaceRoot, ".gitignore"), "dist\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, ".npmrc"), "registry=x\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, ".env.local"), "A=1\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, "go.mod"), "module x\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, "LICENSE"), "MIT\n", "utf8");
-
-    const expected: Array<[string, string | undefined]> = [
-      ["Dockerfile", "dockerfile"],
-      ["Makefile", "makefile"],
-      [".gitignore", "plaintext"],
-      [".npmrc", "ini"],
-      [".env.local", "bash"],
-      ["go.mod", "go"],
-      ["LICENSE", undefined],
-    ];
-    for (const [name, language] of expected) {
-      const result = await readWorkspaceFile({ relativePath: name }, roots);
-      expect(result.language, name).toBe(language);
-    }
-  });
-
-  it("covers the newly mapped extensions", async () => {
-    const roots = await makeWorkspace();
-    const cases: Array<[string, string]> = [
-      ["a.astro", "xml"],
-      ["a.vue", "xml"],
-      ["a.java", "java"],
-      ["a.cpp", "cpp"],
-      ["a.rb", "ruby"],
-      ["a.tf", "ini"],
-      ["a.proto", "protobuf"],
-      ["a.patch", "diff"],
-      ["a.ini", "ini"],
-      ["a.ps1", "powershell"],
-    ];
-    for (const [name] of cases) {
-      await writeFile(join(roots.workspaceRoot, name), "x\n", "utf8");
-    }
-    for (const [name, language] of cases) {
-      const result = await readWorkspaceFile({ relativePath: name }, roots);
-      expect(result.language, name).toBe(language);
-    }
-  });
-
-  it("leaves plain data files unhighlighted on purpose", async () => {
-    const roots = await makeWorkspace();
-    await writeFile(join(roots.workspaceRoot, "notes.txt"), "hi\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, "app.log"), "hi\n", "utf8");
-    expect((await readWorkspaceFile({ relativePath: "notes.txt" }, roots)).language).toBeUndefined();
-    expect((await readWorkspaceFile({ relativePath: "app.log" }, roots)).language).toBeUndefined();
-  });
-
-  it("routes csv/tsv to the csv render kind without a language", async () => {
-    const roots = await makeWorkspace();
-    await writeFile(join(roots.workspaceRoot, "data.csv"), "a,b\n1,2\n", "utf8");
-    await writeFile(join(roots.workspaceRoot, "data.tsv"), "a\tb\n1\t2\n", "utf8");
-
-    const csv = await readWorkspaceFile({ relativePath: "data.csv" }, roots);
-    expect(csv.renderKind).toBe("csv");
-    expect(csv.content).toBe("a,b\n1,2\n");
-    expect(csv.language).toBeUndefined();
-    expect((await readWorkspaceFile({ relativePath: "data.tsv" }, roots)).renderKind).toBe("csv");
   });
 
   it("returns mtime so the right panel can detect stale tabs", async () => {
@@ -256,15 +176,6 @@ describe("statWorkspaceFile", () => {
   });
 });
 
-describe("language mapping integrity", () => {
-  // 防漂移锁（main 侧一端）：映射表里写的每个语言 id 都必须是 highlight.js 真实存在的语言，
-  // 否则文件会静默回退成纯文本。renderer 侧 `right-panel/highlight.ts` 有对应的另一端。
-  it("only maps languages that highlight.js actually provides", () => {
-    const missing = listMappedLanguages().filter((language) => !hljs.getLanguage(language));
-    expect(missing).toEqual([]);
-  });
-});
-
 describe("workspace root containment", () => {
   it("rejects symlinks that point outside the root but follows ones that stay inside", async () => {
     const roots = await makeWorkspace();
@@ -293,12 +204,12 @@ describe("workspace root containment", () => {
 
   it("does not treat names starting with .. as escaping the root", async () => {
     const roots = await makeWorkspace();
-    await writeFile(join(roots.dataRoot, "..foo"), "dots", "utf8");
+    await writeFile(join(roots.dataRoot, "..foo.md"), "dots", "utf8");
 
-    const result = await readWorkspaceFile({ relativePath: "..foo" }, roots);
+    const result = await readWorkspaceFile({ relativePath: "..foo.md" }, roots);
 
     expect(result.error).toBeUndefined();
     expect(result.content).toBe("dots");
-    expect((await statWorkspaceFile({ relativePath: "..foo" }, roots)).error).toBeUndefined();
+    expect((await statWorkspaceFile({ relativePath: "..foo.md" }, roots)).error).toBeUndefined();
   });
 });

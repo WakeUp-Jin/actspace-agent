@@ -10,7 +10,7 @@
 
 ## 文档范围
 
-本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 面板和 HTML 沙箱安全。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
+本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件打开与渲染、Workspace 文件浏览和 Context 面板。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
 
 ## 交互模型
 
@@ -57,11 +57,8 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 ## Tab 类型
 
 - `Markdown`：Markdown 文件渲染。
-- `HTML`：HTML 预览。
 - `Image`：图片渲染。
-- `PDF`：PDF 预览。**未实现**，V2；当前 `.pdf` 走不到独立 Tab。
-- `CSV`：表格预览。2026-07-30 实现（`CsvRenderView`）。
-- `Text`：纯文本或代码文件查看（`CodeRenderView`，见「代码视图能力」）。
+- `Text`：说明文字（读取失败、远端 Host 文本预览等），用 `CodeRenderView` 显示，见「代码视图能力」。本机工作区里的代码、HTML、CSV 等文件不再生成 Tab，见「文件打开路由与兜底对话框」。
 - `Review`：完整代码审阅工作台入口；支持 Git-first scope 与 `Last Turn` Agent 视角，具体契约见 `docs/design-docs/core-review-change-sources.md`。
 - `Context`：Context 面板；见本文「Context 面板」一节。
 - `sideChat`：侧边对话；见「侧边对话」一节。
@@ -76,14 +73,34 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 
 ## 文件渲染规则
 
-不同文件类型使用不同渲染组件。
+应用内只渲染 **Markdown 和图片**，其余文件交给系统（2026-11-01 功能减法 P3，设计见 `docs/design-docs/架构优化/01-功能减法设计.md` 第 2 节）。
 
-- `md`：默认渲染为可读文档，可切源码；源码态复用 `CodeRenderView`（有行号、有 markdown 高亮），不是裸 `<pre>`。
-- `html`：渲染为可交互预览。
-- `csv` / `tsv`：渲染为表格视图，见「CSV 表格预览」。
-- `pdf`：渲染为分页阅读视图。**未实现**，V2。
-- `图片`：直接预览。
-- `review` / `diff`：进入完整 Review Workbench；Git scope 与 `Last Turn` 共用结构化 file/hunk/line renderer，不放在单条消息里替代消息流中的局部 diff。
+- `md` / `markdown`：默认渲染为可读文档，可切源码；源码态复用 `CodeRenderView`（有行号、有 markdown 高亮），不是裸 `<pre>`。
+- `图片`（png、jpg、jpeg、gif、webp、svg）：直接预览，超过 5MB 提示过大。
+- `html` / `htm`：不在应用内渲染，交给系统默认浏览器。HTML 渲染视图和 iframe 沙箱已删除。
+- 其他所有文件（含代码、CSV、PDF）：交给系统默认应用，main 的 `readWorkspaceFile` 只返回 stat（`renderKind: "external"`），不读内容。
+- `review` / `diff`：进入完整 Review Workbench；结构化 file/hunk/line renderer 共用，不放在单条消息里替代消息流中的局部 diff。
+
+### 文件打开路由与兜底对话框（2026-11-01）
+
+所有「点一个本机工作区文件」的入口（交付卡主体、本轮改动的「打开整个文件」、聊天里的文件链接和读文件工具行、工作区文件树）都走同一个路由 `components/files/open-workspace-path.ts`，组件里经 `useOpenWorkspacePath()` 调用：
+
+| 扩展名（大小写不敏感） | 行为 |
+|---|---|
+| `.md` / `.markdown` | `workspaces.readFile` 后打开 `markdown` Tab |
+| `.png` `.jpg` `.jpeg` `.gif` `.webp` `.svg` | `readFile` 后打开 `image` Tab |
+| 其他（含 `.html` / `.htm`） | `workspaces.openFile({ action: "open" })`，即系统默认应用 / 默认浏览器 |
+
+远端 Host 会话不经过这个路由，仍用 `hooks/remoteArtifact.ts` 的文本 / 图片预览。
+
+**打不开时的兜底。** macOS 上 `shell.openPath` 对没有关联应用的文件返回 `Failed to open path`（2026-11-01 实测，系统不弹框）。main 把这个错误映射为 `no_application`，路由返回 `{ ok: false, reason: "no_app" }`，`OpenFileFallbackProvider`（挂在 `WorkbenchLayout` 内）弹出 `OpenFileFallbackDialog`：
+
+- 标题「没有可以打开「文件名」的应用」；
+- 「选择应用打开」：用 `useFileApplications` 列出关联应用，选中后 `openFile({ action: "open", applicationId })`；列表为空时整块不显示；
+- 「在 Finder 中显示」：`openFile({ action: "reveal" })`；
+- 一行「推荐安装 VS Code 打开代码文件」加下载链接，只在 `listOpenTools` 明确返回 VS Code `available: false` 时出现。
+
+只在用户点了却打不开的那一刻出现；不在启动时检测软件。调用方拿到 `no_app` 不需要再提示，只需要处理 `reason: "error"`。
 
 ### 代码视图能力（2026-07-30）
 
@@ -110,13 +127,6 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 
 `fs.watch` 实时监听属于 V2 体验增量；真要做时应 watch 已打开文件的**父目录**而非文件本身（Agent 与编辑器常用 rename 原子写，watch 文件路径会丢 inode）。
 
-### CSV 表格预览（2026-07-30）
-
-- 首行当表头，表头 sticky，左侧行号列复用 gutter 样式。
-- 解析走小状态机而不是 `split(",")`：字段内的分隔符、引号包裹、`""` 转义、CRLF 都要处理对 —— 错位的表格比纯文本更误导人。`.tsv` 按 `\t` 切。
-- 行数不齐时按最大列数补空，单元格不会串列。
-- 超过 2000 行只渲染前 2000 行并提示；解析不出多列时降级为纯文本视图并说明原因；随时可切「以纯文本查看」。
-
 ## Markdown 渲染
 
 右侧面板是正式 Markdown 渲染栈的入口，聊天消息区是否迁移到同一栈属于 V2。
@@ -129,31 +139,11 @@ V1 渲染栈：
 - 不引入 `rehype-raw`，Markdown 中的原始 HTML 不直接执行。
 - 链接只放行 `http` / `https` / `mailto`，外链使用 `target="_blank" rel="noreferrer"`。
 - 复用 `.markdown-prose` 和 `styles/markdown.css`，代码块使用 `markdown-code-block`。
-- 预览 / 源码 两态切换，切换状态只属于当前 Tab。**工作区文件**的切换按钮在 Workspace 操作栏上（对齐 Cursor 的 `View source` / `View preview`），视图本身不再挂工具栏；聊天生成的 markdown / html 没有操作栏，仍用视图内那组分段控件。同一个组件按受控（传 `mode` + `onModeChange`）/ 不受控自动切换这两种壳，状态按 Tab 记在 `RightPanelContext`。
+- 预览 / 源码 两态切换，切换状态只属于当前 Tab。**工作区文件**的切换按钮在 Workspace 操作栏上（对齐 Cursor 的 `View source` / `View preview`），视图本身不再挂工具栏；聊天生成的 markdown 没有操作栏，仍用视图内那组分段控件。同一个组件按受控（传 `mode` + `onModeChange`）/ 不受控自动切换这两种壳，状态按 Tab 记在 `RightPanelContext`。
 
 代码高亮配色必须随浅 / 深主题翻转。`hljs-*` token 颜色使用主题 token 或专用 CSS 变量，禁止写死 `#hex`、`text-black`、`bg-white` 这类非主题感知字面量。
 
 V1 不做数学公式、Mermaid、TOC、标题锚点、原始 HTML 内联和聊天区解析器迁移。
-
-## HTML 渲染与沙箱安全
-
-HTML 来源包括本地 `.html` 文件和聊天生成 HTML。HTML 默认视为不可信或半可信，必须经过 iframe sandbox 与 CSP 双闸。
-
-关键规则：
-
-- 整页 HTML 一律使用 `<iframe srcDoc={html} sandbox="allow-scripts">` 渲染。
-- `srcDoc` 路径绝不同时开启 `allow-scripts` 与 `allow-same-origin`。
-- renderer 不使用 `<webview>`，不向预览 iframe 暴露 preload、`window.actspace`、Node 或文件系统能力。
-- CSP 注入到 `srcDoc` 的 `<meta http-equiv>`。
-- `strict`（本地文件默认）：禁外联，只允许 data/blob 图片、inline style、data 字体和 inline script。
-- `relaxed`（聊天生成 HTML 或用户主动信任外部静态资源）：允许 https 图片 / 样式 / 字体 / 脚本，但 `connect-src 'none'`，阻断数据外传。
-- iframe 只允许单向 `postMessage` 回传运行时错误和布局尺寸；父窗口校验 `event.source === iframe.contentWindow` 后处理。
-- iframe 同时回传内容宽度与自身视口宽度。内容宽度超过视口时视为固定画布：父层锁住自然画布宽度，只做等比缩小、不放大，并用缩放后的宽高承担布局占位；普通响应式页面继续使用 `width: 100%`。预览区、右侧面板或文件树宽度变化时由父层 `ResizeObserver` 重新计算比例，避免固定宽 HTML 被裁切或产生横向滚动。
-- 注入最小 `color-scheme: light dark;` 基线样式，不强行覆盖产物自带样式。
-
-聊天行内 HTML 小片段先用 DOMPurify 净化；需要脚本或复杂结构时升级为 iframe 路径。V1 不支持相对资源、多文件 artifact、页面内导航、keep-alive 池、双向交互桥或 CDP。
-
-V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `localResourceRoots`、安全打开 `allow-scripts allow-same-origin`、支持相对资源、多文件产物、截图 / inspect / 调参和更细 CSP nonce。
 
 ## Workspace 文件浏览器
 
@@ -162,7 +152,7 @@ V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `lo
 结构为纵向三段（2026-07-30 对齐 Cursor 重排）：
 
 1. Tab 条横跨整条右面板。
-2. Workspace 操作栏：**左**是面包屑 `<workspace 名> › <相对路径>`（根名弱化、文件路径主色），**右**是「查看源码 / 查看预览」文字按钮（仅 markdown、html 这类渲染态之外还有源码的文件出现）+ 两个图标动作 ——「在外部应用中打开」与「收起 / 展开文件树」（文件夹图标，展开态用 `bg-selected` 表示）。下方按需挂「已变更」与「已截断」两条提示条。
+2. Workspace 操作栏：**左**是面包屑 `<workspace 名> › <相对路径>`（根名弱化、文件路径主色），**右**是「查看源码 / 查看预览」文字按钮（仅 markdown 这类渲染态之外还有源码的文件出现）+ 两个图标动作 ——「在外部应用中打开」与「收起 / 展开文件树」（文件夹图标，展开态用 `bg-selected` 表示）。下方按需挂「已变更」与「已截断」两条提示条。
 3. 两栏 `[文件预览区 | 文件树]`，文件树无独立头部；树顶有文件名过滤框与刷新按钮。
 
 这一层的取舍：
@@ -175,7 +165,7 @@ V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `lo
 呈现由当前 Tab 决定：
 
 - 激活工作区文件 Tab（文件类且有 `relativePath`）时进入 shell。
-- 激活对象 Tab（Context / 聊天生成 HTML 等）时退出 shell，整面板展示对象视图。
+- 激活对象 Tab（Context 等）时退出 shell，整面板展示对象视图。
 - `isFileTreeOpen` 表示显式进入浏览态；`isFileTreeCollapsed` 只折叠树栏，不关闭内容区。
 
 树状态规则（2026-07-30）：
@@ -226,7 +216,7 @@ type WorkspaceReadFileInput = {
   relativePath: string;
 };
 
-type WorkspaceFileRenderKind = "markdown" | "html" | "image" | "csv" | "text";
+type WorkspaceFileRenderKind = "markdown" | "image" | "external";
 
 /** 文本预览字节上限。定义在契约层：main 用它决定读多少，renderer 要在提示条里复述同一个数。 */
 const WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES = 2 * 1024 * 1024;
@@ -309,10 +299,8 @@ main 侧服务规则：
 - UI 浏览强约束在 `workspaceRoot` 内，`..` 逃逸返回 `escapes_root`。
 - 固定忽略 `node_modules`、`.git`、`.pnpm-store`、`dist`、`.next`、`.turbo`、`coverage`、`.DS_Store`。
 - 单目录最多列出 1000 条，目录在前、文件在后，各自按名称升序。
-- 文本类上限 `WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES`（2MB），图片类 5MB。**文本超限是部分读**：返回上限内的**完整行** + `truncated: true`，不再整体拒绝（2026-07-30 起）。图片超限仍返回 `too_large`，因为部分图片字节无法解码。
-- 图片用 data URL，HTML 文件用 `trust="file"` 的 strict CSP 沙箱。
-- text 类语言判定顺序：**完整 basename**（`Dockerfile` / `Makefile` / `.gitignore` / `go.mod` …）→ **basename 前缀**（`Dockerfile.dev`、`.env.local` …）→ **扩展名**；一律确定性映射，不使用 `highlightAuto` 猜测，识别不出就不给 `language`（渲染回退纯等宽 + 行号）。
-- 映射值域必须都是 highlight.js 真实存在的语言，两侧各有一条防漂移测试锁住：main 侧断言每个映射值 `hljs.getLanguage()` 拿得到，renderer 侧断言按需注册的实例覆盖 main 的全部映射值。否则文件会静默退回纯文本且没人会发现。（这条测试当场抓出 highlight.js 不内置 `hcl`，`.tf` / `.hcl` 因此映射到 `ini` 近似。）
+- Markdown 上限 `WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES`（2MB），图片类 5MB。`external` 类不读内容，只返回 `size` / `mtimeMs`。**Markdown 超限是部分读**：返回上限内的**完整行** + `truncated: true`，不再整体拒绝（2026-07-30 起）。图片超限仍返回 `too_large`，因为部分图片字节无法解码。
+- 图片用 data URL；HTML 不在应用内渲染，走「文件打开路由与兜底对话框」。
 - `readWorkspaceFile` 与 `statWorkspaceFile` 都返回 `mtimeMs`，供右侧面板的新鲜度比对。
 
 V1 不做写 / 删 / 重命名、`.gitignore` 解析、快速打开、多 root 和 PDF 预览。
@@ -421,7 +409,7 @@ Context Tab 回答三个问题：现在占了多少、由哪些条目组成、�
 
 ## 首版边界
 
-- 先支持 `md`、`html`、`图片` 三种文件预览优先级。
+- 应用内只渲染 `md` 和 `图片`；其余文件交给系统默认应用（见「文件打开路由与兜底对话框」）。
 - Git-first Review 作为第二主线；无 Git 时提示创建 Git repository，`Last Turn` 当前未接通数据源，显示不可用状态；不能用聊天工具 diff 冒充该 scope 已实现。
 - 其他类型后续再补，不抢首版设计重点。
 

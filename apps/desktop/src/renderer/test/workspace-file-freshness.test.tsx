@@ -9,7 +9,7 @@ import { overrideBridge, setupBridge } from "./helpers/bridge";
 import { RightPanel } from "../components/RightPanel";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
-const file = { relativePath: "canary.txt", renderKind: "text" as const, size: 8, mtimeMs: 100, content: "snapshot" };
+const file = { relativePath: "canary.md", renderKind: "markdown" as const, size: 8, mtimeMs: 100, content: "snapshot" };
 const wrapper = ({ children }: { children: ReactNode }) => <RightPanelProvider>{children}</RightPanelProvider>;
 
 function useFiles() {
@@ -59,12 +59,12 @@ describe("workspace file freshness after a file becomes unavailable", () => {
     act(() => { window.dispatchEvent(new Event("focus")); });
 
     await waitFor(() => expect(result.current.panel.tabs.find(tab => tab.id === a.id)).toMatchObject({ isStale: true }));
-    expect(result.current.panel.tabs.find(tab => tab.id === a.id)).toMatchObject({ content: "snapshot" });
-    expect(result.current.panel.tabs.find(tab => tab.id === b.id)).toMatchObject({ isStale: false, content: "other root" });
+    expect(result.current.panel.tabs.find(tab => tab.id === a.id)).toMatchObject({ source: "snapshot" });
+    expect(result.current.panel.tabs.find(tab => tab.id === b.id)).toMatchObject({ isStale: false, source: "other root" });
     expect(read).not.toHaveBeenCalled();
 
     if (error === "not_found") {
-      await act(() => result.current.reload(file.relativePath, "canary.txt", target));
+      await act(() => result.current.reload(file.relativePath, "canary.md", target));
       expect(read).toHaveBeenCalledWith({ workspaceRoot: "/tree-a", relativePath: file.relativePath });
       expect(result.current.panel.tabs.find(tab => tab.id === a.id)).toMatchObject({
         isStale: false, content: "文件不存在或已被移动。", workspaceRoot: "/tree-a",
@@ -84,10 +84,10 @@ describe("workspace file freshness after a file becomes unavailable", () => {
     overrideBridge({ "workspaces.statFile": broken });
     await act(async () => { window.dispatchEvent(new Event("focus")); });
     expect(broken).toHaveBeenCalledOnce();
-    expect(result.current.panel.tabs[0]).toMatchObject({ isStale: false, content: "snapshot" });
+    expect(result.current.panel.tabs[0]).toMatchObject({ isStale: false, source: "snapshot" });
 
     overrideBridge({ "workspaces.statFile": async () => ({ ...file, mtimeMs: 200 }) });
     act(() => { window.dispatchEvent(new Event("focus")); });
-    await waitFor(() => expect(result.current.panel.tabs[0]).toMatchObject({ isStale: true, content: "snapshot" }));
+    await waitFor(() => expect(result.current.panel.tabs[0]).toMatchObject({ isStale: true, source: "snapshot" }));
   });
 });

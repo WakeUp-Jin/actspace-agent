@@ -429,7 +429,8 @@ export type WorkspaceReadFileInput = {
   relativePath: string;
 };
 
-export type WorkspaceFileRenderKind = "markdown" | "html" | "image" | "csv" | "text";
+/** markdown / image 在应用内渲染；external 只返回 stat，由调用方交给系统打开。 */
+export type WorkspaceFileRenderKind = "markdown" | "image" | "external";
 
 /**
  * 文本预览的字节上限：超过就只返回上限内的完整行并置 `truncated`。
@@ -442,12 +443,10 @@ export const WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES = 2 * 1024 * 1024;
 export type WorkspaceReadFileResult = {
   relativePath: string;
   renderKind: WorkspaceFileRenderKind;
-  /** text / markdown / html / csv：UTF-8 文本；image：空。 */
+  /** markdown：UTF-8 文本；image / external：空。 */
   content?: string;
   /** image：data URL（base64）；其余空。 */
   dataUrl?: string;
-  /** text 类的语法高亮语言（highlight.js 语言 id，按 basename 与扩展名推断）；无法识别 / 二进制时缺省，渲染回退纯等宽。 */
-  language?: string;
   /** 文件字节数（磁盘上的完整大小，不因截断而变小）。 */
   size: number;
   /**
@@ -457,7 +456,7 @@ export type WorkspaceReadFileResult = {
   truncated?: boolean;
   /** 最后修改时间（epoch 毫秒），供右侧面板判断已打开的 Tab 是否过期；错误分支为 0。 */
   mtimeMs: number;
-  error?: "not_found" | "not_a_file" | "too_large" | "binary" | "escapes_root";
+  error?: "not_found" | "not_a_file" | "too_large" | "escapes_root";
 };
 
 /**
@@ -510,7 +509,8 @@ export type WorkspaceOpenFileInput = {
 
 export type WorkspaceOpenFileResult = {
   ok: boolean;
-  error?: "invalid_target" | "not_registered" | "open_failed";
+  /** no_application：系统里没有任何应用能打开这个文件（`shell.openPath` 返回了错误串），renderer 据此弹兜底对话框。 */
+  error?: "invalid_target" | "not_registered" | "open_failed" | "no_application";
   message?: string;
 };
 

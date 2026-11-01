@@ -15,8 +15,8 @@ import {
 } from "lucide-react";
 import type { WorkspaceDirEntry } from "@actspace/shared";
 import { useRightPanel, workspaceFileTabId, workspaceDirCacheKey } from "./RightPanelContext";
-import { isHtmlFilePath, openHtmlInBrowser } from "./open-html-in-browser";
-import { readFailureTab, tabFromFile } from "./workspaceFileTab";
+import { useOpenWorkspacePath } from "../files/open-file-fallback-context";
+import { readFailureTab } from "./workspaceFileTab";
 import { IconButton } from "../ui/IconButton";
 import { workspacesApi } from "../../api/workspaces";
 
@@ -187,6 +187,7 @@ function EntryRow({
   filter: string;
 }) {
   const { openTab, activeTabId, expandedDirs, toggleDir } = useRightPanel();
+  const openPath = useOpenWorkspacePath();
   const [opening, setOpening] = useState(false);
   const ownership = useRef(0);
   useEffect(() => {
@@ -227,20 +228,18 @@ function EntryRow({
   const isActive = activeTabId === workspaceFileTabId(entry.relativePath, { workspaceRoot });
 
   const openFile = async () => {
-    const api = workspacesApi.readFile;
     if (opening) return;
     setOpening(true);
     const owner = ownership.current;
     try {
-      if (isHtmlFilePath(entry.relativePath)) {
-        const error = await openHtmlInBrowser(workspaceRoot, entry.relativePath);
-        if (error && owner === ownership.current) openTab(readFailureTab(entry.relativePath, entry.name, { workspaceRoot }, error));
-        return;
+      const result = await openPath({
+        workspaceRoot,
+        relativePath: entry.relativePath,
+        openTab: (tab) => { if (owner === ownership.current) openTab(tab); },
+      });
+      if (result.ok === false && result.reason === "error" && owner === ownership.current) {
+        openTab(readFailureTab(entry.relativePath, entry.name, { workspaceRoot }, result.message));
       }
-      const result = await api({ workspaceRoot, relativePath: entry.relativePath });
-      if (owner === ownership.current) openTab(tabFromFile(result, { workspaceRoot }));
-    } catch {
-      if (owner === ownership.current) openTab(readFailureTab(entry.relativePath, entry.name, { workspaceRoot }));
     } finally {
       if (owner === ownership.current) setOpening(false);
     }

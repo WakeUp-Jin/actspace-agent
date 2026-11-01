@@ -6,7 +6,7 @@ import { tabFromFile } from "../components/right-panel/workspaceFileTab";
 import { useReloadFileTab } from "../components/right-panel/useFileFreshness";
 import { setupBridge } from "./helpers/bridge";
 
-const file = { relativePath: "canary.txt", renderKind: "text" as const, size: 1, mtimeMs: 1, content: "A" };
+const file = { relativePath: "canary.md", renderKind: "markdown" as const, size: 1, mtimeMs: 1, content: "A" };
 const wrapper = ({ children }: { children: ReactNode }) => <RightPanelProvider>{children}</RightPanelProvider>;
 
 describe("workspace file target ownership", () => {
@@ -18,7 +18,7 @@ describe("workspace file target ownership", () => {
     const { result } = renderHook(() => useRightPanel(), { wrapper });
     act(() => { result.current.openTab(a); result.current.openTab(b); });
     expect(result.current.tabs).toHaveLength(2);
-    expect(result.current.tabs[0]).toMatchObject({ workspaceRoot: "/tree-a", content: "A" });
+    expect(result.current.tabs[0]).toMatchObject({ workspaceRoot: "/tree-a", source: "A" });
   });
 
   it("reloads an existing tab from its bound root after the active session changes", async () => {
@@ -28,8 +28,8 @@ describe("workspace file target ownership", () => {
     const tab = tabFromFile(file, bound);
     const { result } = renderHook(() => ({ panel: useRightPanel(), reload: useReloadFileTab("/tree-b") }), { wrapper });
     act(() => result.current.panel.openTab(tab));
-    await act(() => result.current.reload(file.relativePath, "canary.txt", bound));
+    await act(() => result.current.reload(file.relativePath, "canary.md", bound));
     expect(read).toHaveBeenCalledWith({ workspaceRoot: "/tree-a", relativePath: file.relativePath });
-    expect(result.current.panel.tabs[0]).toMatchObject({ id: tab.id, workspaceRoot: "/tree-a", content: "updated" });
+    expect(result.current.panel.tabs[0]).toMatchObject({ id: tab.id, workspaceRoot: "/tree-a", source: "updated" });
   });
 });

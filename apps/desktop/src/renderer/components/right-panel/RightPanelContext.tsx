@@ -26,10 +26,8 @@ export type WorkspaceFileMeta = WorkspaceFileTarget & {
 
 export type RightPanelTab = { id: string } & (
   | ({ kind: "markdown"; title: string; source: string } & WorkspaceFileMeta)
-  | ({ kind: "html"; title: string; html: string; trust: "chat" | "file" } & WorkspaceFileMeta)
   | ({ kind: "image"; title: string; src: string } & WorkspaceFileMeta)
-  | ({ kind: "csv"; title: string; content: string } & WorkspaceFileMeta)
-  | ({ kind: "text"; title: string; content: string; language?: string } & WorkspaceFileMeta)
+  | ({ kind: "text"; title: string; content: string } & WorkspaceFileMeta)
   // focus：从轨迹详情「查看轨迹」打开时定位到这个子会话并停在指定视图；revision 每次点击递增，让已打开的 Tab 再次定位。
   | { kind: "subagents"; title: string; sessionId: string; selected?: Extract<import("@actspace/shared").MessageBlock, { kind: "agent" }>; focus?: SubagentFocus }
   // focus：从 bash 行的「后台」标签打开时选中这条命令；revision 每次点击递增，让已打开的 Tab 再次定位。
@@ -49,9 +47,7 @@ export type RightPanelTabKind = RightPanelTab["kind"];
 
 const FILE_TAB_KINDS: ReadonlySet<RightPanelTabKind> = new Set<RightPanelTabKind>([
   "markdown",
-  "html",
   "image",
-  "csv",
   "text",
 ]);
 

@@ -13,8 +13,6 @@ import type { SessionListItem } from "@actspace/shared";
 import type { ContextState } from "@actspace/shared";
 import { CodeRenderView } from "./right-panel/CodeRenderView";
 import { ContextPanel } from "./right-panel/context/ContextPanel";
-import { CsvRenderView } from "./right-panel/CsvRenderView";
-import { HtmlRenderView } from "./right-panel/HtmlRenderView";
 import { MarkdownRenderView } from "./right-panel/MarkdownRenderView";
 import { ReviewRenderView } from "./right-panel/ReviewRenderView";
 import { TurnReviewView } from "./turn-tail/TurnReviewView";
@@ -206,10 +204,6 @@ function RightPanelBody({
 
   if (tab.kind === "turnReview") return <TurnReviewView tab={tab} />;
 
-  if (tab.kind === "html") {
-    return <HtmlTab tab={tab} />;
-  }
-
   if (tab.kind === "markdown") {
     return <MarkdownTab tab={tab} />;
   }
@@ -218,12 +212,8 @@ function RightPanelBody({
     return <ImageRenderView src={tab.src} relativePath={tab.relativePath} />;
   }
 
-  if (tab.kind === "csv") {
-    return <CsvRenderView content={tab.content} relativePath={tab.relativePath} />;
-  }
-
   if (tab.kind === "text") {
-    return <CodeRenderView content={tab.content} language={tab.language} />;
+    return <CodeRenderView content={tab.content} />;
   }
 
   return <ContextPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} contextState={contextState} contextRevision={contextRevision} workspaceRoot={workspaceRoot} />;
@@ -231,7 +221,7 @@ function RightPanelBody({
 
 /**
  * 工作区文件 Tab 的预览 / 源码由操作栏按钮控制（受控）；
- * 聊天生成的 markdown/html 没有操作栏，交给视图自己带切换控件（不受控）。
+ * 聊天生成的 markdown 没有操作栏，交给视图自己带切换控件（不受控）。
  */
 function MarkdownTab({ tab }: { tab: Extract<RightPanelTab, { kind: "markdown" }> }) {
   const { isSourceShown, setSourceShown } = useRightPanel();
@@ -241,22 +231,6 @@ function MarkdownTab({ tab }: { tab: Extract<RightPanelTab, { kind: "markdown" }
   return (
     <MarkdownRenderView
       source={tab.source}
-      mode={isSourceShown(tab.id) ? "source" : "preview"}
-      onModeChange={(next) => setSourceShown(tab.id, next === "source")}
-    />
-  );
-}
-
-function HtmlTab({ tab }: { tab: Extract<RightPanelTab, { kind: "html" }> }) {
-  const { isSourceShown, setSourceShown } = useRightPanel();
-  if (!isWorkspaceFileTab(tab)) {
-    return <HtmlRenderView html={tab.html} trust={tab.trust} relativePath={tab.relativePath} />;
-  }
-  return (
-    <HtmlRenderView
-      html={tab.html}
-      trust={tab.trust}
-      relativePath={tab.relativePath}
       mode={isSourceShown(tab.id) ? "source" : "preview"}
       onModeChange={(next) => setSourceShown(tab.id, next === "source")}
     />
