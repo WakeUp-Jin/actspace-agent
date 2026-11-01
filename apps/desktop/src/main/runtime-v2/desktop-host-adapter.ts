@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { RuntimeV2HostCapability, RuntimeV2HostDescriptor, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { DesktopApprovalBroker } from "./approval-broker";
 import { DesktopArtifactStore } from "./artifact-store";
+import { BROWSER_TOOLS_HOST_PORT_ID } from "@actspace/tool-browser";
 import { createDesktopBrowserCapability } from "./browser-capability";
 import { DEFAULT_CREDENTIAL_REF, DesktopCredentialResolver } from "./credential-resolver";
 import { DesktopLegacyLlmAdapter } from "./legacy-llm-adapter";
@@ -131,7 +132,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
         resolveUserSource: () => options.module.prepareUserPromptSource(options.roots.dataRoot),
         resolveSource: (workspaceRoot: string) => options.module.prepareRuntimePromptSource({ dataRoot: options.roots.dataRoot, workspaceRoot, disabledSkillIds: options.disabledSkillIds?.() }),
       }),
-      [options.module.BROWSER_TOOLS_HOST_PORT_ID]: browser,
+      [BROWSER_TOOLS_HOST_PORT_ID]: browser,
     }),
   });
     const profile = await options.module.bootProfileRuntime({

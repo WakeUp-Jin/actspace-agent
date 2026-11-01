@@ -224,6 +224,36 @@
 | `pnpm --filter @actspace/desktop build` | 通过 |
 | 残留 grep（`@actspace/tools-`、`core-agent`、`core-scope`、`session-jsonl`） | `apps`、`packages`、`scripts`、`.github` 无命中；`ls packages/*/package.json` 无匹配（第一级没有包） |
 
+### S2 插件清单与展示信息
+
+- **操作**：按 `docs/exec-plans/active/20261101-plugin-structure/s2-plugin-catalog.md` 步骤 1–6 实施，辅助脚本在 `tmp/`（不进 git）。
+  - manifest：`PluginManifest` 加可选 `display`，`BuiltinPluginManifestInput` 要求必填；`validatePluginManifest` 校验字数与 scope。49 个包的 `src/manifest.ts` 写入中文 `display`。
+  - 清单：新增 `packages/core/runtime/src/plugin-catalog.ts`（`PLUGIN_CATALOG`、`pluginCatalogEntry`、`PLUGIN_PACKAGES_OUTSIDE_DEFAULT`、`harnessEntriesMissingHostCapabilities`）和 `manifests.ts`（runtime 自己的四个 manifest）。`TRUSTED_LOADER_ENTRIES`、`DEFAULT_HARNESS_ENTRIES`、`build-default-harness.mjs` 入口、codec 查找、基础 bundle、浏览器 bundle 都从清单计算；S1 遗留的入口到模块映射表删除。
+  - `cordis.yml`：`scripts/generate-plugin-loader.mjs` 生成，`--check` 进 `check:packages`；与原文件只差头部注释和 `todo-projection` 的模块名（`@actspace/tool-todo/projection`）。新增 `scripts/check-plugin-catalog.mjs`（纯函数 `checkPluginCatalog` 可测）。
+  - tool-todo 拆分：`projection-plugin.ts` + `./projection` 导出，runtime 的 `./todo-projection` 导出和 `session/todo-projection-plugin.ts` 删除。
+  - 先对旧常量写对照测试（`plugin-catalog.test.ts`，7 个用例），按当前行为修正 manifest，再删旧表。
+- **manifest 修正（为了与旧常量一致）**：session-projection、core/agent、desktop-app、english-learning、llm-service、tool-runtime、context-system / rules / skills / runtime / tools、image-inspection；tool-browser 加 `required: false` 与 `config: { disposeHost: false }`。
+- **default-harness 的 files.json 条目数**：改前 45，改后 45。
+- **决定与偏离**：
+  - 新 todo 投影文件叫 `projection-plugin.ts`（`projection.ts` 已被占用）。
+  - 通用「host.required 缺能力就不加载」规则只对 `required: false` 的条目生效；对必需条目（approval、sandbox）生效会让「只有 filesystem.read」的测试失败，context-disclosure 的相应 manifest 修改已还原。
+  - 清单行多了 `admitOnHost` 字段，标记 Host 组合准入的条目；因此 sandbox 条目在没有 `process` 能力的 Host 上可被判为禁用。
+  - `PLUGIN_PACKAGES_OUTSIDE_DEFAULT` 除计划里的包外，还登记了 scope、subagent、llm-pi-ai 三个带 `plugin.ts` 的包。
+  - 8 个计划 §5.4 没覆盖的包，展示文字是实施时自拟的。
+  - 浏览器组合条目：Entry id `tools.browser`、`required: false`、services `tools.browser`；`agent-factory` 的 `apply` 现在就是 Run 工厂入口，`applyAgentFactory` 删除；`todo-projection` 加载模块名改变。
+  - Electron 实机检查留给用户。
+- **验证**：
+
+| 命令 | 结果 |
+|---|---|
+| `pnpm install` / `pnpm typecheck` | 通过 |
+| `pnpm test`（逐步） | 除 `test:current-docs`（基线 363）外通过；runtime 95 个用例（含 `plugin-catalog` 7、`browser-capability` 3）；`scripts/test/plugin-catalog.test.mjs` 通过 |
+| `check:packages`（含目录检查与 loader `--check`）/ `generate:plugin-loader --check` / `check:desktop-build-graph` / `check:ipc-channels` / `check:renderer-bridge` / `test:contract-matrix` | 通过（矩阵已重新生成） |
+| `test:agent-host:process` | 通过 |
+| `check:docs` / `check:current-docs` | 363 条已知失败，全在 `docs/exec-runs/`，无新增 |
+| `pnpm --filter @actspace/desktop build` | 通过 |
+| 残留 grep（`defaultHarnessEntrySource`、`applyAgentFactory`、`todo-projection-plugin`、`runtime/todo-projection`） | 无命中 |
+
 ## 遇到的问题
 
 - P1：计划没列 `chat-presentation-recovery.test.tsx`，它断言「+」菜单项等于 `["可视化回复", "上下文"]`，删入口后失败，已改为 `["上下文"]`。另有 `RightPanel.tsx`、`RightPanelObjectMenu.tsx` 里提到 Reply / 可视化回复的注释和提示文字，一并改掉。
@@ -245,6 +275,7 @@
 - P5：计划没列 `app-streaming-user-message`、`composer-toolbar`、`review-diff-virtualization` 的改动；强制刷新后，凡是断言挂载时读 `getSnapshot` 的用例都要改成 `refreshSnapshot`；工具栏焦点测试原来用「提交或推送」当最后一个按钮，改用「显示文件列表」。
 
 - S1：替换脚本把 4 个 DeepSeek Harness 来源注释里的 `packages/client/ui-primitives/...` 误改成 `packages/client/client/ui-primitives/...`，已还原；搬家后 pnpm 没刷新 `.pnpm/node_modules/@actspace/` 的隐式提升链接，Host 进程测试启动失败，重建后恢复；`build:deps:dev` 在清空 dist 后第一次会因 `agent-service` 测试文件缺依赖产物而失败，重跑通过（原有顺序依赖）。详见 S1 小节。
+- S2：esbuild 在 todo 拆分后报 `No matching export applyTools`，原因是构建脚本还是旧的，改写 `build-default-harness.mjs` 后恢复；两个测试里字符串与品牌 `ServiceId` 比较报 TS2345，改用 `String(id)`；契约矩阵测试需先 `pnpm gen:contract-matrix`。
 
 ## 跳过或推迟的事项
 
@@ -261,3 +292,4 @@
 - P5：Electron 实机检查留给用户：每轮结束后输入框 +N/−M 更新、打开「改动」面板时数字和 diff 更新、手动刷新、顶部菜单提交后数字更新、外部改文件后不自动变化、非 Git 目录文案、五个 scope 切换与分支 / 提交子视图。
 - P5：已知限制：旧的磁盘 `view-state.json` 不读不删；`agent-contract-matrix.generated.md` 仍是旧基线，留给 S1 重新生成；`pnpm check:current-docs` 仍是 363 条已知失败。
 - S1：Electron 实机检查留给用户：用已有数据目录启动、打开旧会话、新建会话发一条消息、运行一条 Bash。没有跑 `scripts/release-package.sh` 的完整打包，只验证了 `pnpm deploy`。旧能力目录（`context/`、`session/`、`llm/`、`sandbox/`）里的 README 仍按旧包目录写，`packages/README.md` 只改了路径，整体重写留给 S4。`scripts/refactor-stats.mjs` 的分区现在按能力目录统计（`packages/<能力>`），没有改。
+- S2：Electron 实机检查留给用户（默认组合启动、浏览器能力有无时的工具列表、桌面端启动一个会话）。展示信息尚未接到设置页，留给 S3。

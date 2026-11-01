@@ -22,7 +22,7 @@
 
 `createProfileComposition()` 选择 kernel/base 与应用 Bundle，应用 Profile/Home/Invocation Patch 和 Host ceiling，产出不可变 `ResolvedComposition`。Desktop App Bundle 由 Desktop Host 提供；组合描述不拥有运行实例或 Fiber。
 
-受控 `cordis.yml` 是行为装载的文件载体，不是第二份可独立改变语义的配置事实源。`assertLoaderTransport()` 对包含 transport name 的组合条目校验文件中的 id/name/inject；不把这项校验夸大成任意 YAML 的完整语义验证。
+受控 `cordis.yml` 是行为装载的文件载体（由 `PLUGIN_CATALOG` 经 `pnpm generate:plugin-loader` 生成），不是第二份可独立改变语义的配置事实源。`assertLoaderTransport()` 对包含 transport name 的组合条目校验文件中的 id/name/inject；不把这项校验夸大成任意 YAML 的完整语义验证。
 
 Static Manifest 保留 identity、codec、依赖与准入信息；Behavior 由 Cordis Include/Loader 执行 `apply(ctx, config)`，领域对象在 plugin tree 中创建。恢复需要的 codec 先于行为激活发现，不以启动旧行为作为解码历史事件的前提。
 

@@ -7,12 +7,15 @@ export type PluginFrontendRequirement = { readonly required: boolean; readonly r
 export type PluginHostRequirement = { readonly required: readonly string[]; readonly optional: readonly string[] };
 export type PluginBehaviorDescriptor = { readonly contracts?: HarnessBehaviorContracts; readonly entryId: EntryId; readonly module: string; readonly required: boolean; readonly enabled: boolean; readonly config: JsonValue; readonly host: PluginHostRequirement; readonly frontend: PluginFrontendRequirement; readonly provides?: readonly ServiceId[]; readonly injects?: readonly ServiceId[]; /** Used when present; see `IsolatedCordisEntry.optionalInjects`. */ readonly optionalInjects?: readonly ServiceId[] };
 export type PluginContributionSummary = { readonly services: readonly string[]; readonly events: readonly EventTypeId[]; readonly contributions: readonly string[] };
-export type PluginManifest = { readonly schemaVersion: 1; readonly pluginId: PluginId; readonly version: string; readonly name: string; readonly runtimeContract: "actspace.runtime.v2"; readonly source: PluginSource; readonly codecs: readonly PluginCodecDescriptor[]; readonly behaviors: readonly PluginBehaviorDescriptor[]; readonly contributions: PluginContributionSummary };
-export type BuiltinPluginManifestInput = { readonly pluginId: string; readonly version: string; readonly name: string; readonly entry: { readonly entryId: string; readonly behavior: string; readonly codec?: string; readonly required?: boolean; readonly enabled?: boolean }; readonly config?: JsonValue; readonly host: { readonly required: readonly string[]; readonly optional: readonly string[] }; readonly frontend: PluginFrontendRequirement; readonly injects?: readonly string[]; readonly optionalInjects?: readonly string[]; readonly contributions: { readonly services: readonly string[]; readonly tools: readonly string[]; readonly prompts: readonly string[]; readonly events: readonly string[] } };
+export type PluginDisplayScope = "global" | "session";
+/** Chinese display info shown on the plugin page; built-in plugins must carry it (checked by check-plugin-catalog). */
+export type PluginDisplay = { readonly title: string; readonly description: string; readonly scope: PluginDisplayScope; readonly defaultEnabled: boolean; readonly canDisable: boolean };
+export type PluginManifest = { readonly schemaVersion: 1; readonly pluginId: PluginId; readonly version: string; readonly name: string; readonly runtimeContract: "actspace.runtime.v2"; readonly source: PluginSource; readonly codecs: readonly PluginCodecDescriptor[]; readonly behaviors: readonly PluginBehaviorDescriptor[]; readonly contributions: PluginContributionSummary; readonly display?: PluginDisplay };
+export type BuiltinPluginManifestInput = { readonly pluginId: string; readonly display: PluginDisplay; readonly version: string; readonly name: string; readonly entry: { readonly entryId: string; readonly behavior: string; readonly codec?: string; readonly required?: boolean; readonly enabled?: boolean }; readonly config?: JsonValue; readonly host: { readonly required: readonly string[]; readonly optional: readonly string[] }; readonly frontend: PluginFrontendRequirement; readonly injects?: readonly string[]; readonly optionalInjects?: readonly string[]; readonly contributions: { readonly services: readonly string[]; readonly tools: readonly string[]; readonly prompts: readonly string[]; readonly events: readonly string[] } };
 
 export function defineBuiltinPluginManifest(input: BuiltinPluginManifestInput): PluginManifest {
   const events = input.contributions.events.map(eventTypeId);
-  return validatePluginManifest({ schemaVersion: 1, pluginId: pluginId(input.pluginId), version: input.version, name: input.name, runtimeContract: "actspace.runtime.v2", source: { kind: "builtin", reference: `builtin:${input.pluginId}` }, codecs: input.entry.codec === undefined ? [] : [{ module: input.entry.codec, eventTypes: events }], behaviors: [{ entryId: entryId(input.entry.entryId), module: input.entry.behavior, required: input.entry.required ?? true, enabled: input.entry.enabled ?? true, config: input.config ?? {}, host: input.host, frontend: input.frontend, provides: input.contributions.services.map(serviceId), injects: (input.injects ?? []).map(serviceId), ...(input.optionalInjects?.length ? { optionalInjects: input.optionalInjects.map(serviceId) } : {}) }], contributions: { services: input.contributions.services, events, contributions: [...input.contributions.tools, ...input.contributions.prompts] } });
+  return validatePluginManifest({ schemaVersion: 1, pluginId: pluginId(input.pluginId), version: input.version, name: input.name, runtimeContract: "actspace.runtime.v2", source: { kind: "builtin", reference: `builtin:${input.pluginId}` }, codecs: input.entry.codec === undefined ? [] : [{ module: input.entry.codec, eventTypes: events }], behaviors: [{ entryId: entryId(input.entry.entryId), module: input.entry.behavior, required: input.entry.required ?? true, enabled: input.entry.enabled ?? true, config: input.config ?? {}, host: input.host, frontend: input.frontend, provides: input.contributions.services.map(serviceId), injects: (input.injects ?? []).map(serviceId), ...(input.optionalInjects?.length ? { optionalInjects: input.optionalInjects.map(serviceId) } : {}) }], contributions: { services: input.contributions.services, events, contributions: [...input.contributions.tools, ...input.contributions.prompts] }, ...(input.display === undefined ? {} : { display: input.display }) });
 }
 
 export function validatePluginManifest(value: PluginManifest): PluginManifest {
@@ -21,6 +24,7 @@ export function validatePluginManifest(value: PluginManifest): PluginManifest {
   if (!isJsonValue(value)) throw new Error(`Plugin ${value.pluginId} manifest is not JSON-safe.`);
   const entries = new Set<string>(); for (const behavior of value.behaviors) { entryId(behavior.entryId); if (entries.has(behavior.entryId)) throw new Error(`Duplicate Entry id ${behavior.entryId}.`); entries.add(behavior.entryId); rejectSecretConfig(behavior.config); if (behavior.contracts) validateHarnessContracts(behavior.contracts); for (const service of [...behavior.provides ?? [], ...behavior.injects ?? [], ...behavior.optionalInjects ?? []]) serviceId(service); }
   validateServiceDeclarations(value);
+  if (value.display !== undefined) validateDisplay(value.pluginId, value.display);
   for (const codec of value.codecs) for (const type of codec.eventTypes) eventTypeId(type);
   return Object.freeze(value);
 }
@@ -40,4 +44,11 @@ function validateServiceDeclarations(manifest: PluginManifest): void {
     }
   }
   for (const id of declared) if (!provided.has(id)) throw new Error(`Manifest ${manifest.pluginId} declares service ${id} without a behavior provider.`);
+}
+
+function validateDisplay(plugin: string, display: PluginDisplay): void {
+  if (typeof display.title !== "string" || display.title.length < 1 || display.title.length > 12) throw new Error(`Plugin ${plugin} display.title must be 1-12 characters.`);
+  if (typeof display.description !== "string" || display.description.length < 1 || display.description.length > 40) throw new Error(`Plugin ${plugin} display.description must be 1-40 characters.`);
+  if (display.scope !== "global" && display.scope !== "session") throw new Error(`Plugin ${plugin} display.scope must be "global" or "session".`);
+  if (typeof display.defaultEnabled !== "boolean" || typeof display.canDisable !== "boolean") throw new Error(`Plugin ${plugin} display.defaultEnabled and display.canDisable must be booleans.`);
 }

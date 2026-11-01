@@ -115,7 +115,7 @@ flowchart TD
 1. **Authoring source**：作为 Profile/Bundle 的声明输入，被 Composer 解析成 `ResolvedComposition`。
 2. **Loader transport**：当 Cordis Loader 只接受文件路径时，由 Boot 根据已解析结果生成一次受控的、不可变的 Loader config，再通过同一个 Loader 加载。
 
-它不再是独立的运行时真源。`apps/cli/cordis.yml`、`packages/core/runtime/cordis.yml` 和测试 fixture 必须明确标注其角色；默认 CLI 不得出现“Composition digest 来自 A、Loader entries 来自 B”的组合。
+它不再是独立的运行时真源。`packages/core/runtime/cordis.yml` 由 `scripts/generate-plugin-loader.mjs` 从插件清单（`packages/core/runtime/src/plugin-catalog.ts` 的 `PLUGIN_CATALOG`）生成，文件头注明勿手改；`apps/cli/cordis.yml` 和测试 fixture 必须明确标注其角色，其中的条目须在清单里或在清单的“默认组合之外”名单里；默认 CLI 不得出现“Composition digest 来自 A、Loader entries 来自 B”的组合。
 
 ## 7. Host capability ceiling
 

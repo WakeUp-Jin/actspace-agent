@@ -48,7 +48,7 @@ export const inject = Object.freeze([
   "context.source.conversation",
 ]);
 
-export function apply(ctx: CordisContext): AgentFactoryService {
+function createAgentFactory(ctx: CordisContext): AgentFactoryService {
   const host = requireService<AgentRuntimeHostPort>(ctx, AGENT_RUNTIME_HOST_PORT_ID);
   const registry = requireService<import("@actspace/agent").AgentRegistry>(ctx, "agent.registry");
   const sessions = requireService<RuntimeSessionController>(ctx, "session.runtime");
@@ -247,8 +247,8 @@ function requireService<T>(ctx: CordisContext, id: string): T {
 }
 
 /** Harness entry: publish the structural one-Run factory from this isolated service tree. */
-export function applyRunFactory(ctx: CordisContext): void {
-  const factory = apply(ctx);
+export function apply(ctx: CordisContext): void {
+  const factory = createAgentFactory(ctx);
   ctx.provide?.("agent.run-factory", factory.runFactory);
 }
 

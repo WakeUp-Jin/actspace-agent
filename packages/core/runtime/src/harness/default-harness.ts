@@ -17,6 +17,7 @@ const toolEvents: readonly HarnessContract[] = [
 ];
 
 import { DEFAULT_HARNESS_ENTRIES, type DefaultHarnessEntry } from "./default-harness-definition.js";
+import { pluginCatalogEntry } from "../plugin-catalog.js";
 
 const rows: readonly DefaultHarnessEntry[] = DEFAULT_HARNESS_ENTRIES;
 
@@ -50,7 +51,7 @@ export async function prepareDefaultHarnessArtifact(options: {
   const manifest: PluginManifest = {
     schemaVersion: 1, pluginId: id, version: "1", name: "Default built-in Harness", runtimeContract: "actspace.runtime.v2",
     source: { kind: "builtin", reference: "builtin:actspace.default-harness" }, codecs: [],
-    behaviors: rows.map(([name, provides, injects, optional = []]): PluginBehaviorDescriptor => ({ entryId: entryId(name), module: `./${name}.js`, required: true, enabled: !options.disabledEntries?.includes(name), config: name === "browser-tools" ? { disposeHost: false } : {}, host: { required: [], optional: [] }, frontend: null, provides: provides.map(serviceId), injects: injects.map(serviceId), ...(optional.length ? { optionalInjects: optional.map(o => serviceId(o.id)) } : {}), contracts: { services: { provides: provides.map(id => ({ id, version: 1 })), requires: [...injects.map(id => ({ id, version: 1 })), ...optional.map(o => ({ id: o.id, version: 1, optional: true, fallback: o.fallback }))] }, events: { provides: name === "agent-factory" ? loopEvents : name === "tools-runtime" ? toolEvents : [], requires: [] } } })),
+    behaviors: rows.map(([name, provides, injects, optional = []]): PluginBehaviorDescriptor => ({ entryId: entryId(name), module: `./${name}.js`, required: true, enabled: !options.disabledEntries?.includes(name), config: pluginCatalogEntry(name)?.manifest.behaviors[0]?.config ?? {}, host: { required: [], optional: [] }, frontend: null, provides: provides.map(serviceId), injects: injects.map(serviceId), ...(optional.length ? { optionalInjects: optional.map(o => serviceId(o.id)) } : {}), contracts: { services: { provides: provides.map(id => ({ id, version: 1 })), requires: [...injects.map(id => ({ id, version: 1 })), ...optional.map(o => ({ id: o.id, version: 1, optional: true, fallback: o.fallback }))] }, events: { provides: name === "agent-factory" ? loopEvents : name === "tools-runtime" ? toolEvents : [], requires: [] } } })),
     contributions: { services: rows.flatMap(([, provides]) => [...provides]), events: [], contributions: [] },
   };
   const artifact = await publishPluginArtifact({ sourceRoot, artifactRoot: options.artifactRoot, plugin: manifest, files: files as string[], sharedModules });

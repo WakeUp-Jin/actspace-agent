@@ -4,6 +4,7 @@ export const SUBAGENT_TOOLS_PLUGIN_ID = "actspace.subagent-tools" as const;
 export const SUBAGENT_TOOL_NAMES = Object.freeze(["agent", "explore"] as const);
 
 export const manifest = defineBuiltinPluginManifest({
+  display: { title: "子 Agent", description: "把任务交给子 Agent 去做", scope: "session", defaultEnabled: true, canDisable: false },
   pluginId: SUBAGENT_TOOLS_PLUGIN_ID,
   version: "0.1.0",
   name: "ActSpace Subagent Tools",

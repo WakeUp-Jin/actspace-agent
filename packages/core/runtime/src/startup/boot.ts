@@ -8,6 +8,7 @@ import type { DiagnosticInput } from "../projection/diagnostics.js";
 import { sandboxStatusDiagnostic } from "./sandbox-status.js";
 import { SESSION_CODEC_HOST_PORT_ID } from "@actspace/session-journal";
 import { loadBuiltinToolCodec, toolTransportPatches } from "../profiles/composition.js";
+import { harnessEntriesMissingHostCapabilities } from "../plugin-catalog.js";
 import type { EventCodec } from "@actspace/session-journal";
 import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
 import { LlmService } from "@actspace/llm-service";
@@ -140,7 +141,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     // Without a bundled nono only the macOS Seatbelt backend can probe available; Bash otherwise goes to approval.
     [SANDBOX_HOST_PORT_ID]: hostServices.services[SANDBOX_HOST_PORT_ID] ?? createNodeSandboxHostPort(),
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
-      disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...(options.host.capabilityCeiling.includes("browser") ? [] : ["browser-tools"])],
+      disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...harnessEntriesMissingHostCapabilities(options.host.capabilityCeiling)],
       authorizeHarness: options.authorizeHarness,
       ...(options.pinnedHarness ? { pinnedHarness: options.pinnedHarness } : {}),
       evolution: {

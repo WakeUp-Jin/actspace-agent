@@ -15,7 +15,7 @@
 
 Host 持有 Session、存储、调度、审批和连接生命周期。Harness 持有可替换的 Loop、工具、Prompt、上下文和模型执行策略。Host + Harness 组合成可运行应用；同一 Session 不等于同一个长寿命 Loop。
 
-生产 Host 声明是 `runtime/src/profiles/composition.ts` 的 `TRUSTED_LOADER_ENTRIES`，文件载体为 `runtime/cordis.yml`；Boot 校验 id/name/inject 一致性。Harness 构建和准入共用 `runtime/src/harness/default-harness-definition.ts`；构建脚本不再另列一份插件集合。
+内置插件只在一处登记：`packages/core/runtime/src/plugin-catalog.ts` 的 `PLUGIN_CATALOG`（每行含 Entry id、manifest、加载入口 `module`、`loaders`、可选 `codec`）。Host 声明 `TRUSTED_LOADER_ENTRIES`（`runtime/src/profiles/composition.ts`）从 `loaders` 含 `host` 的行计算，文件载体 `runtime/cordis.yml` 由 `pnpm generate:plugin-loader` 生成（`--check` 进 `check:packages`）；Boot 校验 id/name/inject 一致性。默认 Harness 的行 `DEFAULT_HARNESS_ENTRIES`（`runtime/src/harness/default-harness-definition.ts`）从 `loaders` 含 `harness` 的行计算，构建脚本 `build-default-harness.mjs` 直接以各行 `module` 作为入口，不再另列一份插件集合或别名。manifest 的 `provides` / `injects` / `config` 是这些表的唯一来源；`pnpm check:packages` 里的 `check-plugin-catalog` 校验展示信息（`display`）、`module` / `codec` 可解析，以及带 `plugin.ts` 的包要么在清单里、要么在 `PLUGIN_PACKAGES_OUTSIDE_DEFAULT` 里。Host 能力不足时，manifest 标为 `required: false` 的 Harness 条目（目前只有 `browser-tools`）不加载。
 
 HarnessControl 的生产生命周期仍由 `agent-runtime` 行为持有。独立 `harness-control/plugin` 为可选装配入口，不与当前生产路径同时挂载；它不是另一个选择状态所有者。
 

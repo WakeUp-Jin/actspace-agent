@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { expect, it, vi } from "vitest";
 import type { ToolRuntime } from "@actspace/tool-runtime";
 import { inspectCordisAdmission } from "@actspace/cordis-adapter";
-import { createProfileComposition, RUNTIME_PROFILE_IDS, TOOL_PLUGIN_TRANSPORT } from "../profiles/composition.js";
+import { createProfileComposition, RUNTIME_PROFILE_IDS } from "../profiles/composition.js";
+import { PLUGIN_CATALOG } from "../plugin-catalog.js";
 import { runtimeCordisConfigPath } from "../config-path.js";
 import { bootProfileRuntime } from "../startup/boot.js";
 import { createRuntimeHostServices } from "../startup/host-services.js";
@@ -20,7 +21,7 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
   } });
   const env = { workspaceRoot: root, hostCapabilities: new Set<string>(host.capabilityCeiling), capabilitySet: { ids: host.capabilityCeiling, has: () => true, get: <T>() => ({}) as T }, createArtifact: async () => { throw new Error("unused"); } };
   const mounted: string[] = [];
-  const ports = Object.fromEntries(TOOL_PLUGIN_TRANSPORT.filter(item => item.id !== "todo-tools").map(item => [
+  const ports = Object.fromEntries(PLUGIN_CATALOG.filter(item => item.manifest.behaviors[0]!.injects?.some(id => String(id) === `actspace.host.tools.${item.id}`)).map(item => [
     `actspace.host.tools.${item.id}`, { createPorts: () => { mounted.push(item.id); return {}; } },
   ]));
   let profile: Awaited<ReturnType<typeof bootProfileRuntime>> | undefined;

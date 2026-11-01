@@ -1,5 +1,6 @@
 import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
 export const manifest = defineBuiltinPluginManifest({
+  display: { title: "侧边对话", description: "不打断主对话，在旁边提问", scope: "global", defaultEnabled: true, canDisable: false },
   pluginId: "actspace.side-chat", version: "0.1.0", name: "侧边对话",
   entry: { entryId: "side-chat", behavior: "./plugin.js", required: false },
   host: { required: [], optional: [] }, frontend: null,

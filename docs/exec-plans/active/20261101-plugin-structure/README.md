@@ -53,7 +53,7 @@ pnpm --filter @actspace/desktop build
 ## 进度
 
 - [x] S1 包搬家与改名。
-- [ ] S2 插件清单与展示信息。
+- [x] S2 插件清单与展示信息。
 - [ ] S3 插件开关与插件页。
 - [ ] S4 README 与文档。
 - [ ] 收尾：两步一起跑全量检查、Electron 实机检查、执行摘要、history，两份设计文档状态改为“已实施”，两个计划移入 `completed/`。

@@ -9,13 +9,16 @@ it("runs todo_write through Journal and projection, reads it back and removes to
   const { SessionHandle } = await import("@actspace/session-persistence");
   const { ToolRuntime } = await import("@actspace/tool-runtime");
   const { apply } = await import("../plugin.js");
+  const { apply: applyProjection } = await import("../projection-plugin.js");
   const registry = createCoreCodecRegistry(codecs);
   const header = createSessionHeader({ sessionId: "todo-golden", createdAt: "2026-09-28T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } });
   const session = SessionHandle.createEphemeral({ header, registry });
   const tools = new ToolRuntime();
   const projectionService = createSessionProjectionService();
   let cleanup: (() => Promise<void>) | undefined;
-  apply({ get: id => ({ "tools.runtime": tools, "session.runtime": { getOpen: () => session }, "session.projection": projectionService })[id], provide: () => undefined, effect: (factory: () => () => Promise<void>) => { cleanup = factory(); } } as never);
+  const ctx = { get: (id: string) => ({ "tools.runtime": tools, "session.runtime": { getOpen: () => session }, "session.projection": projectionService })[id], provide: () => undefined, effect: (factory: () => () => Promise<void>) => { cleanup = factory(); } };
+  applyProjection({ ...ctx, effect: () => {} } as never);
+  apply(ctx as never);
   const projection = projectionService.createRegistry();
   projectionService.applyContributors(projection, text => text);
   const env: import("@actspace/tool-runtime").ToolPreparedEnvironment = {

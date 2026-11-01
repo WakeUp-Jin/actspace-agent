@@ -139,7 +139,7 @@ type BackgroundTaskTerminal = { status: Exclude<BackgroundTaskStatus, "running" 
 
 ### 上下文插件
 
-`packages/context/context-background-tasks`，owner `actspace.context-background-tasks`，服务 `context.source.background-tasks`，加入 `CONTEXT_PLUGIN_PACKAGES`、`DEFAULT_HARNESS_ENTRIES` 与 `agent-factory-plugin` 的 `createSources`。只对 `descriptor.kind === "main"` 生效。
+`packages/context/context-background-tasks`，owner `actspace.context-background-tasks`，服务 `context.source.background-tasks`，加入 `CONTEXT_PLUGIN_PACKAGES`、插件清单 `PLUGIN_CATALOG`（`DEFAULT_HARNESS_ENTRIES` 由它计算）与 `agent-factory-plugin` 的 `createSources`。只对 `descriptor.kind === "main"` 生效。
 
 - 每轮开始（`context.request.turnId` 变化）读一次 `list(sessionId, activeOnly)` 生成文本，本轮内复用同一文本；引擎的 supplement 去重保证文本没变就不重复写入，压缩后由引擎 `refresh` 重新挂到末尾。
 - 有运行中任务：

@@ -24,7 +24,7 @@ Tool Runtime 只拥有注册、参数验证、权限准入、prepared execution�
 
 1. Profile / Bundle 组合各插件 manifest，Patch 可以禁用或移除一个工具 entry。
 2. Boot 仅加载启用插件的 Codec。内置 Codec 根据已准入的 transport/package 元数据从公开 `./codec` export 加载。
-3. checked-in `cordis.yml` 与可信 transport inventory 校验一致，再由 Include 的启动 patches 将禁用结果应用到真实插件树。
+3. checked-in `cordis.yml`（由插件清单 `PLUGIN_CATALOG` 生成）与可信 transport inventory 校验一致，再由 Include 的启动 patches 将禁用结果应用到真实插件树。
 4. Todo Behavior 注册 Contributor；SessionReadModel 在创建 registry、安装通用事实 projection 后统一应用 Contributor，再 ensureSession / restore / replay。
 5. 工具 Behavior 从专用 Host port 创建资源，注册工具，并在 Context effect 清理时 drain/dispose registrations 和 Host 资源。注册失败回滚本次已注册项。
 

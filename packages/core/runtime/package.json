@@ -42,11 +42,6 @@
       "types": "./loader.d.cts",
       "require": "./loader.cjs",
       "default": "./loader.cjs"
-    },
-    "./todo-projection": {
-      "types": "./dist/session/todo-projection-plugin.d.ts",
-      "import": "./dist/session/todo-projection-plugin.js",
-      "default": "./dist/session/todo-projection-plugin.js"
     }
   },
   "scripts": {

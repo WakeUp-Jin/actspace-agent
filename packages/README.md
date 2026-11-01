@@ -17,6 +17,8 @@
 | `fs/`、`shell/`、`web/`、`image/`、`todo/`、`background-tasks/`、`approval/`、`browser/`、`subagent/`、`english-learning/` | 独立执行能力和可选扩展；通过 manifest、Service 与 Scope 组合 |
 | `util/shared/`、`util/util/`、`util/diagnostics/`、`test-support/test-support/` | 跨进程契约、通用工具、诊断和测试支持；生产代码不反向依赖测试支持 |
 
+新增一个内置插件：包里写 `src/manifest.ts`（含中文 `display`）和 `src/plugin.ts`，在 `core/runtime/src/plugin-catalog.ts` 的 `PLUGIN_CATALOG` 加一行（Entry id、manifest、`module`、`loaders`、可选 `codec`），再运行 `pnpm --filter @actspace/runtime build && pnpm generate:plugin-loader` 生成 `core/runtime/cordis.yml`；不要手改 `cordis.yml`，也不要再另列加载表。带 `plugin.ts` 但不在默认组合里的包要登记到同文件的 `PLUGIN_PACKAGES_OUTSIDE_DEFAULT` 并写明原因，`pnpm check:packages` 会检查。
+
 依赖通过公开 exports，不能跨包深导入 `src`。Session 业务依赖 storage port，JSONL 实现依赖该契约而不反向依赖 SessionStore。Browser Bridge 位于根目录，是 Host capability，不属于 TS 插件装载树。
 
 实际包、插件与服务清单见[生成矩阵](../docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md)；全仓目录入口见[架构总览](../docs/ARCHITECTURE.md)。

@@ -1,3 +1,4 @@
+# 由 scripts/generate-plugin-loader.mjs 生成，勿手改
 - id: actspace-runtime
   name: "@actspace/runtime/cordis"
   inject: [actspace.host]
@@ -22,7 +23,7 @@
   name: "@actspace/llm-service/plugin"
   inject: [actspace.host.llm]
 - id: todo-projection
-  name: "@actspace/runtime/todo-projection"
+  name: "@actspace/tool-todo/projection"
   inject: [session.projection]
 - id: core-agent
   name: "@actspace/agent/plugin"
