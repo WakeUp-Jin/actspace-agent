@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261101-feature-subtraction/README.md`（P1–P5）、`docs/exec-plans/active/20261101-plugin-structure/README.md`（S1–S4）
+- **关联计划**：`docs/exec-plans/completed/20261101-feature-subtraction/README.md`（P1–P5）、`docs/exec-plans/completed/20261101-plugin-structure/README.md`（S1–S4）
 - **执行模式**：连续执行（用户 2026-11-01 同意两步一起做完；每个子计划本地提交一次，不推送）
 - **开始时间**：2026-11-01
 - **结束时间**：进行中
@@ -189,7 +189,7 @@
 
 ### S1 包搬家与改名
 
-- **操作**：按 `docs/exec-plans/active/20261101-plugin-structure/s1-package-move.md` 实施，一次性脚本 `tmp/s1-move.mjs`（不进 git）。
+- **操作**：按 `docs/exec-plans/completed/20261101-plugin-structure/s1-package-move.md` 实施，一次性脚本 `tmp/s1-move.mjs`（不进 git）。
   - 搬目录：设计 §4 表里的 62 个现有包全部对上（P1–P5 没有删包）。其中 `core/agent`、`core/agent-loop`、`core/scope` 目录不变，实际搬了 59 个，改名 16 个（`core-agent`→`agent`、`core-agent-loop`→`agent-loop`、`core-scope`→`scope`、`tools-runtime`→`tool-runtime`、`session-jsonl`→`session-persistence-jsonl`、`tools-filesystem-*`→`tool-fs-*`、`tools-shell-tools`→`tool-shell`、`tools-web-tools`→`tool-web`、`tools-image-*`→`tool-image-*`、`tools-todo-tools`→`tool-todo`、`tools-background-tasks`→`tool-background-tasks`、`tools-approval`→`approval`、`tools-browser-tools`→`tool-browser`）。先 `git mv` 到 `packages/.mv/<n>`，再到终点，避开 `packages/subagent` → `packages/subagent/subagent` 这种终点在起点之下的情况。搬前删掉旧目录里的 `node_modules`、`dist`、`tsbuildinfo`。
   - 相对路径：按旧位置解析每个出包的 `./`、`../` 字面量，映射到新位置后重算（297 处、83 个文件，主要是 `tsconfig*.json` 的 `extends` / `references`；第一级包多一层 `../`；`session-jsonl/src/test/storage.test.ts` 的 `../../../storage/...` → `../../../session-storage/...`）。
   - 包名与路径字符串：单次正则（长名优先，结尾边界 `(?![\w-])`）替换 531 处包名、977 处 `packages/<旧>` 路径，涉及 320 个文件。跳过 `docs/histories`、`docs/exec-runs`、`docs/exec-plans/completed`、`docs/learnings`、两套计划目录、`docs/design-docs/架构优化`、`pnpm-lock.yaml`。`packages/tools/README.md`（旧 `tools/` 目录唯一剩下的文件）删除，目录随之消失；其余旧能力目录 README 先留着，S4 重写。
@@ -226,7 +226,7 @@
 
 ### S2 插件清单与展示信息
 
-- **操作**：按 `docs/exec-plans/active/20261101-plugin-structure/s2-plugin-catalog.md` 步骤 1–6 实施，辅助脚本在 `tmp/`（不进 git）。
+- **操作**：按 `docs/exec-plans/completed/20261101-plugin-structure/s2-plugin-catalog.md` 步骤 1–6 实施，辅助脚本在 `tmp/`（不进 git）。
   - manifest：`PluginManifest` 加可选 `display`，`BuiltinPluginManifestInput` 要求必填；`validatePluginManifest` 校验字数与 scope。49 个包的 `src/manifest.ts` 写入中文 `display`。
   - 清单：新增 `packages/core/runtime/src/plugin-catalog.ts`（`PLUGIN_CATALOG`、`pluginCatalogEntry`、`PLUGIN_PACKAGES_OUTSIDE_DEFAULT`、`harnessEntriesMissingHostCapabilities`）和 `manifests.ts`（runtime 自己的四个 manifest）。`TRUSTED_LOADER_ENTRIES`、`DEFAULT_HARNESS_ENTRIES`、`build-default-harness.mjs` 入口、codec 查找、基础 bundle、浏览器 bundle 都从清单计算；S1 遗留的入口到模块映射表删除。
   - `cordis.yml`：`scripts/generate-plugin-loader.mjs` 生成，`--check` 进 `check:packages`；与原文件只差头部注释和 `todo-projection` 的模块名（`@actspace/tool-todo/projection`）。新增 `scripts/check-plugin-catalog.mjs`（纯函数 `checkPluginCatalog` 可测）。
@@ -303,6 +303,10 @@
 
 - S3：`test:contract-matrix` 因文档改动失效，重新 `pnpm gen:contract-matrix` 后恢复；`PluginsSection` 的两个原生 button 被 `check:frontend-tokens` 拦下，重试改用 `Button`，折叠行是整行铺满的按钮，`Button` 不适用，基线登记 1 个；`docs/roadmap.md` 的已完成行有固定格式（站点解析），加备注会让站点测试失败，已还原，没有改 roadmap；桌面全量测试里 extensions-page 在负载下偶发失败（连接面板文字在插件列表之后才异步出现，原断言是同步的），改成 findByText 后稳定。
 - S4：`pnpm test` 根命令链停在 `test:current-docs`（363 条基线），新测试单独跑；`sed -i` 和复合命令被工作树保护拦下，改用 Edit 工具和分开的命令；`util/`、`test-support/` 的“没有使用方”靠 grep `package.json` 和源码导入确认。
+- 主智能体验收时补修（每个子计划交回后读 diff、自己复跑测试）：
+  - S2：子智能体报告“验证全部通过”，但根 `pnpm test` 在 `test:current-docs` 处就停了，后面的 `pnpm -r test` 没跑到。主智能体单独跑各包测试后发现两处失败：`defineBuiltinPluginManifest` 在没有 `display` 时写入 `display: undefined`，过不了 JSON 校验（`cordis-adapter` 7 个、`composition` 1 个文件失败）；`tool-todo` 的生命周期测试仍只调合并前的 `apply`，读不到待办视图。前者改为有 `display` 才写入，后者改为两个入口都调用。之后的子计划改用 `pnpm -r --no-bail --if-present test` 单独跑各包测试。
+  - S2：确认 sandbox 三行进 `toolTransportPatches` 的行为变化可以接受（三者都是必需条目，Host 缺 `process` 时组合本身就失败）；浏览器 Host 组合条目 id 由内联的 `browser-tools` 变为包 manifest 的 `tools.browser`，该 id 不落盘、无其他引用。
+  - S3：浏览器连接面板自带边框卡片，外面又套了一层灰底，形成框中框，去掉外层。核对 main 侧英语学习所有调用点都有判空或只在开启时注册。
 
 ## 跳过或推迟的事项
 

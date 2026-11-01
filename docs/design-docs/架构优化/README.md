@@ -1,6 +1,6 @@
 # 架构优化
 
-更新：2026-11-01。状态：两步都已与用户逐项确认，待实施。
+更新：2026-11-01。状态：两步都已实施（2026-11-02，分支 `架构优化`，未合入 main），Electron 实机检查待用户执行。
 
 ## 为什么做
 
@@ -26,8 +26,8 @@ ActSpace 是一个人在做的产品。如果大公司的 Agent 产品有什么�
 
 | 步骤 | 内容 | 状态 | 文档 |
 |---|---|---|---|
-| 第一步 | 功能减法：删除、外置、精简一批功能 | 已确认，待实施 | [01-功能减法设计](01-功能减法设计.md)、[文档面板规范](../frontend/front-文档面板规范.md)、[执行计划](../../exec-plans/active/20261101-feature-subtraction/README.md) |
-| 第二步 | 插件结构：两级目录与命名、全局 / 会话两类插件、manifest 展示信息、唯一插件清单、扩展 › 插件页、README 规范 | 已确认，待实施（排在第一步 P1–P5 之后） | [02-插件结构设计](02-插件结构设计.md)、demo [plugins-page-demo.html](../frontend/plugins-page-demo.html)、[执行计划](../../exec-plans/active/20261101-plugin-structure/README.md) |
+| 第一步 | 功能减法：删除、外置、精简一批功能 | 已实施（2026-11-01，分支 `架构优化`） | [01-功能减法设计](01-功能减法设计.md)、[文档面板规范](../frontend/front-文档面板规范.md)、[执行计划](../../exec-plans/completed/20261101-feature-subtraction/README.md) |
+| 第二步 | 插件结构：两级目录与命名、全局 / 会话两类插件、manifest 展示信息、唯一插件清单、扩展 › 插件页、README 规范 | 已实施（2026-11-02，分支 `架构优化`） | [02-插件结构设计](02-插件结构设计.md)、demo [plugins-page-demo.html](../frontend/plugins-page-demo.html)、[执行计划](../../exec-plans/completed/20261101-plugin-structure/README.md) |
 
 第一步里“外置为可选插件”的两项（浏览器能力、英语学习），改由第二步的通用插件开关实现：默认关闭、没有常驻开销，在扩展 › 插件页开启。真正打包成可安装的外部插件，留到以后。
 

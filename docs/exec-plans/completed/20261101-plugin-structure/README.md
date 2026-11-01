@@ -1,6 +1,6 @@
 # 插件结构 — 执行计划总览
 
-状态：待执行（排在功能减法 P1–P5 之后）。
+状态：已完成（2026-11-02，分支 `架构优化` 本地提交 e9e41914…15ceb558，未合入 main）。Electron 实机检查待用户执行，见[执行摘要](../../../exec-runs/20261101-feature-subtraction/execution-summary.md)。
 
 - 分支 / worktree：`架构优化` @ `../actspace-agent-arch-slim`，与[功能减法](../20261101-feature-subtraction/README.md)同一分支。
 - 设计真源：[02 插件结构设计](../../../design-docs/架构优化/02-插件结构设计.md)；插件页视觉以 demo [plugins-page-demo.html](../../../design-docs/frontend/plugins-page-demo.html) 方案 B 为准。
@@ -56,7 +56,7 @@ pnpm --filter @actspace/desktop build
 - [x] S2 插件清单与展示信息。
 - [x] S3 插件开关与插件页（2026-11-02，未提交）。
 - [x] S4 README 与文档（2026-11-02，未提交）。
-- [ ] 收尾：两步一起跑全量检查、Electron 实机检查、执行摘要、history，两份设计文档状态改为“已实施”，两个计划移入 `completed/`。
+- [x] 收尾：两步一起跑全量检查、Electron 实机检查、执行摘要、history，两份设计文档状态改为“已实施”，两个计划移入 `completed/`。
 
 ## 决策记录
 
