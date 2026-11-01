@@ -3,16 +3,18 @@ import { createContextHistorySchema } from "./context-history-projection";
 import { createSyncSchema } from "./read-model-sync";
 import { createUsageJournalSchema } from "./usage-journal-projection";
 import { createUsageRollups } from "./usage-rollups";
+import { createHarnessStatsSchema } from "./harness-stats-schema";
 import type { DatabaseSync } from "node:sqlite";
 
 /** Shared schema for the durable index and bounded in-memory Session fallback.
  * v10 replays history omitted by the former automatic Usage reset boundary;
  * v13 adds indexed unknown-token dimensions to activity and aggregate rollups;
- * v14 excludes Session-owned auxiliary usage from derived Run counts. */
+ * v14 excludes Session-owned auxiliary usage from derived Run counts;
+ * v15 adds Harness statistics tables (projected from the same journal pass). */
 export function createReadModelSchema(db: DatabaseSync): void {
   db.exec(`
     PRAGMA application_id = 0x41555332;
-    PRAGMA user_version = 14;
+    PRAGMA user_version = 15;
     CREATE TABLE IF NOT EXISTS usage_write_mode(batching INTEGER NOT NULL) STRICT;
     INSERT INTO usage_write_mode SELECT 0 WHERE NOT EXISTS(SELECT 1 FROM usage_write_mode);
     CREATE TABLE IF NOT EXISTS session_catalog (
@@ -108,6 +110,7 @@ export function createReadModelSchema(db: DatabaseSync): void {
   db.exec("CREATE INDEX IF NOT EXISTS session_catalog_page_idx ON session_catalog(archived, COALESCE(json_extract(worktree_json,'$.sourceWorkspaceRoot'),workspace_root,''), pinned, updated_at DESC,session_id ASC)");
   createUsageJournalSchema(db);
   createUsageRollups(db);
+  createHarnessStatsSchema(db);
   createSyncSchema(db);
   createContextHistorySchema(db);
   enableUsageBatchWrites(db);

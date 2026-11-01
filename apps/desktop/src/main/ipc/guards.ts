@@ -56,6 +56,21 @@ const usageInput: IpcGuard = input => {
   }
   return null;
 };
+const HARNESS_STATS_KINDS: readonly string[] = ["summary", "options", "overview", "plugins", "tools", "context", "disclosure", "runtime", "versions"];
+const harnessStatsInput: IpcGuard = input => {
+  if (!isRecord(input) || usageRequestId(input)) return "Invalid Harness stats request id";
+  if (typeof input.kind !== "string" || !HARNESS_STATS_KINDS.includes(input.kind)) return "Invalid Harness stats kind";
+  const filter = input.filter;
+  if (!isRecord(filter)) return "Invalid Harness stats filter";
+  if (typeof filter.range !== "string" || !["day", "week", "month", "total"].includes(filter.range)) return "Invalid Harness stats range";
+  if (typeof filter.sessionKind !== "string" || !["main", "child", "side", "all"].includes(filter.sessionKind)) return "Invalid Harness stats session kind";
+  for (const field of ["mode", "model", "workspaceRoot", "revision"]) if (filter[field] !== undefined && filter[field] !== null && (typeof filter[field] !== "string" || (filter[field] as string).length > 1024)) return `Invalid Harness stats ${field}`;
+  if (input.compare !== undefined && input.compare !== null) {
+    const compare = input.compare;
+    if (!isRecord(compare) || typeof compare.from !== "string" || typeof compare.to !== "string" || compare.from.length > 256 || compare.to.length > 256) return "Invalid Harness stats compare";
+  }
+  return null;
+};
 
 const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> = [
   [contract.sessions.listPage, input => {
@@ -70,6 +85,8 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
   [contract.usage.getStatistics, usageInput],
   [contract.usage.getStatus, usageRequestId],
   [contract.usage.cancel, usageRequestId],
+  [contract.harnessStats.query, harnessStatsInput],
+  [contract.harnessStats.cancel, usageRequestId],
   // 工作区文件读取
   [contract.workspaces.readFile, shape({ workspaceRoot: "string?", relativePath: "string" }, "Invalid workspace file")],
   [contract.workspaces.statFile, shape({ workspaceRoot: "string?", relativePath: "string" }, "Invalid workspace file")],

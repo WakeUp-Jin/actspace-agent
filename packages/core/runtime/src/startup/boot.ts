@@ -27,6 +27,7 @@ import type { AgentRuntimeService } from "../harness/agent-runtime-plugin.js";
 import { HEADLESS_HOST_PORT_ID } from "@actspace/headless";
 import { BACKGROUND_TASK_HOST_SERVICE, createBackgroundTaskHost } from "@actspace/background-tasks";
 import { createNodeSandboxHostPort, SANDBOX_HOST_PORT_ID } from "@actspace/sandbox";
+import { HarnessStats, harnessStatsEnabled } from "@actspace/harness-stats";
 import { RuntimeStateController } from "./runtime-state.js";
 import { settleWithinDeadline } from "./shutdown.js";
 
@@ -56,6 +57,8 @@ export type BootRuntimeOptions = {
   readonly pinnedHarness?: import("../harness/agent-host-port.js").PinnedHarness;
   /** Session plugin Entry ids the Host switched off; they join `disabledHarnessEntries` even when their Host capabilities are present. */
   readonly disabledPlugins?: readonly string[];
+  /** Record Harness runtime stats under `<dataRoot>/harness-stats` (default true). Ephemeral runs pass false so they leave no stats behind. */
+  readonly harnessStats?: boolean;
 };
 
 export type BootedRuntimeProfile = {
@@ -120,6 +123,8 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
   });
   const promptPort = Object.freeze({ ...(originalPromptPort as import("@actspace/prompt").PromptHostPort), extensions: (originalPromptPort as import("@actspace/prompt").PromptHostPort).extensions ?? new PromptExtensionRegistry() });
   let runtimeContext: CordisContext | undefined;
+  // Host-owned recorder: it outlives every Harness mount, so switching versions keeps its counts. ACTSPACE_HARNESS_STATS=0 creates nothing.
+  const harnessStats = options.harnessStats !== false && harnessStatsEnabled() ? new HarnessStats({ dataRoot: options.dataRoot }) : undefined;
   const providedHostServices = Object.freeze({
     ...hostServices.services,
     "actspace.host.subagents": Object.freeze({ invoke: (input: import("@actspace/subagent").SubagentInvocation) => {
@@ -145,6 +150,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
       disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...harnessEntriesMissingHostCapabilities(options.host.capabilityCeiling), ...(options.disabledPlugins ?? [])],
       authorizeHarness: options.authorizeHarness,
+      ...(harnessStats ? { observeHarnessMount: harnessStats.observeMount } : {}),
       ...(options.pinnedHarness ? { pinnedHarness: options.pinnedHarness } : {}),
       evolution: {
         inspect: (context: import("@actspace/tool-runtime").ToolExecutionContext) => {
@@ -200,8 +206,9 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     const candidate = await createDshBootCandidate({ host: options.host, composition, cordisAdmission, root, discoveredCodecs: pluginCodecs });
     for (const item of candidate.diagnostics) diagnostics.record({ severity: item.severity, source: "boot", code: item.code, message: item.message, ...(item.provenance.pluginId === undefined ? {} : { pluginId: item.provenance.pluginId }), details: isRecord(item.details) ? item.details : { value: item.details } });
     state.ready();
-    return createBootedProfile({ state, manifest: candidate.manifest, diagnostics, context, root, agentRuntime, candidate, options });
+    return createBootedProfile({ state, manifest: candidate.manifest, diagnostics, context, root, agentRuntime, candidate, options, harnessStats });
   } catch (error) {
+    await harnessStats?.dispose().catch(() => undefined);
     await root?.dispose().catch(() => undefined);
     await options.disposeCordis?.().catch(() => undefined);
     await options.disposePlugins?.().catch(() => undefined);
@@ -220,6 +227,7 @@ function createBootedProfile(input: {
   readonly agentRuntime: AgentRuntimeService;
   readonly candidate: Awaited<ReturnType<typeof createDshBootCandidate>>;
   readonly options: BootRuntimeOptions;
+  readonly harnessStats?: HarnessStats;
 }): BootedRuntimeProfile {
   let shutdownPromise: Promise<RuntimeV2ShutdownResult> | undefined;
   let cleanupPromise: Promise<void> | undefined;
@@ -236,6 +244,8 @@ function createBootedProfile(input: {
         () => input.candidate.disposeCandidate(),
         () => input.options.disposeCordis?.(),
         () => input.options.disposePlugins?.(),
+        // Last: every Harness has stopped, so the final counts are in.
+        () => input.harnessStats?.dispose(),
       ]) {
         try { await dispose(); } catch (error) { failures.push(error); }
       }

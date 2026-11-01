@@ -30,6 +30,8 @@ import { SubagentSection } from "./sections/SubagentSection";
 import { TaskModelDefaultsSection } from "./sections/TaskModelDefaultsSection";
 import { ToolsSection } from "./sections/ToolsSection";
 import { UsageStatisticsPage } from "../UsageStatisticsPage";
+import { HarnessStatsPage } from "../harness-stats/HarnessStatsPage";
+import { devHarnessStatsTab } from "../harness-stats/dev-start";
 
 // 设置页入口：左侧导航 + 右侧按 section 渲染。数据加载与保存在 use-settings，各 section 在 sections/ 下。
 // 测试从这里 import TaskModelDefaultsSection 单独渲染，保留再导出。
@@ -236,6 +238,8 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
           onUpdateNamespace={rest.onUpdateNamespace}
         />
       );
+    case "harnessStats":
+      return <HarnessStatsPage initialTab={devHarnessStatsTab()} />;
     case "update":
       return <PageShell title="更新" description="检查版本并从本机源码更新 ActSpace。"><LocalUpdateSection /></PageShell>;
     default:

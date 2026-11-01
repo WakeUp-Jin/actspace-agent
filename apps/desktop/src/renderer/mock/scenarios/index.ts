@@ -13,7 +13,7 @@ import { streamingScenario } from "./streaming";
 import { turnDeliverablesScenario } from "./turn-deliverables";
 import { subagentTrajectoryScenario } from "./subagent-trajectory";
 
-export type MockScenario = "empty" | "streaming" | "long-session" | "approval-pending" | "remote-host" | "approval-prefix" | "context-pagination" | "turn-deliverables" | "no-workspace" | "sidebar" | "subagent-trajectory" | "background-tasks" | "compaction" | "side-chat";
+export type MockScenario = "empty" | "streaming" | "long-session" | "approval-pending" | "remote-host" | "approval-prefix" | "context-pagination" | "turn-deliverables" | "no-workspace" | "sidebar" | "subagent-trajectory" | "background-tasks" | "compaction" | "side-chat" | "harness-stats";
 
 /** 场景只负责写入种子数据，必要时覆盖少量 handler（如流式回放的触发时机）。 */
 export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) => MockHandlers | void>> = {
@@ -31,6 +31,8 @@ export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) =>
   "background-tasks": backgroundTasksScenario,
   compaction: compactionScenario,
   "side-chat": sideChatScenario,
+  // 「Harness 统计」页的数据在 harness-stats-fixture.ts，会话侧沿用空场景；起始位置见 components/harness-stats/dev-start.ts。
+  "harness-stats": emptyScenario,
 };
 
 export function isMockScenario(value: string | null): value is MockScenario {

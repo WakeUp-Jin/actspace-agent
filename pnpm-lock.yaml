@@ -1138,6 +1138,9 @@ importers:
       '@actspace/harness-hmr':
         specifier: workspace:*
         version: link:../../harness-evolution/harness-hmr
+      '@actspace/harness-stats':
+        specifier: workspace:*
+        version: link:../../harness-evolution/harness-stats
       '@actspace/headless':
         specifier: workspace:*
         version: link:../../host/headless
@@ -1456,6 +1459,25 @@ importers:
       '@actspace/harness-control':
         specifier: workspace:*
         version: link:../harness-control
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/harness-evolution/harness-stats:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
     devDependencies:
       '@types/node':
         specifier: ^24.0.3

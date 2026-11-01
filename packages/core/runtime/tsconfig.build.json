@@ -85,6 +85,9 @@
       "path": "./../../harness-evolution/harness-hmr/tsconfig.build.json"
     },
     {
+      "path": "./../../harness-evolution/harness-stats/tsconfig.build.json"
+    },
+    {
       "path": "./../../host/headless/tsconfig.build.json"
     },
     {

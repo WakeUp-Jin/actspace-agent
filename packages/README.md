@@ -44,7 +44,7 @@ kind: "package-map"
 | [`subagent/`](subagent/README.md) | 子 Agent 调度与子 Agent 工具 | 2 | 会话、库 |
 | [`sandbox/`](sandbox/README.md) | 命令沙箱：策略与后端 | 3 | 会话 |
 | [`approval/`](approval/README.md) | 危险操作的人工审批与模型自动审批 | 2 | 会话 |
-| [`harness-evolution/`](harness-evolution/README.md) | Harness 的选择、热替换、评估与插件开发 | 4 | 会话、库 |
+| [`harness-evolution/`](harness-evolution/README.md) | Harness 的选择、热替换、评估、运行时统计与插件开发 | 5 | 会话、库 |
 | [`composition/`](composition/README.md) | 插件 ABI、组合描述、解析与启动装配 | 4 | 库 |
 | [`host/`](host/README.md) | 三种宿主形态：桌面、远程、命令行 | 3 | 全局 |
 | [`client/`](client/README.md) | 固定界面用的 IPC 与投影契约 | 1 | 库 |

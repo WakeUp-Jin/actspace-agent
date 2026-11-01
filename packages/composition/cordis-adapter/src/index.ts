@@ -17,4 +17,5 @@ export * from "./service-contract.js";
 
 export * from "./plugin-artifact.js";
 export * from "./cordis-tree.js";
+export * from "./harness-observer.js";
 export * from "./harness-contracts.js";

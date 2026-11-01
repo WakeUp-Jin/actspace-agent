@@ -3,6 +3,7 @@ import { EntryTree, type EntryOptions } from "@deepseek-ai/cordis-plugin-loader"
 import { toCordisBehavior } from "./behavior-loader.js";
 import { entryId } from "./identity.js";
 import type { CordisContext } from "./cordis-types.js";
+import type { HarnessMountObserver, HarnessMountPluginInfo, HarnessPluginObservation } from "./harness-observer.js";
 
 export interface IsolatedCordisEntry {
   readonly id: string;
@@ -15,6 +16,8 @@ export interface IsolatedCordisEntry {
    * absent ones are isolated so `ctx.get` returns undefined instead of reaching a same-named Host service.
    */
   readonly optionalInjects?: readonly string[];
+  /** Opaque provenance label handed to the observer, if any. */
+  readonly origin?: string;
 }
 export interface IsolatedCordisTree {
   readonly context: CordisContext;
@@ -41,6 +44,8 @@ export async function mountIsolatedCordisTree(options: {
   readonly entries: readonly IsolatedCordisEntry[];
   readonly sharedServices: readonly string[];
   readonly decorate?: (context: CordisContext) => CordisContext;
+  /** Optional observation port; absent means the plugins are mounted untouched. */
+  readonly observer?: HarnessMountObserver;
 }): Promise<IsolatedCordisTree> {
   const parent = options.parent as Context;
   const provided = new Set<string>();
@@ -60,6 +65,9 @@ export async function mountIsolatedCordisTree(options: {
   for (const entry of options.entries) for (const name of entry.optionalInjects ?? []) {
     if (!available(name)) absentOptional.add(name);
   }
+  const infos: readonly HarnessMountPluginInfo[] | undefined = options.observer
+    ? options.entries.map(entry => Object.freeze({ id: entry.id, provides: entry.provides, injects: entry.injects, optionalInjects: entry.optionalInjects ?? [], ...(entry.origin === undefined ? {} : { origin: entry.origin }) }))
+    : undefined;
   const modules = new Map<string, Plugin>();
   const rows: EntryOptions[] = options.entries.map(entry => {
     entryId(entry.id);
@@ -71,12 +79,19 @@ export async function mountIsolatedCordisTree(options: {
     const names = Array.isArray(declared) ? declared : declared && typeof declared === "object" ? Object.keys(declared) : [];
     if (names.some(name => !entry.injects.includes(String(name)) && !entry.optionalInjects?.includes(String(name)))) throw new Error(`Behavior injection differs from manifest: ${entry.id}`);
     const inject = [...entry.injects, ...(entry.optionalInjects ?? []).filter(available)];
-    modules.set(entry.id, { name: entry.id, inject, apply: (ctx: Context, config: unknown) => {
+    const observation = options.observer?.observePlugin(infos!.find(info => info.id === entry.id)!, infos!);
+    modules.set(entry.id, { name: entry.id, inject, apply: observation === undefined ? (ctx: Context, config: unknown) => {
       const guarded = ctx.extend({ provide: (name: string, value?: unknown) => {
         if (!entry.provides.includes(name)) throw new Error(`Undeclared Harness service: ${entry.id}/${name}`);
         return ctx.provide(name, value);
       } });
       return behavior.apply(guarded, config);
+    } : (ctx: Context, config: unknown) => {
+      const guarded = ctx.extend({ provide: (name: string, value?: unknown) => {
+        if (!entry.provides.includes(name)) throw new Error(`Undeclared Harness service: ${entry.id}/${name}`);
+        return ctx.provide(name, value);
+      } });
+      return runObserved(observation, () => behavior.apply((observation.wrapContext?.(guarded as CordisContext) ?? guarded) as Context, config));
     } } as Plugin);
     return { id: entry.id, name: entry.id, config: structuredClone(entry.config), inject };
   });
@@ -126,4 +141,17 @@ export async function mountIsolatedCordisTree(options: {
     try { await dispose(); } catch (cleanup) { throw new AggregateError([error, cleanup], "Harness activation and cleanup failed"); }
     throw error;
   }
+}
+
+/** Runs one plugin `apply` and reports its outcome; the original return value or error is passed through unchanged. */
+function runObserved(observation: HarnessPluginObservation, run: () => unknown): unknown {
+  const started = performance.now();
+  const end = (ok: boolean, error?: unknown) => { try { observation.onApplyEnd?.({ ok, ...(ok ? {} : { error }), ms: performance.now() - started }); } catch { /* observers never affect mounting */ } };
+  try { observation.onApplyStart?.(); } catch { /* ignored */ }
+  let result: unknown;
+  try { result = run(); }
+  catch (error) { end(false, error); throw error; }
+  if (result instanceof Promise) return result.then(value => { end(true); return value; }, error => { end(false, error); throw error; });
+  end(true);
+  return result;
 }

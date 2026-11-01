@@ -5,14 +5,17 @@ import { prepare, type ProjectionDatabase } from "./usage-sql";
 import { insertUsageActivities } from "./usage-activity-write";
 import { projectQueryCatalog } from "./usage-catalog-projection";
 import { projectUsageJournalBatch, type UsageJournalSource } from "./usage-journal-projection";
+import { HARNESS_SESSION_TABLES, HARNESS_TABLES } from "./harness-stats-schema";
+import { projectHarnessJournalBatch } from "./harness-stats-projection";
 
 export type JournalBatch = { catalogOnly?: boolean; source: UsageJournalSource; events: readonly SessionEventEnvelopeV1[]; cursor: string; first: boolean; final: boolean; reset: boolean };
 export type JournalState = { revision: number | null; cursor?: string; stamp?: string; codecSetDigest?: string; building?: boolean };
 type Build = { target: number; stamp: string; codec: string; revision: number; cursor: string | null };
-const tables = ["session_catalog", "catalog_pending_tasks", "usage_activity", "usage_projection_events", "usage_projection_requests", "usage_projection_groups", "usage_projection_turns", "session_excerpt_search", "session_search"] as const;
+const usageTables = ["usage_activity", "usage_projection_events", "usage_projection_requests", "usage_projection_groups", "usage_projection_turns", ...HARNESS_SESSION_TABLES];
+const tables = ["session_catalog", "catalog_pending_tasks", "usage_activity", "usage_projection_events", "usage_projection_requests", "usage_projection_groups", "usage_projection_turns", "session_excerpt_search", "session_search", ...HARNESS_SESSION_TABLES];
 const tablePattern = new RegExp(`\\b(${tables.join("|")})\\b`, "g");
 const namespace = (catalog: boolean) => catalog ? "building_catalog_" : "building_usage_";
-const publishedOnlyIndexes = ["usage_activity_started_idx", "usage_activity_kind_page_idx", "usage_activity_status_page_idx", "usage_activity_model_page_idx", "usage_activity_provider_page_idx", "usage_activity_search_idx", "usage_activity_filter_idx"];
+const publishedOnlyIndexes = ["usage_activity_started_idx", "usage_activity_kind_page_idx", "usage_activity_status_page_idx", "usage_activity_model_page_idx", "usage_activity_provider_page_idx", "usage_activity_search_idx", "usage_activity_filter_idx", ...Object.values(HARNESS_TABLES).map(spec => `${spec.name}_hour_idx`)];
 const adapters = new WeakMap<DatabaseSync, Map<string, ProjectionDatabase>>();
 /** Only internal projection SQL uses this closed table namespace. No triggers or
  * aggregate/search dimensions exist in staging, so unpublished rows cannot count. */
@@ -107,6 +110,8 @@ export async function commitJournalBatch(db: DatabaseSync, message: JournalBatch
       insertUsageActivities(projection, { ...source, rows });
       await yieldBatch();
     });
+    // Harness 统计与使用统计共用这一次读取；行与游标同一事务提交。
+    if (!catalog) projectHarnessJournalBatch(projection, id, message.events);
     const revision = message.final ? source.throughJournalSeq : message.events.at(-1)?.seq ?? build?.revision ?? -1;
     if (useBuilding) prepare(db, "UPDATE read_model_builds SET revision=?,cursor=? WHERE session_id=? AND projection=?").run(revision, message.cursor, id, catalog ? "catalog" : "usage");
     else {
@@ -147,7 +152,7 @@ async function publish(db: DatabaseSync, source: UsageJournalSource, cursor: str
   };
   db.exec("BEGIN IMMEDIATE");
   try {
-    if (!catalog) for (const table of ["usage_activity", "usage_projection_events", "usage_projection_requests", "usage_projection_groups", "usage_projection_turns"]) { await removeRows(db, table, id, yieldBatch); }
+    if (!catalog) for (const table of usageTables) { await removeRows(db, table, id, yieldBatch); }
     const state = publishedState(db, id, true);
     prepare(db, `INSERT OR IGNORE INTO session_catalog SELECT * FROM ${prefix}session_catalog WHERE session_id=?`).run(id);
     if (source.throughJournalSeq >= (state.revision ?? -1)) {
@@ -160,7 +165,7 @@ async function publish(db: DatabaseSync, source: UsageJournalSource, cursor: str
       saveState(db, source, cursor, source.throughJournalSeq, true);
     }
     if (!catalog) {
-      for (const table of ["usage_activity", "usage_projection_events", "usage_projection_requests", "usage_projection_groups", "usage_projection_turns"]) await copy(table);
+      for (const table of usageTables) await copy(table);
       saveState(db, source, cursor, source.throughJournalSeq, false);
     }
     await clearBuilding(db, id, catalog, yieldBatch);

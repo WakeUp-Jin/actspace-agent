@@ -38,6 +38,8 @@ export interface HarnessControlOptions {
   readonly onDiagnostic?: (error: unknown) => void;
   /** @mode emit: called after durable selection and memory publication. */
   readonly onSelection?: (record: SelectionRecord) => void;
+  /** Host-owned statistics observation of each prepared Harness mount; absent when statistics are off. */
+  readonly observeMount?: import("@actspace/boot").HarnessMountObservationFactory;
 }
 
 export interface HarnessControlEvents {

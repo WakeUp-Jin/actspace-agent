@@ -41,6 +41,7 @@ import { NewSpaceDialog } from "./space/dialogs/NewSpaceDialog";
 import { SpaceDemoHelpButton } from "./space/dialogs/SpaceDemoHelpDialog";
 import { useSpacePanelBinding } from "./space/use-space-panel-binding";
 import { TrajectoryNavigationProvider } from "./trajectory/TrajectoryNavigation";
+import { devStartSettingsSection, devStartView } from "./harness-stats/dev-start";
 import { OpenFileFallbackProvider } from "./files/open-file-fallback-context";
 
 /** 「文档」标签的右栏默认宽度；窗口放不下时由 rightMaxWidth 截断。 */
@@ -84,7 +85,7 @@ export function WorkbenchLayout({
   } = useRightPanel();
   // 「文档」标签自己记一个宽度：正文 + 260px 文件树放不进默认的 390px 右栏，拖宽它不该改掉其他标签的宽度。
   const [docsRightWidth, setDocsRightWidth] = useState(DOCS_RIGHT_DEFAULT_WIDTH);
-  const [view, setView] = useState<SidebarView>("chat");
+  const [view, setView] = useState<SidebarView>(() => devStartView() ?? "chat");
   const [returnFocusRequest, setReturnFocusRequest] = useState(0);
   // 所有 Space 分支都挂在 SPACE_DEMO_ENABLED 上：生产构建里它是常量 false，演示代码整块删掉。
   const isSpace = SPACE_DEMO_ENABLED && view === "space";
@@ -122,7 +123,7 @@ export function WorkbenchLayout({
   const effectiveIsSessionReady = (projectedComposer != null && projectedComposer.phase !== "blank") || isSessionReady || projectionSessionReady;
   const sessionViewByIdRef = useRef(new Map<string, SessionMainView>());
   const [sessionMainView, setSessionMainView] = useState<SessionMainView>("chat");
-  const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("general");
+  const [settingsSection, setSettingsSection] = useState<SettingsSectionId>(() => devStartSettingsSection() ?? "general");
   const [focusSpeech, setFocusSpeech] = useState(false);
   const [usageSnapshot, setUsageSnapshot] = useState<UsageStatisticsSnapshot | null>(null);
   const [usageActivitySnapshot, setUsageActivitySnapshot] = useState<UsageActivitySnapshot | null>(null);

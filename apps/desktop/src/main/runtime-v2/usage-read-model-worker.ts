@@ -10,6 +10,9 @@ import { metricsSource, runCountsSource, countableRunSql, metricSql, searchMetri
 import { UsageSessionFallback } from "./usage-session-fallback";
 import type { UsageJournalSource } from "./usage-journal-projection";
 import { commitJournalBatch, resumableState, discardSessionBuilds, pruneSyncIndexes } from "./read-model-sync";
+import { archiveHarnessSession, ingestHarnessArchive, refreshHarnessSessionMeta } from "./harness-stats-archive";
+import { harnessFingerprint, queryHarnessStats } from "./harness-stats-query";
+import { ingestHarnessRuntimeFiles } from "./harness-stats-runtime-ingest";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { DatabaseSync } from "node:sqlite";
 import { getHeapStatistics } from "node:v8";
@@ -17,7 +20,7 @@ import { chmod, mkdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { parentPort, workerData } from "node:worker_threads";
 import { setImmediate as yieldWorker } from "node:timers/promises";
-import type { UsageCostSummary, SessionListPage, SessionListPageInput, UsageActivityAggregate, UsageActivityRow, UsageActivitySnapshot, UsageActivitySummary, UsageStatisticsGetInput, UsageStatisticsSnapshot } from "@actspace/shared";
+import type { HarnessStatsData, HarnessStatsQueryInput, UsageCostSummary, SessionListPage, SessionListPageInput, UsageActivityAggregate, UsageActivityRow, UsageActivitySnapshot, UsageActivitySummary, UsageStatisticsGetInput, UsageStatisticsSnapshot } from "@actspace/shared";
 import type { IndexedUsageSource } from "@actspace/client/sessions";
 
 type Message =
@@ -37,6 +40,9 @@ type Message =
   | { id: string; type: "source-state"; sessionId: string; catalogOnly?: boolean; target?: { throughSeq: number; stamp?: string; codecSetDigest?: string } }
   | { id: string; type: "abort-sync" }
   | { id: string; type: "journal"; catalogOnly?: boolean; source: UsageJournalSource; events: readonly SessionEventEnvelopeV1[]; cursor: string; first: boolean; final: boolean; reset: boolean }
+  | { id: string; type: "harness-query"; input: HarnessStatsQueryInput }
+  | { id: string; type: "harness-ingest" }
+  | { id: string; type: "harness-fingerprint" }
   | { id: string; type: "diagnostics" };
 type DbRow = { row_json: string; activity_id: string; session_id: string; session_title: string | null; started_at: string; kind: string; status: string; model: string | null; provider_id: string | null; connection_id: string | null; tool_name: string | null; agent_run_id: string };
 type Source = IndexedUsageSource & { querySource?: UsageJournalSource["querySource"] };
@@ -57,7 +63,7 @@ parentPort?.on("message", (message: Message) => {
   chain = chain.then(async () => {
     activeMessageId = message.id;
     try {
-      const result = message.type === "context-fallback" ? await contextFallback(message.source, message.events) : message.type === "context-query" ? queryContextHistory(await open(), message.sessionId) : message.type === "context-source-state" ? contextSourceState(await open(), message.source) : message.type === "context-journal" ? await commitContextBatch(await open(), message.source, message.events, message.cursor, message.first, message.final, message.reset, async () => { parentPort?.postMessage({ id: message.id, heartbeat: true }); await yieldWorker(); }) : message.type.startsWith("catalog-fallback-") ? catalogFallbackMessage(message) : message.type === "reset-database" ? await resetDatabase() : message.type.startsWith("fallback-") ? await fallbackMessage(message) : message.type === "source-state" ? await sourceState(message.sessionId, message.catalogOnly, message.target) : message.type === "journal" ? await syncJournal(message) : message.type === "abort-sync" ? abortSync() : message.type === "sync" ? await sync(message.sources, message.catalog, message.replaceSessionIds, message.activeSessionIds, message.final, message.continuation) : message.type === "query" ? await query(message.request, message.input) : { memory: { ...process.memoryUsage(), heapSizeLimit: getHeapStatistics().heap_size_limit }, sqlite: db ? prepare(db, "PRAGMA temp_store").get() : null };
+      const result = message.type === "context-fallback" ? await contextFallback(message.source, message.events) : message.type === "context-query" ? queryContextHistory(await open(), message.sessionId) : message.type === "context-source-state" ? contextSourceState(await open(), message.source) : message.type === "context-journal" ? await commitContextBatch(await open(), message.source, message.events, message.cursor, message.first, message.final, message.reset, async () => { parentPort?.postMessage({ id: message.id, heartbeat: true }); await yieldWorker(); }) : message.type.startsWith("catalog-fallback-") ? catalogFallbackMessage(message) : message.type === "reset-database" ? await resetDatabase() : message.type.startsWith("fallback-") ? await fallbackMessage(message) : message.type === "source-state" ? await sourceState(message.sessionId, message.catalogOnly, message.target) : message.type === "journal" ? await syncJournal(message) : message.type === "abort-sync" ? abortSync() : message.type === "sync" ? await sync(message.sources, message.catalog, message.replaceSessionIds, message.activeSessionIds, message.final, message.continuation) : message.type === "query" ? await query(message.request, message.input) : message.type === "harness-query" ? await harnessQuery(message.input) : message.type === "harness-ingest" ? { ...ingestHarnessRuntimeFiles(await open(), root), fingerprint: harnessFingerprint(await open()) } : message.type === "harness-fingerprint" ? { fingerprint: harnessFingerprint(await open()) } : { memory: { ...process.memoryUsage(), heapSizeLimit: getHeapStatistics().heap_size_limit }, sqlite: db ? prepare(db, "PRAGMA temp_store").get() : null };
       if (result && Buffer.byteLength(JSON.stringify(result)) > 1024 * 1024) throw new Error("Usage result exceeds 1 MiB; narrow the query.");
       parentPort?.postMessage({ id: message.id, ok: true, result });
     } catch (error) {
@@ -118,11 +124,16 @@ async function open(): Promise<DatabaseSync> {
   try {
   const appId = Number((prepare(db, "PRAGMA application_id").get() as { application_id: number }).application_id);
   const version = Number((prepare(db, "PRAGMA user_version").get() as { user_version: number }).user_version);
-  if ((appId !== 0 && appId !== 0x41555332) || (version !== 0 && version !== 14)) throw new Error("Usage read model schema mismatch; rebuild required.");
+  if ((appId !== 0 && appId !== 0x41555332) || (version !== 0 && version !== 15)) throw new Error("Usage read model schema mismatch; rebuild required.");
   await chmod(databasePath, 0o600).catch(() => undefined);
   db.exec("PRAGMA temp_store = FILE; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; PRAGMA cache_size = -32768; PRAGMA wal_autocheckpoint = 4096;");
   memoryTemp = false;
-  if (version === 0) createReadModelSchema(db);
+  if (version === 0) {
+    createReadModelSchema(db);
+    // 新库：读回已删除会话的 Harness 统计归档（D15）。归档损坏不影响使用统计。
+    try { ingestHarnessArchive(db, root); } catch (error) { console.warn("[harness-stats] archive ingest failed", error); }
+    prepare(db, "INSERT INTO harness_stats_health(id,last_rebuild_at) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET last_rebuild_at=excluded.last_rebuild_at").run(new Date().toISOString());
+  }
   else if (["usage_write_mode", "read_model_builds", "usage_activity_session_idx", "context_state", "context_request_seq", "context_event_seq", "building_context_state"].some(name => !prepare(db!, "SELECT 1 FROM sqlite_master WHERE name=?").get(name))) throw new Error("Usage read model schema incomplete; rebuild required.");
   addSideChatColumn(db);
   pruneSyncIndexes(db);
@@ -207,6 +218,7 @@ async function sync(sources: readonly Source[], catalogRows: readonly CatalogRow
       const active = new Set(activeSessionIds);
       const known = prepare(database, "SELECT session_id FROM session_catalog").iterate() as Iterable<{ session_id: string }>;
       for (const row of known) if (!active.has(row.session_id)) {
+        archiveHarnessSession(database, root, row.session_id);
         await clearContextSession(database, row.session_id, false, async () => { if (activeMessageId) parentPort?.postMessage({ id: activeMessageId, heartbeat: true }); await yieldWorker(); });
         await clearContextSession(database, row.session_id, true, async () => { if (activeMessageId) parentPort?.postMessage({ id: activeMessageId, heartbeat: true }); await yieldWorker(); });
         await discardSessionBuilds(database, row.session_id, async () => { if (activeMessageId) parentPort?.postMessage({ id: activeMessageId, heartbeat: true }); await yieldWorker(); });
@@ -236,6 +248,14 @@ async function removeSessionActivities(database: DatabaseSync, sessionId: string
     if (activeMessageId) parentPort?.postMessage({ id: activeMessageId, heartbeat: true });
     await yieldWorker();
   }
+}
+
+/** Harness 统计查询读已发布的表；重建期间发布表仍是上一版完整数据，所以不必等同步结束。 */
+async function harnessQuery(input: HarnessStatsQueryInput): Promise<{ data: HarnessStatsData; fingerprint: string }> {
+  const database = await open();
+  refreshHarnessSessionMeta(database);
+  setTempStorage(database, false);
+  return { data: queryHarnessStats(database, input), fingerprint: harnessFingerprint(database) };
 }
 
 async function query(kind: "activity" | "statistics" | "sessions", input: UsageStatisticsGetInput | SessionListPageInput, scratch?: DatabaseSync): Promise<UsageActivitySnapshot | UsageStatisticsSnapshot | SessionListPage | null> {

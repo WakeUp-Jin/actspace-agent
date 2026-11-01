@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { AgentScope, scopeContext } from "@actspace/scope";
-import { discoverPluginCodecs, importArtifactModule, mountIsolatedCordisTree, verifyPluginArtifact, type CordisContext, type EventCodec, type PluginArtifact } from "@actspace/cordis-adapter";
+import { discoverPluginCodecs, importArtifactModule, mountIsolatedCordisTree, verifyPluginArtifact, type CordisContext, type EventCodec, type HarnessMountObserver, type PluginArtifact } from "@actspace/cordis-adapter";
 import type { ResolvedComposition } from "@actspace/composition";
 
 export interface HarnessMountRequest {
@@ -20,7 +20,7 @@ export interface HarnessMount {
 }
 
 /** Admit all codecs before importing behavior; mount a scoped tree under the existing Host. */
-export async function mountHarness(parent: CordisContext, request: HarnessMountRequest): Promise<HarnessMount> {
+export async function mountHarness(parent: CordisContext, request: HarnessMountRequest, observer?: HarnessMountObserver): Promise<HarnessMount> {
   // Callers may retain mutable composition objects; preparation captures its own description.
   const composition = structuredClone(request.composition);
   const requestedArtifacts = structuredClone(request.artifacts);
@@ -58,10 +58,10 @@ export async function mountHarness(parent: CordisContext, request: HarnessMountR
     if (!codecs.some(codec => codec.type === type)) throw new Error(`Missing Harness codec: ${type}`);
   }
   const rows = [];
-  for (const entry of entries) rows.push({ id: entry.entryId, module: await importArtifactModule(artifacts.get(entry.pluginId)!, entry.module), config: entry.config, provides: entry.provides, injects: entry.injects, optionalInjects: entry.optionalInjects ?? [] });
+  for (const entry of entries) rows.push({ id: entry.entryId, module: await importArtifactModule(artifacts.get(entry.pluginId)!, entry.module), config: entry.config, provides: entry.provides, injects: entry.injects, optionalInjects: entry.optionalInjects ?? [], ...(observer ? { origin: pluginOrigin(artifacts.get(entry.pluginId)!.manifest.plugin.source) } : {}) });
   const scope = new AgentScope("harness");
   try {
-    const tree = await mountIsolatedCordisTree({ parent, entries: rows, sharedServices, decorate: ctx => scopeContext(ctx, scope.scopeKey, scope.disposer) });
+    const tree = await mountIsolatedCordisTree({ parent, entries: rows, sharedServices, decorate: ctx => scopeContext(ctx, scope.scopeKey, scope.disposer), ...(observer ? { observer } : {}) });
     let disposal: Promise<void> | undefined;
     return Object.freeze({
       executionDigest: createHash("sha256").update(stable({ hostContractDigest: request.hostContractDigest, composition: { profileId: composition.profileId, entries: composition.entries, hostCapabilities: composition.hostCapabilities }, artifacts: [...artifacts].map(([id, artifact]) => [id, artifact.artifactId]).sort(), sharedServices: [...sharedServices].sort() })).digest("hex"),
@@ -76,6 +76,11 @@ export async function mountHarness(parent: CordisContext, request: HarnessMountR
     try { await scope.dispose(); } catch (cleanup) { throw new AggregateError([error, cleanup], "Harness preparation and scope cleanup failed"); }
     throw error;
   }
+}
+/** Evolved plugins are built Host-side with an `evolution:` reference; other builtin sources ship with the app, the rest are user-installed. */
+function pluginOrigin(source: { readonly kind: string; readonly reference: string }): "builtin" | "user" | "evolved" {
+  if (source.reference.startsWith("evolution:")) return "evolved";
+  return source.kind === "builtin" ? "builtin" : "user";
 }
 function stable(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
