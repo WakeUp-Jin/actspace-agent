@@ -184,6 +184,9 @@ export const desktopBridgeContract = {
     installFromRepo: invoke<{ repoRoot: string }, S.BrowserBridgeInstallResult>(CH.installBrowserBridgeFromRepo),
     installNativeHost: invoke<void, S.BrowserBridgeActionResult>(CH.installBrowserBridgeNativeHost),
   },
+  plugins: {
+    list: invoke<void, S.PluginListItem[]>(CH.listPlugins),
+  },
   skills: {
     list: invokeWithDefault<S.SkillListInput, S.SkillListResult>(CH.listSkills, {}),
     install: invoke<void, S.SkillInstallResult>(CH.installSkill),

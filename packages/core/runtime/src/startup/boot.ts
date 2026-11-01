@@ -7,7 +7,7 @@ import type { RendererAllowlist } from "../projection/tool-dto.js";
 import type { DiagnosticInput } from "../projection/diagnostics.js";
 import { sandboxStatusDiagnostic } from "./sandbox-status.js";
 import { SESSION_CODEC_HOST_PORT_ID } from "@actspace/session-journal";
-import { loadBuiltinToolCodec, toolTransportPatches } from "../profiles/composition.js";
+import { hostTransportPatches, loadBuiltinToolCodec, toolTransportPatches } from "../profiles/composition.js";
 import { harnessEntriesMissingHostCapabilities } from "../plugin-catalog.js";
 import type { EventCodec } from "@actspace/session-journal";
 import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
@@ -54,6 +54,8 @@ export type BootRuntimeOptions = {
   readonly hostServices?: RuntimeHostServices;
   /** Boot this Harness selection instead of the built-in one; the data root must hold no selection history. */
   readonly pinnedHarness?: import("../harness/agent-host-port.js").PinnedHarness;
+  /** Session plugin Entry ids the Host switched off; they join `disabledHarnessEntries` even when their Host capabilities are present. */
+  readonly disabledPlugins?: readonly string[];
 };
 
 export type BootedRuntimeProfile = {
@@ -141,7 +143,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     // Without a bundled nono only the macOS Seatbelt backend can probe available; Bash otherwise goes to approval.
     [SANDBOX_HOST_PORT_ID]: hostServices.services[SANDBOX_HOST_PORT_ID] ?? createNodeSandboxHostPort(),
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
-      disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...harnessEntriesMissingHostCapabilities(options.host.capabilityCeiling)],
+      disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...harnessEntriesMissingHostCapabilities(options.host.capabilityCeiling), ...(options.disabledPlugins ?? [])],
       authorizeHarness: options.authorizeHarness,
       ...(options.pinnedHarness ? { pinnedHarness: options.pinnedHarness } : {}),
       evolution: {
@@ -177,6 +179,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     const boot = await bootDshCordis({
       configPath: options.cordis!.configPath!,
       composition,
+      transportPatches: hostTransportPatches(composition),
       createRoot: options.cordis?.createRoot,
 
       requiredServices: ["actspace.runtime", "session.journal", "session.runtime", "llm.service", "core.agent", "agent.registry", "agent.service", "agent.runtime"],

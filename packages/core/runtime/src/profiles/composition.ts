@@ -64,6 +64,17 @@ export function toolTransportPatches(composition: ResolvedComposition) {
     return { id: item.id, disabled: !entry?.enabled || entry.state === "skipped" };
   });
 }
+/**
+ * Host (Cordis) loader rows whose composition entry is disabled or skipped, as startup-only Include overrides.
+ * This is what makes an `invocationPatch` `disable` (for example the english-learning switch) stop the loader
+ * from mounting the plugin; the composition alone only records the decision.
+ */
+export function hostTransportPatches(composition: ResolvedComposition) {
+  return PLUGIN_CATALOG.filter(item => item.loaders.includes("host")).flatMap(item => {
+    const entry = composition.entries.find(entry => entry.pluginId === item.manifest.pluginId && entry.entryId === item.manifest.behaviors[0]?.entryId);
+    return entry !== undefined && (!entry.enabled || entry.state === "skipped") ? [{ id: item.id, disabled: true }] : [];
+  });
+}
 // Admit the pure Context codecs on the Host; behavior lives only in the Harness.
 const contextManifest = pluginCatalogEntry("context-engine")!.manifest;
 const contextCodecManifest: PluginManifest = Object.freeze({ ...contextManifest, behaviors: [], contributions: { services: [], events: contextManifest.contributions.events, contributions: [] } });

@@ -22,7 +22,7 @@ describe("Browser Runtime restart admission", () => {
     vi.clearAllMocks();
   });
 
-  async function setup(blockedHarness = false) {
+  async function setup(blockedHarness = false, omitBrowser = false) {
     const dataRoot = await mkdtemp("/tmp/actspace-reconfigure-");
     rootsToRemove.push(dataRoot);
     let bridgeReady = blockedHarness;
@@ -45,7 +45,7 @@ describe("Browser Runtime restart admission", () => {
       context: { get: (name: string) => name === "desktop.app" ? app : name === "english-learning" ? learning : name === "tools.browser" ? { available: bridgeReady, registrations: [1], definitions: [1] } : undefined },
       getState: () => ({ state: "ready", runtimeInstanceId: "test" }), shutdown,
     } }));
-    const registry = new DesktopRuntimeV2Registry({ roots: { dataRoot, workspaceRoot: join(dataRoot, "workspace"), defaultWorkspaceRoot: join(dataRoot, "workspace") }, browser, approvals, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
+    const registry = new DesktopRuntimeV2Registry({ roots: { dataRoot, workspaceRoot: join(dataRoot, "workspace"), defaultWorkspaceRoot: join(dataRoot, "workspace") }, ...(omitBrowser ? {} : { browser }), approvals, loadModule: async () => ({}) } as unknown as DesktopRuntimeV2RegistryOptions);
     registries.push(registry);
     await registry.boot();
     return { registry, app, browser, approvals, learning, shutdown, connect: () => { bridgeReady = true; } };
@@ -125,5 +125,13 @@ describe("Browser Runtime restart admission", () => {
     expect(fixture.browser.setRuntimeReady).toHaveBeenLastCalledWith(true);
     await fixture.registry.submitTask("session", "submission", "accepted");
     expect(fixture.app.submitTask).toHaveBeenCalledOnce();
+  });
+
+  it("boots and refreshes without a browser port when the plugin is off", async () => {
+    const fixture = await setup(false, true);
+    expect(bootDesktopRuntimeV2.mock.calls[0]![0].browser).toBeUndefined();
+    expect(await fixture.registry.refreshBrowser()).toBe(false);
+    expect(fixture.browser.getStatus).not.toHaveBeenCalled();
+    expect(fixture.shutdown).not.toHaveBeenCalled();
   });
 });

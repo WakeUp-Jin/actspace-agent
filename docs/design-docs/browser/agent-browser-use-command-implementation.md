@@ -1,5 +1,7 @@
 # Browser Use 命令实现设计
 
+> 插件状态：默认不加载，在 扩展 › 插件 中开启后重启生效。
+
 命令参数与行为见 [命令面](agent-browser-use-command-surface.md)，调用与权限见 [集成设计](agent-browser-use-integration-design.md)。本页维护实现职责、底层原语和代码入口，具体算法以当前 Go handler 和 Locator Runtime 为准。
 
 ### 从 CDP 原语出发

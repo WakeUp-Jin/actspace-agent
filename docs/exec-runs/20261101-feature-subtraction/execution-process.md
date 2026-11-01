@@ -254,6 +254,19 @@
 | `pnpm --filter @actspace/desktop build` | 通过 |
 | 残留 grep（`defaultHarnessEntrySource`、`applyAgentFactory`、`todo-projection-plugin`、`runtime/todo-projection`） | 无命中 |
 
+### S3 插件开关与插件页
+
+- 设置：`SettingsV4Tools.plugins?: Record<string, boolean>`，不升 schema 版本；规范化时丢弃非布尔值和非法 id（`sanitizePluginSwitches`），tools 补丁按键合并。
+- 开关解析：`plugins/plugin-switches.ts` 的 `resolvePluginSwitches(settings, catalog)` 在启动时算一次，作为“启动开关”；不可关的插件忽略设置，可关的取设置值，缺省取 `display.defaultEnabled`（浏览器、英语学习都是关）。
+- 关闭方式（全局插件，英语学习）：`createProfileComposition` 的 `invocationPatch` 加一条 `disable`，条目 `enabled:false, state:"skipped"`；`hostTransportPatches(composition)` 把它转成 Cordis loader 的 `transportPatches`，boot 传给 `bootDshCordis`，否则 loader 仍会加载。关闭后 main 不创建语音播放，英语学习 IPC 换成桩（`getState` 返回“未开启”，其余抛“插件未开启”）。
+- 关闭方式（会话插件，操控浏览器）：boot 增加 `disabledPlugins`，追加到 `disabledHarnessEntries`，Harness 条目被跳过；main 不创建 `BrowserBridgeService`、不轮询、不写 Native Host 清单；`desktop-host-adapter` 的 browser 参数可选，`browserReady` 恒为 false；`runtime-registry`、`fixed-renderer-ipc` 对 browser 判空；浏览器 IPC 换成桩，`getStatus` 返回 `runState:"disabled"`。
+- `plugins.list` IPC：`plugins/plugins-ipc.ts` 从 `PLUGIN_CATALOG` 派生，每个 id 一行，按应用形态过滤 Host 专属条目（桌面端只列 `desktop-app`）；`loaded` 是启动开关，`enabled` 每次读最新设置，两者不同时界面显示“重启后开启 / 关闭”。`llm-service` 同时在 Host 和 Harness，按全局插件列一次。
+- 插件页：`PluginsSection` 按 demo B 实现；分「全局插件」「会话插件」，可关的在上，内置折叠行，搜索按名称、描述、目录、id 匹配并自动展开；复用 `Toggle`、`SectionShell`，只用主题 token。开启并已加载后才挂载 `BrowserConnectPanel` 和英语学习设置，关闭时不请求浏览器与英语学习状态。工具设置的浏览器组、常规设置的语音设置由 `usePluginLoaded` 决定是否显示。删除 `CapabilitiesSection`，扩展页标签改为「插件」。
+- 先写后用的测试：`english-learning.test.ts` 先写了 invocationPatch `disable` 的用例，发现关闭后仍被加载，才补 `hostTransportPatches`。
+- 新增测试：`plugin-switches.test.ts`（开关解析、列表、桩状态）、`plugins-section.test.tsx`（7 个）、`runtime-v2-browser-reconfigure.test.ts` 未传 browser 用例、`browser-capability.test.ts` 的 `disabledPlugins` 用例、`composition.test.ts` 的 `hostTransportPatches` 用例；`extensions-page`、`settings-page` 测试按新标签和 `plugins.list` 调整。
+- 截图（浏览器 mock，`?mock=empty`）：`tmp/s3-plugins-light.png`、`tmp/s3-plugins-dark.png`，与 demo B 对照一致。
+- 验证：`pnpm install`、`pnpm typecheck` 通过；`pnpm -r --no-bail --if-present test` 全绿（desktop 2104 通过 / 7 跳过，runtime 98，agent-host 62，site 31）；根命令链（package-boundaries、plugin-catalog、contract-matrix、renderer-bridge、harness-events、harness-recovery、ipc-channels、frontend-tokens）、`check:packages`、`check:desktop-build-graph`、`check:frontend-tokens`、`check:frontend-theme`、`test:agent-host:process`、`@actspace/desktop build` 通过；`check:docs` / `check:current-docs` 仍是 363 条已知失败，全在 `docs/exec-runs/`。
+
 ## 遇到的问题
 
 - P1：计划没列 `chat-presentation-recovery.test.tsx`，它断言「+」菜单项等于 `["可视化回复", "上下文"]`，删入口后失败，已改为 `["上下文"]`。另有 `RightPanel.tsx`、`RightPanelObjectMenu.tsx` 里提到 Reply / 可视化回复的注释和提示文字，一并改掉。
@@ -277,6 +290,8 @@
 - S1：替换脚本把 4 个 DeepSeek Harness 来源注释里的 `packages/client/ui-primitives/...` 误改成 `packages/client/client/ui-primitives/...`，已还原；搬家后 pnpm 没刷新 `.pnpm/node_modules/@actspace/` 的隐式提升链接，Host 进程测试启动失败，重建后恢复；`build:deps:dev` 在清空 dist 后第一次会因 `agent-service` 测试文件缺依赖产物而失败，重跑通过（原有顺序依赖）。详见 S1 小节。
 - S2：esbuild 在 todo 拆分后报 `No matching export applyTools`，原因是构建脚本还是旧的，改写 `build-default-harness.mjs` 后恢复；两个测试里字符串与品牌 `ServiceId` 比较报 TS2345，改用 `String(id)`；契约矩阵测试需先 `pnpm gen:contract-matrix`。
 
+- S3：`test:contract-matrix` 因文档改动失效，重新 `pnpm gen:contract-matrix` 后恢复；`PluginsSection` 的两个原生 button 被 `check:frontend-tokens` 拦下，重试改用 `Button`，折叠行是整行铺满的按钮，`Button` 不适用，基线登记 1 个；`docs/roadmap.md` 的已完成行有固定格式（站点解析），加备注会让站点测试失败，已还原，没有改 roadmap；桌面全量测试里 extensions-page 在负载下偶发失败（连接面板文字在插件列表之后才异步出现，原断言是同步的），改成 findByText 后稳定。
+
 ## 跳过或推迟的事项
 
 - P1：Space 演示里的 mock「可视化回复」标签留待 Space 演示后续处理（见 P1 决定）。磁盘上旧的 `visualizations.json` 不读不删。
@@ -293,3 +308,6 @@
 - P5：已知限制：旧的磁盘 `view-state.json` 不读不删；`agent-contract-matrix.generated.md` 仍是旧基线，留给 S1 重新生成；`pnpm check:current-docs` 仍是 363 条已知失败。
 - S1：Electron 实机检查留给用户：用已有数据目录启动、打开旧会话、新建会话发一条消息、运行一条 Bash。没有跑 `scripts/release-package.sh` 的完整打包，只验证了 `pnpm deploy`。旧能力目录（`context/`、`session/`、`llm/`、`sandbox/`）里的 README 仍按旧包目录写，`packages/README.md` 只改了路径，整体重写留给 S4。`scripts/refactor-stats.mjs` 的分区现在按能力目录统计（`packages/<能力>`），没有改。
 - S2：Electron 实机检查留给用户（默认组合启动、浏览器能力有无时的工具列表、桌面端启动一个会话）。展示信息尚未接到设置页，留给 S3。
+- S3：Electron 实机检查留给用户：默认启动插件页两个开关都关、工具设置无浏览器组、常规设置无语音设置、Agent 工具列表无 `browser_*`；打开操控浏览器后出现“重启后开启”，重启后连接面板和 `browser_*` 回来并能连 Chrome；打开英语学习重启后选目标会话、双语回答、朗读与原来一致；关闭后重启语音设置消失，旧会话能打开。
+- S3：常驻开销检查（默认设置启动 Electron 60 秒内无浏览器状态轮询、`ps` 无 `abb`、数据目录无新写 Native Host 清单）没有在无头环境里跑，留给 Electron 实机。代码上已保证：开关关闭时 `BrowserBridgeService` 不创建。
+- S3：没有改站点「设置与数据」等页面里对「能力」页的零散提法（只改了 english-learning 的入口文字）；`docs/roadmap.md` 没改（格式限制）。

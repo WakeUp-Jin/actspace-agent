@@ -1,5 +1,7 @@
 # 英语辅助学习插件设计
 
+> 插件状态：默认不加载，在 扩展 › 插件 中开启后重启生效。
+
 > 状态：插件、配置与固定 UI 已实现；2026-10-06 修复空闲会话开启与跨 Run 绑定，见第 5.1 节；本轮真实复验见[修复记录](../../exec-runs/20261006-context-acceptance-bugfix/execution-summary.md)。Electron 与真实 MiniMax 音频验收见[执行摘要](../../exec-runs/20260906-actspace-english-learning/execution-summary.md)。
 >
 > 日期：2026-09-06。执行入口：[英语辅助学习执行计划](../../exec-plans/completed/20260906-actspace-english-learning/README.md)。

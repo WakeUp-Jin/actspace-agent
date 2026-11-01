@@ -4,6 +4,7 @@ import { BROWSER_TOOL_GROUP, BROWSER_TOOL_ITEMS, PRIMARY_TOOL_ITEMS } from "../t
 import { useToolToggle } from "../useToolToggle";
 import { SettingGroup, SettingLinkRow, SettingSubhead, InlineWarning, useSettingsSaveNotice, SettingRow, Toggle } from "../SettingsPrimitives";
 import type { SectionProps } from "./shared";
+import { usePluginLoaded } from "../../../hooks/usePluginLoaded";
 
 export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace }: SectionProps) {
   const notifySaved = useSettingsSaveNotice();
@@ -11,6 +12,8 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
   const bashAlwaysAsk = settingsV4?.settings.tools.bash.alwaysAsk ?? settings.agent.bashAlwaysAsk;
   const showFileChangeStats = settingsV4?.settings.tools.showFileChangeStats !== false;
   const [browserDetailsOpen, setBrowserDetailsOpen] = useState(false);
+  // 操控浏览器插件本次启动没加载时，整个浏览器工具组都不显示。
+  const browserPluginLoaded = usePluginLoaded("browser-tools") === true;
   const bashEnabled = tools.isEnabled("bash");
   const browserEnabled = tools.isEnabled(BROWSER_TOOL_GROUP) && tools.isEnabled("browser_help");
   const browserExecutionTools = BROWSER_TOOL_ITEMS.filter((tool) => tool.kind !== "capability");
@@ -93,7 +96,7 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
         />
       </SettingGroup>
 
-      <SettingGroup title="浏览器" headingLevel={3}>
+      {browserPluginLoaded ? <SettingGroup title="浏览器" headingLevel={3}>
         <SettingRow
           title="浏览器工具"
           description="需要 Browser Bridge 与 Chrome 扩展；修改从下一次模型调用开始生效。"
@@ -121,7 +124,7 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
             }))}
           </div>
         ) : null}
-      </SettingGroup>
+      </SettingGroup> : null}
 
       <SettingGroup title="多媒体" headingLevel={3}>
         {mediaTools.map((tool) => renderToolRow(tool, { description: mediaDescription(tool) }))}

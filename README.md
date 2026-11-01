@@ -40,7 +40,7 @@ Actspace 是一个本地优先的 Agent 桌面应用，也是一套可观察、�
 - 文件读写、Grep / Glob、Bash、Web、图片分析和图片生成等工具能力。
 - 工具参数校验、策略、审批、执行、结果与 Session-owned artifact。
 - 固定 Desktop renderer，通过 Runtime Projection 展示消息、工具、Context、Usage、Trajectory 和诊断数据。
-- Browser Bridge 保留为顶层 Host capability；真实 Chrome 链路仍属于独立发布验收门禁。
+- Browser Bridge 保留为顶层 Host capability；真实 Chrome 链路仍属于独立发布验收门禁。操控浏览器与英语学习默认不加载，在 扩展 › 插件 中开启后重启生效。
 
 Team、Room、Kairos、Lab 和 fs-watch 不属于当前 v2 已交付能力。未来能力以 [`docs/roadmap.md`](docs/roadmap.md) 和对应 execution plan 为准。
 

@@ -13,7 +13,7 @@ import { createRuntimeHostServices } from "../startup/host-services.js";
 const BASE_CAPABILITIES = ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const;
 
 /** Boot the checked-in tree and report the Harness's tool names. `browser-tools` is gated only by the Host capability ceiling. */
-async function bootToolNames(capabilities: readonly string[]): Promise<readonly string[]> {
+async function bootToolNames(capabilities: readonly string[], disabledPlugins?: readonly string[]): Promise<readonly string[]> {
   const root = await mkdtemp(join(tmpdir(), "browser-capability-"));
   const host = { hostKind: "cli-run" as const, capabilityCeiling: capabilities as typeof BASE_CAPABILITIES, runtimeContract: "actspace.runtime.v2" as const, invocationId: "test" };
   const composition = createProfileComposition(RUNTIME_PROFILE_IDS.headless, host);
@@ -22,7 +22,7 @@ async function bootToolNames(capabilities: readonly string[]): Promise<readonly 
   let profile: Awaited<ReturnType<typeof bootProfileRuntime>> | undefined;
   try {
     profile = await bootProfileRuntime({
-      host, dataRoot: root, toolEnvironment: env, composition,
+      host, dataRoot: root, toolEnvironment: env, composition, ...(disabledPlugins ? { disabledPlugins } : {}),
       hostServices: createRuntimeHostServices({ descriptor: host, dataRoot: root, workspaceRoot: root, toolEnvironment: env, services: {
         ...ports,
         "actspace.host.tools.browser": { ready: true, command: async () => { throw new Error("unused"); } },
@@ -53,5 +53,9 @@ describe("Host capability rule for optional Harness entries", () => {
 
   it("loads browser-tools when the Host has the browser capability", async () => {
     expect(await bootToolNames([...BASE_CAPABILITIES, "browser"])).toContain("browser_help");
+  }, 15_000);
+
+  it("keeps browser-tools out when the plugin switch is off, even with the browser capability", async () => {
+    expect(await bootToolNames([...BASE_CAPABILITIES, "browser"], ["browser-tools"])).not.toContain("browser_help");
   }, 15_000);
 });

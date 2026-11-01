@@ -5,6 +5,10 @@ import { registerPerformanceIpc } from "./performance-ipc";
 import { ModelCatalogService } from "./model-catalog-service";
 import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
+import { BROWSER_PLUGIN_ID, disabledPluginIds, ENGLISH_LEARNING_PLUGIN_ID, resolvePluginSwitches } from "./plugins/plugin-switches";
+import { registerPluginsIpc } from "./plugins/plugins-ipc";
+import { registerDisabledEnglishLearningIpc } from "./plugins/optional-plugin-stubs";
+import { loadRuntimeV2Module } from "./runtime-v2/runtime-loader";
 import { app, BrowserWindow, globalShortcut, safeStorage, net, screen } from "electron";
 import { presentQuickOpenWindow } from "./quick-open-window";
 import { appendFile, mkdir } from "node:fs/promises";
@@ -39,6 +43,7 @@ let mainWindow: BrowserWindow | undefined;
 let runtimeV2Registry: DesktopRuntimeV2Registry | undefined;
 let disposePerformanceIpc: (() => void) | undefined;
 let disposeEnglishLearningIpc: (() => void) | undefined;
+let disposePluginsIpc: (() => void) | undefined;
 let speechPlayback: DesktopSpeechPlayback | undefined;
 let disposeRuntimeV2DesktopShell: (() => void) | undefined;
 let remoteDesktop: RemoteDesktopAdapter | undefined;
@@ -174,13 +179,19 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
       .catch((error) => void logMain("quick open presentation failed", { error: String(error) }));
   }, quickOpenSettings.accelerator);
   await logMain("v2 quick open initialized", quickOpenShortcutController.activate(quickOpenSettings));
-  browserBridgeService = new BrowserBridgeService({
+  // Startup switches: fixed for this process. A switched-off plugin is not created, polled or installed;
+  // changing the setting only takes effect after a restart (see plugin-switches.ts).
+  const runtimeModule = await loadRuntimeV2Module();
+  const startupSwitches = resolvePluginSwitches(settingsService.getV4().settings, runtimeModule.PLUGIN_CATALOG);
+  const browserEnabled = startupSwitches.get(BROWSER_PLUGIN_ID) === true;
+  const englishLearningEnabled = startupSwitches.get(ENGLISH_LEARNING_PLUGIN_ID) === true;
+  browserBridgeService = browserEnabled ? new BrowserBridgeService({
     dataRoot: roots.dataRoot,
     bundledRoot: app.isPackaged && !process.env.ACTSPACE_DEV_APP_ID
       ? join(process.resourcesPath, "app", "browser-components")
       : join(roots.logRoot, "..", "dist", "browser-components"),
     log: (message, details) => void logMain(message, details),
-  });
+  }) : undefined;
   localUpdateService = new LocalUpdateService({
     dataRoot: roots.dataRoot,
     appPath: app.getPath("exe"),
@@ -191,10 +202,11 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   const packagedResources = app.isPackaged && !process.env.ACTSPACE_DEV_APP_ID;
   const nonoPath = resolveDesktopNonoPath({ packaged: packagedResources, resourcesPath: process.resourcesPath, repoRoot: join(roots.logRoot, ".."), env: process.env });
   await logMain("sandbox nono resolved", { nonoPath: nonoPath ?? null });
-  const speech = new DesktopSpeechPlayback(roots.tmpRoot, settingsService);
+  const speech = englishLearningEnabled ? new DesktopSpeechPlayback(roots.tmpRoot, settingsService) : undefined;
   speechPlayback = speech;
   runtimeV2Registry = new DesktopRuntimeV2Registry({
     speech,
+    disabledPlugins: disabledPluginIds(startupSwitches),
     roots,
     models: modelRuntimeService,
     approvals: approvalRegistry,
@@ -235,9 +247,12 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
       scheduleBrowserSync(Math.round(base * (0.9 + Math.random() * 0.2)));
     }
   };
-  scheduleBrowserSync(1_000);
+  if (browserBridgeService) scheduleBrowserSync(1_000);
   disposePerformanceIpc = registerPerformanceIpc(getMainWindow);
-  disposeEnglishLearningIpc = registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow });
+  disposeEnglishLearningIpc = englishLearningEnabled
+    ? registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow })
+    : registerDisabledEnglishLearningIpc({ getMainWindow: () => getMainWindow() ?? null });
+  disposePluginsIpc = registerPluginsIpc({ getMainWindow, catalog: runtimeModule.PLUGIN_CATALOG, startupSwitches, settings: settingsService });
   remoteHosts = new RemoteHostRegistry(roots.dataRoot);
   await remoteHosts.open();
   disposeRemoteHostIpc = registerRemoteHostIpc(remoteHosts, getMainWindow, async sessionId => { await remoteDesktop?.activate(sessionId); });
@@ -307,6 +322,7 @@ app.on("before-quit", (event) => {
       localUpdateService?.dispose();
       disposePerformanceIpc?.();
       disposeEnglishLearningIpc?.();
+      disposePluginsIpc?.();
       await speechPlayback?.dispose();
       clearTimeout(timeout);
       disposeRuntimeV2DesktopShell?.();

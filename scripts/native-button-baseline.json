@@ -15,6 +15,7 @@
   "components/extensions/BrowserConnectPanel.tsx": 2,
   "components/extensions/EnglishLearningCapability.tsx": 4,
   "components/extensions/ExtensionsPage.tsx": 2,
+  "components/extensions/PluginsSection.tsx": 1,
   "components/extensions/SkillsSection.tsx": 1,
   "components/messages/AgentRunBlock.tsx": 1,
   "components/messages/BackgroundNoticeRow.tsx": 1,

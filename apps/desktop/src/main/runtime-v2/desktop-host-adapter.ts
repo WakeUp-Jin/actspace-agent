@@ -18,7 +18,10 @@ export type DesktopRuntimeV2BootOptions = {
   readonly roots: DesktopRuntimeV2Roots;
   readonly models: DesktopRuntimeV2ModelPort;
   readonly approvals: DesktopRuntimeV2ApprovalPort;
-  readonly browser: DesktopRuntimeV2BrowserPort;
+  /** Absent when the 操控浏览器 plugin is switched off: the Host reports no `browser` capability. */
+  readonly browser?: DesktopRuntimeV2BrowserPort;
+  /** Plugin ids switched off for this process; global ones become an invocation `disable` patch, session ones skip the Harness entry. */
+  readonly disabledPlugins?: readonly string[];
   /** The bundled nono; absent when it was not found (see `resolveDesktopNonoPath`). */
   readonly nonoPath?: string;
   readonly disabledSkillIds?: () => readonly string[];
@@ -42,7 +45,7 @@ export type DesktopRuntimeV2BootOptions = {
 };
 
 export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions) {
-  const browser = await createDesktopBrowserCapability(options.browser);
+  const browser = options.browser === undefined ? undefined : await createDesktopBrowserCapability(options.browser);
   const capabilities: RuntimeV2HostCapability[] = [
     "filesystem.read",
     "filesystem.write",
@@ -51,7 +54,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
     "credential",
     "renderer",
     "process",
-    ...(browser.ready ? ["browser" as const] : []),
+    ...(browser?.ready ? ["browser" as const] : []),
   ];
   const host: RuntimeV2HostDescriptor = Object.freeze({
     hostKind: "desktop",
@@ -62,13 +65,16 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
   });
   const artifacts = new DesktopArtifactStore(options.roots.dataRoot);
   const desktopApp = await import("@actspace/desktop-app");
+  const disabled = new Set(options.disabledPlugins ?? []);
+  const switched = options.module.PLUGIN_CATALOG.filter(entry => disabled.has(entry.id));
+  const globalSwitched = switched.filter(entry => entry.loaders.includes("host"));
   const composition = options.module.createProfileComposition(options.module.RUNTIME_PROFILE_IDS.desktop, host, {
     appBundle: desktopApp.DESKTOP_APP_BUNDLE,
-
+    ...(globalSwitched.length === 0 ? {} : { invocationPatch: { id: "desktop.plugin-switches", provenance: "desktop-settings", operations: globalSwitched.map(entry => ({ id: `disable:${entry.id}`, kind: "disable" as const, target: String(entry.manifest.behaviors[0]!.entryId) })) } }),
   });
   const credentialResolver = new DesktopCredentialResolver(options.models);
   const capabilityMap = new Map<string, unknown>([
-    ["browser", browser],
+    ...(browser ? [["browser", browser] as const] : []),
     ["workspace", Object.freeze({ root: options.roots.workspaceRoot })],
     ["artifact", artifacts],
   ]);
@@ -91,7 +97,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
       "actspace.host.desktop": Object.freeze({ workspaceRoot: options.roots.workspaceRoot }),
       "actspace.host.chat-settings": Object.freeze({ compactionTriggerRatio: options.chatCompactionTriggerRatio }),
       "host.approval": approvalBroker,
-      "host.browser": browser,
+      ...(browser ? { "host.browser": browser, [BROWSER_TOOLS_HOST_PORT_ID]: browser } : {}),
       "host.artifacts": artifacts,
       [options.module.LLM_HOST_PORT_ID]: Object.freeze({
         credentials: credentialResolver,
@@ -132,7 +138,6 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
         resolveUserSource: () => options.module.prepareUserPromptSource(options.roots.dataRoot),
         resolveSource: (workspaceRoot: string) => options.module.prepareRuntimePromptSource({ dataRoot: options.roots.dataRoot, workspaceRoot, disabledSkillIds: options.disabledSkillIds?.() }),
       }),
-      [BROWSER_TOOLS_HOST_PORT_ID]: browser,
     }),
   });
     const profile = await options.module.bootProfileRuntime({
@@ -151,13 +156,14 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
         resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId),
       },
       composition,
+      disabledPlugins: switched.filter(entry => !entry.loaders.includes("host")).map(entry => entry.id),
       cordis: { configPath: options.module.runtimeCordisConfigPath(), admission: await options.module.inspectCordisAdmission() },
       disposeCordis: options.disposeCordis,
       onLiveEvent: options.onRuntimeLive,
       rendererAllowlist: DESKTOP_RENDERER_ALLOWLIST,
     });
-    if (!browser.ready) profile.recordDiagnostic({ severity: "warning", source: "host", code: "BROWSER_BRIDGE_UNAVAILABLE", message: "Browser Bridge is not ready; browser tools were not activated." });
-    return Object.freeze({ profile, host, artifacts, browserReady: browser.ready, sessionRoot: join(options.roots.dataRoot, "sessions-v2") });
+    if (browser && !browser.ready) profile.recordDiagnostic({ severity: "warning", source: "host", code: "BROWSER_BRIDGE_UNAVAILABLE", message: "Browser Bridge is not ready; browser tools were not activated." });
+    return Object.freeze({ profile, host, artifacts, browserReady: browser?.ready === true, sessionRoot: join(options.roots.dataRoot, "sessions-v2") });
 }
 
 const DESKTOP_RENDERER_ALLOWLIST = new Map([

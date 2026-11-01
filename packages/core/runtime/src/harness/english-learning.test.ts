@@ -12,6 +12,8 @@ import { LlmRouteRegistry, LlmService, EMPTY_LLM_USAGE, type LlmMessage, type Ll
 import { ToolRuntime } from "@actspace/tool-runtime";
 import { EnglishLearningService } from "@actspace/english-learning";
 import { DEFAULT_SPEECH_SETTINGS } from "@actspace/shared";
+import { DESKTOP_APP_BUNDLE } from "@actspace/desktop-app";
+import { createProfileComposition, RUNTIME_PROFILE_IDS } from "../profiles/composition.js";
 
 describe("English learning real AgentLoop integration", () => {
   it("keeps Provider messages and Journal snapshots scoped while speaking only newly completed English", async () => {
@@ -75,5 +77,21 @@ describe("English learning real AgentLoop integration", () => {
       await Promise.all(sessions.map((session) => session.close()));
       await route.dispose(100); await root.dispose();
     }
+  });
+});
+
+describe("English learning composition switch", () => {
+  const host = { hostKind: "desktop" as const, capabilityCeiling: ["filesystem.read", "filesystem.write", "network", "approval", "credential", "renderer", "process"] as const, runtimeContract: "actspace.runtime.v2", invocationId: "english-switch" };
+  const entryOf = (composition: ReturnType<typeof createProfileComposition>) => composition.entries.find((entry) => entry.entryId === "english-learning");
+
+  it("skips the english-learning entry when an invocation patch disables it", () => {
+    const on = createProfileComposition(RUNTIME_PROFILE_IDS.desktop, host, { appBundle: DESKTOP_APP_BUNDLE });
+    const off = createProfileComposition(RUNTIME_PROFILE_IDS.desktop, host, { appBundle: DESKTOP_APP_BUNDLE, invocationPatch: { id: "plugin-switches", provenance: "desktop-settings", operations: [{ id: "disable:english-learning", kind: "disable", target: "english-learning" }] } });
+    expect(entryOf(on)).toMatchObject({ enabled: true });
+    expect(entryOf(on)?.state).not.toBe("skipped");
+    expect(entryOf(off)).toBeDefined();
+    const row = entryOf(off)!;
+    expect(row.enabled === false || row.state === "skipped").toBe(true);
+    expect(off.digest).not.toBe(on.digest);
   });
 });

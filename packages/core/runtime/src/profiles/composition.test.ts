@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DESKTOP_APP_BUNDLE } from "@actspace/desktop-app";
-import { createProfileComposition, RUNTIME_PROFILE_IDS, TRUSTED_LOADER_ENTRIES, toolTransportPatches } from "./composition.js";
+import { createProfileComposition, hostTransportPatches, RUNTIME_PROFILE_IDS, TRUSTED_LOADER_ENTRIES, toolTransportPatches } from "./composition.js";
 
 const host = {
   hostKind: "desktop" as const,
@@ -34,4 +34,10 @@ describe("runtime profile composition", () => {
     expect(changed.entries.find(entry => entry.entryId === "tools.filesystem-read")?.enabled).toBe(true);
   });
 
+
+  it("turns a disabled Host plugin into a startup-only loader override", () => {
+    const patch = { id: "plugin-switches", provenance: "test", operations: [{ id: "disable:english-learning", kind: "disable" as const, target: "english-learning" }] };
+    expect(hostTransportPatches(createProfileComposition(RUNTIME_PROFILE_IDS.desktop, host, { appBundle: DESKTOP_APP_BUNDLE }))).toEqual([]);
+    expect(hostTransportPatches(createProfileComposition(RUNTIME_PROFILE_IDS.desktop, host, { appBundle: DESKTOP_APP_BUNDLE, invocationPatch: patch }))).toEqual([{ id: "english-learning", disabled: true }]);
+  });
 });

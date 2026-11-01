@@ -1,5 +1,7 @@
 # Browser Use 集成设计
 
+> 插件状态：默认不加载，在 扩展 › 插件 中开启后重启生效。
+
 ## 当前状态
 
 本文档定义 Browser 工具、Go Bridge 与 Chrome Extension 的当前集成边界。62 条 canonical command 由 Go registry 管理；capability ready 时注册 11 个工具，模型可见集合由 Agent mode 白名单、registry 和调用范围共同决定。连接、启动、打包与真实 Chrome 验收见 `docs/exec-plans/active/20260928-chrome-connect-experience.md`。

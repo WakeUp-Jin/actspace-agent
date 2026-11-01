@@ -108,6 +108,7 @@ export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   revealBrowserExtensionDirectory: "runtime-v2:fixed-renderer:reveal-browser-extension-directory",
   installBrowserBridgeFromRepo: "runtime-v2:fixed-renderer:install-browser-bridge-from-repo",
   installBrowserBridgeNativeHost: "runtime-v2:fixed-renderer:install-browser-bridge-native-host",
+  listPlugins: "runtime-v2:fixed-renderer:list-plugins",
   listSkills: "runtime-v2:fixed-renderer:list-skills",
   installSkill: "runtime-v2:fixed-renderer:install-skill",
   uninstallSkill: "runtime-v2:fixed-renderer:uninstall-skill",

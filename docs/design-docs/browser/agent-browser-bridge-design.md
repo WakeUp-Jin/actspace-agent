@@ -1,5 +1,7 @@
 # Agent Browser Bridge 设计
 
+> 插件状态：默认不加载，在 扩展 › 插件 中开启后重启生效。
+
 Browser Bridge 的主线实现位于仓库顶层 `browser-bridge/`，属于 Host capability。当前产品路径只有 Chrome Extension → Native Messaging Host → Browser Tools；不提供独立 CDP backend 或 IAB fallback。
 
 ## 职责边界

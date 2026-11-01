@@ -13,6 +13,7 @@ import { ModelsPage } from "./models/ModelsPage";
 import { SearchSettings } from "./SearchSettings";
 import { ShortcutSettings } from "./ShortcutSettings";
 import { SpeechSettingsSection } from "./SpeechSettingsSection";
+import { usePluginLoaded } from "../../hooks/usePluginLoaded";
 import { ProviderKeyModal } from "./dialogs/ProviderKeyModal";
 import { PageShell, SettingsSaveNoticeProvider } from "./SettingsPrimitives";
 import { useSettings } from "./use-settings";
@@ -172,6 +173,8 @@ export function SettingsPage({
 }
 
 function SettingsContent({ section, ...rest }: SectionProps & { section: SettingsSectionId }) {
+  // 英语学习插件本次启动没加载时，不挂载语音设置。
+  const englishLearningLoaded = usePluginLoaded("english-learning") === true;
   switch (section) {
     case "hosts": return <HostConnectionsSettings />;
     case "general":
@@ -192,7 +195,7 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
             onRefresh={rest.onRefresh}
             onNavigate={rest.onNavigate}
           />
-          <SpeechSettingsSection />
+          {englishLearningLoaded ? <SpeechSettingsSection /> : null}
           <ShortcutSettings settings={rest.settings} onSettingsChange={rest.onReplaceSettings} />
         </PageShell>
       );

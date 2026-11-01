@@ -23,6 +23,7 @@ import { MOCK_REPLY, MOCK_SIDE_CHAT_REPLY, playReply, type ReplyPlayback } from 
 import { MOCK_CONTEXT_PATHS, MOCK_CONTEXT_PATHS_REVISION, mockContextPanelView, mockContextState } from "./context-panel-fixture";
 import { mockContextPathsPage } from "./context-paths-fixture";
 import { createModelConnectionsMock } from "./model-connections-fixture";
+import { mockPluginList } from "./plugins-fixture";
 import { mockListMarkdownFiles, mockReadMarkdown, mockStatMarkdown, mockWriteMarkdown } from "./docs-fixture";
 
 /** 按域覆盖 mock 实现；未覆盖的成员用默认实现，默认也没有的成员调用时 reject。 */
@@ -211,6 +212,9 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         if (expectedRevision !== latest.revision) return { ok: false, code: "revision_conflict", latest, message: "设置已在别处修改。" };
         const revision = `mock-${Number(latest.revision.replace("mock-", "")) + 1}`;
         db.settingsV4 = { ...latest, revision, settings: { ...latest.settings, [namespace]: { ...latest.settings[namespace], ...patch } } };
+        if (namespace === "tools" && "plugins" in patch) {
+          db.settingsV4.settings.tools.plugins = { ...latest.settings.tools.plugins, ...patch.plugins };
+        }
         if (namespace === "tools" && "searchProviders" in patch) {
           db.settingsV4.settings.tools.searchProviders = { ...latest.settings.tools.searchProviders, ...patch.searchProviders };
         }
@@ -244,6 +248,7 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
     modelConnections: createModelConnectionsMock(),
     englishLearning: { getState: async () => mockEnglishLearningState() },
     browserBridge: { getStatus: async () => mockBrowserBridgeStatus() },
+    plugins: { list: async () => mockPluginList(db.settingsV4.settings) },
     skills: { list: async () => ({ items: [], warnings: [] }) },
     updates: { getState: async () => mockLocalUpdateState() },
     appearance: {

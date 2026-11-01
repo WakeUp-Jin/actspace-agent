@@ -1,6 +1,8 @@
 /** Host capability DTOs for the optional browser-bridge binary. */
 
 export type BrowserBridgeRunState =
+  /** The 操控浏览器 plugin is switched off: nothing is created, polled or installed. */
+  | "disabled"
   | "disconnected"
   | "not_installed"
   | "host_not_installed"

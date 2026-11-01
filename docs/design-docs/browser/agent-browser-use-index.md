@@ -1,5 +1,7 @@
 # Browser Use 设计专题入口
 
+> 插件状态：默认不加载，在 扩展 › 插件 中开启后重启生效。
+
 Browser Use 接入用户真实 Chrome。当前实现是 11 个模型工具通过 Unix socket 调用 Go command engine，再由 Chrome Extension 执行 Chrome API / CDP 原语。命令 registry 是命令 ID、schema、风险和实现状态的机器事实来源。
 
 ## 当前职责
