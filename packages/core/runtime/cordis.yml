@@ -45,3 +45,6 @@
 - id: side-chat
   name: "@actspace/side-chat/plugin"
   inject: [session.runtime]
+- id: session-transcript
+  name: "@actspace/session-transcript/plugin"
+  inject: [actspace.host.session, session.runtime, session.storage]

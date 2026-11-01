@@ -15,7 +15,7 @@ describe("plugin catalog", () => {
     const hostRows = PLUGIN_CATALOG.filter(entry => entry.loaders.includes("host"));
     expect(TRUSTED_LOADER_ENTRIES.map(entry => entry.id)).toEqual([
       "actspace-runtime", "session-journal", "session-persistence", "session-jsonl", "session-projection", "session-runtime", "session-checkpoint-policy",
-      "llm-service", "todo-projection", "core-agent", "agent-runtime", "headless-runner", "agent-host", "desktop-app", "english-learning", "side-chat",
+      "llm-service", "todo-projection", "core-agent", "agent-runtime", "headless-runner", "agent-host", "desktop-app", "english-learning", "side-chat", "session-transcript",
     ]);
     expect(TRUSTED_LOADER_ENTRIES).toEqual(hostRows.map(entry => ({ id: entry.id, name: entry.module, inject: [...(behavior(entry.id).injects ?? [])] })));
     expect(TRUSTED_LOADER_ENTRIES).toContainEqual({ id: "todo-projection", name: "@actspace/tool-todo/projection", inject: ["session.projection"] });

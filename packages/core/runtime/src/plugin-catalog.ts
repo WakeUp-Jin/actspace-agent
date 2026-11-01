@@ -37,6 +37,7 @@ import { manifest as sessionJsonlManifest } from "@actspace/session-persistence-
 import { manifest as sessionProjectionManifest } from "@actspace/session-projection/manifest";
 import { manifest as shellManifest } from "@actspace/tool-shell/manifest";
 import { manifest as sideChatManifest } from "@actspace/side-chat/manifest";
+import { manifest as sessionTranscriptManifest } from "@actspace/session-transcript/manifest";
 import { manifest as subagentToolsManifest } from "@actspace/tool-subagent/manifest";
 import { manifest as todoToolsManifest, projectionManifest as todoProjectionManifest } from "@actspace/tool-todo/manifest";
 import { manifest as webManifest } from "@actspace/tool-web/manifest";
@@ -86,6 +87,7 @@ export const PLUGIN_CATALOG: readonly PluginCatalogEntry[] = Object.freeze([
   { id: "desktop-app", manifest: desktopAppManifest, module: "@actspace/desktop-app/plugin", loaders: host, directory: "host" },
   { id: "english-learning", manifest: englishLearningManifest, module: "@actspace/english-learning/plugin", loaders: host, directory: "english-learning" },
   { id: "side-chat", manifest: sideChatManifest, module: "@actspace/side-chat/plugin", loaders: host, directory: "side-chat" },
+  { id: "session-transcript", manifest: sessionTranscriptManifest, module: "@actspace/session-transcript/plugin", loaders: host, directory: "session" },
 
   { id: "auto-review", manifest: autoReviewManifest, module: "@actspace/auto-review/plugin", loaders: harness, directory: "approval" },
   { id: "tools-approval", manifest: approvalManifest, module: "@actspace/approval/plugin", loaders: harness, directory: "approval" },

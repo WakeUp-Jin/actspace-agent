@@ -32,7 +32,7 @@ kind: "package-map"
 | 目录 | 职责 | 包数 | 类别 |
 | --- | --- | --- | --- |
 | [`core/`](core/README.md) | Agent 身份与注册表、Agent 循环、任务调度、工具运行时，以及总装配 `runtime` | 6 | 全局、会话、库 |
-| [`session/`](session/README.md) | 会话日志、持久化、物理存储、视图和检查点 | 7 | 全局、库 |
+| [`session/`](session/README.md) | 会话日志、持久化、物理存储、视图、检查点和会话记录 Markdown | 8 | 全局、库 |
 | [`llm/`](llm/README.md) | 模型服务契约和提供商适配 | 2 | 全局、库 |
 | [`context/`](context/README.md) | 每一轮发给模型的上下文：引擎、提示词、各个来源、披露与压缩 | 11 | 会话 |
 | [`fs/`](fs/README.md) | 读、搜索、写工作区文件的工具 | 3 | 会话 |

@@ -180,6 +180,8 @@ Runtime 合同已暴露 `GrantLifetime`。Desktop 接受 `once | session | deny`
 
 敏感分类和 hard deny 始终优先于该表。
 
+Host 可读路径例外：工具环境可带 `isHostReadablePath`，命中的路径在读操作时跳过 workspace scope 审批，写和删除不受影响。当前唯一来源是会话记录：`<dataRoot>/sessions-v2/<id>/transcript.md`（不含 `sessions-v2` 目录本身，避免目录搜索读到 Journal），见[会话记录 Markdown](../agent-runtime/agent-session-transcript.md)。
+
 ## 8. 文件 canonicalization
 
 现有目标按以下顺序解析：

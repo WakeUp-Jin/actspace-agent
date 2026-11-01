@@ -1,5 +1,5 @@
 ---
-description: "会话的事实源与读写：日志、持久化接口、JSONL 物理存储、视图和检查点。"
+description: "会话的事实源与读写：日志、持久化接口、JSONL 物理存储、视图、检查点和会话记录 Markdown。"
 kind: "package-group"
 ---
 
@@ -18,6 +18,7 @@ kind: "package-group"
 | `session-projection-cache` | 库 | 库 | — | 可丢弃的派生缓存：单会话日志缓存和跨会话摘要索引，丢了可从日志重建 |
 | `session-storage` | 接口 | 库 | — | 中立的物理存储端口（`SessionStorage` 等类型），不含实现 |
 | `session-checkpoint-policy` | 实现 | 全局 | 开 | 决定什么时候给会话存检查点（flush）；提供 `session.checkpoint` |
+| `session-transcript` | 实现 | 全局 | 开 | 每轮结束从日志重写 `sessions-v2/<id>/transcript.md`（派生视图，可删除重建），并在主会话提示词里告诉 Agent 怎么读历史会话；提供 `session.transcript` |
 
 ## 包之间怎么连
 
@@ -34,6 +35,7 @@ session-journal ──→ session-persistence ──→ session-storage（端口
 - `session-projection` 提供 `session.projection`；`todo-projection`（`todo/tool-todo`）等投影插件 inject 它来注册自己的投影。
 - `session-runtime`（在 [`core/runtime`](../core/README.md)）inject 以上四项，提供 `session.runtime`；`session-checkpoint-policy` inject `session.runtime`。
 - `session-projection-cache` 没有插件入口，由 `core/runtime` 直接使用。
+- `session-transcript` inject `actspace.host.session`、`session.runtime`、`session.storage`，在每轮结束时读日志、写 `transcript.md`；读 transcript 不弹审批由 `core/runtime` 的 `isHostReadablePath` 放行。
 
 ## 入口与测试
 
