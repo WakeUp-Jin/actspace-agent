@@ -61,6 +61,8 @@ export type ToolPreparedEnvironment = {
   readonly agentScopeToken?: object;
   readonly resolveArtifact?: import("./executor.js").SessionArtifactResolver;
   readonly workspaceRoot: string;
+  /** Read-only paths outside the workspace that the Host lets tools read without a scope approval. */
+  readonly isHostReadablePath?: (canonicalPath: string) => boolean;
   readonly contextGeneration?: number;
   readonly permissionMode?: PermissionMode | (() => PermissionMode);
   readonly permissionModeExplicit?: boolean;
@@ -183,7 +185,7 @@ export class PreparedToolExecution {
           workspaceRoot: this.environment.workspaceRoot,
           canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot),
         }));
-        const global = evaluateGlobalBoundary(mode, this.environment.workspaceRoot, this.#resources);
+        const global = evaluateGlobalBoundary(mode, this.environment.workspaceRoot, this.#resources, this.environment.isHostReadablePath);
         const tool = await this.registration.permission.evaluate(this.#args, this.#resources, {
           mode,
           workspaceRoot: this.environment.workspaceRoot,

@@ -26,6 +26,9 @@ importers:
       '@actspace/english-learning':
         specifier: workspace:*
         version: link:packages/english-learning
+      '@actspace/session-transcript':
+        specifier: workspace:*
+        version: link:packages/session/transcript
       '@actspace/side-chat':
         specifier: workspace:*
         version: link:packages/side-chat
@@ -130,6 +133,9 @@ importers:
       '@actspace/session-storage':
         specifier: workspace:*
         version: link:../../packages/session/storage
+      '@actspace/session-transcript':
+        specifier: workspace:*
+        version: link:../../packages/session/transcript
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -1495,6 +1501,9 @@ importers:
       '@actspace/session-projection-cache':
         specifier: workspace:*
         version: link:../session/projection-cache
+      '@actspace/session-transcript':
+        specifier: workspace:*
+        version: link:../session/transcript
       '@actspace/shared':
         specifier: workspace:*
         version: link:../shared
@@ -1754,6 +1763,31 @@ importers:
       '@actspace/session-journal':
         specifier: workspace:*
         version: link:../journal
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/session/transcript:
+    dependencies:
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../../prompt
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../journal
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
     devDependencies:
       '@types/node':
         specifier: ^24.0.3

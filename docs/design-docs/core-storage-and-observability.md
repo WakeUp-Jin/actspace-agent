@@ -49,6 +49,7 @@ Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；�
 ├── artifacts/
 ├── recovery/
 ├── .writer-lock/          # 仅持有 writer lease 时存在
+├── transcript.md          # 会话记录 Markdown，派生视图，不是 Session 事实源
 └── visualizations.json    # Desktop 可选派生缓存，不是 Session 事实源
 ```
 
@@ -58,6 +59,7 @@ Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；�
 - `artifacts/` 是 Session persistence 预留的受管目录，不代表所有 concrete tool artifact 当前都物理存放在这里；
 - `recovery/` 保存 torn-tail repair 前的 forensic 副本和失效 writer lock；
 - `.writer-lock/owner.json` 保存当前 writer lease，关闭 Session 后移除；
+- `transcript.md` 由 `@actspace/session-transcript` 在每轮结束时从 Journal 重写，只含对话正文和一行工具结果，供 Agent 读取历史会话；可删除并重新生成，见[会话记录 Markdown](agent-runtime/agent-session-transcript.md)；
 - `visualizations.json` 保存 Desktop 对 Assistant 回复生成的自包含 HTML，可删除并重新生成，不参与 Agent 历史恢复。
 
 v2 不创建或读取以下 v1 文件：

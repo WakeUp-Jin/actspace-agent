@@ -130,6 +130,9 @@
       "path": "./../session/projection-cache/tsconfig.build.json"
     },
     {
+      "path": "./../session/transcript/tsconfig.build.json"
+    },
+    {
       "path": "./../shared/tsconfig.build.json"
     },
     {

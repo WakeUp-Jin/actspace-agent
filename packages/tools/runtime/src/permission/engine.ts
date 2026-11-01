@@ -6,6 +6,8 @@ export function evaluateGlobalBoundary(
   mode: PermissionMode,
   workspaceRoot: string,
   resources: readonly ToolResource[],
+  /** Host-owned read-only files outside the workspace that need no scope approval (e.g. Session transcripts). */
+  isHostReadable?: (canonicalPath: string) => boolean,
 ): GlobalBoundaryDecision {
   const reasons: PermissionReason[] = [];
   for (const resource of resources) {
@@ -15,7 +17,8 @@ export function evaluateGlobalBoundary(
     if (sensitivity.kind === "once-only") {
       reasons.push({ code: sensitivity.code, message: sensitivity.reason, risk: "high", reusable: false });
     }
-    if (mode !== "full-access" && !isPathWithin(workspaceRoot, resource.canonicalPath)) {
+    const hostReadable = resource.access === "read" && isHostReadable?.(resource.canonicalPath) === true;
+    if (mode !== "full-access" && !hostReadable && !isPathWithin(workspaceRoot, resource.canonicalPath)) {
       reasons.push({ code: "WORKSPACE_SCOPE_APPROVAL_REQUIRED", message: "The requested file is outside the workspace.", risk: resource.access === "read" ? "medium" : "high", reusable: resource.access !== "delete" });
     }
   }
