@@ -19,7 +19,6 @@ import { ContextPanel } from "./right-panel/context/ContextPanel";
 import { CsvRenderView } from "./right-panel/CsvRenderView";
 import { HtmlRenderView } from "./right-panel/HtmlRenderView";
 import { MarkdownRenderView } from "./right-panel/MarkdownRenderView";
-import { ReplyHtmlRenderView } from "./right-panel/ReplyHtmlRenderView";
 import { ReviewRenderView } from "./right-panel/ReviewRenderView";
 import { TurnReviewView } from "./turn-tail/TurnReviewView";
 import { WorkspaceFileTree } from "./right-panel/WorkspaceFileTree";
@@ -132,7 +131,7 @@ function WorkspaceFileEmpty() {
     <div className={RIGHT_PANEL_BODY_CLASS}>
       <h2 className={RIGHT_PANEL_HEADING_CLASS}>选择文件查看</h2>
       <p className={RIGHT_PANEL_TEXT_CLASS}>
-        在右侧文件树中点击文件，将在这里打开预览。上下文、可视化回复等对象请关闭「工作区文件」后查看完整视图。
+        在右侧文件树中点击文件，将在这里打开预览。上下文等对象请关闭「工作区文件」后查看完整视图。
       </p>
     </div>
   );
@@ -268,10 +267,6 @@ function RightPanelBody({
   if (tab.kind === "subagents") return <SubagentsPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} selected={tab.sessionId === sessionId ? tab.selected : undefined} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
 
   if (tab.kind === "backgroundTasks") return <BackgroundTasksPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
-
-  if (tab.kind === "replyHtml") {
-    return <ReplyHtmlRenderView sessionId={tab.sessionId} />;
-  }
 
   if (tab.kind === "review") {
     return (
@@ -447,13 +442,6 @@ function RightPanelLauncher({
       onFocus: () => void preloadTerminalRenderView(),
     });
   }
-  items.push({
-    id: "reply",
-    label: "可视化回复",
-    description: "图表、页面形式的回复",
-    icon: <MessageSquare size={15} strokeWidth={1.8} />,
-    onClick: () => openTab({ id: "reply", kind: "replyHtml", title: "可视化回复", sessionId }),
-  });
 
   return (
     <RightPanelLauncherList

@@ -57,10 +57,6 @@ export const desktopBridgeContract = {
     showArtifactContextMenu: invoke<S.ArtifactContextMenuInput, S.ArtifactContextMenuResult>(CH.showArtifactContextMenu),
     getPathForFile: local<(file: DesktopFileHandle) => string>(),
   },
-  visualize: {
-    convertReply: invoke<S.VisualizeReplyInput, S.VisualizeReplyResult>(CH.visualizeReply),
-    list: invoke<S.ListVisualizationsInput, S.ListVisualizationsResult>(CH.listVisualizations),
-  },
   workspaces: {
     list: invoke<void, S.WorkspaceListResult>(CH.listWorkspaces),
     openInIde: invoke<S.WorkspaceIdInput, S.WorkspaceOpenInIdeResult>(CH.openWorkspaceInIde),

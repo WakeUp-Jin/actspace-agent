@@ -36,7 +36,6 @@ function fixture(handlers: Record<string, unknown> = {}) {
     "tasks.command": async () => ({ snapshot: emptySnapshot() }),
     "events.sessionLive": (callback: (payload: unknown) => void) => { const entry = (payload: unknown) => callback(payload); live.add(entry); return () => { live.delete(entry); }; },
     "review.getSnapshot": async () => ({ ok: false, code: "not_available", message: "No changes" }),
-    "visualize.list": async () => ({ items: [] }),
     ...handlers,
   });
   const emit = (event: Record<string, unknown>) => act(async () => { for (const listener of live) listener({ event, emittedAt: NOW }); await Promise.resolve(); });

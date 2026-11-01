@@ -347,54 +347,6 @@ export type SubAgentTranscriptGetInput = {
   transcriptRef: import("./session").SubAgentTranscriptRef;
 };
 
-/** 把一条回复 Markdown 用主模型转成 HTML（见 `front-右侧面板与文件渲染规范.md`）。 */
-export type VisualizeReplyInput = {
-  sessionId: string;
-  /** 被可视化的 assistant 消息事件 id，参与缓存键。 */
-  messageId: string;
-  /** 回复 Markdown 原文，参与缓存键（内容变了 hash 不命中即重算）。 */
-  content: string;
-  /** 强制重新生成，忽略缓存命中。 */
-  regenerate?: boolean;
-  model?: ModelId;
-  modelKey?: ModelKey;
-};
-
-export type VisualizeReplyResult = {
-  html: string;
-  /** content 的内容指纹；renderer 可据此判断是否需重算。 */
-  sourceHash: string;
-  /** true=命中缓存（未触发模型调用）；false=本次新生成。 */
-  cached: boolean;
-  model?: string;
-  provider?: string;
-  usage?: {
-    input: number;
-    output: number;
-    totalTokens: number;
-  };
-};
-
-/** 列出某会话已生成的可视化 HTML（右侧「Reply HTML」文件列表用）。 */
-export type ListVisualizationsInput = {
-  sessionId: string;
-};
-
-export type SessionVisualizationItem = {
-  messageId: string;
-  sourceHash: string;
-  /** 文件列表展示名（从源回复派生）。 */
-  title: string;
-  html: string;
-  model?: string;
-  createdAt: string;
-};
-
-export type ListVisualizationsResult = {
-  /** 按 createdAt 倒序（最新在前）。 */
-  items: SessionVisualizationItem[];
-};
-
 /**
  * 按需重建某会话的完整 Context（含各 bucket 的内容预览），供右侧 Context 完整视图实时展示。
  *

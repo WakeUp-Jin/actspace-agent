@@ -33,7 +33,7 @@
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
 | 2026-10-06 | renderer / 文件行数 | `RightPanel.tsx` 763 行、`settings/SettingsPrimitives.tsx` 783 行、`workspace/WorkspaceChromeControls.tsx` 662 行，超过 500 行。SettingsPrimitives 剩下的组件都被两个以上设置文件使用，再降要拆成多个文件。 | RightPanel 按标签栏、标签内容、溢出菜单拆；SettingsPrimitives 按行 / 表单控件 / 菜单拆成 `settings/primitives/`。 |
-| 2026-10-06 | renderer / 手写弹层 | 三处没有迁到 `components/ui/`：RightPanel 标签溢出菜单（菜单项里嵌「关闭标签」按钮）、`right-panel/ReplyHtmlRenderView.tsx` 的可视化文件列表、`settings/ModelSettings.tsx` 的 `ModelMultiSelector`（可搜索多选，document 监听，没有方向键）。它们仍自己监听 Escape 和外部点击。 | 溢出菜单要先改交互（关闭按钮挪出菜单项或改子菜单）再换 `ui/Menu`；文件列表换 `ui/Select`；多选换 `ui/Popover` + 列表，补方向键。 |
+| 2026-10-06 | renderer / 手写弹层 | 两处没有迁到 `components/ui/`：RightPanel 标签溢出菜单（菜单项里嵌「关闭标签」按钮）、`settings/ModelSettings.tsx` 的 `ModelMultiSelector`（可搜索多选，document 监听，没有方向键）。它们仍自己监听 Escape 和外部点击。 | 溢出菜单要先改交互（关闭按钮挪出菜单项或改子菜单）再换 `ui/Menu`；多选换 `ui/Popover` + 列表，补方向键。 |
 | 2026-10-06 | renderer / 归档范围 | App 的 `handleArchiveWorkspace` 自己按 `workspaceId` / 路径挑要归档的会话，规则和侧栏分组（`sidebar/session-grouping.ts`）不完全相同：带本机工作区 id 的远端会话会被它算进去，侧栏却分在远端组；`workspaceId` 已不存在、路径却和某个工作区相同的会话，侧栏归进那个工作区，它却不算。边角情况下「归档全部」可用与否和实际归档的范围可能不一致。 | 改为复用 `session-grouping.ts` 的 `sessionGroupKey`，补一条对照测试。 |
 | 2026-10-06 | renderer / 死状态 | WorkbenchLayout 的 `usageSnapshot` 状态从未被写入（`setUsageSnapshot` 没有调用方），SettingsPage 收到的恒为 null。 | 先确认 SettingsPage 用量页的数据来源，再删掉这条 prop 链或接上数据。 |
 | 2026-10-06 | renderer / 疑似死代码 | `messages/SubAgentTranscriptModal.tsx` 的 `SubAgentTranscriptPanel` 在 renderer 里没有使用方，只有 `agent-run-block.test.tsx` 引用。 | 确认子 Agent 记录已由 `right-panel/SubagentsPanel.tsx` 取代后，连同测试删除。 |

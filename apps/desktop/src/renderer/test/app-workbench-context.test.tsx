@@ -46,7 +46,6 @@ function installQuickOpenBridge() {
     "workspaces.list": async () => ({ version: 1, items: [{ id: "default", kind: "folder", label: "workspace", path: "/tmp/workspace", order: 0, createdAt: NOW, updatedAt: NOW }] }),
     "approvals.listPending": async () => [],
     "tasks.command": async (command: { sessionId: string }) => ({ snapshot: { sessionId: command.sessionId, revision: 1, paused: false, tasks: [], queue: [], runs: [] } }),
-    "visualize.list": async () => ({ items: [] }),
   });
   return {
     request() {

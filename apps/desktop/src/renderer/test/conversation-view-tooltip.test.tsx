@@ -301,14 +301,6 @@ describe("ConversationView tooltips", () => {
     }
   });
 
-  it("shows a readable label for the visualize action", async () => {
-    const user = userEvent.setup();
-    renderConversation();
-
-    await user.hover(screen.getByRole("button", { name: "可视化这条回复" }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("用主模型把这条回复转成可视化 HTML");
-  });
-
   it("shows a readable label for the more actions button", async () => {
     const user = userEvent.setup();
     renderConversation();
@@ -433,63 +425,6 @@ describe("ConversationView tooltips", () => {
     viewport.scrollTop = 1300;
     fireEvent.scroll(viewport);
     expect(screen.queryByRole("button", { name: "滚动到底部" })).not.toBeInTheDocument();
-  });
-
-  it("visualizes only the final reply and sends an explicit regenerate request", async () => {
-    const visualizeReply = vi.fn(async () => ({
-      html: "<!doctype html><html><body>generated</body></html>",
-      sourceHash: "hash",
-      cached: false,
-    }));
-    setupBridge({ "visualize.convertReply": visualizeReply });
-    renderConversation([
-      {
-        kind: "user",
-        id: "user-visualize",
-        content: "执行并总结",
-        createdAt: "2026-06-02T00:00:00.000Z",
-      },
-      {
-        kind: "assistant",
-        id: "assistant-progress",
-        content: "正在执行第一步。",
-        createdAt: "2026-06-02T00:00:01.000Z",
-      },
-      {
-        kind: "thinking",
-        id: "thinking-visualize",
-        title: "Thinking",
-        content: "检查结果",
-        collapsedByDefault: true,
-        createdAt: "2026-06-02T00:00:02.000Z",
-      },
-      {
-        kind: "assistant",
-        id: "assistant-final",
-        content: "这是最终回复。",
-        createdAt: "2026-06-02T00:00:03.000Z",
-      },
-    ]);
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "可视化这条回复" }));
-    await waitFor(() => expect(visualizeReply).toHaveBeenCalledOnce());
-    expect(visualizeReply).toHaveBeenNthCalledWith(1, {
-      sessionId: "session-1",
-      messageId: "assistant-final",
-      content: "这是最终回复。",
-      regenerate: false,
-    });
-
-    await user.click(screen.getByRole("button", { name: "更多消息操作" }));
-    await user.click(screen.getByRole("menuitem", { name: "重新生成可视化" }));
-    await waitFor(() => expect(visualizeReply).toHaveBeenCalledTimes(2));
-    expect(visualizeReply).toHaveBeenNthCalledWith(2, {
-      sessionId: "session-1",
-      messageId: "assistant-final",
-      content: "这是最终回复。",
-      regenerate: true,
-    });
   });
 });
 

@@ -189,7 +189,6 @@ export function setupBridge(overrides?: DeepPartial<DesktopBridge>, scenario: Mo
 | `settings` | get、update、providers、models、customConnections、systemPrompt、search | SettingsPage 等 |
 | `skills` | list、install、uninstall | Composer、Settings |
 | `extensions` | browserBridge 系列 | ExtensionsPage |
-| `visualize` | convertReply、list | 消息区 |
 | `hosts` | list、add、remove、reconnect、activate、call、preview、download | `target/host-directory`（03） |
 | `events` | agentStream、sessionLive、terminal、reviewChanged、hostsChanged、hostEvent、uploadProgress | 各 store |
 

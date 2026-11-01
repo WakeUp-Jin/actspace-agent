@@ -10,7 +10,7 @@
 
 ## 文档范围
 
-本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 面板、Reply 和 HTML 沙箱安全。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。Terminal 在面板中的 Tab 语义由本文约束，PTY、会话生命周期、背压、进程清理与打包边界见 `front-右侧终端与会话生命周期规范.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
+本文是右侧对象浏览区的单一前端事实来源，覆盖面板外壳、对象启动页、Tab 系统、文件渲染、Workspace 文件浏览、Context 面板和 HTML 沙箱安全。Review 作为右侧对象 Tab 直接在面板内展示；六种 scope、upstream Branch、结构化 diff、Review Options 和 Git actions 统一见 `docs/design-docs/core-review-change-sources.md`。Terminal 在面板中的 Tab 语义由本文约束，PTY、会话生命周期、背压、进程清理与打包边界见 `front-右侧终端与会话生命周期规范.md`。工作台左右面板 resize、collapse 和标题栏让位仍见 `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`；颜色硬约束见 `docs/design-docs/frontend/front-主题与配色规范.md`。
 
 ## 交互模型
 
@@ -29,18 +29,17 @@
 
 右侧面板没有打开对象时，不默认塞入业务 Tab，而是展示一个参考 Cursor 空面板入口密度的对象启动页。启动页只借用“方块入口 + 大留白”的形式，入口名称与数量由 Actspace 当前真实对象决定。
 
-当前固定展示五个入口，另有「侧边对话」入口与已收起列表（见「侧边对话」一节）：
+当前固定展示四个入口，另有「侧边对话」入口与已收起列表（见「侧边对话」一节）：
 
 - `Files`：进入 Workspace 文件浏览态，不新增对象 Tab。
 - `Terminal`：创建或聚焦绑定当前会话 workspace / worktree 的交互式 shell；详见 `front-右侧终端与会话生命周期规范.md`。
 - `Review`：打开当前 workspace 的 Review，并创建/聚焦稳定的右侧 Review Tab。
 - `Context`：打开主 Agent 当前会话的 Context 面板 Tab（占用、路径、明细、趋势和事件，只读）。
-- `Reply`：打开当前会话生成过的可视化回复聚合视图；HTML 是当前内部渲染格式，不进入入口名称。
 
 布局与状态规则：
 
-- 默认宽度下使用双列网格，第五个入口自然落在最后一行，不保留空占位。
-- 卡片使用中性 surface、语义边框和统一 Lucide 线性图标；当前状态使用中性 selected 层级，focus-visible 使用高对比主题 token，颜色只承担语义状态或数据可视化，不把六个入口做成六种彩色功能卡。
+- 默认宽度下使用双列网格，入口数量为奇数时最后一个自然落在最后一行，不保留空占位。
+- 卡片使用中性 surface、语义边框和统一 Lucide 线性图标；当前状态使用中性 selected 层级，focus-visible 使用高对比主题 token，颜色只承担语义状态或数据可视化，不把各入口做成彩色功能卡。
 - 关闭最后一个对象 Tab 后回到启动页；折叠面板时若仍有已打开对象，重新展开继续恢复原 Tab。
 - 启动页和右上角 `+` 菜单打开的是同一组对象语义，不能出现名称或行为漂移。
 - 启动页入口必须是键盘可达的原生按钮，具备明确 hover、pressed、focus-visible 和 disabled 状态。
@@ -66,27 +65,16 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 - `Text`：纯文本或代码文件查看（`CodeRenderView`，见「代码视图能力」）。
 - `Review`：完整代码审阅工作台入口；支持 Git-first scope 与 `Last Turn` Agent 视角，具体契约见 `docs/design-docs/core-review-change-sources.md`。
 - `Context`：Context 面板；见本文「Context 面板」一节。
-- `Reply`：当前会话已生成的可视化回复浏览器（见下文）；内部当前由 HTML 产物承载。
 - `Terminal`：用户交互式 shell；Tab 只保存 terminalId / sessionId / title，不保存 PTY、xterm 实例或输出缓冲。
 - `sideChat`：侧边对话；见「侧边对话」一节。
 
 ## 「+ 新建对象」菜单（2026-05-30，2026-06-04 补 Review）
 
 - 隐藏标题栏 chrome 右段、右侧折叠（PanelRight）按钮**左侧**放一个 `+` 按钮（参考 Cursor 顶栏的 +）。
-- 点开是一个轻量菜单，可往右侧面板新增对象：`侧边对话`（排第一，仅本地运行目标）/ `工作区文件` / `Terminal` / `Review` / `Reply` / `Context`。非 Terminal 对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；Terminal 底层允许每会话多实例，标题按创建顺序区分。`工作区文件` 只切换工作区浏览态，不新增 Tab。
+- 点开是一个轻量菜单，可往右侧面板新增对象：`侧边对话`（排第一，仅本地运行目标）/ `工作区文件` / `Terminal` / `Review` / `Context`。非 Terminal 对象 Tab 使用稳定 id 去重（重复打开只聚焦或刷新，不堆叠）；Terminal 底层允许每会话多实例，标题按创建顺序区分。`工作区文件` 只切换工作区浏览态，不新增 Tab。
 - `Review` 入口复用 Composer 的 Review 打开逻辑，首次默认选择当前 workspace 的 Git `Uncommitted` scope；后续打开恢复该 workspace 最近 selection。
 - 菜单与右侧折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`。
 - **`+` 仅在右侧面板打开时显示**（`view === "chat" && isRightPanelOpen`）：`+` 的语义是「往面板里加对象」，面板关着时无意义；面板关闭时 chrome-right 只保留 PanelRight 折叠按钮。
-
-## Reply 视图（2026-05-30，下拉选择器版；2026-07-17 收口名称）
-
-把**当前会话**里通过「消息可视化」生成过的 HTML 聚合到一处（数据见 `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md` 的缓存 sidecar）。**渲染区占满**，文件列表收进一个下拉选择器，不再用常驻侧栏挡住渲染图：
-
-- 顶部操作栏（左起）：**文件选择器**（按钮显示当前文件名 + chevron，点击弹出可滚动浮层，列表项只显示文件名，参考模型选择器）、**刷新**按钮。
-- 主体：复用沙箱 `HtmlRenderView` 渲染选中文件（半可信 → `trust="chat"`，自带预览/源码切换）。
-- 无文件时选择器禁用显示「暂无文件」，渲染区给空态提示去某条回复点「可视化」。
-- 数据走 `visualize:list` IPC（倒序 + 派生 `title`），renderer 不直接读 FS；浏览器 mock 无 IPC 时优雅降级为空态。
-- 设计取舍：聚合入口与「每条回复下的可视化按钮」互补——后者按需看单条，前者集中浏览本会话全部产物。
 
 ## 文件渲染规则
 
@@ -151,7 +139,7 @@ V1 不做数学公式、Mermaid、TOC、标题锚点、原始 HTML 内联和聊�
 
 ## HTML 渲染与沙箱安全
 
-HTML 来源包括本地 `.html` 文件、聊天生成 HTML、Markdown 回复转 HTML 的可视化产物。HTML 默认视为不可信或半可信，必须经过 iframe sandbox 与 CSP 双闸。
+HTML 来源包括本地 `.html` 文件和聊天生成 HTML。HTML 默认视为不可信或半可信，必须经过 iframe sandbox 与 CSP 双闸。
 
 关键规则：
 
@@ -189,7 +177,7 @@ V2 方向：注册独立 origin（自定义协议或本地端口）、受控 `lo
 呈现由当前 Tab 决定：
 
 - 激活工作区文件 Tab（文件类且有 `relativePath`）时进入 shell。
-- 激活对象 Tab（Context / Reply / 聊天生成 HTML 等）时退出 shell，整面板展示对象视图。
+- 激活对象 Tab（Context / 聊天生成 HTML 等）时退出 shell，整面板展示对象视图。
 - `isFileTreeOpen` 表示显式进入浏览态；`isFileTreeCollapsed` 只折叠树栏，不关闭内容区。
 
 树状态规则（2026-07-30）：
@@ -432,30 +420,6 @@ Context Tab 回答三个问题：现在占了多少、由哪些条目组成、�
 - 文件活动、耗时统计。
 - 子 Agent 的 Context。
 - 导出：旧视图的「导出 .md / .json」随这次重做去掉。会话原文已改到轨迹里看，导出出来的东西不完整；需要时再在明细头部加回。
-
-## 消息可视化转换（Markdown -> HTML）
-
-助手回复上的「可视化」按钮把该条回复的 Markdown 用主模型转换成自包含 HTML，然后在右侧 HTML Tab 渲染。
-
-核心约束：转换是一次真实模型调用，成本高，必须缓存。第一次点击才生成并持久化，之后命中缓存直接渲染。
-
-入口与状态：
-
-- `TurnActions` 的「...」按钮左侧放可视化按钮。
-- `idle` / `error` 用 `Wand2`，`generating` 用旋转 `Loader2`，`ready` 用 `Eye`。
-- 状态机：`idle -> generating -> ready`；失败进入 `error` 可重试。
-- 已生成内容提供显式「重新生成」入口，只有显式触发才重算。
-- 输入只取当前 turn 的最终可见回复段；工具执行过程、工具间旁白和更早会话历史都不进入转换内容。
-
-缓存与数据流：
-
-- 缓存键 = `messageId | turnId` + `sourceHash`。
-- sidecar 存 HTML、sourceHash、model、generatedAt、usage 和派生 title。
-- renderer 点击 -> typed IPC -> main Host 的 v2 Runtime Projection / LLM service 解析当前模型和仅 main 可见的 credential reference -> Runtime 生成受控 artifact / projection -> renderer 打开或聚焦 HTML Tab。Desktop 路径不得回退到旧 Agent Core builder 或依赖环境变量读取 LLM Key。
-- `visualize:list({ sessionId })` 读取同一 sidecar，供 Reply 聚合视图按 createdAt 倒序浏览本会话全部产物。
-- usage 计入使用统计；缓存命中不新增模型调用。
-
-生成提示词要求输出单个自包含 HTML 文档；如果模型输出 ```html 围栏，解析围栏内内容。`stopReason=error/aborted/length/toolUse`、空输出、缺少 doctype 或缺少 `</html>` 都按失败处理且不得写入缓存；历史空缓存不命中，也不出现在 Reply 聚合列表。产物按半可信处理，一律走 HTML sandbox 路径，不因为「是自己模型生成的」就放宽权限。
 
 ## 首版边界
 

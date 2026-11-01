@@ -39,7 +39,6 @@ export type RightPanelTab = { id: string } & (
   | { kind: "review"; title: string; workspaceRoot?: string; scope: "uncommitted"; refreshKey?: number }
   // 某一轮的改动快照（轮尾改动卡点开）；index 是要选中的文件，revision 每次点击递增，让同一 Tab 重新跳到该文件。
   | { kind: "turnReview"; title: string; changes: TurnChanges; index: number; revision: number; sessionId: string | null; workspaceRoot?: string }
-  | { kind: "replyHtml"; title: string; sessionId: string | null }
   | { kind: "terminalStarting"; title: string; requestId: string; sessionId: string }
   | { kind: "terminalError"; title: string; sessionId: string; message: string }
   | { kind: "terminal"; title: string; terminalId: string; sessionId: string; shellName: string }

@@ -75,7 +75,6 @@ import {
   projectSubagentList,
   toolPreview,
 } from "@actspace/client/sessions";
-import { listVisualizationsV2, visualizeReplyV2 } from "./fixed-renderer-visualization";
 
 export type FixedRendererIpcOptions = {
   readonly registry: DesktopRuntimeV2Registry;
@@ -657,8 +656,6 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     return projectSubagentTranscript(snapshot, journal);
   });
 
-  ipc.handle(contract.visualize.convertReply, (input) => visualizeReplyV2(input, options.roots, options.registry));
-  ipc.handle(contract.visualize.list, (input) => listVisualizationsV2(input.sessionId, options.roots, options.registry));
 }
 
 async function toSessionListItem(item: RuntimeV2SessionListItem, registry: DesktopRuntimeV2Registry): Promise<SessionListItem> {

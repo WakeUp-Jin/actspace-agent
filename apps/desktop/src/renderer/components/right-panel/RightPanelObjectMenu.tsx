@@ -1,4 +1,4 @@
-import { Eye, FolderTree, GitBranch, GitFork, MessageSquare, Plus, SquareTerminal } from "lucide-react";
+import { Eye, FolderTree, GitBranch, GitFork, Plus, SquareTerminal } from "lucide-react";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 import { useRightPanel } from "./RightPanelContext";
 import { useOpenTerminal } from "./useOpenTerminal";
@@ -11,7 +11,6 @@ import { useOpenSideChat } from "./side-chat/use-open-side-chat";
  * 放在右侧折叠按钮左侧，点开后可往右侧面板加对象：
  * - 工作区文件：切换工作区浏览态（操作栏 + 文件树两栏，不新增 Tab）。
  * - Review：打开当前 workspace 的 Git Review。
- * - Reply：当前会话生成过的可视化回复浏览器。
  * - Context：完整只读上下文视图。
  * - 侧边对话：从当前会话分出一条新对话（本机运行目标才有）。
  */
@@ -68,10 +67,6 @@ export function RightPanelObjectMenu({
               </MenuItem>
             </>
           ) : null}
-          <MenuItem onSelect={() => openTab({ id: "reply", kind: "replyHtml", title: "可视化回复", sessionId })}>
-            <MessageSquare size={15} strokeWidth={2} />
-            可视化回复
-          </MenuItem>
           <MenuItem onSelect={() => openTab({ id: "context", kind: "context", title: "上下文" })}>
             <Eye size={15} strokeWidth={2} />
             上下文

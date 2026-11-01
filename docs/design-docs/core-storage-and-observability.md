@@ -49,7 +49,6 @@ Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；�
 ├── artifacts/
 ├── recovery/
 ├── .writer-lock/          # 仅持有 writer lease 时存在
-└── visualizations.json    # Desktop 可选派生缓存，不是 Session 事实源
 ```
 
 其中：
@@ -58,7 +57,7 @@ Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；�
 - `artifacts/` 是 Session persistence 预留的受管目录，不代表所有 concrete tool artifact 当前都物理存放在这里；
 - `recovery/` 保存 torn-tail repair 前的 forensic 副本和失效 writer lock；
 - `.writer-lock/owner.json` 保存当前 writer lease，关闭 Session 后移除；
-- `visualizations.json` 保存 Desktop 对 Assistant 回复生成的自包含 HTML，可删除并重新生成，不参与 Agent 历史恢复。
+- 旧版本可能在会话目录里留下 `visualizations.json`（已移除的「转成可视化 HTML」功能的缓存）。现在不读不写，可以直接删除。
 
 v2 不创建或读取以下 v1 文件：
 

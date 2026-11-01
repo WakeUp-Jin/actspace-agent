@@ -115,7 +115,6 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       importComposerImage: async () => ({ ok: false, error: { code: "write_failed", message: "浏览器 mock 模式不保存图片。" } }),
       getPathForFile: (file) => file.name,
     },
-    visualize: { list: async () => ({ items: [] }) },
     workspaces: {
       list: async () => db.workspaces,
       setVisibility: async ({ workspaceId, hidden }) => {

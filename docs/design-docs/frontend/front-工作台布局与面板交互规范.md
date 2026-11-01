@@ -41,7 +41,7 @@
 - 左右面板争抢空间时，中间区优先于右侧预览区和左侧展开态。
 - 顶部栏保持单行，不重复展示工作区状态副标题；标题和操作必须归属于真实 pane，而不是相对整窗居中或全部堆到窗口右端。
 - 中间栏顶部左侧展示当前会话标题；标题前的单个 icon-only 按钮用于在 Chat 与 Trajectory 主视图之间切换，按钮只切换当前会话的中心内容，不建立持久化 tab。Chat 状态显示 Trajectory 入口，Trajectory 状态显示返回 Chat 的消息图标，并提供动态 tooltip / aria label。右侧放置编辑器选择和 Environment；对象菜单与右侧面板入口只属于右栏。左列同时承载 Sidebar 折叠与会话历史 Back / Forward；顶部不再重复渲染 Search，Sidebar 内 Search 保持原有入口。Environment 的本地工作区、Git 与 Sources 规则见 `front-environment-and-git-actions.md`。
-- Trajectory 是 Session Projection 的只读派生视图，不属于右侧对象 Tab，也不应出现在 Sidebar 或右侧对象启动页。切换时保持 `ConversationView` 外壳挂载，使消息会话的 Composer、草稿与右侧 Files / Review / Context / Terminal / Reply 面板不因观察轨迹而重置。
+- Trajectory 是 Session Projection 的只读派生视图，不属于右侧对象 Tab，也不应出现在 Sidebar 或右侧对象启动页。切换时保持 `ConversationView` 外壳挂载，使消息会话的 Composer、草稿与右侧 Files / Review / Context / Terminal 面板不因观察轨迹而重置。
 - 消息流滚动容器应占满中间主区 viewport，让滚动条贴近主区右边界；消息内容和 Composer 再由内层容器限制阅读宽度并居中。
 - 不要用父级 padding 加负 margin 对冲来决定滚动条位置，避免左侧隐藏态、右侧面板和窗口缩放时出现不一致的留白。
 
