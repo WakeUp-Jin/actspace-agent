@@ -34,7 +34,8 @@
 
 - 每个修复都补了回归测试，并把产品文件换回 HEAD 版本确认新测试失败、换回修复后通过（B、C、D、F；E 为新增函数）。
 - `@actspace/harness-evaluation` 连跑 3 次通过；desktop 全量 vitest 262 文件 / 2138 项通过，desktop typecheck 通过；client 56 项、shared 181 项、session-transcript 10 项通过。
-- 未做：Electron 真实界面复验（H1/H11 空库 0→1、C7 右栏模型、T4 标题、H2/H16 插件规则、U5/U6 分叉统计重建），留给验收按 `repair-handoff.md` 的定向复验范围执行。
+- Codex 定向复验（Electron 真实界面 + Journal / SQLite 核对）：23 点 20 通过、0 失败、3 项局部未覆盖，7 个原问题均未复现，见 [复验摘要](../../exec-runs/20261102-unified-reacceptance/execution-summary.md)。
+- 合入 main（e132d844，Bash 命令统计）后重跑文档门禁、全仓 typecheck 与完整测试。
 
 ### 📁 Files Modified
 
