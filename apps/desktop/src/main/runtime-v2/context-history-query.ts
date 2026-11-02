@@ -1,8 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { ContextContentManifest, ContextPanelEvent, ContextPanelManifest, ContextPanelModel, ContextPanelStats, ContextPanelTrendPoint, ContextPanelTruncation } from "@actspace/shared";
+import type { ContextContentManifest, ContextPanelBashCount, ContextPanelBashProgram, ContextPanelBashStats, ContextPanelEvent, ContextPanelManifest, ContextPanelModel, ContextPanelStats, ContextPanelTrendPoint, ContextPanelTruncation } from "@actspace/shared";
 import { prepare } from "./usage-sql";
+import { BASH_SUBCOMMAND_PROGRAMS } from "./bash-programs";
 
-export type ContextHistoryResult = { generation: string; revision: number; target: number; logicalAgentScopeId: string; previous: ContextPanelManifest | null; model: ContextPanelModel | null; stats: ContextPanelStats; trend: ContextPanelTrendPoint[]; events: ContextPanelEvent[]; limits: { trend: ContextPanelTruncation; events: ContextPanelTruncation } };
+export type ContextHistoryResult = { generation: string; revision: number; target: number; logicalAgentScopeId: string; previous: ContextPanelManifest | null; model: ContextPanelModel | null; stats: ContextPanelStats; bash: ContextPanelBashStats; trend: ContextPanelTrendPoint[]; events: ContextPanelEvent[]; limits: { trend: ContextPanelTruncation; events: ContextPanelTruncation } };
 type RequestRow = { request_id: string; seq: number; scope: string; time: string; model_json: string; manifest_json: string; turn_index: number; step_index: number };
 export function queryContextHistory(db: DatabaseSync, id: string): ContextHistoryResult | null {
   const state = prepare(db, "SELECT generation,revision,target FROM context_state WHERE session_id=?").get(id) as { generation: string; revision: number; target: number } | undefined;
@@ -26,5 +27,23 @@ export function queryContextHistory(db: DatabaseSync, id: string): ContextHistor
     const total = Number((prepare(db, `SELECT COUNT(*) AS n FROM ${table} WHERE session_id=?`).get(id) as { n: number }).n);
     return { total, truncated: total > values.length, returnedCount: values.length, fromSeq: values.at(-1)?.seq ?? null, throughSeq: values[0]?.seq ?? null };
   };
-  return { ...state, logicalAgentScopeId: latest?.scope ?? `main:${id}`, previous, model: latest ? JSON.parse(latest.model_json) : null, stats, trend, events: events.map(row => JSON.parse(row.row_json)), limits: { trend: range("context_request", rows), events: range("context_event", events) } };
+  return { ...state, logicalAgentScopeId: latest?.scope ?? `main:${id}`, previous, model: latest ? JSON.parse(latest.model_json) : null, stats, bash: queryBashStats(db, id), trend, events: events.map(row => JSON.parse(row.row_json)), limits: { trend: range("context_request", rows), events: range("context_event", events) } };
+}
+
+/** 按 count 降序、同数按名字；`""`（其他）固定排最后。 */
+function compareBashCounts(a: ContextPanelBashCount, b: ContextPanelBashCount): number {
+  return Number(a.name === "") - Number(b.name === "") || b.count - a.count || a.name.localeCompare(b.name);
+}
+function queryBashStats(db: DatabaseSync, id: string): ContextPanelBashStats {
+  const total = prepare(db, "SELECT calls,failed,duration_ms FROM context_bash_stats WHERE session_id=?").get(id) as { calls: number; failed: number; duration_ms: number } | undefined;
+  const rows = prepare(db, "SELECT program,subcommand,count,failed,program_failed FROM context_bash_program WHERE session_id=?").all(id) as { program: string; subcommand: string; count: number; failed: number; program_failed: number }[];
+  const programs = new Map<string, ContextPanelBashProgram>();
+  for (const row of rows) {
+    let program = programs.get(row.program);
+    if (!program) { program = { name: row.program, count: 0, failed: 0, subcommands: [] }; programs.set(row.program, program); }
+    program.count += Number(row.count); program.failed += Number(row.program_failed);
+    if (BASH_SUBCOMMAND_PROGRAMS.has(row.program)) program.subcommands.push({ name: row.subcommand, count: Number(row.count), failed: Number(row.failed) });
+  }
+  for (const program of programs.values()) program.subcommands.sort(compareBashCounts);
+  return { calls: Number(total?.calls ?? 0), failed: Number(total?.failed ?? 0), durationMs: Number(total?.duration_ms ?? 0), programs: [...programs.values()].sort(compareBashCounts) };
 }

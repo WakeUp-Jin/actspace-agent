@@ -1,4 +1,4 @@
-import { getContextBucketDisplay, type ContextState, type ContextPanelBucketKey, type ContextPanelBucketTokens, type ContextPanelConversationKind, type ContextPanelEntry, type ContextPanelView } from "@actspace/shared";
+import { getContextBucketDisplay, type ContextState, type ContextPanelBucketKey, type ContextPanelBashStats, type ContextPanelBucketTokens, type ContextPanelConversationKind, type ContextPanelEntry, type ContextPanelView } from "@actspace/shared";
 import { mockContextPaths, mockDisclosureSummary } from "./context-paths-fixture";
 import type { MockSession } from "./mock-db";
 
@@ -93,6 +93,20 @@ const SHARE_BEFORE: [ContextPanelBucketKey, number][] = [["systemPrompt", 0.05],
 const SHARE_AFTER: [ContextPanelBucketKey, number][] = [["systemPrompt", 0.05], ["tools", 0.15], ["rules", 0.04], ["skills", 0.03], ["summarizedConversation", 0.06], ["conversation", 0.67]];
 const COMPACTED_AT = 16;
 
+/** 「Bash 命令」卡片：数字与 `docs/design-docs/frontend/context-bash-demo.html` 一致。 */
+const bashCount = (name: string, count: number, failed = 0) => ({ name, count, failed });
+export const MOCK_CONTEXT_BASH: ContextPanelBashStats = {
+  calls: 38,
+  failed: 3,
+  durationMs: 112_400,
+  programs: [
+    { ...bashCount("git", 12), subcommands: [bashCount("status", 5), bashCount("diff", 4), bashCount("log", 2), bashCount("show", 1)] },
+    { ...bashCount("pnpm", 8, 2), subcommands: [bashCount("test", 5, 2), bashCount("build", 2), bashCount("install", 1)] },
+    ...([["cat", 6], ["grep", 5], ["rg", 4], ["tail", 4], ["ls", 3], ["sed", 2], ["node", 2, 1], ["find", 1], ["sleep", 1], ["python3", 1]] as const)
+      .map(([name, count, failed]) => ({ ...bashCount(name, count, failed), subcommands: [] })),
+  ],
+};
+
 /** Composer and panel share the same complete mock totals, independent of entry paging. */
 export function mockContextState(view: ContextPanelView): ContextState {
   const maxTokens = view.model.contextWindow ?? 0;
@@ -156,6 +170,7 @@ export function mockContextPanelView(sessionId: string, session?: MockSession): 
       cumulativeUsage: { inputTokens: 98_400, outputTokens: 41_200, cacheReadTokens: 1_602_000, cacheWriteTokens: 78_400 },
       costUsd: 0.42,
     },
+    bash: MOCK_CONTEXT_BASH,
     trend: trendTotals.map((estimated, index) => {
       const shares = index >= COMPACTED_AT ? SHARE_AFTER : SHARE_BEFORE;
       const last = index === trendTotals.length - 1;

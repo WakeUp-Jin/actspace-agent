@@ -6,9 +6,14 @@ import type { SessionQuerySource } from "@actspace/session-storage";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { prepare, type ProjectionDatabase } from "./usage-sql";
 import { projectUsageJournalBatch } from "./usage-journal-projection";
+import { parseBashPrograms } from "./bash-programs";
+import { CONTEXT_PROJECTOR_VERSION } from "./context-history-version";
+
+/** 每会话最多记多少个（程序, 子命令）组合，超出的归入「其他」。 */
+export const CONTEXT_BASH_PROGRAM_LIMIT = 500;
 
 const associationTables = ["usage_projection_events", "usage_projection_requests", "usage_projection_groups", "usage_projection_turns"];
-export const contextTables = ["context_state", "context_request", "context_manifest_entry", "context_event", "context_session_stats", "context_identity", "context_usage_row", ...associationTables.map(name => `context_${name}`)];
+export const contextTables = ["context_state", "context_request", "context_manifest_entry", "context_event", "context_session_stats", "context_identity", "context_usage_row", "context_bash_stats", "context_bash_program", "context_bash_call", ...associationTables.map(name => `context_${name}`)];
 const pattern = new RegExp(`\\b(${[...contextTables, ...associationTables].join("|")})\\b`, "g");
 const connections = new WeakMap<DatabaseSync, Map<boolean, ProjectionDatabase>>();
 export function contextConnection(db: DatabaseSync, stage: boolean): ProjectionDatabase {
@@ -20,7 +25,22 @@ export function contextConnection(db: DatabaseSync, stage: boolean): ProjectionD
   }
   return connection;
 }
+/**
+ * Bash 命令统计（`front-Context面板Bash命令统计.md` §4）。`program_failed` 让每个失败调用对每个程序只记一次失败：
+ * 记在该程序在这次调用里第一次出现的那一行上。`context_bash_call.occurrences_json` 为 NULL 表示已计入，行保留用来去重。
+ */
+const BASH_TABLES_SQL = `
+    CREATE TABLE IF NOT EXISTS context_bash_stats(session_id TEXT PRIMARY KEY,calls INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0,duration_ms INTEGER NOT NULL DEFAULT 0) STRICT;
+    CREATE TABLE IF NOT EXISTS context_bash_program(session_id TEXT NOT NULL,program TEXT NOT NULL,subcommand TEXT NOT NULL,count INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0,program_failed INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(session_id,program,subcommand)) STRICT;
+    CREATE TABLE IF NOT EXISTS context_bash_call(session_id TEXT NOT NULL,call_id TEXT NOT NULL,occurrences_json TEXT,started_at TEXT NOT NULL,PRIMARY KEY(session_id,call_id)) STRICT;
+`;
+/** 使用统计库 Schema 版本不变；Worker 打开老库时补建 Bash 统计表（含 `building_*`）。 */
+export function ensureContextBashTables(db: DatabaseSync): void {
+  contextConnection(db, false).exec(BASH_TABLES_SQL);
+  contextConnection(db, true).exec(BASH_TABLES_SQL);
+}
 export function createContextHistorySchema(db: DatabaseSync): void {
+  db.exec(BASH_TABLES_SQL);
   db.exec(`
     CREATE TABLE context_state(session_id TEXT PRIMARY KEY,target INTEGER NOT NULL,revision INTEGER NOT NULL,cursor TEXT,stamp TEXT NOT NULL,codec TEXT NOT NULL,generation TEXT NOT NULL,projector_version INTEGER NOT NULL) STRICT;
     CREATE TABLE context_request(session_id TEXT NOT NULL,request_id TEXT NOT NULL,seq INTEGER NOT NULL,scope TEXT NOT NULL,turn_id TEXT,step_id TEXT,time TEXT NOT NULL,model_json TEXT,manifest_json TEXT,turn_index INTEGER NOT NULL,step_index INTEGER NOT NULL,PRIMARY KEY(session_id,request_id)) STRICT;
@@ -45,7 +65,7 @@ export function createContextHistorySchema(db: DatabaseSync): void {
 }
 export type ContextHistoryState = { target: number; revision: number; cursor: string | null; stamp: string; codec: string; generation: string; projector_version: number; building?: boolean };
 function state(db: ProjectionDatabase, id: string): ContextHistoryState | undefined { return prepare(db, "SELECT target,revision,cursor,stamp,codec,generation,projector_version FROM context_state WHERE session_id=?").get(id) as unknown as ContextHistoryState | undefined; }
-function sameTarget(saved: ContextHistoryState, source: SessionQuerySource): boolean { return saved.target === source.throughSeq && saved.stamp === source.stamp && saved.codec === (source.codecSetDigest ?? "") && saved.projector_version === 1; }
+function sameTarget(saved: ContextHistoryState, source: SessionQuerySource): boolean { return saved.target === source.throughSeq && saved.stamp === source.stamp && saved.codec === (source.codecSetDigest ?? "") && saved.projector_version === CONTEXT_PROJECTOR_VERSION; }
 export function contextSourceState(db: DatabaseSync, source: SessionQuerySource): ContextHistoryState | null {
   const staging = state(contextConnection(db, true), source.header.sessionId);
   return staging && sameTarget(staging, source) ? { ...staging, building: true } : state(db, source.header.sessionId) ?? null;
@@ -66,8 +86,9 @@ export async function commitContextBatch(db: DatabaseSync, source: SessionQueryS
   try {
     if (restart || (saved && !sameTarget(saved, source))) await clearContextSession(db, id, true, yieldBatch);
     prepare(db, "INSERT OR IGNORE INTO session_catalog(session_id,title,revision,created_at,updated_at) VALUES(?,NULL,?,?,?)").run(id, source.throughSeq, source.header.createdAt, source.header.createdAt);
-    prepare(target, "INSERT OR IGNORE INTO context_state VALUES(?,?,-1,NULL,?,?,?,1)").run(id, source.throughSeq, source.stamp, source.codecSetDigest ?? "", randomUUID());
+    prepare(target, "INSERT OR IGNORE INTO context_state VALUES(?,?,-1,NULL,?,?,?,?)").run(id, source.throughSeq, source.stamp, source.codecSetDigest ?? "", randomUUID(), CONTEXT_PROJECTOR_VERSION);
     prepare(target, "INSERT OR IGNORE INTO context_session_stats(session_id) VALUES(?)").run(id);
+    prepare(target, "INSERT OR IGNORE INTO context_bash_stats(session_id) VALUES(?)").run(id);
     await projectContextEvents(target, source, events, yieldBatch);
     prepare(target, "UPDATE context_state SET target=?,revision=?,cursor=?,stamp=?,codec=? WHERE session_id=?").run(source.throughSeq, final ? source.throughSeq : events.at(-1)?.seq ?? saved?.revision ?? -1, cursor, source.stamp, source.codecSetDigest ?? "", id);
     db.exec("COMMIT");
@@ -123,6 +144,7 @@ async function projectContextEvents(db: ProjectionDatabase, source: SessionQuery
       }
       prepare(db, "DELETE FROM context_manifest_entry WHERE session_id=? AND request_id NOT IN (SELECT request_id FROM context_request WHERE session_id=? ORDER BY seq DESC LIMIT 2)").run(id, id);
     }
+    if (event.type === "tool/call" || event.type === "tool-workflow/run-start" || event.type === "tool/result") projectBashEvent(db, id, event, data);
     if (event.type === "compaction/end") addEvent(event, { id: `${event.seq}:compact`, kind: "compact", label: "上下文已压缩", tokenDelta: null });
     if (event.type === "agent/mode-set") addEvent(event, { id: `${event.seq}:mode`, kind: "mode-switch", label: `模式：${String(data.mode ?? "未知").slice(0, 32)}`, tokenDelta: null });
     if (event.type === "plugin/actspace.context/supplement" && data.op === "add") addEvent(event, { id: `${event.seq}:inject`, kind: "inject", label: "上下文补充", source: String(data.owner ?? "").slice(0, 80), tokenDelta: null });
@@ -139,6 +161,42 @@ async function projectContextEvents(db: ProjectionDatabase, source: SessionQuery
     }
     await yieldBatch();
   });
+}
+/** `tool/call` 记下解析结果，`run-start` 更新开始时间，`tool/result` 计入。只有 `tool/call` 写过行的调用才会被计入。 */
+function projectBashEvent(db: ProjectionDatabase, id: string, event: SessionEventEnvelopeV1, data: Record<string, unknown>): void {
+  const callId = data.callId;
+  if (typeof callId !== "string") return;
+  if (event.type === "tool/call") {
+    const command = record(data.args).command;
+    if (data.name !== "bash" || typeof command !== "string") return;
+    const occurrences = parseBashPrograms(command).map(item => [item.program, item.subcommand]);
+    prepare(db, "INSERT OR IGNORE INTO context_bash_call VALUES(?,?,?,?)").run(id, callId, JSON.stringify(occurrences), event.time);
+    return;
+  }
+  if (event.type === "tool-workflow/run-start") {
+    prepare(db, "UPDATE context_bash_call SET started_at=? WHERE session_id=? AND call_id=? AND occurrences_json IS NOT NULL").run(event.time, id, callId);
+    return;
+  }
+  const call = prepare(db, "SELECT occurrences_json,started_at FROM context_bash_call WHERE session_id=? AND call_id=?").get(id, callId) as { occurrences_json: string | null; started_at: string } | undefined;
+  if (!call?.occurrences_json) return;
+  prepare(db, "UPDATE context_bash_call SET occurrences_json=NULL WHERE session_id=? AND call_id=?").run(id, callId);
+  // 被拒绝的命令没有执行，不计。
+  if (data.status === "denied") return;
+  const failed = data.status === "failed";
+  const started = Date.parse(call.started_at); const ended = Date.parse(event.time);
+  const duration = Number.isFinite(started) && Number.isFinite(ended) ? Math.max(0, Math.round(ended - started)) : 0;
+  prepare(db, "UPDATE context_bash_stats SET calls=calls+1,failed=failed+?,duration_ms=duration_ms+? WHERE session_id=?").run(Number(failed), duration, id);
+  const failedPairs = new Set<string>(); const failedPrograms = new Set<string>();
+  for (const [rawProgram, rawSubcommand] of JSON.parse(call.occurrences_json) as [string, string][]) {
+    const known = prepare(db, "SELECT 1 FROM context_bash_program WHERE session_id=? AND program=? AND subcommand=?").get(id, rawProgram, rawSubcommand);
+    const full = !known && Number((prepare(db, "SELECT COUNT(*) AS n FROM context_bash_program WHERE session_id=?").get(id) as { n: number }).n) >= CONTEXT_BASH_PROGRAM_LIMIT;
+    const [program, subcommand] = full ? ["", ""] : [rawProgram, rawSubcommand];
+    const pair = JSON.stringify([program, subcommand]);
+    const pairFailed = failed && !failedPairs.has(pair); const programFailed = failed && !failedPrograms.has(program);
+    if (pairFailed) failedPairs.add(pair);
+    if (programFailed) failedPrograms.add(program);
+    prepare(db, "INSERT INTO context_bash_program VALUES(?,?,?,1,?,?) ON CONFLICT(session_id,program,subcommand) DO UPDATE SET count=count+1,failed=failed+excluded.failed,program_failed=program_failed+excluded.program_failed").run(id, program, subcommand, Number(pairFailed), Number(programFailed));
+  }
 }
 function applyUsage(db: ProjectionDatabase, id: string, row: Pick<UsageActivityRow, "tokens" | "costAmount" | "costCurrency">, sign: number): void {
   const t = row.tokens; const knownUsage = [t.inputTokens, t.outputTokens, t.cacheReadTokens, t.cacheWriteTokens].some(value => value !== null);

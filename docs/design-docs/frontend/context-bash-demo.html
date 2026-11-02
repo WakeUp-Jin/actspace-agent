@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Context Bash Demo</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --selected: #e4e4e1; --hover: #eaeae7;
+  --line: #deded9; --line-strong: #8c8c85; --track: #e9e9e5;
+  --text: #20201e; --muted: #676762; --faint: #72726b;
+  --action: #20201e; --on-action: #ffffff;
+  --danger: #c74747; --danger-soft: #f8e9e9; --info: #3978b8; --info-soft: #e8f1f9;
+  --c-system: #7d858b; --c-tools: #7a68ad; --c-rules: #087a4b; --c-skills: #91600e; --c-summarized: #a84f7a; --c-conversation: #b96831;
+  --bash: #7a68ad;
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --selected: #30312d; --hover: #2a2b27;
+  --line: #353630; --line-strong: #787870; --track: #3a3b35;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f;
+  --action: #f1f1ed; --on-action: #181916;
+  --danger: #e06b6b; --danger-soft: #452525; --info: #6ca6da; --info-soft: #1e3345;
+  --c-system: #a2aaa9; --c-tools: #aa96d7; --c-rules: #55d99a; --c-skills: #e2ba6b; --c-summarized: #dc8db4; --c-conversation: #dfa06a;
+  --bash: #aa96d7;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 13px/1.5 var(--font-ui); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); }
+
+.demo-bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.demo-bar h1 { margin: 0 8px 0 0; font-size: 13px; font-weight: 600; }
+.demo-bar .grp { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.seg button { padding: 2px 9px; border-radius: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--selected); }
+
+.stage { display: flex; height: calc(100vh - 49px); }
+.chat { flex: 1; min-width: 0; padding: 28px; overflow: auto; }
+.notes { max-width: 560px; color: var(--muted); font-size: 12.5px; }
+.notes h2 { font-size: 13px; color: var(--text); margin: 0 0 6px; }
+.notes ul { margin: 0 0 14px; padding-left: 18px; }
+.notes li { margin: 3px 0; }
+.notes code { font-family: var(--font-mono); font-size: 11.5px; background: var(--surface-subtle); padding: 0 4px; border-radius: 4px; }
+
+.panel { width: 420px; flex-shrink: 0; border-left: 1px solid var(--line); background: var(--bg); display: flex; flex-direction: column; min-height: 0; }
+.panel-tabs { display: flex; align-items: center; gap: 2px; height: 40px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+.panel-tabs .tab { padding: 4px 10px; border-radius: 6px; color: var(--faint); font-size: 12.5px; }
+.panel-tabs .tab.on { background: var(--selected); color: var(--text); font-weight: 500; }
+.panel-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.panel-body > * { flex-shrink: 0; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.card-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 0; }
+.card-title { font-weight: 600; font-size: 12.5px; display: inline-flex; align-items: center; gap: 4px; }
+.card-meta { margin-left: auto; color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+.q { display: inline-grid; place-items: center; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line-strong); font-size: 8.5px; color: var(--faint); cursor: help; font-weight: 400; position: relative; }
+.q:hover::after, .q:focus::after { content: attr(data-tip); position: absolute; bottom: 16px; left: -40px; z-index: 30; width: 260px; padding: 8px 10px; border-radius: 8px; background: var(--action); color: var(--on-action); font-size: 11.5px; line-height: 1.55; white-space: normal; text-align: left; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+
+/* 现有区块：只画个轮廓，表示位置 */
+.ghost { opacity: .55; }
+.ghost .collapsed { display: flex; align-items: center; gap: 8px; padding: 10px 12px; color: var(--faint); font-size: 12px; }
+.ghost .collapsed b { color: var(--text); font-weight: 600; font-size: 12.5px; }
+.ov { padding: 8px 12px 12px; }
+.ov-figs { display: flex; align-items: baseline; justify-content: space-between; }
+.ov-big { font-size: 22px; font-weight: 600; }
+.ov-max { color: var(--faint); font-size: 12px; margin-left: 2px; }
+.bar { display: flex; height: 10px; margin: 8px 0 4px; border-radius: 5px; overflow: hidden; background: var(--track); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+.stat { background: var(--surface); padding: 8px 10px; }
+.stat .k { color: var(--faint); font-size: 11px; display: flex; align-items: center; gap: 4px; }
+.stat .v { font-size: 15px; font-weight: 600; margin-top: 1px; }
+.stat .v small { font-size: 11px; color: var(--faint); font-weight: 400; margin-left: 2px; }
+.stat .v.bad { color: var(--danger); }
+
+/* ---------- 新增：Bash 命令 ---------- */
+.new-mark { position: relative; }
+.new-mark::before { content: "新增"; position: absolute; top: -9px; right: 10px; padding: 0 6px; border-radius: 4px; background: var(--info-soft); color: var(--info); font-size: 10.5px; line-height: 17px; font-weight: 500; }
+.bash .stats { margin: 8px 12px 0; grid-template-columns: repeat(3, 1fr); border-radius: 8px; }
+.sub { margin: 8px 12px 0; padding: 6px 9px; border-radius: 7px; background: var(--info-soft); color: var(--info); font-size: 11.5px; line-height: 1.55; }
+.sub .mono { font-size: 11px; }
+.list-h { display: flex; align-items: center; gap: 6px; padding: 10px 12px 2px; font-size: 11.5px; color: var(--faint); }
+.list-h .sp { flex: 1; }
+.prog { margin: 0 6px; }
+.prow { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 6px 4px 8px; border-radius: 6px; text-align: left; }
+button.prow:hover { background: var(--hover); }
+.prog.open > .prow { background: var(--surface-subtle); border-radius: 6px 6px 0 0; }
+.chev { width: 12px; height: 12px; flex-shrink: 0; color: var(--faint); transition: transform .15s; }
+.prog.open .chev { transform: rotate(90deg); }
+.chev.none { visibility: hidden; }
+.pname { width: 92px; flex-shrink: 0; font: 12px var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptrack { flex: 1; min-width: 0; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
+.ptrack i { display: block; height: 100%; border-radius: 2px; background: var(--bash); }
+.pcount { width: 34px; text-align: right; font-size: 12px; color: var(--text); flex-shrink: 0; }
+.ppct { width: 34px; text-align: right; font-size: 11px; color: var(--faint); flex-shrink: 0; }
+.pfail { width: 44px; text-align: right; font-size: 11px; flex-shrink: 0; color: var(--faint); }
+.pfail.has { color: var(--danger); }
+.psubs { display: none; padding: 2px 6px 6px 28px; background: var(--surface-subtle); border-radius: 0 0 6px 6px; }
+.prog.open .psubs { display: block; }
+.psubs .prow { padding: 2px 6px 2px 0; }
+.psubs .pname { width: 72px; color: var(--muted); font-size: 11.5px; }
+.psubs .ptrack i { opacity: .55; }
+.more { display: block; padding: 4px 0 0 34px; font-size: 12px; color: var(--faint); }
+.more:hover { color: var(--text); }
+.foot { padding: 8px 12px 12px; color: var(--faint); font-size: 11px; }
+.empty { padding: 14px 12px 14px; color: var(--faint); font-size: 12px; }
+.note { margin: 0; text-align: center; font-size: 11px; color: var(--faint); }
+</style>
+</head>
+<body>
+
+<div class="demo-bar">
+  <h1>Context 面板 · Bash 命令统计 Demo</h1>
+  <div class="grp">数据 <span class="seg" data-ctl="scene"><button aria-pressed="true" data-v="normal">常规</button><button aria-pressed="false" data-v="empty">本会话没用过 Bash</button></span></div>
+  <div class="grp">主题 <span class="seg" data-ctl="theme"><button aria-pressed="true" data-v="light">浅色</button><button aria-pressed="false" data-v="dark">深色</button></span></div>
+</div>
+
+<div class="stage">
+  <div class="chat">
+    <div class="notes">
+      <h2>放在哪</h2>
+      <ul>
+        <li>右侧「上下文」面板最底下，单独一张卡片「Bash 命令」。只统计当前会话。</li>
+        <li>上面的现有区块只画了轮廓，表示位置，不改。</li>
+      </ul>
+      <h2>只有两样东西</h2>
+      <ul>
+        <li><b>3 个数</b>：调用次数、失败次数、合计耗时。</li>
+        <li><b>程序分布</b>：每个程序被用了几次、占比、失败几次。<code>git / pnpm / npm / yarn / cargo / go / gh / docker</code> 可以点开看子命令。默认显示前 8 个。</li>
+      </ul>
+      <h2>计数口径</h2>
+      <ul>
+        <li><code>cd src &amp;&amp; pnpm test | tail -20</code> 记为 <code>pnpm test</code> 1 次、<code>tail</code> 1 次；<code>cd</code> 前缀、<code>FOO=1</code>、<code>sudo/timeout/env/nohup/time</code> 都跳过。</li>
+        <li>出现一次就记 1 次：<code>cat a &amp;&amp; cat b</code> 记 <code>cat</code> ×2。这次调用失败，里面每个程序各记 1 次失败。</li>
+      </ul>
+      <h2>没有的（对照 DSH 砍掉）</h2>
+      <ul>
+        <li>逐条命令列表、展开看输出、按失败/慢/后台筛选、搜索——看具体某条命令去轨迹。</li>
+        <li>「最慢的命令」「重复命令」这类要展示命令原文的提示。</li>
+        <li>按程序拆耗时（复合命令的耗时拆不开）。</li>
+        <li>失败占比、后台次数。</li>
+      </ul>
+    </div>
+  </div>
+
+  <aside class="panel">
+    <div class="panel-tabs"><span class="tab">文档</span><span class="tab">改动</span><span class="tab">后台任务</span><span class="tab on">上下文</span></div>
+    <div class="panel-body">
+      <section class="card ghost">
+        <div class="card-head"><span class="card-title">当前上下文</span></div>
+        <div class="ov">
+          <div class="ov-figs"><span><span class="ov-big num">86.4k</span><span class="ov-max">/ 200k</span></span></div>
+          <div class="bar"><span style="width:6%;background:var(--c-system)"></span><span style="width:9%;background:var(--c-tools)"></span><span style="width:3%;background:var(--c-rules)"></span><span style="width:2%;background:var(--c-skills)"></span><span style="width:4%;background:var(--c-summarized)"></span><span style="width:19%;background:var(--c-conversation)"></span></div>
+        </div>
+      </section>
+      <section class="stats ghost">
+        <div class="stat"><div class="k">轮次</div><div class="v num">6</div></div>
+        <div class="stat"><div class="k">步数</div><div class="v num">58</div></div>
+        <div class="stat"><div class="k">压缩</div><div class="v num">1<small>次</small></div></div>
+        <div class="stat"><div class="k">缓存命中</div><div class="v num">94.2%</div></div>
+        <div class="stat"><div class="k">累计 Token</div><div class="v num">2.1M</div></div>
+        <div class="stat"><div class="k">费用</div><div class="v num">$0.84</div></div>
+      </section>
+      <section class="card ghost"><div class="collapsed"><b>路径</b><span style="margin-left:auto">活跃 42 · 睡眠 17</span></div></section>
+      <section class="card ghost"><div class="collapsed"><b>上下文明细</b></div></section>
+      <section class="card ghost"><div class="collapsed"><b>上下文趋势</b></div></section>
+      <section class="card ghost"><div class="collapsed"><b>上下文事件</b></div></section>
+
+      <section class="card bash new-mark" id="bash" aria-label="Bash 命令"></section>
+
+      <p class="note">≈ 为本地估算 · 实际值来自服务商返回的用量</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+const CHEV = '<svg class="chev{x}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4l4 4-4 4"/></svg>';
+const DATA = {
+  calls: 38, failed: 3, totalMs: 112400, background: 1,
+  replace: [["cat", 5, "read_file"], ["grep", 3, "grep"], ["find", 1, "glob"]],
+  programs: [
+    { name: "git", n: 12, fail: 0, subs: [["status", 5], ["diff", 4], ["log", 2], ["show", 1]] },
+    { name: "pnpm", n: 8, fail: 2, subs: [["test", 5], ["build", 2], ["install", 1]] },
+    { name: "cat", n: 6, fail: 0 },
+    { name: "grep", n: 5, fail: 0 },
+    { name: "rg", n: 4, fail: 0 },
+    { name: "tail", n: 4, fail: 0 },
+    { name: "ls", n: 3, fail: 0 },
+    { name: "sed", n: 2, fail: 0 },
+    { name: "node", n: 2, fail: 1 },
+    { name: "find", n: 1, fail: 0 },
+    { name: "sleep", n: 1, fail: 0 },
+    { name: "python3", n: 1, fail: 0 },
+  ],
+};
+const TITLE_TIP = "只统计本会话的 Bash 调用。程序在命令里出现一次就记 1 次（cat a && cat b 记 cat ×2）；cd 前缀、环境变量和 sudo / timeout 等包装不计。";
+const TIME_TIP = "所有 Bash 调用执行时间之和，不含等待审批的时间；转到后台运行的命令只算到转入后台为止。";
+const REPLACE_TIP = "这些程序作为命令的第一个程序出现时，做的事专用工具也能做。管道后面用来过滤输出的不算。";
+
+let open = new Set(), showAll = false, scene = "normal";
+
+function fmtMs(ms) {
+  if (ms < 1000) return ms + "ms";
+  const s = ms / 1000;
+  if (s < 60) return s.toFixed(1) + "s";
+  return Math.floor(s / 60) + "m" + String(Math.round(s % 60)).padStart(2, "0") + "s";
+}
+
+function render() {
+  const el = document.getElementById("bash");
+  if (scene === "empty") {
+    el.innerHTML = `<div class="card-head"><span class="card-title">Bash 命令 <span class="q" tabindex="0" data-tip="${TITLE_TIP}">?</span></span></div>
+      <div class="empty">本会话还没有调用过 Bash。</div>`;
+    return;
+  }
+  const d = DATA, max = d.programs[0].n;
+  const total = d.programs.reduce((s, p) => s + p.n, 0);
+  const shown = showAll ? d.programs : d.programs.slice(0, 8);
+  const failPct = d.calls ? (d.failed / d.calls * 100).toFixed(1) : "0.0";
+  const replaceN = d.replace.reduce((s, r) => s + r[1], 0);
+
+  const row = p => {
+    const subs = p.subs || [];
+    const has = subs.length > 0;
+    const inner = `${CHEV.replace("{x}", has ? "" : " none")}
+      <span class="pname">${p.name}</span>
+      <span class="ptrack"><i style="width:${Math.max(4, p.n / max * 100)}%"></i></span>
+      <span class="pcount num">×${p.n}</span>
+      <span class="ppct num">${Math.round(p.n / total * 100)}%</span>
+      <span class="pfail num ${p.fail ? "has" : ""}">${p.fail ? p.fail + " 失败" : ""}</span>`;
+    const subRows = subs.map(([s, n]) => `<div class="prow"><span class="pname">${s}</span><span class="ptrack"><i style="width:${Math.max(4, n / max * 100)}%"></i></span><span class="pcount num">×${n}</span><span class="ppct"></span><span class="pfail"></span></div>`).join("");
+    return has
+      ? `<div class="prog ${open.has(p.name) ? "open" : ""}"><button class="prow" aria-expanded="${open.has(p.name)}" data-p="${p.name}">${inner}</button><div class="psubs">${subRows}</div></div>`
+      : `<div class="prog"><div class="prow">${inner}</div></div>`;
+  };
+
+  el.innerHTML = `
+    <div class="card-head">
+      <span class="card-title">Bash 命令 <span class="q" tabindex="0" data-tip="${TITLE_TIP}">?</span></span>
+      <span class="card-meta num">${d.programs.length} 个程序</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">调用</div><div class="v num">${d.calls}<small>次</small></div></div>
+      <div class="stat"><div class="k">失败</div><div class="v num ${d.failed ? "bad" : ""}">${d.failed}<small>次</small></div></div>
+      <div class="stat"><div class="k">合计耗时 <span class="q" tabindex="0" data-tip="${TIME_TIP}">?</span></div><div class="v num">${fmtMs(d.totalMs)}</div></div>
+    </div>
+    <div class="list-h"><span>程序</span><span class="sp"></span><span>次数</span></div>
+    ${shown.map(row).join("")}
+    ${d.programs.length > 8 ? `<button class="more" data-more>${showAll ? "收起" : `再显示 ${d.programs.length - 8} 项`}</button>` : ""}
+    <div class="foot"></div>`;
+}
+
+document.addEventListener("click", e => {
+  const p = e.target.closest("[data-p]");
+  if (p) { const n = p.dataset.p; open.has(n) ? open.delete(n) : open.add(n); render(); return; }
+  if (e.target.closest("[data-more]")) { showAll = !showAll; render(); return; }
+  const b = e.target.closest(".seg button");
+  if (!b) return;
+  const ctl = b.parentElement.dataset.ctl;
+  b.parentElement.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  if (ctl === "theme") document.documentElement.dataset.theme = b.dataset.v;
+  if (ctl === "scene") { scene = b.dataset.v; render(); }
+});
+render();
+</script>
+</body>
+</html>

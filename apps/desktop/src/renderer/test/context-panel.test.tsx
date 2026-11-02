@@ -32,18 +32,18 @@ async function choose(label: string, option: string) {
 }
 
 describe("ContextPanel", () => {
-  it("renders all five blocks from the full mock view", async () => {
+  it("renders all blocks from the full mock view", async () => {
     setupBridge();
     renderPanel();
 
-    for (const name of ["当前上下文", "会话统计", "上下文明细", "上下文趋势", "上下文事件"]) {
+    for (const name of ["当前上下文", "会话统计", "上下文明细", "上下文趋势", "上下文事件", "Bash 命令"]) {
       expect(await screen.findByRole("region", { name })).toBeInTheDocument();
     }
     expect(screen.getByText("Claude Opus 5.5")).toBeInTheDocument();
     expect(screen.getByText(/自动压缩 ≈160K/)).toBeInTheDocument();
     expect(screen.getByText("$0.42")).toBeInTheDocument();
     expect(screen.getByText(/最近请求实际/)).toBeInTheDocument();
-    expect(screen.queryByText(/趋势、事件和路径需要后端数据/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/趋势、事件、路径和 Bash 命令需要后端数据/)).not.toBeInTheDocument();
   });
 
   it("falls back to the interim view when describeContextPanel returns null", async () => {
@@ -67,7 +67,7 @@ describe("ContextPanel", () => {
     });
     renderPanel({ navigation: true });
 
-    expect(await screen.findByText("趋势、事件和路径需要后端数据，暂未提供")).toBeInTheDocument();
+    expect(await screen.findByText("趋势、事件、路径和 Bash 命令需要后端数据，暂未提供")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "上下文趋势" })).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "对比基准" })).toBeDisabled();
     // 过渡数据的会话条目没有类型和轨迹身份：没有类型 chip，行不可点，只留「在轨迹中打开」。
