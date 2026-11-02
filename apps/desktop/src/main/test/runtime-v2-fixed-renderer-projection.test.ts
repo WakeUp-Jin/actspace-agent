@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
-import { projectSubagentList, projectSubagentTranscript, projectContextSnapshot, projectContextState, projectChatEvents, projectChatSession, projectSessionUsageActivities, projectIndexedUsageActivity } from "@actspace/client/sessions";
+import { projectSubagentList, subagentChildrenWithoutModel, latestRequestModel, projectSubagentTranscript, projectContextSnapshot, projectContextState, projectChatEvents, projectChatSession, projectSessionUsageActivities, projectIndexedUsageActivity } from "@actspace/client/sessions";
 
 it("restores a durable failed turn as an error block, including old failures without details", () => {
   for (const failure of [undefined, { kind: "invalid-request", message: "Cannot send tool image", retryable: false }]) {
@@ -366,6 +366,23 @@ describe("live subagent projection", () => {
   it("carries the child's model recorded on delegation/completed", () => {
     const journal = [event(1, "tool/call", { callId: "call", name: "agent", args: { task: "Inspect UI" } }), event(2, "delegation/requested", { invocationId: "inv", parentCallId: "call", childSessionId: "child", presetId: "actspace.agent" }), event(3, "delegation/completed", { invocationId: "inv", childSessionId: "child", presetId: "actspace.agent", status: "completed", model: "claude-sonnet-5-5" })];
     expect(projectSubagentList(baseSnapshot({}), journal)).toEqual([expect.objectContaining({ kind: "agent", model: "claude-sonnet-5-5" })]);
+  });
+  it("uses the running child's own request model until the parent records one", () => {
+    const requested = [event(1, "tool/call", { callId: "call", name: "explore", args: { task: "Inspect UI" } }), event(2, "delegation/requested", { invocationId: "inv", parentCallId: "call", childSessionId: "child", presetId: "actspace.explore" })];
+    expect(subagentChildrenWithoutModel(requested)).toEqual([{ childSessionId: "child", finished: false }]);
+    const child = [event(0, "turn/start", { turnId: "t" }), event(1, "request/header", { requestId: "q1", model: "deepseek-pro" }), event(2, "request/header", { requestId: "q2", model: "deepseek-flash", attempt: 2 })];
+    expect(latestRequestModel(child)).toBe("deepseek-flash");
+    expect(latestRequestModel([event(0, "turn/start", { turnId: "t" })])).toBeUndefined();
+    // Before any request the list stays without a model rather than guessing from the purpose binding.
+    expect(projectSubagentList(baseSnapshot({}), requested)).toEqual([expect.not.objectContaining({ model: expect.anything() })]);
+    expect(projectSubagentList(baseSnapshot({}), requested, new Map([["child", "deepseek-flash"]]))).toEqual([expect.objectContaining({ kind: "agent", status: "running", model: "deepseek-flash" })]);
+    // Once the parent records the model on completion, that fact wins.
+    const completed = [...requested, event(3, "delegation/completed", { invocationId: "inv", childSessionId: "child", presetId: "actspace.explore", status: "failed", model: "deepseek-pro" })];
+    expect(subagentChildrenWithoutModel(completed)).toEqual([]);
+    expect(projectSubagentList(baseSnapshot({}), completed, new Map([["child", "deepseek-flash"]]))).toEqual([expect.objectContaining({ model: "deepseek-pro" })]);
+    // A child that ended without a recorded model (e.g. stopped) still gets its request fact.
+    const stopped = [...requested, event(3, "delegation/completed", { invocationId: "inv", childSessionId: "child", presetId: "actspace.explore", status: "aborted" })];
+    expect(subagentChildrenWithoutModel(stopped)).toEqual([{ childSessionId: "child", finished: true }]);
   });
   it("projects live text and thinking separately and removes chunks once the message is committed", () => {
     const journal = [event(1, "assistant/chunk", { messageId: "m", kind: "assistant-delta", content: "Hello" }), event(2, "assistant/chunk", { messageId: "m", kind: "reasoning-delta", content: "Thinking" }), event(3, "assistant/chunk", { messageId: "m", kind: "tool-call-delta", content: '{"path":', callId: "c" })];

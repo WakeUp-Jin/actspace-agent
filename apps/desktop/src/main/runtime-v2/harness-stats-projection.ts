@@ -70,8 +70,12 @@ export function clearHarnessSession(db: ProjectionDatabase, sessionId: string): 
   prepare(db, `DELETE FROM ${HARNESS_STATE_TABLE} WHERE session_id=?`).run(sessionId);
 }
 
-/** 增量投影一个批次；已处理过的 seq 会被跳过，所以重复投递同一批次是安全的。 */
-export function projectHarnessJournalBatch(db: ProjectionDatabase, sessionId: string, events: readonly SessionEventEnvelopeV1[]): void {
+/**
+ * 增量投影一个批次；已处理过的 seq 会被跳过，所以重复投递同一批次是安全的。
+ * `inheritedThroughSeq`：分叉 / 侧边对话从父会话复制来的前缀（seq ≤ 它）。这些事件在父会话里执行和记账，
+ * 这里只用来恢复状态（版本、模式、模型、披露、Skills 等），不产生任何统计行。
+ */
+export function projectHarnessJournalBatch(db: ProjectionDatabase, sessionId: string, events: readonly SessionEventEnvelopeV1[], inheritedThroughSeq = -1): void {
   const saved = prepare(db, `SELECT last_seq,state_json FROM ${HARNESS_STATE_TABLE} WHERE session_id=?`).get(sessionId) as { last_seq: number; state_json: string } | undefined;
   let state: State;
   try { state = saved ? { ...emptyState(), ...JSON.parse(saved.state_json) as State } : emptyState(); } catch { state = emptyState(); }
@@ -80,13 +84,24 @@ export function projectHarnessJournalBatch(db: ProjectionDatabase, sessionId: st
   if (!fresh.length) return;
   const acc = new HarnessAccumulator();
   const replay = new HarnessReplay(db, sessionId, state, acc);
-  for (const event of fresh) { replay.apply(event); lastSeq = event.seq; }
+  // 继承的前缀写进一个不落盘的累加器：状态照常推进，行被丢弃。
+  const inherited = new HarnessReplay(db, sessionId, state, new HarnessAccumulator(), false);
+  for (const event of fresh) {
+    if (event.seq <= inheritedThroughSeq) inherited.apply(event);
+    else {
+      // 跨过边界：父会话里还没等到重读的压缩属于父会话，不在这里补记。
+      if (lastSeq <= inheritedThroughSeq) state.compaction.pending = null;
+      replay.apply(event);
+    }
+    lastSeq = event.seq;
+  }
   acc.flush(db);
   prepare(db, `INSERT INTO ${HARNESS_STATE_TABLE}(session_id,last_seq,state_json) VALUES(?,?,?) ON CONFLICT(session_id) DO UPDATE SET last_seq=excluded.last_seq,state_json=excluded.state_json`).run(sessionId, lastSeq, JSON.stringify(state));
 }
 
 class HarnessReplay {
-  constructor(private readonly db: ProjectionDatabase, private readonly sessionId: string, private readonly s: State, private readonly acc: HarnessAccumulator) {}
+  /** counting=false：只推进状态，不读写统计表（累加器由调用方丢弃）。 */
+  constructor(private readonly db: ProjectionDatabase, private readonly sessionId: string, private readonly s: State, private readonly acc: HarnessAccumulator, private readonly counting = true) {}
 
   apply(event: SessionEventEnvelopeV1): void {
     const data = record(event.data);
@@ -411,7 +426,7 @@ class HarnessReplay {
   private folded(data: Json): void {
     const compactionId = text(data.compactionId);
     const seqs = list(data.sourceEventSeqs).filter((seq): seq is number => typeof seq === "number");
-    if (!seqs.length) return;
+    if (!seqs.length || !this.counting) return;
     const select = prepare(this.db, "SELECT hour,revision,mode,model,tool,tokens FROM harness_tool_output WHERE session_id=? AND seq=?");
     const remove = prepare(this.db, "DELETE FROM harness_tool_output WHERE session_id=? AND seq=?");
     let count = 0; let tokens = 0;

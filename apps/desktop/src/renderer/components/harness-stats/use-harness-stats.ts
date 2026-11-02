@@ -86,7 +86,8 @@ export function useHarnessStatsTab({
 
   const entriesRef = useRef<Partial<Record<HarnessStatsQueryKind, Entry>>>({});
   const inflightRef = useRef<Partial<Record<HarnessStatsQueryKind, Inflight>>>({});
-  const latestVersionRef = useRef(0);
+  /** 已知的最新 dataVersion；null = 还没收到任何版本。0 是合法版本（空库首次同步前），不能当「未知」。 */
+  const latestVersionRef = useRef<number | null>(null);
   const staleRetriesRef = useRef<Partial<Record<HarnessStatsQueryKind, number>>>({});
   const [entries, setEntries] = useState<Partial<Record<HarnessStatsQueryKind, Entry>>>({});
   const [sync, setSync] = useState<HarnessStatsSyncStatus | null>(null);
@@ -119,18 +120,18 @@ export function useHarnessStatsTab({
   }, []);
 
   const noteVersion = useCallback((version: number) => {
-    if (version <= latestVersionRef.current) return;
-    const first = latestVersionRef.current === 0;
+    const known = latestVersionRef.current;
+    if (known !== null && version <= known) return;
     latestVersionRef.current = version;
     staleRetriesRef.current = {};
-    // 第一份结果只是「知道版本号」，正在飞的其他请求不算过期。
-    if (!first) revalidateActive();
+    // 第一份结果只是「知道版本号」，正在飞的其他请求不算过期；之后任何变大（包括 0→1）都要重查。
+    if (known !== null) revalidateActive();
   }, [revalidateActive]);
 
   const ensure = useCallback((kind: HarnessStatsQueryKind, force = false) => {
     const key = keyFor(kind);
     const current = entriesRef.current[kind];
-    const fresh = current?.key === key && current.result && !current.error && current.result.dataVersion >= latestVersionRef.current;
+    const fresh = current?.key === key && current.result && !current.error && current.result.dataVersion >= (latestVersionRef.current ?? 0);
     if (fresh && !force) return;
     const inflight = inflightRef.current[kind];
     if (inflight && inflight.key === key && !force) return;
@@ -151,7 +152,7 @@ export function useHarnessStatsTab({
         }
         commit(kind, { key, result, error: null, loading: false });
         setSync(result.sync);
-        const behind = result.dataVersion < latestVersionRef.current;
+        const behind = latestVersionRef.current !== null && result.dataVersion < latestVersionRef.current;
         noteVersion(result.dataVersion);
         if (behind) {
           const retries = staleRetriesRef.current[kind] ?? 0;

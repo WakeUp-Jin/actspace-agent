@@ -8,6 +8,19 @@ export function isDelegatedSession(lineage: unknown): boolean {
 }
 
 /** Parent of a side chat, read from Session lineage; undefined for every other Session. */
+/**
+ * Fork and side-chat Sessions start with a copy of the parent's Journal
+ * `[0..parentBoundarySeq]` (same seqs). Those events were executed — and are
+ * counted — in the parent; usage statistics count only what comes after.
+ * Delegated children copy nothing. Returns -1 when nothing was inherited.
+ */
+export function inheritedThroughSeq(lineage: unknown): number {
+  if (!lineage || typeof lineage !== 'object' || Array.isArray(lineage)) return -1;
+  const value = lineage as { origin?: unknown; parentBoundarySeq?: unknown };
+  if (value.origin !== 'fork' && value.origin !== 'side-chat') return -1;
+  return typeof value.parentBoundarySeq === 'number' && Number.isSafeInteger(value.parentBoundarySeq) ? value.parentBoundarySeq : -1;
+}
+
 export function sideChatParentId(lineage: unknown): string | undefined {
   if (!lineage || typeof lineage !== 'object' || Array.isArray(lineage)) return undefined;
   const value = lineage as { origin?: unknown; parentSessionId?: unknown };

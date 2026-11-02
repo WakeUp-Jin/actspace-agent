@@ -25,15 +25,20 @@ export const inject = Object.freeze(["actspace.host.session", "session.runtime",
 const PROJECTION = Symbol("actspace.session-transcript");
 const HEADER_READ_LIMIT = 1024 * 1024;
 
+const TITLE_EVENTS = new Set(["session/title-set", "session/title"]);
+
 /**
  * Keeps `sessions-v2/<id>/transcript.md` in step with the Journal (rewritten at
- * every Turn end) and tells main agents where those transcripts live.
+ * every Turn end, and again when the title changes between Turns) and tells
+ * main agents where those transcripts live.
  */
 export class SessionTranscriptService {
   readonly #running = new Map<string, Promise<void>>();
   readonly #dirty = new Set<string>();
   readonly #prompts = new Map<string, () => void>();
   readonly #branches = new Map<string, TranscriptBranch[]>();
+  /** Sessions with a Turn in progress: a title set then is picked up by that Turn's end. */
+  readonly #activeTurns = new Set<string>();
   readonly #removeListeners: Array<() => void> = [];
   #branchScan: Promise<void> | undefined;
   #closed = false;
@@ -46,10 +51,14 @@ export class SessionTranscriptService {
     };
     listen("session/event", function (this: { sessionId?: string } | undefined, event: SessionEventEnvelopeV1) {
       const sessionId = this?.sessionId;
-      if (sessionId && event?.type === "turn/end") return service.render(sessionId);
+      if (!sessionId || !event) return;
+      if (event.type === "turn/start") service.#activeTurns.add(sessionId);
+      else if (event.type === "turn/end") { service.#activeTurns.delete(sessionId); return service.render(sessionId); }
+      // The generated title usually lands after a short first Turn has ended; a manual rename can come any time.
+      else if (TITLE_EVENTS.has(event.type)) return service.#retitle(sessionId);
     });
     listen("session/created", (payload: { sessionId: string }) => this.#created(payload.sessionId));
-    listen("session/disposed", (payload: { sessionId: string }) => this.#detachPrompt(payload.sessionId));
+    listen("session/disposed", (payload: { sessionId: string }) => { this.#activeTurns.delete(payload.sessionId); this.#detachPrompt(payload.sessionId); });
   }
 
   get root(): string { return sessionsRoot(this.dataRoot); }
@@ -65,6 +74,18 @@ export class SessionTranscriptService {
     })().finally(() => { this.#running.delete(sessionId); });
     this.#running.set(sessionId, run);
     return run;
+  }
+
+  /**
+   * Only between Turns, and only once a Turn has written the file: rewriting
+   * mid-Turn would publish half a Turn, and before the first Turn there is
+   * nothing to show but the title (that Turn's end writes it anyway).
+   */
+  #retitle(sessionId: string): Promise<void> | undefined {
+    if (this.#activeTurns.has(sessionId)) return undefined;
+    let target: string;
+    try { target = transcriptPath(this.dataRoot, sessionId); } catch { return undefined; }
+    return existsSync(target) ? this.render(sessionId) : undefined;
   }
 
   async #write(sessionId: string): Promise<void> {
@@ -167,6 +188,7 @@ export class SessionTranscriptService {
 
   async dispose(): Promise<void> {
     this.#closed = true;
+    this.#activeTurns.clear();
     for (const remove of this.#removeListeners.splice(0)) remove();
     for (const remove of this.#prompts.values()) remove();
     this.#prompts.clear();

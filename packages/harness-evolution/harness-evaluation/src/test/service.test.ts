@@ -83,18 +83,35 @@ describe("harness evaluation service", () => {
     expect(await refused.evaluation.run(request())).toMatchObject({ status: "failed", error: "The sandbox refused the evaluation: needs network.allowlist" });
   });
 
-  it("terminates the sandbox when the caller aborts", async () => {
-    const { sandbox, evaluation } = service(async () => "hang");
+  it("terminates the sandbox when the caller aborts after the candidate started", async () => {
+    let started!: () => void;
+    const running = new Promise<void>(resolve => { started = resolve; });
+    const { sandbox, evaluation } = service(async () => { started(); return "hang"; });
     const controller = new AbortController();
     const pending = evaluation.run(request(), controller.signal);
-    await new Promise(resolve => setTimeout(resolve, 20));
+    await running;
     controller.abort();
     expect(await pending).toMatchObject({ status: "cancelled", sandbox: { outcome: { status: "cancelled" } }, cleanup: "ok" });
     expect(sandbox.terminated).toBe(1);
-    const early = service(async () => exited());
+    expect(await readdir(tempRoot)).toEqual([]);
+  });
+
+  it("cancels without starting the sandbox when the caller aborts during preparation", async () => {
+    const controller = new AbortController();
+    const sandbox = fakeSandbox(async () => exited());
+    const host = fakeHost(artifactRoot);
+    const preparing = createHarnessEvaluationService({ sandbox, tempRoot, host: { ...host, modelEnvironment: async id => { controller.abort(); return host.modelEnvironment(id); } } });
+    expect(await preparing.run(request(), controller.signal)).toEqual({ status: "cancelled", outputTail: "", cleanup: "ok" });
+    expect(sandbox.requests).toEqual([]);
+    expect(sandbox.terminated).toBe(0);
+    expect(await readdir(tempRoot)).toEqual([]);
+  });
+
+  it("cancels without starting the sandbox when the signal is already aborted", async () => {
+    const { sandbox, evaluation } = service(async () => exited());
     const aborted = new AbortController(); aborted.abort();
-    expect(await early.evaluation.run(request(), aborted.signal)).toMatchObject({ status: "cancelled" });
-    expect(early.sandbox.requests).toEqual([]);
+    expect(await evaluation.run(request(), aborted.signal)).toMatchObject({ status: "cancelled", cleanup: "ok" });
+    expect(sandbox.requests).toEqual([]);
   });
 
   it("fails before the sandbox starts when an artifact or the workspace cannot be copied", async () => {

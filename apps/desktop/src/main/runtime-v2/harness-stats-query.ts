@@ -168,7 +168,7 @@ function toolAggregates(scope: Scope, options: Parameters<Scope["from"]>[2] = {}
   }
   for (const tool of map.values()) {
     const t = tool as { -readonly [K in keyof ToolAggregate]: ToolAggregate[K] };
-    t.pluginId ??= owners.get(t.name)?.toolPluginId ?? owners.get(t.name)?.plugin ?? null;
+    t.pluginId = ownerPlugin(owners, t.name, t.pluginId);
     t.schemaTokens = avg(t.schemaSum, t.schemaSamples);
     t.outputTokensAvg = avg(t.outputSum, t.outputSamples);
     t.outputTokensP95 = harnessHistogramQuantile(t.outputHist, 0.95, HARNESS_TOKEN_BASE);
@@ -177,10 +177,22 @@ function toolAggregates(scope: Scope, options: Parameters<Scope["from"]>[2] = {}
   }
   return { rows: [...map.values()].sort((a, b) => b.calls - a.calls || b.exposures - a.exposures || a.name.localeCompare(b.name)), raw };
 }
-function toolOwners(scope: Scope): Map<string, { plugin: string; toolPluginId: string | null }> {
+type ToolOwners = Map<string, { plugin: string; toolPluginId: string | null }>;
+function toolOwners(scope: Scope): ToolOwners {
   const revision = scope.filter.revision ?? currentRevision(scope.db);
   const rows = prepare(scope.db, "SELECT tool,plugin,tool_plugin_id,revision FROM harness_tool_owner ORDER BY (revision=?) ASC,last_seen ASC").all(revision ?? "") as Row[];
   return new Map(rows.map(row => [String(row.tool), { plugin: String(row.plugin), toolPluginId: row.tool_plugin_id ? String(row.tool_plugin_id) : null }]));
+}
+/**
+ * 工具归属统一用加载器的插件 ID（插件页的行 ID，如 `filesystem-read`）。
+ * Journal 里工具自报的是 toolPluginId（如 `actspace.filesystem-read`），两者不同，
+ * 所以先按工具名查归属表，再按 toolPluginId 反查，都查不到才用 Journal 里的原值。
+ */
+function ownerPlugin(owners: ToolOwners, tool: string, journalPluginId: string | null): string | null {
+  const owned = owners.get(tool)?.plugin;
+  if (owned) return owned;
+  if (journalPluginId) for (const value of owners.values()) if (value.toolPluginId === journalPluginId) return value.plugin;
+  return journalPluginId;
 }
 const publicTool = (tool: ToolAggregate): HarnessToolRow => {
   const { schemaSum: _a, schemaSamples: _b, durationHist: _c, outputHist: _d, outputSum: _e, outputSamples: _f, ...row } = tool;
@@ -218,7 +230,7 @@ function plugins(scope: Scope): HarnessStatsPlugins {
   const ids = new Set<string>([...inventory.map(row => String(row.plugin)), ...loads.map(row => String(row.plugin)), ...[...owners.values()].map(value => value.plugin)]);
   const sources = new Map(inventory.map(row => [String(row.plugin), String(row.source) as HarnessPluginSource]));
   const rows: HarnessPluginRow[] = [...ids].map(pluginId => {
-    const pluginTools = toolRows.filter(tool => (owners.get(tool.name)?.plugin ?? tool.pluginId) === pluginId);
+    const pluginTools = toolRows.filter(tool => tool.pluginId === pluginId);
     const toolPluginIds = new Set([...owners.entries()].filter(([, value]) => value.plugin === pluginId).map(([, value]) => value.toolPluginId).filter((value): value is string => !!value));
     const provided = service.filter(row => row.provider === pluginId);
     const listening = listener.filter(row => row.plugin === pluginId);
@@ -408,7 +420,6 @@ function versions(scope: Scope, compare?: { from: string; to: string }): Harness
   const rows: HarnessCompareRow[] = COMPARE.map(item => ({ id: item.id, label: item.label, better: item.better, format: item.format, from: a ? a[item.id] ?? null : null, to: b ? b[item.id] ?? null : null }));
   const evolution = scope.all("t.action AS action,COUNT(*) AS count,SUM(CASE WHEN t.status IN ('completed','running') THEN 0 ELSE 1 END) AS failed", "harness_evolution_op", "GROUP BY t.action ORDER BY 2 DESC");
   const evolved = prepare(scope.db, "SELECT DISTINCT plugin FROM harness_plugin_inventory WHERE source='evolved'").all() as Row[];
-  const owners = toolOwners(scope);
   const toolRows = evolved.length ? toolAggregates(scope).rows : [];
   return {
     revisions, from, to, compare: rows,
@@ -416,7 +427,7 @@ function versions(scope: Scope, compare?: { from: string; to: string }): Harness
     evolutionOps: evolution.map(row => ({ action: String(row.action ?? "unknown"), count: n(row.count), failed: n(row.failed) })),
     evolvedPlugins: evolved.map(row => {
       const plugin = String(row.plugin);
-      const pluginTools = toolRows.filter(tool => (owners.get(tool.name)?.plugin ?? tool.pluginId) === plugin);
+      const pluginTools = toolRows.filter(tool => tool.pluginId === plugin);
       const names = pluginTools.map(tool => tool.name);
       const sessions = names.length ? n(scope.get("COUNT(DISTINCT t.session_id) AS sessions", "harness_tool_rollup", { extra: `t.calls>0 AND t.tool IN (${names.map(name => `'${name.replaceAll("'", "''")}'`).join(",")})` }).sessions) : 0;
       return { pluginId: plugin, calls: pluginTools.reduce((sum, tool) => sum + tool.calls, 0), failures: pluginTools.reduce((sum, tool) => sum + tool.failed, 0), sessions };
@@ -491,7 +502,7 @@ export function flags(scope: Scope): HarnessFlag[] {
   }
   const plugin = plugins(scope);
   for (const row of plugin.rows) {
-    const pluginTools = toolRows.filter(tool => tool.pluginId === row.pluginId || (row.tools > 0 && plugin.rows.length && false));
+    const pluginTools = toolRows.filter(tool => tool.pluginId === row.pluginId);
     const exposures = Math.max(0, ...pluginTools.map(tool => tool.exposures));
     if (row.tools > 0 && exposures >= R.pluginCostlyUnused.minExposures && (row.contextTokens ?? 0) >= R.pluginCostlyUnused.minSchemaTokens && row.toolCalls / exposures < R.pluginCostlyUnused.maxCallRate)
       out.push({ rule: "plugin-costly-unused", level: "warn", title: `${row.pluginId} 占用高、使用少`, detail: `${row.tools} 个工具定义合计约 ${Math.round(row.contextTokens ?? 0)} token，${exposures} 次请求里调用 ${row.toolCalls} 次`, category: "插件 · 成本 vs 使用", target: { tab: "plugins", key: row.pluginId } });

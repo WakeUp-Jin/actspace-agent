@@ -73,6 +73,8 @@ import {
   projectChatEvents,
   projectSubagentTranscript,
   projectSubagentList,
+  subagentChildrenWithoutModel,
+  latestRequestModel,
   toolPreview,
 } from "@actspace/client/sessions";
 
@@ -653,7 +655,17 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   ipc.handle(contract.usage.getStatistics, (input) => createUsageStatistics(options.registry, options.roots.dataRoot, input));
   ipc.handle(contract.usage.getActivity, (input) => createUsageActivity(options.registry, options.roots.dataRoot, input));
   ipc.handle(contract.sessions.getSubagents, async (input) => {
-    return projectSubagentList(await options.registry.inspectSession(input.sessionId), await options.registry.inspectSessionEvents(input.sessionId));
+    const journal = await options.registry.inspectSessionEvents(input.sessionId);
+    // The parent records a child's model only when it finishes; until then use the child's own request facts.
+    // The panel polls every second, so a finished child's answer is remembered instead of re-reading its Journal.
+    const childModels = new Map<string, string>();
+    await Promise.all(subagentChildrenWithoutModel(journal).map(async ({ childSessionId, finished }) => {
+      const cached = finishedChildModels.get(childSessionId);
+      const model = cached !== undefined ? cached : latestRequestModel(await options.registry.inspectSessionEvents(childSessionId).catch(() => [])) ?? null;
+      if (finished) rememberFinishedChildModel(childSessionId, model);
+      if (model) childModels.set(childSessionId, model);
+    }));
+    return projectSubagentList(await options.registry.inspectSession(input.sessionId), journal, childModels);
   });
   ipc.handle(contract.sessions.getSubAgentTranscript, async (input) => {
     const snapshot = await options.registry.inspectSession(input.transcriptRef.runId);
@@ -661,6 +673,15 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     return projectSubagentTranscript(snapshot, journal);
   });
 
+}
+
+/** Request model of finished subagent children whose parent recorded none (null = the child sent no request). */
+const finishedChildModels = new Map<string, string | null>();
+const FINISHED_CHILD_MODEL_LIMIT = 500;
+function rememberFinishedChildModel(childSessionId: string, model: string | null): void {
+  if (finishedChildModels.has(childSessionId)) return;
+  if (finishedChildModels.size >= FINISHED_CHILD_MODEL_LIMIT) finishedChildModels.delete(finishedChildModels.keys().next().value!);
+  finishedChildModels.set(childSessionId, model);
 }
 
 async function toSessionListItem(item: RuntimeV2SessionListItem, registry: DesktopRuntimeV2Registry): Promise<SessionListItem> {

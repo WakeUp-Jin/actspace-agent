@@ -37,7 +37,9 @@ export function reduceTranscript(state: TranscriptState, event: SessionEventEnve
   const data = record(event.data);
   const base = { ...state, lastTime: event.time, throughSeq: event.seq };
   if (event.type === "session/title-set" || event.type === "session/title") {
-    return typeof data.title === "string" && data.title.trim() ? { ...base, title: data.title.trim() } : base;
+    if (typeof data.title === "string" && data.title.trim()) return { ...base, title: data.title.trim() };
+    // A manual rename to an empty title clears it.
+    return event.type === "session/title-set" && data.title === null ? { ...base, title: null } : base;
   }
   if (event.seq <= inheritedThroughSeq) return base;
   switch (event.type) {

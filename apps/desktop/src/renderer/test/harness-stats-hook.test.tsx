@@ -112,6 +112,28 @@ describe("useHarnessStatsTab", () => {
     expect(stub.getStatus.mock.calls.length).toBe(calls);
   });
 
+  it("空库首次补历史：dataVersion 从 0 变成 1 时自动重查一次，之后不再反复查", async () => {
+    let phase: HarnessStatsSyncStatus["phase"] = "syncing";
+    let version = 0;
+    const stub = install({ sync: () => ({ ...MOCK_HARNESS_STATS_SYNC, phase, dataVersion: version, completedSessions: 0, totalSessions: 1 }) });
+    const { result } = renderHook(() => useHarnessStatsTab({ filter: FILTER, tab: "overview" }));
+    await waitFor(() => expect(result.current.tab.status).toBe("ready"));
+    await waitFor(() => expect(result.current.summary.status).toBe("ready"));
+    expect(result.current.sync?.phase).toBe("syncing");
+    const before = stub.queries.length;
+
+    // 补齐和结束在同一次轮询里被看到：phase 变 idle、版本 0→1。
+    version = 1; phase = "idle";
+    await act(async () => { await vi.advanceTimersByTimeAsync(HARNESS_STATS_POLL_MS + 50); });
+    await waitFor(() => expect(result.current.sync?.phase).toBe("idle"));
+    await waitFor(() => expect(stub.queries.slice(before).map((item) => item.kind).sort()).toEqual(["options", "overview", "summary"]));
+    await waitFor(() => expect(result.current.tab.status).toBe("ready"));
+
+    const after = stub.queries.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(HARNESS_STATS_POLL_MS * 5); });
+    expect(stub.queries.length).toBe(after);
+  });
+
   it("当前 tab 查询失败时给出错误，刷新可恢复", async () => {
     install({ failKind: "tools" });
     const { result } = renderHook(() => useHarnessStatsTab({ filter: FILTER, tab: "tools" }));

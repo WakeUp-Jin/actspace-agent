@@ -1,5 +1,5 @@
 import type { ContextHistoryResult } from "./context-history-query";
-import { isDelegatedSession, sideChatParentId } from "@actspace/shared/session-list-page";
+import { inheritedThroughSeq, isDelegatedSession, sideChatParentId } from "@actspace/shared/session-list-page";
 import type { ContextHistoryState } from "./context-history-projection";
 import { CONTEXT_PROJECTOR_VERSION } from "./context-history-version";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -410,7 +410,7 @@ export class UsageReadModelService {
           this.#progress();
           const batch = await read(summary.sessionId, { throughSeq: summary.throughJournalSeq, ...(cursor ? { cursor } : {}) });
           if (!batch.done && cursor === batch.cursor) throw new Error("Session fallback made no progress.");
-          await this.#send({ type: "fallback-append", source: { sessionId: summary.sessionId, title: summary.title, workspaceRoot: summary.workspaceRoot, throughJournalSeq: summary.throughJournalSeq }, events: batch.events });
+          await this.#send({ type: "fallback-append", source: { sessionId: summary.sessionId, title: summary.title, workspaceRoot: summary.workspaceRoot, throughJournalSeq: summary.throughJournalSeq, inheritedThroughSeq: inheritedThroughSeq(summary.lineage) }, events: batch.events });
           cursor = batch.cursor;
           if (batch.done) break;
         }
@@ -510,7 +510,7 @@ export class UsageReadModelService {
       // Keep that read-only compatibility check; new writes persist it separately.
       const codecChanged = digest !== undefined && (state.codecSetDigest !== undefined ? state.codecSetDigest !== digest : !state.stamp?.endsWith(`:${digest}`));
       if (!state.building && !codecChanged && state.revision === summary.throughJournalSeq && state.cursor && (!summary.querySource || state.stamp === summary.querySource.stamp)) { this.#indexed.set(cacheId, key); return; }
-      const source = { sessionId: summary.sessionId, title: summary.title, workspaceRoot: summary.workspaceRoot, throughJournalSeq: summary.throughJournalSeq, querySource: summary.querySource };
+      const source = { sessionId: summary.sessionId, title: summary.title, workspaceRoot: summary.workspaceRoot, throughJournalSeq: summary.throughJournalSeq, querySource: summary.querySource, inheritedThroughSeq: inheritedThroughSeq(summary.lineage) };
       let reset = codecChanged || !state.cursor || state.revision === null || state.revision > summary.throughJournalSeq || (state.revision === summary.throughJournalSeq && !!summary.querySource && state.stamp !== summary.querySource.stamp);
       let cursor = reset ? undefined : state.cursor;
       // An invalidated cursor rebuilds only this Session. Each committed batch

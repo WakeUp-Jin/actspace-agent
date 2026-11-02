@@ -4,7 +4,8 @@ import { projectSessionUsageActivities } from "@actspace/client/sessions";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { UsageActivityRow } from "@actspace/shared";
 
-export type UsageJournalSource = { querySource?: import("@actspace/session-storage").SessionQuerySource; sessionId: string; title: string | null; throughJournalSeq: number; workspaceRoot: string | null };
+/** `inheritedThroughSeq`: events at or below it were copied from a fork / side-chat parent and are not counted here (see `inheritedThroughSeq` in shared). */
+export type UsageJournalSource = { querySource?: import("@actspace/session-storage").SessionQuerySource; sessionId: string; title: string | null; throughJournalSeq: number; workspaceRoot: string | null; inheritedThroughSeq?: number };
 type Json = Record<string, unknown>;
 const record = (value: unknown): Json => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Json : {};
 
@@ -47,7 +48,10 @@ export async function projectUsageJournalBatch(db: ProjectionDatabase, source: U
     return run;
   };
   const saveEvent = prepare(db, "INSERT INTO usage_projection_events(session_id,seq,group_key,event_json) VALUES(?,?,?,?)");
+  // The copied parent prefix is balanced (no open Turn, request or tool call), so skipping it loses no association.
+  const inherited = source.inheritedThroughSeq ?? -1;
   for (const event of events) {
+    if (event.seq <= inherited) continue;
     const data = record(event.data);
     if (typeof data.turnId === "string" && typeof data.agentRunId === "string") {
       if (runFor(data.turnId) !== data.agentRunId) {
