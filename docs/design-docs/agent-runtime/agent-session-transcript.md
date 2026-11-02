@@ -22,7 +22,7 @@ Agent 现在看不到自己过去的会话。用户常说“看看会话 xxx 里
 | 访问方式 | 派生 Markdown + 系统提示词。**不新增工具**，Agent 用现有的读文件、搜索工具 |
 | 文件 | 每个会话一份 `transcript.md`，只有精简版。工具结果只留 1 行；以后再把工具调用这部分做细 |
 | 位置 | `sessions-v2/<id>/transcript.md`，和 `journal.jsonl` 放在一起 |
-| 生成时机 | 每一轮结束（`turn/end`）时重写一次；增量投影，不重新扫整个 Journal |
+| 生成时机 | 每一轮结束（`turn/end`）时重写一次；两轮之间标题变了（自动标题晚于首轮结束、手动改名）再重写一次；增量投影，不重新扫整个 Journal |
 | 子 Agent | 子会话各有一份 transcript；父会话在 `agent` 工具那一行标出子会话 ID 和相对路径 |
 | 侧边对话、Fork | 各有一份 transcript，只写分出之后的内容；父会话在分出的位置加一行标记 |
 | 压缩 | 原文保留，在压缩的位置加分隔线和压缩摘要 |
@@ -107,6 +107,7 @@ tools-runtime  evaluateGlobalBoundary 接受 isHostReadable：读操作且命中
 - **派生视图，不是事实源**。Journal 仍是唯一事实源；transcript 坏了、删了都能从 Journal 重新生成。
 - **增量投影**：打开中的会话用 `journal.project(key, initial, reduce)`，同一个 reducer；没打开的会话（子 Agent、重启后的父会话）用 `session.storage.inspect` 读盘后 fold。
 - **写入时机**：监听 `session/event` 的 `turn/end`。这个通知在会话的串行追加里触发，所以先让出一拍（`setImmediate`）再投影，不阻塞 Journal 追加。同一会话重叠的请求合并成“再写一次”。写入走临时文件 + rename，权限 `0600`。
+- **标题晚到**：自动标题异步生成，短回复常常先结束，`session/title-set` 落在 `turn/end` 之后。所以也监听 `session/title-set`：没有进行中的轮（按 `turn/start`/`turn/end` 跟踪）且文件已经写过时立即重写；轮进行中不写，避免写出半轮内容，由这一轮的 `turn/end` 带上新标题；还没写过文件时等首轮结束。手动清空标题（`title: null`）回到 `Untitled session`。
 - **子 Agent 会话**：子会话不发 `session/event`。父会话写完后，检查它引用的子会话，Journal 比 transcript 新就从盘上重写。
 - **侧边对话 / Fork 标记**：父会话需要知道谁从它分出。第一次需要时扫一遍所有会话的 header（只读第一行），之后靠 `session/created` 更新。新侧边对话打开时，若父会话已有 transcript，立即重写父会话加上标记。
 - **继承的内容不重复**：Fork 和侧边对话复制了父会话 `[0..boundarySeq]` 的事件，seq 相同。渲染时跳过这段（标题除外），头部指回父会话。子 Agent 不复制事件。

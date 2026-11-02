@@ -23,7 +23,7 @@
 
 - core-agent-loop 54、context-compaction 20、context-engine 27、session-journal 37、shared 179、client 50、web 124、desktop 2029 项通过；desktop typecheck 通过。
 - `check:frontend-tokens`、`check:frontend-theme`、`check:renderer-bridge` 通过；`check:current-docs` 失败在既有的 `20261021-model-acquisition-picker` 截图链接，与本分支无关。
-- 浏览器 mock 截图：[浅色完成](screenshots/1-light-completed.png)、[深色完成](screenshots/2-dark-completed.png)、[进行中](screenshots/3-light-running.png)、[深色失败](screenshots/4-dark-failed.png)、[480px](screenshots/5-light-480-completed.png)、[轨迹详情](screenshots/6-light-trajectory.png)。
+- 浏览器 mock 截图：浅色完成、深色完成、进行中、深色失败、480px、轨迹详情六张，只留在本机 `screenshots/`（`docs/exec-runs/**/*.png` 按 `.gitignore` 不入库），不作为仓库内可链接证据。
 
 ## 人工验证指引（Electron，需要模型 Key）
 

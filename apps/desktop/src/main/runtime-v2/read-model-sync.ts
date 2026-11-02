@@ -111,7 +111,7 @@ export async function commitJournalBatch(db: DatabaseSync, message: JournalBatch
       await yieldBatch();
     });
     // Harness 统计与使用统计共用这一次读取；行与游标同一事务提交。
-    if (!catalog) projectHarnessJournalBatch(projection, id, message.events);
+    if (!catalog) projectHarnessJournalBatch(projection, id, message.events, source.inheritedThroughSeq ?? -1);
     const revision = message.final ? source.throughJournalSeq : message.events.at(-1)?.seq ?? build?.revision ?? -1;
     if (useBuilding) prepare(db, "UPDATE read_model_builds SET revision=?,cursor=? WHERE session_id=? AND projection=?").run(revision, message.cursor, id, catalog ? "catalog" : "usage");
     else {

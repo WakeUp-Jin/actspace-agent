@@ -59,7 +59,7 @@ Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；�
 - `recovery/` 保存 torn-tail repair 前的 forensic 副本和失效 writer lock；
 - `.writer-lock/owner.json` 保存当前 writer lease，关闭 Session 后移除；
 - 旧版本可能在会话目录里留下 `visualizations.json`（已移除的「转成可视化 HTML」功能的缓存）。现在不读不写，可以直接删除。
-- `transcript.md` 由 `@actspace/session-transcript` 在每轮结束时从 Journal 重写，只含对话正文和一行工具结果，供 Agent 读取历史会话；可删除并重新生成，见[会话记录 Markdown](agent-runtime/agent-session-transcript.md)；
+- `transcript.md` 由 `@actspace/session-transcript` 在每轮结束时（以及轮间标题变化时）从 Journal 重写，只含对话正文和一行工具结果，供 Agent 读取历史会话；可删除并重新生成，见[会话记录 Markdown](agent-runtime/agent-session-transcript.md)；
 
 v2 不创建或读取以下 v1 文件：
 

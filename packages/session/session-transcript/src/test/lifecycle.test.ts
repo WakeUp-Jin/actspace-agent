@@ -120,6 +120,43 @@ describe("session transcript plugin", () => {
     } finally { await root.dispose(); }
   });
 
+  it("rewrites the title when it is set after the Turn ended, and leaves a running Turn alone", async () => {
+    const fixture: Fixture = { header: header("s-title"), open: true, events: [event(0, "turn/start", { turnId: "t1" }), userMessage(1, "你好"), event(2, "turn/end", { reason: "completed" })] };
+    const { dataRoot, root, service } = await setup({ "s-title": fixture });
+    const notify = (value: SessionEventEnvelopeV1) => { fixture.events.push(value); emitNotification(root.context, "session/event", value, { sessionId: "s-title" }); };
+    const transcript = () => readFile(transcriptPath(dataRoot, "s-title"), "utf8");
+    try {
+      // A title set before any Turn wrote the file waits for that Turn's end.
+      notify(event(3, "session/title-set", { title: "太早" }));
+      await new Promise(resolve => setImmediate(resolve));
+      expect(existsSync(transcriptPath(dataRoot, "s-title"))).toBe(false);
+
+      emitNotification(root.context, "session/event", fixture.events[0]!, { sessionId: "s-title" });
+      emitNotification(root.context, "session/event", fixture.events[2]!, { sessionId: "s-title" });
+      await service.render("s-title");
+      expect((await transcript()).split("\n")[0]).toBe("# 太早");
+
+      // Fast reply, slow title: the generated title lands after turn/end.
+      notify(event(4, "session/title-set", { title: "问候与寒暄" }));
+      await vi.waitFor(async () => expect((await transcript()).split("\n")[0]).toBe("# 问候与寒暄"));
+
+      // Renamed while a Turn runs: no mid-Turn rewrite; the Turn's end carries the new title.
+      notify(event(5, "turn/start", { turnId: "t2" }));
+      notify(userMessage(6, "第二个问题"));
+      notify(event(7, "session/title-set", { title: "手动改名" }));
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(await transcript()).not.toContain("第二个问题");
+      notify(event(8, "turn/end", { reason: "completed" }));
+      await vi.waitFor(async () => expect(await transcript()).toContain("第二个问题"));
+      expect((await transcript()).split("\n")[0]).toBe("# 手动改名");
+
+      // Clearing the title between Turns.
+      notify(event(9, "session/title-set", { title: null }));
+      await vi.waitFor(async () => expect((await transcript()).split("\n")[0]).toBe("# Untitled session"));
+      expect((await transcript()).match(/你好/g)).toHaveLength(1);
+    } finally { await root.dispose(); }
+  });
+
   it("skips sessions without a Journal on disk", async () => {
     const sessions: Record<string, Fixture> = { ephemeral: { header: header("ephemeral"), open: true, events: [userMessage(0, "hi")] } };
     const { dataRoot, root, service } = await setup(sessions, { withJournal: [] });

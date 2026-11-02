@@ -10,11 +10,12 @@ import type { DatabaseSync } from "node:sqlite";
  * v10 replays history omitted by the former automatic Usage reset boundary;
  * v13 adds indexed unknown-token dimensions to activity and aggregate rollups;
  * v14 excludes Session-owned auxiliary usage from derived Run counts;
- * v15 adds Harness statistics tables (projected from the same journal pass). */
+ * v15 adds Harness statistics tables (projected from the same journal pass);
+ * v16 stops counting the parent prefix a fork / side chat copied (rebuild drops the old double counts). */
 export function createReadModelSchema(db: DatabaseSync): void {
   db.exec(`
     PRAGMA application_id = 0x41555332;
-    PRAGMA user_version = 15;
+    PRAGMA user_version = 16;
     CREATE TABLE IF NOT EXISTS usage_write_mode(batching INTEGER NOT NULL) STRICT;
     INSERT INTO usage_write_mode SELECT 0 WHERE NOT EXISTS(SELECT 1 FROM usage_write_mode);
     CREATE TABLE IF NOT EXISTS session_catalog (

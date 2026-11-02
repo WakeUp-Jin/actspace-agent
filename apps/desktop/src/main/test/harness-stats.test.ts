@@ -11,6 +11,9 @@ import { projectHarnessJournalBatch } from "../runtime-v2/harness-stats-projecti
 import { harnessFingerprint, queryHarnessStats } from "../runtime-v2/harness-stats-query";
 import { archiveHarnessSession, ingestHarnessArchive } from "../runtime-v2/harness-stats-archive";
 import { ingestHarnessRuntimeFiles } from "../runtime-v2/harness-stats-runtime-ingest";
+import { projectUsageJournalBatch } from "../runtime-v2/usage-journal-projection";
+import { UsageSessionFallback } from "../runtime-v2/usage-session-fallback";
+import type { UsageActivityRow } from "@actspace/shared";
 
 const BASE = Date.parse("2026-10-30T08:00:00.000Z");
 const dirs: string[] = [];
@@ -135,6 +138,88 @@ describe("Harness 统计投影", () => {
   });
 });
 
+/** 分叉 / 侧边对话复制父会话 [0..boundary] 之后再自己执行一轮：一次请求、一次 read_file。 */
+function ev(seq: number, type: string, data: Record<string, unknown>): SessionEventEnvelopeV1 {
+  return { recordKind: "event", seq, type, eventVersion: 1, criticality: "required", time: new Date(BASE + 3_600_000 + seq * 1000).toISOString(), source: { ownerPluginId: "@actspace/core" }, data, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [] } } as unknown as SessionEventEnvelopeV1;
+}
+function ownTurn(from: number, id: string): SessionEventEnvelopeV1[] {
+  let seq = from;
+  return [
+    ev(seq++, "turn/start", { turnId: `t-${id}`, agentRunId: `run-${id}`, mode: "agent" }),
+    ev(seq++, "step/start", { stepId: `st-${id}`, turnId: `t-${id}` }),
+    ev(seq++, "request/header", { requestId: `q-${id}`, turnId: `t-${id}`, stepId: `st-${id}`, model: "m1" }),
+    ev(seq++, "assistant/message", { requestId: `q-${id}`, usage: { inputTokens: 10, outputTokens: 5 } }),
+    ev(seq++, "tool/call", { callId: `c-${id}`, name: "read_file", requestId: `q-${id}`, turnId: `t-${id}`, stepId: `st-${id}`, args: { path: `/w/${id}.ts` } }),
+    ev(seq++, "tool/result", { callId: `c-${id}`, status: "completed", modelOutput: [{ type: "text", text: "ok" }] }),
+    ev(seq++, "step/end", { stepId: `st-${id}`, turnId: `t-${id}`, usage: { inputTokens: 10, outputTokens: 5 } }),
+    ev(seq++, "turn/end", { turnId: `t-${id}`, reason: "completed" }),
+  ];
+}
+
+describe("分叉 / 侧边对话继承的历史只在父会话记账", () => {
+  const parent = journal();
+  const boundary = parent.length - 1;
+  const fork = [...parent, ...ownTurn(parent.length, "fork")];
+  const grandBoundary = fork.length - 1;
+  const grandchild = [...fork, ...ownTurn(fork.length, "grand")];
+
+  it("Harness：继承的前缀不产生统计行，但版本、模式、模型等状态照常恢复", () => {
+    const db = database();
+    projectHarnessJournalBatch(db, "parent", parent);
+    const parentOnly = { tools: query(db, "tools").rows, runtime: query(db, "runtime") };
+    projectHarnessJournalBatch(db, "fork", fork, boundary);
+    projectHarnessJournalBatch(db, "grand", grandchild, grandBoundary);
+
+    // 父会话 2 次 read_file + 两个分支各自 1 次；轮数 1 + 1 + 1。
+    expect(query(db, "tools").rows.find(row => row.name === "read_file")!.calls).toBe(4);
+    expect(query(db, "runtime").turns).toBe(3);
+    const perSession = (table: string) => db.prepare(`SELECT session_id,COUNT(*) AS n FROM ${table} GROUP BY session_id ORDER BY session_id`).all();
+    expect(perSession("harness_request")).toEqual([{ session_id: "fork", n: 1 }, { session_id: "grand", n: 1 }, { session_id: "parent", n: 1 }]);
+    expect(perSession("harness_turn")).toEqual([{ session_id: "fork", n: 1 }, { session_id: "grand", n: 1 }, { session_id: "parent", n: 1 }]);
+    // 分支自己的请求沿用继承来的 Harness 版本和模式，不是 unknown。
+    expect(db.prepare("SELECT revision,mode,model FROM harness_request WHERE session_id='fork'").get()).toEqual({ revision: "main@3", mode: "agent", model: "m1" });
+    // 继承前缀里的压缩、后台任务、子 Agent 不会在分支里重复出现。
+    for (const table of ["harness_compaction", "harness_background_task", "harness_delegation"]) expect(perSession(table)).toEqual([{ session_id: "parent", n: 1 }]);
+
+    // 只有父会话时的结果不变；分批跨过边界与一次写入一致。
+    const alone = database();
+    projectHarnessJournalBatch(alone, "parent", parent);
+    expect({ tools: query(alone, "tools").rows, runtime: query(alone, "runtime") }).toEqual(parentOnly);
+    const split = database();
+    projectHarnessJournalBatch(split, "parent", parent);
+    for (let index = 0; index < fork.length; index += 4) projectHarnessJournalBatch(split, "fork", fork.slice(index, index + 4), boundary);
+    const forkOnly = database();
+    projectHarnessJournalBatch(forkOnly, "parent", parent);
+    projectHarnessJournalBatch(forkOnly, "fork", fork, boundary);
+    expect({ tools: query(split, "tools").rows, runtime: query(split, "runtime") }).toEqual({ tools: query(forkOnly, "tools").rows, runtime: query(forkOnly, "runtime") });
+  });
+
+  it("使用统计：索引与回退查询都只算分支自己的请求和工具", async () => {
+    const usage = async (sessionId: string, events: readonly SessionEventEnvelopeV1[], inheritedThroughSeq?: number) => {
+      const db = database();
+      db.prepare("INSERT INTO session_catalog(session_id,title,revision) VALUES(?,?,?)").run(sessionId, null, events.at(-1)!.seq);
+      const rows: UsageActivityRow[] = [];
+      await projectUsageJournalBatch(db, { sessionId, title: null, throughJournalSeq: events.at(-1)!.seq, workspaceRoot: null, ...(inheritedThroughSeq === undefined ? {} : { inheritedThroughSeq }) }, events, async batch => { rows.push(...batch); });
+      return rows;
+    };
+    const kinds = (rows: readonly UsageActivityRow[]) => rows.map(row => `${row.kind}:${row.requestId ?? row.toolName ?? ""}`).sort();
+    const parentRows = await usage("parent", ownTurn(0, "p"));
+    expect(kinds(parentRows)).toEqual(["llm_request:q-p", "tool_invocation:read_file"]);
+    const forkEvents = [...ownTurn(0, "p"), ...ownTurn(8, "f")];
+    expect(kinds(await usage("fork", forkEvents, 7))).toEqual(["llm_request:q-f", "tool_invocation:read_file"]);
+    // 没有边界（旧行为）时会把父请求再算一遍：用来证明上面的断言确实在测边界。
+    expect(kinds(await usage("fork", forkEvents))).toHaveLength(4);
+
+    const fallback = new UsageSessionFallback();
+    fallback.append({ sessionId: "fork", title: null, throughJournalSeq: 15, workspaceRoot: null, inheritedThroughSeq: 7 }, [ev(0, "session/title-set", { title: "继承的标题" }), ...forkEvents.slice(1)]);
+    const materialized = fallback.materialize();
+    try {
+      const rows = materialized.prepare("SELECT kind,session_title FROM usage_activity ORDER BY kind").all();
+      expect(rows).toEqual([{ kind: "llm_request", session_title: "继承的标题" }, { kind: "tool_invocation", session_title: "继承的标题" }]);
+    } finally { materialized.close(); }
+  });
+});
+
 describe("运行时统计文件", () => {
   const line = (value: Record<string, unknown>) => `${JSON.stringify({ v: 1, ...value })}\n`;
   const histogram = [0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -180,6 +265,42 @@ describe("运行时统计文件", () => {
     expect(ingestHarnessRuntimeFiles(db, root).reset).toBe(true);
     expect(query(db, "plugins").services.find(row => row.service === "tools.runtime")!.calls).toBe(7);
     expect(db.prepare("SELECT write_failures FROM harness_stats_health WHERE id=1").get()).toEqual({ write_failures: 0 });
+  });
+
+  it("插件归属统一用加载器 ID：工具自报的 toolPluginId 不同也能对上插件行和规则", () => {
+    const root = tempRoot(); const dir = join(root, "harness-stats"); mkdirSync(dir);
+    writeFileSync(join(dir, "2026-10.jsonl"), [
+      line({ t: "inventory", at: "2026-10-30T08:00:00.000Z", revision: "main@3", plugin: "filesystem-read", source: "builtin", provides: [], loadMs: 1, ok: true, error: null }),
+      line({ t: "tool-owner", at: "2026-10-30T08:00:00.000Z", revision: "main@3", plugin: "filesystem-read", toolPluginId: "actspace.filesystem-read", tool: "read_file" }),
+    ].join(""));
+    const db = database();
+    ingestHarnessRuntimeFiles(db, root);
+    const rollup = (session: string, tool: string, pluginId: string, exposures: number, calls: number, schemaTokens: number) => db.prepare(
+      "INSERT INTO harness_tool_rollup(session_id,hour,revision,mode,model,tool,plugin_id,exposures,calls,completed,schema_tokens,schema_samples) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+    ).run(session, "2026-10-30T08:00:00.000Z", "main@3", "agent", "m1", tool, pluginId, exposures, calls, calls, schemaTokens * exposures, exposures);
+    const pluginRules = () => query(db, "overview").flags.filter(flag => flag.rule === "plugin-costly-unused");
+
+    // 样本不足（199 次请求）：不报。
+    rollup("s1", "read_file", "actspace.filesystem-read", 199, 1, 600);
+    expect(pluginRules()).toEqual([]);
+
+    // 够 200 次、调用率 0.5%：工具和插件两条都报，插件规则跳到加载器 ID 的插件行。
+    rollup("s2", "read_file", "actspace.filesystem-read", 1, 0, 600);
+    const tools = query(db, "tools");
+    expect(tools.rows.find(row => row.name === "read_file")).toMatchObject({ pluginId: "filesystem-read", exposures: 200, calls: 1 });
+    const plugins = query(db, "plugins");
+    expect(plugins.rows.find(row => row.pluginId === "filesystem-read")).toMatchObject({ tools: 1, toolCalls: 1, contextTokens: 600 });
+    expect(plugins.rows.some(row => row.pluginId === "actspace.filesystem-read")).toBe(false);
+    expect(pluginRules()).toEqual([expect.objectContaining({ target: { tab: "plugins", key: "filesystem-read" } })]);
+    expect(query(db, "overview").flags.map(flag => flag.rule)).toContain("tool-costly-unused");
+
+    // 调用率够高：不报。
+    rollup("s3", "read_file", "actspace.filesystem-read", 0, 10, 600);
+    expect(pluginRules()).toEqual([]);
+
+    // 归属表里没有这个工具名，但 toolPluginId 能反查到加载器 ID。
+    rollup("s4", "read_many", "actspace.filesystem-read", 5, 1, 100);
+    expect(query(db, "tools").rows.find(row => row.name === "read_many")!.pluginId).toBe("filesystem-read");
   });
 
   it("读取 Harness 版本记录", () => {

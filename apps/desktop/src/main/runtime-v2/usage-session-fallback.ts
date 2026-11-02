@@ -31,6 +31,8 @@ export class UsageSessionFallback {
       if (event.type === "session/workspace-set" && typeof data?.workspaceRoot === "string" && data.workspaceRoot.trim()) entry.source.workspaceRoot = data.workspaceRoot;
       this.#bytes += Buffer.byteLength(JSON.stringify([entry.source.title, entry.source.workspaceRoot])) - previousMetadataBytes;
       if (this.#bytes > 8 * 1024 * 1024) throw new Error("Session fallback exceeds 8 MiB projection budget.");
+      // Copied from a fork / side-chat parent: keeps the title, but its requests and tools belong to the parent.
+      if (event.seq <= (entry.source.inheritedThroughSeq ?? -1)) continue;
       const relation = data && typeof data.turnId === "string" && typeof data.agentRunId === "string" ? { ...event, surface: null, data: { turnId: data.turnId, agentRunId: data.agentRunId }, type: "usage/run-association" } as SessionEventEnvelopeV1 : undefined;
       for (const value of [relation, reduced]) if (value) {
         this.#bytes += Buffer.byteLength(JSON.stringify(value));

@@ -407,7 +407,7 @@ Context Tab 回答三个问题：现在占了多少、由哪些条目组成、�
 
 右侧对象面板新增 Subagents tab，按当前 Session 隔离列表，分 Running / Done；任务行显示描述、状态、持续时间。点击在同一个 tab 内打开执行详情，顶部返回列表。聊天中的 Agent 条目也打开此视图；本轮首次出现子任务时自动打开，用户关闭后不因后续更新重复抢焦点。
 
-列表通过 `getSubagents` 每秒更新；详情通过 `getSubAgentTranscript` 读取规范 SessionEvent，运行中每 750ms 更新。组件卸载、切任务或切会话时取消后续刷新，迟到响应不更新新视图。详情复用会话 MessageBlock 渲染，支持正文、Thinking 和工具，不再附着在 Composer 上方。
+列表通过 `getSubagents` 每秒更新；模型名优先取父会话 `delegation/completed` 记下的模型，运行中（或停止时没记模型）取子会话最近一次 `request/header` 的实际模型，不按用途绑定猜；已结束子会话的查询结果在主进程缓存，不每秒重读。详情通过 `getSubAgentTranscript` 读取规范 SessionEvent，运行中每 750ms 更新。组件卸载、切任务或切会话时取消后续刷新，迟到响应不更新新视图。详情复用会话 MessageBlock 渲染，支持正文、Thinking 和工具，不再附着在 Composer 上方。
 
 ## 侧边对话（2026-10-21）
 

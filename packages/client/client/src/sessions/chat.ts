@@ -347,13 +347,51 @@ export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, jo
   return events;
 }
 
-export function projectSubagentList(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): MessageBlock[] {
+/**
+ * Child Sessions whose model the parent Journal does not know yet: the parent
+ * learns it only on `delegation/completed`, so a running (or a failed/stopped
+ * without model) child needs its own request facts. See `latestRequestModel`.
+ * `finished` children cannot send another request, so their answer can be cached.
+ */
+export function subagentChildrenWithoutModel(journal: readonly SessionEventEnvelopeV1[]): { readonly childSessionId: string; readonly finished: boolean }[] {
+  const requested = new Set<string>();
+  const finished = new Set<string>();
+  const known = new Set<string>();
+  for (const event of journal) {
+    const data = record(event.data);
+    const childSessionId = string(data.childSessionId);
+    if (!childSessionId) continue;
+    if (event.type === "delegation/requested") requested.add(childSessionId);
+    if (event.type === "delegation/completed") { finished.add(childSessionId); if (string(data.model)) known.add(childSessionId); }
+  }
+  return [...requested].filter((id) => !known.has(id)).map((childSessionId) => ({ childSessionId, finished: finished.has(childSessionId) }));
+}
+
+/** The model of the latest request a Session actually sent (`request/header`); not the purpose binding. */
+export function latestRequestModel(journal: readonly SessionEventEnvelopeV1[]): string | undefined {
+  for (let index = journal.length - 1; index >= 0; index -= 1) {
+    const event = journal[index]!;
+    if (event.type !== "request/header") continue;
+    const model = string(record(event.data).model);
+    if (model) return model;
+  }
+  return undefined;
+}
+
+/**
+ * `childModels` fills in the model of children the parent Journal has no model
+ * for yet (keyed by child Session id, from `latestRequestModel`); a model
+ * recorded on `delegation/completed` always wins.
+ */
+export function projectSubagentList(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[], childModels: ReadonlyMap<string, string> = new Map()): MessageBlock[] {
   const index = buildIndex(snapshot, journal);
   return journal.filter((event) => event.type === "tool/call" && ["agent", "explore"].includes(String(record(event.data).name))).flatMap((event) => {
     const call = record(event.data);
     const callId = String(call.callId);
     const tool = index.toolByCall.get(callId);
-    const child = index.childByCall.get(callId);
+    const indexed = index.childByCall.get(callId);
+    const requestModel = indexed && !indexed.model ? childModels.get(indexed.childSessionId) : undefined;
+    const child = indexed && requestModel ? { ...indexed, model: requestModel } : indexed;
     const terminalEvent = journal.find((candidate) => isToolTerminal(candidate.type) && record(candidate.data).callId === callId);
     const identity = identityFor(event, call, index);
     const preview = toolPreview(String(call.name), tool, terminalEvent ? record(terminalEvent.data) : {}, call, child, snapshot.sessionId, identity.agentRunId, terminalEvent ? "finished" : "running", snapshot.workspaceRoot ?? undefined, undefined, index.backgroundByCall.get(callId));
