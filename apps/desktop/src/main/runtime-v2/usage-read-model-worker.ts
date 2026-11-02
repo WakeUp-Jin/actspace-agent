@@ -1,4 +1,4 @@
-import { commitContextBatch, contextSourceState, clearContextSession } from "./context-history-projection";
+import { commitContextBatch, contextSourceState, clearContextSession, ensureContextBashTables } from "./context-history-projection";
 import { queryContextHistory } from "./context-history-query";
 import { insertUsageActivities } from "./usage-activity-write";
 import { createReadModelSchema } from "./usage-read-model-schema";
@@ -136,6 +136,7 @@ async function open(): Promise<DatabaseSync> {
   }
   else if (["usage_write_mode", "read_model_builds", "usage_activity_session_idx", "context_state", "context_request_seq", "context_event_seq", "building_context_state"].some(name => !prepare(db!, "SELECT 1 FROM sqlite_master WHERE name=?").get(name))) throw new Error("Usage read model schema incomplete; rebuild required.");
   addSideChatColumn(db);
+  ensureContextBashTables(db);
   pruneSyncIndexes(db);
   enableUsageBatchWrites(db);
   return db;

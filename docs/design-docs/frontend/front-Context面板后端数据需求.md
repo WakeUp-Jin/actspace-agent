@@ -45,6 +45,7 @@
 - `history.status` 为 ready/syncing/rebuilding/fallback/unavailable，错误可重试。当前 Context 不等待全局 Usage 重建。
 - `previous` 是最近持久化的请求输入摘要；`comparable`、`comparisonUnavailableReason`、`estimatorVersion` 决定能否比较。缺身份的旧请求只展示总量，不伪造逐项变化。
 - `stats` 尚未追平时为 null，界面显示待同步；累计用量与费用缺失同样保留 null，不当成零。
+- `bash`（2026-11-02）与 `stats` 同一出现条件：本会话 Bash 调用次数、失败次数、合计耗时和程序 / 子命令分布，不截断、不存命令原文。口径见 [Context 面板 · Bash 命令统计](front-Context面板Bash命令统计.md)。
 - `trend` 最近 500 次请求，`events` 最近 200 条，`limits` 明确截断；事件 `inferred` 表示由相邻请求推导。未知回收量为 null。
 - `entriesPage` 提供 revision、total、nextCursor、truncated；所有分类和总量在分页前计算。条目包含稳定 key/bucket/title/estimatedTokens，可选 kind/source/preview/fullTextAvailable/trajectoryRef。
 
@@ -118,6 +119,7 @@ manifest 将压缩摘要独立归入 `summarizedConversation`，身份包含 com
 | 当前条目、分类、模型 | Context 引擎缓存的 ManagedContextProjection.manifest/model |
 | 最近请求清单 | request/context 的最小 manifest metadata；旧数据有限兼容 |
 | 轮次、步数、压缩次数、用量、费用 | 单 Session 的 Context SQLite 投影，按 request/run 身份去重 |
+| Bash 命令统计 | 同一投影，`tool/call` 解析程序名、`tool-workflow/run-start` 记开始、`tool/result` 计入，按 callId 去重 |
 | 趋势 | 请求摘要与对应实际 usage，独立于全局 Usage 清零 |
 | 压缩/模式事件 | 持久化事实；模型/工具差异事件明确标 inferred |
 | 条目全文 | 当前引擎按 key + generation/revision 读取；不从任意路径读文件 |

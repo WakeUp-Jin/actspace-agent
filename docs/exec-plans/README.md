@@ -30,7 +30,8 @@
 
 ## 最近完成
 
-- [昨日修复与今日功能统一验收](completed/20261101-unified-acceptance.md)：2026-11-01 同版本64点、7组执行结束，44通过/11失败/9未覆盖；确认7问题，按6组交接。仅验收与定位，未修复；不表示全部通过。见[执行摘要](../exec-runs/20261101-unified-acceptance/execution-summary.md)与[修复交接](../exec-runs/20261101-unified-acceptance/repair-handoff.md)。
+- [Context 面板 · Bash 命令统计](completed/20261102-context-bash-stats.md)：右侧「上下文」最底下新增「Bash 命令」卡片（调用、失败、合计耗时、程序与子命令分布）；数据走上下文历史投影，投影版本 1→2 让老会话第一次打开时补齐，不升使用统计库 Schema；desktop 2201 项测试与前端检查通过，浏览器 mock 截图完成；Electron 真实 Host 未验证，见[执行摘要](../exec-runs/20261102-context-bash-stats/execution-summary.md)。
+- [昨日修复与今日功能统一验收](completed/20261101-unified-acceptance.md)：2026-11-01 同版本64点、7组执行结束，44通过/11失败/9未覆盖；确认7问题，按6组交接。2026-11-02 7问题全部修复（读模型 schema 15→16 整库重建），定向复验23点20通过/0失败/3局部未覆盖，见[复验摘要](../exec-runs/20261102-unified-reacceptance/execution-summary.md)。原始记录见[执行摘要](../exec-runs/20261101-unified-acceptance/execution-summary.md)与[修复交接](../exec-runs/20261101-unified-acceptance/repair-handoff.md)。
 
 - [架构优化：功能减法](completed/20261101-feature-subtraction/README.md) + [插件结构](completed/20261101-plugin-structure/README.md)：P1–P5、S1–S4 完成（分支 `架构优化`，提 PR 合入 main，已合并 main 上的会话记录 Markdown）；删可视化回复、终端、HTML/CSV/代码渲染、文件树和 Review 的写操作与监听，新增文档面板；包改为 `packages/<能力>/<包>` 两级、唯一插件清单、扩展 › 插件页（浏览器与英语学习默认关）、23 份能力目录 README 及检查；desktop 2106 项测试与全仓检查通过；Codex 真机验收发现的 3 个问题已修复，见[执行摘要](../exec-runs/20261101-feature-subtraction/execution-summary.md)。
 - [会话记录 Markdown](completed/20261101-session-history-transcript.md)：新插件 `@actspace/session-transcript` 每轮结束写 `sessions-v2/<id>/transcript.md`，主会话提示词告诉 Agent 怎么读历史会话；读 transcript 不弹审批，`sessions-v2` 目录不放行；包测试与契约检查通过；Electron 手工检查 1–5 未执行，见[执行摘要](../exec-runs/20261101-session-history-transcript/execution-summary.md)。

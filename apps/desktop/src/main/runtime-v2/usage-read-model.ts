@@ -1,6 +1,7 @@
 import type { ContextHistoryResult } from "./context-history-query";
 import { inheritedThroughSeq, isDelegatedSession, sideChatParentId } from "@actspace/shared/session-list-page";
 import type { ContextHistoryState } from "./context-history-projection";
+import { CONTEXT_PROJECTOR_VERSION } from "./context-history-version";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { ReadModelScheduler } from "./read-model-scheduler";
 import type { HarnessStatsData, HarnessStatsQueryInput, HarnessStatsQueryResult, HarnessStatsSyncStatus, UsageQueryProgress, SessionListPage, SessionListPageInput, UsageActivitySnapshot, UsageStatisticsGetInput, UsageStatisticsSnapshot } from "@actspace/shared";
@@ -119,7 +120,7 @@ export class UsageReadModelService {
         let state = await this.#send({ type: "context-source-state", source }) as ContextHistoryState | null;
         item.indexedThroughSeq = state?.revision ?? -1;
         if (state && !state.building && state.revision === source.throughSeq && state.stamp === source.stamp && state.codec === (source.codecSetDigest ?? "")) return;
-        let reset = !state?.cursor || state.projector_version !== 1 || state.revision > source.throughSeq || state.codec !== (source.codecSetDigest ?? "") || (state.revision === source.throughSeq && state.stamp !== source.stamp);
+        let reset = !state?.cursor || state.projector_version !== CONTEXT_PROJECTOR_VERSION || state.revision > source.throughSeq || state.codec !== (source.codecSetDigest ?? "") || (state.revision === source.throughSeq && state.stamp !== source.stamp);
         for (let attempt = 0; attempt < 2; attempt++) {
           let cursor = reset ? undefined : state?.cursor ?? undefined; let first = true;
           try {

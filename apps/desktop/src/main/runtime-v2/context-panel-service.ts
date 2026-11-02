@@ -39,13 +39,16 @@ export class ContextPanelService {
     const manifest = projection?.manifest;
     const prior = result?.previous ?? null;
     const entries = manifest?.entries ?? (prior?.entries ?? []).map(entry => ({ ...entry, title: entry.title ?? "最近请求输入" }));
+    // 累计数字只在索引追上日志时给出，避免显示半截的统计。
+    const caughtUp = !!result && (history.status === "ready" || history.status === "fallback") && result.revision >= history.targetThroughSeq;
     const view: ContextPanelView = {
       schemaVersion: 2, sessionId, logicalAgentScopeId: projection?.identity.logicalAgentScopeId ?? result?.logicalAgentScopeId ?? `main:${sessionId}`,
       contextRevision: projection?.contextRevision ?? 0, throughJournalSeq: projection?.throughJournalSeq ?? result?.revision ?? -1,
       currentVersion, versionToken, history, disclosure: disclosureSummary(projection, currentVersion), model: projection?.model ?? result?.model ?? null,
       current: { basis: projection ? "current-context" : prior ? "last-request" : "unavailable", status: manifest ? "ready" : prior ? "stale" : "unavailable", totalEstimatedTokens: manifest?.totalEstimatedTokens ?? prior?.totalEstimatedTokens ?? 0, buckets: manifest?.buckets ?? prior?.buckets ?? {}, entries: [] },
       previous: prior ? { ...prior, entries: [] } : null,
-      stats: result && (history.status === "ready" || history.status === "fallback") && result.revision >= history.targetThroughSeq ? result.stats : null,
+      stats: caughtUp ? result.stats : null,
+      bash: caughtUp ? result.bash : null,
       trend: result?.trend ?? [], events: result?.events ?? [], ...(result ? { limits: result.limits } : {}),
     };
     const entriesVersion = digest([currentVersion, result?.generation ?? null, prior?.requestId ?? null]);

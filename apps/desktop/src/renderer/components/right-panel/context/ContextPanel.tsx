@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { ContextState } from "@actspace/shared";
 import { Button } from "../../ui/Button";
 import { buildCategories } from "./context-panel-model";
+import { ContextBash } from "./ContextBash";
 import { ContextBrowser } from "./ContextBrowser";
 import { ContextEvents } from "./ContextEvents";
 import { ContextOverview } from "./ContextOverview";
@@ -16,7 +17,7 @@ const NOTE_CLASS = "m-0 text-center text-act-xxs text-text-faint";
 
 /**
  * 右侧面板的 Context Tab（见 `front-右侧面板与文件渲染规范.md`「Context 面板」）：
- * 当前上下文、会话统计、路径、上下文明细、趋势、事件六块。只看占用，会话原文在轨迹里读。
+ * 当前上下文、会话统计、路径、上下文明细、趋势、事件、Bash 命令七块。只看占用，会话原文在轨迹里读。
  * 后端 `describeContextPanel` 未实现时是过渡视图：没有对比、趋势和事件，底部写明。
  */
 export function ContextPanel({ sessionId, contextRevision, contextState, workspaceRoot }: {
@@ -66,10 +67,11 @@ export function ContextPanel({ sessionId, contextRevision, contextState, workspa
         <>
           <ContextTrend points={view.trend} />
           <ContextEvents events={view.events} />
+          {view.bash ? <ContextBash stats={view.bash} /> : null}
           {view.limits?.trend.truncated || view.limits?.events.truncated ? <p className={NOTE_CLASS}>展示最近 {view.limits.trend.returnedCount} 次请求、{view.limits.events.returnedCount} 个事件；会话统计包含全部历史。</p> : null}
         </>
       ) : (
-        <p className={NOTE_CLASS}>趋势、事件和路径需要后端数据，暂未提供</p>
+        <p className={NOTE_CLASS}>趋势、事件、路径和 Bash 命令需要后端数据，暂未提供</p>
       )}
       <p className={NOTE_CLASS}>≈ 为本地估算 · 实际值来自服务商返回的用量</p>
     </div>
