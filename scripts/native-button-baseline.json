@@ -37,6 +37,7 @@
   "components/review/ReviewToolbar.tsx": 7,
   "components/review/ReviewWorkspace.tsx": 1,
   "components/right-panel/BackgroundTasksPanel.tsx": 1,
+  "components/right-panel/context/ContextBash.tsx": 1,
   "components/right-panel/context/ContextBrowser.tsx": 1,
   "components/right-panel/context/ContextConversationList.tsx": 3,
   "components/right-panel/context/ContextEntryList.tsx": 2,

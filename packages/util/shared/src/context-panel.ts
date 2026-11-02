@@ -40,6 +40,8 @@ export type ContextPanelView = {
   /** 对比基准：最近已持久化的请求输入；还没发过请求时为 null。 */
   previous: ContextPanelManifest | null;
   stats: ContextPanelStats | null;
+  /** 本会话的 Bash 命令统计；出现条件与 `stats` 相同，缺省表示旧后端。 */
+  bash?: ContextPanelBashStats | null;
   /** 按时间升序。 */
   trend: ContextPanelTrendPoint[];
   /** 按时间降序。 */
@@ -106,6 +108,26 @@ export type ContextPanelStats = {
   cumulativeUsage: ContextPanelUsage | null;
   /** 为 null 时前端隐藏费用格，不自行估算。 */
   costUsd: number | null;
+};
+
+/**
+ * Bash 命令统计（`docs/design-docs/frontend/front-Context面板Bash命令统计.md`）。
+ * `name` 为 `""` 表示「其他」：程序名不合法或超出每会话 500 个组合；子命令为 `""` 表示没有子命令。
+ */
+export type ContextPanelBashCount = { name: string; count: number; failed: number };
+export type ContextPanelBashProgram = ContextPanelBashCount & {
+  /** 只有 git / pnpm / npm / yarn / cargo / go / gh / docker 有内容；排序同 `programs`。 */
+  subcommands: ContextPanelBashCount[];
+};
+export type ContextPanelBashStats = {
+  /** 已有结果、且没有被拒绝的 Bash 调用数。 */
+  calls: number;
+  /** `status === "failed"` 的调用数。 */
+  failed: number;
+  /** 每次调用从开始执行到结果的时间之和，不含等待审批。 */
+  durationMs: number;
+  /** 按 count 降序、同数按名字；`""` 固定排最后。 */
+  programs: ContextPanelBashProgram[];
 };
 
 export type ContextPanelTrendPoint = {
