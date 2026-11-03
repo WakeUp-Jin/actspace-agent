@@ -1,19 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Copy, FolderOpen, Loader2, Maximize2, Minimize2, PanelRight, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
 import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
 import { workspacesApi } from "../../../api/workspaces";
 import { Button } from "../../ui/Button";
 import { IconButton } from "../../ui/IconButton";
-import { MarkdownPreviewBody } from "../MarkdownRenderView";
+import { MarkdownEditor, type MarkdownEditorHandle } from "../../markdown-editor";
 import { PreviewSourceToggle } from "../PreviewSourceToggle";
 import { isDocsDocDirty, useRightPanel, type DocsDocState } from "../RightPanelContext";
 import { formatBytes } from "../WorkspaceOperationBar";
 import { DocsOutline } from "./DocsOutline";
-import { MarkdownSourceEditor } from "./MarkdownSourceEditor";
 import type { DocsListingStatus } from "./use-docs-listing";
 
 /**
- * 「文档」面板的正文区（树的左侧）：操作栏 + 提示条 + 预览 / 源码编辑 + 空状态。
+ * 「文档」面板的正文区（树的左侧）：操作栏 + 提示条 + Markdown 编辑器 + 空状态。
+ * 预览和源码是同一个编辑器（`markdown-editor/`，懒加载）的两种模式，切换只重新配置，光标和撤销历史都保留。
  * 路径（工作区名弱化、文件名主色，未保存时文件名旁有圆点）在左，操作在右：
  * 预览 / 源码、大纲、在 Finder 中显示、用默认应用打开、复制路径、展开面板、收起文件树。
  */
@@ -45,8 +45,11 @@ export function DocsReader({
   /** 清单已取回且一篇 Markdown 都没有。 */
   listingEmpty: boolean;
 }) {
-  const { docsSelectedPath, docsMode, setDocsMode, docsTreeCollapsed, toggleDocsTreeCollapsed, docsExpanded, toggleDocsExpanded } = useRightPanel();
-  const contentRef = useRef<HTMLDivElement | null>(null);
+  const {
+    docsSelectedPath, docsMode, setDocsMode, docsTreeCollapsed, toggleDocsTreeCollapsed, docsExpanded, toggleDocsExpanded,
+    docsPendingLine, clearDocsPendingLine,
+  } = useRightPanel();
+  const editorRef = useRef<MarkdownEditorHandle | null>(null);
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,7 +107,7 @@ export function DocsReader({
         {path ? (
           <>
             <PreviewSourceToggle mode={docsMode} onChange={setDocsMode} />
-            <DocsOutline contentRef={contentRef} disabled={docsMode === "source" || !ready} />
+            <DocsOutline editorRef={editorRef} disabled={!ready} />
             {/* 面板窄时先收掉三个次要操作，保证文件名、未保存圆点、展开面板和收起文件树始终看得见。 */}
             <div className="hidden items-center gap-1 @[460px]:flex">
             <IconButton label="在 Finder 中显示" onClick={() => void run("reveal")}>
@@ -154,14 +157,23 @@ export function DocsReader({
         <div className={STATE_CLASS}><Loader2 size={15} className="animate-spin" aria-label="正在读取文档" /></div>
       ) : doc.status === "error" ? (
         <div className={STATE_CLASS} role="alert">{doc.message ?? "读取文件失败。"}</div>
-      ) : docsMode === "preview" ? (
-        <div ref={contentRef} className="min-h-0 flex-1 overflow-auto" data-testid="docs-preview">
-          <div className="mx-auto max-w-[760px] px-10 pb-20 pt-7 text-act-md leading-[1.75] text-text-main">
-            <MarkdownPreviewBody source={doc.draft} />
-          </div>
-        </div>
       ) : (
-        <MarkdownSourceEditor value={doc.draft} onChange={onDraftChange} onSave={onSave} readOnly={doc.truncated} />
+        // 编辑器是懒加载的 chunk：加载期间显示与读取文档时一样的占位。
+        <Suspense fallback={<div className={STATE_CLASS}><Loader2 size={15} className="animate-spin" aria-label="正在加载编辑器" /></div>}>
+          <MarkdownEditor
+            ref={editorRef}
+            value={doc.draft}
+            docPath={doc.relativePath}
+            workspaceRoot={workspaceRoot}
+            mode={docsMode}
+            readOnly={doc.truncated}
+            replaceKey={doc.relativePath}
+            revealLine={docsPendingLine?.path === doc.relativePath ? docsPendingLine : null}
+            onRevealed={clearDocsPendingLine}
+            onChange={onDraftChange}
+            onSave={onSave}
+          />
+        </Suspense>
       )}
     </div>
   );

@@ -4,6 +4,7 @@ import type { MessageBlock } from "@actspace/shared";
 import { TestConversationView } from "./helpers/workbench";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { replyText } from "./helpers/reply-text";
 
 // 一个含「旁白 content + 多个工具 + 最终回复」的 turn，用来覆盖工具活动组的折叠/展开与最终回复留外行为。
 const toolTurn: MessageBlock[] = [
@@ -185,10 +186,10 @@ describe("ToolActivityGroup in ConversationView", () => {
     // 执行中不折叠、不出滚动视口：过程行和最终回复都直接可见。
     expect(screen.queryByRole("button", { name: /Worked for/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Tool activity" })).not.toBeInTheDocument();
-    expect(screen.getByText("我要调用读取工具看看。")).toBeInTheDocument();
+    expect(screen.getByText(replyText("我要调用读取工具看看。"))).toBeInTheDocument();
     expect(screen.getByText("package.json")).toBeInTheDocument();
     expect(screen.getByText("Grep ToolActivityGroup")).toBeInTheDocument();
-    expect(screen.getByText("项目是 monorepo 结构，这是最终结论。")).toBeInTheDocument();
+    expect(screen.getByText(replyText("项目是 monorepo 结构，这是最终结论。"))).toBeInTheDocument();
   });
 
   it("shows a run failure as an error line outside the collapsed process", () => {

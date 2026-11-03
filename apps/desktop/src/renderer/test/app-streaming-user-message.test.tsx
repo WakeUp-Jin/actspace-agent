@@ -14,6 +14,7 @@ import { ToolLogLine } from "../components/messages/ToolLogLine";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
 import { projectRecord } from "./helpers/session-records";
+import { replyText } from "./helpers/reply-text";
 import { transcriptShadow } from "./helpers/transcript-shadow";
 
 // 14 T15：每次 durable / live 合并都与旧实现对照，不一致就让用例失败（见 helpers/transcript-shadow.ts）。
@@ -926,7 +927,7 @@ sessionId,
       });
     });
 
-    expect(await screen.findByText("Model response")).toBeInTheDocument();
+    expect(await screen.findByText(replyText("Model response"))).toBeInTheDocument();
     expect(screen.queryByText("Operating Space · Expanding")).toBeNull();
 
     await act(async () => {
@@ -1065,7 +1066,7 @@ sessionId: input.sessionId,
     await userEvent.type(betaComposer, "beta prompt");
     await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(await screen.findByText("beta streamed once")).toBeInTheDocument();
+    expect(await screen.findByText(replyText("beta streamed once"))).toBeInTheDocument();
     expect(screen.queryByText("beta streamed oncebeta streamed once")).toBeNull();
     expect(streamListeners.size).toBe(1);
 
@@ -1086,7 +1087,7 @@ sessionId: alphaSessionId,
     await act(async () => {
       resolveTurns.get(alphaSessionId)?.();
     });
-    expect(await screen.findByText("beta streamed once")).toBeInTheDocument();
+    expect(await screen.findByText(replyText("beta streamed once"))).toBeInTheDocument();
     expect(screen.getByLabelText("停止 Agent")).toBeInTheDocument();
 
     await act(async () => {
@@ -1197,7 +1198,7 @@ sessionId,
     await userEvent.click(screen.getByLabelText("发送消息"));
 
     const streamingUserNode = (await screen.findByText("handoff prompt")).closest(".message-turn");
-    const streamingAssistantNode = (await screen.findByText("handoff reply")).closest(".assistant-reply");
+    const streamingAssistantNode = (await screen.findByText(replyText("handoff reply"))).closest(".assistant-reply");
     expect(streamingUserNode).not.toBeNull();
     expect(streamingAssistantNode).not.toBeNull();
 
@@ -3180,7 +3181,7 @@ sessionId: input.sessionId,
     await act(async () => fixture.event('background-a', { type: 'assistant_text_delta', delta: ' continued in background' }));
     await fixture.send('B running question');
     await fixture.select('background-a');
-    expect(await screen.findByText('A partial reply continued in background')).toBeInTheDocument();
+    expect(await screen.findByText(replyText('A partial reply continued in background'))).toBeInTheDocument();
     expect(screen.getAllByText('A running question')).toHaveLength(1);
     expect(screen.queryByText('B running question')).not.toBeInTheDocument();
     await userEvent.click(screen.getByLabelText('停止 Agent'));
@@ -3333,7 +3334,7 @@ sessionId: input.sessionId,
     await fixture.select('background-a');
     expect(screen.getByText('Durable earlier question')).toBeInTheDocument();
     expect(screen.getByText('Pinned live question')).toBeInTheDocument();
-    expect(screen.getByText('Pinned reply')).toBeInTheDocument();
+    expect(screen.getByText(replyText('Pinned reply'))).toBeInTheDocument();
     expect(screen.getByLabelText('停止 Agent')).toBeInTheDocument();
   }, 10_000);
 

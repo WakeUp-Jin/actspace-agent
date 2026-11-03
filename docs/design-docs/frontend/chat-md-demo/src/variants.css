@@ -1,0 +1,160 @@
+/*
+ * A 方向（书页）的几版。.mdv-book 是共用底子（= 上一轮的 A），各版只写不同的地方。
+ * 选择器都以 .md-improved 开头，压过应用里 .markdown-prose 的同级规则。
+ */
+
+/* ====================== 底子：A 书页 ====================== */
+.md-improved.mdv-book {
+  --md-enter: md-enter-fade 420ms ease-out both;
+  --md-tail-1: 0.22; --md-tail-2: 0.5; --md-tail-3: 0.8;
+  --book-serif: ui-serif, "New York", "Iowan Old Style", Charter, Georgia, "PingFang SC", "Hiragino Sans GB", serif;
+  gap: 14px;
+  font-family: var(--book-serif);
+  font-size: 16.5px;
+  line-height: 1.78;
+  & h1, & h2, & h3, & h4 { font-family: inherit; font-weight: 600; line-height: 1.35; letter-spacing: -0.005em; margin-top: 14px; }
+  & h1 { font-size: 1.55em; } & h2 { font-size: 1.3em; } & h3 { font-size: 1.12em; } & h4 { font-size: 1em; }
+  & strong { font-weight: 650; }
+  & ul, & ol { gap: 7px; padding-left: 1.6em; }
+  & li::marker { color: var(--act-color-text-faint); }
+  & :not(pre) > code:not(.md-path) { font-size: 0.82em; padding: 0.14em 0.4em; border: 1px solid var(--act-color-inline-code-border); border-radius: 5px; background: var(--act-color-surface-subtle); }
+  & code.md-path { font-size: 0.82em; padding: 0.14em 0.4em; border-radius: 5px; }
+  & blockquote { padding: 0 0 0 18px; border-left: 2px solid var(--act-color-border); color: var(--act-color-text-muted); }
+  & blockquote.md-callout { padding: 2px 0 2px 18px; border-left: 2px solid var(--callout); }
+  & blockquote.md-callout::before { font-family: var(--act-font-ui); font-size: 12.5px; letter-spacing: 0.04em; }
+  & .markdown-table-wrap { border: 0; border-radius: 0; }
+  & table { font-family: var(--act-font-ui); font-size: 14px; background: transparent; }
+  & th, & td { padding: 10px 16px 10px 0; border-right: 0; }
+  & th { background: none; color: var(--act-color-text); border-bottom: 1px solid var(--act-color-border-strong); }
+  & hr { margin: 6px 0; }
+  & details { font-family: var(--act-font-ui); font-size: 15px; }
+  & .md-code { border: 0; border-radius: 12px; background: var(--act-color-surface-subtle); }
+  & .md-code-head { min-height: 36px; padding: 0 8px 0 18px; border-bottom: 0; font-family: var(--act-font-ui); font-size: 12px; color: var(--act-color-text-faint); }
+  & .md-code-actions { opacity: 0; transition: opacity 0.15s; }
+  & .md-code:hover .md-code-actions, & .md-code:focus-within .md-code-actions { opacity: 1; }
+  & .md-code pre.markdown-code-block { padding: 0 18px 16px; line-height: 1.65; }
+  & .md-code-fold { border-top: 0; font-family: var(--act-font-ui); }
+}
+
+/* ====================== A1 宋体 ====================== */
+.md-improved.mdv-a1 {
+  --md-enter: md-enter-fade 600ms ease-out both;
+  --md-tail-1: 0.15; --md-tail-2: 0.42; --md-tail-3: 0.75;
+  --book-serif: ui-serif, "New York", "Songti SC", "STSong", "Source Han Serif SC", "Noto Serif CJK SC", serif;
+  gap: 16px;
+  font-size: 17px;
+  line-height: 1.88;
+  letter-spacing: 0.01em;
+  & h1, & h2, & h3, & h4 { font-weight: 700; letter-spacing: 0.02em; margin-top: 18px; }
+  & h2 { font-size: 1.32em; }
+  & strong { font-weight: 700; }
+  & ul, & ol { gap: 8px; }
+  & :not(pre) > code:not(.md-path), & code.md-path { font-size: 0.78em; letter-spacing: 0; }
+  & blockquote { border-left-width: 1px; }
+  & .md-code { border-radius: 10px; }
+  & .md-code pre.markdown-code-block { letter-spacing: 0; }
+}
+
+/* ====================== A2 Claude 味 ====================== */
+.md-improved.mdv-a2 {
+  --md-enter: md-enter-fade 360ms ease-out both;
+  --md-tail-1: 0.3; --md-tail-2: 0.65;
+  --book-serif: "Iowan Old Style", Charter, ui-serif, Georgia, "PingFang SC", "Hiragino Sans GB", serif;
+  --inline-warm: color-mix(in srgb, var(--act-color-danger) 72%, var(--act-color-text));
+  gap: 13px;
+  font-size: 16px;
+  line-height: 1.72;
+  & h1, & h2, & h3, & h4 { font-weight: 650; margin-top: 12px; }
+  & h1 { font-size: 1.45em; } & h2 { font-size: 1.24em; } & h3 { font-size: 1.08em; }
+  & :not(pre) > code:not(.md-path) { border: 0; border-radius: 4px; color: var(--inline-warm); background: color-mix(in srgb, var(--inline-warm) 8%, transparent); }
+  & blockquote { border-left: 3px solid var(--act-color-border); }
+  & blockquote.md-callout { padding: 12px 16px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--callout) 8%, transparent); }
+  & blockquote.md-callout::before { letter-spacing: 0.02em; }
+  & .markdown-table-wrap { border: 1px solid var(--act-color-border); border-radius: 12px; }
+  & th, & td { padding: 9px 14px; }
+  & th { border-bottom-color: var(--act-color-border); background: var(--act-color-surface-subtle); font-weight: 600; }
+  & .md-code { border: 1px solid var(--act-color-border); border-radius: 12px; background: var(--act-color-surface); }
+  & .md-code-head { min-height: 34px; padding-left: 16px; border-bottom: 1px solid var(--act-color-border); background: var(--act-color-surface-subtle); }
+  & .md-code-actions { opacity: 1; }
+  & .md-code pre.markdown-code-block { padding: 14px 16px 16px; }
+  & .md-caret-dot { background: var(--inline-warm); }
+}
+
+/* ====================== A3 印刷 ====================== */
+.md-improved.mdv-a3 {
+  --md-enter: md-enter-fade 480ms ease-out both;
+  --md-tail-1: 0.2; --md-tail-2: 0.5; --md-tail-3: 0.8;
+  gap: 15px;
+  font-size: 16.5px;
+  line-height: 1.8;
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  & h2 { font-size: 1.36em; margin-top: 22px; }
+  & h3 { font-size: 1.1em; margin-top: 16px; }
+  & h4 { font-size: 0.82em; font-family: var(--act-font-ui); font-weight: 600; letter-spacing: 0.12em; color: var(--act-color-text-muted); }
+  & ul:not(.contains-task-list) { list-style: none; padding-left: 1.5em; }
+  & ul:not(.contains-task-list) > li { position: relative; }
+  & ul:not(.contains-task-list) > li::before { content: "–"; position: absolute; left: -1.1em; color: var(--act-color-text-faint); }
+  & ol > li::marker { font-variant-numeric: oldstyle-nums; color: var(--act-color-text-muted); }
+  & :not(pre) > code:not(.md-path) { border: 0; background: transparent; padding: 0 0.1em; color: var(--act-color-text-muted); }
+  & code.md-path { background: transparent; padding: 0 0.1em; border-bottom: 1px solid color-mix(in srgb, var(--act-color-link) 35%, transparent); border-radius: 0; }
+  & blockquote { padding: 0 1.4em; border: 0; font-style: italic; color: var(--act-color-text-muted); }
+  & blockquote.md-callout { padding: 0 0 0 1.4em; border: 0; font-style: normal; color: var(--act-color-text); }
+  & blockquote.md-callout::before { font-size: 11.5px; letter-spacing: 0.16em; margin-bottom: 4px; }
+  & table { font-variant-numeric: tabular-nums lining-nums; border-top: 1.5px solid var(--act-color-text); border-bottom: 1.5px solid var(--act-color-text); }
+  & th { border-bottom: 0.75px solid var(--act-color-text); font-weight: 600; }
+  & td { border-bottom: 0; }
+  & hr { height: auto; border: 0; text-align: center; color: var(--act-color-text-faint); line-height: 1; margin: 10px 0; }
+  & hr::after { content: "⁂"; font-size: 1.1em; }
+  & .md-code { border-radius: 0; background: transparent; border-left: 2px solid var(--act-color-border-strong); }
+  & .md-code-head { min-height: 26px; padding: 0 4px 0 18px; font-size: 11px; letter-spacing: 0.08em; }
+  & .md-code pre.markdown-code-block { padding: 2px 18px 6px; }
+  & .md-code-fold { text-align: left; padding-left: 18px; border-top: 0; }
+  & .md-code[data-folded] .md-code-body { -webkit-mask-image: linear-gradient(#000 calc(100% - 80px), transparent); mask-image: linear-gradient(#000 calc(100% - 80px), transparent); }
+}
+
+/* ====================== A4 书页 · 有分寸 ====================== */
+.md-improved.mdv-a4 {
+  --md-enter: md-enter-fade 360ms ease-out both;
+  --md-tail-1: 0.3; --md-tail-2: 0.65;
+  & h1, & h2, & h3, & h4 { font-family: var(--act-font-ui); font-weight: 600; letter-spacing: 0; }
+  & h1 { font-size: 1.4em; } & h2 { font-size: 1.16em; } & h3 { font-size: 1.02em; } & h4 { font-size: 0.86em; color: var(--act-color-text-muted); }
+  & h2:not(:first-child) { padding-top: 18px; margin-top: 10px; border-top: 1px solid var(--act-color-border); }
+  & ol { list-style: none; counter-reset: a4; padding-left: 2em; }
+  & ol > li { position: relative; counter-increment: a4; }
+  & ol > li::before { content: counter(a4, decimal-leading-zero); position: absolute; left: -2em; top: 0.3em; font-family: var(--act-font-mono); font-size: 0.72em; color: var(--act-color-text-faint); }
+  & :not(pre) > code:not(.md-path) { background: transparent; border-radius: 4px; }
+  & blockquote { border-left: 1px solid var(--act-color-border-strong); }
+  & blockquote.md-callout { padding: 10px 14px; border: 1px solid var(--act-color-border); border-left: 2px solid var(--callout); border-radius: 0 6px 6px 0; }
+  & blockquote.md-callout::before { font-family: var(--act-font-mono); font-size: 10.5px; letter-spacing: 0.14em; }
+  & th { border-bottom-color: var(--act-color-border-strong); color: var(--act-color-text-faint); font-size: 12px; font-weight: 500; letter-spacing: 0.04em; }
+  & .md-code { border: 1px solid var(--act-color-border); border-radius: 6px; background: var(--act-color-surface); }
+  & .md-code-head { min-height: 32px; padding: 0 6px 0 14px; border-bottom: 1px solid var(--act-color-border); font-family: var(--act-font-mono); font-size: 11px; }
+  & .md-code-lang { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+  & .md-code-title::before { content: "/"; margin-right: 4px; color: var(--act-color-border-strong); }
+  & .md-code-actions { opacity: 1; }
+  & .md-code-btn > span { display: none; }
+  & .md-code pre.markdown-code-block { padding: 12px 16px 14px; }
+  & .md-code-fold { border-top: 1px solid var(--act-color-border); font-family: var(--act-font-mono); font-size: 11px; }
+  & hr { height: auto; border: 0; text-align: center; color: var(--act-color-text-faint); line-height: 1; }
+  & hr::after { content: "·  ·  ·"; letter-spacing: 0.3em; }
+}
+
+/* ====================== A5 暖纸 ====================== */
+.md-improved.mdv-a5 {
+  --ink: #2c2823; --ink-muted: #6b6359; --paper-code: #f3efe6; --paper-line: #e6dfd1; --paper-inline: #f0eadf; --warm: #8a4f2a;
+  --md-enter: md-enter-fade 480ms ease-out both;
+  color: var(--ink);
+  & h1, & h2, & h3, & h4, & strong { color: var(--ink); }
+  & li::marker { color: var(--ink-muted); }
+  & :not(pre) > code:not(.md-path) { border: 0; background: var(--paper-inline); color: var(--warm); }
+  & blockquote { border-left-color: var(--paper-line); color: var(--ink-muted); }
+  & blockquote.md-callout { padding: 12px 16px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--callout) 7%, var(--paper-code)); color: var(--ink); }
+  & th { border-bottom-color: var(--ink-muted); color: var(--ink); }
+  & td { border-bottom-color: var(--paper-line); }
+  & .md-code { background: var(--paper-code); }
+  & .md-code-head { color: var(--ink-muted); }
+  & .md-code-btn:hover, & .md-code-btn[aria-pressed="true"] { background: var(--paper-line); }
+  & details { border-color: var(--paper-line); }
+  & .md-caret-dot { background: var(--warm); }
+}
+:root[data-theme="dark"] .md-improved.mdv-a5 { --ink: #ece5d8; --ink-muted: #a89f91; --paper-code: #221f1a; --paper-line: #39342c; --paper-inline: #2b2720; --warm: #e2b48c; }

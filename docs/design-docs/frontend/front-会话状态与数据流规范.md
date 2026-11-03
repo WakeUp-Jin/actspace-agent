@@ -67,7 +67,7 @@ App 只负责把这些 store 装配起来、把事件接到对应的 store，以
 - **普通流式投影复用**：`useChatSessionRecord` 仅在非 recovered 模式下，新 cell 相对上一个只追加了 `assistant/chunk`、投影值和快照（除 `throughJournalSeq`、`updatedAt`）都没变时，复用上一次的 record（`onlyStreamChunksSince`）。普通 Chat 投影默认忽略 chunk，正文由 LiveRunStore 按帧显示，历史块保持引用不变。
 - **重载恢复投影**：App 将既有 `isRecoveredRun` 传给 `useChatSessionRecord`；恢复模式显式启用 Client 的 `includePendingChunks`，从 cell 的 Journal 窗口聚合尚未完成的正文及思考片段，并继续消费后续 chunk，不走普通流式复用。片段按 messageId/类型聚合，保留 run/turn/request 身份与首片段顺序；同消息的完整 `assistant/message` 到来后替换合成片段，不重复追加。片段仍是 durable 事实的派生结果，不新增 React 正文状态或第二个事实源；子轨迹复用同一片段投影。
 - **按引用跳过**：`TurnView` 逐条比较消息块引用，`AssistantReply`、`MarkdownProse` 用 `memo`。新增给这些组件的 props 必须是稳定引用（`useCallback` / 常量），否则整页历史每帧都会重渲染。
-- **Markdown 分块**：`MarkdownProse` 用 `components/messages/markdown-blocks.ts` 按顶层块切分，除最后两块外冻结复用，只重新解析尾部；每块单独交给 react-markdown，`MarkdownSourceContext` 给的是本块源码。引用式链接定义、脚注会跨块生效，出现时整条消息退回一块。还在写的代码围栏不做语言自动识别，闭合后再识别。
+- **Markdown 分块**：`MarkdownProse` 用 `components/messages/markdown-blocks.ts` 按顶层块切分，除最后两块外冻结复用，只重新解析尾部；每块单独交给 react-markdown，`MarkdownSourceContext` 给的是本块源码。引用式链接定义、脚注会跨块生效：全文收集后，追加到引用它们的块，脚注区整条回复只渲染一次，不再退回一块。代码块不做语言自动识别，没标语言的按纯文本显示。流式时 `MarkdownProse` 按帧平滑放出积压的文字，每帧只重渲染最后一块；`ReplyStreamingContext` 结束后，要等积压放完才退出流式显示。详见 [聊天区 Markdown 渲染规范](front-聊天区Markdown渲染规范.md) §7、§8。
 
 
 

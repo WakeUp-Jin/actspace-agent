@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  LANGUAGE_MODULES,
   highlightToLines,
   isSupportedLanguage,
   listRegisteredLanguages,
@@ -54,5 +55,12 @@ describe("highlightToLines", () => {
 
   it("转义纯文本分支也保持一行一项", () => {
     expect(highlightToLines("1\n2\n3", undefined)).toEqual(["1", "2", "3"]);
+  });
+});
+describe("语言表（聊天区代码块共用）", () => {
+  it("覆盖文件视图那一套，不只是 lowlight 的 common", () => {
+    for (const language of ["shell", "bash", "typescript", "dockerfile", "yaml", "json"]) {
+      expect(LANGUAGE_MODULES).toHaveProperty(language);
+    }
   });
 });

@@ -72,6 +72,8 @@
 - `docs/design-docs/frontend/front-workspace-git-worktree-context.md`：初始 Composer 的 Workspace、Git branch、This Mac 与 New Worktree 执行上下文。
 - `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`：对象启动页、文件预览、Workspace 文件树和 diff。
 - `docs/design-docs/frontend/front-文档面板规范.md`：「文档」面板（只含 Markdown 的目录树 + 正文），2026-11-01 确认、待实施；实施后取代上一条中的 Workspace 文件树。
+- `docs/design-docs/frontend/front-Markdown编辑与渲染规范.md`：「文档」正文的 CodeMirror 6 实时预览编辑器（预览 / 源码都可编辑），D1–D12 预览规则、Codex 排版、文中路径与链接、安全与性能；2026-11-03 已实施，demo 在 `md-render-demo/`。
+- `docs/design-docs/frontend/front-聊天区Markdown渲染规范.md`：聊天区（`MarkdownProse`）的 Markdown 渲染。内容有：改进 1–10（路径可点、提示框、公式、原始 HTML 白名单、远程图片不加载、脚注全局化…）、「A 书页」排版、流式效果和稳定性约束。2026-11-03 已实施，demo 在 `chat-md-demo/`。
 - `docs/design-docs/frontend/plugins-page-demo.html`：扩展 › 插件页 demo，2026-11-01 用户选定方案 B（可关的在上，内置的折叠）；规则见 [02 插件结构设计](../架构优化/02-插件结构设计.md) §7.3。
 - `docs/design-docs/frontend/front-Context面板后端数据需求.md`：右侧栏 Context 面板（当前上下文、会话统计、明细对比上次请求、趋势、事件）需要后端提供的数据形状与缺口；2026-10-11 需求稿，前端先用 mock 实现。
 - `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置中心的产品信息架构、页面职责、模型连接流程、身份设置、Usage 活动分析和实施边界。后续设置中心实现以本文为准。

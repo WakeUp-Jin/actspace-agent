@@ -98,7 +98,7 @@ export function useDocsDraft({
   editedPaths: ReadonlySet<string>;
   enabled?: boolean;
 }) {
-  const { docsSelectedPath, docsDoc, setDocsDoc } = useRightPanel();
+  const { docsSelectedPath, docsDoc, setDocsDoc, getDocsDoc } = useRightPanel();
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -196,7 +196,8 @@ export function useDocsDraft({
   );
 
   const save = useCallback(async (): Promise<boolean> => {
-    const doc = live.current.doc;
+    // 编辑器的输入每帧同步一次草稿，⌘S 可能紧跟在它后面：渲染里的 live.current.doc 还是上一版，要读 context 里最新的。
+    const doc = getDocsDoc() ?? live.current.doc;
     if (!doc || !isDocsDocDirty(doc)) return true;
     setSaving(true);
     setSaveError(null);
@@ -204,7 +205,7 @@ export function useDocsDraft({
     setSaving(false);
     setSaveError(error);
     return error === null;
-  }, [setDocsDoc]);
+  }, [getDocsDoc, setDocsDoc]);
 
   const reload = useCallback(() => {
     const { path, root } = live.current;

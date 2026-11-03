@@ -30,6 +30,7 @@
 
 ## 最近完成
 
+- [Markdown 编辑与渲染](completed/20261102-md-render.md)：「文档」面板的预览和源码换成同一个 CodeMirror 6 实时预览编辑器（光标所在元素露出标记、可直接编辑，T1–T16，[规范](../design-docs/frontend/front-Markdown编辑与渲染规范.md)）；聊天区 Markdown 重做（「A 书页」排版、提示框、公式、脚注、原始 HTML 白名单、路径带行号、流式平滑输出，T17–T28，[规范](../design-docs/frontend/front-聊天区Markdown渲染规范.md)）。desktop 2662 项测试与前端检查通过；1MB 文档打开 ≤ 43ms、按键 p95 ≤ 12.5ms，30KB 回复流式每次提交中位 1.7ms（原版 20ms）；2026-11-03 Codex Electron 验收 15 通过 / 0 失败 / 2 局部未覆盖，复验 0 功能失败；展开面板时顶栏标题被盖住（N1）已修。分支 `feat/md-render`，未提交。见[执行摘要](../exec-runs/20261102-md-render/execution-summary.md)。
 - [Context 面板 · Bash 命令统计](completed/20261102-context-bash-stats.md)：右侧「上下文」最底下新增「Bash 命令」卡片（调用、失败、合计耗时、程序与子命令分布）；数据走上下文历史投影，投影版本 1→2 让老会话第一次打开时补齐，不升使用统计库 Schema；desktop 2201 项测试与前端检查通过，浏览器 mock 截图完成；Electron 真实 Host 未验证，见[执行摘要](../exec-runs/20261102-context-bash-stats/execution-summary.md)。
 - [昨日修复与今日功能统一验收](completed/20261101-unified-acceptance.md)：2026-11-01 同版本64点、7组执行结束，44通过/11失败/9未覆盖；确认7问题，按6组交接。2026-11-02 7问题全部修复（读模型 schema 15→16 整库重建），定向复验23点20通过/0失败/3局部未覆盖，见[复验摘要](../exec-runs/20261102-unified-reacceptance/execution-summary.md)。原始记录见[执行摘要](../exec-runs/20261101-unified-acceptance/execution-summary.md)与[修复交接](../exec-runs/20261101-unified-acceptance/repair-handoff.md)。
 

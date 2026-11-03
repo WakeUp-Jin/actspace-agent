@@ -820,6 +820,26 @@ describe("WindowChromeBar", () => {
     );
   });
 
+  it("hides the center title and actions while the docs panel is expanded over the main column", () => {
+    const expanded = renderChromeBar({
+      rightOpen: true,
+      rightExpanded: true,
+      centerTrailing: <span>center action</span>,
+    });
+    const chrome = expanded.container.querySelector(".window-chrome-bar") as HTMLElement;
+    expect(chrome.getAttribute("data-right-expanded")).toBe("true");
+    // 标题和中间栏操作仍在 DOM 里（CSS 让它们退场），拖动区不变
+    expect(expanded.container.querySelector(".chrome-center-actions")).toHaveTextContent("center action");
+    expanded.unmount();
+
+    // 面板没开、或紧凑布局（面板是覆盖层，走 data-compact-panel-open）时不标记
+    for (const overrides of [{ rightOpen: false, rightExpanded: true }, { rightOpen: true, rightExpanded: true, compactLayout: true }]) {
+      const { container, unmount } = renderChromeBar(overrides);
+      expect(container.querySelector(".window-chrome-bar")!.hasAttribute("data-right-expanded")).toBe(false);
+      unmount();
+    }
+  });
+
   it("flips the left toggle aria-label / aria-pressed when sidebar is hidden", () => {
     renderChromeBar({ leftMode: "hidden" });
 

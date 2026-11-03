@@ -26,7 +26,7 @@ const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
 const MODEL_WAITING_DELAY_MS = 300;
 
 function DeferredToolMessage({ message, className, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile }: {
-  message: MessageBlock; className?: string; onOpenAgentTranscript?: (message: AgentMessageBlock) => void; replyCompleted: boolean; onOpenReadFile?: (message: ReadMessageBlock) => void; onOpenWorkspaceFile?: (path: string) => void;
+  message: MessageBlock; className?: string; onOpenAgentTranscript?: (message: AgentMessageBlock) => void; replyCompleted: boolean; onOpenReadFile?: (message: ReadMessageBlock) => void; onOpenWorkspaceFile?: (path: string, line?: number) => void;
 }) {
   const [blocks, setBlocks] = useState<MessageBlock[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -52,7 +52,7 @@ export function renderMessage(
   onOpenAgentTranscript?: (message: AgentMessageBlock) => void,
   replyCompleted = false,
   onOpenReadFile?: (message: ReadMessageBlock) => void,
-  onOpenWorkspaceFile?: (path: string) => void,
+  onOpenWorkspaceFile?: (path: string, line?: number) => void,
   onExpand?: () => void,
 ) {
   const renderKey = message.renderKey ?? message.id;
@@ -173,7 +173,7 @@ function ModelWaitingStatus({ content }: { content: string }) {
   );
 }
 
-export function renderMessageList(messages: MessageBlock[], onOpenAgentTranscript?: AgentTranscriptHandler, replyCompleted = false, onOpenReadFile?: (message: ReadMessageBlock) => void, onOpenWorkspaceFile?: (path: string) => void) {
+export function renderMessageList(messages: MessageBlock[], onOpenAgentTranscript?: AgentTranscriptHandler, replyCompleted = false, onOpenReadFile?: (message: ReadMessageBlock) => void, onOpenWorkspaceFile?: (path: string, line?: number) => void) {
   // Preserve message/usage data, but do not give empty assistant text a prose gap.
   return messages.filter((message) => message.kind !== "assistant" || message.content.trim().length > 0).map((message) =>
     <div key={message.renderKey ?? message.id} className="message-flow-item" data-flow-kind={messageFlowKind(message)}>

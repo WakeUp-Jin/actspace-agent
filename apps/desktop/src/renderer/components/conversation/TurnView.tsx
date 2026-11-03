@@ -26,7 +26,7 @@ function renderProcessContent(
   onOpenAgentTranscript?: AgentTranscriptHandler,
   replyCompleted = false,
   onOpenReadFile?: (message: ReadMessageBlock) => void,
-  onOpenWorkspaceFile?: (path: string) => void,
+  onOpenWorkspaceFile?: (path: string, line?: number) => void,
   completeTurn = true,
 ): ReactNode[] {
   return [
@@ -79,7 +79,7 @@ function renderTurnBody(
   isActive: boolean,
   onOpenAgentTranscript?: AgentTranscriptHandler,
   onOpenReadFile?: (message: ReadMessageBlock) => void,
-  onOpenWorkspaceFile?: (path: string) => void,
+  onOpenWorkspaceFile?: (path: string, line?: number) => void,
 ) {
   const { workItems, finalReply, failures } = splitTurnMessages(turn.messages);
   const replyCompleted = !isActive && finalReply.length > 0;
@@ -124,7 +124,7 @@ type TurnViewProps = {
   onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
   onOpenAgentTranscript?: AgentTranscriptHandler;
   onOpenReadFile?: (message: ReadMessageBlock) => void;
-  onOpenWorkspaceFile?: (path: string) => void;
+  onOpenWorkspaceFile?: (path: string, line?: number) => void;
 };
 
 /** 一轮对话：用户输入、过程和最终回复、轮尾（改动卡、交付卡、图片）、回复操作。 */

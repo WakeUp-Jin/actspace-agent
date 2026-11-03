@@ -38,13 +38,15 @@ function externalFailure(result: WorkspaceOpenFileResult, relativePath: string):
 export type OpenWorkspacePathInput = {
   workspaceRoot: string;
   relativePath: string;
+  /** 1 起始的行号（如 `a.md:12`）。只有打开 Markdown 时才传给文档面板，其他文件交给外部应用，忽略。 */
+  line?: number;
   openTab: (tab: RightPanelTab) => void;
 };
 
 /** `openWorkspacePath` 的函数形状；组件里经 `useOpenWorkspacePath()` 拿到的是会弹兜底对话框的版本。 */
 export type OpenWorkspacePath = (input: OpenWorkspacePathInput) => Promise<OpenWorkspacePathResult>;
 
-export async function openWorkspacePath({ workspaceRoot, relativePath, openTab }: OpenWorkspacePathInput): Promise<OpenWorkspacePathResult> {
+export async function openWorkspacePath({ workspaceRoot, relativePath, line, openTab }: OpenWorkspacePathInput): Promise<OpenWorkspacePathResult> {
   try {
     if (classifyWorkspaceFile(relativePath) === "external") {
       return externalFailure(await workspacesApi.openFile({ workspaceRoot, relativePath, action: "open" }), relativePath);
@@ -55,7 +57,7 @@ export async function openWorkspacePath({ workspaceRoot, relativePath, openTab }
       if (stat.error === "not_found" || stat.error === "escapes_root" || stat.error === "not_a_file") {
         return { ok: false, reason: "error", message: READ_ERROR_TEXT[stat.error] };
       }
-      openTab({ id: "docs", kind: "docs", title: "文档", select: stat.relativePath || relativePath });
+      openTab({ id: "docs", kind: "docs", title: "文档", select: stat.relativePath || relativePath, ...(line !== undefined ? { line } : {}) });
       return { ok: true };
     }
     const result = await workspacesApi.readFile({ workspaceRoot, relativePath });

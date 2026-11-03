@@ -131,6 +131,8 @@ Tab 过多时**不加可见水平滚动条**（用户明确反对），改用 Cu
 
 ## Markdown 渲染
 
+> 2026-11-02：「文档」面板的预览与源码编辑改为 CodeMirror 6 + Lezer 实时预览，规则见[Markdown 编辑与渲染规范](front-Markdown编辑与渲染规范.md)（设计已确认，待实施）。实施后，本节下面描述的 `react-markdown` 渲染栈只剩聊天消息区（`MarkdownProse`）和轨迹详情在用，`MarkdownPreviewBody` 和 `.markdown-doc` 会删除。聊天区是否迁移由用户另行决定。
+
 右侧面板是正式 Markdown 渲染栈的入口，聊天消息区是否迁移到同一栈属于 V2。
 
 V1 渲染栈：

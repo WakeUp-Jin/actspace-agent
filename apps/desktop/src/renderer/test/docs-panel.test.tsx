@@ -1,12 +1,15 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { undoDepth } from "@codemirror/commands";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RightPanel } from "../components/RightPanel";
 import { RightPanelProvider, useRightPanel } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { resetMockDocs } from "../mock/docs-fixture";
 import { resetDocsDraftStoreForTests } from "../components/right-panel/docs/docs-draft-store";
+import { getDocument } from "../components/markdown-editor/core";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
+import { findEditorView, polyfillLayout, pressKey, typeInto, typeSynced } from "./markdown-editor-helpers";
 
 vi.mock("mermaid", () => ({ default: { initialize: vi.fn(), render: vi.fn(async () => ({ svg: "<svg></svg>", diagramType: "flowchart-v2" })) } }));
 
@@ -38,7 +41,16 @@ async function renderDocs({ workspaceRoot = "/ws", edited, select }: { workspace
 const tree = () => screen.getByRole("tree", { name: "Markdown 文档" });
 const file = (name: string) => within(tree()).getByRole("treeitem", { name: new RegExp(name) });
 
+/** 等编辑器（懒加载的 chunk）挂上并带着这份内容。 */
+async function editorWith(text: string) {
+  await waitFor(() => expect(getDocument(findEditorView())).toContain(text));
+  return findEditorView();
+}
+
+const dirtyDot = () => screen.queryByRole("img", { name: "有未保存的改动" });
+
 beforeEach(() => {
+  polyfillLayout();
   resetMockDocs();
   resetDocsDraftStoreForTests();
   setupBridge();
@@ -65,20 +77,52 @@ describe("文档面板", () => {
     expect(await screen.findByText("这个工作区还没有 Markdown 文档")).toBeInTheDocument();
   });
 
-  it("点文件默认预览；切源码直接编辑，未保存圆点出现，预览跟着草稿变化", async () => {
+  it("点文件默认预览；切源码仍是同一个编辑器，未保存圆点出现，改动保留在预览里", async () => {
     const user = userEvent.setup();
     await renderDocs();
     await user.click(await within(tree()).findByRole("treeitem", { name: /AGENTS\.md/ }));
-    expect(await screen.findByRole("heading", { name: "AGENTS" })).toBeInTheDocument();
-    expect(screen.queryByRole("img", { name: "有未保存的改动" })).toBeNull();
+    const view = await editorWith("AGENTS");
+    expect(view.dom).toHaveClass("cm-md-preview");
+    // 预览里标题的 `#` 被隐藏，只剩文字，并按标题排版
+    expect(view.dom.querySelector(".md-h1")).toHaveTextContent("AGENTS");
+    expect(view.dom.textContent).not.toContain("# AGENTS");
+    expect(dirtyDot()).toBeNull();
 
     await user.click(screen.getByRole("tab", { name: "源码" }));
-    const editor = screen.getByRole("textbox", { name: "Markdown 源码" });
-    await user.type(editor, "新增的一行");
-    expect(screen.getByRole("img", { name: "有未保存的改动" })).toBeInTheDocument();
+    expect(findEditorView()).toBe(view);
+    expect(view.dom).toHaveClass("cm-md-source");
+    expect(view.dom.querySelector(".cm-lineNumbers")).not.toBeNull();
+    expect(view.dom.textContent).toContain("# AGENTS");
+    await typeSynced(view, "新增的一行");
+    await waitFor(() => expect(dirtyDot()).toBeInTheDocument());
 
     await user.click(screen.getByRole("tab", { name: "预览" }));
-    expect(screen.getByTestId("docs-preview")).toHaveTextContent("新增的一行");
+    expect(findEditorView()).toBe(view);
+    expect(view.dom).toHaveClass("cm-md-preview");
+    expect(view.dom.querySelector(".cm-lineNumbers")).toBeNull();
+    expect(view.dom).toHaveTextContent("新增的一行");
+  });
+
+  it("切换预览 / 源码保留光标和撤销历史，焦点留在编辑器里", async () => {
+    const user = userEvent.setup();
+    await renderDocs({ select: "AGENTS.md" });
+    const view = await editorWith("AGENTS");
+    await typeSynced(view, "甲");
+    await typeSynced(view, "乙");
+    view.dispatch({ selection: { anchor: 3 } });
+    const depth = undoDepth(view.state);
+    expect(depth).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("tab", { name: "源码" }));
+    expect(findEditorView()).toBe(view);
+    expect(view.state.selection.main.head).toBe(3);
+    expect(undoDepth(view.state)).toBe(depth);
+    expect(document.activeElement).toBe(view.contentDOM);
+
+    await user.click(screen.getByRole("tab", { name: "预览" }));
+    expect(view.state.selection.main.head).toBe(3);
+    expect(undoDepth(view.state)).toBe(depth);
+    expect(document.activeElement).toBe(view.contentDOM);
   });
 
   it("编辑后切换工作区再切回：草稿和未保存圆点恢复，不写盘", async () => {
@@ -87,10 +131,8 @@ describe("文档面板", () => {
     overrideBridge({ "workspaces.writeMarkdownFile": write });
     const view = await renderDocs();
     await user.click(await within(tree()).findByRole("treeitem", { name: /AGENTS\.md/ }));
-    await screen.findByRole("heading", { name: "AGENTS" });
-    await user.click(screen.getByRole("tab", { name: "源码" }));
-    await user.type(screen.getByRole("textbox", { name: "Markdown 源码" }), "草稿内容");
-    expect(screen.getByRole("img", { name: "有未保存的改动" })).toBeInTheDocument();
+    await typeSynced(await editorWith("AGENTS"), "草稿内容");
+    await waitFor(() => expect(dirtyDot()).toBeInTheDocument());
 
     // 同一个 Provider 下换根：用同一棵树的 props 变化，而不是重新挂载。
     view.rerender(
@@ -112,7 +154,7 @@ describe("文档面板", () => {
       </TooltipProvider>,
     );
     expect(await screen.findByRole("img", { name: "有未保存的改动" })).toBeInTheDocument();
-    expect(await screen.findByTestId("docs-preview")).toHaveTextContent("草稿内容");
+    await editorWith("草稿内容");
     expect(write).not.toHaveBeenCalled();
   });
 
@@ -122,23 +164,38 @@ describe("文档面板", () => {
     overrideBridge({ "workspaces.writeMarkdownFile": write });
     await renderDocs();
     await user.click(await within(tree()).findByRole("treeitem", { name: /AGENTS\.md/ }));
-    await screen.findByRole("heading", { name: "AGENTS" });
+    const view = await editorWith("AGENTS");
     await user.click(screen.getByRole("tab", { name: "源码" }));
-    const editor = screen.getByRole("textbox", { name: "Markdown 源码" });
-    await user.type(editor, "X");
-    await user.keyboard("{Meta>}s{/Meta}");
+    await typeSynced(view, "X");
+    await waitFor(() => expect(dirtyDot()).toBeInTheDocument());
+    let event!: KeyboardEvent;
+    await act(async () => { event = pressKey(view, { key: "s", keyCode: 83, ctrlKey: true }); });
+    expect(event.defaultPrevented).toBe(true);
     await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
     expect(write).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: "/ws", relativePath: "AGENTS.md", content: expect.stringContaining("X") }));
-    await waitFor(() => expect(screen.queryByRole("img", { name: "有未保存的改动" })).toBeNull());
+    await waitFor(() => expect(dirtyDot()).toBeNull());
+  });
+
+  it("输入后立刻 ⌘S（草稿还没渲染出来）也保存最新内容", async () => {
+    const write = vi.fn(async (input: { content: string }) => ({ ok: true as const, mtimeMs: 2000, size: input.content.length }));
+    overrideBridge({ "workspaces.writeMarkdownFile": write });
+    await renderDocs({ select: "AGENTS.md" });
+    const view = await editorWith("AGENTS");
+    // 输入和 ⌘S 在同一个任务里：这时 onChange 的帧还没到，保存前要先把它补发出去。
+    await act(async () => {
+      typeInto(view, "紧跟的输入");
+      pressKey(view, { key: "s", keyCode: 83, ctrlKey: true });
+    });
+    await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
+    expect(write.mock.calls[0][0].content).toContain("紧跟的输入");
   });
 
   it("有未保存内容时切换文档会先询问：取消留在原地，不保存则切走", async () => {
     const user = userEvent.setup();
     await renderDocs();
     await user.click(await within(tree()).findByRole("treeitem", { name: /AGENTS\.md/ }));
-    await screen.findByRole("heading", { name: "AGENTS" });
-    await user.click(screen.getByRole("tab", { name: "源码" }));
-    await user.type(screen.getByRole("textbox", { name: "Markdown 源码" }), "Y");
+    await typeSynced(await editorWith("AGENTS"), "Y");
+    await waitFor(() => expect(dirtyDot()).toBeInTheDocument());
 
     await user.click(file("CLAUDE\\.md"));
     const dialog = await screen.findByRole("alertdialog");
@@ -158,16 +215,15 @@ describe("文档面板", () => {
     overrideBridge({ "workspaces.writeMarkdownFile": write });
     await renderDocs();
     await user.click(await within(tree()).findByRole("treeitem", { name: /AGENTS\.md/ }));
-    await screen.findByRole("heading", { name: "AGENTS" });
-    await user.click(screen.getByRole("tab", { name: "源码" }));
-    await user.type(screen.getByRole("textbox", { name: "Markdown 源码" }), "Z");
+    await typeSynced(await editorWith("AGENTS"), "Z");
+    await waitFor(() => expect(dirtyDot()).toBeInTheDocument());
     await user.click(file("CLAUDE\\.md"));
     await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "保存" }));
     await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(file("CLAUDE\\.md")).toHaveAttribute("aria-selected", "true"));
   });
 
-  it("读取被截断的文件在源码状态只读，并提示用默认应用编辑", async () => {
+  it("读取被截断的文件在预览和源码两种模式下都只读，并提示用默认应用编辑", async () => {
     const user = userEvent.setup();
     overrideBridge({
       "workspaces.readFile": async ({ relativePath }: { relativePath: string }) => ({
@@ -177,11 +233,14 @@ describe("文档面板", () => {
     await renderDocs();
     await user.click(await within(tree()).findByRole("treeitem", { name: /AGENTS\.md/ }));
     expect(await screen.findByText(/文件过大，请用默认应用编辑/)).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "源码" }));
-    const editor = screen.getByRole("textbox", { name: "Markdown 源码" });
-    expect(editor).toHaveAttribute("readonly");
-    await user.type(editor, "abc");
-    expect(screen.queryByRole("img", { name: "有未保存的改动" })).toBeNull();
+    const view = await editorWith("很大");
+    for (const tab of [null, "源码", "预览"]) {
+      if (tab) await user.click(screen.getByRole("tab", { name: tab }));
+      expect(view.state.readOnly).toBe(true);
+      await typeSynced(view, "abc");
+      expect(getDocument(view)).toBe("# 很大\n");
+    }
+    expect(dirtyDot()).toBeNull();
   });
 
   it("绿点只出现在本会话改过的文件上，「本会话改过」筛选展开祖先文件夹", async () => {
@@ -215,29 +274,49 @@ describe("文档面板", () => {
     await renderDocs({ select: README });
     const item = await within(tree()).findByRole("treeitem", { name: /^README\.md/ , selected: true });
     expect(item).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "Harness 自进化方案设计" })).toBeInTheDocument();
+    await editorWith("Harness 自进化方案设计");
+    expect(findEditorView().dom.querySelector(".md-h1")).toHaveTextContent("Harness 自进化方案设计");
   });
 
   it("已经打开的文档再从链接打开一次：重新读出正文，不停在加载中", async () => {
     await renderDocs({ select: README });
-    expect(await screen.findByRole("heading", { name: "Harness 自进化方案设计" })).toBeInTheDocument();
+    await editorWith("Harness 自进化方案设计");
     await userEvent.click(screen.getByRole("button", { name: "probe-open-docs" }));
-    expect(await screen.findByRole("heading", { name: "Harness 自进化方案设计" })).toBeInTheDocument();
+    await editorWith("Harness 自进化方案设计");
     expect(screen.queryByLabelText("正在读取文档")).toBeNull();
   });
 
-  it("大纲列出 h2/h3，点击后滚动到对应标题；源码状态下大纲置灰", async () => {
+  it("大纲列出 h2/h3（代码块里的 # 不算），点击后平滑滚动到对应标题；预览和源码两种模式都可用", async () => {
     const user = userEvent.setup();
-    const scrollIntoView = vi.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;
     await renderDocs({ select: README });
-    await screen.findByRole("heading", { name: "Harness 自进化方案设计" });
+    const view = await editorWith("Harness 自进化方案设计");
+    const scrollTo = vi.fn();
+    view.scrollDOM.scrollTo = scrollTo as unknown as typeof view.scrollDOM.scrollTo;
+
     await user.click(screen.getByRole("button", { name: "大纲" }));
-    await user.click(await screen.findByRole("button", { name: "触发条件" }));
-    expect(scrollIntoView).toHaveBeenCalled();
+    const popover = await screen.findByLabelText("本页大纲");
+    expect(within(popover).getAllByRole("button").map((button) => button.textContent)).toEqual(["当前状态", "进化流程", "触发条件", "插件声明示例", "待办"]);
+    await user.click(within(popover).getByRole("button", { name: "触发条件" }));
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
+    await waitFor(() => expect(screen.queryByLabelText("本页大纲")).toBeNull());
 
     await user.click(screen.getByRole("tab", { name: "源码" }));
-    expect(screen.getByRole("button", { name: "大纲" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "大纲" })).toBeEnabled();
+    scrollTo.mockClear();
+    await user.click(screen.getByRole("button", { name: "大纲" }));
+    await user.click(await screen.findByRole("button", { name: "当前状态" }));
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+  });
+
+  it("大纲打开期间随输入更新", async () => {
+    const user = userEvent.setup();
+    await renderDocs({ select: README });
+    const view = await editorWith("Harness 自进化方案设计");
+    await user.click(screen.getByRole("button", { name: "大纲" }));
+    const popover = await screen.findByLabelText("本页大纲");
+    expect(within(popover).queryByRole("button", { name: "新加的章节" })).toBeNull();
+    await typeSynced(view, "\n\n## 新加的章节\n");
+    expect(await within(popover).findByRole("button", { name: "新加的章节" })).toBeInTheDocument();
   });
 
   it("没有标题的文档，大纲显示「没有标题」", async () => {
@@ -248,15 +327,17 @@ describe("文档面板", () => {
       }),
     });
     await renderDocs({ select: "AGENTS.md" });
-    await screen.findByText("只有正文。");
+    await editorWith("只有正文。");
     await user.click(screen.getByRole("button", { name: "大纲" }));
     expect(await screen.findByText("没有标题")).toBeInTheDocument();
   });
 
-  it("磁盘上的文件变了：窗口聚焦后出现「重新加载」，点击后换成新内容", async () => {
+  it("磁盘上的文件变了：窗口聚焦后出现「重新加载」，点击后整份换成新内容并清空撤销历史", async () => {
     const user = userEvent.setup();
     await renderDocs({ select: "AGENTS.md" });
-    await screen.findByRole("heading", { name: "AGENTS" });
+    const before = await editorWith("AGENTS");
+    await typeSynced(before, "改动");
+    expect(undoDepth(before.state)).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "重新加载" })).toBeNull();
 
     overrideBridge({
@@ -267,8 +348,25 @@ describe("文档面板", () => {
     });
     act(() => { window.dispatchEvent(new Event("focus")); });
     await user.click(await screen.findByRole("button", { name: "重新加载" }));
-    expect(await screen.findByRole("heading", { name: "磁盘新内容" })).toBeInTheDocument();
+    const after = await editorWith("磁盘新内容");
+    expect(getDocument(after)).toBe("# 磁盘新内容");
+    expect(undoDepth(after.state)).toBe(0);
+    expect(dirtyDot()).toBeNull();
     expect(screen.queryByRole("button", { name: "重新加载" })).toBeNull();
+  });
+
+  it("换一篇文档：内容整份换掉，上一篇的撤销历史不带过来", async () => {
+    const user = userEvent.setup();
+    await renderDocs({ select: "AGENTS.md" });
+    const first = await editorWith("AGENTS");
+    await typeSynced(first, "第一篇的输入");
+    await waitFor(() => expect(dirtyDot()).toBeInTheDocument());
+    await user.click(file("CLAUDE\\.md"));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "不保存" }));
+    const second = await editorWith("CLAUDE");
+    expect(getDocument(second)).not.toContain("第一篇的输入");
+    expect(undoDepth(second.state)).toBe(0);
+    expect(dirtyDot()).toBeNull();
   });
 
   it("收起文件树后正文占满，展开按钮可以恢复", async () => {

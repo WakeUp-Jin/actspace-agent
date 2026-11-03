@@ -43,6 +43,7 @@ import { useSpacePanelBinding } from "./space/use-space-panel-binding";
 import { TrajectoryNavigationProvider } from "./trajectory/TrajectoryNavigation";
 import { devStartSettingsSection, devStartView } from "./harness-stats/dev-start";
 import { OpenFileFallbackProvider } from "./files/open-file-fallback-context";
+import { ChatMarkdownHostProvider } from "./conversation/ChatMarkdownHostProvider";
 
 /** 「文档」标签的右栏默认宽度；窗口放不下时由 rightMaxWidth 截断。 */
 const DOCS_RIGHT_DEFAULT_WIDTH = 720;
@@ -401,9 +402,14 @@ export function WorkbenchLayout({
   const docsTabActive = view === "chat" && activeRightTab?.kind === "docs";
   const effectiveRightWidth = docsTabActive ? Math.min(Math.max(docsRightWidth, RIGHT_MIN_WIDTH), rightMaxWidth) : rightWidth;
 
+  /** 「文档」面板展开到中间栏：SplitView 隐藏中间栏，chrome 的中间标题也要退场。 */
+  const rightExpanded = docsExpanded && activeRightTab?.kind === "docs" && rightPanelShown && !isCompactLayout;
+
   return (
     <TrajectoryNavigationProvider onShowTrajectory={showSessionTrajectory}>
       <OpenFileFallbackProvider>
+      {/* 聊天区 Markdown 的宿主（打开路径带行号、读本地图片），对话区和右栏子 Agent 面板共用。 */}
+      <ChatMarkdownHostProvider>
       <WindowChromeBar
         leftMode={chromeLeftMode}
         rightOpen={rightPanelShown}
@@ -411,6 +417,7 @@ export function WorkbenchLayout({
         leftPaneWidth={displayedLeftWidth}
         rightPaneWidth={effectiveRightWidth}
         compactLayout={isCompactLayout}
+        rightExpanded={rightExpanded}
         onToggleLeft={toggleSidebarMode}
         onToggleRight={toggleRightPanel}
         canGoBack={view === "chat" && canGoBack}
@@ -458,7 +465,7 @@ export function WorkbenchLayout({
         rightBounds={{ minWidth: RIGHT_MIN_WIDTH, maxWidth: rightMaxWidth }}
         rightSeparatorLabel="调整预览面板宽度"
         rightWidth={effectiveRightWidth}
-        rightExpanded={docsExpanded && activeRightTab?.kind === "docs" && rightPanelShown && !isCompactLayout}
+        rightExpanded={rightExpanded}
       />
       {(isCompactLayout ? !compactSidebarOpen : isSidebarHidden) ? <PerformancePanel compact /> : null}
       {isCompactLayout && compactSidebarOpen ? (
@@ -488,6 +495,7 @@ export function WorkbenchLayout({
         </div>
       ) : null}
       {SPACE_DEMO_ENABLED ? <NewSpaceDialog open={newSpaceOpen} onOpenChange={setNewSpaceOpen} onCreated={() => handleSelectView("space")} /> : null}
+      </ChatMarkdownHostProvider>
       </OpenFileFallbackProvider>
     </TrajectoryNavigationProvider>
   );

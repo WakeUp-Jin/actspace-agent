@@ -34,7 +34,8 @@ export function useWorkspaceFileLinks() {
     owner.current += 1;
     return () => { owner.current += 1; };
   }, [sessionId, workspaceRoot, target.kind === "remote" ? target.hostId : target.kind]);
-  const openReadFile = useCallback(async (message: ReadMessageBlock) => {
+  /** `line`（1 起始）只在本机打开 Markdown 时生效：「文档」面板滚到该行；其他文件、远端会话忽略。 */
+  const openReadFile = useCallback(async (message: ReadMessageBlock, line?: number) => {
     const requestOwner = owner.current;
     const openIfCurrent = (tab: Parameters<typeof openTab>[0]) => {
       if (requestOwner === owner.current) openTab(tab);
@@ -46,19 +47,19 @@ export function useWorkspaceFileLinks() {
       return;
     }
     if (!workspaceRoot || !isSafeWorkspaceRelativePath(relativePath)) return;
-    const result = await openPath({ workspaceRoot, relativePath, openTab: openIfCurrent });
+    const result = await openPath({ workspaceRoot, relativePath, openTab: openIfCurrent, ...(line !== undefined ? { line } : {}) });
     if (result.ok === false && result.reason === "error") {
       openIfCurrent(readFailureTab(relativePath, relativePath.split(/[\\/]/).pop() || relativePath, { workspaceRoot }, result.message));
     }
   }, [isRemoteTarget, sessionId, openTab, openPath, workspaceRoot]);
-  const openWorkspaceFile = useCallback((path: string) => {
+  const openWorkspaceFile = useCallback((path: string, line?: number) => {
     const normalizedPath = path.replace(/^file:\/\//i, "").replace(/\\/g, "/");
     const root = workspaceRoot?.replace(/\\/g, "/").replace(/\/+$/, "");
     const relativePath = normalizedPath.startsWith(`${root ?? ""}/`)
       ? normalizedPath.slice((root ?? "").length + 1)
       : normalizedPath;
     if (!isSafeWorkspaceRelativePath(relativePath)) return;
-    void openReadFile({ filePath: relativePath } as ReadMessageBlock);
+    void openReadFile({ filePath: relativePath } as ReadMessageBlock, line);
   }, [openReadFile, workspaceRoot]);
-  return { openReadFile, openWorkspaceFile };
+  return { openReadFile, openWorkspaceFile, workspaceRoot: isRemoteTarget ? undefined : workspaceRoot || undefined };
 }

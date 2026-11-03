@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="zh-CN" data-typo="codex" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MD 渲染 Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=Noto+Sans+SC:wght@400..700&family=JetBrains+Mono:wght@400..600&display=swap" />
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+  --ed-pad-x: 32px;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --selected: #e4e4e1; --hover: #eaeae7;
+  --line: #deded9; --line-strong: #b9b9b2; --text: #20201e; --muted: #676762; --faint: #8a8a83;
+  --success: #087a4b; --success-soft: #e5f2ea; --warning: #91600e; --warning-soft: #f7eedb; --danger: #b3261e;
+  --info: #3978b8; --info-soft: #e8f1f9; --accent: #20201e; --on-accent: #ffffff;
+  --code-bg: #f4f4f2; --sel: rgba(57,120,184,.18);
+  --tok-kw: #a33ea1; --tok-str: #2f7d32; --tok-cmt: #8a8a83; --tok-num: #b35c00; --tok-fn: #3978b8; --tok-type: #8a5a00; --tok-prop: #20201e;
+  --shadow-pop: 0 10px 30px rgba(0,0,0,.12), 0 1px 3px rgba(0,0,0,.08);
+  /* MD 强调色：和链接同一条退回规则——选了配色就用配色，默认配色退回 info 蓝 */
+  --accent: var(--info); --link: var(--info);
+}
+:root[data-accent="ink"] { --accent: #20201e; }
+:root[data-accent="emerald"] { --accent: #087a4b; }
+:root[data-accent="blue"] { --accent: #2c67c5; --link: var(--accent); }
+:root[data-accent="purple"] { --accent: #7849d1; --link: var(--accent); }
+:root[data-accent="pink"] { --accent: #ad4178; --link: var(--accent); }
+:root[data-accent="orange"] { --accent: #b4501f; --link: var(--accent); }
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #1f201d; --surface-subtle: #292a26; --selected: #30312d; --hover: #2a2b27;
+  --line: #353630; --line-strong: #5a5a54; --text: #f1f1ed; --muted: #b5b5ae; --faint: #8d8d86;
+  --success: #36c783; --success-soft: #193a2b; --warning: #d2a14d; --warning-soft: #3e321c; --danger: #f2827a;
+  --info: #6ca6da; --info-soft: #1e3345; --accent: #f1f1ed; --on-accent: #181916;
+  --code-bg: #262723; --sel: rgba(108,166,218,.28);
+  --tok-kw: #d38ad1; --tok-str: #8cc98f; --tok-cmt: #85857e; --tok-num: #e0a060; --tok-fn: #7fb3e3; --tok-type: #d8b26a; --tok-prop: #f1f1ed;
+  --shadow-pop: 0 10px 30px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.3);
+  --accent: var(--info);
+}
+:root[data-theme="dark"][data-accent="ink"] { --accent: #f1f1ed; }
+:root[data-theme="dark"][data-accent="emerald"] { --accent: #36c783; }
+:root[data-theme="dark"][data-accent="blue"] { --accent: #6aa3f8; }
+:root[data-theme="dark"][data-accent="purple"] { --accent: #b394f5; }
+:root[data-theme="dark"][data-accent="pink"] { --accent: #f28bbb; }
+:root[data-theme="dark"][data-accent="orange"] { --accent: #f2995f; }
+.swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; vertical-align: -1px; margin-right: 4px; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 13px/1.55 var(--font-ui); -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+
+/* ---------- demo chrome ---------- */
+.bar { display: flex; align-items: center; gap: 14px; height: 46px; padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar h1 { margin: 0; font-size: 13px; font-weight: 600; }
+.bar .tag { font-size: 11px; color: var(--faint); border: 1px solid var(--line); border-radius: 5px; padding: 0 6px; }
+.bar .sp { flex: 1; }
+.bar .lbl { color: var(--muted); font-size: 12px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.seg button { padding: 2px 9px; border-radius: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--selected); }
+.ghost { padding: 3px 9px; border-radius: 6px; font-size: 12px; color: var(--muted); border: 1px solid var(--line); }
+.ghost:hover { background: var(--hover); color: var(--text); }
+
+.stage { display: flex; height: calc(100vh - 46px); }
+.panel-wrap { flex: 1; min-width: 0; display: flex; justify-content: center; padding: 16px; }
+
+/* ---------- 文档面板外壳（模拟右侧面板） ---------- */
+.docs { width: 100%; max-width: 760px; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.docs-head { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 10px 0 14px; border-bottom: 1px solid var(--line); }
+.crumb { display: flex; align-items: center; gap: 4px; min-width: 0; color: var(--faint); font-size: 12px; }
+.crumb b { color: var(--text); font-weight: 500; }
+.dirty { width: 6px; height: 6px; border-radius: 50%; background: var(--text); display: none; }
+.dirty.on { display: inline-block; }
+.docs-head .sp { flex: 1; }
+.saved-hint { font-size: 11px; color: var(--faint); }
+.docs-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.docs-body .cm-editor { flex: 1; min-height: 0; height: 100%; }
+
+/* ---------- 规则面板 ---------- */
+.rules { width: 420px; flex-shrink: 0; border-left: 1px solid var(--line); background: var(--surface); overflow-y: auto; padding: 14px 16px 40px; }
+.rules h2 { margin: 4px 0 4px; font-size: 13px; font-weight: 600; }
+.rules .intro { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+.legend { display: flex; gap: 10px; margin-bottom: 10px; font-size: 11px; color: var(--faint); }
+.d { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; margin-bottom: 8px; }
+.d-head { display: flex; align-items: baseline; gap: 6px; }
+.d-title { font-weight: 600; font-size: 12.5px; }
+.d-go { margin-left: auto; font-size: 11px; color: var(--info); }
+.d-go:hover { text-decoration: underline; }
+.d-desc { margin: 2px 0 8px; color: var(--muted); font-size: 12px; }
+.opt { display: flex; gap: 8px; align-items: flex-start; width: 100%; text-align: left; padding: 6px 8px; border-radius: 7px; border: 1px solid transparent; }
+.opt:hover { background: var(--hover); }
+.opt[aria-pressed="true"] { background: var(--surface-subtle); border-color: var(--line-strong); }
+.radio { width: 12px; height: 12px; margin-top: 3px; border-radius: 50%; border: 1.5px solid var(--line-strong); flex-shrink: 0; }
+.opt[aria-pressed="true"] .radio { border: 4px solid var(--text); }
+.opt-main { min-width: 0; }
+.opt-label { font-size: 12.5px; }
+.opt-note { display: block; color: var(--faint); font-size: 11.5px; }
+.chip { display: inline-block; font-size: 10.5px; line-height: 16px; padding: 0 5px; border-radius: 4px; margin-left: 4px; vertical-align: 1px; }
+.chip.codex { background: var(--info-soft); color: var(--info); }
+.chip.rec { background: var(--success-soft); color: var(--success); }
+.chip.src { background: var(--warning-soft); color: var(--warning); }
+.fixed { margin: 16px 0 0; padding: 0 0 0 16px; color: var(--muted); font-size: 12px; }
+.fixed li { margin-bottom: 4px; }
+.fixed b { color: var(--text); font-weight: 500; }
+
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); opacity: 0; transition: .18s; background: var(--accent); color: var(--on-accent); padding: 7px 14px; border-radius: 8px; font-size: 12px; box-shadow: var(--shadow-pop); pointer-events: none; }
+.toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* =====================================================================
+   编辑器（CodeMirror 6）—— 两种模式共用一个实例
+   ===================================================================== */
+.cm-editor { background: var(--surface); color: var(--text); font-size: 14px; }
+.cm-editor.cm-focused { outline: none; }
+.cm-editor .cm-scroller { font-family: var(--font-ui); line-height: 1.75; }
+.cm-editor .cm-content { padding: 22px 0 120px; caret-color: var(--text); }
+.cm-editor .cm-cursor { border-left: 2px solid var(--text); }
+.cm-editor .cm-selectionBackground, .cm-editor.cm-focused .cm-selectionBackground { background: var(--sel) !important; }
+.cm-editor .cm-line { padding: 1px var(--ed-pad-x); }
+.cm-editor .cm-panels { background: var(--surface-subtle); color: var(--text); border-color: var(--line); }
+.cm-editor .cm-searchMatch { background: var(--warning-soft); }
+
+/* ---------- 源码模式 ---------- */
+.cm-editor.md-source .cm-scroller { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.65; }
+.cm-editor.md-source .cm-content { padding: 14px 0 120px; }
+.cm-editor.md-source .cm-line { padding: 0 16px 0 12px; }
+.cm-editor .cm-gutters { background: var(--surface); border-right: 1px solid var(--line); color: var(--faint); font-variant-numeric: tabular-nums; }
+.cm-editor .cm-lineNumbers .cm-gutterElement { padding: 0 10px 0 14px; }
+.cm-editor.md-source .tok-heading { font-weight: 700; color: var(--text); }
+.cm-editor.md-source .tok-meta { color: var(--faint); }
+.cm-editor.md-source .tok-link { color: var(--info); }
+.cm-editor.md-source .tok-url { color: var(--faint); text-decoration: underline; text-underline-offset: 2px; }
+.cm-editor.md-source .tok-quote { color: var(--muted); }
+.cm-editor.md-source .tok-mono { color: var(--tok-str); }
+
+/* ---------- 共用 token ---------- */
+.cm-editor .tok-em { font-style: italic; }
+.cm-editor .tok-strong { font-weight: 650; }
+.cm-editor .tok-strike { text-decoration: line-through; color: var(--muted); }
+.cm-editor .tok-html { color: var(--faint); font-family: var(--font-mono); font-size: .9em; }
+.cm-editor .tok-math { font-family: var(--font-mono); font-size: .9em; color: var(--tok-num); }
+.cm-editor .tok-kw { color: var(--tok-kw); }
+.cm-editor .tok-str { color: var(--tok-str); }
+.cm-editor .tok-cmt { color: var(--tok-cmt); font-style: italic; }
+.cm-editor .tok-num { color: var(--tok-num); }
+.cm-editor .tok-fn { color: var(--tok-fn); }
+.cm-editor .tok-type { color: var(--tok-type); }
+.cm-editor .tok-prop { color: var(--tok-prop); }
+.cm-editor .tok-op { color: var(--muted); }
+
+/* ---------- 预览模式 ---------- */
+.cm-editor.md-preview .tok-meta { color: var(--faint); }
+.cm-editor.md-preview .tok-quote { color: var(--muted); }
+.cm-editor.md-preview .tok-url { color: var(--faint); }
+.cm-editor.md-preview .cm-line.md-h { font-weight: 600; line-height: 1.35; }
+.cm-editor.md-preview .cm-line.md-h1 { font-size: 1.6em; padding-top: 14px; padding-bottom: 6px; }
+.cm-editor.md-preview .cm-line.md-h2 { font-size: 1.3em; padding-top: 14px; padding-bottom: 4px; }
+.cm-editor.md-preview .cm-line.md-h3 { font-size: 1.12em; padding-top: 10px; }
+.cm-editor.md-preview .cm-line.md-h4 { font-size: 1em; padding-top: 8px; }
+.cm-editor.md-preview .md-h .tok-heading { font-weight: 600; }
+.cm-editor.md-preview .cm-line.md-setext-mark { font-size: 0; line-height: 0; padding-top: 0; padding-bottom: 0; }
+.cm-editor.md-preview .md-inline-code { font-family: var(--font-mono); font-size: .86em; background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; padding: .05em .3em; }
+.cm-editor.md-preview .md-inline-code .tok-mono { color: inherit; }
+.cm-editor.md-preview .md-link, .cm-editor.md-preview .md-link .tok-link, .cm-editor.md-preview .md-link .tok-url { color: var(--link); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--link) 45%, transparent); text-underline-offset: 3px; }
+.cm-editor.md-preview[data-link="click"] .md-link { cursor: pointer; }
+.cm-editor.md-preview .cm-line.md-quote { margin-left: var(--ed-pad-x); border-left: 3px solid var(--accent); padding-left: 14px; color: var(--muted); }
+.cm-editor.md-preview .cm-line.md-li { padding-left: calc(var(--ed-pad-x) + 12px); }
+.cm-editor.md-preview .md-list-mark { color: var(--faint); }
+.cm-editor.md-preview .md-bullet { display: inline-block; width: 1.25em; position: relative; }
+.cm-editor.md-preview .md-bullet::before { content: ""; position: absolute; left: .35em; top: -.32em; width: 5px; height: 5px; border-radius: 50%; background: var(--text); }
+.cm-editor.md-preview .md-bullet-2::before { background: transparent; border: 1.2px solid var(--text); width: 5px; height: 5px; }
+.cm-editor.md-preview .md-bullet-3::before { border-radius: 1px; }
+.cm-editor.md-preview .md-checkbox { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; margin: 0 6px 0 1px; vertical-align: -2px; border: 1.5px solid var(--line-strong); border-radius: 4px; cursor: pointer; color: var(--on-accent); }
+.cm-editor.md-preview .md-checkbox.is-checked { background: var(--accent); border-color: var(--accent); }
+.cm-editor.md-preview .md-task-done { color: var(--faint); text-decoration: line-through; }
+.cm-editor.md-preview .cm-line.md-hr { background: linear-gradient(var(--line), var(--line)) center / calc(100% - 2 * var(--ed-pad-x)) 1px no-repeat; }
+
+/* 代码块：围栏行变成上下内边距，首行右上角写语言（Codex） */
+.cm-editor.md-preview .cm-line.md-code-line { margin: 0 var(--ed-pad-x); padding: 0 14px; background: var(--code-bg); font-family: var(--font-mono); font-size: 12.5px; line-height: 1.65; }
+.cm-editor.md-preview .cm-line.md-code-first { border-radius: 8px 8px 0 0; position: relative; padding-top: 4px; }
+.cm-editor.md-preview .cm-line.md-code-last { border-radius: 0 0 8px 8px; padding-bottom: 4px; }
+.cm-editor.md-preview .cm-line.md-code-codex.md-code-first::after { content: attr(data-language); position: absolute; top: 6px; right: 12px; font-family: var(--font-ui); font-size: 11px; color: var(--faint); }
+.cm-editor.md-preview .cm-line.md-code-fence { color: var(--faint); }
+.cm-editor.md-preview .cm-line.md-code-open { border-left: 2px solid var(--warning); }
+.cm-editor.md-preview .md-code-line .tok-mono { color: inherit; }
+.cm-editor.md-preview .md-code-line .cm-widgetBuffer { display: none; }
+.cm-editor.md-preview .md-code-head { display: flex; line-height: 22px; align-items: center; justify-content: space-between; font-family: var(--font-ui); font-size: 11px; color: var(--faint); }
+.cm-editor.md-preview .md-code-copy { font-size: 11px; color: var(--faint); padding: 0 6px; border-radius: 4px; }
+.cm-editor.md-preview .md-code-copy:hover { background: var(--hover); color: var(--text); }
+
+/* 表格 A：行内伪表格（Codex flex 行） */
+.cm-editor.md-preview .cm-line.md-tr { display: flex; margin: 0 var(--ed-pad-x); padding: 0; }
+.cm-editor.md-preview .cm-line.md-tr:not(.md-th) { border-top: 1px solid var(--line); }
+.cm-editor.md-preview .cm-line.md-th { background: var(--surface-subtle); border-radius: 6px 6px 0 0; }
+.cm-editor.md-preview .md-td { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; padding: 6px 10px; font-size: .94em; }
+.cm-editor.md-preview .md-th .md-td { font-weight: 600; }
+.cm-editor.md-preview .md-tr .cm-widgetBuffer { display: none; }
+.cm-editor.md-preview .cm-line.md-tsep { font-size: 0; line-height: 0; padding: 0; }
+.cm-editor.md-preview .cm-line.md-table-src { font-family: var(--font-mono); font-size: 12.5px; }
+/* 表格 B：块级 widget */
+.cm-editor .md-table-widget { margin: 4px var(--ed-pad-x); overflow-x: auto; cursor: text; }
+.cm-editor .md-table-widget table { border-collapse: collapse; width: 100%; font-size: .94em; }
+.cm-editor .md-table-widget th, .cm-editor .md-table-widget td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.cm-editor .md-table-widget th { background: var(--surface-subtle); font-weight: 600; }
+.cm-editor .md-table-widget code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); padding: 0 .3em; border-radius: 4px; }
+
+/* 图片 / 公式 / Mermaid / Frontmatter */
+.cm-editor .md-img { display: block; width: fit-content; max-width: 100%; margin: 6px auto; }
+.cm-editor .md-img img { display: block; max-width: 100%; max-height: 300px; margin: 0 auto; border-radius: 8px; border: 1px solid var(--line); }
+.cm-editor .md-img.is-broken { color: var(--warning); font-size: 12px; }
+.cm-editor .md-img-skipped { color: var(--faint); font-size: .92em; }
+.cm-editor .md-img-skipped::after { content: "远程图片不加载"; margin-left: 6px; font-size: 10.5px; padding: 0 5px; border-radius: 4px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.cm-editor .md-math-inline { cursor: text; }
+.cm-editor .md-math-block { margin: 4px var(--ed-pad-x); padding: 6px 0; text-align: center; overflow-x: auto; cursor: text; }
+.cm-editor.md-preview .cm-line.md-math-src { font-family: var(--font-mono); font-size: 12.5px; color: var(--tok-num); }
+.cm-editor .md-mermaid { margin: 6px var(--ed-pad-x); padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow-x: auto; text-align: center; cursor: pointer; }
+.cm-editor .md-mermaid-below { margin-top: 2px; cursor: default; border-style: dashed; }
+.cm-editor .md-mermaid svg { max-width: 100%; height: auto; }
+.cm-editor .md-mermaid-status { color: var(--faint); font-size: 12px; }
+.cm-editor .md-mermaid.has-error .md-mermaid-status { color: var(--warning); }
+.cm-editor .md-fm-card { margin: 0 var(--ed-pad-x) 10px; display: grid; grid-template-columns: auto 1fr; gap: 3px 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); font-size: 12.5px; cursor: text; }
+.cm-editor .md-fm-title { grid-column: 1 / -1; font-size: 11px; color: var(--faint); margin-bottom: 2px; }
+.cm-editor .md-fm-key { color: var(--muted); }
+.cm-editor .md-fm-val { font-family: var(--font-mono); font-size: 12px; }
+.cm-editor.md-preview .cm-line.md-fm-raw { font-family: var(--font-mono); font-size: 12px; color: var(--faint); }
+
+/* 文件路径（D12） */
+.cm-editor.md-preview .md-path { font-family: var(--font-mono); font-size: .86em; color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); border-radius: 4px; padding: .08em .35em; }
+.cm-editor.md-preview .md-path-text { font-family: inherit; font-size: inherit; background: none; padding: 0; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 3px; }
+.cm-editor.md-preview .md-path-icon { display: inline-flex; vertical-align: -1px; margin-right: 3px; color: var(--accent); }
+.cm-editor.md-preview .md-path .tok-mono { color: inherit; }
+.cm-editor.md-preview .md-link.md-link-file, .cm-editor.md-preview .md-link.md-link-file .tok-link { color: var(--accent); text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.cm-editor.md-preview[data-link="click"] .md-link { cursor: pointer; }
+.cm-editor.md-preview[data-link="click"] .md-path { cursor: pointer; }
+
+/* ---------- 排版：Codex 原样（字号 14 / 行高 1.4 + 行上下 2px / 标题 24·20·18·14 字重 500 / 正文字重 430 / 左右 16px） ---------- */
+:root[data-typo="codex"] { --ed-pad-x: 16px; }
+:root[data-typo="codex"] .cm-editor { font-weight: 430; }
+:root[data-typo="codex"] .cm-editor .cm-scroller { line-height: 1.4; }
+:root[data-typo="codex"] .cm-editor .cm-content { padding: 12px 0 64px; }
+:root[data-typo="codex"] .cm-editor .cm-line { padding-top: 2px; padding-bottom: 2px; }
+:root[data-typo="codex"] .cm-editor .tok-strong { font-weight: 700; }
+:root[data-typo="codex"] .cm-editor.md-source .cm-scroller { font-size: 12px; line-height: 1.4; }
+:root[data-typo="codex"] .cm-editor.md-preview .cm-line.md-h { font-weight: 500; line-height: 1.4; padding-top: 2px; padding-bottom: 2px; }
+:root[data-typo="codex"] .cm-editor.md-preview .md-h .tok-heading { font-weight: 500; }
+:root[data-typo="codex"] .cm-editor.md-preview .cm-line.md-h1 { font-size: 24px; }
+:root[data-typo="codex"] .cm-editor.md-preview .cm-line.md-h2 { font-size: 20px; }
+:root[data-typo="codex"] .cm-editor.md-preview .cm-line.md-h3 { font-size: 18px; }
+:root[data-typo="codex"] .cm-editor.md-preview .cm-line.md-h4 { font-size: 14px; }
+:root[data-typo="codex"] .cm-editor.md-preview .cm-line.md-code-line { font-size: 12px; line-height: 1.4; padding-left: 12px; padding-right: 12px; }
+:root[data-typo="codex"] .cm-editor.md-preview .cm-line.md-quote { border-left-width: 4px; padding-left: 12px; }
+
+/* 提示框（GitHub 写法 > [!NOTE] 等）：竖线和标签用语义色，正文保持正文色 */
+.cm-editor.md-preview .cm-line.md-callout { color: var(--text); --callout: var(--info); border-left-color: var(--callout); }
+.cm-editor.md-preview .cm-line.md-callout-tip { --callout: var(--success); }
+.cm-editor.md-preview .cm-line.md-callout-important { --callout: var(--text); }
+.cm-editor.md-preview .cm-line.md-callout-warning { --callout: var(--warning); }
+.cm-editor.md-preview .cm-line.md-callout-caution { --callout: var(--danger); }
+.cm-editor.md-preview .md-callout .tok-quote { color: inherit; }
+.cm-editor.md-preview .md-callout-label { color: var(--callout); font-weight: 600; font-size: 13px; }
+:root[data-typo="codex"] .cm-editor.md-preview .md-inline-code { font-size: 1em; border: 0; }
+:root[data-typo="codex"] .cm-editor.md-source .cm-content { padding-top: 0; }
+
+/* ---------- 字体：Inter + 思源黑体 + JetBrains Mono（均为免费字体） ---------- */
+:root[data-font="inter"] { --font-ui: "Inter", "Noto Sans SC", -apple-system, sans-serif; --font-mono: "JetBrains Mono", ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>MD 功能渲染 Demo</h1>
+  <span class="tag">CodeMirror 6 + Lezer · 真实可编辑</span>
+  <span class="sp"></span>
+  <span class="lbl">整套方案</span>
+  <div class="seg" id="preset">
+    <button data-preset="codex">Codex 原样</button>
+    <button data-preset="rec" aria-pressed="true">我的推荐</button>
+  </div>
+  <span class="lbl">排版</span>
+  <div class="seg" id="typo">
+    <button data-typo="codex" aria-pressed="true">Codex 原样</button>
+    <button data-typo="loose">宽松</button>
+  </div>
+  <span class="lbl">字体</span>
+  <div class="seg" id="font">
+    <button data-font="system" aria-pressed="true">系统</button>
+    <button data-font="inter">Inter + 思源黑体</button>
+  </div>
+  <span class="lbl">主题</span>
+  <div class="seg" id="theme">
+    <button data-theme="light" aria-pressed="true">浅色</button>
+    <button data-theme="dark">深色</button>
+  </div>
+  <span class="lbl">强调色</span>
+  <div class="seg" id="accent">
+    <button data-accent="default" aria-pressed="true"><span class="swatch" style="background:#3978b8"></span>默认（信息蓝）</button>
+    <button data-accent="ink"><span class="swatch" style="background:#20201e"></span>近黑</button>
+    <button data-accent="emerald"><span class="swatch" style="background:#087a4b"></span>翡翠绿</button>
+    <button data-accent="blue"><span class="swatch" style="background:#3a83f7"></span>蓝</button>
+    <button data-accent="purple"><span class="swatch" style="background:#a67df2"></span>紫</button>
+    <button data-accent="pink"><span class="swatch" style="background:#f077af"></span>粉</button>
+    <button data-accent="orange"><span class="swatch" style="background:#ee7c37"></span>橙</button>
+  </div>
+  <button class="ghost" id="reset">重置文档</button>
+</div>
+
+<div class="stage">
+  <div class="panel-wrap">
+    <section class="docs" aria-label="文档面板">
+      <header class="docs-head">
+        <div class="crumb">docs <span>/</span> design <span>/</span> <b>md-render-sample.md</b> <span class="dirty" id="dirty" title="未保存"></span></div>
+        <span class="sp"></span>
+        <span class="saved-hint" id="savedHint">⌘S 保存</span>
+        <div class="seg" id="mode">
+          <button data-mode="preview" aria-pressed="true">预览</button>
+          <button data-mode="source">源码</button>
+        </div>
+      </header>
+      <div class="docs-body" id="editor"></div>
+    </section>
+  </div>
+
+  <aside class="rules" aria-label="预览规则">
+    <h2>预览规则 · 待拍板</h2>
+    <p class="intro">每一项都能直接切换，左边编辑器即时生效。点进正文编辑才能看到「标记露出」的效果；点编辑器外面，所有标记都会收起。</p>
+    <div class="legend"><span><span class="chip codex">Codex</span> Codex App 现在的做法</span><span><span class="chip rec">推荐</span> 我的建议</span></div>
+    <div id="decisions"></div>
+    <h2 style="margin-top:18px">固定规则（不用选）</h2>
+    <ul class="fixed">
+      <li><b>同一个编辑器</b>：预览和源码是同一个 CM6 实例，只开关装饰；撤销历史、光标、未保存内容两边共享。</li>
+      <li><b>失焦 = 纯阅读</b>：编辑器没焦点时所有标记都隐藏，看起来就是排好版的文档。</li>
+      <li><b>标题</b>：H1–H4 四档字号，H5/H6 同 H4；<code>#</code> 跟着 D1 露出。</li>
+      <li><b>粗体 / 斜体 / 删除线 / 行内代码 / 链接</b>：标记跟着 D1 露出。</li>
+      <li><b>引用</b>：第一层 <code>&gt;</code> 隐藏，左侧竖线；嵌套引用保留 <code>&gt;</code>（Codex）。</li>
+      <li><b>分割线</b>：整行画成细线，光标在这一行时还原 <code>---</code>。</li>
+      <li><b>原始 HTML</b>：按源码淡色显示，不渲染、不执行（沿用现有安全约束）。</li>
+      <li><b>未闭合的代码块</b>：只加代码背景和左侧黄线，不隐藏围栏。</li>
+      <li><b>源码模式</b>：等宽字体、Markdown 语法高亮、⌘F 查找；没有任何装饰。</li>
+    </ul>
+  </aside>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="text/markdown" id="sample">---
+title: MD 渲染示例
+owner: Astra
+tags: [design, markdown]
+---
+
+# MD 功能渲染示例
+
+这份文档把常见元素都放进来了，点任意位置直接编辑。行内有 *斜体*、**粗体**、~~删除线~~、`行内代码`，一个[普通链接](https://example.com/docs)，和一个自动链接 <https://openai.com>。
+
+## 标题层级
+
+### 三级标题
+
+#### 四级标题
+
+## 列表
+
+- 无序列表第一项
+- 第二项，里面有 **粗体** 和 `code`
+  - 嵌套的子项
+    - 第三层
+  - 另一个子项
+- 第三项
+
+1. 有序列表第一步
+2. 第二步
+3. 第三步
+
+## 任务列表
+
+- [x] 已完成：确认框架用 CodeMirror 6
+- [ ] 待办：拍板预览规则
+- [ ] 待办：Electron 里实测
+
+## 引用
+
+> 唯变所适。好的工具应该退到内容后面。
+> 第二行引用，**依然可以加粗**。
+>
+> > 嵌套引用保留它的标记。
+
+> [!NOTE]
+> 说明：GitHub 写法的提示框，竖线和标签用语义色。
+
+> [!TIP]
+> 提示：光标移到第一行会露出 `[!TIP]` 原文。
+
+> [!WARNING]
+> 注意：保存会覆盖磁盘上的版本。
+
+> [!CAUTION]
+> 警告：这一步不能撤销。
+
+---
+
+## 表格
+
+| 元素 | Codex 做法 | 说明 |
+| --- | --- | --- |
+| 标题 | 隐藏 `#` | 光标靠近时露出 |
+| 表格 | 行内伪表格 | 单元格可以直接改 |
+| 代码块 | 隐藏围栏 | 右上角写语言 |
+
+## 代码块
+
+```ts
+export function greet(name: string): string {
+  // 光标进入代码块，看围栏怎么处理
+  return `Hello, ${name}`;
+}
+```
+
+```python
+def total(items):
+    return sum(i.price for i in items)
+```
+
+## Mermaid
+
+```mermaid
+flowchart LR
+  A[打开 .md] --> B{模式}
+  B -->|预览| C[CM6 + 装饰]
+  B -->|源码| D[CM6 原文]
+```
+
+## 数学公式
+
+行内公式 $E = mc^2$，以及块级公式：
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
+
+## 图片
+
+![本地图片](assets/md-demo-image.svg)
+
+![远程图片](https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f4d6.svg)
+
+## 文件路径
+
+改动在 `apps/desktop/src/renderer/components/right-panel/MarkdownRenderView.tsx`，规则写在 `docs/design-docs/frontend/front-文档面板规范.md:80`，相关文档见[文档面板规范](./front-文档面板规范.md)。
+普通文字里的路径 docs/design-docs/frontend/README.md 要不要也识别？版本号 `v1.2.3` 和命令 `pnpm dev` 不该被当成路径。
+
+## 原始 HTML
+
+<details><summary>原始 HTML 不渲染</summary>按源码显示。</details>
+
+最后一段普通文字。
+</script>
+
+<script src="editor.bundle.js"></script>
+<script>
+const DECISIONS = [
+  { key: "reveal", title: "D1 语法标记什么时候露出", desc: "预览里 # ** ` [](url) 平时隐藏，编辑时要露出来。", go: "这份文档把常见元素", options: [
+    { v: "node", label: "光标进入这个语法节点", note: "光标进 **粗体** 才露出这对 **；同一行别的标记不动", codex: true, rec: true },
+    { v: "line", label: "光标所在的整行全部露出", note: "Obsidian 的做法；行内东西多时会整行跳动" },
+  ]},
+  { key: "bullet", title: "D2 无序列表符号", desc: "", go: "## 列表", options: [
+    { v: "raw", label: "保留 - 原文（淡色）", codex: true },
+    { v: "dot", label: "显示成圆点，光标碰到时还原 -", note: "三层分别是实心点 / 空心点 / 方点", rec: true },
+  ]},
+  { key: "task", title: "D3 任务列表", desc: "", go: "## 任务列表", options: [
+    { v: "raw", label: "保留 - [ ] 原文", codex: true },
+    { v: "checkbox", label: "可点击的复选框", note: "点一下把 [ ] 改写成 [x]；已完成项划线变淡", rec: true },
+  ]},
+  { key: "table", title: "D4 表格", desc: "", go: "## 表格", options: [
+    { v: "inline", label: "行内伪表格，单元格原地编辑", note: "隐藏 | 和分隔行；列宽每行均分，预览里加不了列", codex: true, rec: true },
+    { v: "widget", label: "渲染成真表格，光标进入还原源码", note: "列宽按内容；改表格时看到的是 | 源码" },
+  ]},
+  { key: "code", title: "D5 代码块围栏", desc: "", go: "## 代码块", options: [
+    { v: "codex", label: "围栏始终隐藏，右上角写语言", note: "改语言只能切到源码", codex: true },
+    { v: "reveal", label: "光标进入露出 ``` 围栏，平时显示语言 + 复制", rec: true },
+  ]},
+  { key: "link", title: "D6 点击链接", desc: "", go: "## 标题层级", options: [
+    { v: "click", label: "单击直接打开", note: "想改链接文字用方向键移进去，或切源码", codex: true, rec: true },
+    { v: "mod", label: "⌘ + 单击打开，单击就是编辑" },
+  ]},
+  { key: "frontmatter", title: "D7 文件头 Frontmatter", desc: "SKILL.md、文档元信息常用。", go: "MD 渲染示例\n", options: [
+    { v: "hide", label: "整块隐藏，只能在源码里改", codex: true },
+    { v: "card", label: "属性卡片，点一下展开源码编辑", rec: true },
+    { v: "raw", label: "按原文淡色显示" },
+  ]},
+  { key: "mermaid", title: "D8 Mermaid 图", desc: "", go: "## Mermaid", options: [
+    { v: "always", label: "始终显示图，改图要切源码", codex: true },
+    { v: "live", label: "点图露出源码，图在下方实时更新", rec: true },
+  ]},
+  { key: "math", title: "D9 数学公式", desc: "KaTeX 约 270KB，用到时才加载。", go: "## 数学公式", options: [
+    { v: "katex", label: "KaTeX 渲染，光标进入露出源码", codex: true, rec: true },
+    { v: "raw", label: "不渲染，等宽显示原文" },
+  ]},
+  { key: "remoteImg", title: "D10 远程图片", desc: "", go: "## 图片", options: [
+    { v: "local", label: "只渲染工作区本地图片", note: "远程地址显示原文，不发网络请求", codex: true, rec: true },
+    { v: "all", label: "本地和远程都渲染" },
+  ]},
+  { key: "paths", title: "D12 正文里的文件路径", desc: "比如 `apps/…/x.tsx`、`docs/a.md:80`、[规范](./a.md)。打开方式跟 D6 一致。", go: "## 文件路径", options: [
+    { v: "codex", label: "只有指向本地文件的链接可点，在应用内打开", note: "行内代码里的路径就是普通代码", codex: true },
+    { v: "chip", label: "行内代码里的路径也识别成文件", note: "强调色 + 文件图标；带 :行号 的跳到对应行", rec: true },
+    { v: "all", label: "连普通文字里的路径也识别", note: "最方便，但容易误判（版本号、网址片段）" },
+  ]},
+  { key: "lineNumbers", title: "D11 源码模式行号", desc: "只在「源码」模式下可见。", src: true, options: [
+    { v: true, label: "显示行号", codex: true, rec: true },
+    { v: false, label: "不显示（和现在 textarea 一样）" },
+  ]},
+];
+const PRESETS = {
+  codex: Object.fromEntries(DECISIONS.map((d) => [d.key, d.options.find((o) => o.codex).v])),
+  rec: Object.fromEntries(DECISIONS.map((d) => [d.key, d.options.find((o) => o.rec)?.v ?? d.options[0].v])),
+};
+const sample = document.getElementById("sample").textContent.replace(/^\n/, "");
+let config = { ...PRESETS.rec, theme: "light" };
+let savedDoc = sample;
+
+const $dirty = document.getElementById("dirty");
+const $toast = document.getElementById("toast");
+let toastTimer;
+function showToast(msg) {
+  $toast.textContent = msg;
+  $toast.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $toast.classList.remove("on"), 1800);
+}
+
+let editor;
+function mount(doc) {
+  const host = document.getElementById("editor");
+  host.innerHTML = "";
+  editor = MdEditor.create(host, {
+    doc,
+    config,
+    onChange: (text) => $dirty.classList.toggle("on", text !== savedDoc),
+    onSave: () => { savedDoc = editor.view.state.doc.toString(); $dirty.classList.remove("on"); showToast("已保存（demo 不写磁盘）"); },
+    onToast: showToast,
+  });
+}
+mount(sample);
+
+function press(group, attr, value) {
+  for (const b of document.querySelectorAll(`#${group} button`)) b.setAttribute("aria-pressed", String(b.dataset[attr] === String(value)));
+}
+document.getElementById("mode").addEventListener("click", (e) => {
+  const m = e.target.closest("button")?.dataset.mode;
+  if (!m) return;
+  editor.setMode(m);
+  press("mode", "mode", m);
+});
+document.getElementById("theme").addEventListener("click", (e) => {
+  const th = e.target.closest("button")?.dataset.theme;
+  if (!th) return;
+  document.documentElement.dataset.theme = th;
+  press("theme", "theme", th);
+  config = { ...config, theme: th };
+  editor.setConfig({ theme: th });
+});
+document.getElementById("accent").addEventListener("click", (e) => {
+  const a = e.target.closest("button")?.dataset.accent;
+  if (!a) return;
+  if (a === "default") delete document.documentElement.dataset.accent;
+  else document.documentElement.dataset.accent = a;
+  press("accent", "accent", a);
+});
+for (const [group, attr, off] of [["typo", "typo", "loose"], ["font", "font", "system"]]) {
+  document.getElementById(group).addEventListener("click", (e) => {
+    const v = e.target.closest("button")?.dataset[attr];
+    if (!v) return;
+    if (v === off) delete document.documentElement.dataset[attr];
+    else document.documentElement.dataset[attr] = v;
+    press(group, attr, v);
+    editor.view.requestMeasure();
+  });
+}
+document.getElementById("preset").addEventListener("click", (e) => {
+  const p = e.target.closest("button")?.dataset.preset;
+  if (!p) return;
+  config = { ...config, ...PRESETS[p] };
+  editor.setConfig(config);
+  press("preset", "preset", p);
+  renderDecisions();
+});
+document.getElementById("reset").addEventListener("click", () => {
+  savedDoc = sample;
+  $dirty.classList.remove("on");
+  const mode = editor.getMode();
+  mount(sample);
+  editor.setMode(mode);
+});
+
+function renderDecisions() {
+  const root = document.getElementById("decisions");
+  root.innerHTML = DECISIONS.map((d) => `
+    <div class="d">
+      <div class="d-head"><span class="d-title">${d.title}</span>${d.src ? '<span class="chip src">源码模式</span>' : ""}${d.go ? `<button class="d-go" data-go="${encodeURIComponent(d.go)}">定位 ↘</button>` : ""}</div>
+      ${d.desc ? `<p class="d-desc">${d.desc}</p>` : '<div style="height:6px"></div>'}
+      ${d.options.map((o) => `
+        <button class="opt" data-key="${d.key}" data-v="${String(o.v)}" aria-pressed="${String(config[d.key] === o.v)}">
+          <span class="radio"></span>
+          <span class="opt-main"><span class="opt-label">${o.label.replace(/</g, "&lt;")}</span>${o.codex ? '<span class="chip codex">Codex</span>' : ""}${o.rec ? '<span class="chip rec">推荐</span>' : ""}${o.note ? `<span class="opt-note">${o.note.replace(/</g, "&lt;")}</span>` : ""}</span>
+        </button>`).join("")}
+    </div>`).join("");
+}
+renderDecisions();
+document.getElementById("decisions").addEventListener("click", (e) => {
+  const go = e.target.closest("[data-go]");
+  if (go) {
+    editor.scrollToText(decodeURIComponent(go.dataset.go));
+    return;
+  }
+  const opt = e.target.closest(".opt");
+  if (!opt) return;
+  const d = DECISIONS.find((x) => x.key === opt.dataset.key);
+  const value = d.options.find((o) => String(o.v) === opt.dataset.v).v;
+  config = { ...config, [d.key]: value };
+  editor.setConfig({ [d.key]: value });
+  if (d.src && editor.getMode() !== "source") { editor.setMode("source"); press("mode", "mode", "source"); }
+  const matches = Object.entries(PRESETS).find(([, p]) => DECISIONS.every((x) => p[x.key] === config[x.key]));
+  press("preset", "preset", matches ? matches[0] : "");
+  renderDecisions();
+});
+</script>
+</body>
+</html>
