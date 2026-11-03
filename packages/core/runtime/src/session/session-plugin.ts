@@ -2,7 +2,6 @@ import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
 import type { EventCodecRegistry } from "@actspace/session-journal";
 import type { SessionProjectionService } from "@actspace/session-projection";
 import { SessionStoreService } from "@actspace/session-persistence";
-import { repairSubagentPublications } from "@actspace/subagent";
 import type { RendererAllowlist } from "../projection/tool-dto.js";
 import { RuntimeSessionController } from "./session-controller.js";
 import { createAuxiliaryRequestRecorder } from "./auxiliary-request-recorder.js";
@@ -39,7 +38,6 @@ export function apply(ctx: CordisContext): void {
     ...host,
     registry: journal.registry,
     projectionService: projection,
-    beforeRecovery: async (parent, store) => { await repairSubagentPublications({ store, parent }); },
     onEvent: (sessionId, event) => emitNotification(ctx, "session/event", event, { sessionId }),
     onFlush: (sessionId, throughSeq) => emitNotification(ctx, "session/flush", { sessionId, throughSeq }),
     onCreated: (sessionId) => emitNotification(ctx, "session/created", { sessionId }),

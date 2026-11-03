@@ -19,7 +19,7 @@ import {
 import { BUILTIN_MODEL_CATALOG } from "@actspace/shared/model-catalog-data";
 import type { SettingsService } from "./settings-service";
 
-const PURPOSES: readonly ModelPurpose[] = ["chat", "utility", "explore", "vision"];
+const PURPOSES: readonly ModelPurpose[] = ["chat", "utility", "vision"];
 
 export interface ModelStoreServiceOptions {
   settings: SettingsService;

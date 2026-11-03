@@ -110,7 +110,8 @@ export interface TaskModelSettings {
   defaultChatModel: ModelKey | null;
   utilityModel: ModelKey | null;
   autoReviewModel?: ModelKey | null;
-  exploreModel: ModelKey | null;
+  /** 子智能体默认模型；null = 跟随父会话当前模型。不是用途表里的用途，没有思考档位。 */
+  subagentDefaultModel: ModelKey | null;
   /** 看图；null = 跟随会话默认（需能看图）。 */
   visionModel?: ModelKey | null;
   /** 每个用途的思考档位；缺省用模型的默认档位。 */
@@ -128,13 +129,6 @@ export interface AgentSettings {
   disabledTools: string[];
   /** 「自动审查」开关 → ACTSPACE_BASH_ALWAYS_ASK：每条 bash 命令执行前都要确认。 */
   bashAlwaysAsk: boolean;
-  /**
-   * 内置 Explore 聚焦子代理模型。
-   *
-   * null = 默认 `deepseek-v4-flash`（便宜、快）；显式值覆盖为指定模型。
-   * 缺 DeepSeek key 时运行时回落主模型，见 docs/design-docs/collaboration/agent-explore-subagent.md。
-   */
-  exploreModelId: ModelId | null;
 }
 
 export interface SkillsSettings {
@@ -173,7 +167,7 @@ export interface AppSettingsV1 {
   skills: SkillsSettings;
 }
 
-export type AgentSettingsV2 = Omit<AgentSettings, "exploreModelId">;
+export type AgentSettingsV2 = AgentSettings;
 export interface AppSettingsV2 {
   version: 2;
   providers: Record<LlmProviderId, ProviderSettingsView>;
@@ -270,7 +264,7 @@ export interface SettingsV4Models {
     defaultChat: ModelKey | null;
     utility: ModelKey | null;
     autoReview?: ModelKey | null;
-    explore: ModelKey | null;
+    subagentDefaultModel: ModelKey | null;
     vision?: ModelKey | null;
     thinking?: TaskModelSettings["thinking"];
   };

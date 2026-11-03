@@ -908,6 +908,31 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/context/context-subagents:
+    dependencies:
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+      '@actspace/subagent':
+        specifier: workspace:*
+        version: link:../../subagent/subagent
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/context/context-system:
     dependencies:
       '@actspace/context-engine':
@@ -1162,6 +1187,9 @@ importers:
       '@actspace/context-skills':
         specifier: workspace:*
         version: link:../../context/context-skills
+      '@actspace/context-subagents':
+        specifier: workspace:*
+        version: link:../../context/context-subagents
       '@actspace/context-system':
         specifier: workspace:*
         version: link:../../context/context-system
@@ -2137,15 +2165,9 @@ importers:
       '@actspace/agent-loop':
         specifier: workspace:*
         version: link:../../core/agent-loop
-      '@actspace/background-tasks':
-        specifier: workspace:*
-        version: link:../../background-tasks/background-tasks
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../composition/cordis-adapter
-      '@actspace/llm-service':
-        specifier: workspace:*
-        version: link:../../llm/llm-service
       '@actspace/scope':
         specifier: workspace:*
         version: link:../../core/scope
@@ -2180,9 +2202,6 @@ importers:
       '@actspace/agent':
         specifier: workspace:*
         version: link:../../core/agent
-      '@actspace/background-tasks':
-        specifier: workspace:*
-        version: link:../../background-tasks/background-tasks
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../composition/cordis-adapter

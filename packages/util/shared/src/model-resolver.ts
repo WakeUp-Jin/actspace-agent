@@ -10,7 +10,7 @@ import type {
   ProviderConnectionState,
 } from "./settings";
 
-export type ModelPurpose = "chat" | "utility" | "explore" | "vision";
+export type ModelPurpose = "chat" | "utility" | "vision";
 
 export interface ProviderAvailability {
   enabled: boolean;

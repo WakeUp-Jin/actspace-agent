@@ -143,9 +143,9 @@ it("removes models and connections together with their purpose bindings and keys
   const created = await service.create({ templateId: "custom", apiKey: "relay-secret", baseUrl: "https://relay.example/v1", models: [{ apiModel: "relay-a" }, { apiModel: "relay-b" }] });
   if (!created.ok) throw new Error(created.error.message);
   const [a, b] = created.view.connections[0]!.models;
-  const bound = await service.updatePurposes({ utility: { model: a!.key, thinking: "high" }, explore: { model: b!.key, thinking: null } });
+  const bound = await service.updatePurposes({ utility: { model: a!.key, thinking: "high" }, vision: { model: b!.key, thinking: null } });
   if (!bound.ok) throw new Error(bound.error.message);
-  expect(bound.view.purposes).toMatchObject({ utility: { model: a!.key, thinking: "high" }, explore: { model: b!.key, thinking: null } });
+  expect(bound.view.purposes).toMatchObject({ utility: { model: a!.key, thinking: "high" }, vision: { model: b!.key, thinking: null } });
   expect(bound.view.connections[0]!.models.find((model) => model.key === a!.key)!.usedBy).toEqual(["utility"]);
   expect(await service.updatePurposes({ vision: { model: "openrouter:missing" as ModelKey, thinking: null } })).toMatchObject({ ok: false, error: { code: "model_missing" } });
 
@@ -157,7 +157,7 @@ it("removes models and connections together with their purpose bindings and keys
   const gone = await service.remove({ connectionId: created.connectionId! });
   if (!gone.ok) throw new Error(gone.error.message);
   expect(gone.view.connections).toEqual([]);
-  expect(gone.view.purposes.explore.model).toBeNull();
+  expect(gone.view.purposes.vision.model).toBeNull();
   expect(settings.getV4().settings.models.installed[b!.key]).toBeUndefined();
   expect(settings.hasConnectionKey(created.connectionId!, "openrouter")).toBe(false);
 });

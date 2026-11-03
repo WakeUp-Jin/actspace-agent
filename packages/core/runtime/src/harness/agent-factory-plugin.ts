@@ -22,20 +22,14 @@ import { HOST_READABLE_FILES_SERVICE_ID, HostReadableFiles } from "@actspace/too
 import { projectPermissionMode, applySessionGrantEvent } from "@actspace/session-projection";
 import { isBackgroundWake } from "@actspace/shared/runtime-v2";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
+import { SUBAGENT_APPROVAL_UNAVAILABLE, type ChildLoopInput } from "@actspace/subagent";
 
-const PURPOSE_ROUTE_IDS = new Set(["utility", "auto-review", "explore"]);
+const PURPOSE_ROUTE_IDS = new Set(["utility", "auto-review"]);
 
 export type AgentFactoryService = {
   readonly runFactory: RunFactory;
   readonly activeSessions: ReadonlyMap<string, import("@actspace/session-persistence").SessionHandle>;
-  readonly createSubagentLoop: (input: {
-    readonly session: import("@actspace/session-persistence").SessionHandle;
-    readonly scope: AgentScope;
-    readonly preset: import("@actspace/subagent").StaticAgentPreset;
-    readonly allowedToolNames: readonly string[];
-    readonly signal: AbortSignal;
-    readonly agentId: string;
-  }) => AgentLoop | Promise<AgentLoop>;
+  readonly createSubagentLoop: (input: ChildLoopInput) => AgentLoop | Promise<AgentLoop>;
 };
 
 export const inject = Object.freeze([
@@ -73,8 +67,8 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
 
   const createSources = (scope: AgentScope, agent: import("@actspace/agent").AgentDescriptor, workspaceRoot: string) => {
     const sources = new ContextSourceRegistry(["context-system", "context-conversation"]);
-    // 后台任务清单只给主 Agent：子智能体不能发起后台任务。
-    for (const kind of ["system", "rules", "skills", "runtime", "conversation", "tools", ...(agent.kind === "main" ? ["background-tasks"] : [])]) {
+    // 后台任务与运行中子智能体清单只给主 Agent：子智能体不能发起后台任务，也不能再派子智能体。
+    for (const kind of ["system", "rules", "skills", "runtime", "conversation", "tools", ...(agent.kind === "main" ? ["background-tasks", "subagents"] : [])]) {
       const factory = ctx.get?.(`context.source.${kind}`) as SourceFactory | undefined;
       if (!factory && (kind === "system" || kind === "conversation")) throw new Error(`Required context source ${kind} is unavailable.`);
       if (factory) scope.disposer.add(sources.register(factory.create({ scope, scopeId: scope.identity.scopeId, agent, host: host.host, workspaceRoot, prompt })));
@@ -108,7 +102,7 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
         : sessions.subscribeProjection(update => {
           if (update.sessionId === session.header.sessionId && update.event.type === "permission/mode-set") listener();
         }),
-      sessionGrants: () => host.toolEnvironment.sessionGrantCapability ? session.journal.project(SESSION_GRANTS, () => [], applySessionGrantEvent).flatMap(item => item.grant && item.revokedAt === null ? [item.grant] : []) : [],
+      sessionGrants: () => host.toolEnvironment.sessionGrantCapability ? activeGrants(session) : [],
     });
   };
 
@@ -124,8 +118,22 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
     scope.disposer.add(() => { activeSessions.delete(session.header.sessionId); });
     const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal, host.workspaceRoot);
     const subject: AgentSubject = Object.freeze({ agentId: agentId ?? scope.agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
+    // A subagent cannot ask for approval or start background work; it reuses its parent's session grants without adding any.
     const scopedToolEnvironment = descriptor.kind === "subagent"
-      ? (activeSession: import("@actspace/session-persistence").SessionHandle) => ({ ...toolEnvironmentFor(activeSession), sessionGrantCapability: false, sessionGrants: [] })
+      ? (activeSession: import("@actspace/session-persistence").SessionHandle) => {
+        const { approvalBroker: _approvalBroker, ...environment } = toolEnvironmentFor(activeSession);
+        const parentId = activeSession.header.lineage?.parentSessionId;
+        return {
+          ...environment,
+          approvalUnavailableMessage: SUBAGENT_APPROVAL_UNAVAILABLE,
+          backgroundAllowed: false,
+          sessionGrantCapability: false,
+          sessionGrants: () => {
+            const parent = parentId === undefined ? undefined : sessions.getOpen(parentId);
+            return parent && host.toolEnvironment.sessionGrantCapability ? activeGrants(parent) : [];
+          },
+        };
+      }
       : toolEnvironmentFor;
     const binding = tools.bindAgentScope(session.header.sessionId, subject.agentId, () => new Set(allowedToolNames ?? []));
     scope.disposer.add(binding.dispose);
@@ -223,8 +231,8 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
   const service: AgentFactoryService = Object.freeze({
     runFactory,
     activeSessions,
-    // 宿主没注册预设专用的路由（例如 explore）时，退回主 Agent 用的路由。
-    createSubagentLoop: ({ session, scope, preset, allowedToolNames, signal, agentId }) => createLoop({ session, scope, signal, agentId, allowedToolNames, descriptor: Object.freeze({ id: preset.id, version: preset.version, kind: "subagent", description: `One-shot ${preset.id} child Agent`, presetId: preset.id, routeId: llm.routes.list().some(route => route.routeId === preset.routeId) ? preset.routeId : mainRouteId(), model: preset.model, maxSteps: preset.maxSteps }) }),
+    // Subagents run on the main route; the model of each activation comes from runTurn.
+    createSubagentLoop: ({ session, scope, preset, description, allowedToolNames, maxSteps, signal, agentId }) => createLoop({ session, scope, signal, agentId, allowedToolNames, descriptor: Object.freeze({ id: `actspace.subagent.${preset}`, version: 2, kind: "subagent", description: `Subagent (${preset}): ${description}`, presetId: `actspace.subagent.${preset}`, routeId: mainRouteId(), model: MAIN_AGENT_DESCRIPTOR.model, maxSteps }) }),
   });
   ctx.provide?.("actspace.agent.factory", service);
   return service;
@@ -273,3 +281,6 @@ function taskContent(content: import("@actspace/shared/runtime-v2").RuntimeV2Jso
 }
 
 const SESSION_GRANTS = Symbol("session-grants");
+function activeGrants(session: import("@actspace/session-persistence").SessionHandle) {
+  return session.journal.project(SESSION_GRANTS, () => [], applySessionGrantEvent).flatMap(item => item.grant && item.revokedAt === null ? [item.grant] : []);
+}

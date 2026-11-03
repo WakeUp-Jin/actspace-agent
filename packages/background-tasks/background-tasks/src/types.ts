@@ -1,4 +1,5 @@
-export type BackgroundTaskKind = "bash" | "agent";
+/** Only Bash runs as a background task; subagents have their own events and notices (`subagent/*`). Old `kind: "agent"` records are ignored. */
+export type BackgroundTaskKind = "bash";
 export type BackgroundTaskStatus = "running" | "completed" | "failed" | "stopped" | "lost";
 export type BackgroundTaskTerminalStatus = "completed" | "failed" | "stopped";
 /** How a settled task's result reached the model. */
@@ -24,7 +25,7 @@ export type BackgroundTaskOutput = { readonly text: string; readonly outputPath?
 /** `since`: Bash log byte offset to read from; without it a source returns its tail. */
 export type BackgroundTaskOutputOptions = { readonly since?: number };
 
-/** Implemented by Bash and Subagent; the registry owns delivery, persistence and wake-up. */
+/** Implemented by background Bash; the registry owns delivery, persistence and wake-up. */
 export interface BackgroundTaskSource {
   readonly taskId: string;
   readonly kind: BackgroundTaskKind;

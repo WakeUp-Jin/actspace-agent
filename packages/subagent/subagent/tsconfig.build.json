@@ -13,13 +13,7 @@
       "path": "./../../core/agent-loop/tsconfig.build.json"
     },
     {
-      "path": "./../../background-tasks/background-tasks/tsconfig.build.json"
-    },
-    {
       "path": "./../../composition/cordis-adapter/tsconfig.build.json"
-    },
-    {
-      "path": "./../../llm/llm-service/tsconfig.build.json"
     },
     {
       "path": "./../../core/scope/tsconfig.build.json"

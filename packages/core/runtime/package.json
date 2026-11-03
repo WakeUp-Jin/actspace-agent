@@ -109,7 +109,8 @@
     "@actspace/auto-review": "workspace:*",
     "@actspace/sandbox": "workspace:*",
     "@actspace/sandbox-nono": "workspace:*",
-    "@actspace/sandbox-seatbelt": "workspace:*"
+    "@actspace/sandbox-seatbelt": "workspace:*",
+    "@actspace/context-subagents": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

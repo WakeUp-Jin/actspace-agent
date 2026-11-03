@@ -667,6 +667,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     }));
     return projectSubagentList(await options.registry.inspectSession(input.sessionId), journal, childModels);
   });
+  ipc.handle(contract.sessions.interruptSubagent, async (input) => options.registry.interruptSubagent(input.sessionId, input.agentId));
   ipc.handle(contract.sessions.getSubAgentTranscript, async (input) => {
     const snapshot = await options.registry.inspectSession(input.transcriptRef.runId);
     const journal = await options.registry.inspectSessionEvents(input.transcriptRef.runId);

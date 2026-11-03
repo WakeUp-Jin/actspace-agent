@@ -99,6 +99,8 @@ export const desktopBridgeContract = {
     getPreview: invoke<S.SessionPreviewInput, S.SessionPreviewResult | null>(CH.getSessionPreview),
     getSubagents: invoke<{ sessionId: string }, S.MessageBlock[]>(CH.getSubagents),
     getSubAgentTranscript: invoke<S.SubAgentTranscriptGetInput, S.SessionEvent[]>(CH.getSubAgentTranscript),
+    /** 子 Agent 面板的「停止」：效果同主会话调用 `interrupt_agent`；message 是给模型看的同一句话。 */
+    interruptSubagent: invoke<{ sessionId: string; agentId: string }, { ok: boolean; message: string }>(CH.interruptSubagent),
     /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */
     create: invokeWithDefault<S.SessionCreateInput, RV2.RuntimeV2DesktopSessionProjection>(CH.createSession, {}),
     /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */

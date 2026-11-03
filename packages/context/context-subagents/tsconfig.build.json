@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "./../context-engine/tsconfig.build.json"
+    },
+    {
+      "path": "./../../composition/cordis-adapter/tsconfig.build.json"
+    },
+    {
+      "path": "./../prompt/tsconfig.build.json"
+    },
+    {
+      "path": "./../../subagent/subagent/tsconfig.build.json"
+    }
+  ]
+}

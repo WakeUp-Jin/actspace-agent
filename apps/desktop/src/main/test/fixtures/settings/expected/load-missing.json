@@ -98,7 +98,7 @@
           "defaultChat": null,
           "utility": null,
           "autoReview": null,
-          "explore": null,
+          "subagentDefaultModel": null,
           "vision": null,
           "thinking": {
             "utility": "off",
@@ -106,7 +106,7 @@
           }
         },
         "overrides": {},
-        "layersVersion": 2
+        "layersVersion": 3
       },
       "tools": {
         "disabledTools": [

@@ -81,7 +81,6 @@ export function getCredentialStorageView(store: SettingsStore): CredentialStorag
 export function get(store: SettingsStore): AppSettings {
   const v2 = getV2(store);
   const defaultModelId = legacyModelIdFromKey(v2.taskModels.defaultChatModel as ModelKey) ?? null;
-  const exploreModelId = legacyModelIdFromKey(v2.taskModels.exploreModel as ModelKey) ?? null;
   return {
     version: 2,
     defaultModelId: isPublicModelId(defaultModelId) ? defaultModelId : null,
@@ -91,7 +90,7 @@ export function get(store: SettingsStore): AppSettings {
     taskModels: v2.taskModels,
     searchProviders: v2.searchProviders,
     imageGeneration: v2.imageGeneration,
-    agent: { ...v2.agent, exploreModelId },
+    agent: v2.agent,
     skills: v2.skills,
     shortcuts: v2.shortcuts,
   };
@@ -199,11 +198,6 @@ export async function update(store: SettingsStore, input: SettingsUpdateInput): 
       }
       if (input.agent) {
         store.settings.agent = sanitizeAgentV2({ ...store.settings.agent, ...input.agent }, store.settings.agent);
-        if (input.agent.exploreModelId !== undefined) {
-          store.settings.taskModels.exploreModel = input.agent.exploreModelId && isPublicModelId(input.agent.exploreModelId)
-            ? LEGACY_MODEL_KEY_MAP[input.agent.exploreModelId]
-            : null;
-        }
         await store.ensureAgentSystemPromptFile();
       }
       if (input.skills) {

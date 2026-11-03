@@ -22,16 +22,17 @@ kind: "package-group"
 | `context-conversation` | 实现 | 会话 | 开 | 来源：之前的对话；提供 `context.source.conversation` |
 | `context-tools` | 实现 | 会话 | 开 | 来源：每个工具怎么用；提供 `context.source.tools` |
 | `context-background-tasks` | 实现 | 会话 | 开 | 来源：正在运行的后台任务（只给主 Agent）；提供 `context.source.background-tasks` |
+| `context-subagents` | 实现 | 会话 | 开 | 来源：正在运行的子智能体及其 transcript 路径（只给主 Agent）；提供 `context.source.subagents` |
 | `context-disclosure` | 实现 | 会话 | 开 | 渐进式披露：按需把工作区路径和文件摘要告诉 Agent，并恢复披露状态；提供 `context.disclosure` |
 | `context-compaction` | 实现 | 会话 | 开 | 压缩策略、摘要器和策略注册；通过 append-only 的 Surface 替换记录摘要，不删原始日志；提供 `compaction.runtime`、`compaction.surface` |
 
 ## 包之间怎么连
 
-- **来源。** 每个 `context-*` 来源插件提供 `context.source.<种类>` 工厂。会话插件 `agent-factory`（在 [`core/runtime`](../core/README.md)）按种类取工厂，搭出 `ContextSourceRegistry` 交给引擎：`system` 和 `conversation` 必须有，缺了启动失败；`rules`、`skills`、`runtime`、`tools` 可缺；`background-tasks` 只给主 Agent，子 Agent 没有。
+- **来源。** 每个 `context-*` 来源插件提供 `context.source.<种类>` 工厂。会话插件 `agent-factory`（在 [`core/runtime`](../core/README.md)）按种类取工厂，搭出 `ContextSourceRegistry` 交给引擎：`system` 和 `conversation` 必须有，缺了启动失败；`rules`、`skills`、`runtime`、`tools` 可缺；`background-tasks`、`subagents` 只给主 Agent，子智能体没有。
 - **披露。** `context-disclosure` inject `context.engine` 和 `actspace.host.agent`；`agent-factory` 发现 `context.disclosure` 存在就注册披露来源。
 - **压缩。** `context-compaction` inject `llm.service`、`context.engine`、`llm.auxiliary-requests`；策略的选择和提交协调仍在引擎的 `compaction.ts`，压缩包只提供策略和摘要器。
 - **提示词。** `prompt` inject `actspace.host.prompt`，来源（`context-rules` 等）借 `@actspace/prompt/source-support` 向引擎贡献内容。Prompt 只贡献内容，引擎负责组织和转换，`llm-service` 负责真实请求。
-- 引擎 inject `session.journal`。`context-background-tasks` inject `actspace.host.background-tasks`。
+- 引擎 inject `session.journal`。`context-background-tasks` inject `actspace.host.background-tasks`；`context-subagents` inject `actspace.host.subagents`。
 
 ## 入口与测试
 

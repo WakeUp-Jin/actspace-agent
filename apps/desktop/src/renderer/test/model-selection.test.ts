@@ -30,7 +30,7 @@ describe("resolvePreferredChatModel", () => {
   });
 
   it("uses the current DeepSeek Flash default when v2 has no explicit default", () => {
-    expect(resolvePreferredChatModel(settings({ taskModels: { defaultChatModel: null, utilityModel: null, exploreModel: null } }), usableModels)).toBe(
+    expect(resolvePreferredChatModel(settings({ taskModels: { defaultChatModel: null, utilityModel: null, subagentDefaultModel: null } }), usableModels)).toBe(
       "deepseek:deepseek-flash",
     );
   });

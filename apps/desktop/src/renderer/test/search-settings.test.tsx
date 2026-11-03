@@ -16,7 +16,7 @@ function makeSettings(connected: Array<"zhipu" | "tavily" | "tinyfish" | "exa"> 
       tinyfish: { hasApiKey: connected.includes("tinyfish") },
       exa: { hasApiKey: connected.includes("exa") },
     },
-    agent: { systemPromptPath: "/tmp/main-agent.md", temperature: null, maxTokens: null, disabledTools, bashAlwaysAsk: false, exploreModelId: null },
+    agent: { systemPromptPath: "/tmp/main-agent.md", temperature: null, maxTokens: null, disabledTools, bashAlwaysAsk: false },
     skills: { disabled: [] },
   } as AppSettings;
 }

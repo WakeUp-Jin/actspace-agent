@@ -380,7 +380,6 @@ export class ModelConnectionsService {
       chat: { model: task.defaultChatModel ?? null, thinking: thinking.chat ?? null },
       utility: { model: task.utilityModel ?? null, thinking: thinking.utility ?? null },
       autoReview: { model: task.autoReviewModel ?? null, thinking: thinking.autoReview ?? null },
-      explore: { model: task.exploreModel ?? null, thinking: thinking.explore ?? null },
       vision: { model: task.visionModel ?? null, thinking: thinking.vision ?? null },
     };
   }
@@ -555,7 +554,6 @@ const PURPOSE_BINDING_FIELD: Record<PurposeId, keyof Omit<SettingsV4Models["task
   chat: "defaultChat",
   utility: "utility",
   autoReview: "autoReview",
-  explore: "explore",
   vision: "vision",
 };
 
@@ -615,7 +613,7 @@ function removeKeysPatch(models: SettingsV4Models, keys: ModelKey[]): Partial<Se
   const removed = new Set<string>(keys);
   const nulls = Object.fromEntries(keys.map((key) => [key, null]));
   const bindings = models.taskBindings;
-  const cleared = Object.fromEntries((["defaultChat", "utility", "autoReview", "explore", "vision"] as const)
+  const cleared = Object.fromEntries((["defaultChat", "utility", "autoReview", "subagentDefaultModel", "vision"] as const)
     .filter((field) => bindings[field] && removed.has(bindings[field]!))
     .map((field) => [field, null]));
   return {

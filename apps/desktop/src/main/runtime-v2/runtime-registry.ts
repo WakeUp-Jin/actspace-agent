@@ -231,6 +231,12 @@ export class DesktopRuntimeV2Registry {
     try { return await this.requireApp().stopBackgroundTask(sessionId, taskId); }
     finally { this.#admittedWork--; }
   }
+  async interruptSubagent(sessionId: string, agentId: string) {
+    this.assertAdmission();
+    this.#admittedWork++;
+    try { return await this.requireApp().interruptSubagent(sessionId, agentId); }
+    finally { this.#admittedWork--; }
+  }
   async submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue) {
     this.assertAdmission();
     this.#admittedWork++;

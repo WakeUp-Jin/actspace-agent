@@ -125,22 +125,6 @@ export class ModelRuntimeService {
     return main.ok ? this.resolveUtilityModel(main.model) : main;
   }
 
-  resolveExploreModel(main: ResolvedRuntimeModel): RuntimeModelResolution {
-    const configured = this.settings.getModelStorageState().taskModels.exploreModel;
-    if (configured) {
-      const resolution = this.resolve(configured, "explore", "configured");
-      if ("model" in resolution) return resolution;
-      return { ok: true, model: { ...main, source: "fallback", fallbackReason: `explore_to_main:${resolution.reason ?? resolution.code}` } };
-    }
-    return { ok: true, model: { ...main, source: "fallback", fallbackReason: "explore_to_main:not_configured" } };
-  }
-
-  /** 子 Agent 探索：用途表里设了就用，否则跟随会话模型。 */
-  resolveExploreTaskModel(requestedMain?: string | null): RuntimeModelResolution {
-    const main = this.resolveMainModel(requestedMain);
-    return main.ok ? this.resolveExploreModel(main.model) : main;
-  }
-
   /** 看图：用途表里的模型 → 会话默认模型（能看图时）→ 第一个能看图的可用模型。 */
   resolveImageInspectionModel(): RuntimeModelResolution {
     const taskModels = this.settings.getModelStorageState().taskModels;
@@ -151,6 +135,11 @@ export class ModelRuntimeService {
     const first = listUsableModels(snapshot, "vision")[0];
     if (first) return this.fromUsable(first, "fallback");
     return { ok: false, code: "model_unavailable", message: "没有可用的看图模型，请在设置 › 模型的用途里选一个能看图的模型。" };
+  }
+
+  /** 设置里的子智能体默认模型；null = 未设置，跟随父会话当前模型。每次现读，改设置不用重启。 */
+  subagentDefaultModel(): ModelKey | null {
+    return this.settings.getModelStorageState().taskModels.subagentDefaultModel ?? null;
   }
 
   /** 用途表里的思考档位；null = 用模型默认档位。会话默认的档位由对话框决定，这里不读。 */

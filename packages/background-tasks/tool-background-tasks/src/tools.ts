@@ -7,7 +7,7 @@ export type BackgroundTaskToolRegistration = { readonly name: string; readonly d
 type Args = Readonly<Record<string, RuntimeV2JsonValue>>;
 
 const NO_POLLING = "Background tasks notify you automatically when they finish; prefer waiting for that notification. Do not poll with sleep or repeated task_output.";
-const TASK_ID = { type: "string", description: "Background task id, e.g. bash_… or agent_…." } as const;
+const TASK_ID = { type: "string", description: "Background Bash task id (bash_…)." } as const;
 
 export function registerBackgroundTaskTools(runtime: ToolRuntime, tasks: BackgroundTaskHost): readonly BackgroundTaskToolRegistration[] {
   const handles: ReturnType<ToolRuntime["register"]>[] = [];
@@ -18,7 +18,7 @@ export function registerBackgroundTaskTools(runtime: ToolRuntime, tasks: Backgro
     return Object.freeze({ name, dispose: () => handle.dispose() });
   };
   try { return Object.freeze([
-    register("task_list", `List background tasks (bash and agent) started in this session. ${NO_POLLING}`, {
+    register("task_list", `List background Bash tasks started in this session. ${NO_POLLING}`, {
       activeOnly: { type: "boolean", description: "Only running tasks. Defaults to true." },
       limit: { type: "integer", minimum: 1, maximum: 50, description: "Maximum tasks to list. Defaults to 20." },
     }, [], "read-only", async (args, context) => {
@@ -27,7 +27,7 @@ export function registerBackgroundTaskTools(runtime: ToolRuntime, tasks: Backgro
       const text = [`${activeOnly ? "active_background_tasks" : "background_tasks"}: ${list.length}`, ...list.map(task => `\n${describe(task)}`)].join("\n");
       return completed(`${list.length} background task${list.length === 1 ? "" : "s"}`, text);
     }),
-    register("task_output", `Read a non-blocking snapshot of a background task. Bash: the last 32KB of output and the output file path (use read_file for the full log). Pass since with the previous next_offset to read only new output. Running agent: progress summary. Finished agent: its final text. ${NO_POLLING}`, {
+    register("task_output", `Read a non-blocking snapshot of a background Bash task: the last 32KB of output and the output file path (use read_file for the full log). Pass since with the previous next_offset to read only new output. ${NO_POLLING}`, {
       taskId: TASK_ID,
       since: { type: "integer", minimum: 0, description: "Byte offset in the Bash log to read from." },
     }, ["taskId"], "read-only", async (args, context) => {

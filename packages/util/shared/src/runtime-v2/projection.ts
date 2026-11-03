@@ -314,6 +314,7 @@ export type RuntimeV2TodoItem = {
   readonly updatedAt?: string;
 };
 
+/** Old Sessions only (`delegation/*`). New subagents are folded from `subagent/*` by `foldSubagentTree` (subagent-projection.ts). */
 export type RuntimeV2DelegationView = {
   readonly invocationId: string;
   readonly childSessionId: string | null;

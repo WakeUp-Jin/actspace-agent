@@ -5,6 +5,7 @@ import { manifest as backgroundTasksToolManifest } from "@actspace/tool-backgrou
 import { manifest as browserToolsManifest } from "@actspace/tool-browser/manifest";
 import { manifest as compactionManifest } from "@actspace/context-compaction/manifest";
 import { manifest as contextBackgroundTasksManifest } from "@actspace/context-background-tasks/manifest";
+import { manifest as contextSubagentsManifest } from "@actspace/context-subagents/manifest";
 import { manifest as contextConversationManifest } from "@actspace/context-conversation/manifest";
 import { manifest as contextDisclosureManifest } from "@actspace/context-disclosure/manifest";
 import { manifest as contextEngineManifest } from "@actspace/context-engine/manifest";
@@ -104,6 +105,7 @@ export const PLUGIN_CATALOG: readonly PluginCatalogEntry[] = Object.freeze([
   { id: "context-conversation", manifest: contextConversationManifest, module: "@actspace/context-conversation/plugin", loaders: harness, directory: "context" },
   { id: "context-tools", manifest: contextToolsManifest, module: "@actspace/context-tools/plugin", loaders: harness, directory: "context" },
   { id: "context-background-tasks", manifest: contextBackgroundTasksManifest, module: "@actspace/context-background-tasks/plugin", loaders: harness, directory: "context" },
+  { id: "context-subagents", manifest: contextSubagentsManifest, module: "@actspace/context-subagents/plugin", loaders: harness, directory: "context" },
   { id: "context-disclosure", manifest: contextDisclosureManifest, module: "@actspace/context-disclosure/plugin", loaders: harness, directory: "context" },
   { id: "compaction-runtime", manifest: compactionManifest, module: "@actspace/context-compaction/plugin", loaders: harness, directory: "context" },
   { id: "filesystem-read", manifest: fsReadManifest, module: "@actspace/tool-fs-read/plugin", loaders: harness, directory: "fs", admitOnHost: true },
@@ -129,7 +131,7 @@ export const PLUGIN_PACKAGES_OUTSIDE_DEFAULT: readonly { readonly package: strin
   { package: "@actspace/harness-hmr", reason: "Agent 运行时当库用，直接调用" },
   { package: "@actspace/harness-evaluation", reason: "评估候选 Harness 时单独装配" },
   { package: "@actspace/scope", reason: "只提供作用域类，由 Agent 注册表等包直接引用" },
-  { package: "@actspace/subagent", reason: "子 Agent 调度库，由 tool-subagent 与运行时直接调用" },
+  { package: "@actspace/subagent", reason: "子智能体管理器与工具定义，由运行时创建、tool-subagent 注册" },
   { package: "@actspace/llm-pi-ai", reason: "模型适配库，由桌面端和远程 Host 直接构造适配器，运行时只重新导出" },
 ]);
 

@@ -42,6 +42,8 @@ type State = {
   disclosure: { cycle: number; paths: Record<string, DisclosurePath>; indexPaths: string[]; conversionSteps: number; converted: boolean };
   compaction: { lastStep: number; lastTurn: number; windowRatio: number | null; readSince: string[]; pending: { id: string; before: string[]; found: string[]; steps: number } | null; open: Record<string, Dims & { time: string }> };
   tasks: Record<string, string>;
+  /** Preset of each subagent (`subagent/spawned`), for its activations' rows. Absent in states saved before subagents. */
+  subagents?: Record<string, string>;
 };
 
 function emptyState(): State {
@@ -132,7 +134,10 @@ class HarnessReplay {
       case "compaction/start": { const id = text(data.compactionId); if (id) this.s.compaction.open[id] = { ...this.dims(event), time: event.time }; return; }
       case "surface/replaced": return this.folded(data);
       case "compaction/end": return this.compactionEnd(event, data);
+      // Old Sessions record `delegation/*`; new ones one row per subagent activation.
       case "delegation/requested": case "delegation/completed": case "delegation/child-terminal": return this.delegation(event, data);
+      case "subagent/spawned": { const agentId = text(data.agentId); if (agentId) { (this.s.subagents ??= {})[agentId] = `actspace.subagent.${text(data.preset) ?? text(data.kind) ?? "unknown"}`; trim(this.s.subagents, 200); } return; }
+      case "subagent/activation": return this.subagentActivation(event, data);
       case "background/task": return this.background(event, data);
     }
   }
@@ -470,6 +475,28 @@ class HarnessReplay {
     else Object.assign(values, { status: text(data.status) ?? null });
     if (event.type === "delegation/child-terminal") Object.assign(values, { duration_ms: num(data.durationMs) ?? null, tool_uses: num(data.toolUseCount) ?? null, return_tokens: typeof data.text === "string" ? tokensOf(data.text.length) : null });
     this.acc.add("delegation", this.sessionId, { invocation_id: invocationId }, values);
+  }
+  private subagentActivation(event: SessionEventEnvelopeV1, data: Json): void {
+    const activationId = text(data.activationId), agentId = text(data.agentId); if (!activationId || !agentId) return;
+    const values: Record<string, unknown> = { preset_id: this.s.subagents?.[agentId] ?? null, child_session_id: agentId };
+    const started = `activation:${activationId}`;
+    if (data.op === "start") {
+      const callId = text(data.callId);
+      const call = callId ? this.s.calls[callId] ?? this.s.recentCalls[callId] : undefined;
+      const dims: Dims = call ? { hour: hourOf(event.time), revision: call.revision, mode: call.mode, model: call.model } : this.dims(event);
+      this.s.tasks[started] = text(data.startedAt) ?? event.time; trim(this.s.tasks, 200);
+      Object.assign(values, { ...dims, time: event.time, status: "running" });
+    } else if (data.op === "settle") {
+      const status = text(data.status);
+      const startedAt = this.s.tasks[started]; delete this.s.tasks[started];
+      const duration = startedAt ? Date.parse(text(data.endedAt) ?? event.time) - Date.parse(startedAt) : NaN;
+      Object.assign(values, {
+        status: status === "completed" ? "completed" : status === "interrupted" ? "aborted" : "failed",
+        duration_ms: Number.isFinite(duration) ? Math.max(0, duration) : null,
+        return_tokens: typeof data.result === "string" ? tokensOf(data.result.length) : null,
+      });
+    } else return;
+    this.acc.add("delegation", this.sessionId, { invocation_id: activationId }, values);
   }
   private background(event: SessionEventEnvelopeV1, data: Json): void {
     const taskId = text(data.taskId); if (!taskId) return;

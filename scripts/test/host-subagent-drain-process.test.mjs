@@ -31,7 +31,7 @@ test('real Host drains an active parent and child before closing', { timeout: 60
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     if (requests === 2) { waiting.push(response); response.write(': child waiting\n\n'); return; }
     const delta = requests === 1
-      ? { role: 'assistant', tool_calls: [{ index: 0, id: 'delegate-child', type: 'function', function: { name: 'agent', arguments: JSON.stringify({ task: 'Return the child fixture result' }) } }] }
+      ? { role: 'assistant', tool_calls: [{ index: 0, id: 'delegate-child', type: 'function', function: { name: 'agent', arguments: JSON.stringify({ description: 'Child fixture', prompt: 'Return the child fixture result', background: false }) } }] }
       : { role: 'assistant', content: 'Parent consumed child result' };
     for (const chunk of [{ choices: [{ index: 0, delta, finish_reason: null }] }, { choices: [{ index: 0, delta: {}, finish_reason: requests === 1 ? 'tool_calls' : 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }]) response.write(`data: ${JSON.stringify({ id: 'fixture', object: 'chat.completion.chunk', created: 1, model: 'fixture', ...chunk })}\n\n`);
     response.end('data: [DONE]\n\n');

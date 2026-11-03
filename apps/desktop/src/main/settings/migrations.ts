@@ -45,7 +45,7 @@ function taskBindingsFromTaskModels(taskModels: PersistedSettingsV3["taskModels"
     defaultChat: taskModels.defaultChatModel,
     utility: taskModels.utilityModel,
     autoReview: taskModels.autoReviewModel ?? null,
-    explore: taskModels.exploreModel,
+    subagentDefaultModel: taskModels.subagentDefaultModel,
     vision: taskModels.visionModel ?? null,
     ...(taskModels.thinking ? { thinking: cloneJson(taskModels.thinking) } : {}),
   };
@@ -103,7 +103,6 @@ export function toSettingsV4(settings: PersistedSettingsV3, metadata: SettingsV4
   const tools = cloneJson(metadata.tools);
   if (tools.disabledTools.length === 0 && settings.agent.disabledTools.length > 0) tools.disabledTools = [...settings.agent.disabledTools];
   if (!tools.bash.alwaysAsk && settings.agent.bashAlwaysAsk) tools.bash.alwaysAsk = true;
-  // 探索模型只存在 taskBindings.explore；subagents.routes.explore 是旧的镜像，四层迁移时并入后删除。
   const subagents = cloneJson(metadata.subagents);
   return {
     version: 4,
@@ -149,7 +148,6 @@ export function legacySettingsFromV4(settings: SettingsV4, dataRoot: string): Pe
     ...(model.connectionId ? { connectionId: model.connectionId } : {}),
     ...(model.customLabel !== undefined && { customLabel: model.customLabel }),
   }])) as PersistedSettingsV3["installedModels"];
-  const explore = settings.models.taskBindings.explore ?? null;
   const general = settings.general;
   return {
     version: 3,
@@ -161,7 +159,7 @@ export function legacySettingsFromV4(settings: SettingsV4, dataRoot: string): Pe
       defaultChatModel: settings.models.taskBindings.defaultChat,
       utilityModel: settings.models.taskBindings.utility,
       autoReviewModel: settings.models.taskBindings.autoReview ?? null,
-      exploreModel: explore,
+      subagentDefaultModel: settings.models.taskBindings.subagentDefaultModel ?? null,
       visionModel: settings.models.taskBindings.vision ?? null,
       ...(settings.models.taskBindings.thinking ? { thinking: cloneJson(settings.models.taskBindings.thinking) } : {}),
     },
@@ -258,7 +256,7 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
         defaultChat: normalizeModelKeyOrNull(taskBindings.defaultChat),
         utility: normalizeModelKeyOrNull(taskBindings.utility),
         autoReview: normalizeModelKeyOrNull(taskBindings.autoReview),
-        explore: normalizeModelKeyOrNull(taskBindings.explore),
+        subagentDefaultModel: normalizeModelKeyOrNull(taskBindings.subagentDefaultModel),
         vision: normalizeModelKeyOrNull(taskBindings.vision),
         ...(sanitizePurposeThinking(taskBindings.thinking) ?? {}),
       },
@@ -305,7 +303,6 @@ export function migrateV1Settings(
   const seed = defaultSettingsFromEnv(dataRoot);
   const agent = isRecord(raw.agent) ? raw.agent : {};
   const defaultModel = isModelId(raw.defaultModelId) ? LEGACY_MODEL_KEY_MAP[raw.defaultModelId] : null;
-  const exploreModel = isModelId(agent.exploreModelId) ? LEGACY_MODEL_KEY_MAP[agent.exploreModelId] : null;
   return {
     legacySystemPrompt: typeof agent.systemPrompt === "string" ? agent.systemPrompt : undefined,
     settings: {
@@ -313,7 +310,7 @@ export function migrateV1Settings(
       taskModels: {
         defaultChatModel: defaultModel,
         utilityModel: hasDeepSeekKey ? LEGACY_MODEL_KEY_MAP["deepseek-v4-flash"] : null,
-        exploreModel,
+        subagentDefaultModel: null,
       },
       agent: sanitizeAgentV2({
         systemPromptPath: agent.systemPromptPath,

@@ -34,14 +34,14 @@ kind: "package-map"
 | [`core/`](core/README.md) | Agent 身份与注册表、Agent 循环、任务调度、工具运行时，以及总装配 `runtime` | 6 | 全局、会话、库 |
 | [`session/`](session/README.md) | 会话日志、持久化、物理存储、视图、检查点和会话记录 Markdown | 8 | 全局、库 |
 | [`llm/`](llm/README.md) | 模型服务契约和提供商适配 | 2 | 全局、库 |
-| [`context/`](context/README.md) | 每一轮发给模型的上下文：引擎、提示词、各个来源、披露与压缩 | 11 | 会话 |
+| [`context/`](context/README.md) | 每一轮发给模型的上下文：引擎、提示词、各个来源、披露与压缩 | 12 | 会话 |
 | [`fs/`](fs/README.md) | 读、搜索、写工作区文件的工具 | 3 | 会话 |
 | [`shell/`](shell/README.md) | 命令行（Bash）工具 | 1 | 会话 |
 | [`web/`](web/README.md) | 网页搜索与读取工具 | 1 | 会话 |
 | [`image/`](image/README.md) | 生成图片、看图片的工具 | 2 | 会话 |
 | [`todo/`](todo/README.md) | 待办工具与待办视图 | 1 | 全局、会话 |
 | [`background-tasks/`](background-tasks/README.md) | 后台任务登记表与后台任务工具 | 2 | 会话、库 |
-| [`subagent/`](subagent/README.md) | 子 Agent 调度与子 Agent 工具 | 2 | 会话、库 |
+| [`subagent/`](subagent/README.md) | 子智能体管理器与子智能体工具 | 2 | 会话、库 |
 | [`sandbox/`](sandbox/README.md) | 命令沙箱：策略与后端 | 3 | 会话 |
 | [`approval/`](approval/README.md) | 危险操作的人工审批与模型自动审批 | 2 | 会话 |
 | [`harness-evolution/`](harness-evolution/README.md) | Harness 的选择、热替换、评估、运行时统计与插件开发 | 5 | 会话、库 |

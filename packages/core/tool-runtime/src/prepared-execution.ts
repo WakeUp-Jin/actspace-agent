@@ -71,6 +71,10 @@ export type ToolPreparedEnvironment = {
   readonly hostCapabilities: ReadonlySet<string>;
   readonly capabilitySet: ToolCapabilitySet;
   readonly approvalBroker?: ApprovalBroker;
+  /** Failure text when an action needs approval and there is no broker (subagents set their own). */
+  readonly approvalUnavailableMessage?: string;
+  /** false in subagent Sessions: tools must finish in the foreground (Bash ignores `blockMs`). */
+  readonly backgroundAllowed?: boolean;
   readonly approvalTimeoutMs?: number;
   readonly sessionGrants?: readonly SessionGrant[] | (() => readonly SessionGrant[]);
   readonly sessionGrantCapability?: boolean;
@@ -267,6 +271,7 @@ export class PreparedToolExecution {
       }),
       ...(this.environment.approvalBroker === undefined ? {} : { requestApproval: this.environment.approvalBroker.requestApproval.bind(this.environment.approvalBroker) }),
       ...(this.environment.notifyAgent === undefined ? {} : { notifyAgent: this.environment.notifyAgent }),
+      ...(this.environment.backgroundAllowed === false ? { backgroundAllowed: false } : {}),
       createArtifact: (input) => this.environment.createArtifact({
         ...input,
         owner: { sessionId: this.input.sessionId, callId: this.callId, pluginId: this.pluginId, name: this.name },
@@ -352,7 +357,7 @@ export class PreparedToolExecution {
     }
     this.#approvalMode = "manual";
     if (this.environment.approvalBroker === undefined) {
-      return { code: "APPROVAL_REQUIRED", message: "Host approval is required but no ApprovalBroker is available.", retryable: false, phase: "approval" };
+      return { code: "APPROVAL_REQUIRED", message: this.environment.approvalUnavailableMessage ?? "Host approval is required but no ApprovalBroker is available.", retryable: false, phase: "approval" };
     }
     const requestedAt = new Date();
     const expiresAt = new Date(requestedAt.getTime() + (this.environment.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS));

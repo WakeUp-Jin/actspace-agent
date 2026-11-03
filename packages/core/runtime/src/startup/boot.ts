@@ -128,15 +128,11 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
   const harnessStats = options.harnessStats !== false && harnessStatsEnabled() ? new HarnessStats({ dataRoot: options.dataRoot }) : undefined;
   const providedHostServices = Object.freeze({
     ...hostServices.services,
-    "actspace.host.subagents": Object.freeze({ invoke: (input: import("@actspace/subagent").SubagentInvocation) => {
+    "actspace.host.subagents": createSubagentHost(() => {
       const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
       if (!runtime) throw new Error("Agent runtime is not ready");
-      return runtime.subagents.invoke(input);
-    }, launch: (input: import("@actspace/subagent").SubagentInvocation) => {
-      const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
-      if (!runtime) throw new Error("Agent runtime is not ready");
-      return runtime.subagents.launch(input);
-    } }),
+      return runtime.subagents;
+    }),
     [BACKGROUND_TASK_HOST_SERVICE]: createBackgroundTaskHost(() => {
       const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
       if (!runtime) throw new Error("Agent runtime is not ready");
@@ -315,4 +311,18 @@ export function resetRuntimeProcessGuardForTest(): void { runtimeClaimed = false
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** The Harness-facing subagent port; calls reach the Host's SubagentManager once the runtime is up. */
+function createSubagentHost(manager: () => import("@actspace/subagent").SubagentHostPort): import("@actspace/subagent").SubagentHostPort {
+  const port: import("@actspace/subagent").SubagentHostPort = {
+    spawn: input => manager().spawn(input),
+    sendMessage: input => manager().sendMessage(input),
+    waitForInput: input => manager().waitForInput(input),
+    listAgents: input => manager().listAgents(input),
+    interrupt: input => manager().interrupt(input),
+    listModels: input => manager().listModels(input),
+    running: sessionId => manager().running(sessionId),
+  };
+  return Object.freeze(port);
 }

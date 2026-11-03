@@ -25,7 +25,6 @@ function makeSettings(over: Partial<AppSettings> = {}): AppSettings {
       maxTokens: null,
       disabledTools: [],
       bashAlwaysAsk: false,
-      exploreModelId: null,
     },
     skills: { disabled: [] },
   };
@@ -81,7 +80,7 @@ function stubToolsV4(tools: Partial<SettingsV4Snapshot["settings"]["tools"]> = {
         taskDefaults: { temperature: null, maxOutputTokens: null, chatCompactionTriggerRatio: 0.8 },
         shortcuts: { quickOpen: { enabled: true, accelerator: "CommandOrControl+Shift+Space", target: { kind: "automatic" as const } } },
       },
-      models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, explore: null } },
+      models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, subagentDefaultModel: null } },
       tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {}, ...tools },
       media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" }, imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" as const } },
       skills: { disabled: [] },
@@ -315,7 +314,7 @@ describe("SettingsPage", () => {
             },
           },
         },
-        models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, explore: null } },
+        models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, subagentDefaultModel: null } },
         tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {} },
         media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" } },
         skills: { disabled: [] },
@@ -356,7 +355,7 @@ describe("SettingsPage", () => {
           taskDefaults: { temperature: null, maxOutputTokens: null, chatCompactionTriggerRatio: 0.8 },
           shortcuts: { quickOpen: { enabled: true, accelerator: "CommandOrControl+Shift+Space", target: { kind: "automatic" as const } } },
         },
-        models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, explore: null } },
+        models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, subagentDefaultModel: null } },
         tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {} },
         media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" }, imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" as const } },
         skills: { disabled: [] },
@@ -691,7 +690,7 @@ describe("SettingsPage", () => {
     renderSettingsPage({ onBack: () => {}, initialSection: "subagents" });
     await userEvent.click(await screen.findByRole("button", { name: "前往模型设置 Explore 模型" }));
     expect(await screen.findByRole("heading", { name: "模型", level: 2 })).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /子 Agent 探索/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "看图模型" })).toBeInTheDocument();
   });
   it("归档会话分区加载归档列表并支持恢复", async () => {
     const onArchivedSessionsChange = vi.fn();

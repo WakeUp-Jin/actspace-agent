@@ -76,9 +76,9 @@ describe("设置 › 模型", () => {
 
   it("看图只列能看图的模型；选「跟随」清空绑定", async () => {
     await renderModels();
-    await userEvent.click(screen.getByRole("button", { name: "子 Agent 探索模型" }));
+    await userEvent.click(screen.getByRole("button", { name: "自动审批模型" }));
     await userEvent.click(within(await screen.findByRole("menu")).getByRole("button", { name: "跟随会话默认" }));
-    await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ explore: { model: null, thinking: null } }));
+    await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ autoReview: { model: null, thinking: "off" } }));
 
     await userEvent.click(screen.getByRole("button", { name: "看图模型" }));
     const list = await screen.findByRole("menu", { name: "看图可选模型" });

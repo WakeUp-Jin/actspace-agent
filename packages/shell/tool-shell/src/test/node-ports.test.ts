@@ -315,6 +315,23 @@ describe("shell-tools ports", () => {
     } finally { await ports.dispose(); }
   });
 
+  it("runs subagent commands in the foreground and kills them at the time limit", async () => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, subagentTimeoutMs: 400 });
+    const subagent = (args: Readonly<Record<string, RuntimeV2JsonValue>>) => ports.bash!(args, { ...context(), backgroundAllowed: false });
+    try {
+      // blockMs: 0 would background the command in a main Session; here it waits for the result.
+      const done = await subagent({ command: "sleep 0.2; printf finished", intent: "foreground", blockMs: 0 });
+      expect(done.status).toBe("completed");
+      expect(JSON.stringify(done.modelOutput)).toContain("finished");
+      expect(lastHost.sources.size).toBe(0);
+      const slow = await subagent({ command: "sleep 30", intent: "too slow", blockMs: 0 });
+      expect(slow).toMatchObject({ status: "failed", failure: { code: "BASH_TIMEOUT", message: "Bash timed out after 10 minutes in a subagent and was killed." } });
+      expect(lastHost.sources.size).toBe(0);
+      expect(ports.hasRunningBackgroundTask("session")).toBe(false);
+    } finally { await ports.dispose(); }
+  });
+
   it("sweeps scratch directories older than a day that belong to no live process", async () => {
     const root = await workspace(); const tmpRoot = await workspace();
     const stale = join(tmpRoot, "bash-v2", "stale"); const fresh = join(tmpRoot, "bash-v2", "fresh");

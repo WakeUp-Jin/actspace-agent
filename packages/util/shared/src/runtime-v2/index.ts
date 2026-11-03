@@ -25,3 +25,4 @@ export * from "./fixed-renderer";
 export * from "./tasks";
 export * from "./live-event";
 export * from "./subagents";
+export * from "./subagent-projection";

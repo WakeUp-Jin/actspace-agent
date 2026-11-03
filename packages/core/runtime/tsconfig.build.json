@@ -61,6 +61,9 @@
       "path": "./../../context/context-skills/tsconfig.build.json"
     },
     {
+      "path": "./../../context/context-subagents/tsconfig.build.json"
+    },
+    {
       "path": "./../../context/context-system/tsconfig.build.json"
     },
     {

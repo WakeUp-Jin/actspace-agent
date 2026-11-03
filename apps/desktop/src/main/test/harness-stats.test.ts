@@ -122,6 +122,33 @@ describe("Harness 统计投影", () => {
     expect(query(once, "tools").rows.find(row => row.name === "read_file")!.calls).toBe(2);
   });
 
+  it("新会话按子智能体激活统计：续派算一次，中断算停止，失败与丢失算失败", () => {
+    const events: SessionEventEnvelopeV1[] = [];
+    const time = (offset: number) => new Date(BASE + offset * 1000).toISOString();
+    const e = (type: string, data: Record<string, unknown>) => { events.push({ recordKind: "event", seq: events.length, type, eventVersion: 1, criticality: "required", time: time(events.length), source: { ownerPluginId: "@actspace/core" }, data, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } } as SessionEventEnvelopeV1); };
+    const start = (agentId: string, activationId: string, at: number) => e("subagent/activation", { op: "start", agentId, activationId, trigger: "spawn", callId: `call-${activationId}`, background: true, startedAt: time(at) });
+    const settle = (agentId: string, activationId: string, status: string, at: number, result?: string) => e("subagent/activation", { op: "settle", agentId, activationId, status, summary: status, delivery: "notified", endedAt: time(at), ...(result ? { result } : {}) });
+    e("turn/start", { turnId: "t1", agentRunId: "run1", mode: "agent" });
+    e("subagent/spawned", { agentId: "sa-1", kind: "local", preset: "explore", description: "Map", transcriptPath: "/t/sa-1.md", callId: "call-a1", createdAt: time(1) });
+    start("sa-1", "a1", 1); settle("sa-1", "a1", "completed", 5, "z".repeat(40));
+    start("sa-1", "a2", 10); settle("sa-1", "a2", "interrupted", 12);
+    e("subagent/spawned", { agentId: "sa-2", kind: "local", preset: "general", description: "Fix", transcriptPath: "/t/sa-2.md", callId: "call-b1", createdAt: time(20) });
+    start("sa-2", "b1", 20); settle("sa-2", "b1", "max_steps", 30);
+    start("sa-2", "b2", 31); settle("sa-2", "b2", "lost", 33);
+    e("turn/end", { turnId: "t1", reason: "completed" });
+
+    const once = database();
+    projectHarnessJournalBatch(once, "s2", events);
+    const delegations = query(once, "runtime").delegations;
+    expect(delegations.byPreset).toEqual([{ presetId: "actspace.subagent.explore", count: 2 }, { presetId: "actspace.subagent.general", count: 2 }]);
+    expect(delegations.failed).toBe(2);
+    expect(delegations.avgDurationMs).toBe((4000 + 2000 + 10_000 + 2000) / 4);
+    expect(delegations.avgReturnTokens).toBe(10);
+    const split = database();
+    for (const event of events) projectHarnessJournalBatch(split, "s2", [event]);
+    expect(query(split, "runtime").delegations).toEqual(delegations);
+  });
+
   it("删除会话后统计归档，重建统计库时读回", () => {
     const root = tempRoot();
     const db = database();

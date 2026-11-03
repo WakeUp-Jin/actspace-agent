@@ -14,7 +14,6 @@ it("seeds two effective models idempotently and binds purposes through the curre
     expect(second.connections[0]!.connectionId).toBe(first.connections[0]!.connectionId);
     expect(second.connections[0]!.models.map(model => model.apiModel)).toEqual(["fixture-alternate", "fixture-main"]);
     expect(second.connections[0]!.models[0]!.effective).toMatchObject({ contextWindow: 32768, maxOutput: 4096, input: ["text", "image"] });
-    expect(second.purposes.chat.model).toBe(second.purposes.explore.model);
     expect(second.purposes.chat.model).toBe(second.purposes.utility.model);
     expect(await readFile(join(root, "settings.json"), "utf8")).not.toContain("synthetic-acceptance-credential");
   } finally { await rm(root, { recursive: true, force: true }); }

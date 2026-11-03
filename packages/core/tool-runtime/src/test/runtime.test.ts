@@ -305,6 +305,20 @@ describe("Tool Runtime execution contract", () => {
     expect(bodyCalls).toBe(0);
   });
 
+  it("fails with the environment's own text when approval is needed and nobody can grant it (subagents)", async () => {
+    let bodyCalls = 0;
+    const runtime = new ToolRuntime();
+    runtime.register({
+      definition: definition(),
+      executor: { concurrencySafe: true, async execute() { bodyCalls += 1; return success(); } },
+      permission: { extractResources: () => [{ kind: "file", access: "read", canonicalPath: "/outside.txt", targetKind: "file" }], evaluate: () => ({ kind: "allow" }) },
+    });
+    const message = "This action needs the user's approval, which a subagent cannot request. Report what you need to your parent instead.";
+    const [result] = await runtime.executeBatch([call("escape", { value: "../outside.txt" })], { ...environment([]), approvalUnavailableMessage: message });
+    expect(result).toMatchObject({ status: "denied", failure: { code: "APPROVAL_REQUIRED", message } });
+    expect(bodyCalls).toBe(0);
+  });
+
   it("issues a validated Session Grant and reuses it only through Runtime matching", async () => {
     const runtime = new ToolRuntime();
     runtime.register({

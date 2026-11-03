@@ -68,7 +68,7 @@
         "defaultChatModel": "kimi:kimi-k2.6",
         "utilityModel": null,
         "autoReviewModel": null,
-        "exploreModel": null,
+        "subagentDefaultModel": null,
         "visionModel": null,
         "thinking": {
           "utility": "off",
@@ -104,8 +104,7 @@
         "disabledTools": [
           "bash"
         ],
-        "bashAlwaysAsk": false,
-        "exploreModelId": null
+        "bashAlwaysAsk": false
       },
       "skills": {
         "disabled": [
@@ -217,7 +216,7 @@
             "defaultChat": "kimi:kimi-k2.6",
             "utility": null,
             "autoReview": null,
-            "explore": null,
+            "subagentDefaultModel": null,
             "vision": null,
             "thinking": {
               "utility": "off",
@@ -225,7 +224,7 @@
             }
           },
           "overrides": {},
-          "layersVersion": 2
+          "layersVersion": 3
         },
         "tools": {
           "disabledTools": [
@@ -384,7 +383,7 @@
           "defaultChat": "kimi:kimi-k2.6",
           "utility": null,
           "autoReview": null,
-          "explore": null,
+          "subagentDefaultModel": null,
           "vision": null,
           "thinking": {
             "utility": "off",
@@ -392,7 +391,7 @@
           }
         },
         "overrides": {},
-        "layersVersion": 2
+        "layersVersion": 3
       },
       "tools": {
         "disabledTools": [

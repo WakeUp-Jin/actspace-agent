@@ -1,11 +1,8 @@
 export { manifest } from "./manifest.js";
 export { apply } from "./plugin.js";
-export * from "./agent-tool.js";
 export * from "./child-session.js";
-export * from "./descriptor.js";
-export * from "./explore-tool.js";
+export * from "./manager.js";
+export * from "./messages.js";
 export * from "./preset.js";
-export * from "./provider.js";
-export * from "./publication.js";
-export * from "./terminal-result.js";
-export * from "./tool-plugin.js";
+export * from "./tools.js";
+export * from "./types.js";

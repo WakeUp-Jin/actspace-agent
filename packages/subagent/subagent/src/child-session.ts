@@ -1,9 +1,27 @@
 import { createHash } from "node:crypto";
-import type { SessionStore } from "@actspace/session-persistence";
-import type { SessionHandle } from "@actspace/session-persistence";
-import type { StaticAgentPreset } from "./preset.js";
+import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import type { SessionHandle, SessionStore } from "@actspace/session-persistence";
 
-export async function createChildSession(options: { readonly store: SessionStore; readonly parentSessionId: string; readonly parentBoundarySeq: number; readonly parentCallId: string; readonly childSessionId: string; readonly createdAt: string; readonly cwd?: string; readonly delegationDepth: number; readonly task: string; readonly preset: StaticAgentPreset; readonly manifestDigest: string; readonly plugins: readonly { id: string; version: string }[] }): Promise<SessionHandle> {
-  const seedDigest = createHash("sha256").update(options.task).digest("hex");
-  return options.store.create({ sessionId: options.childSessionId, createdAt: options.createdAt, ...(options.cwd === undefined ? {} : { cwd: options.cwd }), lineage: { parentSessionId: options.parentSessionId, parentBoundarySeq: options.parentBoundarySeq, parentCallId: options.parentCallId, seedDigest, origin: "delegation", delegationDepth: options.delegationDepth }, createdWith: { profileId: "base", presetId: options.preset.id, runtimeContractVersion: "2", manifestDigest: options.manifestDigest, plugins: options.plugins, codecSetDigest: options.store.options.registry.digest } });
+/** A new child Session: `agent_id` is its id, its lineage points at the main Session (design 02 §4.2). */
+export async function createChildSession(options: {
+  readonly store: SessionStore;
+  readonly parent: SessionHandle;
+  readonly parentCallId: string;
+  readonly childSessionId: string;
+  readonly createdAt: string;
+  readonly cwd?: string;
+  readonly prompt: string;
+  readonly presetId: string;
+  readonly manifestDigest: string;
+  readonly plugins: readonly { id: string; version: string }[];
+  readonly onEvent?: (event: SessionEventEnvelopeV1) => void;
+}): Promise<SessionHandle> {
+  const seedDigest = createHash("sha256").update(options.prompt).digest("hex");
+  return options.store.create({
+    sessionId: options.childSessionId,
+    createdAt: options.createdAt,
+    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+    lineage: { parentSessionId: options.parent.header.sessionId, parentBoundarySeq: options.parent.lastSeq, parentCallId: options.parentCallId, seedDigest, origin: "delegation", delegationDepth: 1 },
+    createdWith: { profileId: "base", presetId: options.presetId, runtimeContractVersion: "2", manifestDigest: options.manifestDigest, plugins: options.plugins, codecSetDigest: options.store.options.registry.digest },
+  }, options.onEvent ? { onEvent: options.onEvent } : {});
 }

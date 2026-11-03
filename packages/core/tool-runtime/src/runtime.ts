@@ -10,6 +10,8 @@ export class ToolRuntime {
   readonly registry: ToolRegistry;
   readonly scheduler: ToolExecutionScheduler;
   readonly #agentBindings = new WeakMap<object, { readonly sessionId: string; readonly agentId: string; readonly allowed: () => ReadonlySet<string> }>();
+  /** Latest live binding per Agent, so a tool can read what its caller may use. */
+  readonly #latestBindings = new Map<string, object>();
 
   constructor(options: { readonly maxParallel?: number; readonly registry?: ToolRegistry; readonly requireAgentScope?: boolean } = {}) {
     this.registry = options.registry ?? new ToolRegistry();
@@ -24,8 +26,19 @@ export class ToolRuntime {
 
   bindAgentScope(sessionId: string, agentId: string, allowed: () => ReadonlySet<string>): { readonly token: object; readonly dispose: () => void } {
     const token = Object.freeze({});
+    const key = bindingKey(sessionId, agentId);
     this.#agentBindings.set(token, { sessionId, agentId, allowed });
-    return Object.freeze({ token, dispose: () => { this.#agentBindings.delete(token); } });
+    this.#latestBindings.set(key, token);
+    return Object.freeze({ token, dispose: () => {
+      this.#agentBindings.delete(token);
+      if (this.#latestBindings.get(key) === token) this.#latestBindings.delete(key);
+    } });
+  }
+
+  /** Tool names the Agent's live binding allows right now; undefined when it has none. */
+  allowedToolNames(sessionId: string, agentId: string): ReadonlySet<string> | undefined {
+    const token = this.#latestBindings.get(bindingKey(sessionId, agentId));
+    return token === undefined ? undefined : this.#agentBindings.get(token)?.allowed();
   }
 
   executeBatch(calls: readonly ToolCallInput[], environment: ToolPreparedEnvironment): Promise<readonly ToolExecutionResult[]> {
@@ -66,5 +79,8 @@ export class ToolRuntimeService extends Service {
 
   register(registration: ToolExecutorRegistration): ToolRegistrationHandle { return this.runtime.register(registration); }
   bindAgentScope(sessionId: string, agentId: string, allowed: () => ReadonlySet<string>) { return this.runtime.bindAgentScope(sessionId, agentId, allowed); }
+  allowedToolNames(sessionId: string, agentId: string): ReadonlySet<string> | undefined { return this.runtime.allowedToolNames(sessionId, agentId); }
   executeBatch(calls: readonly ToolCallInput[], environment: ToolPreparedEnvironment): Promise<readonly ToolExecutionResult[]> { return this.runtime.executeBatch(calls, environment); }
 }
+
+function bindingKey(sessionId: string, agentId: string): string { return `${sessionId}\u0000${agentId}`; }

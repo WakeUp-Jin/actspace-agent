@@ -1,29 +1,20 @@
-export type StaticAgentPreset = {
-  readonly id: string;
-  readonly version: number;
-  readonly routeId: string;
-  readonly model: string;
-  readonly promptContributorIds: readonly string[];
-  readonly allowedToolNames: readonly string[];
-  readonly readOnly: boolean;
-  readonly maxSteps: number;
-  readonly maxDurationMs: number;
-  readonly maxDelegationDepth: number;
-};
+import type { SubagentPreset } from "@actspace/shared/runtime-v2";
 
-export class StaticPresetRegistry {
-  readonly #presets = new Map<string, StaticAgentPreset>();
-  register(preset: StaticAgentPreset): void { if (this.#presets.has(preset.id)) throw new Error(`Duplicate Agent Preset ${preset.id}.`); this.#presets.set(preset.id, deepFreeze({ ...preset, promptContributorIds: [...preset.promptContributorIds].sort(), allowedToolNames: [...preset.allowedToolNames].sort() })); }
-  get(id: string): StaticAgentPreset { const preset = this.#presets.get(id); if (preset === undefined) throw new Error(`Agent Preset ${id} is unavailable.`); return preset; }
-  list(): readonly StaticAgentPreset[] { return Object.freeze([...this.#presets.values()].sort((a, b) => a.id.localeCompare(b.id))); }
+/** Read-only tools of the `explore` preset (design 02 §5.1). */
+export const EXPLORE_TOOL_NAMES = Object.freeze(["read_file", "list_directory", "grep", "glob"]);
+/** Every subagent can talk to its tree. */
+export const SUBAGENT_COORDINATION_TOOL_NAMES = Object.freeze(["send_message", "list_agents", "wait_agent"]);
+/** Tools a subagent never runs: delegation (depth is 1), main-only management, background tasks, plugin development. */
+const BLOCKED = new Set(["agent", "agent_fork", "agent_codex", "agent_claude_code", "interrupt_agent", "list_subagent_models", "present", "plugin_manager", "harness_inspect"]);
+
+export function isSubagentBlockedTool(name: string): boolean { return BLOCKED.has(name) || name.startsWith("task_"); }
+
+/**
+ * The tools a `local` subagent gets, fixed at creation: `general` takes what its parent's mode
+ * allows minus the blocked ones, `explore` the four read-only tools; both add the coordination tools.
+ */
+export function subagentToolNames(preset: SubagentPreset, parentAllowed: Iterable<string>, registered: Iterable<string>): readonly string[] {
+  const available = new Set(registered);
+  const base = preset === "explore" ? EXPLORE_TOOL_NAMES : [...parentAllowed].filter(name => !isSubagentBlockedTool(name));
+  return Object.freeze([...new Set([...base, ...SUBAGENT_COORDINATION_TOOL_NAMES])].filter(name => available.has(name)).sort());
 }
-
-export function createBuiltInPresets(allToolNames: readonly string[]): StaticPresetRegistry {
-  const registry = new StaticPresetRegistry();
-  const readOnlyTools = allToolNames.filter((name) => /^(read_file|list_directory|grep|glob)$/.test(name));
-  registry.register({ id: "actspace.agent", version: 1, routeId: "default", model: "default", promptContributorIds: [], allowedToolNames: readOnlyTools, readOnly: true, maxSteps: 1000, maxDurationMs: 1_800_000, maxDelegationDepth: 1 });
-  registry.register({ id: "actspace.explore", version: 1, routeId: "explore", model: "default", promptContributorIds: [], allowedToolNames: readOnlyTools, readOnly: true, maxSteps: 1000, maxDurationMs: 1_800_000, maxDelegationDepth: 1 });
-  return registry;
-}
-
-function deepFreeze<T>(value: T): T { if (value !== null && typeof value === "object") { for (const child of Array.isArray(value) ? value : Object.values(value)) deepFreeze(child); Object.freeze(value); } return value; }

@@ -148,7 +148,7 @@ export class BackgroundTaskRegistry {
       const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
       if (taskId === undefined) return state;
       const next = new Map(state);
-      if (data.op === "start" && (data.kind === "bash" || data.kind === "agent")) next.set(taskId, { kind: data.kind, description: typeof data.description === "string" ? data.description : "" });
+      if (data.op === "start" && data.kind === "bash") next.set(taskId, { kind: data.kind, description: typeof data.description === "string" ? data.description : "" });
       if (data.op === "settle") next.delete(taskId);
       return next;
     });

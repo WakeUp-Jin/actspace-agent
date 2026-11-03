@@ -47,7 +47,7 @@ export async function seedSettings(dataRoot: string, baseUrl: string) {
     const model = connection?.models.find(item => item.apiModel === "fixture-main")?.key;
     if (!model || connection?.models.length !== 2) throw new Error("Fixture model configuration is incomplete");
     const binding = { model, thinking: null };
-    const result = await service.updatePurposes({ chat: binding, utility: binding, explore: binding });
+    const result = await service.updatePurposes({ chat: binding, utility: binding });
     if (!result.ok) throw new Error(result.error.message);
     return result.view;
   } finally { await network.dispose(); }

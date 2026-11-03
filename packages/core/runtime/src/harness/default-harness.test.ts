@@ -127,10 +127,12 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
         expect((await runtime.runs.service.snapshot(childId)).runs[0]?.state).toBe("running");
         expect((await sessions.inspectEvents(childId)).length).toBe(before);
       };
-      const childResult = await runtime.subagents.invoke({ parentSession: parent, parentScope, parentCallId: "child-call", presetId: "actspace.explore", task: "Report a short result", parentVisibleToolIds: [], delegationDepth: 0 });
+      expect(parent.header.sessionId).toBe("conversation");
+      const childResult = await runtime.subagents.spawn({ sessionId: "conversation", callId: "child-call", scope: parentScope, description: "short result", prompt: "Report a short result", preset: "explore", background: false, parentToolNames: [], registeredToolNames: [], signal: new AbortController().signal });
       observeChild = undefined;
-      expect(childResult).toMatchObject({ status: "completed", text: "fixed loop result" });
-      const child = await sessions.resume(childResult.childSessionId);
+      expect(childResult).toMatchObject({ ok: true, text: expect.stringContaining("fixed loop result") });
+      const childSessionId = /Subagent (\S+) \(short result\) finished\./.exec(childResult.text)![1]!;
+      const child = await sessions.resume(childSessionId);
       const childLedger = await TaskLedger.open(child);
       expect(childLedger.snapshot().runs).toEqual([expect.objectContaining({ state: "completed", harness: expect.objectContaining({ revision: 1 }), result: { status: "completed", text: "fixed loop result" } })]);
       expect(childLedger.snapshot().tasks).toEqual([expect.objectContaining({ state: "completed" })]);
@@ -174,8 +176,8 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       await app.submit("conversation", "alternative", "Continue existing history"); await app.waitForIdle("conversation");
       expect(failures).toEqual([]);
       expect((await app.snapshot("conversation")).runs.at(-1)).toMatchObject({ harness: { revision: 3 }, result: { implementation: "alternative", priorEvents: expect.any(Number) } });
-      const child = await runtime.subagents.invoke({ parentSession: sessions.getOpen("conversation")!, parentScope: oldParent.scope, parentCallId: "alternative-child", presetId: "actspace.explore", task: "Run parent Loop", parentVisibleToolIds: [], delegationDepth: 0 });
-      expect(child).toMatchObject({ status: "completed", text: "fixed loop result" });
+      const child = await runtime.subagents.spawn({ sessionId: "conversation", callId: "alternative-child", scope: oldParent.scope, description: "parent loop", prompt: "Run parent Loop", preset: "explore", background: false, parentToolNames: [], registeredToolNames: [], signal: new AbortController().signal });
+      expect(child).toMatchObject({ ok: true, text: expect.stringContaining("fixed loop result") });
       expect(oldParent.revision).toBe(2);
     } finally { await oldParent.release(); }
 

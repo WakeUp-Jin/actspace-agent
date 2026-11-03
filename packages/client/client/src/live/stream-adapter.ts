@@ -107,8 +107,10 @@ export class FixedRendererStreamAdapter {
       // 任务通知只给模型看；用户插入的消息要立刻出现在当前回合里。
       if (event.source === "steer") this.#emit({ type: "user_message_steered", ...ids, messageId: event.messageId });
       const notice = event.notice;
-      if (event.source === "task_notification" && notice && (notice.kind === "bash" || notice.kind === "agent")) {
-        this.#emit({ type: "background_notice_claimed", ...ids, messageId: event.messageId, content: event.content ?? "", notice: { taskId: notice.taskId, taskKind: notice.kind, title: notice.title, status: notice.status } });
+      // Background tasks, subagent completion notices and agent messages that wake an idle Session.
+      const taskKind = notice && (event.source === "task_notification" || event.source === "subagent_notification" || event.source === "agent_message") && isNoticeKind(notice.kind) ? notice.kind : undefined;
+      if (notice && taskKind) {
+        this.#emit({ type: "background_notice_claimed", ...ids, messageId: event.messageId, content: event.content ?? "", notice: { taskId: notice.taskId, taskKind, title: notice.title, status: notice.status } });
       }
       return;
     }
@@ -162,4 +164,8 @@ export class FixedRendererStreamAdapter {
     if (update.deletions !== undefined) entry.deletions = Math.max(0, update.deletions);
     this.#publish(entry);
   }
+}
+
+function isNoticeKind(kind: string): kind is "bash" | "agent" | "subagent" | "agent_message" {
+  return kind === "bash" || kind === "agent" || kind === "subagent" || kind === "agent_message";
 }

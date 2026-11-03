@@ -21,7 +21,6 @@ export const PURPOSES: readonly PurposeMeta[] = [
   { id: "chat", label: "会话默认", description: "新会话一开始用的模型" },
   { id: "utility", label: "轻量任务", description: "起标题、写摘要、压缩上下文", follow: "chat" },
   { id: "autoReview", label: "自动审批", description: "判断工具调用能否自动放行", follow: "chat" },
-  { id: "explore", label: "子 Agent 探索", description: "读代码、搜资料的子 Agent", follow: "chat" },
   { id: "vision", label: "看图", description: "当前模型看不了图时，由它代看", follow: "chat", needImage: true },
 ];
 

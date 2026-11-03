@@ -9,7 +9,7 @@ const view = (key: ModelKey, extra: Partial<UsableModelView> = {}): UsableModelV
 });
 
 describe("Desktop models host port", () => {
-  it("lists the chat-usable models from the model store and has no subagent default yet", () => {
+  it("lists the chat-usable models from the model store and has no subagent default when none is set", () => {
     const listUsableModels = vi.fn(() => [view("openrouter:openai/gpt-5.5", { connectionId: "c1", connectionLabel: "Relay" }), view("deepseek:v4", { thinkingDefault: true })]);
     const port = createDesktopModelsHostPort({ listUsableModels });
     expect(port.listUsableModels()).toEqual([
@@ -26,6 +26,14 @@ describe("Desktop models host port", () => {
     expect(port.listUsableModels().map(model => model.key)).toEqual(["deepseek:a"]);
     models = [view("deepseek:a"), view("deepseek:b")];
     expect(port.listUsableModels().map(model => model.key)).toEqual(["deepseek:a", "deepseek:b"]);
+  });
+
+  it("reads the subagent default model on every call", () => {
+    let configured: string | null = null;
+    const port = createDesktopModelsHostPort({ subagentDefaultModel: () => configured });
+    expect(port.subagentDefaultModel()).toBeNull();
+    configured = "deepseek:a";
+    expect(port.subagentDefaultModel()).toBe("deepseek:a");
   });
 
   it("returns an empty list for a model port without a list", () => {

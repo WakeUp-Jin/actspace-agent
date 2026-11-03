@@ -53,7 +53,7 @@ describe("migrateModelLayers", () => {
     // 目录里没有这个模型：和「未知」比，填过的字段全算用户修改。
     expect(migrated.models.overrides?.[bigger]).toMatchObject({ label: "Big Sonnet", contextWindow: 1_000_000, maxOutput: 64_000 });
     expect(migrated.models.connections.relay).not.toHaveProperty("billingMode");
-    expect(migrated.models.layersVersion).toBe(2);
+    expect(migrated.models.layersVersion).toBe(3);
   });
 
   it("turns reference and manual prices into hand-entered prices and drops token-mode prices", () => {
@@ -88,32 +88,45 @@ describe("migrateModelLayers", () => {
     expect(migrated.models.definitions[auto]).not.toHaveProperty("reasoningConfig");
   });
 
-  it("moves custom labels, vision, the explore mirror and purpose thinking into the purpose table", () => {
+  it("moves custom labels, vision, purpose thinking into the purpose table", () => {
     const settings = settingsV4();
     addConnection(settings, "relay", "reference");
     const key = addModel(settings, "relay", "claude-sonnet-5");
     settings.models.installed[key]!.customLabel = "工作用 Sonnet";
     visionModel = key;
-    settings.models.taskBindings.explore = null;
-    settings.subagents.routes.explore = { model: key };
     delete settings.models.taskBindings.thinking;
     const migrated = migrateModelLayers(settings, catalog, hints())!;
     expect(migrated.models.overrides?.[key]).toMatchObject({ label: "工作用 Sonnet" });
     expect(migrated.models.installed[key]).not.toHaveProperty("customLabel");
-    expect(migrated.models.taskBindings).toMatchObject({ vision: key, explore: key, thinking: { utility: "off", autoReview: "off" } });
+    expect(migrated.models.taskBindings).toMatchObject({ vision: key, thinking: { utility: "off", autoReview: "off" } });
     expect(migrated.subagents.routes).not.toHaveProperty("explore");
   });
 
-  it("follows the chat model for vision when the old vision model is not installed, and keeps a set explore binding", () => {
+  it("follows the chat model for vision when the old vision model is not installed, and drops the explore binding", () => {
     const settings = settingsV4();
     addConnection(settings, "relay", "reference");
     const key = addModel(settings, "relay", "claude-sonnet-5");
     visionModel = "openrouter:not-installed";
-    settings.models.taskBindings.explore = key;
+    (settings.models.taskBindings as Record<string, unknown>).explore = key;
     settings.subagents.routes.explore = { model: "openrouter:stale" };
     settings.models.taskBindings.thinking = { utility: "high" };
     const migrated = migrateModelLayers(settings, catalog, hints())!;
-    expect(migrated.models.taskBindings).toMatchObject({ vision: null, explore: key, thinking: { utility: "high", autoReview: "off" } });
+    expect(migrated.models.taskBindings).toMatchObject({ vision: null, subagentDefaultModel: null, thinking: { utility: "high", autoReview: "off" } });
+    expect(migrated.models.taskBindings).not.toHaveProperty("explore");
+    expect(migrated.subagents.routes).not.toHaveProperty("explore");
+  });
+
+  it("removes explore bindings and thinking without carrying them into the subagent default model", () => {
+    const settings = settingsV4();
+    addConnection(settings, "relay", "reference");
+    const key = addModel(settings, "relay", "claude-sonnet-5");
+    settings.models.layersVersion = 2;
+    Object.assign(settings.models.taskBindings, { explore: key, thinking: { utility: "high", explore: "low" } });
+    const migrated = migrateModelLayers(settings, catalog, hints())!;
+    expect(migrated.models.taskBindings).not.toHaveProperty("explore");
+    expect(migrated.models.taskBindings.thinking).toEqual({ utility: "high" });
+    expect(migrated.models.taskBindings.subagentDefaultModel).toBeNull();
+    expect(migrated.models.layersVersion).toBe(3);
   });
 
   it("runs only once", () => {
@@ -141,7 +154,7 @@ describe("migrateModelLayers", () => {
     expect(migrated.models.overrides?.[off]).toBeUndefined();
     expect(migrated.models.taskBindings).toMatchObject({ utility: null, defaultChat: kept });
     expect(migrated.models.installed[kept]).toMatchObject({ enabled: true });
-    expect(migrated.models.layersVersion).toBe(2);
+    expect(migrated.models.layersVersion).toBe(3);
   });
 
   it("keeps built-in definitions when a disabled built-in model is dropped", () => {

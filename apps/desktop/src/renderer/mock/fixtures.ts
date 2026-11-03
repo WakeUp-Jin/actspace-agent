@@ -63,9 +63,9 @@ export function mockAppSettings(): AppSettings {
     defaultModelId: null,
     providers: { deepseek: providerView("deepseek"), kimi: providerView("kimi") },
     searchProviders: { deepseek: unconfigured, zhipu: unconfigured, tavily: unconfigured, tinyfish: unconfigured, exa: unconfigured },
-    agent: { systemPromptPath: PROMPT_PATH, temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false, exploreModelId: null },
+    agent: { systemPromptPath: PROMPT_PATH, temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
     skills: { disabled: [] },
-    taskModels: { defaultChatModel: MOCK_DEFAULT_MODEL_KEY, utilityModel: null, exploreModel: null },
+    taskModels: { defaultChatModel: MOCK_DEFAULT_MODEL_KEY, utilityModel: null, subagentDefaultModel: null },
     imageGeneration: { hasApiKey: false, baseUrl: DEFAULT_IMAGE_GENERATION_BASE_URL, model: DEFAULT_IMAGE_GENERATION_MODEL },
     shortcuts,
   };
@@ -87,7 +87,7 @@ export function mockSettingsV4(): SettingsV4Snapshot {
         connections: {},
         definitions: {},
         installed: {},
-        taskBindings: { defaultChat: MOCK_DEFAULT_MODEL_KEY, utility: null, explore: null },
+        taskBindings: { defaultChat: MOCK_DEFAULT_MODEL_KEY, utility: null, subagentDefaultModel: null },
       },
       tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {} },
       media: {

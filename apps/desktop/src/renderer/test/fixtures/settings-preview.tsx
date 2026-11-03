@@ -22,11 +22,11 @@ const settings = {
   defaultModelId: "deepseek:deepseek-v4-flash",
   providers: { deepseek: { hasApiKey: true }, kimi: { hasApiKey: true }, openrouter: { hasApiKey: false } },
   searchProviders: { zhipu: { hasApiKey: true }, tavily: { hasApiKey: false }, tinyfish: { hasApiKey: false }, exa: { hasApiKey: false } },
-  agent: { systemPromptPath: promptPath, temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false, exploreModelId: null },
+  agent: { systemPromptPath: promptPath, temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
   skills: { disabled: [] },
   imageGeneration: { hasApiKey: true, baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" },
   shortcuts: { quickOpen },
-  taskModels: { defaultChatModel: "deepseek:deepseek-v4-flash", utilityModel: null, exploreModel: null },
+  taskModels: { defaultChatModel: "deepseek:deepseek-v4-flash", utilityModel: null, subagentDefaultModel: null },
 };
 const settingsV4 = {
   version: 4,
@@ -39,7 +39,7 @@ const settingsV4 = {
       taskDefaults: { temperature: null, maxOutputTokens: null, chatCompactionTriggerRatio: 0.8 },
       shortcuts: { quickOpen },
     },
-    models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, explore: null } },
+    models: { connections: {}, definitions: {}, installed: {}, taskBindings: { defaultChat: null, utility: null, subagentDefaultModel: null } },
     tools: { disabledTools: [], bash: { alwaysAsk: false }, searchProviders: {} },
     media: {
       imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" },

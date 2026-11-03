@@ -86,6 +86,8 @@ export class ManagedRuns {
     return { sessionId, taskId: receipt.task.taskId, agentRunId: run?.runId ?? null,
       outcome: run?.state ?? task.state, value: run?.result ?? null, snapshot: this.sessions.snapshot(session) };
   }
+  /** A message the user queued is waiting for this Session. */
+  hasQueuedTask(sessionId: string): boolean { return (this.#states.get(sessionId)?.queue.length ?? 0) > 0; }
   isActive(sessionId: string): boolean { return this.#states.get(sessionId)?.runs.some(run => run.state === "running") ?? false; }
   abort(sessionId: string): boolean {
     const runId = this.#states.get(sessionId)?.runs.find(run => run.state === "running")?.runId;

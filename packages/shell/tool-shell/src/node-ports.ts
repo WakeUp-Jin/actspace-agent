@@ -19,6 +19,9 @@ const DEFAULT_BLOCK_MS = 30_000;
 const MAX_BLOCK_MS = 600_000;
 const MAX_RUNTIME_MS = 30 * 60_000;
 const MAX_BACKGROUND_PER_SESSION = 5;
+/** Subagent Sessions cannot background a command; it is killed after this long. */
+const SUBAGENT_BASH_TIMEOUT_MS = 10 * 60_000;
+export const SUBAGENT_BASH_TIMEOUT_MESSAGE = "Bash timed out after 10 minutes in a subagent and was killed.";
 const KILL_GRACE_MS = 500;
 const MAX_SUBSCRIPTION_PATTERN_LENGTH = 500;
 const MIN_SUBSCRIPTION_DEBOUNCE_MS = 5_000;
@@ -46,6 +49,8 @@ type BashOptions = {
   readonly background?: BackgroundTaskHost;
   /** Tests only: the per-Session `bash-log/` cap. */
   readonly sessionLogCapBytes?: number;
+  /** Tests only: how long a subagent's command may run. */
+  readonly subagentTimeoutMs?: number;
 };
 
 /**
@@ -110,13 +115,21 @@ async function executeBash(
     const abort = () => processHandle.kill();
     context.signal.addEventListener("abort", abort, { once: true });
     const blockMs = clampInteger(args.blockMs, DEFAULT_BLOCK_MS, 0, MAX_BLOCK_MS);
-    const boundary = backgroundBoundary(blockMs);
+    // Subagent Sessions have no background registry or wake: the command runs to the end, at most 10 minutes.
+    const foregroundOnly = context.backgroundAllowed === false;
+    const boundary = backgroundBoundary(foregroundOnly ? options.subagentTimeoutMs ?? SUBAGENT_BASH_TIMEOUT_MS : blockMs);
     try {
       const completedInTime = await Promise.race([
         processHandle.wait.then(() => true),
         boundary.promise,
       ]);
       if (completedInTime || processHandle.settled) { monitor.dispose(); return await foreground(command, realCwd, await processHandle.wait, processHandle.outputPath, context); }
+      if (foregroundOnly) {
+        processHandle.kill();
+        await processHandle.wait;
+        monitor.dispose();
+        return failed("BASH_TIMEOUT", SUBAGENT_BASH_TIMEOUT_MESSAGE, false);
+      }
       const task = await registry.register({ taskId: log.id, sessionId: context.sessionId, callId: context.callId, command, intent: stringArg(args, "intent") || undefined, cwd: realCwd, outputPath: log.path, process: processHandle, sandboxed, monitor, subscription, reportProgress: context.reportProgress });
       keepLog = true;
       return backgrounded(task, blockMs === 0 ? "explicit" : "block_timeout");
