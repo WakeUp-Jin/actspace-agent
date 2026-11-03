@@ -133,6 +133,38 @@ describe("BackgroundTaskRegistry", () => {
     expect(first.inbox().pending()).toHaveLength(1);
   });
 
+  it("names the Bash log in the completion notification and passes since to the source", async () => {
+    const { registry, inbox } = setup("parent");
+    const reads: (number | undefined)[] = [];
+    const task = { ...source("bash_1"), bash: { command: "make", cwd: "/w", sandboxed: true, outputPath: "/data/sessions-v2/parent/bash-log/bash_1.log" }, output: async (options?: { since?: number }) => { reads.push(options?.since); return { text: "new", logSize: 9, nextOffset: 9 }; } };
+    await registry.register(task);
+    await expect(registry.output("parent", "bash_1", { since: 4 })).resolves.toMatchObject({ output: { text: "new", nextOffset: 9 } });
+    expect(reads).toEqual([4]);
+    task.finish();
+    await flush(); await flush();
+    const content = String(inbox().pending()[0]!.content);
+    expect(content).toContain("</summary>\n<output_path>/data/sessions-v2/parent/bash-log/bash_1.log</output_path>\n<output_tail>");
+  });
+
+  it("records a pruned log once, for tasks of this or an earlier process, and reports it from task_output", async () => {
+    const { registry, facts } = setup("parent");
+    await registry.register({ ...source("bash_1"), bash: { command: "make", cwd: "/w", sandboxed: true, outputPath: "/logs/bash_1.log" } });
+    await registry.markPruned("parent", "bash_1");
+    await registry.markPruned("parent", "bash_1");
+    await expect(registry.output("parent", "bash_1")).resolves.toMatchObject({ output: { text: "", outputPath: "/logs/bash_1.log", pruned: true } });
+    // An earlier process's task is known from the Journal; a log that never became a task writes nothing.
+    const earlier = setup("parent");
+    await earlier.registry.register(source("bash_old"));
+    await earlier.registry.dispose();
+    const restarted = new BackgroundTaskRegistry({ openSession: async () => earlier.sessions.get("parent")!, wake: () => undefined, now: () => Date.parse("2026-10-22T07:00:00.000Z") });
+    await restarted.markPruned("parent", "bash_old");
+    await restarted.markPruned("parent", "bash_old");
+    await restarted.markPruned("parent", "bash_foreground");
+    await restarted.markPruned("other", "bash_1");
+    expect(facts().filter(fact => fact.op === "prune")).toEqual([{ op: "prune", taskId: "bash_1", prunedAt: "2026-10-22T06:00:00.000Z", reason: "session-cap" }]);
+    expect(earlier.facts().filter(fact => fact.op === "prune")).toEqual([{ op: "prune", taskId: "bash_old", prunedAt: "2026-10-22T07:00:00.000Z", reason: "session-cap" }]);
+  });
+
   it("stops running tasks on dispose and leaves them for restart reconciliation", async () => {
     const { registry, facts, inbox } = setup("parent");
     const task = source("bash_1");

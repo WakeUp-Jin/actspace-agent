@@ -2,8 +2,8 @@ import type { BackgroundTaskRecord } from "./types.js";
 
 export const AGENT_RESULT_LIMIT_BYTES = 8 * 1024;
 
-/** The model-facing completion message; Bash carries an output tail, an Agent its final text. */
-export function renderTaskNotification(task: Pick<BackgroundTaskRecord, "taskId" | "kind">, terminal: { readonly status: string; readonly summary: string; readonly body: string }): string {
+/** The model-facing completion message; Bash carries an output tail and its log path, an Agent its final text. */
+export function renderTaskNotification(task: Pick<BackgroundTaskRecord, "taskId" | "kind"> & { readonly outputPath?: string }, terminal: { readonly status: string; readonly summary: string; readonly body: string }): string {
   const tag = task.kind === "agent" ? "result" : "output_tail";
   return [
     "<task_notification>",
@@ -11,6 +11,7 @@ export function renderTaskNotification(task: Pick<BackgroundTaskRecord, "taskId"
     `<kind>${task.kind}</kind>`,
     `<status>${escapeXml(terminal.status)}</status>`,
     `<summary>${escapeXml(terminal.summary)}</summary>`,
+    ...(task.outputPath ? [`<output_path>${escapeXml(task.outputPath)}</output_path>`] : []),
     ...(terminal.body ? [`<${tag}>`, escapeXml(terminal.body), `</${tag}>`] : []),
     "</task_notification>",
   ].join("\n");

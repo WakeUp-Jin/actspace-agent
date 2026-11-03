@@ -12,11 +12,17 @@ export type BackgroundTaskTerminal = {
   readonly exitCode?: number | null;
 };
 
-/** What a background Bash command is, for the 「后台任务」 panel. */
-export type BackgroundBashDetails = { readonly command: string; readonly cwd: string; readonly sandboxed: boolean };
+/** What a background Bash command is, for the 「后台任务」 panel. `outputPath` is its log under the Session directory. */
+export type BackgroundBashDetails = { readonly command: string; readonly cwd: string; readonly sandboxed: boolean; readonly outputPath?: string };
 
-/** Non-blocking snapshot shown by `task_output`. */
-export type BackgroundTaskOutput = { readonly text: string; readonly outputPath?: string };
+/**
+ * Non-blocking snapshot shown by `task_output`. Bash also reports the log size and the byte offset to pass as
+ * `since` next time; `pruned` means the log was deleted by the per-Session cap and `text` is empty.
+ */
+export type BackgroundTaskOutput = { readonly text: string; readonly outputPath?: string; readonly logSize?: number; readonly nextOffset?: number; readonly pruned?: boolean };
+
+/** `since`: Bash log byte offset to read from; without it a source returns its tail. */
+export type BackgroundTaskOutputOptions = { readonly since?: number };
 
 /** Implemented by Bash and Subagent; the registry owns delivery, persistence and wake-up. */
 export interface BackgroundTaskSource {
@@ -30,7 +36,7 @@ export interface BackgroundTaskSource {
   /** Bash only: the command, where and how it runs. */
   readonly bash?: BackgroundBashDetails;
   readonly done: Promise<BackgroundTaskTerminal>;
-  output(): Promise<BackgroundTaskOutput>;
+  output(options?: BackgroundTaskOutputOptions): Promise<BackgroundTaskOutput>;
   stop(reason: string): Promise<void>;
 }
 

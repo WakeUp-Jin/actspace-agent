@@ -37,7 +37,7 @@ export const agentRuntimeManifest = defineBuiltinPluginManifest({
   entry: { entryId: "agent-runtime", behavior: "./harness/agent-runtime-plugin.js" },
   host: { required: [], optional: [] },
   frontend: null,
-  injects: ["actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "actspace.host.background-tasks", "actspace.host.sandbox", "actspace.host.models", "agent.registry", "session.runtime", "llm.auxiliary-requests", "session.checkpoint", "session.journal", "session.projection", "actspace.host.tools.filesystem-read", "actspace.host.tools.filesystem-search", "actspace.host.tools.filesystem-write", "actspace.host.tools.shell-tools", "actspace.host.tools.web-tools", "actspace.host.tools.image-generation", "actspace.host.tools.image-inspection", "actspace.host.session"],
+  injects: ["actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "actspace.host.background-tasks", "actspace.host.sandbox", "actspace.host.models", "actspace.host.session", "agent.registry", "session.runtime", "llm.auxiliary-requests", "session.checkpoint", "session.journal", "session.projection", "actspace.host.tools.filesystem-read", "actspace.host.tools.filesystem-search", "actspace.host.tools.filesystem-write", "actspace.host.tools.shell-tools", "actspace.host.tools.web-tools", "actspace.host.tools.image-generation", "actspace.host.tools.image-inspection"],
   contributions: { services: ["agent.runtime", "agent.service", "harness.control", "harness.hmr", "harness.plugin-manager"], tools: [], prompts: [], events: [] },
 });
 

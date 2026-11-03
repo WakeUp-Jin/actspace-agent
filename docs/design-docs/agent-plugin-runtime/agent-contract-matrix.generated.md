@@ -1,7 +1,7 @@
 # Agent Contract Matrix
 
 > Generated artifact; edit source declarations instead. Do not hand-edit this file.
-> Generator 1.0.0; source digest `909ffd45fef7b4180cf3b8785a4e874c92bfb604426506d17e2c487ae2073112`.
+> Generator 1.0.0; source digest `10006e51df3060e1bdf03d19c411b297e0890c062e3040f9db009427b610882a`.
 
 This document is an audit view of the current ActSpace v2 declarations. It never activates Runtime services, plugins, Session persistence, tools or Cordis entries.
 
@@ -231,7 +231,7 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | actspace.session.jsonl | ActSpace Session JSONL | 0.1.0 | session.jsonl | active | true | session.storage | actspace.host.session<br>session.journal | filesystem.session | packages/session/session-persistence-jsonl/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
 | actspace.session.persistence | ActSpace Session Persistence | 0.1.0 | session.persistence | active | true | session.store | session.journal<br>session.storage | - | packages/session/session-persistence/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
 | actspace.session.projection | ActSpace Session Projection | 0.1.0 | session.projection | active | true | session.projection | - | - | packages/session/session-projection/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
-| actspace.shell-tools | ActSpace Shell Tools | 2.0.0 | tools.shell-tools | active | true | tools.shell-tools | actspace.host.background-tasks<br>actspace.host.tools.shell-tools<br>tools.runtime | process | packages/shell/tool-shell/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
+| actspace.shell-tools | ActSpace Shell Tools | 2.0.0 | tools.shell-tools | active | true | tools.shell-tools | actspace.host.background-tasks<br>actspace.host.session<br>actspace.host.tools.shell-tools<br>tools.runtime | process | packages/shell/tool-shell/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
 | actspace.side-chat | 侧边对话 | 0.1.0 | side-chat | optional | false | side-chat | session.runtime | - | packages/side-chat/side-chat/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
 | actspace.subagent | ActSpace One-shot Subagent | 0.1.0 | subagent.one-shot | active | true | subagent.one-shot | core.agent<br>core.agent-loop<br>session.journal<br>tools.runtime | - | packages/subagent/subagent/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |
 | actspace.subagent-tools | ActSpace Subagent Tools | 0.1.0 | subagent-tools | active | true | tools.subagents | actspace.host.background-tasks<br>actspace.host.subagents<br>agent.registry<br>tools.runtime | - | packages/subagent/tool-subagent/src/manifest.ts#manifest | cordis-adapter/event-contract<br>cordis-adapter/service-contract |

@@ -18,7 +18,7 @@ import { BackgroundTaskRegistry } from "@actspace/background-tasks";
 import { ManagedRuns } from "./managed-runs.js";
 import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
 
-export const inject = Object.freeze([...new Set([...DEFAULT_HARNESS_SHARED_SERVICES.filter(name => name !== "actspace.host.tools.browser"), "actspace.host.session"])]);
+export const inject = Object.freeze(DEFAULT_HARNESS_SHARED_SERVICES.filter(name => name !== "actspace.host.tools.browser"));
 
 /** Host owns scheduling and lifetime; execution services live in isolated Harness trees. */
 export class AgentRuntimeService {

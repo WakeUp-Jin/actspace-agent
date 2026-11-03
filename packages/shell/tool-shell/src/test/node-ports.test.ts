@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, realpath, rm, symlink, utimes, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, readFile, realpath, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -45,19 +45,21 @@ const MODES: readonly Mode[] = [
   { label: "sandbox service, sandboxed", noSandbox: false, sandbox: () => recordingSandbox(), summary: "sandboxed=true, sandbox=fake" },
 ];
 
-import { createNodeBashToolPorts, sandboxDenial } from "../node-ports.js";
+import { createNodeBashToolPorts, readLog, sandboxDenial } from "../node-ports.js";
 
 /** Records what Bash hands to the Host registry. */
 function fakeHost() {
-  const sources = new Map<string, BackgroundTaskSource>(); const terminals = new Map<string, BackgroundTaskTerminal>(); const matches: { taskId: string; summary: string; line: string }[] = [];
+  const sources = new Map<string, BackgroundTaskSource>(); const terminals = new Map<string, BackgroundTaskTerminal>(); const matches: { taskId: string; summary: string; line: string }[] = []; const pruned: { sessionId: string; taskId: string }[] = [];
   const host = {
     register: async (source: BackgroundTaskSource) => { sources.set(source.taskId, source); void source.done.then(terminal => terminals.set(source.taskId, terminal)); return undefined as never; },
     notifyOutputMatch: async (taskId: string, summary: string, line: string) => { matches.push({ taskId, summary, line }); },
+    markPruned: async (sessionId: string, taskId: string) => { pruned.push({ sessionId, taskId }); },
   } as unknown as BackgroundTaskHost;
-  return { host, sources, terminals, matches };
+  return { host, sources, terminals, matches, pruned };
 }
 let lastHost: ReturnType<typeof fakeHost>;
-function createNodeToolPorts(options: Omit<Parameters<typeof createNodeBashToolPorts>[0], "background"> & { readonly sandbox?: SandboxService }) { lastHost = fakeHost(); return createNodeBashToolPorts({ ...options, background: lastHost.host }); }
+/** Logs go under `dataRoot`; tests that do not look at them share the temp root. */
+function createNodeToolPorts(options: Omit<Parameters<typeof createNodeBashToolPorts>[0], "background" | "dataRoot"> & { readonly sandbox?: SandboxService; readonly dataRoot?: string }) { lastHost = fakeHost(); return createNodeBashToolPorts({ ...options, dataRoot: options.dataRoot ?? options.tmpRoot, background: lastHost.host }); }
 import { getBashHardRejectReason } from "../command-rules.js";
 describe("shell-tools ports", () => {
   it.each(MODES)("measures real foreground commands and background termination ($label)", async mode => {
@@ -205,7 +207,7 @@ describe("shell-tools ports", () => {
     expect(foreground).toMatchObject({ status: "completed" }); expect(JSON.stringify(foreground)).toContain("hello");
     const background = await invoke(ports.bash, { command: "printf ready; sleep 30", intent: "verify background", blockMs: 0 });
     const taskId = JSON.stringify(background).match(/bash_[0-9a-f-]+/)?.[0]; expect(taskId).toBeTruthy();
-    expect(background.detail).toEqual([{ label: "background-task", value: { taskId, status: "running" } }, { label: "environment", value: { sandboxed: false } }]);
+    expect(background.detail).toEqual([{ label: "background-task", value: { taskId, status: "running" } }, { label: "environment", value: { sandboxed: false } }, { label: "actspace.context.trace", value: { kind: "trace", path: join(tmpRoot, "sessions-v2", "session", "bash-log", `${taskId}.log`), description: "Background Bash log: verify background" } }]);
     expect(ports.hasRunningBackgroundTask("session")).toBe(true);
     expect(ports.hasRunningBackgroundTask("other-session")).toBe(false);
     const source = lastHost.sources.get(taskId!)!;
@@ -247,6 +249,99 @@ describe("shell-tools ports", () => {
     expect(JSON.stringify(lastHost.matches)).not.toContain("token-abcdefgh");
     await ports.dispose?.();
   });
+  it("deletes a foreground log once the result exists and keeps long output as an artifact", async () => {
+    const root = await workspace(); const tmpRoot = await workspace(); const dataRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, dataRoot });
+    const logs = join(dataRoot, "sessions-v2", "session", "bash-log");
+    try {
+      expect(await invoke(ports.bash, { command: "printf short", intent: "short", blockMs: 5_000 })).toMatchObject({ status: "completed" });
+      expect(await invoke(ports.bash, { command: "printf nope; exit 4", intent: "failing", blockMs: 5_000 })).toMatchObject({ status: "failed" });
+      const long = await invoke(ports.bash, { command: "node -e \"process.stdout.write('x'.repeat(9000))\"", intent: "long", blockMs: 5_000 });
+      expect(long).toMatchObject({ status: "completed", artifacts: [{ mediaType: "text/plain" }] });
+      const controller = new AbortController(); controller.abort();
+      expect(await ports.bash!({ command: "printf never", intent: "cancelled" }, { ...context(), signal: controller.signal })).toMatchObject({ failure: { code: "TOOL_ABORTED" } });
+      expect(await readdir(logs)).toEqual([]);
+    } finally { await ports.dispose(); }
+  });
+
+  it("writes a background log into the Session directory, keeps it after dispose and removes only the scratch directory", async () => {
+    const root = await workspace(); const tmpRoot = await workspace(); const dataRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, dataRoot });
+    const background = await invoke(ports.bash, { command: "printf ready; sleep 30", intent: "keep log", blockMs: 0 }, "child-session");
+    const taskId = JSON.stringify(background).match(/bash_[0-9a-f-]+/)![0];
+    const logPath = join(dataRoot, "sessions-v2", "child-session", "bash-log", `${taskId}.log`);
+    expect(JSON.stringify(background.modelOutput)).toContain(`output_path: ${logPath}`);
+    expect(background.detail).toContainEqual({ label: "actspace.context.trace", value: { kind: "trace", path: logPath, description: "Background Bash log: keep log" } });
+    expect(lastHost.sources.get(taskId)!.bash).toMatchObject({ outputPath: logPath });
+    await vi.waitFor(async () => expect(await readFile(logPath, "utf8")).toBe("ready"));
+    const [scratch] = await readdir(join(tmpRoot, "bash-v2"));
+    await ports.dispose();
+    expect(await readFile(logPath, "utf8")).toBe("ready");
+    expect(existsSync(join(tmpRoot, "bash-v2", scratch!))).toBe(false);
+  });
+
+  it("allows five running background tasks per Session", async () => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot });
+    try {
+      for (let index = 0; index < 5; index += 1) expect((await invoke(ports.bash, { command: `sleep 30 # ${index}`, intent: "fill", blockMs: 0 })).summary).toContain("running in the background");
+      expect(await invoke(ports.bash, { command: "sleep 30 # 5", intent: "one more", blockMs: 0 })).toMatchObject({ status: "failed", failure: { code: "BASH_TASK_LIMIT", message: "Background task limit reached (5)." } });
+    } finally { await ports.dispose(); }
+  });
+
+  it("prunes the oldest finished logs past the Session cap, never a running one, and reports each to the Host", async () => {
+    const root = await workspace(); const tmpRoot = await workspace(); const dataRoot = await workspace();
+    const logs = join(dataRoot, "sessions-v2", "session", "bash-log");
+    await mkdir(logs, { recursive: true });
+    const old = (n: number) => `bash_0000000${n}-0000-4000-8000-000000000000`;
+    // Two finished logs from an earlier process, the older one first; 600 bytes each against a 1000 byte cap.
+    for (const [index, age] of [[1, 3_000], [2, 2_000]] as const) {
+      await writeFile(join(logs, `${old(index)}.log`), "y".repeat(600));
+      const time = new Date(Date.now() - age * 1000); await utimes(join(logs, `${old(index)}.log`), time, time);
+    }
+    await writeFile(join(logs, "notes.txt"), "z".repeat(5_000));
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, dataRoot, sessionLogCapBytes: 1_000 });
+    try {
+      // Starting a command prunes the oldest log; 600 bytes are left.
+      const running = await invoke(ports.bash, { command: "node -e \"process.stdout.write('r'.repeat(700))\"; sleep 30", intent: "running", blockMs: 0 });
+      const runningId = JSON.stringify(running).match(/bash_[0-9a-f-]+/)![0];
+      expect(lastHost.pruned).toEqual([{ sessionId: "session", taskId: old(1) }]);
+      await vi.waitFor(async () => expect((await readFile(join(logs, `${runningId}.log`), "utf8")).length).toBe(700));
+      // A finishing task is checked again: 1300 bytes, the older finished log goes; the running one stays although it is bigger.
+      const done = await invoke(ports.bash, { command: "sleep 0.1", intent: "finishes", blockMs: 0 });
+      const doneId = JSON.stringify(done).match(/bash_[0-9a-f-]+/)![0];
+      await vi.waitFor(() => expect(lastHost.pruned.map(item => item.taskId)).toEqual([old(1), old(2)]), { timeout: 3_000 });
+      expect((await readdir(logs)).sort()).toEqual([`${doneId}.log`, `${runningId}.log`, "notes.txt"].sort());
+    } finally { await ports.dispose(); }
+  });
+
+  it("sweeps scratch directories older than a day that belong to no live process", async () => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    const stale = join(tmpRoot, "bash-v2", "stale"); const fresh = join(tmpRoot, "bash-v2", "fresh");
+    await mkdir(stale, { recursive: true }); await mkdir(fresh, { recursive: true });
+    const old = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000); await utimes(stale, old, old);
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot });
+    try {
+      await vi.waitFor(() => expect(existsSync(stale)).toBe(false));
+      expect(existsSync(fresh)).toBe(true);
+    } finally { await ports.dispose(); }
+  });
+
+  it("reads a log from a byte offset without splitting a UTF-8 character", async () => {
+    const root = await workspace(); const path = join(root, "bash_x.log");
+    await writeFile(path, "ab中文cd");
+    expect(await readLog(path)).toEqual({ text: "ab中文cd", logSize: 10, nextOffset: 10 });
+    // Offset 3 is inside 中 (bytes 2–4): the read starts at 文.
+    expect(await readLog(path, 3)).toEqual({ text: "文cd", logSize: 10, nextOffset: 10 });
+    expect(await readLog(path, 10)).toEqual({ text: "", logSize: 10, nextOffset: 10 });
+    expect(await readLog(path, 99)).toEqual({ text: "", logSize: 10, nextOffset: 10 });
+    await writeFile(path, `${"a".repeat(32 * 1024 - 1)}中tail`);
+    const first = await readLog(path, 0);
+    // The 32KB window ends inside 中, so it stops before it and the next read starts there.
+    expect(first).toMatchObject({ text: "a".repeat(32 * 1024 - 1), nextOffset: 32 * 1024 - 1 });
+    expect(await readLog(path, first.nextOffset)).toMatchObject({ text: "中tail", nextOffset: 32 * 1024 + 6 });
+  });
+
   it("hard-rejects broad deletion and repository metadata targets before execution", async () => {
     const root = await workspace();
     expect(getBashHardRejectReason("rm -rf /", root, root)).toContain("dangerous delete");

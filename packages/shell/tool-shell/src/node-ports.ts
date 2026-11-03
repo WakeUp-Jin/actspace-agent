@@ -1,15 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { mkdir, open, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { spawnHostProcess } from "@actspace/sandbox/node-ports";
 import type { HostProcessSpec, SandboxExecution, SandboxRequest, SandboxResult, SandboxService } from "@actspace/sandbox/types";
 import type { BackgroundTaskHost, BackgroundTaskTerminal } from "@actspace/background-tasks";
 import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tool-runtime";
 import { redactToolText } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
+import { SessionBashLogs, sweepStaleScratchDirectories } from "./bash-log.js";
 
 const INLINE_OUTPUT_CHARS = 8_000;
 const OUTPUT_DISK_CAP_CHARS = 5 * 1024 * 1024;
@@ -17,7 +18,7 @@ const OUTPUT_PREVIEW_BYTES = 32 * 1024;
 const DEFAULT_BLOCK_MS = 30_000;
 const MAX_BLOCK_MS = 600_000;
 const MAX_RUNTIME_MS = 30 * 60_000;
-const MAX_BACKGROUND_PER_SESSION = 8;
+const MAX_BACKGROUND_PER_SESSION = 5;
 const KILL_GRACE_MS = 500;
 const MAX_SUBSCRIPTION_PATTERN_LENGTH = 500;
 const MIN_SUBSCRIPTION_DEBOUNCE_MS = 5_000;
@@ -35,14 +36,28 @@ export type NodeBashToolPorts = Pick<ToolPorts, "bash"> & {
   readonly forceTerminate: () => void;
 };
 
-type BashOptions = { readonly workspaceRoot: string; readonly tmpRoot: string; readonly sandbox?: SandboxService; readonly background?: BackgroundTaskHost };
+type BashOptions = {
+  readonly workspaceRoot: string;
+  /** Holds `bash-v2/<process>/`, the sandbox `TMPDIR`; removed when the Harness unloads. */
+  readonly tmpRoot: string;
+  /** Holds `sessions-v2/<sessionId>/bash-log/`, the command logs. */
+  readonly dataRoot: string;
+  readonly sandbox?: SandboxService;
+  readonly background?: BackgroundTaskHost;
+  /** Tests only: the per-Session `bash-log/` cap. */
+  readonly sessionLogCapBytes?: number;
+};
 
 /**
  * `background` is the Host task registry; it owns notifications, `task_*` queries and persisted status.
  * `sandbox` is the Harness sandbox service. Without it only commands admitted with `noSandbox` run.
+ * Creating the ports also sweeps scratch directories a crashed process left behind.
  */
 export function createNodeBashToolPorts(options: BashOptions): NodeBashToolPorts {
-  const registry = new BashTaskRegistry(join(options.tmpRoot, "bash-v2", randomUUID()), options.background);
+  const bashRoot = join(options.tmpRoot, "bash-v2");
+  const scratchRoot = join(bashRoot, randomUUID());
+  const registry = new BashTaskRegistry(scratchRoot, new SessionBashLogs(options.dataRoot, options.sessionLogCapBytes), options.background);
+  void sweepStaleScratchDirectories(bashRoot, scratchRoot).catch((error: unknown) => console.warn("[shell-tools] scratch sweep failed", error));
   return Object.freeze({
     bash: (args, context) => executeBash(args, context, options, registry),
     hasRunningBackgroundTask: (sessionId) => registry.running(sessionId) > 0,
@@ -73,36 +88,44 @@ async function executeBash(
   const noSandbox = admittedNoSandbox(args, context);
   if (!noSandbox && !options.sandbox) return failed("SANDBOX_PREPARE_FAILED", "Bash needs the sandbox, but the sandbox plugin is not loaded. The command did not run; retry with sandbox_permissions: require_escalated and a justification to run it outside the sandbox after approval.", false);
 
-  const outputRoot = registry.outputRoot;
-  await mkdir(outputRoot, { recursive: true, mode: 0o700 });
-  const outputPath = join(outputRoot, `${randomUUID()}.log`);
-  await writeFile(outputPath, "", { encoding: "utf8", mode: 0o600 });
-  if (context.signal.aborted) return failed("TOOL_ABORTED", "Bash was cancelled before process creation.", true);
-  const argv = [process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", "-lc", command];
-  const run = !options.sandbox
-    ? directRun({ command: argv[0]!, args: argv.slice(1), cwd: realCwd, env: process.env })
-    : options.sandbox.run(noSandbox
-      ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env: process.env, scratchDir: outputRoot }
-      : await sandboxedRequest(argv, realCwd, workspaceRoot, outputRoot));
-  const sandboxed = !noSandbox;
-  const monitor = new OutputMonitor(subscription);
-  const processHandle = new ProcessHandle(run, outputPath, monitor.handleChunk);
-  registry.own(processHandle);
-  const abort = () => processHandle.kill();
-  context.signal.addEventListener("abort", abort, { once: true });
-  const blockMs = clampInteger(args.blockMs, DEFAULT_BLOCK_MS, 0, MAX_BLOCK_MS);
-  const boundary = backgroundBoundary(blockMs);
+  // The scratch directory is recreated per command: another process's sweep may have taken an idle one.
+  const scratchRoot = registry.scratchRoot;
+  await mkdir(scratchRoot, { recursive: true, mode: 0o700 });
+  const log = await registry.logs.create(context.sessionId);
+  // A log that never becomes a background task goes once the result exists; the artifact keeps long output.
+  let keepLog = false;
   try {
-    const completedInTime = await Promise.race([
-      processHandle.wait.then(() => true),
-      boundary.promise,
-    ]);
-    if (completedInTime || processHandle.settled) { monitor.dispose(); return foreground(command, realCwd, await processHandle.wait, processHandle.outputPath, context); }
-    const task = await registry.register({ sessionId: context.sessionId, callId: context.callId, command, intent: stringArg(args, "intent") || undefined, cwd: realCwd, outputPath, process: processHandle, sandboxed, monitor, subscription, reportProgress: context.reportProgress });
-    return backgrounded(task, blockMs === 0 ? "explicit" : "block_timeout");
+    await registry.pruneLogs(context.sessionId, log.path);
+    if (context.signal.aborted) return failed("TOOL_ABORTED", "Bash was cancelled before process creation.", true);
+    const argv = [process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", "-lc", command];
+    const run = !options.sandbox
+      ? directRun({ command: argv[0]!, args: argv.slice(1), cwd: realCwd, env: process.env })
+      : options.sandbox.run(noSandbox
+        ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env: process.env, scratchDir: scratchRoot }
+        : await sandboxedRequest(argv, realCwd, workspaceRoot, scratchRoot));
+    const sandboxed = !noSandbox;
+    const monitor = new OutputMonitor(subscription);
+    const processHandle = new ProcessHandle(run, log.path, monitor.handleChunk);
+    registry.own(processHandle);
+    const abort = () => processHandle.kill();
+    context.signal.addEventListener("abort", abort, { once: true });
+    const blockMs = clampInteger(args.blockMs, DEFAULT_BLOCK_MS, 0, MAX_BLOCK_MS);
+    const boundary = backgroundBoundary(blockMs);
+    try {
+      const completedInTime = await Promise.race([
+        processHandle.wait.then(() => true),
+        boundary.promise,
+      ]);
+      if (completedInTime || processHandle.settled) { monitor.dispose(); return await foreground(command, realCwd, await processHandle.wait, processHandle.outputPath, context); }
+      const task = await registry.register({ taskId: log.id, sessionId: context.sessionId, callId: context.callId, command, intent: stringArg(args, "intent") || undefined, cwd: realCwd, outputPath: log.path, process: processHandle, sandboxed, monitor, subscription, reportProgress: context.reportProgress });
+      keepLog = true;
+      return backgrounded(task, blockMs === 0 ? "explicit" : "block_timeout");
+    } finally {
+      boundary.cancel();
+      context.signal.removeEventListener("abort", abort);
+    }
   } finally {
-    boundary.cancel();
-    context.signal.removeEventListener("abort", abort);
+    if (!keepLog) await rm(log.path, { force: true });
   }
 }
 
@@ -198,9 +221,9 @@ function directRun(spec: HostProcessSpec): BashRun {
   });
 }
 
-/** Canonical paths, so the policy, TMPDIR and the output file all name the same directory. The tool template adds the .git denies. */
-async function sandboxedRequest(argv: readonly string[], cwd: string, workspaceRoot: string, outputRoot: string): Promise<SandboxRequest> {
-  const scratch = await realpath(outputRoot);
+/** Canonical paths, so the policy and TMPDIR name the same directory. The log is written by this process, not the command. The tool template adds the .git denies. */
+async function sandboxedRequest(argv: readonly string[], cwd: string, workspaceRoot: string, scratchRoot: string): Promise<SandboxRequest> {
+  const scratch = await realpath(scratchRoot);
   return { purpose: "tool", isolation: "sandboxed", argv, cwd, env: { ...process.env, TMPDIR: scratch }, scratchDir: scratch, filesystem: { readWrite: [await realpath(workspaceRoot), scratch, await realpath(tmpdir())] } };
 }
 
@@ -237,7 +260,14 @@ type BashTask = {
 class BashTaskRegistry {
   readonly #tasks = new Map<string, BashTask>();
   readonly #processes = new Set<ProcessHandle>();
-  constructor(readonly outputRoot: string, private readonly background?: BackgroundTaskHost) {}
+  constructor(readonly scratchRoot: string, readonly logs: SessionBashLogs, private readonly background?: BackgroundTaskHost) {}
+
+  /** Runs after a log is created (`keep` is that log) and after a background task ends; never fails the command. */
+  async pruneLogs(sessionId: string, keep?: string): Promise<void> {
+    const running = new Set([...[...this.#processes].filter(process => !process.settled).map(process => process.outputPath), ...(keep === undefined ? [] : [keep])]);
+    await this.logs.prune(sessionId, running, async taskId => { await this.background?.markPruned(sessionId, taskId); })
+      .catch((error: unknown) => console.warn("[shell-tools] bash-log prune failed", error));
+  }
 
   own(process: ProcessHandle): void {
     this.#processes.add(process);
@@ -246,8 +276,9 @@ class BashTaskRegistry {
 
   forceTerminate(): void { for (const process of this.#processes) process.forceTerminate(); }
 
-  async register(input: Omit<BashTask, "taskId" | "startedAt" | "status" | "timedOut" | "timer" | "completion">): Promise<BashTask> {
-    const task = { ...input, taskId: `bash_${randomUUID()}`, startedAt: Date.now(), status: "running" as const, timedOut: false } as BashTask;
+  /** `taskId` is the log id given at start, so the log name and the task id match. */
+  async register(input: Omit<BashTask, "startedAt" | "status" | "timedOut" | "timer" | "completion">): Promise<BashTask> {
+    const task = { ...input, startedAt: Date.now(), status: "running" as const, timedOut: false } as BashTask;
     task.timer = setTimeout(() => { if (task.status === "running") { task.status = "killed"; task.timedOut = true; task.process.kill(); } }, MAX_RUNTIME_MS);
     task.timer.unref?.();
     this.#tasks.set(task.taskId, task);
@@ -264,11 +295,14 @@ class BashTaskRegistry {
       task.notStarted = status.notStarted;
       task.monitor.dispose();
       task.reportProgress({ message: `Background Bash task ${task.taskId} ${task.status}.` });
-      return terminal(task, await readFile(task.outputPath, "utf8").then((value) => value.slice(-NOTIFICATION_TAIL_CHARS)).catch(() => ""), await sandboxDenialHint(status, task.outputPath));
+      const result = terminal(task, await readFile(task.outputPath, "utf8").then((value) => value.slice(-NOTIFICATION_TAIL_CHARS)).catch(() => ""), await sandboxDenialHint(status, task.outputPath));
+      // The handle is settled by now, so this task's own log counts as finished.
+      await this.pruneLogs(task.sessionId);
+      return result;
     });
     await this.background?.register({
-      taskId: task.taskId, kind: "bash", sessionId: task.sessionId, callId: task.callId, description: task.intent ?? task.command, bash: { command: task.command, cwd: task.cwd, sandboxed: task.sandboxed }, done: task.completion,
-      output: async () => ({ text: await readTail(task.outputPath), outputPath: task.outputPath }),
+      taskId: task.taskId, kind: "bash", sessionId: task.sessionId, callId: task.callId, description: task.intent ?? task.command, bash: { command: task.command, cwd: task.cwd, sandboxed: task.sandboxed, outputPath: task.outputPath }, done: task.completion,
+      output: async (options) => ({ outputPath: task.outputPath, ...await readLog(task.outputPath, options?.since) }),
       stop: async () => { this.#kill(task); await task.completion; },
     });
     return task;
@@ -284,7 +318,8 @@ class BashTaskRegistry {
     await Promise.allSettled([...this.#tasks.values()].map((task) => task.completion));
     await Promise.all(owned.map((process) => process.wait));
     for (const task of this.#tasks.values()) { clearTimeout(task.timer); task.monitor.dispose(); }
-    await rm(this.outputRoot, { force: true, recursive: true });
+    // Logs stay with their Sessions; only the sandbox scratch directory goes.
+    await rm(this.scratchRoot, { force: true, recursive: true });
     this.#tasks.clear();
   }
 
@@ -324,11 +359,25 @@ async function readEnd(path: string, bytes: number): Promise<string> {
   } catch { return ""; } finally { await file.close(); }
 }
 
-async function readTail(path: string): Promise<string> {
+/**
+ * `task_output`: without `since` the last 32KB, with it up to 32KB from that byte offset. Both ends are moved to UTF-8
+ * character boundaries (the start forward, the end back), and `nextOffset` is where the next read starts.
+ */
+export async function readLog(path: string, since?: number): Promise<{ readonly text: string; readonly logSize: number; readonly nextOffset: number }> {
   const bytes = await readFile(path).catch(() => Buffer.alloc(0));
-  if (bytes.length <= OUTPUT_PREVIEW_BYTES) return redactToolText(bytes.toString("utf8"));
-  return `[Earlier output omitted; read the output file for the full log]\n${redactToolText(bytes.subarray(-OUTPUT_PREVIEW_BYTES).toString("utf8").replace(/^[^\n]*\n/, ""))}`;
+  const logSize = bytes.length;
+  if (since === undefined) {
+    if (logSize <= OUTPUT_PREVIEW_BYTES) return { text: redactToolText(bytes.toString("utf8")), logSize, nextOffset: logSize };
+    return { text: `[Earlier output omitted; read the output file for the full log]\n${redactToolText(bytes.subarray(-OUTPUT_PREVIEW_BYTES).toString("utf8").replace(/^[^\n]*\n/, ""))}`, logSize, nextOffset: logSize };
+  }
+  let start = Math.min(since, logSize);
+  while (start < logSize && isContinuationByte(bytes[start]!)) start += 1;
+  let end = Math.min(start + OUTPUT_PREVIEW_BYTES, logSize);
+  if (end < logSize) while (end > start && isContinuationByte(bytes[end]!)) end -= 1;
+  return { text: redactToolText(bytes.subarray(start, end).toString("utf8")), logSize, nextOffset: end };
 }
+
+function isContinuationByte(byte: number): boolean { return (byte & 0xc0) === 0x80; }
 
 async function foreground(command: string, cwd: string, status: ProcessStatus, outputPath: string, context: ToolExecutionContext): Promise<ToolBodyResult> {
   if (status.notStarted !== undefined) {
@@ -362,7 +411,12 @@ async function foreground(command: string, cwd: string, status: ProcessStatus, o
 function backgrounded(task: BashTask, reason: "explicit" | "block_timeout" | "already_running"): ToolBodyResult {
   const summary = `Bash task ${task.taskId} is running in the background (${reason}).`;
   const next = "You will be notified automatically when it finishes; continue with other work. Use task_output to inspect output or task_stop to stop it. Do not poll with sleep loops or repeated task_output.";
-  return { ...completed(`${summary}\noutput_path: ${task.outputPath}\n${next}`, summary), detail: [{ label: "background-task", value: { taskId: task.taskId, status: "running" } }, environmentDetail(task.sandboxed)] };
+  return { ...completed(`${summary}\noutput_path: ${task.outputPath}\n${next}`, summary), detail: [{ label: "background-task", value: { taskId: task.taskId, status: "running" } }, environmentDetail(task.sandboxed), traceDetail(task)] };
+}
+
+/** Registers the log as an active context path (`actspace.context.trace`, read by context-disclosure). */
+function traceDetail(task: BashTask) {
+  return { label: CONTEXT_TRACE_DETAIL_LABEL, value: { kind: "trace" as const, path: task.outputPath, description: `Background Bash log: ${(task.intent ?? task.command).slice(0, 80)}` } };
 }
 
 /** Where the command ran, as a fact the UI reads; the `sandboxed=` in the summary is prose for the model. */

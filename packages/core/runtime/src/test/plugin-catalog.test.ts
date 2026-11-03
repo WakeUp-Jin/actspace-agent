@@ -31,7 +31,7 @@ describe("plugin catalog", () => {
     ]);
     const rows = new Map(DEFAULT_HARNESS_ENTRIES.map(row => [row[0], row]));
     expect(rows.get("llm-service")).toEqual(["llm-service", ["llm.service", "llm.routes", "llm.service.types"], ["actspace.host.llm"]]);
-    expect(rows.get("shell-tools")).toEqual(["shell-tools", ["tools.shell-tools"], ["tools.runtime", "actspace.host.tools.shell-tools", "actspace.host.background-tasks"], [{ id: "sandbox", fallback: "bash runs outside the sandbox after approval" }]]);
+    expect(rows.get("shell-tools")).toEqual(["shell-tools", ["tools.shell-tools"], ["tools.runtime", "actspace.host.tools.shell-tools", "actspace.host.background-tasks", "actspace.host.session"], [{ id: "sandbox", fallback: "bash runs outside the sandbox after approval" }]]);
     expect(rows.get("todo-tools")).toEqual(["todo-tools", ["tools.todo"], ["tools.runtime", "session.runtime"]]);
     expect(rows.get("context-system")).toEqual(["context-system", ["context.source.system"], []]);
     expect(rows.get("agent-factory")![1]).toEqual(["actspace.agent.factory", "agent.run-factory", "actspace.host-readable-files"]);
