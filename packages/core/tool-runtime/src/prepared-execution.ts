@@ -73,6 +73,8 @@ export type ToolPreparedEnvironment = {
   readonly approvalBroker?: ApprovalBroker;
   /** Failure text when an action needs approval and there is no broker (subagents set their own). */
   readonly approvalUnavailableMessage?: string;
+  /** A forked subagent sees its parent's tools but may not run some of them; the text is the failure the model reads. */
+  readonly blockedToolMessage?: (name: string) => string | undefined;
   /** false in subagent Sessions: tools must finish in the foreground (Bash ignores `blockMs`). */
   readonly backgroundAllowed?: boolean;
   readonly approvalTimeoutMs?: number;
@@ -157,6 +159,11 @@ export class PreparedToolExecution {
         const reason = `Tool ${this.name} is outside this Agent scope.`;
         await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: "TOOL_SCOPE_DENIED", reason });
         return this.#rememberTerminal(this.#failureResult("denied", { code: "TOOL_SCOPE_DENIED", message: reason, retryable: false, phase: "policy" }));
+      }
+      const blocked = this.environment.blockedToolMessage?.(this.name);
+      if (blocked !== undefined) {
+        await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: "SUBAGENT_TOOL_BLOCKED", reason: blocked });
+        return this.#rememberTerminal(this.#failureResult("denied", { code: "SUBAGENT_TOOL_BLOCKED", message: blocked, retryable: false, phase: "policy" }));
       }
       this.#checkToolScope();
       this.#args = materializeToolArguments(this.registration.definition.inputSchema, this.input.arguments);

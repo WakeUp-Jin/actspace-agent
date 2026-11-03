@@ -317,6 +317,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function createSubagentHost(manager: () => import("@actspace/subagent").SubagentHostPort): import("@actspace/subagent").SubagentHostPort {
   const port: import("@actspace/subagent").SubagentHostPort = {
     spawn: input => manager().spawn(input),
+    spawnFork: input => manager().spawnFork(input),
     sendMessage: input => manager().sendMessage(input),
     waitForInput: input => manager().waitForInput(input),
     listAgents: input => manager().listAgents(input),

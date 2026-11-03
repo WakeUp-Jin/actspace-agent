@@ -26,12 +26,25 @@ export type SpawnSubagentInput = SubagentCaller & {
   readonly signal: AbortSignal;
 };
 
+/** `agent_fork`: no preset; the fork gets exactly the caller's visible tools. */
+export type SpawnForkInput = SubagentCaller & {
+  readonly description: string;
+  readonly prompt: string;
+  readonly background: boolean;
+  readonly model?: string;
+  readonly reasoningEffort?: string;
+  /** Tools the caller sees right now; the fork sees the same list (design 02 §5.1). */
+  readonly parentToolNames: readonly string[];
+  readonly signal: AbortSignal;
+};
+
 /** One running subagent as the main agent's context lists it (design 02 §6.4). */
 export type RunningSubagent = { readonly agentId: string; readonly description: string; readonly label: string; readonly startedAt: string; readonly transcriptPath: string };
 
 /** Host side of the subagent tools; the texts it returns are design 02 §2 verbatim. */
 export interface SubagentHostPort {
   spawn(input: SpawnSubagentInput): Promise<SubagentToolOutcome>;
+  spawnFork(input: SpawnForkInput): Promise<SubagentToolOutcome>;
   sendMessage(input: SubagentCaller & { readonly agentId: string; readonly message: string }): Promise<SubagentToolOutcome>;
   waitForInput(input: SubagentCaller & { readonly timeoutMs: number; readonly signal: AbortSignal }): Promise<SubagentToolOutcome>;
   listAgents(input: SubagentCaller): Promise<SubagentToolOutcome>;

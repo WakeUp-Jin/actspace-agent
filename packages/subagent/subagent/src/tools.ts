@@ -2,20 +2,20 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { AgentScope } from "@actspace/scope";
 import type { JsonSchema, ToolBodyResult, ToolDefinition, ToolExecutionContext, ToolRuntime } from "@actspace/tool-runtime";
 import {
-  AGENT_PARAMETERS, AGENT_TOOL_DESCRIPTION, INTERRUPT_AGENT_DESCRIPTION, LIST_AGENTS_DESCRIPTION, LIST_SUBAGENT_MODELS_DESCRIPTION,
+  AGENT_FORK_DESCRIPTION, AGENT_FORK_PARAMETERS, AGENT_PARAMETERS, AGENT_TOOL_DESCRIPTION, INTERRUPT_AGENT_DESCRIPTION, LIST_AGENTS_DESCRIPTION, LIST_SUBAGENT_MODELS_DESCRIPTION,
   SEND_MESSAGE_DESCRIPTION, SEND_MESSAGE_PARAMETERS, WAIT_AGENT_DESCRIPTION,
 } from "./messages.js";
 import type { SubagentCaller, SubagentHostPort, SubagentToolOutcome } from "./types.js";
 
 /** The tools belong to the `actspace.subagent` Agent form member (agent-form.ts). */
 export const SUBAGENT_TOOL_PLUGIN_ID = "actspace.subagent";
-export const SUBAGENT_TOOL_NAMES = Object.freeze(["agent", "send_message", "wait_agent", "list_agents", "interrupt_agent", "list_subagent_models"] as const);
+export const SUBAGENT_TOOL_NAMES = Object.freeze(["agent", "agent_fork", "send_message", "wait_agent", "list_agents", "interrupt_agent", "list_subagent_models"] as const);
 export type SubagentToolRegistration = { readonly name: string; readonly dispose: () => Promise<void> };
 
 const AGENT_ID = { type: "string", minLength: 1, description: SEND_MESSAGE_PARAMETERS.agent_id };
 
 /**
- * Register the six `local` subagent tools (design 02 §2). The Host port does the work;
+ * Register the seven subagent tools of `local` and forked subagents (design 02 §2). The Host port does the work;
  * `mainScope` resolves a main agent's scope (child callers are resolved by the Host).
  */
 export function registerSubagentTools(runtime: ToolRuntime, port: SubagentHostPort, mainScope: (sessionId: string) => AgentScope | undefined): readonly SubagentToolRegistration[] {
@@ -45,6 +45,25 @@ export function registerSubagentTools(runtime: ToolRuntime, port: SubagentHostPo
         ...(typeof args.reasoning_effort === "string" ? { reasoningEffort: args.reasoning_effort } : {}),
         parentToolNames: parent ? [...parent] : registered,
         registeredToolNames: registered,
+        signal: context.signal,
+      });
+    }),
+    register("agent_fork", AGENT_FORK_DESCRIPTION, {
+      description: { type: "string", minLength: 1, maxLength: 60, description: AGENT_FORK_PARAMETERS.description },
+      prompt: { type: "string", minLength: 1, description: AGENT_FORK_PARAMETERS.prompt },
+      background: { type: "boolean", default: true, description: AGENT_FORK_PARAMETERS.background },
+      model: { type: "string", minLength: 1, description: AGENT_FORK_PARAMETERS.model },
+      reasoning_effort: { type: "string", minLength: 1, description: AGENT_FORK_PARAMETERS.reasoning_effort },
+    }, ["description", "prompt"], (args, context) => {
+      const parent = runtime.allowedToolNames(context.sessionId, `main:${context.sessionId}`);
+      return port.spawnFork({
+        ...caller(context),
+        description: text(args.description),
+        prompt: text(args.prompt),
+        background: args.background !== false,
+        ...(typeof args.model === "string" ? { model: args.model } : {}),
+        ...(typeof args.reasoning_effort === "string" ? { reasoningEffort: args.reasoning_effort } : {}),
+        parentToolNames: parent ? [...parent] : runtime.registry.listDefinitions().map(definition => definition.name),
         signal: context.signal,
       });
     }),

@@ -5,17 +5,17 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { MainAgentInbox } from "@actspace/agent";
 import { AgentScope } from "@actspace/scope";
-import { createCoreCodecRegistry } from "@actspace/session-journal";
+import { createCoreCodecRegistry, FORKED_SUBAGENT_PRESET_ID } from "@actspace/session-journal";
 import { SessionStore, type SessionHandle } from "@actspace/session-persistence";
 import type { UsableModelSummary } from "@actspace/shared";
-import { SubagentManager, subagentTree, type ChildLoop, type ChildLoopInput } from "../manager.js";
+import { SubagentManager, subagentTree, type ChildLoop, type ChildLoopInput, type ParentConfiguration } from "../manager.js";
 import { SUBAGENT_APPROVAL_UNAVAILABLE, taskGuidance } from "../messages.js";
 import type { SubagentToolOutcome } from "../types.js";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
 
-type TurnInput = { readonly content: unknown; readonly wake?: boolean; readonly model?: string; readonly reasoningEffort?: string; readonly thinkingEnabled?: boolean };
+type TurnInput = { readonly content: unknown; readonly wake?: boolean; readonly model?: string; readonly reasoningEffort?: string; readonly thinkingEnabled?: boolean; readonly mode?: string; readonly selectedSkillIds?: readonly string[] };
 type TurnContext = { readonly session: SessionHandle; readonly input: TurnInput; readonly claimed: readonly unknown[]; readonly signal: AbortSignal; readonly loop: ChildLoopInput; readonly turn: number };
 type TurnScript = (context: TurnContext) => Promise<{ readonly reason: string; readonly steps?: number; readonly finalText?: string }>;
 
@@ -24,7 +24,7 @@ const MODELS: UsableModelSummary[] = [
   { key: "conn/deep", label: "Deep", connectionLabel: "Relay", reasoningEfforts: ["low", "medium", "high"], defaultEffort: "medium", thinkingDefault: true },
 ];
 
-async function fixture(options: { script?: TurnScript; syncWaitMs?: number; setting?: string | null; dataRoot?: string } = {}) {
+async function fixture(options: { script?: TurnScript; syncWaitMs?: number; setting?: string | null; dataRoot?: string; parent?: ParentConfiguration } = {}) {
   const dataRoot = options.dataRoot ?? await mkdtemp(join(tmpdir(), "actspace-subagent-")); if (!options.dataRoot) roots.push(dataRoot);
   const registry = createCoreCodecRegistry();
   const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime", registry }));
@@ -78,7 +78,7 @@ async function fixture(options: { script?: TurnScript; syncWaitMs?: number; sett
     transcriptPath: id => `/data/sessions-v2/${id}/transcript.md`,
     refreshTranscript: async id => { refreshed.push(id); },
     models: () => ({ listUsableModels: () => MODELS, subagentDefaultModel: () => options.setting ?? null }),
-    parentConfiguration: () => ({ model: "conn/fast", thinkingEnabled: false }),
+    parentConfiguration: () => options.parent ?? { model: "conn/fast", thinkingEnabled: false },
     permissionMode: () => "full-access",
     isSessionRunning: id => id === "root" ? rootRunning : false,
     hasQueuedInput: () => false,
@@ -347,6 +347,94 @@ describe("SubagentManager", () => {
 
   it("keeps the approval text a subagent reports", () => {
     expect(SUBAGENT_APPROVAL_UNAVAILABLE).toBe("This action needs the user's approval, which a subagent cannot request. Report what you need to your parent instead.");
+  });
+});
+
+// S4：agent_fork 复制父会话到当前轮最后一个完整步骤，补 turn/end，按主会话方式组装并沿用父会话的模型。
+describe("SubagentManager forks", () => {
+  const core = (type: string, data: Record<string, unknown>) => ({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null }) as never;
+  /** The parent is in its third step of a Plan-mode Turn, calling `agent_fork`; a subagent notice waits in its inbox. */
+  async function parentMidTurn(root: SessionHandle): Promise<number> {
+    await root.append(core("turn/start", { turnId: "t1", agentRunId: "run", mode: "plan" }));
+    await root.append(core("user/message", { messageId: "u1", agentRunId: "run" }));
+    let boundary = -1;
+    for (const step of ["s1", "s2"]) {
+      await root.append(core("step/start", { turnId: "t1", stepId: step, agentRunId: "run" }));
+      await root.append(core("tool/call", { turnId: "t1", stepId: step, agentRunId: "run", callId: `read-${step}`, name: "read_file", args: {} }));
+      await root.append(core("tool/result", { callId: `read-${step}`, name: "read_file", status: "completed", agentRunId: "run" }));
+      boundary = (await root.append(core("step/end", { turnId: "t1", stepId: step, agentRunId: "run", status: "completed" }))).seq;
+    }
+    await new MainAgentInbox(root).enqueue("<subagent_notification />", { taskId: "x", kind: "subagent", title: "x", status: "completed" }, { source: "subagent_notification" });
+    await root.append(core("step/start", { turnId: "t1", stepId: "s3", agentRunId: "run" }));
+    await root.append(core("tool/call", { turnId: "t1", stepId: "s3", agentRunId: "run", callId: "fork-call", name: "agent_fork", args: {} }));
+    return boundary;
+  }
+  const TOOLS = ["read_file", "write_file", "bash", "agent", "agent_fork", "task_output", "send_message", "list_agents", "wait_agent", "interrupt_agent"];
+  const fork = (f: Awaited<ReturnType<typeof fixture>>, input: { sessionId?: string; callId?: string; model?: string; reasoningEffort?: string; background?: boolean } = {}) => f.manager.spawnFork({
+    sessionId: input.sessionId ?? "root", callId: input.callId ?? "fork-call", ...(input.sessionId ? {} : { scope: f.rootScope }),
+    description: "try plan B", prompt: "Try the other approach.", background: input.background ?? true,
+    ...(input.model ? { model: input.model } : {}), ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+    parentToolNames: TOOLS, signal: new AbortController().signal,
+  });
+
+  it("copies the parent up to its last completed step, closes the copied Turn and runs like the main agent", async () => {
+    const f = await fixture({ setting: "conn/deep", parent: { model: "conn/fast", thinkingEnabled: false, selectedSkillIds: ["skill-a"] } });
+    const boundary = await parentMidTurn(f.root);
+    const started = await fork(f);
+    const agentId = idOf(started);
+    const transcriptPath = `/data/sessions-v2/${agentId}/transcript.md`;
+    expect(started.text.split("\n")[0]).toBe(`Started forked subagent ${agentId} (try plan B) in the background.`);
+    expect(started.ok && started.detail).toEqual([
+      { label: "actspace.context.trace", value: { kind: "trace", path: transcriptPath, description: "Subagent transcript: try plan B" } },
+      { label: "delegation", value: { childSessionId: agentId, agentId, kind: "fork", description: "try plan B", transcriptPath, background: true, inheritedThroughSeq: boundary, status: "running" } },
+    ]);
+    const child = f.live.get(agentId)!;
+    expect(child.header.lineage).toEqual({ parentSessionId: "root", parentBoundarySeq: boundary, origin: "delegation", delegationDepth: 1, inheritedThroughSeq: boundary, parentCallId: "fork-call" });
+    expect(child.header.createdWith).toMatchObject({ presetId: FORKED_SUBAGENT_PRESET_ID, manifestDigest: "manifest" });
+    // The copy keeps seqs; the fork closes the parent's Turn and drops the parent's queued notice.
+    const events = child.journal.readEvents();
+    expect(events.slice(0, boundary + 1).map(event => [event.seq, event.type])).toEqual(f.root.journal.readEvents().slice(0, boundary + 1).map(event => [event.seq, event.type]));
+    expect(events[boundary + 1]).toMatchObject({ type: "turn/end", data: { turnId: "t1", reason: "forked" } });
+    expect(events.some(event => event.type === "tool/call" && (event.data as { callId?: string }).callId === "fork-call")).toBe(false);
+    expect(new MainAgentInbox(child).pending()).toEqual([]);
+    // The parent's own notice is still its own.
+    expect(new MainAgentInbox(f.root).pending()).toHaveLength(1);
+    // Same tools as the parent, same model (the default subagent setting is ignored), the Turn's mode and the selected skills.
+    expect(f.loops[0]).toMatchObject({ agentId, role: "fork", allowedToolNames: [...TOOLS].sort() });
+    expect(f.loops[0]).not.toHaveProperty("preset");
+    expect(f.turns[0]).toEqual(expect.objectContaining({ content: `Try the other approach.\n\n${taskGuidance(transcriptPath, "fork")}`, model: "conn/fast", thinkingEnabled: false, mode: "plan", selectedSkillIds: ["skill-a"] }));
+    const view = await f.settled(agentId);
+    expect(view).toMatchObject({ kind: "fork", inheritedThroughSeq: boundary, toolNames: [...TOOLS].sort(), status: "inactive", activations: [{ trigger: "spawn", model: "conn/fast", settle: { status: "completed", delivery: "notified" } }] });
+    expect(view.preset).toBeUndefined();
+    expect(f.root.journal.events.find(event => event.type === "subagent/spawned")?.data).not.toHaveProperty("preset");
+    expect((await f.manager.listAgents({ sessionId: "root", callId: "l" })).text).toContain(`${agentId} [inactive] fork · 1 turn — try plan B`);
+
+    // A continuation stays a fork in the same mode, without the first Turn's skills.
+    await f.manager.sendMessage({ sessionId: "root", callId: "c2", scope: f.rootScope, agentId, message: "Now compare both." });
+    await f.settled(agentId, 2);
+    expect(f.loops[1]).toMatchObject({ role: "fork", allowedToolNames: [...TOOLS].sort() });
+    expect(f.turns.at(-1)).toMatchObject({ wake: true, mode: "plan", model: "conn/fast" });
+    expect(f.turns.at(-1)).not.toHaveProperty("selectedSkillIds");
+    await f.close();
+  });
+
+  it("takes a requested model, refuses forks from subagents and calls outside a step", async () => {
+    const hold = gate();
+    const f = await fixture({ script: async () => { await hold.promise; return { reason: "completed", finalText: "B works." }; } });
+    await parentMidTurn(f.root);
+    const running = idOf(await fork(f));
+    await until(() => f.live.has(running) && f.turns.length === 1);
+    expect(await fork(f, { sessionId: running })).toEqual({ ok: false, code: "SUBAGENT_BLOCKED", text: "Subagents cannot use agent_fork." });
+    hold.open();
+    await f.settled(running);
+    const started = await fork(f, { model: "conn/deep", reasoningEffort: "high", background: false });
+    expect(started).toMatchObject({ ok: true });
+    expect(started.text.split("\n")[0]).toMatch(/^Subagent [0-9a-f-]{36} \(try plan B\) finished\.$/);
+    expect(started.text).toContain("B works.");
+    expect(f.turns.at(-1)).toMatchObject({ model: "conn/deep", reasoningEffort: "high", thinkingEnabled: true, mode: "plan" });
+    expect(await fork(f, { callId: "missing" })).toMatchObject({ ok: false, code: "FORK_UNAVAILABLE" });
+    expect(await fork(f, { model: "conn/none" })).toMatchObject({ ok: false, code: "UNKNOWN_MODEL" });
+    await f.close();
   });
 });
 

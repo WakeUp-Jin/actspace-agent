@@ -1,7 +1,7 @@
 # Agent Contract Matrix
 
 > Generated artifact; edit source declarations instead. Do not hand-edit this file.
-> Generator 1.0.0; source digest `d5b8a819590639ade0dda7e3cc8030f486e64425f2367d52e5c96a0235fb3b16`.
+> Generator 1.0.0; source digest `8b34084c03ba007fd21a0cfd2c3aefffccc865b07bc7a91c7722a080e9951d31`.
 
 This document is an audit view of the current ActSpace v2 declarations. It never activates Runtime services, plugins, Session persistence, tools or Cordis entries.
 

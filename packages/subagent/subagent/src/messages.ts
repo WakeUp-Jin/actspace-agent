@@ -27,6 +27,17 @@ export const AGENT_PARAMETERS = Object.freeze({
   reasoning_effort: "Reasoning effort id for the chosen model, from list_subagent_models. Omit to use that model's default.",
 });
 
+export const AGENT_FORK_DESCRIPTION = "Start a subagent that inherits this conversation: it sees everything up to your last completed step in this turn (not the step that contains this call), with your tools and model, so its first request reuses this conversation's prompt cache. Use it for work that builds on the current context, such as trying an alternative, reviewing what was just done, or a side investigation, without spending this conversation's context on it. Choosing a different model loses the cache. It cannot start subagents of its own. Otherwise it behaves like agent: background by default, transcript path returned, notified when it finishes, continued with send_message.";
+
+/** `agent_fork` takes `agent`'s parameters without `agent_preset`; only `prompt` reads differently (design 02 §2.2). */
+export const AGENT_FORK_PARAMETERS = Object.freeze({
+  description: AGENT_PARAMETERS.description,
+  prompt: "What the forked subagent should do. It already sees this conversation, so state only what is new.",
+  background: AGENT_PARAMETERS.background,
+  model: AGENT_PARAMETERS.model,
+  reasoning_effort: AGENT_PARAMETERS.reasoning_effort,
+});
+
 export const SEND_MESSAGE_DESCRIPTION = "Send a message to another agent in your subagent tree. A running agent receives it at its next step; an inactive agent starts a new turn with it. Returns at once.";
 export const SEND_MESSAGE_PARAMETERS = Object.freeze({ agent_id: "The id of another agent in your subagent tree, as shown by list_agents." });
 

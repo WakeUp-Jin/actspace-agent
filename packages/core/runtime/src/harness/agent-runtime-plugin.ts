@@ -61,6 +61,7 @@ export class AgentRuntimeService {
           release: async () => { releaseLedger?.(); await lease.release(); },
           start: async (session, content, id) => {
             ledger = await TaskLedger.open(session);
+            await clearChildQueue(ledger);
             releaseLedger = this.runs.service.registerExternalLedger(ledger);
             const receipt = await ledger.submit(id, content);
             await ledger.start(receipt.task.taskId, id, { harnessId: lease.harnessId, generationId: lease.generationId, revision: lease.revision }, { harnessExecutionDigest: lease.executionDigest, kind: "subagent" });
@@ -74,8 +75,8 @@ export class AgentRuntimeService {
       refreshTranscript: async id => { await transcripts()?.refresh(id); },
       models: () => (ctx.get?.(MODELS_HOST_PORT_ID) as ModelsHostPort | undefined) ?? EMPTY_MODELS_HOST_PORT,
       parentConfiguration: id => {
-        const { model, thinkingEnabled, reasoningEffort } = this.runs.configuration(id);
-        return { ...(model === undefined ? {} : { model }), ...(thinkingEnabled === undefined ? {} : { thinkingEnabled }), ...(reasoningEffort === undefined ? {} : { reasoningEffort }) };
+        const { model, thinkingEnabled, reasoningEffort, selectedSkillIds } = this.runs.configuration(id);
+        return { ...(model === undefined ? {} : { model }), ...(thinkingEnabled === undefined ? {} : { thinkingEnabled }), ...(reasoningEffort === undefined ? {} : { reasoningEffort }), ...(selectedSkillIds === undefined ? {} : { selectedSkillIds }) };
       },
       permissionMode: session => {
         const environment = host.toolEnvironment;
@@ -174,4 +175,15 @@ function get<T>(ctx: CordisContext, id: string): T {
   const value = ctx.get?.(id) as T | undefined;
   if (value === undefined) throw new Error(`Agent runtime plugin requires ${id}.`);
   return value;
+}
+
+/**
+ * A child Session only runs the task its lease submits. Opening its ledger after an exit, or on a
+ * fork that copied its parent mid-Run, interrupts the old Run and pauses the queue; tasks still
+ * queued there (the parent's, for a fork) are not the child's to run.
+ */
+async function clearChildQueue(ledger: TaskLedger): Promise<void> {
+  let snapshot = ledger.snapshot();
+  for (const taskId of snapshot.queue) snapshot = await ledger.cancel(taskId, snapshot.revision);
+  if (snapshot.paused) await ledger.setPaused(false, snapshot.revision);
 }

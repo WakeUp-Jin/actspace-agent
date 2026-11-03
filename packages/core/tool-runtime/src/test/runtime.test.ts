@@ -319,6 +319,19 @@ describe("Tool Runtime execution contract", () => {
     expect(bodyCalls).toBe(0);
   });
 
+  it("refuses a tool the environment blocks before it runs (forked subagents see but cannot run delegation tools)", async () => {
+    let bodyCalls = 0;
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { bodyCalls += 1; return success(); } } });
+    const blockedToolMessage = (name: string) => name === "read" ? `Subagents cannot use ${name}.` : undefined;
+    const [result] = await runtime.executeBatch([call("escape", { value: "a.txt" })], { ...environment([]), blockedToolMessage });
+    expect(result).toMatchObject({ status: "denied", failure: { code: "SUBAGENT_TOOL_BLOCKED", message: "Subagents cannot use read." } });
+    expect(bodyCalls).toBe(0);
+    const [allowed] = await runtime.executeBatch([call("escape", { value: "a.txt" })], { ...environment([]), blockedToolMessage: () => undefined });
+    expect(allowed).toMatchObject({ status: "completed" });
+    expect(bodyCalls).toBe(1);
+  });
+
   it("issues a validated Session Grant and reuses it only through Runtime matching", async () => {
     const runtime = new ToolRuntime();
     runtime.register({

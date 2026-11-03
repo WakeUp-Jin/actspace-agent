@@ -4,7 +4,8 @@ import type { ContextRequest, ContextSupplement } from "./types.js";
 import { CONTEXT_OWNER, SUPPLEMENT_EVENT, type SupplementOperation } from "./codec.js";
 
 export interface ContextSession {
-  readonly header: { readonly sessionId: string };
+  /** `lineage` tells a copied Session (fork, side chat, forked subagent) from the one it was copied from. */
+  readonly header: { readonly sessionId: string; readonly lineage?: { readonly origin: string } | null };
   readonly lastSeq: number;
   /** Null means ephemeral; undefined means the adapter cannot expose a barrier. */
   readonly durableSeq?: number | null;

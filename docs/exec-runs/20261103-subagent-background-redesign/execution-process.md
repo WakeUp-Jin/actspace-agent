@@ -164,6 +164,60 @@
   - desktop / cli / web 的 typecheck 都是 0 个错误。
   - `check:packages`、`check:plugin-catalog`、`check:repo`、`check:desktop-build-graph`、`check:harness-events`、`check:renderer-bridge`、`check:ipc-channels`、`check:current-docs` 以及根目录全部 `test:*` 脚本都是 exit 0。
 
+### 步骤 4：S4 Fork
+
+- **操作**：按 `s4-fork.md` 第 1–7 步做，主智能体自己写（各步前后依赖，没有开子智能体）。
+  - 边界：新增 `fork-boundary.ts`，`resolveForkBoundary(events, registry, callId)` 返回 `boundarySeq`、所在 Turn 和它的模式。前缀检查沿用 `isQuietPrefix` 的思路，但允许当前轮未结束、收件箱有待处理消息。
+  - 复制：
+    - `createSessionForkSeed` 只在 `origin: "delegation"` 时接受未结束的轮，lineage 带上 `inheritedThroughSeq` 和 `parentCallId`；
+    - `SessionStore.fork` 增加第二个参数 `openOptions`，让管理器能挂 `onEvent`。
+  - 补齐：子会话追加 `turn/end`（`reason: "forked"`），丢弃继承来的待处理收件箱消息（原因 `forked`），再按 S3 的激活流程开始第一轮。用户消息 = `prompt` + 设计 02 §7 说明。
+  - 按主会话组装：`createLoop` / `createSubagentLoop` 增加 `role: "fork"`：
+    - 描述符用主 Agent 的，`routeId` 取当前主路由；工具作用域走 `registerMainTools`（从 `createMainAgent` 抽出，两边共用）；
+    - 允许的工具 = 父会话当前可见的工具；
+    - 上下文来源与主会话相同，但不加 `background-tasks` / `subagents`；
+    - 提示词扩展 = 父会话的主会话扩展 + fork 自己作用域内的扩展（`forkExtensions`）；
+    - 工具环境与 `subagent` 相同（无审批、Bash 不转后台、读父会话授权），另加 `blockedToolMessage`。
+  - 拦截：tool-runtime 的工具环境新增可选钩子 `blockedToolMessage(name)`。`stage()` 在 `allowedToolNames` 检查之后调用它：返回文字就记一条 `permission/scope-denied`（`SUBAGENT_TOOL_BLOCKED`），并以 `denied` 结束，不执行工具。
+  - 模型：没给 `model` 时用父会话当前的模型和思考档位，不读「子智能体默认模型」设置。续派时也一样。
+  - 运行：fork 每次激活的模式取子会话里最近一条 `turn/start` 的模式（第一次就是继承来的父会话那一轮）。第一轮带上父会话当时选中的 skills（`selectedSkillIds`）。
+  - 登记：父会话 `subagent/spawned` 写 `kind: "fork"`、`inheritedThroughSeq`、`toolNames`；结果 detail 带 `actspace.context.trace`；后台启动首行 `Started forked subagent …`。
+  - 工具：`agent_fork` 的描述与参数照设计 02 §2.2 逐字写；`SUBAGENT_TOOL_NAMES`、`actspace.subagent` 成员和模式工具表都加上它（模式工具表在 S3 已加）。`boot.ts` 的 Host 端口转发 `spawnFork`。
+  - 新常量 `FORKED_SUBAGENT_PRESET_ID`（session-journal）：fork 子会话 `createdWith.presetId` 用它。
+- **影响文件**：
+  - subagent：`fork-boundary.ts`（新）、`manager.ts`、`tools.ts`、`types.ts`、`messages.ts`、`index.ts`、`README.md`；
+  - tool-subagent：`manifest.ts`；agent：`agent-form.ts`；
+  - runtime：`agent-factory-plugin.ts`、`agent-runtime-plugin.ts`、`startup/boot.ts`；
+  - tool-runtime：`prepared-execution.ts`；
+  - session-journal：`fork.ts`；session-persistence：`session-store.ts`；
+  - context-engine：`supplements.ts`（`ContextSession.header` 可带 `lineage`）；context-disclosure：`plugin.ts`；
+  - 生成物：契约矩阵（只有摘要变化）；
+  - 进程测试：`host-subagent-fork-cache-process.test.mjs`（新，已加入 `test:agent-host:process`）。
+- **决定**：
+  - 缓存一致测试找出两处让 fork 首个请求和父会话不一样的地方，都已修掉：
+    - 子会话由管理器直接从 store 打开，不经过 session runtime，收不到 `session/created`。所以只注册给主会话的提示词扩展（会话历史提示、英语辅助学习等）到不了 fork，系统提示词就少了 `<session-history>` 一段。改为 fork 读父会话的主会话扩展。
+    - 渐进披露在会话 id 变化（复制出来的会话）时会删掉继承来的 navigation supplement，这条消息就从历史中间消失了。对 `delegation` 来源不再删：反正 fork 下一次写的 navigation 会覆盖旧的。用户手动 fork 照旧删除。
+  - `agent-runtime` 的子会话租约在 `TaskLedger.open` 之后清掉继承来的排队任务，并取消暂停（`clearChildQueue`）。fork 会复制父会话的 ledger 状态，不清就会带着父会话的队列。这也修了 S3 的一个潜在问题：续派一个重启时丢失的子智能体会碰到 `QUEUE_PAUSED`。
+  - `turn/end` 的 codec 不校验 `reason` 的取值，所以计划第 3 步「在 `core-codecs.ts` 里加取值」不需要改。
+  - fork 的 transcript 会在继承段后面显示一行 `_Turn ended: forked [#N]_`，正好标出复制到哪里为止，保留。
+  - 设计 02 §2.2 说 `agent_fork` 的参数「含义同 `agent`」，所以 `model` 参数说明照搬了 `agent` 的「Omit to use the default subagent model」。可实际不给时用的是父会话的模型（第 5 步）。这句和行为不一致，需要用户决定是否改文字。
+- **验证**：
+  - `fork-boundary.test.ts` 5 个：第一步内、第三步内、同一步里并行的其他调用、本轮还没有完整步骤、未知调用 / 前缀里有没结果的调用。
+  - 管理器 fork 用例 2 个：复制内容、`turn/end forked`、收件箱丢弃、lineage、循环角色与模式、续派；运行中的 fork 再 fork 被拦、同步 fork 指定模型和思考档位、找不到调用、未知模型。
+  - tool-runtime：「环境拦下的工具不执行」1 个。
+  - context-disclosure：「forked subagent 保留继承的 navigation，用户 fork 删除」1 个。
+  - tool-subagent：七个工具名、`agent_fork` 转发（拒绝 `agent_preset`）。
+  - 缓存一致进程测试（真实 Host + 录制型 fake LLM）：父会话 `read_file` 两步后第三步 `agent_fork`。比对 fork 首个请求和父会话第三步请求：
+    - 系统提示词、工具定义、模型和其他请求字段完全相同；
+    - 消息到第二步的工具结果为止逐项相同，之后才是 fork 的任务消息；
+    - fork 的消息里没有 `agent_fork` 那一步。
+    同一个测试里 fork 调 `task_list` 收到 `Subagents cannot use task_list.`，父会话的同步结果里拿到 fork 的回答。
+  - 统一验证：
+    - `pnpm typecheck` exit 0；`pnpm test` exit 0：`pnpm -r test` 全部通过（subagent 21、tool-subagent 2、tool-runtime 54、context-disclosure 24、session-transcript 16、session-journal 42、session-persistence 46、runtime 102、client 61、agent-service 68、desktop 2672 passed / 7 skipped 等），根目录 16 组 node:test 都是 0 失败，`test:agent-host:process` 8 个；
+    - `check:packages`、`check:desktop-build-graph`、`check:ipc-channels`、`check:docs`、`check:current-docs` 都是 exit 0；
+    - `pnpm --filter @actspace/desktop build` exit 0。
+  - 真实模型缓存命中（手工）：**未做**，见「跳过或推迟的事项」。
+
 ## 遇到的问题
 
 - 步骤 1：`default-harness.test.ts` 里替换 Loop 的测试插件继承了 agent-factory 的 `provides`，新增服务后报 `Harness service missing: agent-factory/actspace.host-readable-files`。已在测试插件里补上该服务（替换实现必须提供全部声明的服务，这是契约本身的要求）。
@@ -177,6 +231,10 @@
 - 步骤 3：`check:packages` 要求可加载的插件包有 lifecycle 测试。旧的已随旧实现删除，`subagent` 和 `context-subagents` 已各补一个。
 - 步骤 3：第一次跑客户端新用例失败，原因是 shared 的 dist 没重新构建。重建后通过。
 
+- 步骤 4：缓存一致进程测试第一次就发现 fork 的系统提示词少了 `<session-history>`。先试过在 session-transcript 插件里给 fork 注册，但子会话不发 `session/created`，没用，已撤回；改在 agent-factory 组装时读父会话的主会话扩展。
+- 步骤 4：同一个测试接着发现继承来的 navigation supplement 被渐进披露删掉，消息前缀对不上。已改为 `delegation` 来源不删。
+- 步骤 4：测试自身的两处小问题：父会话后续请求的 `agent_fork` 参数里也有 fork 的提示词，被误判成 fork 的请求；这个 provider 的系统消息角色是 `developer`。都已改测试。
+
 ## 跳过或推迟的事项
 
 - 客户端已在 S3 第 7 步把新 inbox 来源转成 `BackgroundNotice`；`BackgroundNoticeRow` / Web `EventRow` 的文字还没改，留给 S6。
@@ -184,3 +242,6 @@
 - `HostReadableFiles` 跟随 Harness，重载后为空：S5 按计划从 `subagent/spawned` 恢复放行名单。
 - 设置里的「子智能体默认模型」只有数据层，还没有写入口（settings 方法 / IPC）；`SubagentSection.tsx` 还留着 Explore 组和指向已删用途的文案：都归 S6。
 - 子 Agent 面板的实时活动只在 `agent` 调用运行期间显示（后台创建后调用很快结束），面板改造归 S6。
+- S4 真实模型缓存命中检查（手工，DeepSeek 或 Anthropic）还没做：需要真实 key 和在 Electron 里跑一次 fork，看首个请求 usage 里的缓存命中 token 是否接近父会话上一请求的输入 token。fake LLM 的请求逐项比对已经通过。
+- `agent_fork` 的 `model` 参数说明沿用了 `agent` 的「Omit to use the default subagent model」，和实际行为（不给时用父会话的模型）不一致，等用户决定是否改设计 02 §2.2 的文字。
+- `agent_fork` 的卡片：客户端目前只有 `agent` 走子智能体卡片，`agent_fork` 显示为通用行。界面归 S6。

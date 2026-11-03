@@ -9,7 +9,7 @@ function setup() {
   let cleanup: (() => Promise<void>) | undefined;
   const calls: unknown[] = [];
   const reply = (name: string) => async (input: unknown) => { calls.push({ name, input }); return name === "interrupt" ? { ok: false, code: "UNKNOWN_AGENT", text: "Unknown agent x." } : { ok: true, text: `${name} ok`, ...(name === "spawn" ? { detail: [{ label: "actspace.context.trace", value: { kind: "trace", path: "/t.md", description: "Subagent transcript: x" } }] } : {}) }; };
-  const port = { spawn: reply("spawn"), sendMessage: reply("sendMessage"), waitForInput: reply("waitForInput"), listAgents: reply("listAgents"), interrupt: reply("interrupt"), listModels: reply("listModels"), running: () => [] };
+  const port = { spawn: reply("spawn"), spawnFork: reply("spawnFork"), sendMessage: reply("sendMessage"), waitForInput: reply("waitForInput"), listAgents: reply("listAgents"), interrupt: reply("interrupt"), listModels: reply("listModels"), running: () => [] };
   const services: Record<string, unknown> = { "tools.runtime": tools, "agent.registry": { list: () => [] }, "actspace.host.subagents": port };
   apply({ get: (id: string) => services[id], provide: (id: string, value: unknown) => { provided.set(id, value); }, effect: (factory: () => () => Promise<void>) => { cleanup = factory(); } } as never);
   const env: ToolPreparedEnvironment = {
@@ -27,14 +27,19 @@ describe("subagent tools plugin lifecycle", () => {
     expect([...(behavior.injects ?? [])]).toEqual(inject);
   });
 
-  it("registers the six subagent tools, forwards calls to the Host and removes them on dispose", async () => {
+  it("registers the seven subagent tools, forwards calls to the Host and removes them on dispose", async () => {
     const { provided, run, calls, cleanup } = setup();
-    expect((provided.get("tools.subagents") as { registrations: { name: string }[] }).registrations.map(item => item.name)).toEqual(["agent", "send_message", "wait_agent", "list_agents", "interrupt_agent", "list_subagent_models"]);
+    expect((provided.get("tools.subagents") as { registrations: { name: string }[] }).registrations.map(item => item.name)).toEqual(["agent", "agent_fork", "send_message", "wait_agent", "list_agents", "interrupt_agent", "list_subagent_models"]);
     expect((await run("agent", {})).status).toBe("failed");
     const spawned = await run("agent", { description: "review auth", prompt: "Review it." });
     expect(spawned).toMatchObject({ status: "completed", modelOutput: [{ type: "text", text: "spawn ok" }], detail: [{ label: "actspace.context.trace" }] });
     expect(calls[0]).toMatchObject({ name: "spawn", input: { sessionId: "s", callId: "agent-1", description: "review auth", prompt: "Review it.", preset: "general", background: true } });
     expect((await run("agent", { description: "x".repeat(61), prompt: "p" })).status).toBe("failed");
+    // agent_fork takes no agent_preset and forwards the caller's visible tools.
+    expect((await run("agent_fork", { description: "try B", prompt: "Try the other approach.", agent_preset: "general" })).status).toBe("failed");
+    expect((await run("agent_fork", { description: "try B", prompt: "Try the other approach.", background: false })).status).toBe("completed");
+    expect(calls.at(-1)).toMatchObject({ name: "spawnFork", input: { sessionId: "s", callId: "agent_fork-1", description: "try B", prompt: "Try the other approach.", background: false } });
+    expect((calls.at(-1) as { input: { parentToolNames: string[] } }).input.parentToolNames).toContain("agent_fork");
     expect((await run("wait_agent", {})).status).toBe("completed");
     expect(calls.at(-1)).toMatchObject({ name: "waitForInput", input: { timeoutMs: 30000 } });
     expect((await run("wait_agent", { timeout_ms: 5000 })).status).toBe("failed");

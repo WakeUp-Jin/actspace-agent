@@ -5,30 +5,34 @@ import type { AgentScope } from "@actspace/scope";
 import type { ModelsHostPort } from "@actspace/shared";
 import {
   BACKGROUND_WAKE_KIND, EMPTY_SUBAGENT_TREE, CONTEXT_TRACE_DETAIL_LABEL, lastActivationModel, listedSubagents, reduceSubagentTree, runningActivation,
-  type RuntimeV2JsonValue, type SubagentActivationStatus, type SubagentPreset, type SubagentTree, type SubagentView,
+  type RuntimeV2AgentMode, type RuntimeV2JsonValue, type SubagentActivationStatus, type SubagentPreset, type SubagentTree, type SubagentView,
 } from "@actspace/shared/runtime-v2";
-import { resolveSessionWorkspaceRoot, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import { FORKED_SUBAGENT_PRESET_ID, resolveSessionWorkspaceRoot, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { applySessionRecovery, type SessionHandle, type SessionStore } from "@actspace/session-persistence";
 import { createChildSession } from "./child-session.js";
+import { resolveForkBoundary } from "./fork-boundary.js";
 import {
   agentMessage, backgroundStarted, blockedTool, CANNOT_MESSAGE_SELF, externalCannotReceive, INPUT_ARRIVED, interruptRequested, messageDelivered,
   movedToBackground, notRunning, settleSummary, SUBAGENT_CONCURRENCY_LIMIT, SUBAGENT_LIMIT_REACHED, SUBAGENT_MAX_STEPS, SUBAGENT_SYNC_WAIT_MS,
   subagentNotification, syncResult, taskGuidance, truncateUtf8, unknownAgent, unknownEffort, unknownModel, waitTimedOut, type AgentRelation,
 } from "./messages.js";
 import { EXPLORE_TOOL_NAMES, SUBAGENT_COORDINATION_TOOL_NAMES, subagentToolNames } from "./preset.js";
-import type { RunningSubagent, SpawnSubagentInput, SubagentCaller, SubagentHostPort, SubagentToolOutcome } from "./types.js";
+import type { RunningSubagent, SpawnForkInput, SpawnSubagentInput, SubagentCaller, SubagentHostPort, SubagentToolOutcome } from "./types.js";
 
 export type ChildLoop = Pick<AgentLoop, "runTurn" | "abort" | "waitForIdle" | "quiesce">;
+/**
+ * A `subagent` Loop is assembled like a child (its own prompt, no main-only sources); a `fork`
+ * Loop is assembled like its main agent, so its first request reuses the parent's prompt cache (design 02 §8.4).
+ */
 export type ChildLoopInput = {
   readonly session: SessionHandle;
   readonly scope: AgentScope;
   readonly agentId: string;
-  readonly preset: SubagentPreset;
   readonly description: string;
   readonly allowedToolNames: readonly string[];
   readonly maxSteps: number;
   readonly signal: AbortSignal;
-};
+} & ({ readonly role: "subagent"; readonly preset: SubagentPreset } | { readonly role: "fork" });
 
 /** One Harness lease holding a child Run: the TaskLedger entry and the Loop factory of the caller's generation. */
 export type ChildRunLease = {
@@ -40,6 +44,8 @@ export type ChildRunLease = {
 };
 
 export type SubagentModelConfiguration = { readonly model?: string; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: string };
+/** The main agent's current settings; a fork's first Turn also takes its selected skills, which are part of the system prompt. */
+export type ParentConfiguration = SubagentModelConfiguration & { readonly selectedSkillIds?: readonly string[] };
 
 export type SubagentManagerOptions = {
   readonly store: SessionStore;
@@ -54,7 +60,7 @@ export type SubagentManagerOptions = {
   readonly refreshTranscript: (sessionId: string) => Promise<void>;
   readonly models: () => ModelsHostPort;
   /** The main agent's current model settings (not its request headers). */
-  readonly parentConfiguration: (sessionId: string) => SubagentModelConfiguration;
+  readonly parentConfiguration: (sessionId: string) => ParentConfiguration;
   readonly permissionMode: (session: SessionHandle) => string;
   readonly isSessionRunning: (sessionId: string) => boolean;
   /** A user message is queued for this Session. */
@@ -76,10 +82,14 @@ type Activation = {
   readonly agentId: string;
   readonly activationId: string;
   readonly description: string;
-  readonly preset: SubagentPreset;
+  readonly kind: "local" | "fork";
+  /** `local` only. */
+  readonly preset?: SubagentPreset;
   readonly transcriptPath: string;
   readonly toolNames: readonly string[];
   readonly model: SubagentModelConfiguration;
+  /** A fork's first Turn runs with the parent's selected skills. */
+  readonly selectedSkillIds?: readonly string[];
   readonly controller: AbortController;
   /** `caller`: a synchronous `agent` call is waiting; `parent`: notify the main Session. */
   delivery: "caller" | "parent";
@@ -119,19 +129,19 @@ export class SubagentManager implements SubagentHostPort {
     if (!caller.ok) return caller.outcome;
     if (!caller.isRoot) return fail("SUBAGENT_BLOCKED", blockedTool("agent"));
     if (!caller.scope) return fail("PARENT_AGENT_UNAVAILABLE", `Parent Agent for Session ${input.sessionId} is unavailable.`);
-    const model = this.#chooseModel(caller.rootId, input.model, input.reasoningEffort);
+    const model = this.#chooseModel(caller.rootId, input.model, input.reasoningEffort, true);
     if (!model.ok) return model.outcome;
     if (this.#running(caller.rootId) >= this.#limit) return fail("SUBAGENT_LIMIT", SUBAGENT_LIMIT_REACHED);
     const agentId = randomUUID();
     const transcriptPath = this.options.transcriptPath(agentId);
     const toolNames = subagentToolNames(input.preset, input.parentToolNames, input.registeredToolNames);
-    const activation = this.#reserve({ rootId: caller.rootId, agentId, description: input.description, preset: input.preset, transcriptPath, toolNames, model: model.config, delivery: input.background ? "parent" : "caller" });
+    const activation = this.#reserve({ rootId: caller.rootId, agentId, description: input.description, kind: "local", preset: input.preset, transcriptPath, toolNames, model: model.config, delivery: input.background ? "parent" : "caller" });
     const root = caller.root;
     try {
       const workspaceRoot = resolveSessionWorkspaceRoot(root.header, root.journal);
       activation.child = await createChildSession({ store: this.options.store, parent: root, parentCallId: input.callId, childSessionId: agentId, createdAt: this.#now(), ...(workspaceRoot ? { cwd: workspaceRoot } : {}), prompt: input.prompt, presetId: `actspace.subagent.${input.preset}`, manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, onEvent: event => this.#observe(activation, event) });
-      await root.append(extension("subagent/spawned", { agentId, callId: input.callId, kind: "local", preset: input.preset, description: input.description, transcriptPath, createdAt: this.#now(), toolNames: [...toolNames] }));
-      await root.append(extension("subagent/activation", startData(activation, { trigger: "spawn", callId: input.callId, background: input.background, startedAt: this.#now() })));
+      await root.append(coreEvent("subagent/spawned", { agentId, callId: input.callId, kind: "local", preset: input.preset, description: input.description, transcriptPath, createdAt: this.#now(), toolNames: [...toolNames] }));
+      await root.append(coreEvent("subagent/activation", startData(activation, { trigger: "spawn", callId: input.callId, background: input.background, startedAt: this.#now() })));
       await root.flush();
     } catch (error) {
       this.#active.delete(agentId);
@@ -142,8 +152,57 @@ export class SubagentManager implements SubagentHostPort {
     // The transcript must exist with the task message before the path is handed out (design 02 §6.3).
     await Promise.race([activation.ready.promise, activation.result.promise]);
     await this.#refresh(agentId);
-    const detail = details({ agentId, description: input.description, preset: input.preset, transcriptPath, background: input.background });
+    const detail = details({ agentId, description: input.description, kind: "local", preset: input.preset, transcriptPath, background: input.background });
     if (input.background) return ok(backgroundStarted({ agentId, description: input.description, transcriptPath }), detail);
+    return this.#awaitSync(activation, input.signal, detail);
+  }
+
+  /**
+   * `agent_fork` (design 02 §8): copy the main Session up to the last completed step before this
+   * call, close the copied Turn, and run the fork like the main agent so its first request hits the cache.
+   */
+  async spawnFork(input: SpawnForkInput): Promise<SubagentToolOutcome> {
+    const caller = await this.#caller(input);
+    if (!caller.ok) return caller.outcome;
+    if (!caller.isRoot) return fail("SUBAGENT_BLOCKED", blockedTool("agent_fork"));
+    if (!caller.scope) return fail("PARENT_AGENT_UNAVAILABLE", `Parent Agent for Session ${input.sessionId} is unavailable.`);
+    // Without a model the fork keeps the parent's model, thinking and effort; the default subagent model would lose the cache.
+    const model = this.#chooseModel(caller.rootId, input.model, input.reasoningEffort, false);
+    if (!model.ok) return model.outcome;
+    if (this.#running(caller.rootId) >= this.#limit) return fail("SUBAGENT_LIMIT", SUBAGENT_LIMIT_REACHED);
+    const root = caller.root;
+    // The copy is read from storage: everything up to this call must be durable first.
+    await root.flush();
+    let boundary: ReturnType<typeof resolveForkBoundary>;
+    try { boundary = resolveForkBoundary(root.journal.readEvents(), this.options.store.options.registry, input.callId); }
+    catch (error) { return fail("FORK_UNAVAILABLE", errorText(error)); }
+    const agentId = randomUUID();
+    const transcriptPath = this.options.transcriptPath(agentId);
+    const toolNames = Object.freeze([...new Set(input.parentToolNames)].sort());
+    const { selectedSkillIds } = this.options.parentConfiguration(caller.rootId);
+    const activation = this.#reserve({ rootId: caller.rootId, agentId, description: input.description, kind: "fork", transcriptPath, toolNames, model: model.config, ...(selectedSkillIds?.length ? { selectedSkillIds: [...selectedSkillIds] } : {}), delivery: input.background ? "parent" : "caller" });
+    try {
+      const createdWith = { ...root.header.createdWith, presetId: FORKED_SUBAGENT_PRESET_ID, manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.store.options.registry.digest };
+      const child = await this.options.store.fork({ parentSessionId: caller.rootId, boundarySeq: boundary.boundarySeq, newSessionId: agentId, createdAt: this.#now(), createdWith, origin: "delegation", parentCallId: input.callId }, { onEvent: event => this.#observe(activation, event) });
+      activation.child = child;
+      // The copied Turn belongs to the parent: close it, and drop the parent's queued notices so the fork never claims them.
+      await child.append(coreEvent("turn/end", { turnId: boundary.turnId, reason: "forked" }));
+      const inbox = new MainAgentInbox(child);
+      for (const item of inbox.pending()) await inbox.discard(item.messageId, "forked");
+      await child.flush();
+      await root.append(coreEvent("subagent/spawned", { agentId, callId: input.callId, kind: "fork", description: input.description, transcriptPath, createdAt: this.#now(), inheritedThroughSeq: boundary.boundarySeq, toolNames: [...toolNames] }));
+      await root.append(coreEvent("subagent/activation", startData(activation, { trigger: "spawn", callId: input.callId, background: input.background, startedAt: this.#now() })));
+      await root.flush();
+    } catch (error) {
+      this.#active.delete(agentId);
+      await activation.child?.close().catch(report(this.options.onError));
+      return fail("SUBAGENT_FAILED", errorText(error));
+    }
+    this.#begin(activation, caller.scope, { content: `${input.prompt}\n\n${taskGuidance(transcriptPath, "fork")}` });
+    await Promise.race([activation.ready.promise, activation.result.promise]);
+    await this.#refresh(agentId);
+    const detail = details({ agentId, description: input.description, kind: "fork", transcriptPath, background: input.background, inheritedThroughSeq: boundary.boundarySeq });
+    if (input.background) return ok(backgroundStarted({ agentId, description: input.description, transcriptPath, forked: true }), detail);
     return this.#awaitSync(activation, input.signal, detail);
   }
 
@@ -257,7 +316,7 @@ export class SubagentManager implements SubagentHostPort {
       const open = runningActivation(agent);
       if (!open || this.#active.get(agent.agentId)?.activationId === open.activationId) continue;
       const summary = settleSummary({ agentId: agent.agentId, description: agent.description, status: "lost" });
-      await root.append(extension("subagent/activation", { op: "settle", agentId: agent.agentId, activationId: open.activationId, status: "lost", summary, delivery: "lost", endedAt: this.#now() }));
+      await root.append(coreEvent("subagent/activation", { op: "settle", agentId: agent.agentId, activationId: open.activationId, status: "lost", summary, delivery: "lost", endedAt: this.#now() }));
       await new MainAgentInbox(root).enqueue(subagentNotification({ agentId: agent.agentId, description: agent.description, status: "lost", summary, transcriptPath: agent.transcriptPath }), { taskId: agent.agentId, kind: "subagent", title: agent.description, status: "lost" }, { source: "subagent_notification" });
     }
   }
@@ -280,17 +339,18 @@ export class SubagentManager implements SubagentHostPort {
     if (!scope) return fail("PARENT_AGENT_UNAVAILABLE", `Agent ${input.senderId} is unavailable.`);
     if (this.#running(caller.rootId) >= this.#limit) return fail("SUBAGENT_LIMIT", SUBAGENT_LIMIT_REACHED);
     const last = [...view.activations].reverse().find(item => item.model);
+    const kind = view.kind === "fork" ? "fork" : "local";
     const model: SubagentModelConfiguration = last?.model
       ? { model: last.model, ...(last.reasoningEffort ? { reasoningEffort: last.reasoningEffort, thinkingEnabled: true } : {}) }
-      : this.#defaultModel(caller.rootId);
+      : this.#defaultModel(caller.rootId, kind === "local");
     const toolNames = view.toolNames ?? Object.freeze([...EXPLORE_TOOL_NAMES, ...SUBAGENT_COORDINATION_TOOL_NAMES]);
-    const activation = this.#reserve({ rootId: caller.rootId, agentId: view.agentId, description: view.description, preset: view.preset ?? "general", transcriptPath: view.transcriptPath, toolNames, model, delivery: "parent" });
+    const activation = this.#reserve({ rootId: caller.rootId, agentId: view.agentId, description: view.description, kind, ...(kind === "local" ? { preset: view.preset ?? "general" } : {}), transcriptPath: view.transcriptPath, toolNames, model, delivery: "parent" });
     try {
       activation.child = await this.options.store.open(view.agentId, { onEvent: event => this.#observe(activation, event) });
       // An activation cut off by an exit left its Turn open; close it the way a main Session is repaired.
       await applySessionRecovery(activation.child);
       await new MainAgentInbox(activation.child).enqueue(input.content, undefined, { source: "agent_message", senderId: input.senderId });
-      await caller.root.append(extension("subagent/activation", startData(activation, { trigger: "message", senderId: input.senderId, callId: input.callId, background: true, startedAt: this.#now() })));
+      await caller.root.append(coreEvent("subagent/activation", startData(activation, { trigger: "message", senderId: input.senderId, callId: input.callId, background: true, startedAt: this.#now() })));
       await caller.root.flush();
     } catch (error) {
       this.#active.delete(view.agentId);
@@ -302,7 +362,7 @@ export class SubagentManager implements SubagentHostPort {
     return ok(messageDelivered(view.agentId, true));
   }
 
-  #reserve(input: Pick<Activation, "rootId" | "agentId" | "description" | "preset" | "transcriptPath" | "toolNames" | "model" | "delivery">): Activation {
+  #reserve(input: Pick<Activation, "rootId" | "agentId" | "description" | "kind" | "preset" | "transcriptPath" | "toolNames" | "model" | "selectedSkillIds" | "delivery">): Activation {
     const activation: Activation = { ...input, activationId: randomUUID(), controller: new AbortController(), settling: false, settled: false, admitted: false, startSeq: -1, ready: deferred(), result: deferred() };
     this.#active.set(input.agentId, activation);
     return activation;
@@ -322,7 +382,7 @@ export class SubagentManager implements SubagentHostPort {
     let loop: ChildLoop | undefined;
     try {
       const root = await this.options.openSession(activation.rootId);
-      await child.append(extension("permission/mode-set", { mode: this.options.permissionMode(root), changedAt: this.#now(), source: "parent" }));
+      await child.append(coreEvent("permission/mode-set", { mode: this.options.permissionMode(root), changedAt: this.#now(), source: "parent" }));
       activation.startSeq = child.lastSeq;
       controller.signal.throwIfAborted();
       const lease = await this.options.acquireRun({ scope: parentScope, signal: controller.signal });
@@ -330,9 +390,12 @@ export class SubagentManager implements SubagentHostPort {
       const accepted = await lease.start(child, "content" in first ? first.content : { kind: BACKGROUND_WAKE_KIND }, activation.activationId);
       activation.admitted = true;
       activation.scope = lease.scope.child(agentId);
-      loop = await lease.createLoop({ session: child, scope: activation.scope, agentId, preset: activation.preset, description: activation.description, allowedToolNames: activation.toolNames, maxSteps: this.options.maxSteps ?? SUBAGENT_MAX_STEPS, signal: controller.signal });
-      const configuration = { agentRunId: activation.activationId, ...modelInput(activation.model) };
-      let turn = await loop.runTurn("content" in first ? { ...configuration, content: first.content, messageId: accepted.messageId } : { ...configuration, content: "", wake: true });
+      const common = { session: child, scope: activation.scope, agentId, description: activation.description, allowedToolNames: activation.toolNames, maxSteps: this.options.maxSteps ?? SUBAGENT_MAX_STEPS, signal: controller.signal };
+      loop = await lease.createLoop(activation.kind === "fork" ? { ...common, role: "fork" } : { ...common, role: "subagent", preset: activation.preset ?? "general" });
+      // A fork stays in the Agent mode of the Turn it was cut from: the copied `turn/start` is its latest until it runs its own.
+      const mode = activation.kind === "fork" ? latestTurnMode(child) : undefined;
+      const configuration = { agentRunId: activation.activationId, ...modelInput(activation.model), ...(mode ? { mode } : {}) };
+      let turn = await loop.runTurn("content" in first ? { ...configuration, ...(activation.selectedSkillIds ? { selectedSkillIds: activation.selectedSkillIds } : {}), content: first.content, messageId: accepted.messageId } : { ...configuration, content: "", wake: true });
       finalText = turn.finalText;
       for (;;) {
         // Deciding and settling happen in one lock section: a message that arrives after the last step
@@ -371,7 +434,7 @@ export class SubagentManager implements SubagentHostPort {
         const root = await this.options.openSession(rootId);
         const summary = settleSummary({ agentId, description: activation.description, status: outcome.status, ...(outcome.error === undefined ? {} : { error: outcome.error }) });
         const delivery = activation.delivery === "caller" ? "returned" : "notified";
-        await root.append(extension("subagent/activation", { op: "settle", agentId, activationId: activation.activationId, status: outcome.status, summary, ...(bounded.text ? { result: bounded.text } : {}), ...(bounded.truncated ? { resultTruncated: true } : {}), delivery, endedAt: this.#now() }));
+        await root.append(coreEvent("subagent/activation", { op: "settle", agentId, activationId: activation.activationId, status: outcome.status, summary, ...(bounded.text ? { result: bounded.text } : {}), ...(bounded.truncated ? { resultTruncated: true } : {}), delivery, endedAt: this.#now() }));
         if (delivery === "notified") {
           const notice = subagentNotification({ agentId, description: activation.description, status: outcome.status, summary, transcriptPath: activation.transcriptPath, closing: omitted ? "omitted" : bounded });
           await new MainAgentInbox(root).enqueue(notice, { taskId: agentId, kind: "subagent", title: activation.description, status: outcome.status }, { source: "subagent_notification" });
@@ -428,7 +491,8 @@ export class SubagentManager implements SubagentHostPort {
     return { ok: true, root, rootId: lineage.parentSessionId, isRoot: false, ...(scope ? { scope } : {}) };
   }
 
-  #chooseModel(rootId: string, requested: string | undefined, effort: string | undefined): { readonly ok: true; readonly config: SubagentModelConfiguration } | { readonly ok: false; readonly outcome: SubagentToolOutcome } {
+  /** `useSetting`: `agent` falls back to the default subagent model setting; `agent_fork` goes straight to the parent's settings. */
+  #chooseModel(rootId: string, requested: string | undefined, effort: string | undefined, useSetting: boolean): { readonly ok: true; readonly config: SubagentModelConfiguration } | { readonly ok: false; readonly outcome: SubagentToolOutcome } {
     const port = this.options.models();
     const usable = port.listUsableModels();
     const choose = (key: string) => {
@@ -438,17 +502,17 @@ export class SubagentManager implements SubagentHostPort {
       return { ok: true as const, config: { model: key, thinkingEnabled: effort !== undefined || model.thinkingDefault, ...(reasoningEffort ? { reasoningEffort } : {}) } };
     };
     if (requested !== undefined) return usable.some(item => item.key === requested) ? choose(requested) : { ok: false, outcome: fail("UNKNOWN_MODEL", unknownModel(requested)) };
-    const setting = port.subagentDefaultModel();
+    const setting = useSetting ? port.subagentDefaultModel() : undefined;
     if (setting && usable.some(item => item.key === setting)) return choose(setting);
-    const parent = this.options.parentConfiguration(rootId);
+    const { selectedSkillIds: _skills, ...parent } = this.options.parentConfiguration(rootId);
     if (effort === undefined) return { ok: true, config: parent };
     const current = parent.model ? usable.find(item => item.key === parent.model) : undefined;
     if (current && !(current.reasoningEfforts as readonly string[]).includes(effort)) return { ok: false, outcome: fail("UNKNOWN_EFFORT", unknownEffort(effort, current.key)) };
     return { ok: true, config: { ...parent, thinkingEnabled: true, reasoningEffort: effort } };
   }
 
-  #defaultModel(rootId: string): SubagentModelConfiguration {
-    const chosen = this.#chooseModel(rootId, undefined, undefined);
+  #defaultModel(rootId: string, useSetting: boolean): SubagentModelConfiguration {
+    const chosen = this.#chooseModel(rootId, undefined, undefined, useSetting);
     return chosen.ok ? chosen.config : {};
   }
 
@@ -520,11 +584,21 @@ function closingOmitted(child: SessionHandle, startSeq: number, rootId: string):
   return omitted;
 }
 
-function details(input: { readonly agentId: string; readonly description: string; readonly preset: SubagentPreset; readonly transcriptPath: string; readonly background: boolean }): SubagentDetail {
+function details(input: { readonly agentId: string; readonly description: string; readonly kind: "local" | "fork"; readonly preset?: SubagentPreset; readonly transcriptPath: string; readonly background: boolean; readonly inheritedThroughSeq?: number }): SubagentDetail {
   return Object.freeze<SubagentDetail[number][]>([
     { label: CONTEXT_TRACE_DETAIL_LABEL, value: { kind: "trace", path: input.transcriptPath, description: `Subagent transcript: ${input.description}` } },
-    { label: "delegation", value: { childSessionId: input.agentId, agentId: input.agentId, kind: "local", preset: input.preset, description: input.description, transcriptPath: input.transcriptPath, background: input.background, status: "running" } },
+    { label: "delegation", value: {
+      childSessionId: input.agentId, agentId: input.agentId, kind: input.kind, ...(input.preset ? { preset: input.preset } : {}), description: input.description, transcriptPath: input.transcriptPath,
+      background: input.background, ...(input.inheritedThroughSeq === undefined ? {} : { inheritedThroughSeq: input.inheritedThroughSeq }), status: "running",
+    } },
   ]);
+}
+
+/** The Agent mode of the Session's latest `turn/start`. */
+function latestTurnMode(session: SessionHandle): RuntimeV2AgentMode | undefined {
+  let mode: unknown;
+  for (const event of session.journal.iterateEvents()) if (event.type === "turn/start") mode = record(event.data).mode;
+  return mode === "agent" || mode === "plan" || mode === "chat" ? mode : undefined;
 }
 
 function withStatus(detail: SubagentDetail, status: string): SubagentDetail {
@@ -547,7 +621,8 @@ function modelInput(config: SubagentModelConfiguration): { model?: string; think
   };
 }
 
-function extension(type: string, data: Record<string, RuntimeV2JsonValue>) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
+/** A Journal event owned by `@actspace/core` (core types and the `subagent/*` extensions alike). */
+function coreEvent(type: string, data: Record<string, RuntimeV2JsonValue>) { return { type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
 function record(value: unknown): Readonly<Record<string, unknown>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, unknown>> : {}; }
 function ok(text: string, detail?: SubagentDetail): SubagentToolOutcome { return detail ? { ok: true, text, detail } : { ok: true, text }; }
 function fail(code: string, text: string): SubagentToolOutcome { return { ok: false, code, text }; }

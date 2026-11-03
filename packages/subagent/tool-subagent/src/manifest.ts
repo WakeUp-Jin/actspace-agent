@@ -1,7 +1,7 @@
 import { defineBuiltinPluginManifest } from "@actspace/cordis-adapter";
 
 export const SUBAGENT_TOOLS_PLUGIN_ID = "actspace.subagent-tools" as const;
-export const SUBAGENT_TOOL_NAMES = Object.freeze(["agent", "send_message", "wait_agent", "list_agents", "interrupt_agent", "list_subagent_models"] as const);
+export const SUBAGENT_TOOL_NAMES = Object.freeze(["agent", "agent_fork", "send_message", "wait_agent", "list_agents", "interrupt_agent", "list_subagent_models"] as const);
 
 export const manifest = defineBuiltinPluginManifest({
   display: { title: "子智能体", description: "把任务交给子智能体，在后台并行完成", scope: "session", defaultEnabled: true, canDisable: false },

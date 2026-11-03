@@ -1,16 +1,16 @@
 import { expect, it, vi } from "vitest";
 import { SessionJournal, createCoreCodecRegistry, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { codecs, CONTEXT_OWNER, STATE_EVENT } from "@actspace/context-engine/codec";
-import { ContextCompactionCoordinator, type CompactionSession, type Context } from "@actspace/context-engine";
+import { codecs, CONTEXT_OWNER, STATE_EVENT, SUPPLEMENT_EVENT } from "@actspace/context-engine/codec";
+import { ContextCompactionCoordinator, ContextSupplements, type CompactionSession, type Context } from "@actspace/context-engine";
 import { emptyDisclosureState, registerPaths, applyStateEvent, candidatePaths } from "@actspace/context-engine/state";
-import { ProgressiveDisclosure, batchReferences, createDisclosureSource } from "../plugin.js";
+import { DISCLOSURE_OWNER, ProgressiveDisclosure, batchReferences, createDisclosureSource } from "../plugin.js";
 import { selectActive } from "../policy.js";
 import { collectPathHints, type DisclosureHost } from "../paths.js";
 
-function fixture(seed: readonly SessionEventEnvelopeV1[] = [], sessionId = "s"): CompactionSession {
+function fixture(seed: readonly SessionEventEnvelopeV1[] = [], sessionId = "s", origin?: string): CompactionSession {
   const registry = createCoreCodecRegistry(); codecs.forEach(codec => registry.register(codec));
   const journal = new SessionJournal({ registry, seed });
-  return { header: { sessionId }, journal, get lastSeq() { return journal.lastSeq; }, append: async value => journal.append(value), appendMany: async values => journal.appendMany(values), flush: async () => {} };
+  return { header: { sessionId, lineage: origin ? { origin } : null }, journal, get lastSeq() { return journal.lastSeq; }, append: async value => journal.append(value), appendMany: async values => journal.appendMany(values), flush: async () => {} };
 }
 function context(session: CompactionSession): Context {
   return { request: { sessionId: session.header.sessionId, requestId: "r", routeId: "r", model: "m", options: {} }, content: { system: { sections: [], modelFacts: [] }, conversation: session.journal.surface, supplements: [], tools: [] }, status: { throughJournalSeq: session.lastSeq, cycle: 0, paths: [], facts: [], plugins: {} } };
@@ -119,6 +119,21 @@ it("collects paths from real read_file numbered lines", () => {
   const output = "     1|/file/absolute.ts\n     2|src/relative.ts\n     3|AGENTS.md\n     4|ordinary words";
   expect(collectPathHints(output)).toEqual(expect.arrayContaining(["/file/absolute.ts", "src/relative.ts", "AGENTS.md"]));
   expect(collectPathHints(output)).not.toContain("ordinary words");
+});
+
+it("keeps the inherited navigation list in a forked subagent but drops it in a user fork", async () => {
+  const session = fixture(); await users(session, 2); const { port } = host();
+  await new ContextSupplements(session).put({ op: "add", id: "navigation", owner: DISCLOSURE_OWNER, text: "Current active context files", afterEventSeq: session.lastSeq, lifetime: "persistent" });
+  await new ProgressiveDisclosure(port).hydrate(context(session), session);
+  const navigation = (child: CompactionSession) => child.journal.events.filter(event => event.type === SUPPLEMENT_EVENT).map(event => (event.data as { op: string }).op);
+  // agent_fork: the copied prefix stays byte for byte the parent's, so the provider cache keeps hitting.
+  const forked = fixture(session.journal.events, "forked", "delegation");
+  await new ProgressiveDisclosure(port).hydrate(context(forked), forked);
+  expect(navigation(forked)).toEqual(["add"]);
+  expect(forked.journal.events.some(event => event.type === STATE_EVENT && (event.data as { op: string }).op === "fork")).toBe(true);
+  const userFork = fixture(session.journal.events, "user-fork", "fork");
+  await new ProgressiveDisclosure(port).hydrate(context(userFork), userFork);
+  expect(navigation(userFork)).toEqual(["add", "remove"]);
 });
 
 it("does not replay an ignored pre-compaction read into a fork's new cycle", async () => {

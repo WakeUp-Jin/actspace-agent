@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "test:agent-host:process": "node --test scripts/test/host-process.test.mjs scripts/test/host-lifecycle-process.test.mjs scripts/test/host-tools-process.test.mjs scripts/test/host-receipt-process.test.mjs scripts/test/host-blocked-process.test.mjs scripts/test/host-subagent-drain-process.test.mjs",
+    "test:agent-host:process": "node --test scripts/test/host-process.test.mjs scripts/test/host-lifecycle-process.test.mjs scripts/test/host-tools-process.test.mjs scripts/test/host-receipt-process.test.mjs scripts/test/host-blocked-process.test.mjs scripts/test/host-subagent-drain-process.test.mjs scripts/test/host-subagent-fork-cache-process.test.mjs",
     "models:generate": "node scripts/generate-model-catalog.mjs",
     "clean": "pnpm --filter @actspace/shared clean && pnpm --filter @actspace/runtime clean && pnpm --filter @actspace/agent-cli clean && pnpm --filter @actspace/desktop clean",
     "dev": "node scripts/desktop-dev.mjs",
