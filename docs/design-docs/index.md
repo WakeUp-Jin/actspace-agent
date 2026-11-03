@@ -50,6 +50,7 @@
 
 - `core-beliefs.md`：Agent-first 的工作原则和模板设计出发点。
 - [架构优化](架构优化/README.md)：2026-11-01 立项，2026-11-02 两步都已实施（分支 `架构优化`，未合入 main，Electron 实机检查待执行）。第一步「功能减法」，见 [01 功能减法设计](架构优化/01-功能减法设计.md)（删除 HTML / 代码 / CSV 渲染、可视化回复、终端、文件树和 Review 的操作与监听；浏览器能力与英语学习默认不加载），计划见 [20261101-feature-subtraction](../exec-plans/completed/20261101-feature-subtraction/README.md)；第二步「插件结构」见 [02 插件结构设计](架构优化/02-插件结构设计.md)（`packages/<能力>/<包>` 两级目录、全局 / 会话两类插件、manifest 的 `display`、唯一插件清单、扩展 › 插件页、README 规范与检查），计划见 [20261101-plugin-structure](../exec-plans/completed/20261101-plugin-structure/README.md)，插件页 demo 见 [plugins-page-demo](frontend/plugins-page-demo.html)。
+- [子智能体和后台任务设计规范](子智能体和后台任务设计规范/README.md)：2026-11-03 决策已确认，设计规范（02–05）与[执行计划](../exec-plans/active/20261103-subagent-background-redesign/README.md)已写、待审阅后开工（分支 `子智能体功能完善`）；子智能体参考 DSH 改为默认异步、可续聊、可写、预设与模型可选，外加「留痕」：子会话 transcript 与 Bash 日志路径全程交给主智能体并进入活跃 / 睡眠路径；决策记录见 [01-设计决策](子智能体和后台任务设计规范/01-设计决策.md)。
 - [文档面板规范](frontend/front-文档面板规范.md)：2026-11-01 确认并实施（功能减法 P4）；只含 Markdown 的目录树取代工作区文件树，聊天 → 正文 → 文件树，绿点标出本会话改过的文档；demo 见 [md-file-tree-demo](frontend/md-file-tree-demo.html)（方案 A）。
 - [ActSpace 产品概念思路（初稿）](ActSpace产品概念思路初稿.md)：产品形象：定位、信念“唯变所适，每一个问题都有它的空间”、故事线、Agent / 场景 / Actor / Actor 名册 / 空间、意象与气质；视觉方向待定。
 - `core-storage-and-observability.md`：本地存储、workspace root 和可观测性边界。
