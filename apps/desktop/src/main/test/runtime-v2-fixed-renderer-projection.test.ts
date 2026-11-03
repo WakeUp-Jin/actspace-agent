@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
-import { projectSubagentList, subagentChildrenWithoutModel, latestRequestModel, projectSubagentTranscript, projectContextSnapshot, projectContextState, projectChatEvents, projectChatSession, projectSessionUsageActivities, projectIndexedUsageActivity } from "@actspace/client/sessions";
+import { projectSubagentList, subagentChildren, subagentChildrenWithoutModel, latestRequestModel, projectSubagentTranscript, projectContextSnapshot, projectContextState, projectChatEvents, projectChatSession, projectSessionUsageActivities, projectIndexedUsageActivity } from "@actspace/client/sessions";
 
 it("restores a durable failed turn as an error block, including old failures without details", () => {
   for (const failure of [undefined, { kind: "invalid-request", message: "Cannot send tool image", retryable: false }]) {
@@ -383,6 +383,15 @@ describe("live subagent projection", () => {
     // A child that ended without a recorded model (e.g. stopped) still gets its request fact.
     const stopped = [...requested, event(3, "delegation/completed", { invocationId: "inv", childSessionId: "child", presetId: "actspace.explore", status: "aborted" })];
     expect(subagentChildrenWithoutModel(stopped)).toEqual([{ childSessionId: "child", finished: true }]);
+  });
+  it("lists every child with its finished state and carries the child's token usage", () => {
+    const requested = [event(1, "tool/call", { callId: "call", name: "explore", args: { task: "Inspect UI" } }), event(2, "delegation/requested", { invocationId: "inv", parentCallId: "call", childSessionId: "child", presetId: "actspace.explore" })];
+    expect(subagentChildren(requested)).toEqual([{ childSessionId: "child", finished: false }]);
+    const completed = [...requested, event(3, "delegation/completed", { invocationId: "inv", childSessionId: "child", presetId: "actspace.explore", status: "completed", model: "claude-sonnet-5-5" })];
+    // Unlike the model lookup, a child with a recorded model is still listed: tokens come from the child itself.
+    expect(subagentChildren(completed)).toEqual([{ childSessionId: "child", finished: true }]);
+    expect(projectSubagentList(baseSnapshot({}), requested, new Map(), new Map([["child", 18_420]]))).toEqual([expect.objectContaining({ stats: expect.objectContaining({ totalTokens: 18_420, durationMs: expect.any(Number) }) })]);
+    expect(projectSubagentList(baseSnapshot({}), completed)).toEqual([expect.objectContaining({ stats: expect.not.objectContaining({ totalTokens: expect.anything() }) })]);
   });
   it("projects live text and thinking separately and removes chunks once the message is committed", () => {
     const journal = [event(1, "assistant/chunk", { messageId: "m", kind: "assistant-delta", content: "Hello" }), event(2, "assistant/chunk", { messageId: "m", kind: "reasoning-delta", content: "Thinking" }), event(3, "assistant/chunk", { messageId: "m", kind: "tool-call-delta", content: '{"path":', callId: "c" })];

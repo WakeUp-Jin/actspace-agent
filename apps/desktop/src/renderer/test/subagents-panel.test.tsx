@@ -23,8 +23,8 @@ it("groups agents and navigates within the panel while rejecting stale transcrip
   const transcript = vi.fn().mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; })).mockResolvedValue([]);
   overrideBridge({ "sessions.getSubagents": vi.fn().mockResolvedValue([agent("first", "running"), agent("second", "completed")]), "sessions.getSubAgentTranscript": transcript });
   const { unmount } = render(<TooltipProvider><SubagentsPanel sessionId="parent" /></TooltipProvider>);
-  await screen.findByText("运行中 · 1");
-  expect(screen.getByText("已结束 · 1")).toBeInTheDocument();
+  await screen.findByRole("group", { name: "运行中 · 1" });
+  expect(screen.getByRole("group", { name: "已结束 · 1" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /first/ }));
   await waitFor(() => expect(transcript).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByRole("button", { name: "返回子 Agent 列表" }));
@@ -93,5 +93,33 @@ it("returns to the list with a note when the focused child agent is not found", 
   overrideBridge({ "sessions.getSubagents": vi.fn().mockResolvedValue([agent("first", "completed")]), "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue([]) });
   render(<TooltipProvider><SubagentsPanel sessionId="parent" focus={{ childSessionId: "gone", view: "trajectory", revision: 1 }} /></TooltipProvider>);
   expect(await screen.findByText("找不到这个子智能体。")).toBeInTheDocument();
-  expect(screen.getByText("已结束 · 1")).toBeInTheDocument();
+  expect(screen.getByRole("group", { name: "已结束 · 1" })).toBeInTheDocument();
+});
+
+it("shows token usage and duration on list rows, and model plus status in the detail header", async () => {
+  const running: Agent = { ...agent("first", "running"), displayText: "正在读取 migrations.ts", model: "claude-sonnet-5-5", agentKind: "explore", stats: { durationMs: 72_000, toolCallCount: 6, totalTokens: 12_630 } };
+  const failed: Agent = { ...agent("second", "failed"), error: "达到最大轮次", stats: { durationMs: 9_000, toolCallCount: 1 } };
+  overrideBridge({ "sessions.getSubagents": vi.fn().mockResolvedValue([running, failed]), "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue([]) });
+  render(<TooltipProvider><SubagentsPanel sessionId="parent" /></TooltipProvider>);
+  const runningRow = await screen.findByRole("button", { name: /first/ });
+  expect(runningRow).toHaveTextContent("正在读取 migrations.ts");
+  expect(runningRow).toHaveTextContent("12.6K tokens");
+  expect(runningRow).toHaveTextContent("1m 12s");
+  // 没有 token 数据时只显示耗时；失败的说明用红字。
+  const failedRow = screen.getByRole("button", { name: /second/ });
+  expect(failedRow).not.toHaveTextContent("tokens");
+  expect(failedRow).toHaveTextContent("9s");
+  expect(screen.getByText("达到最大轮次")).toHaveClass("text-on-danger");
+  // 列表不再显示类型和模型。
+  expect(runningRow).not.toHaveTextContent("Explore");
+  expect(runningRow).not.toHaveTextContent("Sonnet");
+
+  fireEvent.click(runningRow);
+  const header = screen.getByRole("heading", { name: "first" }).closest("header")!;
+  expect(header).toHaveTextContent(/sonnet/i);
+  expect(header).toHaveTextContent("运行中");
+  expect(header).toHaveTextContent("1m 12s");
+  expect(header).not.toHaveTextContent("子 Agent /");
+  // 轨迹切换在顶部栏最右边。
+  expect(header.lastElementChild).toHaveAccessibleName("查看执行轨迹");
 });
