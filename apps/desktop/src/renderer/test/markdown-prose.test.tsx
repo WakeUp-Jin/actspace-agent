@@ -78,7 +78,7 @@ describe("MarkdownProse", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     render(<MarkdownProse content={'```ts\nconst answer = 42;\n```'} />);
 
-    expect(screen.getByText("ts")).toBeInTheDocument();
+    expect(screen.getByText("TypeScript")).toBeInTheDocument();
     expect(document.querySelector("code")?.textContent).toContain("const answer = 42;");
     await userEvent.click(screen.getByRole("button", { name: "复制代码" }));
     expect(writeText).toHaveBeenCalledWith("const answer = 42;\n");
@@ -89,7 +89,8 @@ describe("MarkdownProse", () => {
     const onOpenWorkspaceFile = vi.fn();
     render(<MarkdownProse content="查看 [src/App.tsx](src/App.tsx)。" onOpenWorkspaceFile={onOpenWorkspaceFile} />);
 
-    const link = screen.getByRole("link", { name: "src/App.tsx" });
+    // 图标和第一个字符包在 .md-path-lead 里，jsdom 算可访问名称时会在中间插空格，比较时忽略空白
+    const link = screen.getByRole("link", { name: (name) => name.replace(/\s+/g, "") === "src/App.tsx" });
     expect(link).not.toHaveAttribute("target");
     await userEvent.click(link);
     expect(onOpenWorkspaceFile).toHaveBeenCalledWith("src/App.tsx");

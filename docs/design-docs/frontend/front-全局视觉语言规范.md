@@ -116,7 +116,7 @@ ActSpace 的视觉气质是：安静、精确、克制、高密度、适合长�
   monospace;
 ```
 
-AI 输出正文继续跟随 UI 字体，代码、diff、Bash 和行内 code 使用 mono 字体。
+聊天区的 AI 输出正文（`MarkdownProse`：助手回复、子 Agent 报告）使用阅读字体 `--act-font-reading`（西文衬线 + 中文苹方），16.5px、行高 1.78，见 [聊天区 Markdown 渲染规范](front-聊天区Markdown渲染规范.md) §6；正文里的表格、代码块头、提示框标签仍用 UI 字体。其余界面继续用 UI 字体。代码、diff、Bash 和行内 code 使用 mono 字体。
 
 ### 字号
 

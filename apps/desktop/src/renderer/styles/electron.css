@@ -120,6 +120,16 @@
   pointer-events: none;
 }
 
+/*
+ * 「文档」展开面板时，面板的 tab 行铺满中间栏（tab 行层级高于 chrome），会话标题和中间栏操作还画在下面就会
+ * 和 tab 叠在一起。这里只让它们退场；拖动区保留，tab 行空白处仍可拖动窗口（tab 自身是 no-drag）。
+ */
+.window-chrome-bar[data-right-expanded="true"] .chrome-center-title,
+.window-chrome-bar[data-right-expanded="true"] .chrome-center-actions {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .chrome-button {
   display: grid;
   place-items: center;

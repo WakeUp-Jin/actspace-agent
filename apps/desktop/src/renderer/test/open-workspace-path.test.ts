@@ -32,6 +32,25 @@ describe("openWorkspacePath", () => {
     expect(openTab).toHaveBeenCalledWith({ id: "docs", kind: "docs", title: "文档", select: "docs/a.md" });
   });
 
+  it("passes the line to the docs panel for Markdown only; other files ignore it", async () => {
+    const { open } = install();
+    const openTab = vi.fn();
+    await openWorkspacePath({ workspaceRoot: "/ws", relativePath: "docs/a.md", line: 12, openTab });
+    expect(openTab).toHaveBeenCalledWith({ id: "docs", kind: "docs", title: "文档", select: "docs/a.md", line: 12 });
+
+    openTab.mockClear();
+    await openWorkspacePath({ workspaceRoot: "/ws", relativePath: "main.ts", line: 12, openTab });
+    expect(open).toHaveBeenCalledWith({ workspaceRoot: "/ws", relativePath: "main.ts", action: "open" });
+    expect(openTab).not.toHaveBeenCalled();
+  });
+
+  it("does not add a line key when none is given", async () => {
+    install();
+    const openTab = vi.fn();
+    await openWorkspacePath({ workspaceRoot: "/ws", relativePath: "docs/a.md", openTab });
+    expect(Object.keys(openTab.mock.calls[0][0])).not.toContain("line");
+  });
+
   it("reads an image and opens an image tab", async () => {
     install({ read: async () => ({ relativePath: "a.png", renderKind: "image", size: 3, mtimeMs: 1, dataUrl: "data:image/png;base64,AA==" }) });
     const openTab = vi.fn();

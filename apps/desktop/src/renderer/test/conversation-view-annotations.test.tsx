@@ -43,4 +43,15 @@ describe("ConversationView response annotations", () => {
     rerender(view([...durable, { ...liveReply, id: "v2-3", sourceSeq: 3 }]));
     expect(await menuFor("v2-3", "回复正文")).toBe(true);
   });
+
+  // 聊天区 Markdown 改造（T26）：含公式、提示框、路径的回复，批注入口照常出现。
+  it("still offers annotation on a durable reply that contains a formula, callout and path chip", async () => {
+    const rich: MessageBlock = {
+      kind: "assistant", id: "v2-5", sourceSeq: 5, createdAt, runId: "run-1",
+      content: "结论在 `src/app.ts:3`，公式 $a^2$ 如下。\n\n> [!NOTE]\n> 这里是提示框正文\n\n先看日志\n再改配置",
+    };
+    render(view([...durable.slice(0, 2), rich]));
+    expect(await menuFor("v2-5", "这里是提示框正文")).toBe(true);
+    expect(await menuFor("v2-5", "再改配置")).toBe(true);
+  });
 });

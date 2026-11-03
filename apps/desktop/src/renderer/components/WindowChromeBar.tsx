@@ -35,6 +35,8 @@ export type WindowChromeBarProps = {
   leftPaneWidth?: number;
   rightPaneWidth?: number;
   compactLayout?: boolean;
+  /** 右侧面板展开到中间栏（「文档」的「展开面板」）。中间栏被面板盖住，标题和中间栏操作退场。 */
+  rightExpanded?: boolean;
   onToggleLeft: () => void;
   onToggleRight: () => void;
   canGoBack?: boolean;
@@ -62,6 +64,7 @@ export function WindowChromeBar({
   leftPaneWidth,
   rightPaneWidth,
   compactLayout = false,
+  rightExpanded = false,
   onToggleLeft,
   onToggleRight,
   canGoBack = false,
@@ -96,6 +99,7 @@ export function WindowChromeBar({
       role="presentation"
       style={style}
       data-compact-panel-open={compactLayout && rightOpen ? "true" : undefined}
+      data-right-expanded={!compactLayout && rightOpen && rightExpanded ? "true" : undefined}
     >
       <div className="chrome-left">
         <button

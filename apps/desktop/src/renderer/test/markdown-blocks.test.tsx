@@ -81,9 +81,14 @@ describe("splitMarkdownBlocks", () => {
     expect(rewritten.blocks.map((block) => block.source).join("")).toBe(rewritten.content);
   });
 
-  it("falls back to one block when reference definitions or footnotes span blocks", () => {
-    expect(splitMarkdownBlocks("见 [文档][doc]。\n\n[doc]: https://example.com").blocks).toHaveLength(1);
-    expect(splitMarkdownBlocks("正文[^1]\n\n[^1]: 注释").blocks).toHaveLength(1);
+  // 规范 §8.2（改进 10）有意改变：跨块的引用式定义和脚注不再让整条回复退回一块，而是分块并给定义块打 definition 标记。
+  it("no longer falls back to one block when reference definitions or footnotes span blocks", () => {
+    const link = splitMarkdownBlocks("见 [文档][doc]。\n\n[doc]: https://example.com").blocks;
+    expect(link.length).toBeGreaterThan(1);
+    expect(link.some((block) => block.definition?.kind === "link")).toBe(true);
+    const footnote = splitMarkdownBlocks("正文[^1]\n\n[^1]: 注释").blocks;
+    expect(footnote.length).toBeGreaterThan(1);
+    expect(footnote.some((block) => block.definition?.kind === "footnote")).toBe(true);
     expect(splitMarkdownBlocks("").blocks).toEqual([]);
   });
 });
@@ -92,7 +97,7 @@ describe("MarkdownProse block rendering", () => {
   const normalize = (html: string) => html.replace(/>\s+</g, "><").trim();
 
   it("renders the same structure as parsing the whole message at once", () => {
-    const blocked = render(<MarkdownProse content={DOC} />).container.querySelector(".markdown-prose")!;
+    const blocked = render(<MarkdownProse content={DOC} onOpenWorkspaceFile={() => {}} />).container.querySelector(".markdown-prose")!;
     const whole = render(<div><Markdown remarkPlugins={[remarkGfm]}>{DOC}</Markdown></div>).container.firstElementChild!;
     const tags = (root: Element) => Array.from(root.querySelectorAll("h1, h2, p, ul, li, table, td, blockquote, a")).map((node) => `${node.tagName}:${node.textContent}`);
     expect(tags(blocked)).toEqual(tags(whole));

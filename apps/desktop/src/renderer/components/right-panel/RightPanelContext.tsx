@@ -33,8 +33,9 @@ export type RightPanelTab = { id: string } & (
   // focus：从 bash 行的「后台」标签打开时选中这条命令；revision 每次点击递增，让已打开的 Tab 再次定位。
   | { kind: "backgroundTasks"; title: string; sessionId: string; focus?: BackgroundTaskFocus }
   | { kind: "context"; title: string }
-  // 「文档」面板：只有一个 Tab（id 固定为 `docs`）。select 是「打开并选中这篇」的一次性请求，openTab 消费后不会存进 Tab。
-  | { kind: "docs"; title: string; select?: string }
+  // 「文档」面板：只有一个 Tab（id 固定为 `docs`）。select 是「打开并选中这篇」的一次性请求，openTab 消费后不会存进 Tab；
+  // line（1 起始）随 select 一起，文档读完后滚到该行并选中整行，只对 Markdown 有意义。
+  | { kind: "docs"; title: string; select?: string; line?: number }
   | { kind: "review"; title: string; workspaceRoot?: string; scope: "uncommitted"; refreshKey?: number }
   // 某一轮的改动快照（轮尾改动卡点开）；index 是要选中的文件，revision 每次点击递增，让同一 Tab 重新跳到该文件。
   | { kind: "turnReview"; title: string; changes: TurnChanges; index: number; revision: number; sessionId: string | null; workspaceRoot?: string }
@@ -88,6 +89,9 @@ export type DocsDocState = {
 
 export type DocsMode = "preview" | "source";
 
+/** 「打开并滚到某行」的一次性请求：`id` 每次递增，让同一行再次打开也能重新触发。 */
+export type DocsPendingLine = { path: string; line: number; id: number };
+
 /** 有未保存的改动：截断文件只读，不会有草稿。 */
 export function isDocsDocDirty(doc: DocsDocState | null | undefined): boolean {
   return Boolean(doc && doc.status === "ready" && !doc.truncated && doc.draft !== doc.original);
@@ -117,9 +121,14 @@ type RightPanelContextValue = {
    * 必须放在 Provider：面板会随切换标签、收起右栏反复卸载，草稿、选中文件和展开层级留在组件里就会丢。
    */
   docsSelectedPath: string | null;
-  /** 选中一篇文档（树点击、交付卡 / 聊天链接）。有未保存草稿时先弹「保存 / 不保存 / 取消」。 */
-  selectDocsPath: (path: string | null) => void;
+  /** 选中一篇文档（树点击、交付卡 / 聊天链接）。有未保存草稿时先弹「保存 / 不保存 / 取消」。`line` 见 `DocsPendingLine`。 */
+  selectDocsPath: (path: string | null, line?: number) => void;
+  /** 等待文档读完后滚到某行的请求；编辑器处理完调 `clearDocsPendingLine`。 */
+  docsPendingLine: DocsPendingLine | null;
+  clearDocsPendingLine: () => void;
   docsDoc: DocsDocState | null;
+  /** 同步读取最新的文档状态（含还没渲染出来的草稿）：⌘S 紧跟在输入之后时，渲染里的值可能还是旧的。 */
+  getDocsDoc: () => DocsDocState | null;
   setDocsDoc: (update: DocsDocState | null | ((current: DocsDocState | null) => DocsDocState | null)) => void;
   /** 预览 / 源码；每次打开新文档重置为预览。 */
   docsMode: DocsMode;
@@ -176,6 +185,8 @@ export function RightPanelProvider({
   const [docsDoc, setDocsDocState] = useState<DocsDocState | null>(null);
   const docsDocRef = useRef<DocsDocState | null>(null);
   const [docsMode, setDocsMode] = useState<DocsMode>("preview");
+  const [docsPendingLine, setDocsPendingLine] = useState<DocsPendingLine | null>(null);
+  const pendingLineId = useRef(0);
   const [docsTreeCollapsed, setDocsTreeCollapsed] = useState(false);
   const [docsExpanded, setDocsExpanded] = useState(false);
   const [docsFilter, setDocsFilter] = useState<DocsFilter>("all");
@@ -192,9 +203,21 @@ export function RightPanelProvider({
     setDocsDocState(next);
   }, []);
 
-  const selectDocsPath = useCallback((path: string | null) => {
+  const getDocsDoc = useCallback(() => docsDocRef.current, []);
+  const clearDocsPendingLine = useCallback(() => setDocsPendingLine(null), []);
+
+  const selectDocsPath = useCallback((path: string | null, line?: number) => {
     const current = docsDocRef.current;
+    const requestLine = () => {
+      if (path && line !== undefined && Number.isFinite(line) && line >= 1) {
+        pendingLineId.current += 1;
+        setDocsPendingLine({ path, line: Math.trunc(line), id: pendingLineId.current });
+      } else {
+        setDocsPendingLine(null);
+      }
+    };
     const apply = () => {
+      requestLine();
       setDocsSelectedPath(path);
       setDocsDoc(null);
       setDocsMode("preview");
@@ -207,7 +230,11 @@ export function RightPanelProvider({
     };
     if (isDocsDocDirty(current)) {
       // 同一篇不动它（草稿还在）；换到另一篇要先问。
-      if (path === current?.relativePath) return;
+      if (path === current?.relativePath) {
+        // 草稿还在，不重读；带行号的请求仍要滚过去。
+        requestLine();
+        return;
+      }
       setDocsPendingLeave({ run: apply });
       return;
     }
@@ -216,7 +243,7 @@ export function RightPanelProvider({
 
   const openTab = useCallback((tab: RightPanelTab) => {
     // 「打开并选中」是一次性请求，不存进 Tab，免得 Tab 重放时重复选中。
-    const stored: RightPanelTab = tab.kind === "docs" && tab.select !== undefined ? { id: tab.id, kind: "docs", title: tab.title } : tab;
+    const stored: RightPanelTab = tab.kind === "docs" && (tab.select !== undefined || tab.line !== undefined) ? { id: tab.id, kind: "docs", title: tab.title } : tab;
     setTabs((current) => {
       const existingIndex = current.findIndex((item) => item.id === stored.id);
       if (existingIndex === -1) {
@@ -228,7 +255,7 @@ export function RightPanelProvider({
     });
     setActiveTabId(stored.id);
     setIsOpen(true);
-    if (tab.kind === "docs" && tab.select !== undefined) selectDocsPath(tab.select);
+    if (tab.kind === "docs" && tab.select !== undefined) selectDocsPath(tab.select, tab.line);
   }, [selectDocsPath]);
 
   const replaceTab = useCallback((tab: RightPanelTab) => {
@@ -316,6 +343,7 @@ export function RightPanelProvider({
     setDocsMode("preview");
     setDocsListing(null);
     setDocsPendingLeave(null);
+    setDocsPendingLine(null);
     setDocsRefreshKey((key) => key + 1);
   }, [setDocsDoc]);
 
@@ -354,8 +382,11 @@ export function RightPanelProvider({
       replaceTab,
       docsSelectedPath,
       selectDocsPath,
+      docsPendingLine,
+      clearDocsPendingLine,
       docsDoc,
       setDocsDoc,
+      getDocsDoc,
       docsMode,
       setDocsMode,
       docsTreeCollapsed,
@@ -390,8 +421,11 @@ export function RightPanelProvider({
     replaceTab,
     docsSelectedPath,
     selectDocsPath,
+    docsPendingLine,
+    clearDocsPendingLine,
     docsDoc,
     setDocsDoc,
+    getDocsDoc,
     docsMode,
     docsTreeCollapsed,
     toggleDocsTreeCollapsed,

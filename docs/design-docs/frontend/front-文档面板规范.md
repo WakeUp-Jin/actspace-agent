@@ -1,6 +1,6 @@
 # 文档面板规范
 
-更新：2026-11-01。状态：已实施（2026-11-01 功能减法 P4；同日补充：源码可编辑；渲染做精另开功能）。来源：[01 功能减法设计](../架构优化/01-功能减法设计.md)第 3 节；demo 见 [md-file-tree-demo.html](md-file-tree-demo.html)，用户选定方案 A。
+更新：2026-11-02。状态：已实施（2026-11-01 功能减法 P4；同日补充：源码可编辑）。2026-11-02 起，正文的预览与源码编辑器改为 CodeMirror 6 实时预览，规则见[Markdown 编辑与渲染规范](front-Markdown编辑与渲染规范.md)（设计已确认，待实施）；本文下面标「2026-11-02」的条目都以那份规范为准。来源：[01 功能减法设计](../架构优化/01-功能减法设计.md)第 3 节；demo 见 [md-file-tree-demo.html](md-file-tree-demo.html)，用户选定方案 A。
 
 ## 定位
 
@@ -25,6 +25,7 @@
 - 从左到右是**聊天 → 正文 → 文件树**。正文紧挨聊天区，视线从消息移到文档不用跨过文件树；文件树作为导航放在最外侧。这条沿用原 Workspace 文件浏览器“文件树放右栏”的取舍。
 - 文件树默认宽 260px，可以收起；收起按钮放在正文顶部操作栏的最右端，离文件树最近。
 - 右侧面板可以展开到盖住聊天区，用于专心阅读；再点一次还原。
+- 展开时顶栏中间的会话标题和中间栏操作隐藏（聊天区已被盖住），避免和面板的标签行叠在一起；顶栏空白处仍可拖动窗口。
 - 方案 A：大纲收在操作栏的「大纲」按钮里，点开是浮层，正文保持最大宽度。不做右侧常驻大纲栏（方案 B 未选）。
 
 ## 文件树
@@ -71,7 +72,7 @@
 左侧是路径（工作区名弱化，文件名主色）。右侧依次是：
 
 1. 「预览 / 源码」切换。
-2. 「大纲」：浮层列出本页 h2、h3，点击平滑滚动到对应标题；没有标题时显示“没有标题”。只在预览状态可用。
+2. 「大纲」：浮层列出本页 h2、h3，点击平滑滚动到对应标题；没有标题时显示“没有标题”。2026-11-02：标题改从语法树取，预览、源码两种状态都可用。
 3. 「在 Finder 中显示」。
 4. 「用默认应用打开」。
 5. 「复制路径」：复制相对路径。
@@ -79,40 +80,34 @@
 
 ### 预览、源码与编辑
 
-- 打开文件默认是**预览**。切到**源码**就是编辑状态：源码直接可改，不另设“编辑”按钮。
-- 源码编辑器用原生 `<textarea>`：等宽字体、自动换行，Tab 插入两个空格；撤销、选择、输入法都用系统自带能力。不引入编辑器依赖，不做语法高亮、行号和框内查找。编辑器封装成独立组件（只接收内容、变更和保存），以后单独优化 Markdown 时可以整体替换。
+- 打开文件默认是**预览**。2026-11-02：预览和源码**都能直接编辑**，共用同一个编辑器（CodeMirror 6），切换时保留光标、撤销历史和滚动位置；预览是实时预览，语法标记在光标进入时露出。源码状态显示行号、做语法着色。两种状态都支持 ⌘F 查找。细节见[Markdown 编辑与渲染规范](front-Markdown编辑与渲染规范.md)。
 - **保存**：⌘S / Ctrl+S。有未保存内容时，路径里的文件名旁显示圆点。切回预览显示的是未保存的当前内容。
 - **未保存时离开**：切换到另一篇文档或关闭文档面板时，提示「保存 / 不保存 / 取消」。
 - **与 Agent 改同一个文件**：以人为准。保存时直接写入，不做冲突检测。编辑期间若 Agent 改了文件，照常出现“已变化”提示条，但不打断编辑；保存后提示条消失。
 - 只写已存在的工作区内 `.md` / `.markdown` 文件，不新建文件。
-- 超过读取上限、内容被截断的文件，源码状态只读，并提示“文件过大，请用默认应用编辑”，避免保存时丢掉截断部分。
+- 超过读取上限、内容被截断的文件只读（2026-11-02 起预览、源码两种状态都只读），并提示“文件过大，请用默认应用编辑”，避免保存时丢掉截断部分。
 
 ### 渲染要求
 
-本轮保持现有 `react-markdown` + `remark-gfm` + `rehype-highlight` 渲染栈与效果，只补两项：
+2026-11-02 起由[Markdown 编辑与渲染规范](front-Markdown编辑与渲染规范.md)规定，原来列在“后续渲染做精”里的几项都纳入了这次范围：
 
-- **Mermaid**：复用聊天区已有的 Mermaid 渲染器，源码同样按不可信输入处理。
-- **大纲**：见操作栏。
+- frontmatter 属性卡片；
+- GitHub 提示框 `> [!NOTE]` 等；
+- 代码块语言名与复制；
+- 相对链接与行内代码路径在应用内打开；
+- 工作区本地图片；
+- 数学公式；
+- 源码高亮、行号与查找。
 
-安全边界不变：不引入 `rehype-raw`，原始 HTML 不执行；链接只放行 `http`、`https`、`mailto`。
+“悬停标题出现 `#` 锚点”不做：实时预览里光标进入标题就会露出 `#`。
 
-### 后续“渲染做精”（单独立项，不在本轮）
-
-用户计划以后把 Markdown 渲染单独拿出来做。demo 里已展示、但本轮不做的：
-
-- **frontmatter**：开头的 YAML frontmatter 显示为一排小标签（键弱化、值主色），不当正文渲染。
-- **提示框**：支持 GitHub 写法 `> [!NOTE]`、`> [!TIP]`、`> [!IMPORTANT]`、`> [!WARNING]`、`> [!CAUTION]`，用语义色区分。
-- **代码块语言名**：代码块右上角显示语言名（高亮本身已有，继续共用 `right-panel/highlight.ts`）。
-- **标题锚点**：悬停 h2、h3 时左侧出现 `#`。
-- **相对链接**：指向工作区内 `.md` 的链接在文档面板里打开；指向其他工作区文件的，按 01 第 2 节的规则打开；外链用系统默认浏览器打开。
-- **相对图片**：按当前文档所在目录解析为工作区内图片并显示；越界路径不加载。
-- 数学公式；更好的源码编辑器（高亮、行号、查找）。
+安全边界不变：原始 HTML 不执行；外链只放行 `http`、`https`、`mailto`；远程图片不加载。
 
 ### 性能
 
 - 只读取并渲染当前打开的那一篇，切换文件时释放上一篇。
 - 大文件沿用现有读取上限和“已截断”提示。
-- 长文档按块拆分渲染，块内容不变时不重新渲染（复用聊天区的 Markdown 分块做法）。
+- 长文档只渲染可见区域，语法树增量解析（2026-11-02 起，见[Markdown 编辑与渲染规范](front-Markdown编辑与渲染规范.md)§11）。
 
 ### 新鲜度
 
@@ -133,7 +128,8 @@
 ## 主题与样式
 
 - 只用主题 token 和语义色，浅色、深色都要验过（见[主题与配色规范](front-主题与配色规范.md)）。
-- 绿点用 operational 语义色，提示框用 info / warning / danger 语义色，代码高亮配色随主题翻转。
+- 绿点用 operational 语义色，提示框用 info / success / 正文色 / warning / danger，代码高亮配色随主题翻转。
+- 正文的强调色（引用竖条、文件路径、本地链接）默认是信息蓝，与链接色同一条规则；只作用于文档正文，不改应用全局强调色。
 
 ## 不做
 
@@ -152,16 +148,16 @@
 | 面板外壳、正文区、目录树 | `components/right-panel/docs/DocsPanel.tsx`、`DocsReader.tsx`、`DocsTree.tsx` |
 | 树模型（组树、搜索高亮、筛选、绿点路径换算） | `components/right-panel/docs/docs-tree-model.ts` |
 | 清单获取、草稿 / 保存 / 新鲜度 | `components/right-panel/docs/use-docs-listing.ts`、`use-docs-draft.ts` |
-| 源码编辑器（原生 textarea） | `components/right-panel/docs/MarkdownSourceEditor.tsx` |
+| 编辑器（预览 / 源码，CodeMirror 6；2026-11-02 起，待实施） | `components/markdown-editor/`，见[Markdown 编辑与渲染规范](front-Markdown编辑与渲染规范.md)§15；取代 `docs/MarkdownSourceEditor.tsx` |
 | 大纲浮层 | `components/right-panel/docs/DocsOutline.tsx` |
 | 离开确认（保存 / 不保存 / 取消） | `components/right-panel/docs/DocsLeaveDialog.tsx`，挂在 `components/RightPanel.tsx` |
 | 状态（选中、草稿、展开、筛选、清单） | `components/right-panel/RightPanelContext.tsx` |
-| Markdown 预览正文、Mermaid、分块渲染 | `components/right-panel/MarkdownRenderView.tsx`（导出 `MarkdownPreviewBody`） |
+| Markdown 预览正文、Mermaid、分块渲染 | `components/right-panel/MarkdownRenderView.tsx`（导出 `MarkdownPreviewBody`）；2026-11-02 起由上一行取代，实施时删除 |
 | 交付卡 / 聊天链接 → 文档面板 | `components/files/open-workspace-path.ts` |
-| 展开面板盖住聊天区 | `components/SplitView.tsx`（`rightExpanded`）、`components/WorkbenchLayout.tsx`（含文档标签自己的默认宽度 720px） |
+| 展开面板盖住聊天区 | `components/SplitView.tsx`（`rightExpanded`）、`components/WorkbenchLayout.tsx`（含文档标签自己的默认宽度 720px）、`components/WindowChromeBar.tsx` + `styles/electron.css`（`data-right-expanded`，展开时隐藏中间标题） |
 | 主进程 IPC | `workspaces.listMarkdownFiles`、`workspaces.writeMarkdownFile`：`apps/desktop/src/main/workspace-fs-service.ts`、`main/runtime-v2/desktop-shell-ipc.ts`、`main/ipc/guards.ts`；契约在 `packages/util/shared/src/desktop-bridge/contract.ts`、`ipc.ts`、`runtime-v2/fixed-renderer.ts` |
 | 浏览器 mock 数据 | `mock/docs-fixture.ts`、`mock/handlers.ts` |
-| 测试 | `test/docs-panel.test.tsx`、`docs-tree-model.test.ts`、`markdown-source-editor.test.tsx`、`markdown-render-view.test.tsx`、`split-view-expanded.test.tsx`；主进程 `main/test/workspace-fs-service.test.ts` 等 |
+| 测试 | `test/docs-panel.test.tsx`、`docs-tree-model.test.ts`、`markdown-source-editor.test.tsx`、`markdown-render-view.test.tsx`、`split-view-expanded.test.tsx`；主进程 `main/test/workspace-fs-service.test.ts` 等。2026-11-02 起两个 markdown 测试由 `test/markdown-editor-*.test.ts(x)` 取代 |
 
 实施时的几处取舍（与上文不冲突，补充说明）：
 

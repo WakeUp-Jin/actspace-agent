@@ -14,6 +14,8 @@ type ReplyOptions = {
   readonly chunkMs?: number;
   /** false：流到最后一段后保持运行态，用于截图「流式中」的界面。 */
   readonly finish?: boolean;
+  /** 自定义分批：给了就按它切分，`delays[i]` 是第 i 批之前的等待（没给时用 chunkMs）。用于模拟真实网络的不均匀到达。 */
+  readonly batches?: { readonly chunks: readonly string[]; readonly delays?: readonly number[] };
 };
 
 /**
@@ -21,8 +23,9 @@ type ReplyOptions = {
  * App 收到完成事件后重新 `sessions.getPage`，和 Electron 下是同一条路径。
  */
 export function playReply(clock: MockClock, options: ReplyOptions): ReplyPlayback {
-  const { sessionId, agentRunId, text, chunkMs = 60, finish = true } = options;
-  const chunks = text.match(/[\s\S]{1,6}/g) ?? [];
+  const { sessionId, agentRunId, text, chunkMs = 60, finish = true, batches } = options;
+  const chunks = batches?.chunks ?? text.match(/[\s\S]{1,6}/g) ?? [];
+  const delayBefore = (index: number) => batches?.delays?.[index] ?? chunkMs;
   const messageId = clock.db.nextId("assistant-stream");
   const base = { sessionId, agentRunId, turnId: `${agentRunId}:turn-0`, llmCallId: `${agentRunId}:llm-0` };
   let cancel: (() => void) | null = null;
@@ -32,7 +35,7 @@ export function playReply(clock: MockClock, options: ReplyOptions): ReplyPlaybac
   const step = (index: number) => {
     if (index < chunks.length) {
       clock.emit("agentStream", { type: "assistant_text_delta", ...base, messageId, delta: chunks[index]! });
-      cancel = clock.schedule(() => step(index + 1), chunkMs);
+      cancel = clock.schedule(() => step(index + 1), delayBefore(index + 1));
       return;
     }
     if (!finish) return;
@@ -40,7 +43,7 @@ export function playReply(clock: MockClock, options: ReplyOptions): ReplyPlaybac
     const message = appendMockMessage(clock.db, requireSession(clock.db, sessionId), "assistant", text, agentRunId);
     clock.emit("agentStream", { type: "agent_run_finished", sessionId, agentRunId, resultEventIds: [message.id] });
   };
-  cancel = clock.schedule(() => step(0), chunkMs);
+  cancel = clock.schedule(() => step(0), delayBefore(0));
 
   return {
     abort() {

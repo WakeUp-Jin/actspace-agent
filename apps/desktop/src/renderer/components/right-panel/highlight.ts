@@ -57,9 +57,10 @@ import yaml from "highlight.js/lib/languages/yaml";
 /**
  * 本仓库实际可达的语法集合。
  *
- * 同时被两处消费：本模块的 hljs 实例（文件视图），以及 `MarkdownRenderView` 里
- * `rehype-highlight` 的 `languages`（Markdown fenced code）。后者默认只有 lowlight 的
+ * 同时被两处消费：本模块的 hljs 实例（代码文件视图），以及聊天区 Markdown 管线里
+ * `rehype-highlight` 的 `languages`（回复里的 fenced code）。后者默认只有 lowlight 的
  * `common`，覆盖面比这里窄（缺 dockerfile / protobuf / dart 等），共用一份能让两处对齐。
+ * 「文档」面板的 Markdown 编辑器不用这里：它用 Lezer 的 `@codemirror/language-data`。
  *
  * `toml` 不是独立模块，它是 ini 的 alias；register 会连 alias 一起注册。
  */
