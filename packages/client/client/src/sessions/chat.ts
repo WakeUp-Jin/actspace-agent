@@ -367,6 +367,19 @@ export function subagentChildrenWithoutModel(journal: readonly SessionEventEnvel
   return [...requested].filter((id) => !known.has(id)).map((childSessionId) => ({ childSessionId, finished: finished.has(childSessionId) }));
 }
 
+/** Every delegated child Session in the parent Journal, and whether the parent recorded it as finished. */
+export function subagentChildren(journal: readonly SessionEventEnvelopeV1[]): { readonly childSessionId: string; readonly finished: boolean }[] {
+  const requested = new Set<string>();
+  const finished = new Set<string>();
+  for (const event of journal) {
+    const childSessionId = string(record(event.data).childSessionId);
+    if (!childSessionId) continue;
+    if (event.type === "delegation/requested") requested.add(childSessionId);
+    if (event.type === "delegation/completed") finished.add(childSessionId);
+  }
+  return [...requested].map((childSessionId) => ({ childSessionId, finished: finished.has(childSessionId) }));
+}
+
 /** The model of the latest request a Session actually sent (`request/header`); not the purpose binding. */
 export function latestRequestModel(journal: readonly SessionEventEnvelopeV1[]): string | undefined {
   for (let index = journal.length - 1; index >= 0; index -= 1) {
@@ -381,9 +394,10 @@ export function latestRequestModel(journal: readonly SessionEventEnvelopeV1[]): 
 /**
  * `childModels` fills in the model of children the parent Journal has no model
  * for yet (keyed by child Session id, from `latestRequestModel`); a model
- * recorded on `delegation/completed` always wins.
+ * recorded on `delegation/completed` always wins. `childTokens` is each child
+ * Session's cumulative `usage.totalTokens`, shown on the panel's list rows.
  */
-export function projectSubagentList(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[], childModels: ReadonlyMap<string, string> = new Map()): MessageBlock[] {
+export function projectSubagentList(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[], childModels: ReadonlyMap<string, string> = new Map(), childTokens: ReadonlyMap<string, number> = new Map()): MessageBlock[] {
   const index = buildIndex(snapshot, journal);
   return journal.filter((event) => event.type === "tool/call" && ["agent", "explore"].includes(String(record(event.data).name))).flatMap((event) => {
     const call = record(event.data);
@@ -396,6 +410,8 @@ export function projectSubagentList(snapshot: RuntimeV2SessionSnapshot, journal:
     const identity = identityFor(event, call, index);
     const preview = toolPreview(String(call.name), tool, terminalEvent ? record(terminalEvent.data) : {}, call, child, snapshot.sessionId, identity.agentRunId, terminalEvent ? "finished" : "running", snapshot.workspaceRoot ?? undefined, undefined, index.backgroundByCall.get(callId));
     if (preview.kind === "agent" && !terminalEvent) preview.stats = { durationMs: Math.max(0, Date.now() - Date.parse(event.time)), toolCallCount: 0 };
+    const totalTokens = indexed ? childTokens.get(indexed.childSessionId) : undefined;
+    if (preview.kind === "agent" && totalTokens !== undefined) preview.stats = { ...(preview.stats ?? { durationMs: 0, toolCallCount: 0 }), totalTokens };
     return createMessageBlocks([{ id: `subagent:${callId}`, sessionId: snapshot.sessionId, agentRunId: identity.agentRunId, timestamp: event.time, type: "tool_result", payload: { toolCallId: callId, uiPreview: preview, status: terminalEvent ? tool?.state : "running" } } as SessionEvent]);
   });
 }

@@ -121,7 +121,7 @@ RuntimeV2TrajectorySnapshot（projectTrajectoryWindow，同一事件对象只转
 
 - 父轨迹里，一次委派只占 `agent` 工具调用那一行，不把子会话的记录并进来。「子工具」只指同一会话里带 `parentCallId` 的嵌套调用。
 - `trajectoryDelegations(snapshot)`（`trajectory/subagents.ts`）从 `delegation/requested` 取出 `parentCallId → childSessionId`。`agent` 行详情的「概述」据此显示「子智能体」一栏和「查看轨迹」按钮。
-- 点「查看轨迹」会在右侧「子 Agent」面板打开这个子会话，并停在轨迹页。面板标题前用和主会话一样的 `SessionViewToggle` 切换对话 / 轨迹。
+- 点「查看轨迹」会在右侧「子 Agent」面板打开这个子会话，并停在轨迹页。顶部栏最右用和主会话一样的 `SessionViewToggle` 切换对话 / 轨迹（顶部栏布局见 [子 Agent 列表与详情顶部栏](front-子Agent列表与详情顶部栏.md)）。
 - 子轨迹由 `<TrajectoryView sessionId={child} variant="panel" />` 渲染：
   - 只在挂载时 `bridge.watch` 子会话。
   - 不处理 Context 面板跳转。

@@ -74,6 +74,7 @@ import {
   projectSubagentTranscript,
   projectSubagentList,
   subagentChildrenWithoutModel,
+  subagentChildren,
   latestRequestModel,
   toolPreview,
 } from "@actspace/client/sessions";
@@ -662,10 +663,19 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     await Promise.all(subagentChildrenWithoutModel(journal).map(async ({ childSessionId, finished }) => {
       const cached = finishedChildModels.get(childSessionId);
       const model = cached !== undefined ? cached : latestRequestModel(await options.registry.inspectSessionEvents(childSessionId).catch(() => [])) ?? null;
-      if (finished) rememberFinishedChildModel(childSessionId, model);
+      if (finished) rememberFinished(finishedChildModels, childSessionId, model);
       if (model) childModels.set(childSessionId, model);
     }));
-    return projectSubagentList(await options.registry.inspectSession(input.sessionId), journal, childModels);
+    // List rows show each child's cumulative token usage, read from its own Session snapshot.
+    const childTokens = new Map<string, number>();
+    await Promise.all(subagentChildren(journal).map(async ({ childSessionId, finished }) => {
+      const cached = finishedChildTokens.get(childSessionId);
+      const tokens = cached !== undefined ? cached : await options.registry.inspectSession(childSessionId).then((child) => child.usage.totalTokens, () => undefined);
+      if (tokens === undefined) return;
+      if (finished) rememberFinished(finishedChildTokens, childSessionId, tokens);
+      childTokens.set(childSessionId, tokens);
+    }));
+    return projectSubagentList(await options.registry.inspectSession(input.sessionId), journal, childModels, childTokens);
   });
   ipc.handle(contract.sessions.getSubAgentTranscript, async (input) => {
     const snapshot = await options.registry.inspectSession(input.transcriptRef.runId);
@@ -677,11 +687,13 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
 
 /** Request model of finished subagent children whose parent recorded none (null = the child sent no request). */
 const finishedChildModels = new Map<string, string | null>();
-const FINISHED_CHILD_MODEL_LIMIT = 500;
-function rememberFinishedChildModel(childSessionId: string, model: string | null): void {
-  if (finishedChildModels.has(childSessionId)) return;
-  if (finishedChildModels.size >= FINISHED_CHILD_MODEL_LIMIT) finishedChildModels.delete(finishedChildModels.keys().next().value!);
-  finishedChildModels.set(childSessionId, model);
+/** Final cumulative token usage of finished subagent children; they no longer change, so the 1s list poll skips re-reading them. */
+const finishedChildTokens = new Map<string, number>();
+const FINISHED_CHILD_CACHE_LIMIT = 500;
+function rememberFinished<T>(cache: Map<string, T>, childSessionId: string, value: T): void {
+  if (cache.has(childSessionId)) return;
+  if (cache.size >= FINISHED_CHILD_CACHE_LIMIT) cache.delete(cache.keys().next().value!);
+  cache.set(childSessionId, value);
 }
 
 async function toSessionListItem(item: RuntimeV2SessionListItem, registry: DesktopRuntimeV2Registry): Promise<SessionListItem> {

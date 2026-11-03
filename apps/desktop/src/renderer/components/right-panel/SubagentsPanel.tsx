@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
 import { createMessageBlocks, type MessageBlock } from "@actspace/shared";
-import { AgentAvatar, AgentStatus, agentModelLabel } from "../messages/AgentIdentity";
+import { AgentAvatar, AgentStatusIcon, agentLatestActivity, agentModelLabel, agentStatusLabel, formatAgentDuration } from "../messages/AgentIdentity";
 import { MarkdownProse } from "../messages/MarkdownProse";
 import { renderMessageList } from "../conversation/render-message";
 import { sessionsApi } from "../../api/sessions";
+import { formatTokenCount } from "../../context-format";
 import { SessionViewToggle, type SessionMainView } from "../SessionViewToggle";
 import { TrajectoryView } from "../TrajectoryView";
 import type { SubagentFocus } from "./RightPanelContext";
@@ -13,7 +14,8 @@ import type { SubagentFocus } from "./RightPanelContext";
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 // 运行中持续轮询；结束后记录可能拉取失败（父会话还在输出时主进程繁忙），拿到非空结果前继续重试，最多这么多次。
 const COMPLETED_TRANSCRIPT_RETRIES = 20;
-const buttonClass = "w-full rounded-act-md px-3 py-3 text-left hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring";
+// 列表行：设置页分组卡里的一行，规范见 docs/design-docs/frontend/front-子Agent列表与详情顶部栏.md。
+const rowClass = "flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring";
 
 export function SubagentsPanel({ sessionId, selected, focus }: { sessionId: string | null; selected?: AgentMessage; focus?: SubagentFocus }) {
   const [agents, setAgents] = useState<AgentMessage[]>([]);
@@ -90,12 +92,7 @@ export function SubagentsPanel({ sessionId, selected, focus }: { sessionId: stri
   if (!sessionId) return <p className="p-5 text-act-sm text-text-muted">选择会话查看子 Agent。</p>;
   if (pendingChild) return <p role="status" className="p-5 text-act-sm text-text-muted">正在加载子智能体…</p>;
   if (active) return <section className="flex h-full min-h-0 flex-col" aria-label="子 Agent 详情">
-    <header className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3">
-      <IconButton label="返回子 Agent 列表" tooltip="返回" onClick={() => setSelection(undefined)}><ArrowLeft size={16} /></IconButton>
-      <SessionViewToggle view={view} onToggle={() => setView((current) => current === "chat" ? "trajectory" : "chat")} />
-      <AgentAvatar message={active} size={28} />
-      <div className="min-w-0 flex-1"><h2 className="m-0 truncate text-act-sm font-medium" title={active.description}>{active.description}</h2><p className="m-0 mt-1 flex min-w-0 items-center gap-2 text-act-xs text-text-muted"><span>{kindLabel(active)}</span>{agentModelLabel(active) ? <><span aria-hidden="true">·</span><span className="min-w-0 truncate" title={active.model}>{agentModelLabel(active)}</span></> : null}<span aria-hidden="true">·</span><AgentStatus status={active.status} /></p></div>
-    </header>
+    <SubagentDetailHeader agent={active} view={view} onBack={() => setSelection(undefined)} onToggleView={() => setView((current) => current === "chat" ? "trajectory" : "chat")} />
     {view === "trajectory" ? <div className="flex min-h-0 flex-1 flex-col" aria-label="子 Agent 执行轨迹">
       {childId ? <TrajectoryView sessionId={childId} variant="panel" /> : <p className="p-5 text-act-sm text-text-muted">没有执行记录。</p>}
     </div> : <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4" aria-label="子 Agent 执行内容">
@@ -109,30 +106,58 @@ export function SubagentsPanel({ sessionId, selected, focus }: { sessionId: stri
         : null}
     </div>}
   </section>;
-  return <section className="h-full overflow-y-auto p-4" aria-label="子 Agent 列表">
-    {error ? <p role="status" className="text-act-xs text-text-muted">{error}</p> : null}
-    {missingChild ? <p role="status" className="mb-3 px-3 text-act-xs text-text-muted">找不到这个子智能体。</p> : null}
+  return <section className="h-full overflow-y-auto px-3 py-3.5" aria-label="子 Agent 列表">
+    {error ? <p role="status" className="mb-3 px-1.5 text-act-xs text-text-muted">{error}</p> : null}
+    {missingChild ? <p role="status" className="mb-3 px-1.5 text-act-xs text-text-muted">找不到这个子智能体。</p> : null}
     {([true, false] as const).map((running) => {
       const items = agents.filter((agent) => (agent.status === "running") === running);
       if (!items.length) return null;
-      return <div key={String(running)} className="mb-6"><h2 className="mb-2 px-3 text-act-xs font-normal text-text-faint">{running ? "运行中" : "已结束"} · {items.length}</h2>
-        {items.map((agent) => <button key={agent.id} type="button" className={buttonClass} onClick={() => { setSelection(agent); setView("chat"); setMissingChild(false); }}>
-          <span className="flex items-center gap-3">
-            <AgentAvatar message={agent} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-act-sm text-text-main" title={agent.description}>{agent.description}</span>
-              <span className="mt-1 flex min-w-0 items-center gap-1.5 text-act-xs text-text-muted">
-                <AgentStatus status={agent.status} /><span aria-hidden="true">·</span><span>{kindLabel(agent)}</span>
-                {agentModelLabel(agent) ? <><span aria-hidden="true">·</span><span className="min-w-0 truncate" title={agent.model}>{agentModelLabel(agent)}</span></> : null}
-                <span aria-hidden="true">·</span><span className="text-text-faint">{Math.floor((agent.stats?.durationMs ?? 0) / 1000)}s</span>
-              </span>
-            </span>
-          </span>
-        </button>)}
+      const title = running ? "运行中" : "已结束";
+      return <div key={String(running)} className="mb-4.5" role="group" aria-label={`${title} · ${items.length}`}>
+        <h2 className="mb-1.5 flex items-center justify-between px-1.5 text-act-xs font-normal text-text-faint"><span>{title}</span><span className="tabular-nums">{items.length}</span></h2>
+        <div className="divide-y divide-line/60 overflow-hidden rounded-act-group border border-line bg-surface">
+          {items.map((agent) => <SubagentRow key={agent.id} agent={agent} onOpen={() => { setSelection(agent); setView("chat"); setMissingChild(false); }} />)}
+        </div>
       </div>;
     })}
-    {!agents.length && !error ? <p className="px-3 text-act-sm text-text-muted">此会话还没有子智能体。</p> : null}
+    {!agents.length && !error ? <p className="px-1.5 text-act-sm text-text-muted">此会话还没有子智能体。</p> : null}
   </section>;
+}
+
+function SubagentRow({ agent, onOpen }: { agent: AgentMessage; onOpen: () => void }) {
+  const running = agent.status === "running";
+  const tokens = agent.stats?.totalTokens;
+  return <button type="button" className={rowClass} onClick={onOpen}>
+    <AgentAvatar message={agent} size={28} />
+    <span className="flex min-w-0 flex-1 flex-col gap-px">
+      <span className="truncate text-act-sm text-text-main" title={agent.description}>{agent.description}</span>
+      <span className={`truncate text-act-xs ${agent.status === "failed" ? "text-on-danger" : "text-text-faint"}`}>{agentLatestActivity(agent)}</span>
+    </span>
+    <span className="flex shrink-0 flex-col items-end gap-0.5 text-act-xs tabular-nums text-text-faint">
+      {tokens ? <span className="text-text-muted">{formatTokenCount(tokens)} <span className="text-text-faint">tokens</span></span> : null}
+      <span className={`inline-flex items-center gap-1 ${running ? "text-operational" : ""}`}>{running ? <AgentStatusIcon status="running" size={12} /> : null}{formatAgentDuration(agent.stats?.durationMs ?? 0)}</span>
+    </span>
+  </button>;
+}
+
+function SubagentDetailHeader({ agent, view, onBack, onToggleView }: { agent: AgentMessage; view: SessionMainView; onBack: () => void; onToggleView: () => void }) {
+  const model = agentModelLabel(agent);
+  const timeTone = agent.status === "running" ? "text-operational" : agent.status === "failed" ? "text-on-danger" : "text-text-faint";
+  const hover = [agent.description, kindLabel(agent), agent.background ? "后台" : undefined].filter(Boolean).join(" · ");
+  return <header className="flex h-11 shrink-0 items-center gap-1.5 border-b border-line pl-1.5 pr-2">
+    <IconButton label="返回子 Agent 列表" tooltip="返回" onClick={onBack}><ChevronLeft size={16} /></IconButton>
+    <div className="flex min-w-0 flex-1 items-center gap-2" title={hover}>
+      <AgentAvatar message={agent} size={18} />
+      <h2 className="m-0 min-w-0 truncate text-act-sm font-medium">{agent.description}</h2>
+    </div>
+    <span className="flex shrink-0 items-center gap-2 px-1 text-act-xs text-text-faint">
+      {model ? <><span className="max-w-24 truncate text-text-muted" title={agent.model}>{model}</span><span aria-hidden="true" className="size-[3px] rounded-full bg-line-strong" /></> : null}
+      <span className={`inline-flex items-center gap-1 tabular-nums ${timeTone}`}>
+        <AgentStatusIcon status={agent.status} size={12} /><span className="sr-only">{agentStatusLabel(agent.status)}</span>{formatAgentDuration(agent.stats?.durationMs ?? 0)}
+      </span>
+    </span>
+    <SessionViewToggle view={view} onToggle={onToggleView} />
+  </header>;
 }
 
 function kindLabel(agent: AgentMessage): string { return agent.agentKind === "agent" ? "Agent" : "Explore"; }

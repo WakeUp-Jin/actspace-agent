@@ -65,12 +65,23 @@ export function subagentTrajectoryScenario({ db }: MockClock): MockHandlers | vo
     createdAt: child.createdAt,
     display: "panel",
     summary: child.messages[child.messages.length - 1]!.content,
-    stats: { durationMs: 38_200, toolCallCount: 7 },
+    stats: { durationMs: 38_200, toolCallCount: 7, totalTokens: 18_420 },
     transcriptRef: { kind: "subagent_transcript", sessionId: parent.id, agentRunId: run, runId: child.id },
   };
+  // 面板列表 / 顶部栏要看全几种状态：运行中、后台运行中、失败、已停止（这几个没有子会话内容）。
+  const startedAt = Date.now();
+  const extra = (id: string, fields: Partial<Extract<MessageBlock, { kind: "agent" }>>): Extract<MessageBlock, { kind: "agent" }> => ({
+    ...agent, id: `subagent:${id}`, summary: undefined, transcriptRef: { kind: "subagent_transcript", sessionId: parent.id, agentRunId: run, runId: id }, ...fields,
+  });
+  const others = () => [
+    extra("mock-subagent-migrate", { description: "梳理 storage 迁移脚本", displayText: "正在读取 migrations.ts", status: "running", stats: { durationMs: 72_000 + Date.now() - startedAt, toolCallCount: 6, totalTokens: 12_630 } }),
+    extra("mock-subagent-tests", { description: "为 Transaction.commit 补单测", displayText: "正在运行 pnpm test", agentKind: "agent", model: "claude-opus-5-5", background: true, status: "running", stats: { durationMs: 24_000 + Date.now() - startedAt, toolCallCount: 3, totalTokens: 4_100 } }),
+    extra("mock-subagent-harness", { description: "检查 harness 生成器的调用链", displayText: "达到最大轮次", status: "failed", error: "达到最大轮次（20），已停止", stats: { durationMs: 125_000, toolCallCount: 21, totalTokens: 96_210 } }),
+    extra("mock-subagent-fork", { description: "对比 fork 与 branch 两种实现", displayText: "已停止", agentKind: "agent", model: "deepseek-v4-pro", status: "aborted", summary: "已被父会话停止", stats: { durationMs: 9_000, toolCallCount: 1 } }),
+  ];
   return {
     sessions: {
-      getSubagents: async ({ sessionId }) => sessionId === parent.id ? [agent] : [],
+      getSubagents: async ({ sessionId }) => sessionId === parent.id ? [...others(), agent] : [],
       getSubAgentTranscript: async () => [],
     },
   };
