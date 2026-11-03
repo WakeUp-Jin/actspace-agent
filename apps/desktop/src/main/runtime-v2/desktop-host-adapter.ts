@@ -9,7 +9,8 @@ import { createDesktopBrowserCapability } from "./browser-capability";
 import { DEFAULT_CREDENTIAL_REF, DesktopCredentialResolver } from "./credential-resolver";
 import { DesktopLegacyLlmAdapter } from "./legacy-llm-adapter";
 import type { RuntimeV2Module } from "./runtime-loader";
-import type { DesktopRuntimeV2ModelPort } from "./model-port";
+import { createDesktopModelsHostPort, type DesktopRuntimeV2ModelPort } from "./model-port";
+import { MODELS_HOST_PORT_ID } from "@actspace/shared";
 import type { DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2BrowserPort, DesktopRuntimeV2Roots } from "./host-ports";
 
 export type DesktopRuntimeV2BootOptions = {
@@ -99,6 +100,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
       "host.approval": approvalBroker,
       ...(browser ? { "host.browser": browser, [BROWSER_TOOLS_HOST_PORT_ID]: browser } : {}),
       "host.artifacts": artifacts,
+      [MODELS_HOST_PORT_ID]: createDesktopModelsHostPort(options.models),
       [options.module.LLM_HOST_PORT_ID]: Object.freeze({
         credentials: credentialResolver,
         routes: Object.freeze([{

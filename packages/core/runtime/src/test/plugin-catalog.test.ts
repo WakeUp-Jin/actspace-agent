@@ -34,7 +34,7 @@ describe("plugin catalog", () => {
     expect(rows.get("shell-tools")).toEqual(["shell-tools", ["tools.shell-tools"], ["tools.runtime", "actspace.host.tools.shell-tools", "actspace.host.background-tasks"], [{ id: "sandbox", fallback: "bash runs outside the sandbox after approval" }]]);
     expect(rows.get("todo-tools")).toEqual(["todo-tools", ["tools.todo"], ["tools.runtime", "session.runtime"]]);
     expect(rows.get("context-system")).toEqual(["context-system", ["context.source.system"], []]);
-    expect(rows.get("agent-factory")![1]).toEqual(["actspace.agent.factory", "agent.run-factory"]);
+    expect(rows.get("agent-factory")![1]).toEqual(["actspace.agent.factory", "agent.run-factory", "actspace.host-readable-files"]);
   });
 
   it("uses package subpaths as load entries, with no build aliases", () => {

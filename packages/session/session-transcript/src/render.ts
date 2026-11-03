@@ -1,9 +1,13 @@
 import type { SessionEventEnvelopeV1, SessionHeaderV1 } from "@actspace/session-journal";
 
-/** One rendered piece of the transcript, anchored to the Journal seq it cites. */
-export type TranscriptBlock = { readonly seq: number; readonly text: string };
+/** One rendered piece of the transcript, anchored to the Journal seq it cites; tool lines keep their call id. */
+export type TranscriptBlock = { readonly seq: number; readonly text: string; readonly callId?: string };
 
-type PendingCall = { readonly seq: number; readonly name: string; readonly summary: string };
+/** `head` is the tool line after `[#N] `, e.g. `bash: ls` or `send_message → <agent_id>: <first line>`. */
+type PendingCall = { readonly seq: number; readonly head: string };
+
+/** What the parent Journal says about a subagent (`subagent/spawned`, latest `subagent/activation` start). */
+export type TranscriptSubagentFacts = { readonly description: string; readonly kind: string; readonly preset?: string; readonly model?: string };
 
 /**
  * Incremental Markdown projection of one Session Journal. Reducers return a new
@@ -19,12 +23,16 @@ export type TranscriptState = {
   readonly children: readonly string[];
   readonly lastTime: string | null;
   readonly throughSeq: number;
+  /** Background task id → the call that started it, so a later `prune` can mark that tool line. */
+  readonly tasks: Readonly<Record<string, string>>;
+  /** Calls whose background log was pruned. */
+  readonly prunedCalls: readonly string[];
 };
 
 /** Another Session that branched off this one (side chat or fork) at `boundarySeq`. */
 export type TranscriptBranch = { readonly sessionId: string; readonly origin: "fork" | "side-chat"; readonly boundarySeq: number };
 
-export const EMPTY_TRANSCRIPT: TranscriptState = Object.freeze({ blocks: Object.freeze([]), pending: Object.freeze({}), title: null, speaker: null, children: Object.freeze([]), lastTime: null, throughSeq: -1 });
+export const EMPTY_TRANSCRIPT: TranscriptState = Object.freeze({ blocks: Object.freeze([]), pending: Object.freeze({}), title: null, speaker: null, children: Object.freeze([]), lastTime: null, throughSeq: -1, tasks: Object.freeze({}), prunedCalls: Object.freeze([]) });
 
 const LINE_LIMIT = 200;
 
@@ -47,8 +55,18 @@ export function reduceTranscript(state: TranscriptState, event: SessionEventEnve
     case "agent/inbox/spliced": {
       const node = event.surface?.kind === "append" ? event.surface.node : null;
       if (node?.kind !== "user") return base;
+      const content = contentText(node.content);
+      if (event.type === "agent/inbox/spliced" && data.source === "subagent_notification") {
+        const summary = tagText(content, "summary") ?? firstLine(content);
+        return { ...push(base, event.seq, `## Subagent notification [#${event.seq}] · ${formatTime(event.time)}${summary ? `\n\n${summary}` : ""}`), speaker: "user" };
+      }
+      if (event.type === "agent/inbox/spliced" && data.source === "agent_message") {
+        const sender = typeof data.senderId === "string" && data.senderId ? data.senderId : "another agent";
+        const body = unwrapAgentMessage(content) || "(empty message)";
+        return { ...push(base, event.seq, `## Message from ${sender} [#${event.seq}] · ${formatTime(event.time)}\n\n${body}`), speaker: "user" };
+      }
       const label = event.type === "user/message" ? "User" : data.source === "task_notification" ? "Background task notification" : data.source === "steer" ? "User (sent while the agent was working)" : "User";
-      const body = contentText(node.content) || "(empty message)";
+      const body = content || "(empty message)";
       return { ...push(base, event.seq, `## ${label} [#${event.seq}] · ${formatTime(event.time)}\n\n${body}`), speaker: "user" };
     }
     case "assistant/message": {
@@ -61,7 +79,7 @@ export function reduceTranscript(state: TranscriptState, event: SessionEventEnve
       const callId = typeof data.callId === "string" ? data.callId : null;
       if (callId === null) return base;
       const name = typeof data.name === "string" ? data.name : "tool";
-      return { ...base, pending: { ...state.pending, [callId]: { seq: event.seq, name, summary: summarizeArgs(record(data.args)) } } };
+      return { ...base, pending: { ...state.pending, [callId]: { seq: event.seq, head: callHead(name, record(data.args)) } } };
     }
     case "tool/result":
     case "tool/recovery-outcome": {
@@ -69,13 +87,13 @@ export function reduceTranscript(state: TranscriptState, event: SessionEventEnve
       const call = callId === null ? undefined : state.pending[callId];
       const pending = { ...state.pending };
       if (callId !== null) delete pending[callId];
-      const name = call?.name ?? (typeof data.name === "string" ? data.name : "tool");
+      const head = call?.head ?? (typeof data.name === "string" ? data.name : "tool");
       const child = delegatedChild(data);
       const status = typeof data.status === "string" ? data.status : event.surface?.kind === "append" && event.surface.node.kind === "tool-result" && event.surface.node.isError ? "failed" : "completed";
       const output = resultText(data, event);
       const outcome = [status, child ? `subagent session ${child} (transcript: ../${child}/transcript.md)` : null].filter(Boolean).join(" · ");
-      const text = `- [#${call?.seq ?? event.seq}] ${name}${call?.summary ? `: ${call.summary}` : ""}\n  → ${outcome}${output ? `: ${output}` : ""}`;
-      const next = push({ ...base, pending }, call?.seq ?? event.seq, text);
+      const text = `- [#${call?.seq ?? event.seq}] ${head}\n  → ${outcome}${output ? `: ${output}` : ""}`;
+      const next = push({ ...base, pending }, call?.seq ?? event.seq, text, callId ?? undefined);
       return child && !state.children.includes(child) ? { ...next, children: [...state.children, child] } : next;
     }
     case "surface/replaced": {
@@ -87,10 +105,17 @@ export function reduceTranscript(state: TranscriptState, event: SessionEventEnve
     case "turn/end": {
       let next: TranscriptState = { ...base, pending: {} };
       for (const call of Object.values(state.pending).sort((a, b) => a.seq - b.seq)) {
-        next = push(next, call.seq, `- [#${call.seq}] ${call.name}${call.summary ? `: ${call.summary}` : ""}\n  → no result recorded`);
+        next = push(next, call.seq, `- [#${call.seq}] ${call.head}\n  → no result recorded`);
       }
       const reason = typeof data.reason === "string" ? data.reason : "completed";
       return reason === "completed" ? next : { ...push(next, event.seq, `_Turn ended: ${reason} [#${event.seq}]_`), speaker: null };
+    }
+    case "background/task": {
+      const taskId = typeof data.taskId === "string" ? data.taskId : null;
+      if (taskId === null) return base;
+      if (data.op === "start" && typeof data.callId === "string") return { ...base, tasks: { ...state.tasks, [taskId]: data.callId } };
+      const callId = state.tasks[taskId];
+      return data.op === "prune" && callId !== undefined && !state.prunedCalls.includes(callId) ? { ...base, prunedCalls: [...state.prunedCalls, callId] } : base;
     }
     default:
       return base;
@@ -103,28 +128,52 @@ export function foldTranscript(events: Iterable<SessionEventEnvelopeV1>, inherit
   return state;
 }
 
-/** Events copied from the parent at fork time; delegated children start fresh. */
+/** Events copied from the parent: side chats and forks up to their boundary; a forked subagent up to `inheritedThroughSeq`; other subagents start fresh. */
 export function inheritedThroughSeq(header: SessionHeaderV1): number {
   const lineage = header.lineage;
-  return lineage && lineage.origin !== "delegation" ? lineage.parentBoundarySeq : -1;
+  if (!lineage) return -1;
+  return lineage.origin === "delegation" ? lineage.inheritedThroughSeq ?? -1 : lineage.parentBoundarySeq;
 }
 
-export function renderTranscript(header: SessionHeaderV1, state: TranscriptState, branches: readonly TranscriptBranch[] = []): string {
+/** Folds a parent Journal into what its transcript header needs for each subagent, keyed by agent id. */
+export function reduceSubagentFacts(state: Readonly<Record<string, TranscriptSubagentFacts>>, event: SessionEventEnvelopeV1): Readonly<Record<string, TranscriptSubagentFacts>> {
+  const data = record(event.data);
+  const agentId = typeof data.agentId === "string" ? data.agentId : null;
+  if (agentId === null) return state;
+  if (event.type === "subagent/spawned" && typeof data.description === "string" && typeof data.kind === "string") {
+    return { ...state, [agentId]: { description: data.description, kind: data.kind, ...(typeof data.preset === "string" ? { preset: data.preset } : {}), ...(state[agentId]?.model ? { model: state[agentId]!.model } : {}) } };
+  }
+  const current = state[agentId];
+  if (event.type === "subagent/activation" && data.op === "start" && current && typeof data.model === "string" && data.model && data.model !== current.model) return { ...state, [agentId]: { ...current, model: data.model } };
+  return state;
+}
+
+export function renderTranscript(header: SessionHeaderV1, state: TranscriptState, branches: readonly TranscriptBranch[] = [], subagent?: TranscriptSubagentFacts): string {
   const lineage = header.lineage;
+  const copiedThrough = inheritedThroughSeq(header);
   const facts = [
     `- Session ID: ${header.sessionId}`,
     `- Created: ${formatTime(header.createdAt)}`,
     ...(state.lastTime ? [`- Last activity: ${formatTime(state.lastTime)}`] : []),
     ...(header.cwd ? [`- Working directory: ${header.cwd}`] : []),
     `- Origin: ${origin(header)}`,
-    ...(lineage && lineage.origin !== "delegation" ? [`- Events up to [#${lineage.parentBoundarySeq}] were copied from session ${lineage.parentSessionId}; read ../${lineage.parentSessionId}/transcript.md for that part.`] : []),
+    ...(lineage?.origin === "delegation" && subagent ? [
+      `- Description: ${oneLine(subagent.description)}`,
+      `- Preset: ${subagent.kind === "local" ? subagent.preset ?? "general" : subagent.kind}`,
+      ...(subagent.model ? [`- Model: ${subagent.model}`] : []),
+    ] : []),
+    ...(lineage && copiedThrough >= 0 ? [`- Events up to [#${copiedThrough}] were copied from session ${lineage.parentSessionId}; read ../${lineage.parentSessionId}/transcript.md for that part.`] : []),
   ];
+  const pruned = new Set(state.prunedCalls);
+  // A Turn still in progress shows its unanswered calls; `turn/end` turns them into "no result recorded".
+  const running: TranscriptBlock[] = Object.values(state.pending).sort((a, b) => a.seq - b.seq).map(call => ({ seq: call.seq, text: `- [#${call.seq}] ${call.head}\n  → running` }));
   const marks: TranscriptBlock[] = branches.map(branch => ({
     seq: branch.boundarySeq,
     text: `> ${branch.origin === "side-chat" ? "Side chat" : "Fork"} opened here → session ${branch.sessionId} (transcript: ../${branch.sessionId}/transcript.md)`,
   }));
   // Stable merge: a branch mark goes after every block anchored at or before its boundary.
-  const body = [...state.blocks.map((block, index) => ({ block, key: block.seq, order: index })), ...marks.map((block, index) => ({ block, key: block.seq + 0.5, order: index }))]
+  const blocks = [...state.blocks.map(block => block.callId !== undefined && pruned.has(block.callId) ? { ...block, text: `${block.text} (log pruned)` } : block), ...running];
+  const body = [...blocks.map((block, index) => ({ block, key: block.seq, order: index })), ...marks.map((block, index) => ({ block, key: block.seq + 0.5, order: index }))]
     .sort((a, b) => a.key - b.key || a.order - b.order)
     .map(item => item.block.text);
   return [
@@ -146,8 +195,37 @@ function origin(header: SessionHeaderV1): string {
   return `${lineage.origin === "side-chat" ? "side chat" : "fork"} of session ${lineage.parentSessionId}`;
 }
 
-function push(state: TranscriptState, seq: number, text: string): TranscriptState {
-  return { ...state, blocks: [...state.blocks, { seq, text }] };
+function push(state: TranscriptState, seq: number, text: string, callId?: string): TranscriptState {
+  return { ...state, blocks: [...state.blocks, callId === undefined ? { seq, text } : { seq, text, callId }] };
+}
+
+function callHead(name: string, args: Record<string, unknown>): string {
+  if (name === "send_message" && typeof args.agent_id === "string") {
+    const message = typeof args.message === "string" ? firstLine(args.message) : "";
+    return `send_message → ${args.agent_id}${message ? `: ${clip(message)}` : ""}`;
+  }
+  const summary = summarizeArgs(args);
+  return summary ? `${name}: ${summary}` : name;
+}
+
+function firstLine(text: string): string {
+  return text.split("\n").map(line => line.trim()).find(Boolean) ?? "";
+}
+
+function oneLine(text: string): string {
+  return clip(text.replace(/\s+/g, " ").trim());
+}
+
+function tagText(text: string, tag: string): string | undefined {
+  const match = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`).exec(text);
+  const value = match?.[1]?.trim();
+  return value ? oneLine(value) : undefined;
+}
+
+/** `<agent_message from=… relation=…>body</agent_message>` → body; other text is kept as is. */
+function unwrapAgentMessage(text: string): string {
+  const match = /^\s*<agent_message\b[^>]*>\n?([\s\S]*?)\n?<\/agent_message>\s*$/.exec(text);
+  return (match ? match[1]! : text).trim();
 }
 
 function delegatedChild(data: Record<string, unknown>): string | null {

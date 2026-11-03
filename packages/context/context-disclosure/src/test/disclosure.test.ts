@@ -3,7 +3,7 @@ import { SessionJournal, createCoreCodecRegistry, type SessionEventEnvelopeV1 } 
 import { codecs, CONTEXT_OWNER, STATE_EVENT } from "@actspace/context-engine/codec";
 import { ContextCompactionCoordinator, type CompactionSession, type Context } from "@actspace/context-engine";
 import { emptyDisclosureState, registerPaths, applyStateEvent, candidatePaths } from "@actspace/context-engine/state";
-import { ProgressiveDisclosure, batchReferences } from "../plugin.js";
+import { ProgressiveDisclosure, batchReferences, createDisclosureSource } from "../plugin.js";
 import { selectActive } from "../policy.js";
 import { collectPathHints, type DisclosureHost } from "../paths.js";
 
@@ -271,4 +271,36 @@ it.each(["candidate-flush", "applied-append"])("recovers %s failure at the durab
   expect(await recovery.recover(restored)).toBe(end);
   expect((await recovery.hydrate(context(restored), restored)).status.cycle).toBe(end ? 1 : 0);
   expect(summarize).toHaveBeenCalledTimes(1);
+});
+
+function traceResult(seq: number, pluginId: string, detail: readonly unknown[], status = "completed") {
+  return { seq, type: "tool/result", time: new Date().toISOString(), data: { status, callId: `trace-${seq}`, pluginId, name: "anything", detail } } as unknown as SessionEventEnvelopeV1;
+}
+const trace = (path: string, description: string) => ({ label: "actspace.context.trace", value: { kind: "trace", path, description } });
+
+it("registers trace files from any plugin's completed result with their description, skipping missing files", async () => {
+  const session = fixture(); const { port } = host(); const disclosure = new ProgressiveDisclosure(port);
+  await disclosure.hydrate(context(session), session);
+  await disclosure.observe(session, traceResult(session.lastSeq + 1, "actspace.tool-subagent", [trace("/file/agents/child.md", "Subagent transcript: review the diff")]));
+  await disclosure.observe(session, traceResult(session.lastSeq + 1, "some.third-party", [trace("/missing/bash_1.log", "gone"), trace("/file/logs/bash_2.log", "Bash log: pnpm test"), { label: "actspace.context.trace", value: { kind: "file", path: "/file/not-a-trace.ts" } }]));
+  await disclosure.observe(session, traceResult(session.lastSeq + 1, "some.third-party", [trace("/file/failed.md", "failed call")], "failed"));
+  const view = await disclosure.hydrate(context(session), session);
+  expect(view.status.paths.map(path => [path.path, path.description, path.readsInCycle, path.visibility])).toEqual([
+    ["/file/agents/child.md", "Subagent transcript: review the diff", 0, "active"],
+    ["/file/logs/bash_2.log", "Bash log: pnpm test", 0, "active"],
+  ]);
+  let navigation = "";
+  createDisclosureSource().get(view, value => { navigation = (value.supplements as readonly { text: string }[])[0]!.text; });
+  expect(navigation).toContain('"/file/agents/child.md" — Subagent transcript: review the diff');
+  // A fresh disclosure over the same Journal (restart) folds the durable facts into the same paths.
+  const replayed = await new ProgressiveDisclosure(port).hydrate(context(session), session);
+  expect(replayed.status.paths).toEqual(view.status.paths);
+});
+
+it("keeps a trace description when the same file is also reported as a plain read", async () => {
+  const session = fixture(); const { port } = host(); const disclosure = new ProgressiveDisclosure(port);
+  await disclosure.hydrate(context(session), session);
+  const event = { seq: session.lastSeq + 1, type: "tool/result", time: new Date().toISOString(), data: { status: "completed", callId: "both", pluginId: "actspace.filesystem-read", name: "read_file", detail: [trace("/file/t.md", "Subagent transcript: t"), { label: "actspace.context.file", value: { path: "/file/t.md", kind: "file", operation: "read" } }] } } as unknown as SessionEventEnvelopeV1;
+  await disclosure.observe(session, event);
+  expect((await disclosure.hydrate(context(session), session)).status.paths).toMatchObject([{ path: "/file/t.md", description: "Subagent transcript: t", readsInCycle: 1 }]);
 });

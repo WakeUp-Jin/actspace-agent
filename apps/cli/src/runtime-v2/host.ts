@@ -5,6 +5,7 @@ import type { HostConfig } from "@actspace/agent-host";
 import type { AgentApplicationContract, AgentService } from "@actspace/agent-service";
 import { HostModelRouter, createNodeToolHostServices, resolveNodeHostNonoPath } from "@actspace/agent-host/node-ports";
 import { CLI_REPO_ROOT } from "./host-adapter";
+import { currentModelHostPort, MODELS_HOST_PORT_ID } from "@actspace/shared";
 const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<typeof import("@actspace/agent-host")>;
 
 export async function startRemoteHost(config: HostConfig, options: { mock?: boolean; forceExit?: () => void } = {}) {
@@ -22,6 +23,7 @@ export async function startRemoteHost(config: HostConfig, options: { mock?: bool
       const credentials = { resolve: async () => ({}) };
       const hostServices = runtime.createRuntimeHostServices({ descriptor: host, dataRoot: config.dataRoot, workspaceRoot, toolEnvironment: { hostCapabilities: new Set(capabilities), capabilitySet }, services: {
         "actspace.host.remote": {}, "host.approval": approvals, "host.artifacts": artifacts,
+        [MODELS_HOST_PORT_ID]: currentModelHostPort(config.defaultModel),
         [runtime.LLM_HOST_PORT_ID]: { credentials, routes },
         [runtime.HEADLESS_HOST_PORT_ID]: { enabled: false },
         [runtime.PROMPT_HOST_PORT_ID]: { workspaceRoot, resolveUserSource: () => runtime.prepareUserPromptSource(config.dataRoot), resolveSource: (root: string) => runtime.prepareRuntimePromptSource({ dataRoot: config.dataRoot, workspaceRoot: root }) },

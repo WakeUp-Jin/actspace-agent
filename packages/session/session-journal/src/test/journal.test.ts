@@ -6,6 +6,10 @@ import { SessionJournal } from "../journal.js";
 
 const source = { ownerPluginId: "@actspace/core" } as const;
 
+function omit<T extends Record<string, RuntimeV2JsonValue>>(value: T, ...keys: string[]): Record<string, RuntimeV2JsonValue> {
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !keys.includes(key)));
+}
+
 function candidate(type: string, data: RuntimeV2JsonValue, extra: Partial<SessionEventCandidateV1> = {}): SessionEventCandidateV1 {
   return { type, eventVersion: 1, source, data, surface: null, ...extra };
 }
@@ -26,6 +30,47 @@ describe("Session Journal", () => {
     expect(journal.events.map(event => event.type)).toEqual(["background/task", "background/task"]);
     expect(() => journal.append(candidate("background/task", { op: "settle", taskId: "bash_1", status: "running", endedAt: "2026-10-22T12:00:05.000Z", delivery: "notified" }))).toThrow(/status must be/);
     expect(() => journal.append(candidate("background/task", { op: "start", taskId: "x", kind: "shell", callId: "c", description: "", startedAt: "2026-10-22T12:00:00.000Z" }))).toThrow(/kind must be/);
+  });
+
+  it("validates background task prune facts", () => {
+    const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-11-03T12:00:00.000Z" });
+    journal.append(candidate("background/task", { op: "prune", taskId: "bash_1", prunedAt: "2026-11-03T12:00:00.000Z", reason: "session-cap" }));
+    expect(() => journal.append(candidate("background/task", { op: "prune", taskId: "bash_1", prunedAt: "2026-11-03T12:00:00.000Z", reason: "manual" }))).toThrow(/session-cap/);
+    expect(() => journal.append(candidate("background/task", { op: "prune", taskId: "bash_1", reason: "session-cap" }))).toThrow(/prunedAt/);
+    expect(() => journal.append(candidate("background/task", { op: "expire", taskId: "bash_1" }))).toThrow(/start, settle or prune/);
+  });
+
+  it("validates subagent spawned facts", () => {
+    const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-11-03T12:00:00.000Z" });
+    const spawned = { agentId: "child-1", callId: "call-1", kind: "local", preset: "general", description: "review auth", transcriptPath: "/data/sessions-v2/child-1/transcript.md", createdAt: "2026-11-03T12:00:00.000Z" };
+    journal.append(candidate("subagent/spawned", spawned));
+    journal.append(candidate("subagent/spawned", { ...omit(spawned, "preset"), agentId: "child-2", kind: "fork", inheritedThroughSeq: 12 }));
+    journal.append(candidate("subagent/spawned", { ...omit(spawned, "preset"), agentId: "child-3", kind: "codex" }));
+    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, kind: "remote" }))).toThrow(/kind must be/);
+    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, preset: "plan" }))).toThrow(/preset must be/);
+    expect(() => journal.append(candidate("subagent/spawned", omit(spawned, "preset")))).toThrow(/preset must be/);
+    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, kind: "codex" }))).toThrow(/only allowed for a local/);
+    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, inheritedThroughSeq: 3 }))).toThrow(/only allowed for a fork/);
+    expect(() => journal.append(candidate("subagent/spawned", { ...omit(spawned, "preset"), kind: "fork", inheritedThroughSeq: -1 }))).toThrow(/non-negative/);
+    expect(() => journal.append(candidate("subagent/spawned", { ...spawned, transcriptPath: "" }))).toThrow(/transcriptPath/);
+  });
+
+  it("validates subagent activation start and settle facts", () => {
+    const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-11-03T12:00:00.000Z" });
+    const start = { op: "start", agentId: "child-1", activationId: "act-1", trigger: "spawn", callId: "call-1", background: true, model: "deepseek:deepseek-chat", startedAt: "2026-11-03T12:00:00.000Z" };
+    const settle = { op: "settle", agentId: "child-1", activationId: "act-1", status: "completed", summary: "done", result: "ok", delivery: "notified", endedAt: "2026-11-03T12:01:00.000Z" };
+    journal.append(candidate("subagent/activation", start));
+    journal.append(candidate("subagent/activation", { ...start, activationId: "act-2", trigger: "message", senderId: "main" }));
+    journal.append(candidate("subagent/activation", settle));
+    journal.append(candidate("subagent/activation", { ...omit(settle, "result"), status: "lost", delivery: "lost" }));
+    expect(() => journal.append(candidate("subagent/activation", { ...start, trigger: "resume" }))).toThrow(/trigger must be/);
+    expect(() => journal.append(candidate("subagent/activation", { ...start, background: "yes" }))).toThrow(/background must be/);
+    expect(() => journal.append(candidate("subagent/activation", { ...settle, status: "running" }))).toThrow(/status must be/);
+    expect(() => journal.append(candidate("subagent/activation", { ...settle, delivery: "wait" }))).toThrow(/delivery must be/);
+    expect(() => journal.append(candidate("subagent/activation", { ...settle, op: "stop" }))).toThrow(/op must be start or settle/);
+    // 8KB is measured in UTF-8 bytes: 2731 three-byte characters exceed it, 2730 fit.
+    journal.append(candidate("subagent/activation", { ...settle, result: "界".repeat(2730) }));
+    expect(() => journal.append(candidate("subagent/activation", { ...settle, result: "界".repeat(2731) }))).toThrow(/8192 UTF-8 bytes/);
   });
 
   it("accepts a DSH core Turn and rebuilds a deterministic Surface", () => {

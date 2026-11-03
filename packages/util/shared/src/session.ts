@@ -161,10 +161,15 @@ export type UserMessagePayload = {
   backgroundNotice?: BackgroundNotice;
 };
 
-/** 后台任务完成通知的元数据，来自收件箱 `notice`。 */
+/**
+ * 后台任务完成通知的元数据，来自收件箱 `notice`。
+ *
+ * `taskKind`：`bash` 来自 `task_notification`；`subagent` 来自 `subagent_notification`（子智能体一次激活结束）；
+ * `agent_message` 来自另一个智能体的 `send_message`（`taskId` 为发送方 agent id）；`agent` 只出现在老会话。
+ */
 export type BackgroundNotice = {
   taskId: string;
-  taskKind: "bash" | "agent";
+  taskKind: "bash" | "agent" | "subagent" | "agent_message";
   title: string;
   status: string;
 };
@@ -398,8 +403,16 @@ export type AgentToolPreview = {
   description: string;
   status: SubAgentRunStatus;
   subagentType: "explore";
-  /** 主消息行展示的委托类型；缺省时兼容旧事件并按 Explore 处理。 */
+  /** 主消息行展示的委托类型；缺省时兼容旧事件并按 Explore 处理。只出现在老会话（`delegation/*`）。 */
   agentKind?: "agent" | "explore";
+  /** 新事件（`subagent/spawned`）的子智能体种类；老会话缺省，界面回退到 `agentKind`。 */
+  subagentKind?: import("./runtime-v2/subagents").SubagentKind;
+  /** 只有 `local` 子智能体有预设。 */
+  preset?: import("./runtime-v2/subagents").SubagentPreset;
+  /** 这个子智能体已开始的激活次数（首次创建算 1，每次续派加 1）。 */
+  activationCount?: number;
+  /** 子智能体 transcript 的绝对路径（父会话 `subagent/spawned.transcriptPath`）。 */
+  transcriptPath?: string;
   /** 子 Agent 实际请求的模型（request/header 的 model）；旧事件没有记录时缺省。 */
   model?: string;
   /** 以 background=true 启动；卡片多一个「后台」标签，status 跟随 delegation/completed。 */

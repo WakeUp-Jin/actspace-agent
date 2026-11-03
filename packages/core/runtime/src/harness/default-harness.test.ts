@@ -164,6 +164,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       ctx.provide('actspace.agent.factory', { createSubagentLoop: async () => ({
         runTurn: async () => ({ reason: 'completed', finalText: 'alternative child' }), abort() {}, quiesce() {}, waitForIdle: async () => {}
       }) });
+      ctx.provide('actspace.host-readable-files', { add() {}, has: () => false, remove() {} });
     }`);
     const alternative = await publishPluginArtifact({ sourceRoot, artifactRoot: join(directory, "harness-artifacts"), files: ["loop.js"], plugin: { ...manifest, pluginId: pluginId("alternative-loop"), behaviors: [{ ...behavior, module: "./loop.js" }], contributions: { services: [...behavior.provides ?? []], events: [], contributions: [] }, codecs: [] } });
     const oldParent = await harnesses.acquire("main");

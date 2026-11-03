@@ -7,7 +7,7 @@ import { runtimeInfo } from "@actspace/prompt/source-support";
 import type { SessionEventEnvelopeV1, SessionHeaderV1 } from "@actspace/session-journal";
 import { sessionsRoot, transcriptPath } from "./paths.js";
 import { PLUGIN_ID, PROMPT_ID, sessionHistorySection } from "./prompt.js";
-import { EMPTY_TRANSCRIPT, foldTranscript, inheritedThroughSeq, reduceTranscript, renderTranscript, type TranscriptBranch, type TranscriptState } from "./render.js";
+import { EMPTY_TRANSCRIPT, foldTranscript, inheritedThroughSeq, reduceSubagentFacts, reduceTranscript, renderTranscript, type TranscriptBranch, type TranscriptState, type TranscriptSubagentFacts } from "./render.js";
 
 type OpenSession = {
   readonly header: SessionHeaderV1;
@@ -23,14 +23,16 @@ type HostSession = { readonly dataRoot: string };
 export const inject = Object.freeze(["actspace.host.session", "session.runtime", "session.storage"]);
 
 const PROJECTION = Symbol("actspace.session-transcript");
+const SUBAGENT_FACTS = Symbol("actspace.session-transcript.subagents");
+const NO_SUBAGENTS: Readonly<Record<string, TranscriptSubagentFacts>> = Object.freeze({});
 const HEADER_READ_LIMIT = 1024 * 1024;
 
 const TITLE_EVENTS = new Set(["session/title-set", "session/title"]);
 
 /**
  * Keeps `sessions-v2/<id>/transcript.md` in step with the Journal (rewritten at
- * every Turn end, and again when the title changes between Turns) and tells
- * main agents where those transcripts live.
+ * every Turn end, again when the title changes between Turns, and whenever
+ * `refresh` is called) and tells main agents where those transcripts live.
  */
 export class SessionTranscriptService {
   readonly #running = new Map<string, Promise<void>>();
@@ -65,6 +67,12 @@ export class SessionTranscriptService {
 
   hasPrompt(sessionId: string): boolean { return this.#prompts.has(sessionId); }
 
+  /**
+   * Rewrite one transcript now, even mid-Turn (calls without a result show `→ running`).
+   * The subagent module calls this when an activation starts, after each child `step/end`, and when it settles.
+   */
+  refresh(sessionId: string): Promise<void> { return this.render(sessionId); }
+
   /** Rewrite one transcript; overlapping requests for the same Session coalesce into one extra pass. */
   render(sessionId: string): Promise<void> {
     const running = this.#running.get(sessionId);
@@ -98,7 +106,8 @@ export class SessionTranscriptService {
     const loaded = await this.#load(sessionId);
     if (!loaded) return;
     const branches = await this.#branchesOf(sessionId);
-    await writeAtomic(target, renderTranscript(loaded.header, loaded.state, branches));
+    const subagent = await this.#subagentFacts(loaded.header);
+    await writeAtomic(target, renderTranscript(loaded.header, loaded.state, branches, subagent));
     for (const child of loaded.state.children) if (await this.#stale(child)) await this.render(child);
   }
 
@@ -111,6 +120,18 @@ export class SessionTranscriptService {
     const snapshot = await this.#storage().inspect(sessionId);
     if (!snapshot.header) return undefined;
     return { header: snapshot.header, state: foldTranscript(snapshot.events, inheritedThroughSeq(snapshot.header)) };
+  }
+
+  /** Description, preset and model of a subagent live in its parent's Journal; old delegations have none. */
+  async #subagentFacts(header: SessionHeaderV1): Promise<TranscriptSubagentFacts | undefined> {
+    const lineage = header.lineage;
+    if (lineage?.origin !== "delegation") return undefined;
+    const live = (this.ctx.get?.("session.runtime") as SessionRuntime | undefined)?.getOpen(lineage.parentSessionId);
+    if (live) return live.journal.project(SUBAGENT_FACTS, () => NO_SUBAGENTS, reduceSubagentFacts)[header.sessionId];
+    const parent = await this.#storage().inspect(lineage.parentSessionId).catch(() => undefined);
+    let facts = NO_SUBAGENTS;
+    for (const event of parent?.events ?? []) facts = reduceSubagentFacts(facts, event);
+    return facts[header.sessionId];
   }
 
   /** A delegated child is rewritten only when its Journal is newer than its transcript. */

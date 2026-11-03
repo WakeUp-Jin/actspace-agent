@@ -27,6 +27,7 @@ import type { AgentRuntimeService } from "../harness/agent-runtime-plugin.js";
 import { HEADLESS_HOST_PORT_ID } from "@actspace/headless";
 import { BACKGROUND_TASK_HOST_SERVICE, createBackgroundTaskHost } from "@actspace/background-tasks";
 import { createNodeSandboxHostPort, SANDBOX_HOST_PORT_ID } from "@actspace/sandbox";
+import { EMPTY_MODELS_HOST_PORT, MODELS_HOST_PORT_ID } from "@actspace/shared";
 import { HarnessStats, harnessStatsEnabled } from "@actspace/harness-stats";
 import { RuntimeStateController } from "./runtime-state.js";
 import { settleWithinDeadline } from "./shutdown.js";
@@ -147,6 +148,8 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     [HEADLESS_HOST_PORT_ID]: hostServices.services[HEADLESS_HOST_PORT_ID] ?? Object.freeze({ enabled: false }),
     // Without a bundled nono only the macOS Seatbelt backend can probe available; Bash otherwise goes to approval.
     [SANDBOX_HOST_PORT_ID]: hostServices.services[SANDBOX_HOST_PORT_ID] ?? createNodeSandboxHostPort(),
+    // Hosts without a model list still publish the port, so subagent tools see an empty list rather than a missing service.
+    [MODELS_HOST_PORT_ID]: hostServices.services[MODELS_HOST_PORT_ID] ?? EMPTY_MODELS_HOST_PORT,
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
       disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...harnessEntriesMissingHostCapabilities(options.host.capabilityCeiling), ...(options.disabledPlugins ?? [])],
       authorizeHarness: options.authorizeHarness,

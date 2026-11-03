@@ -135,3 +135,20 @@ it("releases closed Step usage correction state while retaining exact totals and
   const state = registry.checkpoint("bounded").rows.providerUsage!.state as Record<string, unknown>;
   expect(state.selected).toEqual({}); expect(state.requests).toEqual({}); expect(state.activeStep).toBeNull();
 });
+
+it("keeps every known inbox source on pending items and drops unknown ones", () => {
+  const codecs = createCoreCodecRegistry();
+  const journal = new SessionJournal({ registry: codecs, now: () => "2026-11-03T00:00:00.000Z" });
+  const registry = new SessionProjectionRegistry(); registerSessionFacts(registry, value => value);
+  const append = (messageId: string, data: Record<string, unknown>) => registry.apply("inbox", journal.append({ type: "agent/inbox/spliced", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { operation: "enqueue", messageId, target: "next-turn", content: messageId, ...data } as never, surface: null }));
+  append("bash", { source: "task_notification" });
+  append("sub", { source: "subagent_notification" });
+  append("msg", { source: "agent_message", senderId: "child-1" });
+  append("odd", { source: "made_up" });
+  expect(registry.snapshot("inbox").values.pendingInbox).toEqual([
+    { messageId: "bash", target: "next-turn", source: "task_notification" },
+    { messageId: "sub", target: "next-turn", source: "subagent_notification" },
+    { messageId: "msg", target: "next-turn", source: "agent_message" },
+    { messageId: "odd", target: "next-turn" },
+  ]);
+});

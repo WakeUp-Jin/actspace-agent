@@ -1,12 +1,12 @@
 # Agent Contract Matrix
 
 > Generated artifact; edit source declarations instead. Do not hand-edit this file.
-> Generator 1.0.0; source digest `8f527fed2966598a81c28cf683b8185751ce363b8bdd8dd5ebff728194ac0dfb`.
+> Generator 1.0.0; source digest `909ffd45fef7b4180cf3b8785a4e874c92bfb604426506d17e2c487ae2073112`.
 
 This document is an audit view of the current ActSpace v2 declarations. It never activates Runtime services, plugins, Session persistence, tools or Cordis entries.
 
 - Services: 55
-- Events: 81 (Session core 12, Loop interventions 8, notifications 7)
+- Events: 83 (Session core 12, Loop interventions 8, notifications 7)
 - Plugins: 50
 - Packages: 70
 
@@ -140,7 +140,9 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | session/workspace-set | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | step/end | core | session | active | session |  | present | present |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#CORE_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | step/start | core | session | active | session |  | present | present |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#CORE_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
+| subagent/activation | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | subagent/descriptor | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
+| subagent/spawned | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | surface/replaced | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | tool-workflow/agent-end | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | tool-workflow/agent-start | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
