@@ -1,4 +1,4 @@
-import { isCommandPrefixSelector, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { isCommandPrefixSelector, SUBAGENT_ACTIVATION_STATUSES, SUBAGENT_DELIVERIES, SUBAGENT_KINDS, SUBAGENT_PRESETS, SUBAGENT_RESULT_LIMIT_BYTES, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { EventCodecRegistry, type EventCodec } from "./codec-registry.js";
 import { SessionError } from "./errors.js";
 import { validateAuxiliaryRequest } from "./auxiliary-codec.js";
@@ -71,6 +71,8 @@ export const PERSISTED_EXTENSION_EVENT_TYPES = [
   "delegation/requested",
   "delegation/child-terminal",
   "delegation/completed",
+  "subagent/spawned",
+  "subagent/activation",
   "background/task",
   "recovery/committed",
   "recovery/start",
@@ -115,6 +117,8 @@ function createExtensionCodec(type: PersistedExtensionEventType): EventCodec {
       }
       if (type.startsWith("permission/")) validatePermissionData(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
       if (type === "background/task") validateBackgroundTaskData(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
+      if (type === "subagent/spawned") validateSubagentSpawned(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
+      if (type === "subagent/activation") validateSubagentActivation(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
     },
   });
 }
@@ -135,7 +139,56 @@ function validateBackgroundTaskData(type: PersistedExtensionEventType, data: Rea
     requireTimestamp(data.endedAt, type, "endedAt");
     return;
   }
+  if (data.op === "prune") {
+    if (data.reason !== "session-cap") throw invalid(type, "reason must be session-cap");
+    requireTimestamp(data.prunedAt, type, "prunedAt");
+    return;
+  }
+  throw invalid(type, "op must be start, settle or prune");
+}
+
+function validateSubagentSpawned(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+  for (const field of ["agentId", "callId", "description", "transcriptPath"] as const) requireId(data[field], type, field);
+  if (!oneOf(data.kind, SUBAGENT_KINDS)) throw invalid(type, "kind must be local, fork, codex or claude-code");
+  if (data.kind === "local") {
+    if (!oneOf(data.preset, SUBAGENT_PRESETS)) throw invalid(type, "preset must be general or explore for a local subagent");
+  } else if (data.preset !== undefined) throw invalid(type, "preset is only allowed for a local subagent");
+  if (data.inheritedThroughSeq !== undefined) {
+    if (data.kind !== "fork") throw invalid(type, "inheritedThroughSeq is only allowed for a fork");
+    if (!Number.isSafeInteger(data.inheritedThroughSeq) || (data.inheritedThroughSeq as number) < 0) throw invalid(type, "inheritedThroughSeq must be a non-negative integer");
+  }
+  requireTimestamp(data.createdAt, type, "createdAt");
+}
+
+function validateSubagentActivation(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+  requireId(data.agentId, type, "agentId");
+  requireId(data.activationId, type, "activationId");
+  if (data.op === "start") {
+    if (data.trigger !== "spawn" && data.trigger !== "message") throw invalid(type, "trigger must be spawn or message");
+    requireId(data.callId, type, "callId");
+    if (data.senderId !== undefined) requireId(data.senderId, type, "senderId");
+    if (typeof data.background !== "boolean") throw invalid(type, "background must be a boolean");
+    for (const field of ["model", "reasoningEffort"] as const) if (data[field] !== undefined) requireId(data[field], type, field);
+    requireTimestamp(data.startedAt, type, "startedAt");
+    return;
+  }
+  if (data.op === "settle") {
+    if (!oneOf(data.status, SUBAGENT_ACTIVATION_STATUSES)) throw invalid(type, "status must be completed, interrupted, failed, max_steps or lost");
+    if (typeof data.summary !== "string") throw invalid(type, "summary must be a string");
+    if (!oneOf(data.delivery, SUBAGENT_DELIVERIES)) throw invalid(type, "delivery must be returned, notified or lost");
+    if (data.result !== undefined) {
+      if (typeof data.result !== "string") throw invalid(type, "result must be a string when present");
+      if (new TextEncoder().encode(data.result).length > SUBAGENT_RESULT_LIMIT_BYTES) throw invalid(type, `result must be at most ${SUBAGENT_RESULT_LIMIT_BYTES} UTF-8 bytes`);
+    }
+    if (data.resultTruncated !== undefined && typeof data.resultTruncated !== "boolean") throw invalid(type, "resultTruncated must be a boolean when present");
+    requireTimestamp(data.endedAt, type, "endedAt");
+    return;
+  }
   throw invalid(type, "op must be start or settle");
+}
+
+function oneOf<T extends string>(value: RuntimeV2JsonValue | undefined, values: readonly T[]): value is T {
+  return typeof value === "string" && (values as readonly string[]).includes(value);
 }
 
 function validatePermissionData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {

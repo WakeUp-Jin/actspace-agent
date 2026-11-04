@@ -3,7 +3,7 @@ title: "Bash 与后台任务"
 description: "让 Agent 执行命令、观察长任务输出，并区分运行中和已完成。"
 group: "tools-execution"
 order: 2
-updatedAt: 2026-09-19
+updatedAt: 2026-11-04
 draft: false
 ---
 
@@ -19,7 +19,7 @@ Bash 用于在工作区执行测试、构建和命令行工具。让 Agent 运�
 
 较长的命令可以进入后台，工具返回任务标识和运行状态。后续通过输出读取工具查看增量日志，通过终止工具停止不再需要的任务。
 
-看到“后台运行中”时，任务尚未完成。可以要求 Agent 继续读取输出，直到得到退出状态或明确的失败原因。后台任务属于当前应用进程的运行资源，不保证应用退出后继续执行。
+看到“后台运行中”时，任务尚未完成。可以要求 Agent 继续读取输出，直到得到退出状态或明确的失败原因。后台命令属于当前应用进程的运行资源，应用退出时会被终止，不保证继续执行；但它的输出日志保存在会话里，重新打开会话后仍可以读到它跑到哪一步。命令结束时会自动通知 Agent。
 
 <figure class="product-shot screenshot-placeholder" data-screenshot="bash-complete.png">
 <figcaption><span class="screenshot-label">待补实拍 · 19</span><strong>后台命令执行结果</strong><code>bash-complete.png</code><p>截取一次后台命令完成后的记录，保留命令、任务标识、输出和退出状态；不必另拍运行中画面。</p></figcaption>

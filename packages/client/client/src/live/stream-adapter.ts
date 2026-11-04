@@ -64,13 +64,15 @@ export class FixedRendererStreamAdapter {
       }
     }
     const ids = { sessionId: event.sessionId, agentRunId: event.agentRunId, turnId: event.turnId };
+    // A subagent's Run carries its main Session, so clients leave the child's task queue alone.
+    const child = event.parentSessionId ? { parentSessionId: event.parentSessionId } : {};
     if (event.kind === "assistant-delta" || event.kind === "reasoning-delta") {
       this.#emit({ type: event.kind === "assistant-delta" ? "assistant_text_delta" : "assistant_thinking_delta", ...ids, llmCallId: event.requestId, messageId: event.messageId, delta: event.message });
       return;
     }
     if (event.kind === "run-state") {
       if (event.message === "started") {
-        this.#emit({ type: "agent_run_started", sessionId: event.sessionId, agentRunId: event.agentRunId });
+        this.#emit({ type: "agent_run_started", sessionId: event.sessionId, agentRunId: event.agentRunId, ...child });
         this.#emit({ type: "agent_turn_started", ...ids, turnIndex: 0 });
       } else if (event.message === "request-started" && event.requestId) {
         this.#emit({ type: "llm_call_started", ...ids, llmCallId: event.requestId, turnIndex: 0, attempt: 1 });
@@ -82,9 +84,9 @@ export class FixedRendererStreamAdapter {
           this.#clearTimer(entry);
           this.#calls.delete(key);
         }
-        if (event.message === "aborted") this.#emit({ type: "agent_run_aborted", ...ids });
-        else if (event.message === "failed") this.#emit({ type: "agent_run_failed", ...ids, error: { code: event.failure?.kind ?? "AGENT_RUN_FAILED", message: event.failure?.message ?? "The Agent run failed.", recoverable: event.failure?.retryable ?? false } });
-        else this.#emit({ type: "agent_run_finished", ...ids, resultEventIds: [] });
+        if (event.message === "aborted") this.#emit({ type: "agent_run_aborted", ...ids, ...child });
+        else if (event.message === "failed") this.#emit({ type: "agent_run_failed", ...ids, error: { code: event.failure?.kind ?? "AGENT_RUN_FAILED", message: event.failure?.message ?? "The Agent run failed.", recoverable: event.failure?.retryable ?? false }, ...child });
+        else this.#emit({ type: "agent_run_finished", ...ids, resultEventIds: [], ...child });
       }
       return;
     }
@@ -107,8 +109,10 @@ export class FixedRendererStreamAdapter {
       // 任务通知只给模型看；用户插入的消息要立刻出现在当前回合里。
       if (event.source === "steer") this.#emit({ type: "user_message_steered", ...ids, messageId: event.messageId });
       const notice = event.notice;
-      if (event.source === "task_notification" && notice && (notice.kind === "bash" || notice.kind === "agent")) {
-        this.#emit({ type: "background_notice_claimed", ...ids, messageId: event.messageId, content: event.content ?? "", notice: { taskId: notice.taskId, taskKind: notice.kind, title: notice.title, status: notice.status } });
+      // Background tasks, subagent completion notices and agent messages, whether they open a Turn or arrive inside one.
+      const taskKind = notice && (event.source === "task_notification" || event.source === "subagent_notification" || event.source === "agent_message") && isNoticeKind(notice.kind) ? notice.kind : undefined;
+      if (notice && taskKind) {
+        this.#emit({ type: "background_notice_claimed", ...ids, messageId: event.messageId, content: event.content ?? "", notice: { taskId: notice.taskId, taskKind, title: notice.title, status: notice.status, opensTurn: event.opensTurn === true } });
       }
       return;
     }
@@ -162,4 +166,8 @@ export class FixedRendererStreamAdapter {
     if (update.deletions !== undefined) entry.deletions = Math.max(0, update.deletions);
     this.#publish(entry);
   }
+}
+
+function isNoticeKind(kind: string): kind is "bash" | "agent" | "subagent" | "agent_message" {
+  return kind === "bash" || kind === "agent" || kind === "subagent" || kind === "agent_message";
 }

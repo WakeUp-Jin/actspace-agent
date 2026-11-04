@@ -5,6 +5,7 @@ import type { TerminalLineInput } from "../terminal-input";
 import { CliV2ApprovalBroker } from "./approval";
 import { NodeArtifactStore, NodeLlmAdapter, resolveEnvModelProvider } from "@actspace/agent-host/node-ports";
 import { loadRuntimeV2 } from "./loader";
+import { currentModelHostPort, MODELS_HOST_PORT_ID } from "@actspace/shared";
 import type { BootRuntimeOptions } from "@actspace/runtime";
 import type { RuntimeV2PermissionMode } from "./types";
 
@@ -45,6 +46,7 @@ export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: (
       services: Object.freeze({
         "host.approval": approval,
         "host.artifacts": artifacts,
+        [MODELS_HOST_PORT_ID]: currentModelHostPort(options.model),
         [runtime.LLM_HOST_PORT_ID]: Object.freeze({ credentials, routes: Object.freeze([{ routeId: "default", providerId: provider.providerId, modelPattern: "*", adapter: llmAdapter, credentialRef: "cli-env", defaults: {} }]) }),
         ...(options.mock ? { ...toolModule.createUnavailableToolHostServices(), ...toolModule.createNodeSandboxHostServices(sandbox) } : toolModule.createNodeToolHostServices({ ...sandbox, onShellProcesses: (control) => options.onForceCleanup?.(control.forceTerminate), workspaceRoot: options.workspace, tmpRoot: `${options.dataRoot}/runtime/tmp`, model: options.model ?? "default", readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId) })),
         [runtime.PROMPT_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspace, resolveUserSource: async () => runtime.prepareUserPromptSource(options.dataRoot), resolveSource: async (workspaceRoot: string) => runtime.prepareRuntimePromptSource({ dataRoot: options.dataRoot, workspaceRoot }) }),

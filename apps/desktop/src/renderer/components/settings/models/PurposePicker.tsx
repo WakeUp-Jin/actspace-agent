@@ -43,7 +43,7 @@ export function PurposePicker({
   const [open, setOpen] = useState(false);
 
   const summary = purposeSummary(connections, binding);
-  const followLabel = purpose.follow ? `跟随${PURPOSES.find((item) => item.id === purpose.follow)!.label}` : "未设置";
+  const followLabel = purpose.follow ? purpose.followLabel ?? `跟随${PURPOSES.find((item) => item.id === purpose.follow)!.label}` : "未设置";
   const catalog: ModelCatalog = {
     source: "local-providers",
     groups: pickerGroups(connections, purpose, "").map((group) => ({
@@ -99,7 +99,7 @@ export function PurposePicker({
           {summary ? (
             <>
               <span className="min-w-0 truncate">{summary.label}</span>
-              {summary.level ? <span className="text-text-muted">· {summary.level}</span> : null}
+              {summary.level && !purpose.noThinking ? <span className="text-text-muted">· {summary.level}</span> : null}
             </>
           ) : <span className="text-text-faint">{followLabel}</span>}
           <ChevronDown size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-text-subtle" />
@@ -110,7 +110,7 @@ export function PurposePicker({
           catalog={catalog}
           selectedModelId={binding.model ?? FOLLOW_ID}
           onSelect={pick}
-          optionsPanel={panel}
+          optionsPanel={purpose.noThinking ? undefined : panel}
           side="bottom"
           align="end"
           ariaLabel={`${purpose.label}可选模型`}

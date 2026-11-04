@@ -20,7 +20,7 @@ kind: "package-map"
   | 模型工具（给模型调用的工具） | `tool-<名>` | `tool-fs-read`、`tool-shell`、`tool-browser` |
   | 其他 | 直接说它是什么 | `agent-loop`、`context-disclosure`、`harness-hmr` |
 
-- **归属规则。** `context/` 只管“东西怎么进入模型的上下文”，东西本身住在自己的能力目录里：后台任务本身在 `background-tasks/`，把它的状态告诉模型的 `context-background-tasks` 在 `context/`；Skill 的发现与注册在 `skill/`，把 Skill 目录告诉模型的 `context-skills` 在 `context/`；上下文压缩改的是上下文本身，所以 `context-compaction` 留在 `context/`。
+- **归属规则。** `context/` 只管“东西怎么进入模型的上下文”，东西本身住在自己的能力目录里：后台 Bash 任务的登记在 `background-tasks/`，把它的状态告诉模型的 `context-background-tasks` 在 `context/`；子智能体在 `subagent/`，告诉模型谁在跑的 `context-subagents` 也在 `context/`；Skill 的发现与注册在 `skill/`，把 Skill 目录告诉模型的 `context-skills` 在 `context/`；上下文压缩改的是上下文本身，所以 `context-compaction` 留在 `context/`。
 - **插件分两类。** 全局插件在 ActSpace 启动时由 Host 加载一份；会话插件在每个会话的 Harness 里各加载一份。底座（会话存储、Agent 注册表、运行时）也是全局插件，只是不能关。能关的只有操控浏览器（`browser-tools`）和英语学习（`english-learning`），默认都关，在 扩展 › 插件 里开启，重启后生效。
 - **加载清单只有一份。** `core/runtime/src/plugin-catalog.ts` 的 `PLUGIN_CATALOG`：每个插件一行（Entry id、manifest、加载入口 `module`、`loaders`、可选 `codec`）。`core/runtime/cordis.yml`（Host 加载表）、默认 Harness 条目和打包输入都从它生成或计算，不要手改，也不要另列加载表。每个插件的中文名称、说明、默认开关写在它自己的 manifest `display` 里。
 - **库和“不在默认组合”。** 不在清单里的包是库：被别的包引用，自己不作为插件加载。带 `src/plugin.ts` 却不在默认组合里的包，登记在同文件的 `PLUGIN_PACKAGES_OUTSIDE_DEFAULT`，并写明原因。
@@ -34,14 +34,14 @@ kind: "package-map"
 | [`core/`](core/README.md) | Agent 身份与注册表、Agent 循环、任务调度、工具运行时，以及总装配 `runtime` | 6 | 全局、会话、库 |
 | [`session/`](session/README.md) | 会话日志、持久化、物理存储、视图、检查点和会话记录 Markdown | 8 | 全局、库 |
 | [`llm/`](llm/README.md) | 模型服务契约和提供商适配 | 2 | 全局、库 |
-| [`context/`](context/README.md) | 每一轮发给模型的上下文：引擎、提示词、各个来源、披露与压缩 | 11 | 会话 |
+| [`context/`](context/README.md) | 每一轮发给模型的上下文：引擎、提示词、各个来源、披露与压缩 | 12 | 会话 |
 | [`fs/`](fs/README.md) | 读、搜索、写工作区文件的工具 | 3 | 会话 |
 | [`shell/`](shell/README.md) | 命令行（Bash）工具 | 1 | 会话 |
 | [`web/`](web/README.md) | 网页搜索与读取工具 | 1 | 会话 |
 | [`image/`](image/README.md) | 生成图片、看图片的工具 | 2 | 会话 |
 | [`todo/`](todo/README.md) | 待办工具与待办视图 | 1 | 全局、会话 |
-| [`background-tasks/`](background-tasks/README.md) | 后台任务登记表与后台任务工具 | 2 | 会话、库 |
-| [`subagent/`](subagent/README.md) | 子 Agent 调度与子 Agent 工具 | 2 | 会话、库 |
+| [`background-tasks/`](background-tasks/README.md) | 后台 Bash 任务登记表与任务工具 | 2 | 会话、库 |
+| [`subagent/`](subagent/README.md) | 子智能体管理器、子智能体工具，以及用本机 Codex / Claude Code 跑子任务 | 4 | 会话、库 |
 | [`sandbox/`](sandbox/README.md) | 命令沙箱：策略与后端 | 3 | 会话 |
 | [`approval/`](approval/README.md) | 危险操作的人工审批与模型自动审批 | 2 | 会话 |
 | [`harness-evolution/`](harness-evolution/README.md) | Harness 的选择、热替换、评估、运行时统计与插件开发 | 5 | 会话、库 |

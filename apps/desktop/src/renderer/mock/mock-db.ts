@@ -45,8 +45,8 @@ export type MockToolCall = {
   readonly args: Readonly<Record<string, RuntimeV2JsonValue>>;
   /** tool/result 的 data（除 callId 外），例如 status、summary、modelOutput、detail。 */
   readonly result: Readonly<Record<string, RuntimeV2JsonValue>>;
-  /** 这次调用委派出的子会话：紧跟 tool/call 投影一条 delegation/requested。 */
-  readonly delegation?: { readonly childSessionId: string; readonly presetId: string; readonly model?: string };
+  /** 写在 tool/call 与 tool/result 之间的事件（如 `subagent/spawned`、`subagent/activation`），拿到这次调用的 callId。 */
+  readonly during?: (callId: string) => readonly MockRawEvent[];
 };
 
 export type MockSession = {
@@ -66,6 +66,8 @@ export type MockSession = {
   sideChat?: { parentId: string; inheritedMessages: number };
   /** 子智能体的会话：和真实 listPage 一样不进侧栏。 */
   parentSessionId?: string;
+  /** Fork 子智能体：开头复制了主会话的这么多条消息，轨迹和记录只看之后的部分。 */
+  forkInheritedMessages?: number;
   messages: MockMessage[];
 };
 
@@ -222,7 +224,8 @@ export function listMockSessions(db: MockDb, archived = false): SessionListItem[
     .map((session) => sessionListItem(session, db));
 }
 
-function journal(session: MockSession): SessionEventEnvelopeV1[] {
+/** 会话的 Journal 事件（浏览器 mock 里 `getSubagents` 等也从这里投影）。 */
+export function journal(session: MockSession): SessionEventEnvelopeV1[] {
   const events: SessionEventEnvelopeV1[] = [];
   const base = (message: MockMessage) => ({
     recordKind: "event" as const,
@@ -243,15 +246,8 @@ function journal(session: MockSession): SessionEventEnvelopeV1[] {
     if (message.role === "tool" && message.tool) {
       const callId = message.id;
       events.push({ ...base(message), seq: events.length, type: "tool/call", data: { agentRunId: message.agentRunId, callId, name: message.tool.name, args: message.tool.args }, surface: null });
-      if (message.tool.delegation) {
-        const { childSessionId, presetId } = message.tool.delegation;
-        events.push({ ...base(message), seq: events.length, type: "delegation/requested", data: { invocationId: `${callId}:delegation`, presetId, parentCallId: callId, childSessionId }, surface: null });
-      }
+      for (const raw of message.tool.during?.(callId) ?? []) events.push({ ...base(message), seq: events.length, type: raw.type, data: raw.data, surface: raw.surface ?? null });
       events.push({ ...base(message), seq: events.length, type: "tool/result", data: { agentRunId: message.agentRunId, callId, ...message.tool.result }, surface: null });
-      if (message.tool.delegation?.model) {
-        const { childSessionId, presetId, model } = message.tool.delegation;
-        events.push({ ...base(message), seq: events.length, type: "delegation/completed", data: { invocationId: `${callId}:delegation`, presetId, childSessionId, status: "completed", model }, surface: null });
-      }
       continue;
     }
     if (message.role === "tool") continue;
@@ -269,7 +265,7 @@ function journal(session: MockSession): SessionEventEnvelopeV1[] {
   return events;
 }
 
-function snapshot(session: MockSession, throughJournalSeq: number): RuntimeV2SessionSnapshot {
+export function snapshot(session: MockSession, throughJournalSeq: number): RuntimeV2SessionSnapshot {
   const runs = new Set(session.messages.map((message) => message.agentRunId)).size;
   return {
     kind: "session-snapshot",
@@ -297,7 +293,12 @@ function snapshot(session: MockSession, throughJournalSeq: number): RuntimeV2Ses
     pendingInbox: [],
     todos: [],
     delegations: [],
-    lineage: session.sideChat ? {
+    lineage: session.forkInheritedMessages !== undefined && session.parentSessionId ? {
+      parentSessionId: session.parentSessionId,
+      origin: "delegation",
+      delegationDepth: 1,
+      inheritedThroughSeq: journal({ ...session, messages: session.messages.slice(0, session.forkInheritedMessages) }).length - 1,
+    } : session.sideChat ? {
       parentSessionId: session.sideChat.parentId,
       parentBoundarySeq: journal({ ...session, messages: session.messages.slice(0, session.sideChat.inheritedMessages) }).length - 1,
       origin: "side-chat",

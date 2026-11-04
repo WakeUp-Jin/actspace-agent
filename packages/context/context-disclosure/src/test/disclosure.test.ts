@@ -1,16 +1,16 @@
 import { expect, it, vi } from "vitest";
 import { SessionJournal, createCoreCodecRegistry, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { codecs, CONTEXT_OWNER, STATE_EVENT } from "@actspace/context-engine/codec";
-import { ContextCompactionCoordinator, type CompactionSession, type Context } from "@actspace/context-engine";
+import { codecs, CONTEXT_OWNER, STATE_EVENT, SUPPLEMENT_EVENT } from "@actspace/context-engine/codec";
+import { ContextCompactionCoordinator, ContextSupplements, type CompactionSession, type Context } from "@actspace/context-engine";
 import { emptyDisclosureState, registerPaths, applyStateEvent, candidatePaths } from "@actspace/context-engine/state";
-import { ProgressiveDisclosure, batchReferences } from "../plugin.js";
+import { DISCLOSURE_OWNER, ProgressiveDisclosure, batchReferences, createDisclosureSource } from "../plugin.js";
 import { selectActive } from "../policy.js";
 import { collectPathHints, type DisclosureHost } from "../paths.js";
 
-function fixture(seed: readonly SessionEventEnvelopeV1[] = [], sessionId = "s"): CompactionSession {
+function fixture(seed: readonly SessionEventEnvelopeV1[] = [], sessionId = "s", origin?: string): CompactionSession {
   const registry = createCoreCodecRegistry(); codecs.forEach(codec => registry.register(codec));
   const journal = new SessionJournal({ registry, seed });
-  return { header: { sessionId }, journal, get lastSeq() { return journal.lastSeq; }, append: async value => journal.append(value), appendMany: async values => journal.appendMany(values), flush: async () => {} };
+  return { header: { sessionId, lineage: origin ? { origin } : null }, journal, get lastSeq() { return journal.lastSeq; }, append: async value => journal.append(value), appendMany: async values => journal.appendMany(values), flush: async () => {} };
 }
 function context(session: CompactionSession): Context {
   return { request: { sessionId: session.header.sessionId, requestId: "r", routeId: "r", model: "m", options: {} }, content: { system: { sections: [], modelFacts: [] }, conversation: session.journal.surface, supplements: [], tools: [] }, status: { throughJournalSeq: session.lastSeq, cycle: 0, paths: [], facts: [], plugins: {} } };
@@ -119,6 +119,21 @@ it("collects paths from real read_file numbered lines", () => {
   const output = "     1|/file/absolute.ts\n     2|src/relative.ts\n     3|AGENTS.md\n     4|ordinary words";
   expect(collectPathHints(output)).toEqual(expect.arrayContaining(["/file/absolute.ts", "src/relative.ts", "AGENTS.md"]));
   expect(collectPathHints(output)).not.toContain("ordinary words");
+});
+
+it("keeps the inherited navigation list in a forked subagent but drops it in a user fork", async () => {
+  const session = fixture(); await users(session, 2); const { port } = host();
+  await new ContextSupplements(session).put({ op: "add", id: "navigation", owner: DISCLOSURE_OWNER, text: "Current active context files", afterEventSeq: session.lastSeq, lifetime: "persistent" });
+  await new ProgressiveDisclosure(port).hydrate(context(session), session);
+  const navigation = (child: CompactionSession) => child.journal.events.filter(event => event.type === SUPPLEMENT_EVENT).map(event => (event.data as { op: string }).op);
+  // agent_fork: the copied prefix stays byte for byte the parent's, so the provider cache keeps hitting.
+  const forked = fixture(session.journal.events, "forked", "delegation");
+  await new ProgressiveDisclosure(port).hydrate(context(forked), forked);
+  expect(navigation(forked)).toEqual(["add"]);
+  expect(forked.journal.events.some(event => event.type === STATE_EVENT && (event.data as { op: string }).op === "fork")).toBe(true);
+  const userFork = fixture(session.journal.events, "user-fork", "fork");
+  await new ProgressiveDisclosure(port).hydrate(context(userFork), userFork);
+  expect(navigation(userFork)).toEqual(["add", "remove"]);
 });
 
 it("does not replay an ignored pre-compaction read into a fork's new cycle", async () => {
@@ -271,4 +286,36 @@ it.each(["candidate-flush", "applied-append"])("recovers %s failure at the durab
   expect(await recovery.recover(restored)).toBe(end);
   expect((await recovery.hydrate(context(restored), restored)).status.cycle).toBe(end ? 1 : 0);
   expect(summarize).toHaveBeenCalledTimes(1);
+});
+
+function traceResult(seq: number, pluginId: string, detail: readonly unknown[], status = "completed") {
+  return { seq, type: "tool/result", time: new Date().toISOString(), data: { status, callId: `trace-${seq}`, pluginId, name: "anything", detail } } as unknown as SessionEventEnvelopeV1;
+}
+const trace = (path: string, description: string) => ({ label: "actspace.context.trace", value: { kind: "trace", path, description } });
+
+it("registers trace files from any plugin's completed result with their description, skipping missing files", async () => {
+  const session = fixture(); const { port } = host(); const disclosure = new ProgressiveDisclosure(port);
+  await disclosure.hydrate(context(session), session);
+  await disclosure.observe(session, traceResult(session.lastSeq + 1, "actspace.tool-subagent", [trace("/file/agents/child.md", "Subagent transcript: review the diff")]));
+  await disclosure.observe(session, traceResult(session.lastSeq + 1, "some.third-party", [trace("/missing/bash_1.log", "gone"), trace("/file/logs/bash_2.log", "Bash log: pnpm test"), { label: "actspace.context.trace", value: { kind: "file", path: "/file/not-a-trace.ts" } }]));
+  await disclosure.observe(session, traceResult(session.lastSeq + 1, "some.third-party", [trace("/file/failed.md", "failed call")], "failed"));
+  const view = await disclosure.hydrate(context(session), session);
+  expect(view.status.paths.map(path => [path.path, path.description, path.readsInCycle, path.visibility])).toEqual([
+    ["/file/agents/child.md", "Subagent transcript: review the diff", 0, "active"],
+    ["/file/logs/bash_2.log", "Bash log: pnpm test", 0, "active"],
+  ]);
+  let navigation = "";
+  createDisclosureSource().get(view, value => { navigation = (value.supplements as readonly { text: string }[])[0]!.text; });
+  expect(navigation).toContain('"/file/agents/child.md" — Subagent transcript: review the diff');
+  // A fresh disclosure over the same Journal (restart) folds the durable facts into the same paths.
+  const replayed = await new ProgressiveDisclosure(port).hydrate(context(session), session);
+  expect(replayed.status.paths).toEqual(view.status.paths);
+});
+
+it("keeps a trace description when the same file is also reported as a plain read", async () => {
+  const session = fixture(); const { port } = host(); const disclosure = new ProgressiveDisclosure(port);
+  await disclosure.hydrate(context(session), session);
+  const event = { seq: session.lastSeq + 1, type: "tool/result", time: new Date().toISOString(), data: { status: "completed", callId: "both", pluginId: "actspace.filesystem-read", name: "read_file", detail: [trace("/file/t.md", "Subagent transcript: t"), { label: "actspace.context.file", value: { path: "/file/t.md", kind: "file", operation: "read" } }] } } as unknown as SessionEventEnvelopeV1;
+  await disclosure.observe(session, event);
+  expect((await disclosure.hydrate(context(session), session)).status.paths).toMatchObject([{ path: "/file/t.md", description: "Subagent transcript: t", readsInCycle: 1 }]);
 });

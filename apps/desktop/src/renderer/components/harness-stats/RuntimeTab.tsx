@@ -1,7 +1,19 @@
-import type { HarnessStatsRuntime } from "@actspace/shared";
+import { subagentKindLabel, type HarnessStatsRuntime } from "@actspace/shared";
 import { Histogram } from "./harness-stats-charts";
 import { DASH, TURN_STEPS_LABELS, fmtDuration, fmtInt, fmtPct, fmtTokens, ratio } from "./harness-stats-format";
 import { Card, EmptyNote, Grid, KvList, Metric, MetricGrid, SecHead, Stack, type KvRow } from "./harness-stats-ui";
+
+/** `actspace.subagent.<preset|kind>`（新会话）或老会话的 `explore` / `agent`，转成和界面其他地方一致的种类词。 */
+function presetLabel(presetId: string): string {
+  const key = presetId.replace(/^actspace\.subagent\./, "").replace(/^actspace\./, "");
+  switch (key) {
+    case "general": return subagentKindLabel({ subagentKind: "local", preset: "general" });
+    case "explore": return subagentKindLabel({ subagentKind: "local", preset: "explore" });
+    case "fork": case "codex": case "claude-code": return subagentKindLabel({ subagentKind: key });
+    case "agent": return subagentKindLabel({ agentKind: "agent" });
+    default: return key;
+  }
+}
 
 function joinTop(items: readonly { readonly label: string; readonly count: number }[], limit = 3): string | undefined {
   const sorted = [...items].filter((item) => item.count > 0).sort((a, b) => b.count - a.count).slice(0, limit);
@@ -49,7 +61,9 @@ export function RuntimeTab({ data }: { data: HarnessStatsRuntime }) {
       <Grid cols={3}>
         <Card title="子 Agent">
           <KvList rows={[
-            { label: delegations.byPreset.length ? delegations.byPreset.map((item) => item.presetId).join(" / ") : "委派次数", value: delegations.byPreset.length ? delegations.byPreset.map((item) => fmtInt(item.count)).join(" / ") : fmtInt(delegationTotal) },
+            ...(delegations.byPreset.length
+              ? delegations.byPreset.map((item) => ({ label: presetLabel(item.presetId), value: `${fmtInt(item.count)} 次 · 平均 ${fmtDuration(item.avgDurationMs)}` }))
+              : [{ label: "委派次数", value: fmtInt(delegationTotal) }]),
             { label: "失败", value: fmtInt(delegations.failed) },
             { label: "平均步数", value: delegations.avgSteps == null ? DASH : delegations.avgSteps.toFixed(1) },
             { label: "平均耗时", value: fmtDuration(delegations.avgDurationMs) },

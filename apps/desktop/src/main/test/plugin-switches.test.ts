@@ -1,8 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 vi.mock("electron", () => ({ ipcMain: { handle: vi.fn(), removeHandler: vi.fn(), on: vi.fn(), removeListener: vi.fn() }, app: {}, BrowserWindow: class {} }));
-import { disabledPluginIds, resolvePluginSwitches } from "../plugins/plugin-switches";
-import { listPluginItems } from "../plugins/plugins-ipc";
+import { sanitizeExternalSubagentSettings } from "@actspace/shared";
+import { disabledPluginIds, resolvePluginSettings, resolvePluginSwitches } from "../plugins/plugin-switches";
+import { listPluginItems, unavailablePluginReasons } from "../plugins/plugins-ipc";
 import { disabledBrowserBridgeStatus, disabledEnglishLearningState } from "../plugins/optional-plugin-stubs";
 
 const display = (canDisable: boolean, defaultEnabled: boolean, scope: "global" | "session" = "session") => ({ title: "t", description: "d", scope, defaultEnabled, canDisable });
@@ -41,5 +42,54 @@ describe("plugin switches", () => {
   it("reports disabled stub states", () => {
     expect(disabledBrowserBridgeStatus()).toMatchObject({ runState: "disabled", enabled: false });
     expect(disabledEnglishLearningState()).toMatchObject({ enabled: false });
+  });
+});
+
+describe("external subagent plugins", () => {
+  const subagentCatalog = [
+    { id: "subagent-codex", directory: "subagent", loaders: ["harness"], manifest: { display: display(true, false) } },
+    { id: "subagent-claude-code", directory: "subagent", loaders: ["harness"], manifest: { display: display(true, false) } },
+  ] as never[];
+
+  it("fills defaults and drops unknown stored values", () => {
+    expect(resolvePluginSettings({ tools: {} })).toEqual({
+      "subagent-codex": { approvalPolicy: "never", sandbox: "workspace-write" },
+      "subagent-claude-code": { permissionMode: "dontAsk" },
+    });
+    const stored = { tools: { externalSubagents: { codex: { approvalPolicy: "on-request", sandbox: "nope" }, claudeCode: { permissionMode: "plan" } } } } as never;
+    expect(resolvePluginSettings(stored)).toEqual({
+      "subagent-codex": { approvalPolicy: "on-request", sandbox: "workspace-write" },
+      "subagent-claude-code": { permissionMode: "plan" },
+    });
+  });
+
+  it("sanitizes the stored shape", () => {
+    expect(sanitizeExternalSubagentSettings(undefined)).toBeUndefined();
+    expect(sanitizeExternalSubagentSettings({ codex: { sandbox: 1 }, claudeCode: "x" })).toBeUndefined();
+    expect(sanitizeExternalSubagentSettings({ codex: { sandbox: "read-only", extra: 1 } })).toEqual({ codex: { sandbox: "read-only" } });
+  });
+
+  it("lists unavailable reasons from the command lookup, current settings and the restart hint", async () => {
+    const unavailable = await unavailablePluginReasons(subagentCatalog, async (command) => (command === "codex" ? "/usr/local/bin/codex" : undefined));
+    expect([...unavailable]).toEqual([["subagent-claude-code", "本机没有找到 claude 命令"]]);
+    const startupSettings = { tools: {} };
+    const startup = resolvePluginSwitches(startupSettings, subagentCatalog);
+    const items = listPluginItems({
+      catalog: subagentCatalog,
+      startupSwitches: startup,
+      settings: { tools: { externalSubagents: { codex: { sandbox: "read-only" } } } },
+      startupPluginSettings: resolvePluginSettings(startupSettings),
+      unavailable,
+    });
+    const codex = items.find((item) => item.id === "subagent-codex")!;
+    expect(codex).toMatchObject({ settings: { approvalPolicy: "never", sandbox: "read-only" }, settingsPendingRestart: true });
+    expect(codex.unavailableReason).toBeUndefined();
+    const claude = items.find((item) => item.id === "subagent-claude-code")!;
+    expect(claude).toMatchObject({ unavailableReason: "本机没有找到 claude 命令", settings: { permissionMode: "dontAsk" }, settingsPendingRestart: false });
+  });
+
+  it("treats a failing lookup as not installed", async () => {
+    const reasons = await unavailablePluginReasons(subagentCatalog, async () => { throw new Error("boom"); });
+    expect([...reasons.keys()]).toEqual(["subagent-codex", "subagent-claude-code"]);
   });
 });

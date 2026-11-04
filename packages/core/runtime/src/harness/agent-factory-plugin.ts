@@ -17,24 +17,21 @@ import type { CompactionPlugin } from "@actspace/context-compaction";
 import type { RuntimeSessionController } from "../session/session-controller.js";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
-import { isSessionTranscriptReadPath } from "@actspace/session-transcript";
+import { isBashLogReadPath, isSessionTranscriptReadPath } from "@actspace/session-transcript";
+import type { SessionHandle } from "@actspace/session-persistence";
+import { HOST_READABLE_FILES_SERVICE_ID, HostReadableFiles } from "@actspace/tool-runtime";
 import { projectPermissionMode, applySessionGrantEvent } from "@actspace/session-projection";
 import { isBackgroundWake } from "@actspace/shared/runtime-v2";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
+import { blockedTool, isExternalRecordPath, isSubagentBlockedTool, SUBAGENT_APPROVAL_UNAVAILABLE, type ChildLoopInput } from "@actspace/subagent";
 
-const PURPOSE_ROUTE_IDS = new Set(["utility", "auto-review", "explore"]);
+const PURPOSE_ROUTE_IDS = new Set(["utility", "auto-review"]);
+type AgentRole = "main" | "subagent" | "fork";
 
 export type AgentFactoryService = {
   readonly runFactory: RunFactory;
   readonly activeSessions: ReadonlyMap<string, import("@actspace/session-persistence").SessionHandle>;
-  readonly createSubagentLoop: (input: {
-    readonly session: import("@actspace/session-persistence").SessionHandle;
-    readonly scope: AgentScope;
-    readonly preset: import("@actspace/subagent").StaticAgentPreset;
-    readonly allowedToolNames: readonly string[];
-    readonly signal: AbortSignal;
-    readonly agentId: string;
-  }) => AgentLoop | Promise<AgentLoop>;
+  readonly createSubagentLoop: (input: ChildLoopInput) => AgentLoop | Promise<AgentLoop>;
 };
 
 export const inject = Object.freeze([
@@ -49,7 +46,34 @@ export const inject = Object.freeze([
   "context.source.conversation",
 ]);
 
-function createAgentFactory(ctx: CordisContext): AgentFactoryService {
+/**
+ * Files an agent may read without a workspace-scope approval: Session transcripts,
+ * background Bash logs, and the exact files another plugin added (external subagent records).
+ * Journals and the directories around these files stay gated.
+ */
+export function composeHostReadablePath(dataRoot: string | undefined, files: HostReadableFiles): (canonicalPath: string) => boolean {
+  return canonicalPath => (dataRoot !== undefined && (isSessionTranscriptReadPath(dataRoot, canonicalPath) || isBashLogReadPath(dataRoot, canonicalPath))) || files.has(canonicalPath);
+}
+
+/**
+ * Per Session: the Host-readable files plus the session logs of the external subagents in its tree,
+ * read from the main Session's subagent records (a subagent's own Session has none), so they survive
+ * a Harness reload or an app restart.
+ */
+export function composeSessionReadablePath(
+  isHostReadablePath: (canonicalPath: string) => boolean,
+  getOpen: (sessionId: string) => SessionHandle | undefined,
+  isRecordPath: (root: SessionHandle, canonicalPath: string) => boolean = isExternalRecordPath,
+): (session: SessionHandle) => (canonicalPath: string) => boolean {
+  return session => canonicalPath => {
+    if (isHostReadablePath(canonicalPath)) return true;
+    const lineage = session.header.lineage;
+    const root = lineage?.origin === "delegation" ? getOpen(lineage.parentSessionId) : session;
+    return root !== undefined && isRecordPath(root, canonicalPath);
+  };
+}
+
+function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableFiles): AgentFactoryService {
   const host = requireService<AgentRuntimeHostPort>(ctx, AGENT_RUNTIME_HOST_PORT_ID);
   const registry = requireService<import("@actspace/agent").AgentRegistry>(ctx, "agent.registry");
   const sessions = requireService<RuntimeSessionController>(ctx, "session.runtime");
@@ -61,10 +85,10 @@ function createAgentFactory(ctx: CordisContext): AgentFactoryService {
   const getDisclosure = () => ctx.get?.("context.disclosure") as ProgressiveDisclosure | undefined;
   const activeSessions = new Map<string, import("@actspace/session-persistence").SessionHandle>();
 
-  const createSources = (scope: AgentScope, agent: import("@actspace/agent").AgentDescriptor, workspaceRoot: string) => {
+  const createSources = (scope: AgentScope, agent: import("@actspace/agent").AgentDescriptor, workspaceRoot: string, role: AgentRole) => {
     const sources = new ContextSourceRegistry(["context-system", "context-conversation"]);
-    // 后台任务清单只给主 Agent：子智能体不能发起后台任务。
-    for (const kind of ["system", "rules", "skills", "runtime", "conversation", "tools", ...(agent.kind === "main" ? ["background-tasks"] : [])]) {
+    // 后台任务与运行中子智能体清单只给主 Agent：子智能体（含 fork）不能发起后台任务，也不能再派子智能体。
+    for (const kind of ["system", "rules", "skills", "runtime", "conversation", "tools", ...(role === "main" ? ["background-tasks", "subagents"] : [])]) {
       const factory = ctx.get?.(`context.source.${kind}`) as SourceFactory | undefined;
       if (!factory && (kind === "system" || kind === "conversation")) throw new Error(`Required context source ${kind} is unavailable.`);
       if (factory) scope.disposer.add(sources.register(factory.create({ scope, scopeId: scope.identity.scopeId, agent, host: host.host, workspaceRoot, prompt })));
@@ -74,16 +98,23 @@ function createAgentFactory(ctx: CordisContext): AgentFactoryService {
     return sources;
   };
   const extensions = (sessionId: string, scopeId: string, kind: "main" | "subagent") => () => (ctx.get?.("actspace.host.prompt") as PromptHostPort | undefined)?.extensions?.list(sessionId, scopeId, kind) ?? [];
+  // A fork keeps its parent's system prompt (design 02 §8.4): the sections plugins registered for the parent main session,
+  // plus whatever is registered for the fork's own scope.
+  const forkExtensions = (session: import("@actspace/session-persistence").SessionHandle, scopeId: string) => {
+    const parentId = session.header.lineage?.parentSessionId ?? session.header.sessionId;
+    const parent = extensions(parentId, scopeId, "main"), own = extensions(session.header.sessionId, scopeId, "subagent");
+    return () => [...parent(), ...own()];
+  };
 
-  // Session transcripts are readable without a workspace-scope approval; Journals stay gated.
   const sessionDataRoot = (ctx.get?.("actspace.host.session") as { readonly dataRoot?: string } | undefined)?.dataRoot;
-  const isHostReadablePath = sessionDataRoot ? (canonicalPath: string) => isSessionTranscriptReadPath(sessionDataRoot, canonicalPath) : undefined;
+  const isHostReadablePath = composeHostReadablePath(sessionDataRoot, hostReadableFiles);
+  const readableFor = composeSessionReadablePath(isHostReadablePath, id => sessions.getOpen(id));
   const toolEnvironmentFor = (session: import("@actspace/session-persistence").SessionHandle) => {
     activeSessions.set(session.header.sessionId, session);
     const configuredMode = host.toolEnvironment.permissionMode;
     return Object.freeze({
       ...host.toolEnvironment,
-      ...(isHostReadablePath ? { isHostReadablePath } : {}),
+      isHostReadablePath: readableFor(session),
       autoReview: async (input: import("@actspace/tool-runtime").AutoReviewInput) => {
         const reviewer = ctx.get?.("approval.auto-review") as AutoReviewer | undefined;
         if (!reviewer) throw new Error("Auto reviewer unavailable");
@@ -99,14 +130,28 @@ function createAgentFactory(ctx: CordisContext): AgentFactoryService {
         : sessions.subscribeProjection(update => {
           if (update.sessionId === session.header.sessionId && update.event.type === "permission/mode-set") listener();
         }),
-      sessionGrants: () => host.toolEnvironment.sessionGrantCapability ? session.journal.project(SESSION_GRANTS, () => [], applySessionGrantEvent).flatMap(item => item.grant && item.revokedAt === null ? [item.grant] : []) : [],
+      sessionGrants: () => host.toolEnvironment.sessionGrantCapability ? activeGrants(session) : [],
     });
   };
 
-  const createLoop = async ({ session, scope, descriptor, allowedToolNames, signal, agentId }: {
+  // The main agent's tools in its scope: form members, plugin manager and evolved plugins.
+  const registerMainTools = (scope: AgentScope) => {
+    activateMainAgentFormTools(scope, tools);
+    for (const definition of tools.registry.listDefinitions()) {
+      if (definition.pluginId === "actspace.plugin-manager" || definition.pluginId.startsWith("actspace.evolved.")) scope.tools.register({ id: definition.name, owner: definition.pluginId, value: definition.pluginId });
+    }
+  };
+
+  /**
+   * A child Loop. `subagent`: its own descriptor, child prompt extensions and every allowed tool.
+   * `fork`: the main agent's descriptor, prompt extensions and tool scope, limited to the parent's
+   * visible tools, so the request matches the parent's (design 02 §8.4). Both run without approval.
+   */
+  const createLoop = async ({ session, scope, descriptor, role, allowedToolNames, signal, agentId }: {
     readonly session: import("@actspace/session-persistence").SessionHandle;
     readonly scope: AgentScope;
     readonly descriptor: import("@actspace/agent").AgentDescriptor;
+    readonly role: "subagent" | "fork";
     readonly allowedToolNames?: readonly string[];
     readonly signal?: AbortSignal;
     readonly agentId?: string;
@@ -115,13 +160,29 @@ function createAgentFactory(ctx: CordisContext): AgentFactoryService {
     scope.disposer.add(() => { activeSessions.delete(session.header.sessionId); });
     const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal, host.workspaceRoot);
     const subject: AgentSubject = Object.freeze({ agentId: agentId ?? scope.agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
-    const scopedToolEnvironment = descriptor.kind === "subagent"
-      ? (activeSession: import("@actspace/session-persistence").SessionHandle) => ({ ...toolEnvironmentFor(activeSession), sessionGrantCapability: false, sessionGrants: [] })
-      : toolEnvironmentFor;
+    // A subagent cannot ask for approval or start background work; it reuses its parent's session grants without adding any.
+    // A fork sees its parent's tools; the ones a subagent may not run fail when called.
+    const scopedToolEnvironment = (activeSession: import("@actspace/session-persistence").SessionHandle) => {
+      const { approvalBroker: _approvalBroker, ...environment } = toolEnvironmentFor(activeSession);
+      const parentId = activeSession.header.lineage?.parentSessionId;
+      return {
+        ...environment,
+        approvalUnavailableMessage: SUBAGENT_APPROVAL_UNAVAILABLE,
+        backgroundAllowed: false,
+        blockedToolMessage: (name: string) => isSubagentBlockedTool(name) ? blockedTool(name) : undefined,
+        sessionGrantCapability: false,
+        ...(parentId === undefined || !host.toolEnvironment.sessionGrantCapability ? {} : { sessionGrantOwner: { sessionId: parentId, agentId: `main:${parentId}` } }),
+        sessionGrants: () => {
+          const parent = parentId === undefined ? undefined : sessions.getOpen(parentId);
+          return parent && host.toolEnvironment.sessionGrantCapability ? activeGrants(parent) : [];
+        },
+      };
+    };
+    if (role === "fork") registerMainTools(scope);
     const binding = tools.bindAgentScope(session.header.sessionId, subject.agentId, () => new Set(allowedToolNames ?? []));
     scope.disposer.add(binding.dispose);
     const disclosure = getDisclosure();
-    const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot), contextExtensions: extensions(session.header.sessionId, scope.identity.scopeId, descriptor.kind), observeContextToolResult: disclosure ? (session, event) => disclosure.observe(session, event) : undefined, createContextEngine: options => engine.create({ ...options, disclosure }), descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), llm, tools, toolEnvironment: scopedToolEnvironment, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction: engine.compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
+    const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot, role), contextExtensions: role === "fork" ? forkExtensions(session, scope.identity.scopeId) : extensions(session.header.sessionId, scope.identity.scopeId, "subagent"), observeContextToolResult: disclosure ? (session, event) => disclosure.observe(session, event) : undefined, createContextEngine: options => engine.create({ ...options, disclosure }), descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), llm, tools, toolEnvironment: scopedToolEnvironment, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction: engine.compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
     if (signal !== undefined) {
       const abort = () => loop.abort(typeof signal.reason === "string" ? signal.reason : "parent-abort");
       if (signal.aborted) abort(); else signal.addEventListener("abort", abort, { once: true });
@@ -149,10 +210,7 @@ function createAgentFactory(ctx: CordisContext): AgentFactoryService {
     const agentId = `main:${session.header.sessionId}`;
     const scope = run.scope.child(agentId);
     try {
-      activateMainAgentFormTools(scope, tools);
-      for (const definition of tools.registry.listDefinitions()) {
-        if (definition.pluginId === "actspace.plugin-manager" || definition.pluginId.startsWith("actspace.evolved.")) scope.tools.register({ id: definition.name, owner: definition.pluginId, value: definition.pluginId });
-      }
+      registerMainTools(scope);
       const binding = tools.bindAgentScope(session.header.sessionId, agentId, () => {
         const mode = run.mode;
         const names = scope.tools.entries().map(entry => entry.id);
@@ -163,7 +221,7 @@ function createAgentFactory(ctx: CordisContext): AgentFactoryService {
       const inbox = new MainAgentInbox(session);
       const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal, host.workspaceRoot);
       const disclosure = getDisclosure();
-      const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot), contextExtensions: extensions(session.header.sessionId, scope.identity.scopeId, descriptor.kind), observeContextToolResult: disclosure ? (session, event) => disclosure.observe(session, event) : undefined, createContextEngine: options => engine.create({ ...options, disclosure }), descriptor, scope, agentSubject: subject, session, inbox, inputSource: run.inputSource, modeRuntime: async mode => { const compaction = ctx.get?.("compaction.runtime") as CompactionPlugin | undefined; return { compaction: mode === "chat" && compaction ? engine.compaction.withStrategy(compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8))) : engine.compaction }; }, llm, tools, toolEnvironment: activeSession => {
+      const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot, "main"), contextExtensions: extensions(session.header.sessionId, scope.identity.scopeId, "main"), observeContextToolResult: disclosure ? (session, event) => disclosure.observe(session, event) : undefined, createContextEngine: options => engine.create({ ...options, disclosure }), descriptor, scope, agentSubject: subject, session, inbox, inputSource: run.inputSource, modeRuntime: async mode => { const compaction = ctx.get?.("compaction.runtime") as CompactionPlugin | undefined; return { compaction: mode === "chat" && compaction ? engine.compaction.withStrategy(compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8))) : engine.compaction }; }, llm, tools, toolEnvironment: activeSession => {
         const environment = toolEnvironmentFor(activeSession);
         const broker = environment.approvalBroker;
         return !broker || !run.budget ? environment : { ...environment, approvalBroker: {
@@ -214,8 +272,14 @@ function createAgentFactory(ctx: CordisContext): AgentFactoryService {
   const service: AgentFactoryService = Object.freeze({
     runFactory,
     activeSessions,
-    // 宿主没注册预设专用的路由（例如 explore）时，退回主 Agent 用的路由。
-    createSubagentLoop: ({ session, scope, preset, allowedToolNames, signal, agentId }) => createLoop({ session, scope, signal, agentId, allowedToolNames, descriptor: Object.freeze({ id: preset.id, version: preset.version, kind: "subagent", description: `One-shot ${preset.id} child Agent`, presetId: preset.id, routeId: llm.routes.list().some(route => route.routeId === preset.routeId) ? preset.routeId : mainRouteId(), model: preset.model, maxSteps: preset.maxSteps }) }),
+    // Subagents run on the main route; the model of each activation comes from runTurn.
+    // A fork keeps the main descriptor: it is part of the system prompt (the `core/agent-descriptor` model fact).
+    createSubagentLoop: input => {
+      const { session, scope, description, allowedToolNames, maxSteps, signal, agentId } = input;
+      if (input.role === "fork") return createLoop({ session, scope, signal, agentId, allowedToolNames, role: "fork", descriptor: Object.freeze({ ...MAIN_AGENT_DESCRIPTOR, routeId: mainRouteId() }) });
+      const { preset } = input;
+      return createLoop({ session, scope, signal, agentId, allowedToolNames, role: "subagent", descriptor: Object.freeze({ id: `actspace.subagent.${preset}`, version: 2, kind: "subagent", description: `Subagent (${preset}): ${description}`, presetId: `actspace.subagent.${preset}`, routeId: mainRouteId(), model: MAIN_AGENT_DESCRIPTOR.model, maxSteps }) });
+    },
   });
   ctx.provide?.("actspace.agent.factory", service);
   return service;
@@ -253,7 +317,9 @@ function requireService<T>(ctx: CordisContext, id: string): T {
 
 /** Harness entry: publish the structural one-Run factory from this isolated service tree. */
 export function apply(ctx: CordisContext): void {
-  const factory = createAgentFactory(ctx);
+  const hostReadableFiles = new HostReadableFiles();
+  ctx.provide?.(HOST_READABLE_FILES_SERVICE_ID, hostReadableFiles);
+  const factory = createAgentFactory(ctx, hostReadableFiles);
   ctx.provide?.("agent.run-factory", factory.runFactory);
 }
 
@@ -262,3 +328,6 @@ function taskContent(content: import("@actspace/shared/runtime-v2").RuntimeV2Jso
 }
 
 const SESSION_GRANTS = Symbol("session-grants");
+function activeGrants(session: import("@actspace/session-persistence").SessionHandle) {
+  return session.journal.project(SESSION_GRANTS, () => [], applySessionGrantEvent).flatMap(item => item.grant && item.revokedAt === null ? [item.grant] : []);
+}

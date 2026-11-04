@@ -127,13 +127,24 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
         expect((await runtime.runs.service.snapshot(childId)).runs[0]?.state).toBe("running");
         expect((await sessions.inspectEvents(childId)).length).toBe(before);
       };
-      const childResult = await runtime.subagents.invoke({ parentSession: parent, parentScope, parentCallId: "child-call", presetId: "actspace.explore", task: "Report a short result", parentVisibleToolIds: [], delegationDepth: 0 });
+      expect(parent.header.sessionId).toBe("conversation");
+      const childResult = await runtime.subagents.spawn({ sessionId: "conversation", callId: "child-call", scope: parentScope, description: "short result", prompt: "Report a short result", preset: "explore", background: false, parentToolNames: [], registeredToolNames: [], signal: new AbortController().signal });
       observeChild = undefined;
-      expect(childResult).toMatchObject({ status: "completed", text: "fixed loop result" });
-      const child = await sessions.resume(childResult.childSessionId);
+      expect(childResult).toMatchObject({ ok: true, text: expect.stringContaining("fixed loop result") });
+      const childSessionId = /Subagent (\S+) \(short result\) finished\./.exec(childResult.text)![1]!;
+      // A client reading the finished child's task queue gets it without taking the child over,
+      // so the parent can still continue it (acceptance BUG-02).
+      expect((await runtime.runs.service.snapshot(childSessionId)).runs).toEqual([expect.objectContaining({ state: "completed" })]);
+      expect(sessions.getOpen(childSessionId)).toBeUndefined();
+      expect(await runtime.subagents.sendMessage({ sessionId: "conversation", callId: "follow-up", scope: parentScope, agentId: childSessionId, message: "One more" })).toMatchObject({ ok: true });
+      await vi.waitFor(() => expect(runtime.subagents.activeCount).toBe(0));
+      const child = await sessions.resume(childSessionId);
       const childLedger = await TaskLedger.open(child);
-      expect(childLedger.snapshot().runs).toEqual([expect.objectContaining({ state: "completed", harness: expect.objectContaining({ revision: 1 }), result: { status: "completed", text: "fixed loop result" } })]);
-      expect(childLedger.snapshot().tasks).toEqual([expect.objectContaining({ state: "completed" })]);
+      expect(childLedger.snapshot().runs).toEqual([
+        expect.objectContaining({ state: "completed", harness: expect.objectContaining({ revision: 1 }), result: { status: "completed", text: "fixed loop result" } }),
+        expect.objectContaining({ state: "completed", result: { status: "completed", text: "fixed loop result" } }),
+      ]);
+      expect(childLedger.snapshot().tasks).toEqual([expect.objectContaining({ state: "completed" }), expect.objectContaining({ state: "completed" })]);
       expect(parentLease.revision).toBe(1);
       expect(harnesses.inspect().instances.find(item => item.generationId === parentLease.generationId)?.users).toBe(1);
       expect(harnesses.inspect().instances.find(item => item.state === "current")?.users).toBe(0);
@@ -164,6 +175,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       ctx.provide('actspace.agent.factory', { createSubagentLoop: async () => ({
         runTurn: async () => ({ reason: 'completed', finalText: 'alternative child' }), abort() {}, quiesce() {}, waitForIdle: async () => {}
       }) });
+      ctx.provide('actspace.host-readable-files', { add() {}, has: () => false, remove() {} });
     }`);
     const alternative = await publishPluginArtifact({ sourceRoot, artifactRoot: join(directory, "harness-artifacts"), files: ["loop.js"], plugin: { ...manifest, pluginId: pluginId("alternative-loop"), behaviors: [{ ...behavior, module: "./loop.js" }], contributions: { services: [...behavior.provides ?? []], events: [], contributions: [] }, codecs: [] } });
     const oldParent = await harnesses.acquire("main");
@@ -173,8 +185,8 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       await app.submit("conversation", "alternative", "Continue existing history"); await app.waitForIdle("conversation");
       expect(failures).toEqual([]);
       expect((await app.snapshot("conversation")).runs.at(-1)).toMatchObject({ harness: { revision: 3 }, result: { implementation: "alternative", priorEvents: expect.any(Number) } });
-      const child = await runtime.subagents.invoke({ parentSession: sessions.getOpen("conversation")!, parentScope: oldParent.scope, parentCallId: "alternative-child", presetId: "actspace.explore", task: "Run parent Loop", parentVisibleToolIds: [], delegationDepth: 0 });
-      expect(child).toMatchObject({ status: "completed", text: "fixed loop result" });
+      const child = await runtime.subagents.spawn({ sessionId: "conversation", callId: "alternative-child", scope: oldParent.scope, description: "parent loop", prompt: "Run parent Loop", preset: "explore", background: false, parentToolNames: [], registeredToolNames: [], signal: new AbortController().signal });
+      expect(child).toMatchObject({ ok: true, text: expect.stringContaining("fixed loop result") });
       expect(oldParent.revision).toBe(2);
     } finally { await oldParent.release(); }
 
@@ -193,4 +205,16 @@ it("registers the sandbox manager and both backends as replaceable Harness entri
   expect(rows.get("sandbox")).toEqual(["sandbox", ["sandbox"], ["actspace.host.sandbox"]]);
   expect(rows.get("sandbox-nono")).toEqual(["sandbox-nono", [], ["sandbox", "actspace.host.sandbox"]]);
   expect(rows.get("sandbox-seatbelt")).toEqual(["sandbox-seatbelt", [], ["sandbox", "actspace.host.sandbox"]]);
+});
+
+it("puts the Host's plugin settings over each manifest's config defaults", async () => {
+  const { prepareDefaultHarnessArtifact } = await import("./default-harness.js");
+  const artifactRoot = await mkdtemp(join(tmpdir(), "actspace-entry-config-"));
+  try {
+    const request = await prepareDefaultHarnessArtifact({ artifactRoot, hostCapabilities: ["process"], entryConfig: { "subagent-codex": { sandbox: "read-only" } } });
+    const config = (id: string) => request.composition.entries.find(entry => entry.entryId === id)?.config;
+    expect(config("subagent-codex")).toEqual({ approvalPolicy: "never", sandbox: "read-only" });
+    expect(config("subagent-claude-code")).toEqual({ permissionMode: "dontAsk" });
+    expect(config("shell-tools")).toEqual({});
+  } finally { await rm(artifactRoot, { recursive: true, force: true }); }
 });

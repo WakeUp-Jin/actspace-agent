@@ -18,7 +18,7 @@ const settings: AppSettings = {
   defaultModelId: null,
   providers: {},
   searchProviders: {},
-  agent: { systemPromptPath: "/tmp/actspace/prompts/main-agent.md", temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false, exploreModelId: null },
+  agent: { systemPromptPath: "/tmp/actspace/prompts/main-agent.md", temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
   skills: { disabled: [] },
   shortcuts: { quickOpen: { enabled: true, accelerator: "Alt+Space", target: { kind: "session", sessionId: "s-2" } } },
 } as AppSettings;

@@ -314,6 +314,7 @@ export type RuntimeV2TodoItem = {
   readonly updatedAt?: string;
 };
 
+/** Old Sessions only (`delegation/*`). New subagents are folded from `subagent/*` by `foldSubagentTree` (subagent-projection.ts). */
 export type RuntimeV2DelegationView = {
   readonly invocationId: string;
   readonly childSessionId: string | null;
@@ -376,7 +377,7 @@ export type RuntimeV2SessionSnapshot = {
   readonly metadata: RuntimeV2SessionMetadata;
   readonly messages: readonly RuntimeV2SessionMessage[];
   readonly tools: readonly RuntimeV2ToolView[];
-  readonly pendingInbox: readonly { readonly messageId: string; readonly target: "next-step" | "next-turn"; readonly source?: "task_notification" | "steer" }[];
+  readonly pendingInbox: readonly { readonly messageId: string; readonly target: "next-step" | "next-turn"; readonly source?: import("./subagents").InboxSourceId }[];
   readonly todos: readonly RuntimeV2TodoItem[];
   readonly delegations: readonly RuntimeV2DelegationView[];
   readonly usage: RuntimeV2UsageSummary;

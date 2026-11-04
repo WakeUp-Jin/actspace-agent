@@ -32,7 +32,6 @@ const defaultSettings: AppSettings = {
     maxTokens: null,
     disabledTools: [],
     bashAlwaysAsk: false,
-    exploreModelId: null,
   },
   skills: { disabled: [] },
 };

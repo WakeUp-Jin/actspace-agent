@@ -6,7 +6,7 @@ export function extensionsSettings(): AppSettings {
     defaultModelId: null,
     providers: { deepseek: { hasApiKey: false }, kimi: { hasApiKey: false } },
     searchProviders: { zhipu: { hasApiKey: false }, tavily: { hasApiKey: false }, tinyfish: { hasApiKey: false }, exa: { hasApiKey: false } },
-    agent: { systemPromptPath: "", temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false, exploreModelId: null },
+    agent: { systemPromptPath: "", temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
     skills: { disabled: [] },
   };
 }

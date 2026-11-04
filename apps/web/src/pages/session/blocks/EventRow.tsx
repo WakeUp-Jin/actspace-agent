@@ -1,4 +1,4 @@
-import type { MessageBlock } from "@actspace/shared";
+import { subagentActivationStatusLabel, type MessageBlock } from "@actspace/shared";
 import { formatElapsed } from "../../../sessions/composer-state";
 import { cx } from "../../../ui/cx";
 
@@ -7,13 +7,19 @@ const STATUS_TEXT: Readonly<Record<string, string>> = { Stopped: "已停止", "O
 
 const NOTICE_STATUS: Readonly<Record<string, string>> = { completed: "已完成", failed: "失败", stopped: "已停止", lost: "已失联", output_match: "输出匹配" };
 
+function noticeText(block: { readonly taskKind: string; readonly title: string; readonly status: string }): string {
+  if (block.taskKind === "subagent") return `子智能体 ${block.title} ${subagentActivationStatusLabel(block.status)}`;
+  if (block.taskKind === "agent_message") return `${block.title} 发来消息`;
+  return `后台任务 · ${block.taskKind === "agent" ? "Agent" : "Bash"}: ${block.title} · ${NOTICE_STATUS[block.status] ?? block.status}`;
+}
+
 /** 状态提示、上下文压缩与后台任务唤醒分隔线。 */
 export function EventRow({ block }: { readonly block: Extract<MessageBlock, { kind: "status" | "context_compaction" | "background_notice" }> }) {
   if (block.kind === "status") {
     return <p className={cx("m-0 text-act-sm", block.tone === "error" ? "text-danger" : "text-text-faint")}>{STATUS_TEXT[block.content] ?? block.content}</p>;
   }
   const text = block.kind === "background_notice"
-    ? `后台任务 · ${block.taskKind === "agent" ? "Agent" : "Bash"}: ${block.title} · ${NOTICE_STATUS[block.status] ?? block.status}`
+    ? noticeText(block)
     : block.status === "running" ? "正在压缩上下文…" : block.status === "failed" ? `压缩失败${block.errorMessage ? `：${block.errorMessage}` : ""}` : `上下文已压缩${block.durationMs ? ` · ${formatElapsed(block.durationMs)}` : ""}`;
   return (
     <div className="flex items-center gap-3 text-act-xs text-text-faint" role="separator">

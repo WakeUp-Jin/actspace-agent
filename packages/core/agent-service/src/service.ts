@@ -11,11 +11,12 @@ declare module "@actspace/cordis-adapter" {
 }
 
 import type { SessionHandle } from "@actspace/session-persistence";
-import { SessionError } from "@actspace/session-journal";
+import { SessionError, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { TaskError, type TaskReceipt, type TaskSnapshot, type RunRecord, type TaskRecord } from "./contracts.js";
 import { SessionRunManager, type ExecutionConfiguration, type RunLease } from "./run-manager.js";
 import { TaskLedger } from "./task-ledger.js";
+import { projectTasks } from "./task-projection.js";
 
 export interface AgentServicePorts {
   openSession(sessionId: string): Promise<SessionHandle>;
@@ -27,6 +28,12 @@ export interface AgentServicePorts {
   hasPendingNotifications?(session: SessionHandle): boolean;
   onSnapshot?(sessionId: string, snapshot: TaskSnapshot): void;
   onFailure?(sessionId: string, error: unknown): void;
+  /**
+   * A Session another provider schedules (a subagent's): its committed events, read without opening it.
+   * `undefined` for a Session this service owns. The service never opens such a Session: that would take
+   * the writer lease its provider needs to continue it.
+   */
+  providerOwnedEvents?(sessionId: string): Promise<readonly SessionEventEnvelopeV1[] | undefined>;
 }
 
 /** Host-scoped application owner. Opening a Session never creates a Loop or lease. */
@@ -54,7 +61,12 @@ export class AgentService {
   async snapshot(sessionId: string): Promise<TaskSnapshot> {
     if (this.#closed) throw new Error("Agent service is closed");
     const external = this.#externalLedgers.get(sessionId);
-    return external ? external.snapshot() : (await this.#manager(sessionId)).ledger.snapshot();
+    if (external) return external.snapshot();
+    if (!this.#sessions.has(sessionId)) {
+      const events = await this.ports.providerOwnedEvents?.(sessionId);
+      if (events) return projectTasks(sessionId, events);
+    }
+    return (await this.#manager(sessionId)).ledger.snapshot();
   }
   async designate(sessionId: string, taskId: string, runId: string | null, revision: number): Promise<TaskSnapshot> {
     const manager = await this.#manager(sessionId);
@@ -132,6 +144,7 @@ export class AgentService {
     if (existing) return existing;
     let acquired = false;
     const opening = (async () => {
+      if (await this.ports.providerOwnedEvents?.(sessionId)) throw new TaskError("SESSION_BUSY");
       const session = await this.ports.openSession(sessionId);
       acquired = true;
       if (session.header.sessionId !== sessionId) throw new Error("Session owner mismatch");
@@ -143,7 +156,8 @@ export class AgentService {
     // Recovery and durability failures remain cached to protect accepted writes.
     this.#sessions.set(sessionId, opening);
     void opening.catch(error => {
-      if (!acquired && error instanceof SessionError && error.code === "SESSION_WRITER_LOCKED" && this.#sessions.get(sessionId) === opening) this.#sessions.delete(sessionId);
+      const retryable = (error instanceof SessionError && error.code === "SESSION_WRITER_LOCKED") || (error instanceof TaskError && error.code === "SESSION_BUSY");
+      if (!acquired && retryable && this.#sessions.get(sessionId) === opening) this.#sessions.delete(sessionId);
     });
     return opening;
   }

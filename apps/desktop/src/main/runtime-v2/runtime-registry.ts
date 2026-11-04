@@ -37,6 +37,8 @@ export type DesktopRuntimeV2RegistryOptions = {
   readonly browser?: DesktopRuntimeV2BrowserPort;
   /** Plugin ids switched off for this process (startup values; see resolvePluginSwitches). */
   readonly disabledPlugins?: readonly string[];
+  /** Per plugin Entry id settings (startup values), merged over each manifest `config` at boot. */
+  readonly pluginConfig?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   readonly nonoPath?: string;
   readonly disabledSkillIds?: () => readonly string[];
   readonly chatCompactionTriggerRatio?: () => number;
@@ -229,6 +231,12 @@ export class DesktopRuntimeV2Registry {
     this.assertAdmission();
     this.#admittedWork++;
     try { return await this.requireApp().stopBackgroundTask(sessionId, taskId); }
+    finally { this.#admittedWork--; }
+  }
+  async interruptSubagent(sessionId: string, agentId: string) {
+    this.assertAdmission();
+    this.#admittedWork++;
+    try { return await this.requireApp().interruptSubagent(sessionId, agentId); }
     finally { this.#admittedWork--; }
   }
   async submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue) {
@@ -567,6 +575,7 @@ export class DesktopRuntimeV2Registry {
         approvals: this.options.approvals,
         browser: this.options.browser,
         disabledPlugins: this.options.disabledPlugins,
+        pluginConfig: this.options.pluginConfig,
         nonoPath: this.options.nonoPath,
         disabledSkillIds: this.options.disabledSkillIds,
         chatCompactionTriggerRatio: this.options.chatCompactionTriggerRatio ?? (() => 0.8),

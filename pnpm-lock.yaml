@@ -145,6 +145,9 @@ importers:
       '@actspace/side-chat':
         specifier: workspace:*
         version: link:../../packages/side-chat/side-chat
+      '@actspace/subagent':
+        specifier: workspace:*
+        version: link:../../packages/subagent/subagent
       '@actspace/tool-browser':
         specifier: workspace:*
         version: link:../../packages/browser/tool-browser
@@ -908,6 +911,31 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/context/context-subagents:
+    dependencies:
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+      '@actspace/subagent':
+        specifier: workspace:*
+        version: link:../../subagent/subagent
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/context/context-system:
     dependencies:
       '@actspace/context-engine':
@@ -1162,6 +1190,9 @@ importers:
       '@actspace/context-skills':
         specifier: workspace:*
         version: link:../../context/context-skills
+      '@actspace/context-subagents':
+        specifier: workspace:*
+        version: link:../../context/context-subagents
       '@actspace/context-system':
         specifier: workspace:*
         version: link:../../context/context-system
@@ -1249,6 +1280,12 @@ importers:
       '@actspace/subagent':
         specifier: workspace:*
         version: link:../../subagent/subagent
+      '@actspace/subagent-claude-code':
+        specifier: workspace:*
+        version: link:../../subagent/subagent-claude-code
+      '@actspace/subagent-codex':
+        specifier: workspace:*
+        version: link:../../subagent/subagent-codex
       '@actspace/tool-background-tasks':
         specifier: workspace:*
         version: link:../../background-tasks/tool-background-tasks
@@ -2137,15 +2174,9 @@ importers:
       '@actspace/agent-loop':
         specifier: workspace:*
         version: link:../../core/agent-loop
-      '@actspace/background-tasks':
-        specifier: workspace:*
-        version: link:../../background-tasks/background-tasks
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../composition/cordis-adapter
-      '@actspace/llm-service':
-        specifier: workspace:*
-        version: link:../../llm/llm-service
       '@actspace/scope':
         specifier: workspace:*
         version: link:../../core/scope
@@ -2175,14 +2206,67 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
 
+  packages/subagent/subagent-claude-code:
+    dependencies:
+      '@actspace/agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/subagent':
+        specifier: workspace:*
+        version: link:../subagent
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+    devDependencies:
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/subagent/subagent-codex:
+    dependencies:
+      '@actspace/agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/subagent':
+        specifier: workspace:*
+        version: link:../subagent
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+    devDependencies:
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
   packages/subagent/tool-subagent:
     dependencies:
       '@actspace/agent':
         specifier: workspace:*
         version: link:../../core/agent
-      '@actspace/background-tasks':
-        specifier: workspace:*
-        version: link:../../background-tasks/background-tasks
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../composition/cordis-adapter

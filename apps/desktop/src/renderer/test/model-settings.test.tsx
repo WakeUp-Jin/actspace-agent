@@ -76,15 +76,25 @@ describe("设置 › 模型", () => {
 
   it("看图只列能看图的模型；选「跟随」清空绑定", async () => {
     await renderModels();
-    await userEvent.click(screen.getByRole("button", { name: "子 Agent 探索模型" }));
+    await userEvent.click(screen.getByRole("button", { name: "自动审批模型" }));
     await userEvent.click(within(await screen.findByRole("menu")).getByRole("button", { name: "跟随会话默认" }));
-    await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ explore: { model: null, thinking: null } }));
+    await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ autoReview: { model: null, thinking: "off" } }));
 
     await userEvent.click(screen.getByRole("button", { name: "看图模型" }));
     const list = await screen.findByRole("menu", { name: "看图可选模型" });
     expect(within(list).queryByRole("button", { name: /DeepSeek/ })).not.toBeInTheDocument();
     expect(within(list).getByRole("button", { name: /Claude Sonnet 4\.5/ })).toBeInTheDocument();
     expect(within(list).getByText("只列出能看图的模型")).toBeInTheDocument();
+  });
+
+  it("子智能体用途：第一项「跟随主智能体」，选模型保存、不带思考档位", async () => {
+    await renderModels();
+    await userEvent.click(screen.getByRole("button", { name: "子智能体模型" }));
+    const list = await screen.findByRole("menu", { name: "子智能体可选模型" });
+    expect(within(list).getByRole("button", { name: "跟随主智能体" })).toBeInTheDocument();
+    expect(within(list).queryByRole("button", { name: /^编辑 / })).not.toBeInTheDocument();
+    await userEvent.click(within(list).getByRole("button", { name: /Claude Haiku 4\.5/ }));
+    await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ subagent: { model: relayKey("claude-haiku-4-5"), thinking: null } }));
   });
 
   it("添加官方连接：填 Key 后直接建好，弹窗里一个都不预选，勾了才添加", async () => {

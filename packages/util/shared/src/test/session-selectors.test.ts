@@ -829,6 +829,24 @@ describe("session selectors", () => {
     expect(blocks[0]).toMatchObject({ kind: "user", content: "看看进度" });
   });
 
+  it("renders subagent notices and agent messages like task notices, never as user bubbles", () => {
+    const notice = (id: string, source: string, content: string, backgroundNotice?: { taskId: string; taskKind: "subagent" | "agent_message"; title: string; status: string }) => ({
+      id, sessionId: "session-1", agentRunId: "turn-2", type: "user_message" as const, timestamp: "2026-11-04T12:00:00.000Z", schemaVersion: 2 as const,
+      payload: { content, source, ...(backgroundNotice ? { backgroundNotice } : {}) },
+    });
+    const blocks = createMessageBlocks([
+      notice("evt-done", "subagent_notification", "<subagent_notification>\n<agent_id>child-1</agent_id>\n</subagent_notification>", { taskId: "child-1", taskKind: "subagent", title: "复核提交顺序", status: "completed" }),
+      notice("evt-message", "agent_message", '<agent_message from="child-1" relation="child">\n只改一处\n</agent_message>', { taskId: "child-1", taskKind: "agent_message", title: "复核提交顺序", status: "message" }),
+      // 回合进行中领取的（没有开启唤醒的那一条）不渲染。
+      notice("evt-mid-turn", "agent_message", '<agent_message from="child-1" relation="child">\n进度\n</agent_message>'),
+    ]);
+    expect(blocks).toMatchObject([
+      { kind: "background_notice", taskId: "child-1", taskKind: "subagent", title: "复核提交顺序", status: "completed" },
+      { kind: "background_notice", taskId: "child-1", taskKind: "agent_message", status: "message" },
+    ]);
+    expect(blocks).toHaveLength(2);
+  });
+
   it("carries file references and quoted replies onto user blocks only when present", () => {
     const excerpt = { annotationId: "ann", assistantMessageId: "v2-1", selectedText: "x", startOffset: 0, endOffset: 1, prefixContext: "", suffixContext: "" };
     const blocks = createMessageBlocks([

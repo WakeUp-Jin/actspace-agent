@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
-import { projectChatEvents, projectSubagentList, projectChatSession, projectSubagentTranscript } from "../sessions/chat.js";
+import { projectChatEvents, projectChatSession, projectSubagentTranscript } from "../sessions/chat.js";
 
 // 14 T12：投影出的事件带来源 envelope 的 seq；由多条 envelope 合成的 subagent 块只带 runId。
 function snapshot(messageIds: string[]): RuntimeV2SessionSnapshot {
@@ -79,16 +79,5 @@ describe("chat projection identity", () => {
       ["thinking", "run-1", 7],
       ["assistant_message", "run-1", 7],
     ]);
-  });
-
-  it("leaves sourceSeq off the synthetic subagent block, which spans several envelopes", () => {
-    const journal = [
-      envelope(2, "tool/call", { agentRunId: "run-1", callId: "call-agent", name: "agent", args: { description: "Explore", prompt: "look" } }),
-      envelope(5, "tool/result", { agentRunId: "run-1", callId: "call-agent", name: "agent", status: "completed", summary: "done" }),
-    ];
-    const blocks = projectSubagentList(snapshot([]), journal);
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0]).toMatchObject({ id: "subagent:call-agent", runId: "run-1" });
-    expect("sourceSeq" in blocks[0]!).toBe(false);
   });
 });

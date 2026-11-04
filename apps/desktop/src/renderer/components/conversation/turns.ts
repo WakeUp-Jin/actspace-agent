@@ -47,6 +47,12 @@ export function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTu
       continue;
     }
 
+    // 轮内读到的通知留在这一轮里它被读到的位置；唤醒空闲会话的通知开启新的一轮。
+    if (message.kind === "background_notice" && message.opensTurn === false && currentTurn) {
+      currentTurn.messages.push(message);
+      continue;
+    }
+
     if (message.kind === "background_notice") {
       currentTurn = { id: message.renderKey ?? message.id, user: null, notice: message, messages: [] };
       turns.push(currentTurn);

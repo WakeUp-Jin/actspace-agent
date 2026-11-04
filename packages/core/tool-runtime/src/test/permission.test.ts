@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SessionGrant } from "@actspace/shared/runtime-v2";
-import { classifyFileResource, combinePermissionDecisions, evaluateGlobalBoundary, sessionGrantsCoverResources } from "../permission/index.js";
+import { mkdtemp, mkdir, rm, symlink, writeFile, realpath } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { classifyFileResource, combinePermissionDecisions, evaluateGlobalBoundary, HostReadableFiles, sessionGrantsCoverResources } from "../permission/index.js";
 
 const file = (canonicalPath: string, access: "read" | "write" | "delete" = "read") => ({
   kind: "file" as const,
@@ -93,3 +96,34 @@ function grant(overrides: Partial<SessionGrant> = {}): SessionGrant {
     ...overrides,
   };
 }
+
+describe("host-readable exact files", () => {
+  it("lets reads of a listed file skip the scope approval while its siblings, writes and directory still ask", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "actspace-host-readable-")));
+    try {
+      const records = join(root, "records"); await mkdir(records);
+      const listed = join(records, "rollout.jsonl"); const sibling = join(records, "other.jsonl");
+      await writeFile(listed, "{}\n"); await writeFile(sibling, "{}\n");
+      const files = new HostReadableFiles();
+      files.add(listed); files.add(join(root, "dir-only"));
+      const has = (path: string) => files.has(path);
+      expect(evaluateGlobalBoundary("default", "/workspace", [file(listed)], has)).toEqual({ kind: "pass" });
+      expect(evaluateGlobalBoundary("default", "/workspace", [file(sibling)], has)).toMatchObject({ kind: "ask", reasons: [{ code: "WORKSPACE_SCOPE_APPROVAL_REQUIRED" }] });
+      expect(evaluateGlobalBoundary("default", "/workspace", [file(listed, "write")], has)).toMatchObject({ kind: "ask" });
+      expect(evaluateGlobalBoundary("default", "/workspace", [file(join(root, "dir-only", "inside.txt"))], has)).toMatchObject({ kind: "ask" });
+      files.remove(listed);
+      expect(evaluateGlobalBoundary("default", "/workspace", [file(listed)], has)).toMatchObject({ kind: "ask" });
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it("matches the canonical path when a file was added through a symlinked directory", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "actspace-host-readable-")));
+    try {
+      const real = join(root, "real"); await mkdir(real); await writeFile(join(real, "a.jsonl"), "");
+      await symlink(real, join(root, "link"));
+      const files = new HostReadableFiles(); files.add(join(root, "link", "a.jsonl"));
+      expect(files.has(join(real, "a.jsonl"))).toBe(true);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+});
+

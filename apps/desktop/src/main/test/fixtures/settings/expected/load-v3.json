@@ -73,7 +73,7 @@
         "defaultChatModel": "deepseek:deepseek-flash",
         "utilityModel": "kimi:kimi-k2.6",
         "autoReviewModel": null,
-        "exploreModel": null,
+        "subagentDefaultModel": null,
         "visionModel": null,
         "thinking": {
           "utility": "off",
@@ -107,8 +107,7 @@
         "temperature": null,
         "maxTokens": 2048,
         "disabledTools": [],
-        "bashAlwaysAsk": true,
-        "exploreModelId": null
+        "bashAlwaysAsk": true
       },
       "skills": {
         "disabled": []
@@ -223,7 +222,7 @@
             "defaultChat": "deepseek:deepseek-flash",
             "utility": "kimi:kimi-k2.6",
             "autoReview": null,
-            "explore": null,
+            "subagentDefaultModel": null,
             "vision": null,
             "thinking": {
               "utility": "off",
@@ -235,7 +234,7 @@
               "label": "Kimi main"
             }
           },
-          "layersVersion": 2
+          "layersVersion": 3
         },
         "tools": {
           "disabledTools": [],
@@ -395,7 +394,7 @@
           "defaultChat": "deepseek:deepseek-flash",
           "utility": "kimi:kimi-k2.6",
           "autoReview": null,
-          "explore": null,
+          "subagentDefaultModel": null,
           "vision": null,
           "thinking": {
             "utility": "off",
@@ -407,7 +406,7 @@
             "label": "Kimi main"
           }
         },
-        "layersVersion": 2
+        "layersVersion": 3
       },
       "tools": {
         "disabledTools": [],

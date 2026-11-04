@@ -6,12 +6,14 @@
  * - I6：计费模式去掉。reference 下单独填的价格、manual 下填的价格（当时会乘倍率，这里乘好）转成手填价；token 下的价格丢掉，改按参考价 × 倍率。
  * - I7：看图只在白名单模型已安装时迁到用途表，否则跟随会话默认。
  * - 轻量任务和自动审批以前固定不思考，迁成用途表里的「关」档，行为不变。
- * - 探索模型以前还镜像在 subagents.routes.explore 里（只写不清，导致没法改回跟随）：并入 taskBindings 后删除镜像。
+ * - 探索模型以前还镜像在 subagents.routes.explore 里：直接删除（探索用途已取消，见 layersVersion 2 → 3）。
  * - 旧目录模型（provider-catalog）自带的字段转成服务商数据；installed.customLabel 转成名称修改。
  * 多 Key（D11）在 sanitize 里直接丢弃，这里不用处理。
  * 旧文件里的看图模型和计费方式不再进设置类型，由 legacyModelHints 在读文件时从原始 JSON 里取出，只给本次迁移用。
  *
  * layersVersion 1 → 2：模型去掉「启用」开关，在列表里就是在用。停用的模型连同定义和修改一起移除，用到它们的用途改为跟随。
+ *
+ * layersVersion 2 → 3：探索用途取消。删掉 taskBindings.explore（对应旧结构的 taskModels.exploreModel）和 thinking.explore，不带到新的子智能体默认模型 taskBindings.subagentDefaultModel（对应 taskModels.subagentDefaultModel，从空开始）。
  */
 import {
   capabilitiesToThinking,
@@ -62,8 +64,17 @@ export function migrateModelLayers(input: SettingsV4, catalog: Pick<ModelCatalog
   const settings = cloneJson(input);
   if (version < 1) migrateToLayers(settings, catalog, hints);
   dropDisabledModels(settings);
+  if (version < 3) dropExploreBinding(settings);
   settings.models.layersVersion = MODEL_LAYERS_VERSION;
   return settings;
+}
+
+function dropExploreBinding(settings: SettingsV4): void {
+  const bindings = settings.models.taskBindings as Record<string, unknown>;
+  delete bindings.explore;
+  const thinking = bindings.thinking as Record<string, unknown> | undefined;
+  if (thinking) delete thinking.explore;
+  settings.models.taskBindings.subagentDefaultModel = null;
 }
 
 function dropDisabledModels(settings: SettingsV4): void {
@@ -77,7 +88,7 @@ function dropDisabledModels(settings: SettingsV4): void {
     const source = models.definitions[typed]?.source;
     if (source !== "builtin" && source !== "curated") delete models.definitions[typed];
   }
-  for (const field of ["defaultChat", "utility", "autoReview", "explore", "vision"] as const) {
+  for (const field of ["defaultChat", "utility", "autoReview", "subagentDefaultModel", "vision"] as const) {
     const bound = models.taskBindings[field];
     if (bound && disabled.has(bound)) models.taskBindings[field] = null;
   }
@@ -124,8 +135,6 @@ function migrateToLayers(settings: SettingsV4, catalog: Pick<ModelCatalogSnapsho
   const visionKey = hints.visionModel as ModelKey | null;
   models.taskBindings.vision = visionKey && models.installed[visionKey] ? visionKey : null;
   models.taskBindings.thinking = { utility: "off", autoReview: "off", ...models.taskBindings.thinking };
-  const mirroredExplore = settings.subagents.routes.explore?.model as ModelKey | undefined;
-  if (!models.taskBindings.explore && mirroredExplore && models.installed[mirroredExplore]) models.taskBindings.explore = mirroredExplore;
   delete settings.subagents.routes.explore;
   models.overrides = overrides;
 }

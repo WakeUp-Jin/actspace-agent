@@ -28,6 +28,25 @@ export function isSessionTranscriptReadPath(dataRoot: string, canonicalPath: str
   return dirname(sessionDir) === root && SESSION_ID.test(basename(sessionDir));
 }
 
+/** Background Bash logs: `sessions-v2/<id>/bash-log/bash_<uuid>.log`, the id `node-ports.ts` assigns. */
+const BASH_LOG_FILE = /^bash_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.log$/;
+export const BASH_LOG_DIRECTORY_NAME = "bash-log";
+
+/**
+ * True only for one Bash log file of one Session, which the agent may read
+ * without a workspace-scope approval. The `bash-log` directory itself, other
+ * file names and the Journal next to it keep the normal approval.
+ */
+export function isBashLogReadPath(dataRoot: string, canonicalPath: string): boolean {
+  const root = canonical(sessionsRoot(dataRoot));
+  const candidate = resolve(canonicalPath);
+  if (!BASH_LOG_FILE.test(basename(candidate))) return false;
+  const logDir = dirname(candidate);
+  if (basename(logDir) !== BASH_LOG_DIRECTORY_NAME) return false;
+  const sessionDir = dirname(logDir);
+  return dirname(sessionDir) === root && SESSION_ID.test(basename(sessionDir));
+}
+
 function canonical(path: string): string {
   try { return existsSync(path) ? realpathSync(path) : resolve(path); } catch { return resolve(path); }
 }

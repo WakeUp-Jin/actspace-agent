@@ -221,7 +221,7 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
     case "archivedChats":
       return <PageShell title="归档会话"><ArchivedChatsSection onArchivedSessionsChange={rest.onArchivedSessionsChange} /></PageShell>;
     case "subagents":
-      return <PageShell title="子 Agent" description="主 Agent 可以委派任务的专门代理。"><SubagentSection onNavigate={rest.onNavigate} /></PageShell>;
+      return <PageShell title="子 Agent" description="主智能体可以把任务委派给子智能体。"><SubagentSection onNavigate={rest.onNavigate} /></PageShell>;
     case "usage":
       return (
         <UsageStatisticsPage

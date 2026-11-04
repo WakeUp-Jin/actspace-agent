@@ -257,8 +257,33 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
   </article>;
 }
 
-export function ToolLogLine({ message, className, onOpenFile, onExpand }: { onExpand?: () => void; message: ToolLogMessage; className?: string; onOpenFile?: (message: Extract<MessageBlock, { kind: "read" }>) => void }) {
+// 与后台通知行展开后的原文块同一样式：消息原文要整段看，不按行截断。
+const SUBAGENT_TOOL_BODY_CLASS = "mt-1 mb-2 max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-act-md bg-surface-subtle px-3.5 py-3 font-mono text-act-xs leading-5 text-text-muted";
+
+/** `send_message` / `interrupt_agent`：「发消息给 ‹描述›」，点描述打开该子智能体，展开看消息原文与结果（设计 05 §1）。 */
+function SubagentToolLine({ message, className, onOpenSubagent }: { message: Extract<MessageBlock, { kind: "tool" }>; className?: string; onOpenSubagent?: (agentId: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const link = message.subagentLink!;
+  const failed = message.isError || message.status === "failed";
+  return <article className={`tool-result-disclosure${failed ? " is-error" : ""}${className ? ` ${className}` : ""}`}>
+    <div className="tool-result-header">
+      <span className="tool-summary-parts">
+        <span className="tool-summary-action">{link.verb}</span>
+        {onOpenSubagent
+          ? <button className="tool-file-link" type="button" title={`打开子智能体 ${link.target}`} onClick={() => onOpenSubagent(link.agentId)}>{link.target}</button>
+          : <span className="tool-summary-target" title={link.target}>{link.target}</span>}
+      </span>
+      {message.content ? <button className="tool-result-toggle" type="button" aria-label={expanded ? `收起 ${message.title}` : `展开 ${message.title}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+        {expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />}
+      </button> : null}
+    </div>
+    {expanded ? <pre className={SUBAGENT_TOOL_BODY_CLASS}>{message.content}</pre> : null}
+  </article>;
+}
+
+export function ToolLogLine({ message, className, onOpenFile, onExpand, onOpenSubagent }: { onExpand?: () => void; message: ToolLogMessage; className?: string; onOpenFile?: (message: Extract<MessageBlock, { kind: "read" }>) => void; onOpenSubagent?: (agentId: string) => void }) {
   if (message.kind === "tool" && message.status === "pending" && message.approvalRequestId) return <GenericToolApprovalLine message={message} className={className} />;
+  if (message.kind === "tool" && message.subagentLink) return <SubagentToolLine message={message} className={className} onOpenSubagent={onOpenSubagent} />;
   if ((message.kind === "read" || message.kind === "grep" || message.kind === "glob") && message.status === "pending") return <FileReadApprovalLine message={message} className={className} />;
   if (message.kind === "read") {
     const failure = getToolFailureLabel(message.status);

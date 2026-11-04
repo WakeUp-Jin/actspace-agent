@@ -93,10 +93,6 @@ describe("model resolver", () => {
       ok: false,
       reason: "capability_mismatch",
     });
-    expect(resolveConfiguredModel(snapshot, definition.key, "explore")).toMatchObject({
-      ok: false,
-      reason: "capability_mismatch",
-    });
     expect(resolveConfiguredModel(snapshot, definition.key, "review")).toMatchObject({
       ok: false,
       reason: "capability_mismatch",

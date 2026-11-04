@@ -220,7 +220,7 @@ Menu、ContextMenu、Select 共用 `menu-styles.ts` 的外观：面板 `rounded-
 | 定位 | `side` + `align` + `collisionPadding={8}`，空间不够时翻到另一侧；portal 到 body，不依赖祖先 `overflow-visible` |
 | 拖动区域 | 遮罩和浮层都是 `-webkit-app-region: no-drag`，盖在窗口标题栏上时点击不会变成拖动窗口 |
 
-业务组件里仍可以监听 Escape 的只有输入框或表单内的行为：取消重命名、取消录制快捷键、设置表单回到上一步、清除时间轴的拖选。另有两处不是弹层的：窄窗口下关侧栏和右侧面板的覆盖层（`workbench/use-panel-layout.ts`，已被浮层处理过的 Esc 不连带关）、子 Agent 记录面板（`messages/SubAgentTranscriptModal.tsx`，`role="region"`，疑似死代码，见技术债）。
+业务组件里仍可以监听 Escape 的只有输入框或表单内的行为：取消重命名、取消录制快捷键、设置表单回到上一步、清除时间轴的拖选。另有一处不是弹层的：窄窗口下关侧栏和右侧面板的覆盖层（`workbench/use-panel-layout.ts`，已被浮层处理过的 Esc 不连带关）。
 
 设置页本身通过可聚焦根容器处理未被消费的 Esc，沿现有返回动作退出；挂载时不夺取现有模态层的焦点。设置行内 `SettingEditor` 关闭后回到稳定入口，异步保存按钮被禁用而失焦时也须恢复。调用方可用稳定的 `returnFocusId` 指向跨编辑器挂载周期存在的触发器；若用户已把焦点移到其他有效节点，关闭编辑器不能抢回。正在合成的按键不触发取消或退出。回归须同时覆盖Esc、取消、异步保存、焦点主动移出和嵌套浮层，不能只验证编辑器从DOM消失。
 

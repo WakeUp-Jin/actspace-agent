@@ -291,7 +291,7 @@ export function sanitizeTaskModels(input: unknown): TaskModelSettings {
     defaultChatModel: normalizeNullableModelKey(value.defaultChatModel),
     utilityModel: normalizeNullableModelKey(value.utilityModel),
     autoReviewModel: normalizeNullableModelKey(value.autoReviewModel),
-    exploreModel: normalizeNullableModelKey(value.exploreModel),
+    subagentDefaultModel: normalizeNullableModelKey(value.subagentDefaultModel),
     visionModel: normalizeNullableModelKey(value.visionModel),
     ...(sanitizePurposeThinking(value.thinking) ?? {}),
   };

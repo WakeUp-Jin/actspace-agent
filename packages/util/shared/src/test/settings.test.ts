@@ -31,7 +31,7 @@ describe("settings v2 contract", () => {
       taskModels: {
         defaultChatModel: "deepseek:deepseek-v4-pro",
         utilityModel: "deepseek:deepseek-v4-flash",
-        exploreModel: null,
+        subagentDefaultModel: null,
       },
       searchProviders: {
         zhipu: { hasApiKey: false },

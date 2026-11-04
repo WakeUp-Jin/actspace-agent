@@ -24,7 +24,7 @@ const rows: readonly DefaultHarnessEntry[] = DEFAULT_HARNESS_ENTRIES;
 /** Host modules supply data contracts, persistence, and scope identity, not execution policy. */
 const hostModules = ["@actspace/cordis-adapter", "@actspace/scope", "@actspace/shared", "@actspace/shared/runtime-v2", "@actspace/session-journal", "@actspace/session-persistence", "@actspace/session-projection"];
 export const DEFAULT_HARNESS_SHARED_SERVICES = Object.freeze([
-  "actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "actspace.host.background-tasks", "actspace.host.sandbox", "agent.registry", "session.runtime", "llm.auxiliary-requests", "session.checkpoint", "session.journal", "session.projection", "actspace.host.tools.browser",
+  "actspace.host.llm", "actspace.host.prompt", "actspace.host.agent", "actspace.host.subagents", "actspace.host.background-tasks", "actspace.host.sandbox", "actspace.host.models", "actspace.host.session", "agent.registry", "session.runtime", "llm.auxiliary-requests", "session.checkpoint", "session.journal", "session.projection", "actspace.host.tools.browser",
   ...["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => `actspace.host.tools.${id}`),
 ]);
 
@@ -36,11 +36,20 @@ export async function defaultHarnessSharedModules(): Promise<SharedArtifactModul
   }))).sort((a, b) => a.specifier.localeCompare(b.specifier));
 }
 
+/** The manifest's `config` with the Host's settings for this entry on top. */
+function entryConfig(defaults: PluginBehaviorDescriptor["config"] | undefined, settings: Readonly<Record<string, unknown>> | undefined): PluginBehaviorDescriptor["config"] {
+  if (settings === undefined) return defaults ?? {};
+  const base = defaults !== null && typeof defaults === "object" && !Array.isArray(defaults) ? defaults : {};
+  return { ...base, ...settings } as PluginBehaviorDescriptor["config"];
+}
+
 /** Publish the build-produced closure; only supported default builtin implementation is admitted. */
 export async function prepareDefaultHarnessArtifact(options: {
   readonly artifactRoot: string;
   readonly sourceRoot?: string;
   readonly disabledEntries?: readonly string[];
+  /** Entry id -> settings over the manifest's `config` defaults. */
+  readonly entryConfig?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
   readonly hostCapabilities: readonly string[];
 }): Promise<HarnessMountRequest> {
   const sourceRoot = options.sourceRoot ?? fileURLToPath(new URL("../default-harness", import.meta.url));
@@ -51,7 +60,7 @@ export async function prepareDefaultHarnessArtifact(options: {
   const manifest: PluginManifest = {
     schemaVersion: 1, pluginId: id, version: "1", name: "Default built-in Harness", runtimeContract: "actspace.runtime.v2",
     source: { kind: "builtin", reference: "builtin:actspace.default-harness" }, codecs: [],
-    behaviors: rows.map(([name, provides, injects, optional = []]): PluginBehaviorDescriptor => ({ entryId: entryId(name), module: `./${name}.js`, required: true, enabled: !options.disabledEntries?.includes(name), config: pluginCatalogEntry(name)?.manifest.behaviors[0]?.config ?? {}, host: { required: [], optional: [] }, frontend: null, provides: provides.map(serviceId), injects: injects.map(serviceId), ...(optional.length ? { optionalInjects: optional.map(o => serviceId(o.id)) } : {}), contracts: { services: { provides: provides.map(id => ({ id, version: 1 })), requires: [...injects.map(id => ({ id, version: 1 })), ...optional.map(o => ({ id: o.id, version: 1, optional: true, fallback: o.fallback }))] }, events: { provides: name === "agent-factory" ? loopEvents : name === "tools-runtime" ? toolEvents : [], requires: [] } } })),
+    behaviors: rows.map(([name, provides, injects, optional = []]): PluginBehaviorDescriptor => ({ entryId: entryId(name), module: `./${name}.js`, required: true, enabled: !options.disabledEntries?.includes(name), config: entryConfig(pluginCatalogEntry(name)?.manifest.behaviors[0]?.config, options.entryConfig?.[name]), host: { required: [], optional: [] }, frontend: null, provides: provides.map(serviceId), injects: injects.map(serviceId), ...(optional.length ? { optionalInjects: optional.map(o => serviceId(o.id)) } : {}), contracts: { services: { provides: provides.map(id => ({ id, version: 1 })), requires: [...injects.map(id => ({ id, version: 1 })), ...optional.map(o => ({ id: o.id, version: 1, optional: true, fallback: o.fallback }))] }, events: { provides: name === "agent-factory" ? loopEvents : name === "tools-runtime" ? toolEvents : [], requires: [] } } })),
     contributions: { services: rows.flatMap(([, provides]) => [...provides]), events: [], contributions: [] },
   };
   const artifact = await publishPluginArtifact({ sourceRoot, artifactRoot: options.artifactRoot, plugin: manifest, files: files as string[], sharedModules });

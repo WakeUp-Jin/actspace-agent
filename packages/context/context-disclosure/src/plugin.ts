@@ -1,5 +1,5 @@
 import type { CordisContext } from "@actspace/cordis-adapter";
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { Context, ContextPathState, ContextSource, CompactionDisclosure, CompactionRegion, CompactionResult, CompactionSession, ContextCompactionCoordinator } from "@actspace/context-engine";
 import { CONTEXT_OWNER, STATE_EVENT } from "@actspace/context-engine/codec";
@@ -36,7 +36,9 @@ export class ProgressiveDisclosure implements CompactionDisclosure {
     if (state.sessionId !== session.header.sessionId) {
       const path = await this.host.historyPath(session.header.sessionId);
       const replacements = path ? [...state.paths.values()].filter(value => value.history?.sessionId === state.sessionId).map(value => ({ oldId: value.id, path, history: { sessionId: session.header.sessionId, sourceEventSeqs: value.history!.sourceEventSeqs } })) : [];
-      await new ContextSupplements(session).remove(DISCLOSURE_OWNER, "navigation");
+      // A forked subagent (`agent_fork`) must send its parent's message prefix unchanged so the provider cache still
+      // hits (design 02 §8.4); the navigation list it writes next supersedes the inherited one anyway.
+      if (session.header.lineage?.origin !== "delegation") await new ContextSupplements(session).remove(DISCLOSURE_OWNER, "navigation");
       await this.append(session, { op: "fork", sessionId: session.header.sessionId, replacements });
     }
   }
@@ -82,6 +84,13 @@ export class ProgressiveDisclosure implements CompactionDisclosure {
         if (path) paths.push({ path, owner: "actspace.context-tools", read: data.name === "read_file" && value.operation === "read" });
       }
     }
+    // Any tool may point at a trace file it produced (subagent transcript, background Bash log); it becomes an active path, not a read.
+    for (const detail of Array.isArray(data.detail) ? data.detail : []) {
+      const block = record(detail); const value = record(block.value);
+      if (block.label !== CONTEXT_TRACE_DETAIL_LABEL || value.kind !== "trace" || typeof value.path !== "string") continue;
+      const path = await this.host.normalizeFile(session.header.sessionId, value.path);
+      if (path) paths.push({ path, owner: "actspace.context-tools", read: false, ...(typeof value.description === "string" && value.description ? { description: value.description } : {}) });
+    }
     for (const artifact of Array.isArray(data.artifacts) ? data.artifacts : []) {
       const value = record(artifact);
       if (typeof value.artifactId !== "string" || typeof value.mediaType !== "string" || !value.mediaType.startsWith("text/") || state.indexArtifacts.has(value.artifactId)) continue;
@@ -89,7 +98,11 @@ export class ProgressiveDisclosure implements CompactionDisclosure {
     }
     const indexPaths = await this.indexPaths(session);
     const merged = new Map<string, PathReference & { read: boolean }>();
-    for (const path of paths) if (!indexPaths.has(path.path)) merged.set(path.path, { ...path, read: path.read || merged.get(path.path)?.read === true });
+    for (const path of paths) {
+      if (indexPaths.has(path.path)) continue;
+      const previous = merged.get(path.path); const description = path.description ?? previous?.description;
+      merged.set(path.path, { ...path, read: path.read || previous?.read === true, ...(description ? { description } : {}) });
+    }
     const unique = [...merged.values()];
     await this.append(session, { op: "fact", sourceSeq: event.seq, callId: data.callId, time: event.time, paths: unique });
   }

@@ -7,6 +7,7 @@ import { isDeepStrictEqual } from "node:util";
 import { randomUUID } from "node:crypto";
 import { prepareExecutionContext, rollbackPreparedExecution } from "../workspace-git-context-service";
 import { homedir } from "node:os";
+import { stat } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
 import { dialog, nativeImage, nativeTheme, shell, type BrowserWindow } from "electron";
 import { spawn } from "node:child_process";
@@ -36,6 +37,7 @@ import {
 } from "@actspace/shared";
 import {
   RUNTIME_V2_FIXED_RENDERER_CHANNELS,
+  foldSubagentTree,
   type RuntimeV2JsonValue,
   type RuntimeV2SessionListItem,
   type RuntimeV2SessionSnapshot,
@@ -72,9 +74,8 @@ import {
   projectContextState,
   projectChatEvents,
   projectSubagentTranscript,
-  projectSubagentList,
+  projectSubagentItems,
   subagentChildrenWithoutModel,
-  subagentChildren,
   latestRequestModel,
   toolPreview,
 } from "@actspace/client/sessions";
@@ -666,16 +667,27 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       if (finished) rememberFinished(finishedChildModels, childSessionId, model);
       if (model) childModels.set(childSessionId, model);
     }));
-    // List rows show each child's cumulative token usage, read from its own Session snapshot.
+    // List rows show each child's cumulative token usage, read from its own Session snapshot. External
+    // subagents have no child Session and show none. A settled activation's count is remembered; a
+    // continuation starts a new activation, so the cache key carries the activation count.
+    const items = projectSubagentItems(journal, childModels);
     const childTokens = new Map<string, number>();
-    await Promise.all(subagentChildren(journal).map(async ({ childSessionId, finished }) => {
-      const cached = finishedChildTokens.get(childSessionId);
-      const tokens = cached !== undefined ? cached : await options.registry.inspectSession(childSessionId).then((child) => child.usage.totalTokens, () => undefined);
+    await Promise.all(items.filter(item => item.kind === "local" || item.kind === "fork").map(async ({ agentId, status, activationCount }) => {
+      const key = `${agentId}#${activationCount}`;
+      const cached = settledChildTokens.get(key);
+      const tokens = cached !== undefined ? cached : await options.registry.inspectSession(agentId).then((child) => child.usage.totalTokens, () => undefined);
       if (tokens === undefined) return;
-      if (finished) rememberFinished(finishedChildTokens, childSessionId, tokens);
-      childTokens.set(childSessionId, tokens);
+      if (status !== "running") rememberFinished(settledChildTokens, key, tokens);
+      childTokens.set(agentId, tokens);
     }));
-    return projectSubagentList(await options.registry.inspectSession(input.sessionId), journal, childModels, childTokens);
+    return items.map(item => childTokens.has(item.agentId) ? { ...item, totalTokens: childTokens.get(item.agentId)! } : item);
+  });
+  ipc.handle(contract.sessions.interruptSubagent, async (input) => options.registry.interruptSubagent(input.sessionId, input.agentId));
+  ipc.handle(contract.sessions.revealSubagentRecord, async (input) => {
+    const path = foldSubagentTree(await options.registry.inspectSessionEvents(input.sessionId)).agents[input.agentId]?.transcriptPath;
+    if (!path || !(await stat(path).then(info => info.isFile(), () => false))) return { ok: false };
+    shell.showItemInFolder(path);
+    return { ok: true };
   });
   ipc.handle(contract.sessions.getSubAgentTranscript, async (input) => {
     const snapshot = await options.registry.inspectSession(input.transcriptRef.runId);
@@ -687,8 +699,8 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
 
 /** Request model of finished subagent children whose parent recorded none (null = the child sent no request). */
 const finishedChildModels = new Map<string, string | null>();
-/** Final cumulative token usage of finished subagent children; they no longer change, so the 1s list poll skips re-reading them. */
-const finishedChildTokens = new Map<string, number>();
+/** Cumulative token usage of subagents after a settled activation (key `agentId#activationCount`); it no longer changes until a continuation, so the 1s list poll skips re-reading them. */
+const settledChildTokens = new Map<string, number>();
 const FINISHED_CHILD_CACHE_LIMIT = 500;
 function rememberFinished<T>(cache: Map<string, T>, childSessionId: string, value: T): void {
   if (cache.has(childSessionId)) return;

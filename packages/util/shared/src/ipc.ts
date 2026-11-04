@@ -1123,4 +1123,10 @@ export interface PluginListItem {
   loaded: boolean;
   /** The switch value in settings (what the next launch will load). */
   enabled: boolean;
+  /** Why the plugin cannot do its job on this machine (for example the CLI it wraps is not installed); absent when available. */
+  unavailableReason?: string;
+  /** Current plugin settings (defaults filled in), keyed by setting name; only plugins that have settings carry it. */
+  settings?: Record<string, string>;
+  /** The saved settings differ from what this launch loaded; they apply after a restart. */
+  settingsPendingRestart?: boolean;
 }

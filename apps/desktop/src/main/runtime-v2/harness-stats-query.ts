@@ -383,7 +383,7 @@ function runtime(scope: Scope): HarnessStatsRuntime {
     retries: { total: sum("retries"), byCode: [...retryCodes].map(([code, count]) => ({ code, count })).sort((a, b) => b.count - a.count) },
     interventions: { aborted: reasons.aborted, steering: sum("steering"), queued: sum("queued") },
     delegations: {
-      byPreset: [...presets].map(([presetId, count]) => ({ presetId, count })).sort((a, b) => b.count - a.count),
+      byPreset: [...presets].map(([presetId, count]) => ({ presetId, count, avgDurationMs: mean([...delegations.values()].filter(row => String(row.preset_id ?? "unknown") === presetId && row.duration_ms != null).map(row => n(row.duration_ms))) })).sort((a, b) => b.count - a.count),
       failed: [...delegations.values()].filter(row => row.status === "failed" || row.status === "error").length,
       avgSteps: mean(childSteps.map(row => n(row.steps))),
       avgDurationMs: mean([...delegations.values()].filter(row => row.duration_ms != null).map(row => n(row.duration_ms))),

@@ -30,6 +30,11 @@ export function buildTurns(items: readonly TranscriptItem[]): Turn[] {
       raw.push(current);
       continue;
     }
+    // 轮内读到的通知留在这一轮里它被读到的位置；唤醒空闲会话的通知单独成一段。
+    if (current && item.type === "block" && item.block.kind === "background_notice" && item.block.opensTurn === false) {
+      current.items.push(item);
+      continue;
+    }
     if (isKind(item, SEPARATE)) {
       current = null;
       raw.push({ key: item.key, user: null, items: [item] });

@@ -5,6 +5,7 @@ import { manifest as backgroundTasksToolManifest } from "@actspace/tool-backgrou
 import { manifest as browserToolsManifest } from "@actspace/tool-browser/manifest";
 import { manifest as compactionManifest } from "@actspace/context-compaction/manifest";
 import { manifest as contextBackgroundTasksManifest } from "@actspace/context-background-tasks/manifest";
+import { manifest as contextSubagentsManifest } from "@actspace/context-subagents/manifest";
 import { manifest as contextConversationManifest } from "@actspace/context-conversation/manifest";
 import { manifest as contextDisclosureManifest } from "@actspace/context-disclosure/manifest";
 import { manifest as contextEngineManifest } from "@actspace/context-engine/manifest";
@@ -39,6 +40,8 @@ import { manifest as shellManifest } from "@actspace/tool-shell/manifest";
 import { manifest as sideChatManifest } from "@actspace/side-chat/manifest";
 import { manifest as sessionTranscriptManifest } from "@actspace/session-transcript/manifest";
 import { manifest as subagentToolsManifest } from "@actspace/tool-subagent/manifest";
+import { manifest as subagentCodexManifest } from "@actspace/subagent-codex/manifest";
+import { manifest as subagentClaudeCodeManifest } from "@actspace/subagent-claude-code/manifest";
 import { manifest as todoToolsManifest, projectionManifest as todoProjectionManifest } from "@actspace/tool-todo/manifest";
 import { manifest as webManifest } from "@actspace/tool-web/manifest";
 import { agentFactoryManifest, agentRuntimeManifest, runtimeManifest, sessionRuntimeManifest } from "./manifests.js";
@@ -104,6 +107,7 @@ export const PLUGIN_CATALOG: readonly PluginCatalogEntry[] = Object.freeze([
   { id: "context-conversation", manifest: contextConversationManifest, module: "@actspace/context-conversation/plugin", loaders: harness, directory: "context" },
   { id: "context-tools", manifest: contextToolsManifest, module: "@actspace/context-tools/plugin", loaders: harness, directory: "context" },
   { id: "context-background-tasks", manifest: contextBackgroundTasksManifest, module: "@actspace/context-background-tasks/plugin", loaders: harness, directory: "context" },
+  { id: "context-subagents", manifest: contextSubagentsManifest, module: "@actspace/context-subagents/plugin", loaders: harness, directory: "context" },
   { id: "context-disclosure", manifest: contextDisclosureManifest, module: "@actspace/context-disclosure/plugin", loaders: harness, directory: "context" },
   { id: "compaction-runtime", manifest: compactionManifest, module: "@actspace/context-compaction/plugin", loaders: harness, directory: "context" },
   { id: "filesystem-read", manifest: fsReadManifest, module: "@actspace/tool-fs-read/plugin", loaders: harness, directory: "fs", admitOnHost: true },
@@ -117,6 +121,8 @@ export const PLUGIN_CATALOG: readonly PluginCatalogEntry[] = Object.freeze([
   { id: "browser-tools", manifest: browserToolsManifest, module: "@actspace/tool-browser/plugin", loaders: harness, directory: "browser" },
   { id: "background-tasks", manifest: backgroundTasksToolManifest, module: "@actspace/tool-background-tasks/plugin", loaders: harness, directory: "background-tasks" },
   { id: "subagent-tools", manifest: subagentToolsManifest, module: "@actspace/tool-subagent/plugin", loaders: harness, directory: "subagent" },
+  { id: "subagent-codex", manifest: subagentCodexManifest, module: "@actspace/subagent-codex/plugin", loaders: harness, directory: "subagent" },
+  { id: "subagent-claude-code", manifest: subagentClaudeCodeManifest, module: "@actspace/subagent-claude-code/plugin", loaders: harness, directory: "subagent" },
   { id: "plugin-manager", manifest: pluginManagerManifest, module: "@actspace/plugin-manager/plugin", loaders: harness, directory: "harness-evolution" },
   { id: "agent-factory", manifest: agentFactoryManifest, module: "@actspace/runtime/agent-factory", loaders: harness, directory: "core" },
 ]);
@@ -129,7 +135,7 @@ export const PLUGIN_PACKAGES_OUTSIDE_DEFAULT: readonly { readonly package: strin
   { package: "@actspace/harness-hmr", reason: "Agent 运行时当库用，直接调用" },
   { package: "@actspace/harness-evaluation", reason: "评估候选 Harness 时单独装配" },
   { package: "@actspace/scope", reason: "只提供作用域类，由 Agent 注册表等包直接引用" },
-  { package: "@actspace/subagent", reason: "子 Agent 调度库，由 tool-subagent 与运行时直接调用" },
+  { package: "@actspace/subagent", reason: "子智能体管理器与工具定义，由运行时创建、tool-subagent 注册" },
   { package: "@actspace/llm-pi-ai", reason: "模型适配库，由桌面端和远程 Host 直接构造适配器，运行时只重新导出" },
 ]);
 
@@ -137,6 +143,16 @@ const byId = new Map(PLUGIN_CATALOG.map(entry => [entry.id, entry]));
 
 export function pluginCatalogEntry(id: string): PluginCatalogEntry | undefined {
   return byId.get(id);
+}
+
+/**
+ * Harness entries a user turns on in 扩展 › 插件 (`canDisable`, `defaultEnabled: false`). A Host without
+ * plugin switches (CLI, remote Host) leaves them off, e.g. the external subagents that run local CLIs.
+ */
+export function harnessEntriesOffByDefault(): readonly string[] {
+  return PLUGIN_CATALOG
+    .filter(entry => entry.loaders.includes("harness") && entry.manifest.display?.canDisable === true && entry.manifest.display.defaultEnabled === false)
+    .map(entry => entry.id);
 }
 
 /**

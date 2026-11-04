@@ -1,5 +1,6 @@
 import type { EffectiveModel, ModelFacts, ModelOverrides } from "./model-layers";
-import type { ModelApi, ModelKey } from "./model-config";
+import { MODEL_REASONING_EFFORTS, type ModelApi, type ModelKey, type ModelReasoningEffort } from "./model-config";
+import type { UsableModelView } from "./ipc";
 import type { ThinkingLevel } from "./model-thinking-profiles";
 import type { ProviderConnectionErrorKind, ProviderConnectionState, ProviderProxySettings, CustomConnectionResolvedAuth } from "./settings";
 
@@ -8,8 +9,8 @@ import type { ProviderConnectionErrorKind, ProviderConnectionState, ProviderProx
  * 每个修改都返回整份视图，renderer 不自己拼状态。
  */
 
-export type PurposeId = "chat" | "utility" | "autoReview" | "explore" | "vision";
-export const PURPOSE_IDS: readonly PurposeId[] = ["chat", "utility", "autoReview", "explore", "vision"];
+export type PurposeId = "chat" | "utility" | "autoReview" | "subagent" | "vision";
+export const PURPOSE_IDS: readonly PurposeId[] = ["chat", "utility", "autoReview", "subagent", "vision"];
 
 /** model 为 null 表示「跟随」：会话默认之外的用途跟随会话默认。thinking 为 null 表示用模型的默认档位。 */
 export type PurposeBinding = { model: ModelKey | null; thinking: ThinkingLevel | null };
@@ -151,3 +152,48 @@ export type ModelPreviewInput = {
 export type ModelPreviewResult = { effective: EffectiveModel; added: boolean };
 
 export type PurposesUpdateInput = Partial<Record<PurposeId, PurposeBinding>>;
+
+/** Host port id of {@link ModelsHostPort}: the models a Harness plugin may pick for a subagent. */
+export const MODELS_HOST_PORT_ID = "actspace.host.models" as const;
+
+/** One model the user can run right now, as `list_subagent_models` shows it. */
+export type UsableModelSummary = {
+  /** A ModelKey on Desktop; CLI hosts use their configured model string. */
+  readonly key: string;
+  readonly label: string;
+  /** Only for models on a connection other than the provider's default one. */
+  readonly connectionLabel?: string;
+  /** Efforts the model accepts; empty when it has no effort control. */
+  readonly reasoningEfforts: readonly ModelReasoningEffort[];
+  readonly defaultEffort?: ModelReasoningEffort;
+  readonly thinkingDefault: boolean;
+};
+
+export interface ModelsHostPort {
+  listUsableModels(): readonly UsableModelSummary[];
+  /** 设置 › 子智能体默认模型; null follows the main agent's model. */
+  subagentDefaultModel(): string | null;
+}
+
+/** Hosts without a model list (tests, remote hosts) still publish the port. */
+export const EMPTY_MODELS_HOST_PORT: ModelsHostPort = Object.freeze({ listUsableModels: () => Object.freeze([]), subagentDefaultModel: () => null });
+
+/** CLI hosts run one configured model; the list holds just it (empty when none was named). */
+export function currentModelHostPort(model: string | undefined): ModelsHostPort {
+  const models: readonly UsableModelSummary[] = Object.freeze(model ? [Object.freeze({ key: model, label: model, reasoningEfforts: Object.freeze([]), thinkingDefault: false })] : []);
+  return Object.freeze({ listUsableModels: () => models, subagentDefaultModel: () => null });
+}
+
+export function usableModelSummary(view: Pick<UsableModelView, "key" | "label" | "connectionLabel" | "thinkingDefault" | "capabilities">): UsableModelSummary {
+  const efforts = view.capabilities.reasoningEfforts;
+  const defaultEffort = view.capabilities.reasoningDefaultEffort;
+  return Object.freeze({
+    key: view.key,
+    label: view.label,
+    ...(view.connectionLabel ? { connectionLabel: view.connectionLabel } : {}),
+    // null means the provider accepts every normalized effort.
+    reasoningEfforts: Object.freeze(efforts === null ? [...MODEL_REASONING_EFFORTS] : [...(efforts ?? [])]),
+    ...(defaultEffort ? { defaultEffort } : {}),
+    thinkingDefault: view.thinkingDefault,
+  });
+}

@@ -8,7 +8,7 @@ import type { DiagnosticInput } from "../projection/diagnostics.js";
 import { sandboxStatusDiagnostic } from "./sandbox-status.js";
 import { SESSION_CODEC_HOST_PORT_ID } from "@actspace/session-journal";
 import { hostTransportPatches, loadBuiltinToolCodec, toolTransportPatches } from "../profiles/composition.js";
-import { harnessEntriesMissingHostCapabilities } from "../plugin-catalog.js";
+import { harnessEntriesMissingHostCapabilities, harnessEntriesOffByDefault } from "../plugin-catalog.js";
 import type { EventCodec } from "@actspace/session-journal";
 import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
 import { LlmService } from "@actspace/llm-service";
@@ -27,6 +27,7 @@ import type { AgentRuntimeService } from "../harness/agent-runtime-plugin.js";
 import { HEADLESS_HOST_PORT_ID } from "@actspace/headless";
 import { BACKGROUND_TASK_HOST_SERVICE, createBackgroundTaskHost } from "@actspace/background-tasks";
 import { createNodeSandboxHostPort, SANDBOX_HOST_PORT_ID } from "@actspace/sandbox";
+import { EMPTY_MODELS_HOST_PORT, MODELS_HOST_PORT_ID } from "@actspace/shared";
 import { HarnessStats, harnessStatsEnabled } from "@actspace/harness-stats";
 import { RuntimeStateController } from "./runtime-state.js";
 import { settleWithinDeadline } from "./shutdown.js";
@@ -55,8 +56,13 @@ export type BootRuntimeOptions = {
   readonly hostServices?: RuntimeHostServices;
   /** Boot this Harness selection instead of the built-in one; the data root must hold no selection history. */
   readonly pinnedHarness?: import("../harness/agent-host-port.js").PinnedHarness;
-  /** Session plugin Entry ids the Host switched off; they join `disabledHarnessEntries` even when their Host capabilities are present. */
+  /**
+   * Session plugin Entry ids the Host switched off; they join `disabledHarnessEntries` even when their Host capabilities are present.
+   * Absent: the Host has no plugin switches and every plugin that is off by default stays off.
+   */
   readonly disabledPlugins?: readonly string[];
+  /** Plugin settings by plugin Entry id, over the manifest's `config` defaults (e.g. the external subagents' permission settings). */
+  readonly pluginConfig?: Readonly<Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>>>;
   /** Record Harness runtime stats under `<dataRoot>/harness-stats` (default true). Ephemeral runs pass false so they leave no stats behind. */
   readonly harnessStats?: boolean;
 };
@@ -127,15 +133,11 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
   const harnessStats = options.harnessStats !== false && harnessStatsEnabled() ? new HarnessStats({ dataRoot: options.dataRoot }) : undefined;
   const providedHostServices = Object.freeze({
     ...hostServices.services,
-    "actspace.host.subagents": Object.freeze({ invoke: (input: import("@actspace/subagent").SubagentInvocation) => {
+    "actspace.host.subagents": createSubagentHost(() => {
       const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
       if (!runtime) throw new Error("Agent runtime is not ready");
-      return runtime.subagents.invoke(input);
-    }, launch: (input: import("@actspace/subagent").SubagentInvocation) => {
-      const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
-      if (!runtime) throw new Error("Agent runtime is not ready");
-      return runtime.subagents.launch(input);
-    } }),
+      return runtime.subagents;
+    }),
     [BACKGROUND_TASK_HOST_SERVICE]: createBackgroundTaskHost(() => {
       const runtime = runtimeContext?.get?.("agent.runtime") as AgentRuntimeService | undefined;
       if (!runtime) throw new Error("Agent runtime is not ready");
@@ -147,9 +149,12 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     [HEADLESS_HOST_PORT_ID]: hostServices.services[HEADLESS_HOST_PORT_ID] ?? Object.freeze({ enabled: false }),
     // Without a bundled nono only the macOS Seatbelt backend can probe available; Bash otherwise goes to approval.
     [SANDBOX_HOST_PORT_ID]: hostServices.services[SANDBOX_HOST_PORT_ID] ?? createNodeSandboxHostPort(),
+    // Hosts without a model list still publish the port, so subagent tools see an empty list rather than a missing service.
+    [MODELS_HOST_PORT_ID]: hostServices.services[MODELS_HOST_PORT_ID] ?? EMPTY_MODELS_HOST_PORT,
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
-      disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...harnessEntriesMissingHostCapabilities(options.host.capabilityCeiling), ...(options.disabledPlugins ?? [])],
+      disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...harnessEntriesMissingHostCapabilities(options.host.capabilityCeiling), ...(options.disabledPlugins ?? harnessEntriesOffByDefault())],
       authorizeHarness: options.authorizeHarness,
+      ...(options.pluginConfig ? { harnessEntryConfig: options.pluginConfig } : {}),
       ...(harnessStats ? { observeHarnessMount: harnessStats.observeMount } : {}),
       ...(options.pinnedHarness ? { pinnedHarness: options.pinnedHarness } : {}),
       evolution: {
@@ -312,4 +317,20 @@ export function resetRuntimeProcessGuardForTest(): void { runtimeClaimed = false
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** The Harness-facing subagent port; calls reach the Host's SubagentManager once the runtime is up. */
+function createSubagentHost(manager: () => import("@actspace/subagent").SubagentHostPort): import("@actspace/subagent").SubagentHostPort {
+  const port: import("@actspace/subagent").SubagentHostPort = {
+    spawn: input => manager().spawn(input),
+    spawnFork: input => manager().spawnFork(input),
+    spawnExternal: (backend, input) => manager().spawnExternal(backend, input),
+    sendMessage: input => manager().sendMessage(input),
+    waitForInput: input => manager().waitForInput(input),
+    listAgents: input => manager().listAgents(input),
+    interrupt: input => manager().interrupt(input),
+    listModels: input => manager().listModels(input),
+    running: sessionId => manager().running(sessionId),
+  };
+  return Object.freeze(port);
 }

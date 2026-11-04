@@ -3,3 +3,4 @@ export * from "./manifest.js";
 export * from "./plugin.js";
 export * from "./node-ports.js";
 export * from "./command-rules.js";
+export * from "./bash-log.js";

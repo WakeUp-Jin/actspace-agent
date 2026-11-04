@@ -1,4 +1,4 @@
-import type { ModelApi, resolveModelPricing } from "@actspace/shared";
+import { usableModelSummary, type ModelApi, type ModelsHostPort, type resolveModelPricing } from "@actspace/shared";
 
 export type DesktopRuntimeV2ResolvedModel = {
   readonly key: string;
@@ -34,11 +34,14 @@ export type DesktopRuntimeV2ModelResolution =
 export interface DesktopRuntimeV2ModelPort {
   resolveAutoReviewModel?(requestedMain?: string | null): DesktopRuntimeV2ModelResolution;
   resolveUtilityTaskModel?(requestedMain?: string | null): DesktopRuntimeV2ModelResolution;
-  resolveExploreTaskModel?(requestedMain?: string | null): DesktopRuntimeV2ModelResolution;
   /** 用途表里的思考档位；null = 模型默认。 */
-  purposeThinking?(purpose: "utility" | "autoReview" | "explore" | "vision"): import("@actspace/shared").ThinkingLevel | null;
+  purposeThinking?(purpose: "utility" | "autoReview" | "vision"): import("@actspace/shared").ThinkingLevel | null;
   resolvePricing?(model: DesktopRuntimeV2ResolvedModel, apiModel: string): import("@actspace/shared").ModelPricingSnapshot | null;
   resolveMainModel(requested?: string | null): DesktopRuntimeV2ModelResolution;
+  /** 设置 › 模型 里能用的模型（`ModelStoreService.listUsableModels`）。 */
+  listUsableModels?(purpose: "chat"): readonly import("@actspace/shared").UsableModelView[];
+  /** 设置里的子智能体默认模型（ModelKey）；null = 跟随父会话。 */
+  subagentDefaultModel?(): string | null;
   resolveImageInspectionModel(): DesktopRuntimeV2ModelResolution;
   getToolEnvironment(): {
     readonly deepseekFetchApiKey?: string;
@@ -61,3 +64,15 @@ export function customConnectionPricingInput(model: DesktopRuntimeV2ResolvedMode
     unsupportedBilling: model.definition.effective?.ratesUnsupported === true,
   };
 }
+
+/**
+ * `actspace.host.models` for Desktop: the models usable for chat right now.
+ * `subagentDefaultModel` reads the 子智能体默认模型 setting on every call (null = follow the parent session).
+ */
+export function createDesktopModelsHostPort(models: Pick<DesktopRuntimeV2ModelPort, "listUsableModels" | "subagentDefaultModel">): ModelsHostPort {
+  return Object.freeze({
+    listUsableModels: () => Object.freeze((models.listUsableModels?.("chat") ?? []).map(usableModelSummary)),
+    subagentDefaultModel: () => models.subagentDefaultModel?.() ?? null,
+  });
+}
+

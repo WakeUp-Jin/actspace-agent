@@ -40,7 +40,7 @@ export function defaultInstalledModels(): Partial<Record<ModelKey, InstalledMode
 }
 
 /** 四层模型迁移版本，见 model-layers-migration.ts。新装直接是最新版本。 */
-export const MODEL_LAYERS_VERSION = 2;
+export const MODEL_LAYERS_VERSION = 3;
 
 export function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV3 {
   const env = {
@@ -61,7 +61,7 @@ export function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV3 {
     installedModels: defaultInstalledModels(),
     customModels: {},
     modelOverrides: {},
-    taskModels: { defaultChatModel: null, utilityModel: null, autoReviewModel: null, exploreModel: null, visionModel: null, thinking: { utility: "off", autoReview: "off" } },
+    taskModels: { defaultChatModel: null, utilityModel: null, autoReviewModel: null, subagentDefaultModel: null, visionModel: null, thinking: { utility: "off", autoReview: "off" } },
     imageGeneration,
     agent: {
       systemPromptPath: defaultSystemPromptPath(dataRoot),
@@ -88,7 +88,7 @@ export function defaultSettingsV4Metadata(): SettingsV4Metadata {
       connections: {},
       definitions: {},
       installed: {},
-      taskBindings: { defaultChat: null, utility: null, autoReview: null, explore: null, vision: null, thinking: { utility: "off", autoReview: "off" } },
+      taskBindings: { defaultChat: null, utility: null, autoReview: null, subagentDefaultModel: null, vision: null, thinking: { utility: "off", autoReview: "off" } },
       layersVersion: MODEL_LAYERS_VERSION,
     },
     general: {

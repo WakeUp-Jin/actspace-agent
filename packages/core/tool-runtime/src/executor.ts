@@ -80,6 +80,8 @@ export type ToolExecutionContext = {
   /** Nested management approvals use the same Run budget pause as normal tool approvals. */
   readonly requestApproval?: ApprovalBroker["requestApproval"];
   readonly notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>;
+  /** false in subagent Sessions: the tool must finish in the foreground instead of moving to the background. */
+  readonly backgroundAllowed?: boolean;
   readonly createArtifact: (input: { readonly bytes: Uint8Array; readonly mediaType: string }) => Promise<ToolArtifactRef>;
   readonly defer: (finalizer: () => Promise<void>) => void;
 };

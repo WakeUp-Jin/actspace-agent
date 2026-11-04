@@ -71,9 +71,20 @@ export type ToolPreparedEnvironment = {
   readonly hostCapabilities: ReadonlySet<string>;
   readonly capabilitySet: ToolCapabilitySet;
   readonly approvalBroker?: ApprovalBroker;
+  /** Failure text when an action needs approval and there is no broker (subagents set their own). */
+  readonly approvalUnavailableMessage?: string;
+  /** A forked subagent sees its parent's tools but may not run some of them; the text is the failure the model reads. */
+  readonly blockedToolMessage?: (name: string) => string | undefined;
+  /** false in subagent Sessions: tools must finish in the foreground (Bash ignores `blockMs`). */
+  readonly backgroundAllowed?: boolean;
   readonly approvalTimeoutMs?: number;
   readonly sessionGrants?: readonly SessionGrant[] | (() => readonly SessionGrant[]);
   readonly sessionGrantCapability?: boolean;
+  /**
+   * Whose Session Grants this agent may use without adding any (subagents: the parent's main agent).
+   * Set, it lets calls pass on those grants even when `sessionGrantCapability` is false.
+   */
+  readonly sessionGrantOwner?: { readonly sessionId: string; readonly agentId: string };
   readonly trustedGrantAudiences?: ReadonlySet<string>;
   readonly journal: ToolJournalPort;
   readonly onExecutionStarted?: (call: { readonly callId: string; readonly name: string }) => void;
@@ -153,6 +164,11 @@ export class PreparedToolExecution {
         const reason = `Tool ${this.name} is outside this Agent scope.`;
         await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: "TOOL_SCOPE_DENIED", reason });
         return this.#rememberTerminal(this.#failureResult("denied", { code: "TOOL_SCOPE_DENIED", message: reason, retryable: false, phase: "policy" }));
+      }
+      const blocked = this.environment.blockedToolMessage?.(this.name);
+      if (blocked !== undefined) {
+        await this.#recordPermission("permission/scope-denied", { callId: this.callId, code: "SUBAGENT_TOOL_BLOCKED", reason: blocked });
+        return this.#rememberTerminal(this.#failureResult("denied", { code: "SUBAGENT_TOOL_BLOCKED", message: blocked, retryable: false, phase: "policy" }));
       }
       this.#checkToolScope();
       this.#args = materializeToolArguments(this.registration.definition.inputSchema, this.input.arguments);
@@ -267,6 +283,7 @@ export class PreparedToolExecution {
       }),
       ...(this.environment.approvalBroker === undefined ? {} : { requestApproval: this.environment.approvalBroker.requestApproval.bind(this.environment.approvalBroker) }),
       ...(this.environment.notifyAgent === undefined ? {} : { notifyAgent: this.environment.notifyAgent }),
+      ...(this.environment.backgroundAllowed === false ? { backgroundAllowed: false } : {}),
       createArtifact: (input) => this.environment.createArtifact({
         ...input,
         owner: { sessionId: this.input.sessionId, callId: this.callId, pluginId: this.pluginId, name: this.name },
@@ -352,7 +369,7 @@ export class PreparedToolExecution {
     }
     this.#approvalMode = "manual";
     if (this.environment.approvalBroker === undefined) {
-      return { code: "APPROVAL_REQUIRED", message: "Host approval is required but no ApprovalBroker is available.", retryable: false, phase: "approval" };
+      return { code: "APPROVAL_REQUIRED", message: this.environment.approvalUnavailableMessage ?? "Host approval is required but no ApprovalBroker is available.", retryable: false, phase: "approval" };
     }
     const requestedAt = new Date();
     const expiresAt = new Date(requestedAt.getTime() + (this.environment.approvalTimeoutMs ?? DEFAULT_APPROVAL_TIMEOUT_MS));
@@ -498,7 +515,7 @@ export class PreparedToolExecution {
     if (canonicalJson(resources) !== canonicalJson(this.#resources)) throw new ToolRuntimeError({ code: "RESOURCE_SCOPE_CHANGED", message: "Tool resources changed while approval was pending.", retryable: true, phase: "guard" });
     if (this.#admittedBySessionGrant) {
       const audience = this.registration.permission.grantAudience;
-      if (!this.#isTrustedGrantAudience(audience) || !sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}`, audience })) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "The selected Session Grant no longer covers this call.", retryable: true, phase: "approval" });
+      if (!this.#isTrustedGrantAudience(audience) || !sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { ...this.#grantSubject(), audience })) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "The selected Session Grant no longer covers this call.", retryable: true, phase: "approval" });
     }
     if (this.#onceApproval !== undefined) {
       if (this.#onceApproval.consumedAt !== undefined || Date.now() > new Date(this.#onceApproval.expiresAt).getTime()) throw new ToolRuntimeError({ code: "APPROVAL_STALE", message: "One-time approval is no longer valid.", retryable: false, phase: "approval" });
@@ -526,19 +543,27 @@ export class PreparedToolExecution {
     return typeof grants === "function" ? grants() : grants ?? [];
   }
 
+  /** Calls may pass on Session Grants: their own (`sessionGrantCapability`) or, read-only, an owner's. */
+  #usesSessionGrants(): boolean {
+    return this.environment.sessionGrantCapability === true || this.environment.sessionGrantOwner !== undefined;
+  }
+
+  /** The Session and agent the grants were issued to. */
+  #grantSubject(): { readonly sessionId: string; readonly agentId: string } {
+    return this.environment.sessionGrantOwner ?? { sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}` };
+  }
+
   #processGrant(): SessionGrant | undefined {
     const audience = this.registration.permission.grantAudience;
-    if (!this.environment.sessionGrantCapability || !this.#isTrustedGrantAudience(audience)) return undefined;
-    return matchingProcessGrant(this.#sessionGrants(), this.#resources, {
-      sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}`, audience,
-    });
+    if (!this.#usesSessionGrants() || !this.#isTrustedGrantAudience(audience)) return undefined;
+    return matchingProcessGrant(this.#sessionGrants(), this.#resources, { ...this.#grantSubject(), audience });
   }
 
   #resolveGlobalGrant(global: ReturnType<typeof evaluateGlobalBoundary>, tool: ToolPermissionDecision): ReturnType<typeof evaluateGlobalBoundary> {
-    if (global.kind !== "ask" || tool.kind !== "allow" || !this.environment.sessionGrantCapability) return global;
+    if (global.kind !== "ask" || tool.kind !== "allow" || !this.#usesSessionGrants()) return global;
     const audience = this.registration.permission.grantAudience;
     if (!this.#isTrustedGrantAudience(audience) || global.reasons.some((reason) => !reason.reusable)) return global;
-    if (!sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}`, audience })) return global;
+    if (!sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { ...this.#grantSubject(), audience })) return global;
     this.#admittedBySessionGrant = true;
     return { kind: "pass" };
   }

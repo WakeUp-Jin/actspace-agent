@@ -2,7 +2,7 @@ import { MainAgentInbox } from "@actspace/agent";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { renderLostNotification, renderOutputMatchNotification, renderTaskNotification } from "./notification.js";
-import { BackgroundTaskError, type BackgroundTaskDelivery, type BackgroundTaskKind, type BackgroundTaskOutput, type BackgroundTaskRecord, type BackgroundTaskSource, type BackgroundTaskStatus, type BackgroundTaskTerminal, type BackgroundTaskWaitResult } from "./types.js";
+import { BackgroundTaskError, type BackgroundTaskDelivery, type BackgroundTaskKind, type BackgroundTaskOutput, type BackgroundTaskOutputOptions, type BackgroundTaskRecord, type BackgroundTaskSource, type BackgroundTaskStatus, type BackgroundTaskTerminal, type BackgroundTaskWaitResult } from "./types.js";
 
 export type BackgroundTaskRegistryOptions = {
   readonly openSession: (sessionId: string) => Promise<SessionHandle>;
@@ -22,12 +22,15 @@ type Entry = {
   endedAt?: number;
   terminal?: BackgroundTaskTerminal;
   delivery: Delivery;
+  /** The Bash log was deleted by the per-Session cap; `task_output` reports it instead of reading. */
+  pruned?: boolean;
   /** Called synchronously at settlement, before delivery is decided. */
   readonly listeners: Set<(entry: Entry) => void>;
   settled: Promise<void>;
 };
 
 const OPEN_TASKS = Symbol("background-open-tasks");
+const PRUNABLE_TASKS = Symbol("background-prunable-tasks");
 
 /** Host-level registry of background work, viewed per Session. */
 export class BackgroundTaskRegistry {
@@ -58,9 +61,29 @@ export class BackgroundTaskRegistry {
     return [...this.#entries.values()].filter(entry => entry.status === "running" && (sessionId === undefined || entry.source.sessionId === sessionId) && (kind === undefined || entry.source.kind === kind)).length;
   }
 
-  async output(sessionId: string, taskId: string): Promise<{ readonly task: BackgroundTaskRecord; readonly output: BackgroundTaskOutput }> {
+  async output(sessionId: string, taskId: string, options: BackgroundTaskOutputOptions = {}): Promise<{ readonly task: BackgroundTaskRecord; readonly output: BackgroundTaskOutput }> {
     const entry = this.#require(sessionId, taskId);
-    return { task: record(entry), output: await entry.source.output() };
+    return { task: record(entry), output: await this.#output(entry, options) };
+  }
+
+  /**
+   * Bash deleted this task's log to keep the Session under its cap. Writes `background/task` `prune` once, for a
+   * task of this process or one the Journal knows from an earlier process; a log that never became a task is ignored.
+   */
+  async markPruned(sessionId: string, taskId: string): Promise<void> {
+    const entry = this.#entries.get(taskId);
+    if (entry && entry.source.sessionId !== sessionId) return;
+    if (entry?.pruned) return;
+    const session = await this.options.openSession(sessionId);
+    const known = session.journal.project(PRUNABLE_TASKS, () => new Map<string, boolean>(), (state, event) => {
+      if (event.type !== "background/task") return state;
+      const data = event.data as Readonly<Record<string, RuntimeV2JsonValue>>;
+      if (typeof data.taskId !== "string" || (data.op !== "start" && data.op !== "prune")) return state;
+      return new Map(state).set(data.taskId, data.op === "prune");
+    });
+    if (entry) entry.pruned = true;
+    if (known.get(taskId) !== false) return;
+    await session.append(core({ op: "prune", taskId, prunedAt: new Date(this.#now()).toISOString(), reason: "session-cap" }));
   }
 
   /** The stop result is the delivery; a stopped task never sends a notification. */
@@ -83,7 +106,7 @@ export class BackgroundTaskRegistry {
     if (entry.status !== "running") return record(entry);
     await this.stop(sessionId, taskId, "user");
     const { source } = entry;
-    await this.#enqueue(sessionId, renderTaskNotification(source, { status: "stopped", summary: `The user stopped background ${source.kind} task "${source.description}" from the app.`, body: "" }), { taskId, kind: source.kind, title: source.description, status: "stopped" });
+    await this.#enqueue(sessionId, renderTaskNotification(notified(source), { status: "stopped", summary: `The user stopped background ${source.kind} task "${source.description}" from the app.`, body: "" }), { taskId, kind: source.kind, title: source.description, status: "stopped" });
     return record(entry);
   }
 
@@ -105,7 +128,7 @@ export class BackgroundTaskRegistry {
     });
     if (outcome === "timed_out" || outcome === "interrupted") return { status: outcome, running: candidates.filter(entry => entry.status === "running").map(record) };
     await outcome.settled;
-    return { status: "completed", task: record(outcome), output: await outcome.source.output() };
+    return { status: "completed", task: record(outcome), output: await this.#output(outcome) };
   }
 
   /** Bash output subscriptions: a progress notification that neither settles nor dedupes. */
@@ -125,7 +148,7 @@ export class BackgroundTaskRegistry {
       const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
       if (taskId === undefined) return state;
       const next = new Map(state);
-      if (data.op === "start" && (data.kind === "bash" || data.kind === "agent")) next.set(taskId, { kind: data.kind, description: typeof data.description === "string" ? data.description : "" });
+      if (data.op === "start" && data.kind === "bash") next.set(taskId, { kind: data.kind, description: typeof data.description === "string" ? data.description : "" });
       if (data.op === "settle") next.delete(taskId);
       return next;
     });
@@ -156,7 +179,7 @@ export class BackgroundTaskRegistry {
     let delivery: BackgroundTaskDelivery;
     if (entry.delivery.state === "suppressed") delivery = entry.delivery.by;
     else {
-      const item = await this.#enqueue(source.sessionId, renderTaskNotification(source, terminal), { taskId: source.taskId, kind: source.kind, title: source.description, status: terminal.status });
+      const item = await this.#enqueue(source.sessionId, renderTaskNotification(notified(source), terminal), { taskId: source.taskId, kind: source.kind, title: source.description, status: terminal.status });
       // task_wait may have reported the result while the notification was being written.
       const late = suppressedBy(entry);
       if (late !== undefined) { await this.#discard(source.sessionId, item.messageId); delivery = late; }
@@ -171,7 +194,13 @@ export class BackgroundTaskRegistry {
     claimForWait(entry);
     if (previous.state === "enqueued") await this.#discard(entry.source.sessionId, previous.messageId);
     await entry.settled;
-    return { status: "completed", task: record(entry), output: await entry.source.output() };
+    return { status: "completed", task: record(entry), output: await this.#output(entry) };
+  }
+
+  async #output(entry: Entry, options: BackgroundTaskOutputOptions = {}): Promise<BackgroundTaskOutput> {
+    const outputPath = entry.source.bash?.outputPath;
+    if (entry.pruned) return { text: "", ...(outputPath ? { outputPath } : {}), pruned: true };
+    return entry.source.output(options);
   }
 
   async #enqueue(sessionId: string, text: string, notice: { readonly taskId: string; readonly kind: string; readonly title: string; readonly status: string }) {
@@ -189,6 +218,11 @@ export class BackgroundTaskRegistry {
     if (!entry || entry.source.sessionId !== sessionId) throw new BackgroundTaskError("TASK_NOT_FOUND", `Unknown background task: ${taskId || "(missing taskId)"}`);
     return entry;
   }
+}
+
+/** Bash notifications name the log, so the model can read the full output after the tail. */
+function notified(source: BackgroundTaskSource) {
+  return source.bash?.outputPath ? { taskId: source.taskId, kind: source.kind, outputPath: source.bash.outputPath } : source;
 }
 
 /** Re-read after an await: task_wait can change delivery concurrently. */
@@ -210,7 +244,7 @@ function record(entry: Entry): BackgroundTaskRecord {
 function core(data: RuntimeV2JsonValue) { return { type: "background/task", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
 
 /** The surface Harness plugins use through `actspace.host.background-tasks`. */
-export type BackgroundTaskHost = Pick<BackgroundTaskRegistry, "register" | "list" | "get" | "output" | "stop" | "wait" | "notifyOutputMatch" | "hasRunning" | "runningCount">;
+export type BackgroundTaskHost = Pick<BackgroundTaskRegistry, "register" | "list" | "get" | "output" | "stop" | "wait" | "notifyOutputMatch" | "markPruned" | "hasRunning" | "runningCount">;
 export const BACKGROUND_TASK_HOST_SERVICE = "actspace.host.background-tasks" as const;
 
 /** Late-bound Host service: the registry exists only after the Agent runtime starts. */
@@ -219,10 +253,11 @@ export function createBackgroundTaskHost(resolve: () => BackgroundTaskRegistry):
     register: source => resolve().register(source),
     list: (sessionId, options) => resolve().list(sessionId, options),
     get: (sessionId, taskId) => resolve().get(sessionId, taskId),
-    output: (sessionId, taskId) => resolve().output(sessionId, taskId),
+    output: (sessionId, taskId, options) => resolve().output(sessionId, taskId, options),
     stop: (sessionId, taskId, reason) => resolve().stop(sessionId, taskId, reason),
     wait: (sessionId, options) => resolve().wait(sessionId, options),
     notifyOutputMatch: (taskId, summary, line) => resolve().notifyOutputMatch(taskId, summary, line),
+    markPruned: (sessionId, taskId) => resolve().markPruned(sessionId, taskId),
     hasRunning: (sessionId, kind) => resolve().hasRunning(sessionId, kind),
     runningCount: (sessionId, kind) => resolve().runningCount(sessionId, kind),
   });

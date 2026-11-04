@@ -50,10 +50,15 @@ const SESSION: readonly Row[] = [
   ["subagent-tools", "子 Agent", "把任务交给子 Agent 去做", "subagent"],
   ["plugin-manager", "插件开发", "帮 Agent 编写和安装插件", "harness-evolution"],
   ["browser-tools", "操控浏览器", "通过 Chrome 扩展操作网页", "browser"],
+  ["subagent-codex", "Codex 子智能体", "用本机 Codex 跑子任务，用它自己的权限，不经审批和沙箱", "subagent"],
+  ["subagent-claude-code", "Claude Code", "用本机 Claude Code 跑子任务，用它自己的权限，不经审批和沙箱", "subagent"],
 ];
 
 /** Plugins that can be switched; the mock launched with 操控浏览器 on and 英语学习 off, like the demo. */
-const MOCK_LOADED: Readonly<Record<string, boolean>> = { "english-learning": false, "browser-tools": true };
+const MOCK_LOADED: Readonly<Record<string, boolean>> = { "english-learning": false, "browser-tools": true, "subagent-codex": true, "subagent-claude-code": false };
+
+/** The mock machine has codex but no claude, so one subagent plugin is available and the other shows why it is not. */
+const MOCK_UNAVAILABLE: Readonly<Record<string, string>> = { "subagent-claude-code": "本机没有找到 claude 命令" };
 
 export function mockPluginList(settings: SettingsV4Snapshot["settings"]): PluginListItem[] {
   const build = (rows: readonly Row[], scope: "global" | "session"): PluginListItem[] => rows.map(([id, title, description, directory]) => {
@@ -62,7 +67,16 @@ export function mockPluginList(settings: SettingsV4Snapshot["settings"]): Plugin
       id, title, description, scope, directory, canDisable,
       loaded: canDisable ? MOCK_LOADED[id]! : true,
       enabled: canDisable ? settings.tools.plugins?.[id] ?? MOCK_LOADED[id]! : true,
+      ...(MOCK_UNAVAILABLE[id] ? { unavailableReason: MOCK_UNAVAILABLE[id] } : {}),
+      ...mockPluginSettings(id, settings),
     };
   });
   return [...build(GLOBAL, "global"), ...build(SESSION, "session")];
+}
+
+function mockPluginSettings(id: string, settings: SettingsV4Snapshot["settings"]): Pick<PluginListItem, "settings" | "settingsPendingRestart"> {
+  const stored = settings.tools.externalSubagents;
+  if (id === "subagent-codex") return { settings: { approvalPolicy: stored?.codex?.approvalPolicy ?? "never", sandbox: stored?.codex?.sandbox ?? "workspace-write" }, settingsPendingRestart: stored?.codex !== undefined };
+  if (id === "subagent-claude-code") return { settings: { permissionMode: stored?.claudeCode?.permissionMode ?? "dontAsk" }, settingsPendingRestart: stored?.claudeCode !== undefined };
+  return {};
 }

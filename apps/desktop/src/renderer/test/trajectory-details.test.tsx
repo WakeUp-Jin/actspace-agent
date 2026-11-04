@@ -77,11 +77,11 @@ describe('DetailPanel', () => {
   it('offers the delegated child trajectory from a delegated call overview only', async () => {
     const user = userEvent.setup();
     const onOpenSubagent = vi.fn();
-    const subagentFor = (callId: string) => callId === 'c1' ? { parentCallId: 'c1', childSessionId: 'child-1', presetId: 'explore' } : null;
+    const subagentFor = (callId: string) => callId === 'c1' ? { parentCallId: 'c1', agentId: 'child-1', kindLabel: '探索', description: '', continuation: false } : null;
     const handlers = { onTab: vi.fn(), onSelectRecord: vi.fn(), onSelectRequest: vi.fn(), onClose: vi.fn() };
     const { rerender } = render(<DetailPanel layout={layout} selection={record(cellOf(cell => cell.kind === 'tool'))} tab="overview" subagentFor={subagentFor} onOpenSubagent={onOpenSubagent} {...handlers} />);
     expect(screen.getByText('子智能体')).toBeInTheDocument();
-    expect(screen.getByText('explore')).toBeInTheDocument();
+    expect(screen.getByText('探索')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '在右侧查看子智能体轨迹' }));
     expect(onOpenSubagent).toHaveBeenCalledWith('child-1');
     rerender(<DetailPanel layout={layout} selection={record(cellOf(cell => cell.kind === 'subtool'))} tab="overview" subagentFor={subagentFor} onOpenSubagent={onOpenSubagent} {...handlers} />);

@@ -26,7 +26,7 @@ export type LlmUsageCost = {
 };
 
 export type RuntimeStreamEvent =
-  | { type: "agent_run_started"; sessionId: SessionId; agentRunId: AgentRunId; recoveredReset?: boolean }
+  | { type: "agent_run_started"; sessionId: SessionId; agentRunId: AgentRunId; recoveredReset?: boolean; /** Set for a subagent's Run: the main Session it belongs to. */ parentSessionId?: SessionId }
   | { type: "agent_turn_started"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; turnIndex: number }
   | { type: "agent_turn_finished"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; turnIndex: number }
   | {
@@ -115,9 +115,9 @@ export type RuntimeStreamEvent =
       maxAttempts: number;
       reason: string;
     }
-  | { type: "agent_run_aborted"; sessionId: SessionId; agentRunId: AgentRunId }
-  | { type: "agent_run_finished"; sessionId: SessionId; agentRunId: AgentRunId; resultEventIds: EventId[] }
-  | { type: "agent_run_failed"; sessionId: SessionId; agentRunId: AgentRunId; error: SessionError };
+  | { type: "agent_run_aborted"; sessionId: SessionId; agentRunId: AgentRunId; parentSessionId?: SessionId }
+  | { type: "agent_run_finished"; sessionId: SessionId; agentRunId: AgentRunId; resultEventIds: EventId[]; parentSessionId?: SessionId }
+  | { type: "agent_run_failed"; sessionId: SessionId; agentRunId: AgentRunId; error: SessionError; parentSessionId?: SessionId };
 
 export type SessionEventType =
   | "user_message"
@@ -161,12 +161,23 @@ export type UserMessagePayload = {
   backgroundNotice?: BackgroundNotice;
 };
 
-/** 后台任务完成通知的元数据，来自收件箱 `notice`。 */
+/**
+ * 后台任务完成通知的元数据，来自收件箱 `notice`。
+ *
+ * `taskKind`：`bash` 来自 `task_notification`；`subagent` 来自 `subagent_notification`（子智能体一次激活结束）；
+ * `agent_message` 来自另一个智能体的 `send_message`（`taskId` 为发送方 agent id）；`agent` 只出现在老会话。
+ */
 export type BackgroundNotice = {
   taskId: string;
-  taskKind: "bash" | "agent";
+  taskKind: "bash" | "agent" | "subagent" | "agent_message";
   title: string;
   status: string;
+  /**
+   * true：这条通知唤醒了空闲会话、开启了这一轮，作为这一轮开头的分隔行；
+   * false：在进行中的一轮里被读到（运行中完成的任务、重启后补报的通知），分隔行留在这一轮里它被读到的位置。
+   * 老数据没有这个字段，按开启一轮处理。
+   */
+  opensTurn?: boolean;
 };
 
 export type AssistantMessagePayload = AssistantReply;
@@ -398,8 +409,16 @@ export type AgentToolPreview = {
   description: string;
   status: SubAgentRunStatus;
   subagentType: "explore";
-  /** 主消息行展示的委托类型；缺省时兼容旧事件并按 Explore 处理。 */
+  /** 主消息行展示的委托类型；缺省时兼容旧事件并按 Explore 处理。只出现在老会话（`delegation/*`）。 */
   agentKind?: "agent" | "explore";
+  /** 新事件（`subagent/spawned`）的子智能体种类；老会话缺省，界面回退到 `agentKind`。 */
+  subagentKind?: import("./runtime-v2/subagents").SubagentKind;
+  /** 只有 `local` 子智能体有预设。 */
+  preset?: import("./runtime-v2/subagents").SubagentPreset;
+  /** 这个子智能体已开始的激活次数（首次创建算 1，每次续派加 1）。 */
+  activationCount?: number;
+  /** 子智能体 transcript 的绝对路径（父会话 `subagent/spawned.transcriptPath`）。 */
+  transcriptPath?: string;
   /** 子 Agent 实际请求的模型（request/header 的 model）；旧事件没有记录时缺省。 */
   model?: string;
   /** 以 background=true 启动；卡片多一个「后台」标签，status 跟随 delegation/completed。 */
@@ -416,9 +435,42 @@ export type AgentToolPreview = {
    * - `panel`（默认/缺省）：点击打开 Composer 上方 transcript Panel。
    * - `inline`：历史事件兼容值；当前 renderer 对 Agent/Explore 统一使用 panel 入口。
    *
-   * 见 docs/design-docs/collaboration/agent-explore-subagent.md。
+   * 见 docs/design-docs/collaboration/agent-subagent-runtime.md。
    */
   display?: "panel" | "inline";
+};
+
+/**
+ * One row of the right-side 子 Agent panel (design 05 §2): one subagent across all its activations,
+ * folded from the parent Journal (`subagent/*`, plus old `delegation/*`).
+ */
+export type SubagentListItem = {
+  /** The child Session id for `local` / `fork` / old subagents; an opaque id for external ones. */
+  agentId: string;
+  kind: import("./runtime-v2/subagents").SubagentKind;
+  preset?: import("./runtime-v2/subagents").SubagentPreset;
+  /** Old `delegation/*` record: shown, never continued; its kind label stays Agent / Explore. */
+  legacy?: boolean;
+  description: string;
+  status: import("./subagent-labels").SubagentListStatus;
+  /** Activations started so far (spawn counts as 1, each continuation adds 1). */
+  activationCount: number;
+  model?: string;
+  background: boolean;
+  createdAt: string;
+  /** Start of the latest activation. */
+  activeSince: string;
+  /** End of the latest activation; absent while it runs. */
+  endedAt?: string;
+  /** Absolute path of the transcript (local / fork) or the CLI's native session log (external). */
+  transcriptPath: string;
+  /** Fork only: the parent Journal seq the fork copied through. */
+  inheritedThroughSeq?: number;
+  /** Cumulative `usage.totalTokens` of the child Session (local / fork); absent for external subagents or while unreadable. */
+  totalTokens?: number;
+  /** The latest activation's final reply and summary. */
+  result?: string;
+  summary?: string;
 };
 
 export type ToolPreviewKind =
@@ -542,7 +594,10 @@ export type ToolUiPreview =
   | BashPreview
   | AgentToolPreview
   | TodoUiPreview
-  | { kind: "generic"; title: string; content: string; artifacts?: ToolArtifact[] };
+  | { kind: "generic"; title: string; content: string; artifacts?: ToolArtifact[]; subagentLink?: SubagentToolLink };
+
+/** `send_message` / `interrupt_agent` 行：动词加目标子智能体，点目标名打开它（设计 05 §1）。 */
+export type SubagentToolLink = { agentId: string; verb: string; target: string };
 
 export type BashStatus =
   | "pending"
@@ -941,6 +996,7 @@ export type MessageBlock = {
       title: string;
       content: string;
       artifacts?: ToolArtifact[];
+      subagentLink?: SubagentToolLink;
       createdAt: string;
       isError?: boolean;
       status?: "pending" | "running" | "completed" | "failed" | "denied";
@@ -972,7 +1028,7 @@ export type MessageBlock = {
       createdAt: string;
     }
   | ({
-      /** 空闲会话被后台任务通知唤醒的那一轮的开头分隔行；content 是通知原文。 */
+      /** 收件箱通知（后台 Bash、子智能体完成、子智能体来信）的分隔行；content 是通知原文。 */
       kind: "background_notice";
       id: EventId;
       content: string;

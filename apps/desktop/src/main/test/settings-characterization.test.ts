@@ -196,7 +196,6 @@ describe("settings load snapshots (v1–v4)", () => {
         maxTokens: 1000,
         disabledTools: ["bash", "web_fetch"],
         bashAlwaysAsk: true,
-        exploreModelId: null,
       },
       imageGeneration: { hasApiKey: false, baseUrl: "https://images.env.example/v1", model: "env-image-model" },
     });
@@ -216,7 +215,7 @@ describe("settings load snapshots (v1–v4)", () => {
       defaultChatModel: "kimi:kimi-k2.6",
       utilityModel: "deepseek:deepseek-flash",
       autoReviewModel: null,
-      exploreModel: "deepseek:deepseek-flash",
+      subagentDefaultModel: null,
       visionModel: null,
       thinking: { utility: "off", autoReview: "off" },
     });

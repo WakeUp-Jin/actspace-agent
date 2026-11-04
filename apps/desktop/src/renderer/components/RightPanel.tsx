@@ -167,7 +167,7 @@ function RightPanelBody({
 
   if (tab.kind === "sideChat") return <SideChatView tab={tab} />;
 
-  if (tab.kind === "subagents") return <SubagentsPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} selected={tab.sessionId === sessionId ? tab.selected : undefined} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
+  if (tab.kind === "subagents") return <SubagentsPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
 
   if (tab.kind === "backgroundTasks") return <BackgroundTasksPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
 
@@ -226,7 +226,7 @@ function RightPanelLauncher({
       {
         id: "subagents",
         label: "子 Agent",
-        description: "这次对话派出的一次性助手",
+        description: "这次对话派出的子智能体，空闲后还能继续派活",
         icon: <MessageSquare size={15} strokeWidth={1.8} />,
         disabled: !sessionId,
         onClick: () => sessionId && openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId }),

@@ -7,6 +7,8 @@ describe("inheritedThroughSeq", () => {
     expect(inheritedThroughSeq({ origin: "side-chat", parentSessionId: "p", parentBoundarySeq: 3, delegationDepth: 0 })).toBe(3);
     // Delegated children start with an empty Journal.
     expect(inheritedThroughSeq({ origin: "delegation", parentSessionId: "p", parentBoundarySeq: 7, delegationDepth: 1 })).toBe(-1);
+    // An agent_fork child copies the parent up to its boundary.
+    expect(inheritedThroughSeq({ origin: "delegation", parentSessionId: "p", parentBoundarySeq: 7, delegationDepth: 1, inheritedThroughSeq: 7 })).toBe(7);
     expect(inheritedThroughSeq(null)).toBe(-1);
     expect(inheritedThroughSeq({ origin: "fork", parentBoundarySeq: "3" })).toBe(-1);
     expect(inheritedThroughSeq([])).toBe(-1);

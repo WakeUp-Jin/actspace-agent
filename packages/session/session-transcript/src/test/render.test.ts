@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionEventEnvelopeV1, SessionHeaderV1 } from "@actspace/session-journal";
-import { foldTranscript, formatTime, renderTranscript, type TranscriptBranch } from "../render.js";
+import { foldTranscript, formatTime, inheritedThroughSeq, reduceSubagentFacts, renderTranscript, type TranscriptBranch, type TranscriptSubagentFacts } from "../render.js";
 
 let seq = 0;
 const at = "2026-10-28T13:58:00.000Z";
@@ -96,5 +96,79 @@ describe("session transcript rendering", () => {
     expect(markdown).toContain("- Origin: subagent delegated by session s-main (transcript: ../s-main/transcript.md)");
     expect(markdown).not.toContain("were copied from");
     expect(markdown).toContain("_No messages yet._");
+  });
+
+  it("shows calls of a Turn in progress as running, and as no result once the Turn ends", () => {
+    seq = 0;
+    const open = [event("turn/start", { turnId: "t1" }), user("go"), call("c1", "bash", { command: "pnpm test" }), call("c2", "read_file", { path: "/a.ts" }), result("c2", "read_file", "completed", "ok")];
+    const running = renderTranscript(header(), foldTranscript(open));
+    expect(running).toContain("- [#2] bash: pnpm test\n  → running");
+    expect(running).toContain("- [#3] read_file: /a.ts\n  → completed: ok");
+    // The running line sits at the call's place, before the later finished call.
+    expect(running.indexOf("[#2] bash")).toBeLessThan(running.indexOf("[#3] read_file"));
+    const ended = renderTranscript(header(), foldTranscript([...open, event("turn/end", { turnId: "t1", reason: "aborted" })]));
+    expect(ended).toContain("- [#2] bash: pnpm test\n  → no result recorded");
+    expect(ended).not.toContain("→ running");
+  });
+
+  it("renders agent messages, subagent notifications and send_message lines", () => {
+    seq = 0;
+    const spliced = (messageId: string, source: string, content: string, extra: Record<string, unknown> = {}) =>
+      event("agent/inbox/spliced", { operation: "claim", messageId, target: "next-step", source, ...extra }, { kind: "append", node: { kind: "user", messageId, content } });
+    const events = [
+      user("start"),
+      call("c1", "send_message", { agent_id: "child-7", message: "Also check the tests.\nThanks" }),
+      result("c1", "send_message", "completed", "Message delivered to child-7 (running; it will see it at its next step)."),
+      spliced("n1", "subagent_notification", "<subagent_notification>\n<agent_id>child-7</agent_id>\n<status>completed</status>\n<summary>Subagent child-7 finished and will do no further work unless you send it more.</summary>\n<closing_message>\nlong reply\n</closing_message>\n</subagent_notification>"),
+      spliced("n2", "agent_message", "<agent_message from=\"child-7\" relation=\"child\">\nI need the API key name.\n</agent_message>", { senderId: "child-7" }),
+    ];
+    const markdown = renderTranscript(header(), foldTranscript(events));
+    expect(markdown).toContain("- [#1] send_message → child-7: Also check the tests.\n  → completed: Message delivered to child-7");
+    expect(markdown).toContain(`## Subagent notification [#3] · ${formatTime(at)}\n\nSubagent child-7 finished and will do no further work unless you send it more.`);
+    expect(markdown).not.toContain("long reply");
+    expect(markdown).toContain(`## Message from child-7 [#4] · ${formatTime(at)}\n\nI need the API key name.`);
+    expect(markdown).not.toContain("<agent_message");
+  });
+
+  it("marks a background Bash line whose log was pruned", () => {
+    seq = 0;
+    const events = [
+      call("c1", "bash", { command: "pnpm dev" }),
+      event("background/task", { op: "start", taskId: "bash_1", kind: "bash", callId: "c1", description: "pnpm dev", startedAt: at }),
+      result("c1", "bash", "completed", "Bash task bash_1 is running in the background."),
+      call("c2", "bash", { command: "ls" }),
+      result("c2", "bash", "completed", "a"),
+      event("background/task", { op: "settle", taskId: "bash_1", status: "completed", delivery: "notified", endedAt: at }),
+      event("background/task", { op: "prune", taskId: "bash_1", reason: "session-cap", prunedAt: at }),
+      event("background/task", { op: "prune", taskId: "unknown", reason: "session-cap", prunedAt: at }),
+    ];
+    const markdown = renderTranscript(header(), foldTranscript(events));
+    expect(markdown).toContain("- [#0] bash: pnpm dev\n  → completed: Bash task bash_1 is running in the background. (log pruned)");
+    expect(markdown).toContain("- [#3] bash: ls\n  → completed: a\n");
+    expect(markdown.match(/log pruned/g)).toHaveLength(1);
+  });
+
+  it("writes subagent facts from the parent Journal and skips a forked subagent's inherited events", () => {
+    seq = 0;
+    let facts: Readonly<Record<string, TranscriptSubagentFacts>> = {};
+    for (const item of [
+      event("subagent/spawned", { agentId: "child-f", callId: "c9", kind: "fork", description: "try the other approach", transcriptPath: "/x/child-f/transcript.md", createdAt: at, inheritedThroughSeq: 2 }),
+      event("subagent/activation", { op: "start", agentId: "child-f", activationId: "a1", trigger: "spawn", callId: "c9", background: true, model: "deepseek-v4", startedAt: at }),
+      event("subagent/spawned", { agentId: "child-l", callId: "c10", kind: "local", preset: "explore", description: "map the repo", transcriptPath: "/x/child-l/transcript.md", createdAt: at }),
+    ]) facts = reduceSubagentFacts(facts, item);
+    seq = 0;
+    const lineage = { parentSessionId: "s-main", parentBoundarySeq: 2, origin: "delegation", delegationDepth: 1, parentCallId: "c9", inheritedThroughSeq: 2 } as const;
+    const fork = header({ sessionId: "child-f", lineage });
+    expect(inheritedThroughSeq(fork)).toBe(2);
+    const events = [user("父会话里的问题"), assistant([{ type: "text", text: "父会话里的回答" }]), event("turn/end", { reason: "completed" }), event("turn/end", { reason: "forked" }), user("fork 任务")];
+    const markdown = renderTranscript(fork, foldTranscript(events, inheritedThroughSeq(fork)), [], facts["child-f"]);
+    expect(markdown).toContain("- Description: try the other approach\n- Preset: fork\n- Model: deepseek-v4\n- Events up to [#2] were copied from session s-main; read ../s-main/transcript.md for that part.");
+    expect(markdown).toContain("fork 任务");
+    expect(markdown).not.toContain("父会话里的回答");
+    const { inheritedThroughSeq: _copied, ...plain } = lineage;
+    const local = renderTranscript(header({ sessionId: "child-l", lineage: { ...plain, parentCallId: "c10" } }), foldTranscript([]), [], facts["child-l"]);
+    expect(local).toContain("- Description: map the repo\n- Preset: explore\n");
+    expect(local).not.toContain("- Model:");
+    expect(local).not.toContain("were copied from");
   });
 });

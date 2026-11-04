@@ -21,6 +21,8 @@ export type SessionLineageV1 = {
   readonly delegationDepth: number;
   readonly parentCallId?: string;
   readonly seedDigest?: string;
+  /** A forked subagent copied the parent's events `[0..inheritedThroughSeq]`; only with `origin: "delegation"`. */
+  readonly inheritedThroughSeq?: number;
 };
 
 export type SessionCreatedWithV1 = {
@@ -142,6 +144,10 @@ function validateLineage(value: unknown): asserts value is SessionLineageV1 {
   }
   if (value.parentCallId !== undefined) requireString(value.parentCallId, "lineage.parentCallId");
   if (value.seedDigest !== undefined) requireString(value.seedDigest, "lineage.seedDigest");
+  if (value.inheritedThroughSeq !== undefined) {
+    if (value.origin !== "delegation") throw invalidHeader("lineage.inheritedThroughSeq is only allowed for delegation.");
+    if (!Number.isSafeInteger(value.inheritedThroughSeq) || (value.inheritedThroughSeq as number) < 0) throw invalidHeader("lineage.inheritedThroughSeq must be a non-negative integer.");
+  }
 }
 
 function requireString(value: unknown, field: string): asserts value is string {

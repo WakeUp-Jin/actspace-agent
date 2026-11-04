@@ -110,7 +110,8 @@ export interface TaskModelSettings {
   defaultChatModel: ModelKey | null;
   utilityModel: ModelKey | null;
   autoReviewModel?: ModelKey | null;
-  exploreModel: ModelKey | null;
+  /** 子智能体默认模型；null = 跟随父会话当前模型。不是用途表里的用途，没有思考档位。 */
+  subagentDefaultModel: ModelKey | null;
   /** 看图；null = 跟随会话默认（需能看图）。 */
   visionModel?: ModelKey | null;
   /** 每个用途的思考档位；缺省用模型的默认档位。 */
@@ -128,13 +129,6 @@ export interface AgentSettings {
   disabledTools: string[];
   /** 「自动审查」开关 → ACTSPACE_BASH_ALWAYS_ASK：每条 bash 命令执行前都要确认。 */
   bashAlwaysAsk: boolean;
-  /**
-   * 内置 Explore 聚焦子代理模型。
-   *
-   * null = 默认 `deepseek-v4-flash`（便宜、快）；显式值覆盖为指定模型。
-   * 缺 DeepSeek key 时运行时回落主模型，见 docs/design-docs/collaboration/agent-explore-subagent.md。
-   */
-  exploreModelId: ModelId | null;
 }
 
 export interface SkillsSettings {
@@ -173,7 +167,7 @@ export interface AppSettingsV1 {
   skills: SkillsSettings;
 }
 
-export type AgentSettingsV2 = Omit<AgentSettings, "exploreModelId">;
+export type AgentSettingsV2 = AgentSettings;
 export interface AppSettingsV2 {
   version: 2;
   providers: Record<LlmProviderId, ProviderSettingsView>;
@@ -270,7 +264,7 @@ export interface SettingsV4Models {
     defaultChat: ModelKey | null;
     utility: ModelKey | null;
     autoReview?: ModelKey | null;
-    explore: ModelKey | null;
+    subagentDefaultModel: ModelKey | null;
     vision?: ModelKey | null;
     thinking?: TaskModelSettings["thinking"];
   };
@@ -278,6 +272,45 @@ export interface SettingsV4Models {
   overrides?: Partial<Record<ModelKey, import("./model-layers").ModelOverrides>>;
   /** 四层模型迁移的版本；缺省表示还没迁移过旧的自定义模型和计费模式。 */
   layersVersion?: number;
+}
+
+/**
+ * 外部子智能体的取值。和 `@actspace/subagent-codex`、`@actspace/subagent-claude-code` 导出的常量保持一致
+ * （desktop 里有测试逐一比对）；renderer 不能 import 后端包，所以在这里放一份。
+ */
+export const CODEX_APPROVAL_POLICY_VALUES = ["untrusted", "on-request", "never"] as const;
+export const CODEX_SANDBOX_VALUES = ["read-only", "workspace-write", "danger-full-access"] as const;
+export const CLAUDE_CODE_PERMISSION_MODE_VALUES = ["dontAsk", "acceptEdits", "auto", "manual", "plan", "bypassPermissions"] as const;
+
+export interface ExternalSubagentSettings {
+  codex?: {
+    approvalPolicy?: (typeof CODEX_APPROVAL_POLICY_VALUES)[number];
+    sandbox?: (typeof CODEX_SANDBOX_VALUES)[number];
+  };
+  claudeCode?: {
+    permissionMode?: (typeof CLAUDE_CODE_PERMISSION_MODE_VALUES)[number];
+  };
+}
+
+export const DEFAULT_EXTERNAL_SUBAGENT_SETTINGS = Object.freeze({
+  codex: Object.freeze({ approvalPolicy: "never", sandbox: "workspace-write" }),
+  claudeCode: Object.freeze({ permissionMode: "dontAsk" }),
+} as const);
+
+/** 只保留认识的取值；一个字段都没有时返回 undefined（缺省 = 默认）。 */
+export function sanitizeExternalSubagentSettings(value: unknown): ExternalSubagentSettings | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const pick = <T extends string>(input: unknown, allowed: readonly T[]): T | undefined => allowed.find((item) => item === input);
+  const codexRaw = typeof raw.codex === "object" && raw.codex !== null ? raw.codex as Record<string, unknown> : {};
+  const claudeRaw = typeof raw.claudeCode === "object" && raw.claudeCode !== null ? raw.claudeCode as Record<string, unknown> : {};
+  const approvalPolicy = pick(codexRaw.approvalPolicy, CODEX_APPROVAL_POLICY_VALUES);
+  const sandbox = pick(codexRaw.sandbox, CODEX_SANDBOX_VALUES);
+  const permissionMode = pick(claudeRaw.permissionMode, CLAUDE_CODE_PERMISSION_MODE_VALUES);
+  const codex = { ...(approvalPolicy ? { approvalPolicy } : {}), ...(sandbox ? { sandbox } : {}) };
+  const claudeCode = { ...(permissionMode ? { permissionMode } : {}) };
+  const result: ExternalSubagentSettings = { ...(Object.keys(codex).length ? { codex } : {}), ...(Object.keys(claudeCode).length ? { claudeCode } : {}) };
+  return Object.keys(result).length ? result : undefined;
 }
 
 export interface SettingsV4Tools {
@@ -294,6 +327,8 @@ export interface SettingsV4Tools {
    * `display.defaultEnabled`. Only plugins with `display.canDisable` read it. Takes effect after a restart.
    */
   plugins?: Record<string, boolean>;
+  /** 外部子智能体插件（Codex、Claude Code）自己的设置；缺省或不认识的值按默认。下次启动生效。 */
+  externalSubagents?: ExternalSubagentSettings;
   searchProviders: Partial<Record<SearchProviderId, { enabled: boolean }>>;
 }
 

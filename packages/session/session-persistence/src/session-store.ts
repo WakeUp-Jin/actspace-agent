@@ -41,7 +41,7 @@ export class SessionStore {
     catch (error) { return this.cleanupFailure(error, [() => handle.close()]); }
   }
 
-  async fork(options: { readonly parentSessionId: string; readonly boundarySeq: number; readonly newSessionId: string; readonly createdAt: string; readonly createdWith: CreateSessionHeaderInput["createdWith"]; readonly origin?: SessionLineageOrigin }): Promise<SessionHandle> {
+  async fork(options: { readonly parentSessionId: string; readonly boundarySeq: number; readonly newSessionId: string; readonly createdAt: string; readonly createdWith: CreateSessionHeaderInput["createdWith"]; readonly origin?: SessionLineageOrigin; readonly parentCallId?: string }, openOptions: SessionPersistenceOpenOptions = {}): Promise<SessionHandle> {
     const parent = await this.inspect(options.parentSessionId);
     if (!parent.header || !parent.validation || parent.integrity !== "complete") throw new SessionError("INVALID_FORK_BOUNDARY", "Parent session requires repair.");
     const seed = createSessionForkSeed({ parentHeader: parent.header, parentEvents: parent.events, registry: this.options.registry, ...options });
@@ -76,7 +76,7 @@ export class SessionStore {
       const events = await rewrite(seed.events) as typeof seed.events;
       await handle.append(events);
       await handle.flush();
-      return await this.bind(handle, {});
+      return await this.bind(handle, openOptions);
     } catch (error) {
       return this.cleanupFailure(error, [...[...copied.values()].map(id => () => this.options.forkArtifacts!.deleteForSession(options.newSessionId, id)), () => this.storage.discard(handle), () => handle.close()]);
     }

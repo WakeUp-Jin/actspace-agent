@@ -120,7 +120,25 @@ describe("AgentLoop notifications and Task input", () => {
     expect(journal.filter(event => event.type === "user/message")).toEqual([]);
     expect(journal.find(event => event.type === "agent/inbox/spliced" && (event.data as { operation?: string }).operation === "claim")?.data).toMatchObject({ opensTurn: true, notice });
     // 唤醒回合的领取事件带上 notice 与正文，前端在回合开头画分隔行。
-    expect(events.filter(event => event.kind === "inbox-claimed")).toEqual([expect.objectContaining({ source: "task_notification", notice, content: expect.stringContaining(STEER) })]);
+    expect(events.filter(event => event.kind === "inbox-claimed")).toEqual([expect.objectContaining({ source: "task_notification", notice, content: expect.stringContaining(STEER), opensTurn: true })]);
+  });
+
+  it("reports a notification read inside a running turn too, marked as not opening the turn", async () => {
+    let inbox: MainAgentInbox | undefined;
+    const notice = { taskId: "sa-1", kind: "subagent", title: "Map the repo", status: "completed" };
+    const { events, journal } = await runToolStreamFixture({
+      onLoop: (_loop, value) => { inbox = value; },
+      execute: async () => {
+        await inbox!.enqueue([{ type: "text", text: STEER }], notice);
+        return { status: "completed", summary: "Read fixture.txt", modelOutput: [] };
+      },
+    });
+    const claim = journal.find(event => event.type === "agent/inbox/spliced" && (event.data as { operation?: string }).operation === "claim")?.data;
+    // 日志里只有开轮的领取才写 opensTurn；读侧把缺省当作轮内。
+    expect(claim).toMatchObject({ notice });
+    expect(claim).not.toHaveProperty("opensTurn");
+    // 轮内读到的通知同样带 notice 与正文，前端把它插在这一轮里读到的位置。
+    expect(events.filter(event => event.kind === "inbox-claimed")).toEqual([expect.objectContaining({ source: "task_notification", notice, content: expect.stringContaining(STEER), opensTurn: false })]);
   });
 
   it("drops a steer left over from the previous turn instead of placing it after the new user message", async () => {

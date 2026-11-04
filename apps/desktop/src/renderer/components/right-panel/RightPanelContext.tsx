@@ -28,8 +28,8 @@ export type WorkspaceFileMeta = WorkspaceFileTarget & {
 export type RightPanelTab = { id: string } & (
   | ({ kind: "image"; title: string; src: string } & WorkspaceFileMeta)
   | ({ kind: "text"; title: string; content: string } & WorkspaceFileMeta)
-  // focus：从轨迹详情「查看轨迹」打开时定位到这个子会话并停在指定视图；revision 每次点击递增，让已打开的 Tab 再次定位。
-  | { kind: "subagents"; title: string; sessionId: string; selected?: Extract<import("@actspace/shared").MessageBlock, { kind: "agent" }>; focus?: SubagentFocus }
+  // focus：从对话卡片、通知行、工具行（看对话）或轨迹详情「查看轨迹」打开时定位到这个子智能体并停在指定视图。
+  | { kind: "subagents"; title: string; sessionId: string; focus?: SubagentFocus }
   // focus：从 bash 行的「后台」标签打开时选中这条命令；revision 每次点击递增，让已打开的 Tab 再次定位。
   | { kind: "backgroundTasks"; title: string; sessionId: string; focus?: BackgroundTaskFocus }
   | { kind: "context"; title: string }
@@ -43,7 +43,8 @@ export type RightPanelTab = { id: string } & (
   | { kind: "sideChat"; title: string; sessionId: string; parentSessionId: string; inheritedTurnCount?: number; runningTurnExcluded?: boolean }
 );
 
-export type SubagentFocus = { childSessionId: string; view: "chat" | "trajectory"; revision: number };
+/** 打开右侧「子 Agent」并选中一个子智能体（`agentId`，老会话是子会话 id）；`revision` 让同一个目标能再次触发。 */
+export type SubagentFocus = { agentId: string; view: "chat" | "trajectory"; revision: number };
 export type BackgroundTaskFocus = { taskId: string; revision: number };
 
 export type RightPanelTabKind = RightPanelTab["kind"];

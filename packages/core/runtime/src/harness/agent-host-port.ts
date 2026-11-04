@@ -25,6 +25,8 @@ export type AgentRuntimeHostPort = {
   /** The main Harness's tool sandbox once it has mounted; undefined when the sandbox plugin is absent. */
   readonly onSandboxStatus?: (status: import("@actspace/sandbox/types").SandboxStatus | undefined) => void;
   readonly disabledHarnessEntries?: readonly string[];
+  /** Settings of default Harness entries, merged over each manifest's `config`. */
+  readonly harnessEntryConfig?: Readonly<Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>>>;
   readonly pinnedHarness?: PinnedHarness;
   readonly host: RuntimeV2HostDescriptor;
   readonly toolEnvironment: Omit<ToolPreparedEnvironment, "journal">;

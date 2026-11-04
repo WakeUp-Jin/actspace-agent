@@ -21,7 +21,6 @@ import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../sess
 import { useActiveSession } from "../session/active-session-context";
 import { useComposerContext } from "./composer/composer-context";
 import { ConversationComposerSlot } from "./conversation/ConversationComposerSlot";
-import type { AgentMessageBlock } from "./conversation/render-message";
 import { TurnNavigator, useTurnNavigator } from "./conversation/TurnNavigator";
 import { TurnView } from "./conversation/TurnView";
 import { PinnedTurnPrompt } from "./conversation/PinnedTurnPrompt";
@@ -160,14 +159,14 @@ export function ConversationView({
     });
   }, [openTab]);
 
-  const openAgentTranscript = useCallback((message: AgentMessageBlock) => {
-    if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, selected: message });
+  const openSubagent = useCallback((agentId: string | undefined) => {
+    if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, ...(agentId ? { focus: { agentId, view: "chat" as const, revision: Date.now() } } : {}) });
   }, [sessionId, openTab]);
   const openBackgroundTask = useCallback((taskId: string) => {
     if (sessionId) openTab({ id: "background-tasks", kind: "backgroundTasks", title: "后台任务", sessionId, focus: { taskId, revision: Date.now() } });
   }, [sessionId, openTab]);
-  const openSubagentTrajectory = useCallback((childSessionId: string) => {
-    if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, focus: { childSessionId, view: "trajectory", revision: Date.now() } });
+  const openSubagentTrajectory = useCallback((agentId: string) => {
+    if (sessionId) openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId, focus: { agentId, view: "trajectory", revision: Date.now() } });
   }, [sessionId, openTab]);
   const { openReadFile, openWorkspaceFile } = useWorkspaceFileLinks();
   useEffect(() => {
@@ -375,7 +374,7 @@ export function ConversationView({
                       turnNumber={turnNumbers?.get(turn.id)}
                       setTurnElement={turnNavigator.setTurnElement}
                       onOpenAttachmentPreview={openAttachmentPreview}
-                      onOpenAgentTranscript={openAgentTranscript}
+                      onOpenSubagent={openSubagent}
                       onOpenReadFile={openReadFile}
                       onOpenWorkspaceFile={openWorkspaceFile}
                     />

@@ -1,5 +1,5 @@
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { isCommandPrefixSelector, type GrantSelector, type GrantAccess, type GrantAction, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2SessionTiming, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
+import { isCommandPrefixSelector, isInboxSource, type GrantSelector, type GrantAccess, type GrantAction, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2SessionTiming, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
 import { SessionProjectionRegistry } from "./registry.js";
 
 export type SessionFacts = Pick<RuntimeV2SessionSnapshot, "metadata" | "todos" | "delegations" | "usage" | "activity" | "pendingInbox" | "permissionMode" | "sessionGrants">;
@@ -78,12 +78,12 @@ export function registerSessionFacts(registry: SessionProjectionRegistry, redact
   });
   registry.register<UsageState>({ key: "providerUsage", stateVersion: 3, init: () => ({ activeStep: null, requests: {}, selected: {}, knownCosts: 0, total: emptyUsage() }), apply: applyUsage, view: state => state.total });
   registry.register<SessionFacts["pendingInbox"]>({
-    key: "pendingInbox", stateVersion: 2, init: () => [], view: state => state,
+    key: "pendingInbox", stateVersion: 3, init: () => [], view: state => state,
     apply: (state, event) => {
       if (event.type !== "agent/inbox/spliced") return state;
       const data = record(event.data); const messageId = text(data.messageId);
       if (!messageId || (data.target !== "next-step" && data.target !== "next-turn")) return state;
-      if (data.operation === "enqueue") return [...state.filter(item => item.messageId !== messageId), { messageId, target: data.target, ...(data.source === "task_notification" || data.source === "steer" ? { source: data.source } : {}) }];
+      if (data.operation === "enqueue") return [...state.filter(item => item.messageId !== messageId), { messageId, target: data.target, ...(isInboxSource(data.source) ? { source: data.source } : {}) }];
       if (data.operation === "claim" || data.operation === "discard") return state.filter(item => item.messageId !== messageId);
       return state;
     },

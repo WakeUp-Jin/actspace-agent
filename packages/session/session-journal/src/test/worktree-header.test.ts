@@ -23,4 +23,11 @@ describe("optional durable worktree binding", () => {
     expect(() => validateSessionHeader(seed.header)).not.toThrow();
     expect(() => createSessionHeader({ ...base, lineage: { parentSessionId: "source", parentBoundarySeq: -1, origin: "branch" as never, delegationDepth: 0 } })).toThrow("side-chat");
   });
+  it("accepts inheritedThroughSeq only on delegation lineage", () => {
+    const lineage = { parentSessionId: "source", parentBoundarySeq: 9, origin: "delegation" as const, delegationDepth: 1, parentCallId: "call-1", inheritedThroughSeq: 9 };
+    expect(() => validateSessionHeader(createSessionHeader({ ...base, lineage }))).not.toThrow();
+    expect(() => createSessionHeader({ ...base, lineage: { ...lineage, origin: "side-chat" } })).toThrow("only allowed for delegation");
+    expect(() => createSessionHeader({ ...base, lineage: { ...lineage, inheritedThroughSeq: -1 } })).toThrow("non-negative");
+    expect(() => validateSessionHeader(createSessionHeader({ ...base, lineage: { parentSessionId: "source", parentBoundarySeq: -1, origin: "delegation" as const, delegationDepth: 1 } }))).not.toThrow();
+  });
 });

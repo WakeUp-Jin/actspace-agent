@@ -11,11 +11,11 @@ function session(sessionId = "parent"): SessionHandle {
     createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
 }
 
-function source(taskId: string, sessionId = "parent", kind: "bash" | "agent" = "bash"): Controlled {
+function source(taskId: string, sessionId = "parent"): Controlled {
   let finish!: (terminal: BackgroundTaskTerminal) => void;
   const done = new Promise<BackgroundTaskTerminal>(resolve => { finish = resolve; });
   const stopped: string[] = [];
-  return { taskId, kind, sessionId, callId: `call-${taskId}`, description: `task ${taskId}`, done, stopped,
+  return { taskId, kind: "bash", sessionId, callId: `call-${taskId}`, description: `task ${taskId}`, done, stopped,
     output: async () => ({ text: `output of ${taskId}` }),
     stop: async reason => { stopped.push(reason); finish({ status: "stopped", summary: "stopped", body: "" }); },
     finish: terminal => finish({ status: "completed", summary: `${taskId} completed`, body: "tail", exitCode: 0, ...terminal }) };
@@ -52,11 +52,11 @@ describe("BackgroundTaskRegistry", () => {
 
   it("reports through task_wait instead of a notification", async () => {
     const { registry, facts, inbox, wakes } = setup("parent");
-    const task = source("agent_1", "parent", "agent");
+    const task = source("bash_9");
     await registry.register(task);
     const waiting = registry.wait("parent", { timeoutMs: 1_000 });
     task.finish();
-    await expect(waiting).resolves.toMatchObject({ status: "completed", task: { taskId: "agent_1", status: "completed" }, output: { text: "output of agent_1" } });
+    await expect(waiting).resolves.toMatchObject({ status: "completed", task: { taskId: "bash_9", status: "completed" }, output: { text: "output of bash_9" } });
     expect(inbox().pending()).toEqual([]);
     expect(facts().at(-1)).toMatchObject({ op: "settle", delivery: "wait" });
     expect(wakes).toEqual([]);
@@ -122,15 +122,55 @@ describe("BackgroundTaskRegistry", () => {
     expect(registry.hasRunning("parent")).toBe(true);
   });
 
+  it("ignores agent tasks recorded by older versions", async () => {
+    const first = setup("parent");
+    const session = first.sessions.get("parent")!;
+    await session.append({ type: "background/task", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { op: "start", taskId: "agent_old", kind: "agent", sessionId: "parent", callId: "call-old", description: "old agent", startedAt: "2026-10-22T00:00:00.000Z" }, surface: null } as never);
+    await new BackgroundTaskRegistry({ openSession: async () => session, wake: () => undefined }).reconcile(session);
+    expect(first.inbox().pending()).toEqual([]);
+  });
+
   it("marks tasks from an earlier process as lost without waking", async () => {
     const first = setup("parent");
-    await first.registry.register(source("agent_1", "parent", "agent"));
+    await first.registry.register(source("bash_9"));
     const second = new BackgroundTaskRegistry({ openSession: async () => first.sessions.get("parent")!, wake: () => { throw new Error("must not wake"); } });
     await second.reconcile(first.sessions.get("parent")!);
-    expect(first.facts().at(-1)).toMatchObject({ op: "settle", taskId: "agent_1", status: "lost", delivery: "lost" });
+    expect(first.facts().at(-1)).toMatchObject({ op: "settle", taskId: "bash_9", status: "lost", delivery: "lost" });
     expect(first.inbox().pending()).toEqual([expect.objectContaining({ notice: expect.objectContaining({ status: "lost" }) })]);
     await second.reconcile(first.sessions.get("parent")!);
     expect(first.inbox().pending()).toHaveLength(1);
+  });
+
+  it("names the Bash log in the completion notification and passes since to the source", async () => {
+    const { registry, inbox } = setup("parent");
+    const reads: (number | undefined)[] = [];
+    const task = { ...source("bash_1"), bash: { command: "make", cwd: "/w", sandboxed: true, outputPath: "/data/sessions-v2/parent/bash-log/bash_1.log" }, output: async (options?: { since?: number }) => { reads.push(options?.since); return { text: "new", logSize: 9, nextOffset: 9 }; } };
+    await registry.register(task);
+    await expect(registry.output("parent", "bash_1", { since: 4 })).resolves.toMatchObject({ output: { text: "new", nextOffset: 9 } });
+    expect(reads).toEqual([4]);
+    task.finish();
+    await flush(); await flush();
+    const content = String(inbox().pending()[0]!.content);
+    expect(content).toContain("</summary>\n<output_path>/data/sessions-v2/parent/bash-log/bash_1.log</output_path>\n<output_tail>");
+  });
+
+  it("records a pruned log once, for tasks of this or an earlier process, and reports it from task_output", async () => {
+    const { registry, facts } = setup("parent");
+    await registry.register({ ...source("bash_1"), bash: { command: "make", cwd: "/w", sandboxed: true, outputPath: "/logs/bash_1.log" } });
+    await registry.markPruned("parent", "bash_1");
+    await registry.markPruned("parent", "bash_1");
+    await expect(registry.output("parent", "bash_1")).resolves.toMatchObject({ output: { text: "", outputPath: "/logs/bash_1.log", pruned: true } });
+    // An earlier process's task is known from the Journal; a log that never became a task writes nothing.
+    const earlier = setup("parent");
+    await earlier.registry.register(source("bash_old"));
+    await earlier.registry.dispose();
+    const restarted = new BackgroundTaskRegistry({ openSession: async () => earlier.sessions.get("parent")!, wake: () => undefined, now: () => Date.parse("2026-10-22T07:00:00.000Z") });
+    await restarted.markPruned("parent", "bash_old");
+    await restarted.markPruned("parent", "bash_old");
+    await restarted.markPruned("parent", "bash_foreground");
+    await restarted.markPruned("other", "bash_1");
+    expect(facts().filter(fact => fact.op === "prune")).toEqual([{ op: "prune", taskId: "bash_1", prunedAt: "2026-10-22T06:00:00.000Z", reason: "session-cap" }]);
+    expect(earlier.facts().filter(fact => fact.op === "prune")).toEqual([{ op: "prune", taskId: "bash_old", prunedAt: "2026-10-22T07:00:00.000Z", reason: "session-cap" }]);
   });
 
   it("stops running tasks on dispose and leaves them for restart reconciliation", async () => {

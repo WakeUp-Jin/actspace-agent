@@ -16,8 +16,9 @@ import {
   CNY_PER_USD,
   hasVisibleText,
 } from "@actspace/shared";
-import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot, RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
+import { foldSubagentTree, lastActivationModel, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView, type SubagentView } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import { inheritedThroughSeq } from "@actspace/shared/session-list-page";
 
 type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
 
@@ -51,7 +52,10 @@ type EventIndex = {
   readonly lastRequestByStep: Map<string, string>;
   readonly toolByCall: Map<string, RuntimeV2ToolView>;
   readonly callData: Map<string, EventRecord>;
-  readonly childByCall: Map<string, { readonly childSessionId: string; readonly presetId: string; readonly status: string; readonly model?: string }>;
+  /** Child of an `agent`/`explore` call: `subagent/*` facts for new Sessions, `delegation/*` for old ones. */
+  readonly childByCall: Map<string, ChildFacts>;
+  /** Description of each subagent of this Session, for `send_message` / `interrupt_agent` rows. */
+  readonly describeAgent: (agentId: string) => string | undefined;
   /** Background task status by the tool call that started it, from `background/task` facts. */
   readonly backgroundByCall: Map<string, { readonly status: string }>;
 };
@@ -116,7 +120,7 @@ export function projectChatEvents(
     if (event.type === "user/message" || (event.type === "agent/inbox/spliced" && string(data.operation) === "claim")) {
       const node = appendNode(event);
       if (node === null || !activeSurface.showsMessage(node.messageId, event.seq)) continue;
-      projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index, string(data.source) ?? undefined, data.opensTurn === true ? backgroundNotice(data.notice) : undefined);
+      projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index, string(data.source) ?? undefined, backgroundNotice(data.notice, data.opensTurn === true));
       continue;
     }
     if (event.type === "assistant/message") {
@@ -133,7 +137,7 @@ export function projectChatEvents(
       if (tool?.state === "running") {
         projected.push({ ...base, id: `${eventId(event)}-running`, type: "tool_result", payload: {
           toolCallId: callId, toolName: tool.name, status: "running",
-          uiPreview: toolPreview(tool.name, tool, {}, data, index.childByCall.get(callId), snapshot.sessionId, identity.agentRunId, "running", snapshot.workspaceRoot ?? undefined),
+          uiPreview: toolPreview(tool.name, tool, {}, data, index.childByCall.get(callId), snapshot.sessionId, identity.agentRunId, "running", snapshot.workspaceRoot ?? undefined, undefined, undefined, index.describeAgent),
         } });
       }
       continue;
@@ -144,7 +148,7 @@ export function projectChatEvents(
       const tool = index.toolByCall.get(callId);
       const toolName = tool?.name ?? string(index.callData.get(callId)?.name) ?? "tool";
       const ok = event.type === "tool/result" && string(data.status) === "completed";
-      const preview = toolPreview(toolName, tool, data, index.callData.get(callId), index.childByCall.get(callId), snapshot.sessionId, identity.agentRunId, "finished", snapshot.workspaceRoot ?? undefined, undefined, index.backgroundByCall.get(callId));
+      const preview = toolPreview(toolName, tool, data, index.callData.get(callId), index.childByCall.get(callId), snapshot.sessionId, identity.agentRunId, "finished", snapshot.workspaceRoot ?? undefined, undefined, index.backgroundByCall.get(callId), index.describeAgent);
       projected.push({
         ...base,
         id: eventId(event),
@@ -336,7 +340,10 @@ function projectPendingChunks(snapshot: RuntimeV2SessionSnapshot, journal: reado
 }
 
 export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): SessionEvent[] {
-  const events = projectChatEvents(snapshot, journal, { includePendingChunks: true });
+  // A forked subagent's Journal starts with the parent's events; the panel shows only what it did after the fork.
+  const inherited = inheritedThroughSeq(snapshot.lineage);
+  const events = projectChatEvents(snapshot, journal, { includePendingChunks: true })
+    .filter(event => event.sourceSeq === undefined || event.sourceSeq > inherited);
   const index = buildIndex(snapshot, journal);
   for (const tool of snapshot.tools.filter((tool) => tool.state === "running")) {
     if (events.some(event => event.type === "tool_result" && (event.payload as { toolCallId?: string }).toolCallId === tool.callId)) continue;
@@ -364,20 +371,16 @@ export function subagentChildrenWithoutModel(journal: readonly SessionEventEnvel
     if (event.type === "delegation/requested") requested.add(childSessionId);
     if (event.type === "delegation/completed") { finished.add(childSessionId); if (string(data.model)) known.add(childSessionId); }
   }
-  return [...requested].filter((id) => !known.has(id)).map((childSessionId) => ({ childSessionId, finished: finished.has(childSessionId) }));
-}
-
-/** Every delegated child Session in the parent Journal, and whether the parent recorded it as finished. */
-export function subagentChildren(journal: readonly SessionEventEnvelopeV1[]): { readonly childSessionId: string; readonly finished: boolean }[] {
-  const requested = new Set<string>();
-  const finished = new Set<string>();
-  for (const event of journal) {
-    const childSessionId = string(record(event.data).childSessionId);
-    if (!childSessionId) continue;
-    if (event.type === "delegation/requested") requested.add(childSessionId);
-    if (event.type === "delegation/completed") finished.add(childSessionId);
+  // New Sessions: the model is on each activation's start; one without a model follows the parent's request facts.
+  for (const view of Object.values(foldSubagentTree(journal).agents)) {
+    // External subagents have no ActSpace Session to read a request from.
+    if (view.legacy || view.kind === "codex" || view.kind === "claude-code") continue;
+    requested.add(view.agentId);
+    if (lastActivationModel(view)) known.add(view.agentId);
+    // An inactive local subagent can be continued and send more requests; only a closed one cannot.
+    if (view.status === "closed") finished.add(view.agentId);
   }
-  return [...requested].map((childSessionId) => ({ childSessionId, finished: finished.has(childSessionId) }));
+  return [...requested].filter((id) => !known.has(id)).map((childSessionId) => ({ childSessionId, finished: finished.has(childSessionId) }));
 }
 
 /** The model of the latest request a Session actually sent (`request/header`); not the purpose binding. */
@@ -389,31 +392,6 @@ export function latestRequestModel(journal: readonly SessionEventEnvelopeV1[]): 
     if (model) return model;
   }
   return undefined;
-}
-
-/**
- * `childModels` fills in the model of children the parent Journal has no model
- * for yet (keyed by child Session id, from `latestRequestModel`); a model
- * recorded on `delegation/completed` always wins. `childTokens` is each child
- * Session's cumulative `usage.totalTokens`, shown on the panel's list rows.
- */
-export function projectSubagentList(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[], childModels: ReadonlyMap<string, string> = new Map(), childTokens: ReadonlyMap<string, number> = new Map()): MessageBlock[] {
-  const index = buildIndex(snapshot, journal);
-  return journal.filter((event) => event.type === "tool/call" && ["agent", "explore"].includes(String(record(event.data).name))).flatMap((event) => {
-    const call = record(event.data);
-    const callId = String(call.callId);
-    const tool = index.toolByCall.get(callId);
-    const indexed = index.childByCall.get(callId);
-    const requestModel = indexed && !indexed.model ? childModels.get(indexed.childSessionId) : undefined;
-    const child = indexed && requestModel ? { ...indexed, model: requestModel } : indexed;
-    const terminalEvent = journal.find((candidate) => isToolTerminal(candidate.type) && record(candidate.data).callId === callId);
-    const identity = identityFor(event, call, index);
-    const preview = toolPreview(String(call.name), tool, terminalEvent ? record(terminalEvent.data) : {}, call, child, snapshot.sessionId, identity.agentRunId, terminalEvent ? "finished" : "running", snapshot.workspaceRoot ?? undefined, undefined, index.backgroundByCall.get(callId));
-    if (preview.kind === "agent" && !terminalEvent) preview.stats = { durationMs: Math.max(0, Date.now() - Date.parse(event.time)), toolCallCount: 0 };
-    const totalTokens = indexed ? childTokens.get(indexed.childSessionId) : undefined;
-    if (preview.kind === "agent" && totalTokens !== undefined) preview.stats = { ...(preview.stats ?? { durationMs: 0, toolCallCount: 0 }), totalTokens };
-    return createMessageBlocks([{ id: `subagent:${callId}`, sessionId: snapshot.sessionId, agentRunId: identity.agentRunId, timestamp: event.time, type: "tool_result", payload: { toolCallId: callId, uiPreview: preview, status: terminalEvent ? tool?.state : "running" } } as SessionEvent]);
-  });
 }
 
 type UsageSession = Pick<RuntimeV2SessionSnapshot, "sessionId" | "throughJournalSeq" | "workspaceRoot" | "metadata">;
@@ -704,7 +682,7 @@ function toolActivityStatus(status: string | null): UsageActivityStatus {
 }
 
 function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): EventIndex {
-  const runByTurn = new Map<string, string>(); const turnByStep = new Map<string, string>(); const runByInboxMessage = new Map<string, string>(); const turnByInboxMessage = new Map<string, string>(); const requestById = new Map<string, RequestInfo>(); const lastRequestByStep = new Map<string, string>(); const callData = new Map<string, EventRecord>(); const childByCall = new Map<string, { childSessionId: string; presetId: string; status: string; model?: string }>(); const backgroundByCall = new Map<string, { status: string }>(); const callByTask = new Map<string, string>();
+  const runByTurn = new Map<string, string>(); const turnByStep = new Map<string, string>(); const runByInboxMessage = new Map<string, string>(); const turnByInboxMessage = new Map<string, string>(); const requestById = new Map<string, RequestInfo>(); const lastRequestByStep = new Map<string, string>(); const callData = new Map<string, EventRecord>(); const childByCall = new Map<string, ChildFacts>(); const backgroundByCall = new Map<string, { status: string }>(); const callByTask = new Map<string, string>();
   const turnStarts = journal
     .filter((event) => event.type === "turn/start")
     .map((event) => {
@@ -755,7 +733,23 @@ function buildIndex(snapshot: RuntimeV2SessionSnapshot, journal: readonly Sessio
       if (parentCallId) { const model = string(data.model); childByCall.set(parentCallId, { childSessionId: string(data.childSessionId) ?? "", presetId: string(data.presetId) ?? childByCall.get(parentCallId)?.presetId ?? "unknown", status: string(data.status) ?? "completed", ...(model ? { model } : {}) }); }
     }
   }
-  return { runByTurn, turnByStep, runByInboxMessage, turnByInboxMessage, requestById, lastRequestByStep, toolByCall: new Map(snapshot.tools.map((tool) => [tool.callId, tool])), callData, childByCall, backgroundByCall };
+  const tree = foldSubagentTree(journal);
+  for (const view of Object.values(tree.agents)) {
+    if (view.legacy) continue;
+    const model = lastActivationModel(view);
+    childByCall.set(view.callId, { childSessionId: view.agentId, presetId: `actspace.subagent.${view.preset ?? view.kind}`, status: subagentCardStatus(view), ...(model ? { model } : {}), subagent: view });
+  }
+  return { runByTurn, turnByStep, runByInboxMessage, turnByInboxMessage, requestById, lastRequestByStep, toolByCall: new Map(snapshot.tools.map((tool) => [tool.callId, tool])), callData, childByCall, backgroundByCall, describeAgent: (agentId) => tree.agents[agentId]?.description };
+}
+
+type ChildFacts = { readonly childSessionId: string; readonly presetId: string; readonly status: string; readonly model?: string; readonly subagent?: SubagentView };
+
+/** The card status of a subagent: running, or how its latest activation ended. */
+function subagentCardStatus(view: SubagentView): string {
+  if (view.status === "running") return "running";
+  const settled = view.activations.at(-1)?.settle?.status;
+  // Lost (the app exited) is an interruption the user can continue, not a failure.
+  return settled === "completed" ? "completed" : settled === "interrupted" || settled === "lost" ? "aborted" : "failed";
 }
 
 function identityFor(event: SessionEventEnvelopeV1, data: EventRecord, index: EventIndex) {
@@ -770,9 +764,9 @@ function identityFor(event: SessionEventEnvelopeV1, data: EventRecord, index: Ev
   return { requestId, turnId, stepId, agentRunId };
 }
 
-function backgroundNotice(value: RuntimeV2JsonValue | undefined): BackgroundNotice | undefined {
+function backgroundNotice(value: RuntimeV2JsonValue | undefined, opensTurn: boolean): BackgroundNotice | undefined {
   const notice = record(value); const taskId = string(notice.taskId); const kind = notice.kind;
-  return taskId && (kind === "bash" || kind === "agent") ? { taskId, taskKind: kind, title: string(notice.title) ?? taskId, status: string(notice.status) ?? "completed" } : undefined;
+  return taskId && (kind === "bash" || kind === "agent" || kind === "subagent" || kind === "agent_message") ? { taskId, taskKind: kind, title: string(notice.title) ?? taskId, status: string(notice.status) ?? "completed", opensTurn } : undefined;
 }
 function appendNode(event: SessionEventEnvelopeV1) { return event.surface?.kind === "append" ? event.surface.node : null; }
 function contentBlocks(value: RuntimeV2JsonValue): readonly EventRecord[] { return Array.isArray(value) ? value.filter(isRecord) : []; }

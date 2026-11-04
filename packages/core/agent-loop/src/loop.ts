@@ -47,7 +47,7 @@ export type AgentLoopLiveEvent = LiveIdentity & (
   | { readonly kind: "compaction-started" }
   | { readonly kind: "compaction-finished"; readonly removedCount: number; readonly durationMs: number; readonly compactionId?: string; readonly trigger?: "manual" | "auto"; readonly beforeTokens?: number; readonly afterTokens?: number; readonly beforeEstimated?: true }
   | { readonly kind: "compaction-failed"; readonly message: string }
-  | { readonly kind: "inbox-claimed"; readonly messageId: string; readonly source?: import("@actspace/agent").InboxSource }
+  | { readonly kind: "inbox-claimed"; readonly messageId: string; readonly source?: import("@actspace/agent").InboxSource; readonly notice?: import("@actspace/agent").InboxNotice; readonly content?: string; readonly opensTurn?: boolean }
 );
 type WithoutSession<T> = T extends unknown ? Omit<T, "sessionId"> : never;
 
@@ -136,7 +136,7 @@ export class AgentLoop {
           for (const messageId of consumed.messageIds) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId, source: "steer" });
         }
         const opensTurn = input.wake === true && stepCount === 0;
-        for (const item of await this.options.inbox.claim({ opensTurn })) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId: item.messageId, ...(item.source === undefined ? {} : { source: item.source }), ...(opensTurn && item.notice ? { notice: item.notice, content: typeof item.content === "string" ? item.content : JSON.stringify(item.content) } : {}) });
+        for (const item of await this.options.inbox.claim({ opensTurn })) this.emitLive({ kind: "inbox-claimed", agentRunId, turnId, messageId: item.messageId, ...(item.source === undefined ? {} : { source: item.source }), ...(item.notice ? { notice: item.notice, content: typeof item.content === "string" ? item.content : JSON.stringify(item.content), opensTurn } : {}) });
         const stepId = randomUUID(); stepCount += 1;
         const preStep = await this.waterfall("agent/pre-step", { agentRunId, turnId, stepId, stepIndex: stepCount, mode });
         this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, message: "step-started" });

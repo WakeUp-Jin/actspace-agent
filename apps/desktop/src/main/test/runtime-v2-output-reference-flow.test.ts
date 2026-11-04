@@ -17,7 +17,7 @@ it("runs large Bash output through storage, the next request, and paginated read
   const store = new DesktopArtifactStore(join(root, "data"));
   const sessionId = "output-flow";
   const resolveArtifact = (session: string, id: string) => store.resolveForSession(session, id);
-  const ports = { ...createReadPorts({ workspaceRoot, resolveArtifact }), ...createSearchPorts({ workspaceRoot, resolveArtifact }), ...createNodeBashToolPorts({ workspaceRoot, tmpRoot: join(root, "tmp") }) };
+  const ports = { ...createReadPorts({ workspaceRoot, resolveArtifact }), ...createSearchPorts({ workspaceRoot, resolveArtifact }), ...createNodeBashToolPorts({ workspaceRoot, tmpRoot: join(root, "tmp"), dataRoot: join(root, "data") }) };
   const context: ToolExecutionContext = {
     sessionId, workspaceRoot, callId: "read-1", agentRunId: "run", turnId: "turn", stepId: "step", name: "bash", pluginId: "core",
     signal: new AbortController().signal, capabilities: { ids: [], has: () => false, get: () => { throw new Error("unused"); } },

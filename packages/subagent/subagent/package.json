@@ -32,7 +32,6 @@
     "test": "vitest run --globals --passWithNoTests"
   },
   "dependencies": {
-    "@actspace/background-tasks": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/agent": "workspace:*",
     "@actspace/agent-loop": "workspace:*",
@@ -41,7 +40,6 @@
     "@actspace/session-persistence-jsonl": "workspace:*",
     "@actspace/session-persistence": "workspace:*",
     "@actspace/tool-runtime": "workspace:*",
-    "@actspace/llm-service": "workspace:*",
     "@actspace/shared": "workspace:*"
   },
   "devDependencies": {

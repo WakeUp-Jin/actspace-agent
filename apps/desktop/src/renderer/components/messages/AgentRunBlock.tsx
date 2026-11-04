@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { MessageBlock } from "@actspace/shared";
+import { subagentKindLabel, type MessageBlock } from "@actspace/shared";
 import "./agent-activity.css";
-import { AgentAvatar, AgentStatus, agentLatestActivity, agentModelLabel } from "./AgentIdentity";
+import { AgentAvatar, AgentStatus, agentIdentity, agentLatestActivity, agentModelLabel } from "./AgentIdentity";
 import { BackgroundTag } from "./BashRunBlock";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
@@ -16,7 +16,7 @@ const LATEST_CLASS = "min-w-0 truncate text-act-xs leading-[1.45] text-text-mute
 const ERROR_LATEST_CLASS = "text-on-danger";
 
 function kindLabel(message: AgentMessage): string {
-  return message.agentKind === "agent" ? "Agent" : "Explore";
+  return subagentKindLabel({ ...(message.subagentKind ? { subagentKind: message.subagentKind } : {}), ...(message.preset ? { preset: message.preset } : {}), ...(message.agentKind ? { agentKind: message.agentKind } : {}) });
 }
 
 function ActivityLine({ text, running }: { text: string; running: boolean }) {
@@ -36,16 +36,17 @@ function ActivityLine({ text, running }: { text: string; running: boolean }) {
 export function AgentRunBlock({
   message,
   className,
-  onOpenTranscript,
+  onOpen,
 }: {
   message: AgentMessage;
   className?: string;
-  onOpenTranscript?: (message: AgentMessage) => void;
+  /** 打开右侧「子 Agent」并选中它；还没有 `subagent/spawned`（没有子智能体 id）的卡片只打开列表。 */
+  onOpen?: (agentId: string | undefined) => void;
 }) {
   const isRunning = message.status === "running";
   const latest = agentLatestActivity(message);
   const latestClass = message.error ? `${LATEST_CLASS} ${ERROR_LATEST_CLASS}` : LATEST_CLASS;
-  const model = agentModelLabel(message);
+  const model = agentModelLabel(message.model);
 
   return (
     <article className={`${BLOCK_CLASS}${className ? ` ${className}` : ""}`}>
@@ -53,9 +54,9 @@ export function AgentRunBlock({
         className={BUTTON_CLASS}
         type="button"
         aria-label={`Open SubAgent transcript for ${message.description}`}
-        onClick={() => onOpenTranscript?.(message)}
+        onClick={() => onOpen?.(message.transcriptRef?.runId)}
       >
-        <AgentAvatar message={message} />
+        <AgentAvatar identity={agentIdentity(message)} />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className={HEADER_CLASS}>
             <span className={`${NAME_CLASS} flex-1`} title={message.description}>{message.description || message.displayText || kindLabel(message)}</span>

@@ -9,7 +9,8 @@ import { createDesktopBrowserCapability } from "./browser-capability";
 import { DEFAULT_CREDENTIAL_REF, DesktopCredentialResolver } from "./credential-resolver";
 import { DesktopLegacyLlmAdapter } from "./legacy-llm-adapter";
 import type { RuntimeV2Module } from "./runtime-loader";
-import type { DesktopRuntimeV2ModelPort } from "./model-port";
+import { createDesktopModelsHostPort, type DesktopRuntimeV2ModelPort } from "./model-port";
+import { MODELS_HOST_PORT_ID } from "@actspace/shared";
 import type { DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2BrowserPort, DesktopRuntimeV2Roots } from "./host-ports";
 
 export type DesktopRuntimeV2BootOptions = {
@@ -22,6 +23,8 @@ export type DesktopRuntimeV2BootOptions = {
   readonly browser?: DesktopRuntimeV2BrowserPort;
   /** Plugin ids switched off for this process; global ones become an invocation `disable` patch, session ones skip the Harness entry. */
   readonly disabledPlugins?: readonly string[];
+  /** Per plugin Entry id settings, passed to `bootProfileRuntime` as `pluginConfig` (merged over each manifest `config`). */
+  readonly pluginConfig?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   /** The bundled nono; absent when it was not found (see `resolveDesktopNonoPath`). */
   readonly nonoPath?: string;
   readonly disabledSkillIds?: () => readonly string[];
@@ -99,6 +102,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
       "host.approval": approvalBroker,
       ...(browser ? { "host.browser": browser, [BROWSER_TOOLS_HOST_PORT_ID]: browser } : {}),
       "host.artifacts": artifacts,
+      [MODELS_HOST_PORT_ID]: createDesktopModelsHostPort(options.models),
       [options.module.LLM_HOST_PORT_ID]: Object.freeze({
         credentials: credentialResolver,
         routes: Object.freeze([{
@@ -121,13 +125,6 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
           providerId: "desktop",
           modelPattern: "*",
           adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "auto-review"),
-          credentialRef: DEFAULT_CREDENTIAL_REF,
-          defaults: {},
-        }, {
-          routeId: "explore",
-          providerId: "desktop",
-          modelPattern: "*",
-          adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "explore"),
           credentialRef: DEFAULT_CREDENTIAL_REF,
           defaults: {},
         }]),
@@ -157,6 +154,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
       },
       composition,
       disabledPlugins: switched.filter(entry => !entry.loaders.includes("host")).map(entry => entry.id),
+      ...(options.pluginConfig ? { pluginConfig: options.pluginConfig } : {}),
       cordis: { configPath: options.module.runtimeCordisConfigPath(), admission: await options.module.inspectCordisAdmission() },
       disposeCordis: options.disposeCordis,
       onLiveEvent: options.onRuntimeLive,

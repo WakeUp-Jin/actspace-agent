@@ -1,5 +1,5 @@
 import type { DesktopBridge } from "@actspace/shared/desktop-bridge";
-import type { SessionListPage, SessionListPageInput } from "@actspace/shared";
+import type { SessionListPage, SessionListPageInput, SettingsV4Tools } from "@actspace/shared";
 import type { TaskReceipt, TaskSnapshot } from "@actspace/shared/runtime-v2";
 import {
   mockBrowserBridgeStatus,
@@ -216,6 +216,11 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         db.settingsV4 = { ...latest, revision, settings: { ...latest.settings, [namespace]: { ...latest.settings[namespace], ...patch } } };
         if (namespace === "tools" && "plugins" in patch) {
           db.settingsV4.settings.tools.plugins = { ...latest.settings.tools.plugins, ...patch.plugins };
+        }
+        if (namespace === "tools" && "externalSubagents" in patch) {
+          const stored = latest.settings.tools.externalSubagents;
+          const next = (patch as { externalSubagents?: SettingsV4Tools["externalSubagents"] }).externalSubagents;
+          db.settingsV4.settings.tools.externalSubagents = { codex: { ...stored?.codex, ...next?.codex }, claudeCode: { ...stored?.claudeCode, ...next?.claudeCode } };
         }
         if (namespace === "tools" && "searchProviders" in patch) {
           db.settingsV4.settings.tools.searchProviders = { ...latest.settings.tools.searchProviders, ...patch.searchProviders };

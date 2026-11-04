@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,7 +9,7 @@ import type { SessionEventEnvelopeV1, SessionHeaderV1 } from "@actspace/session-
 import { apply, type SessionTranscriptService } from "../plugin.js";
 import { manifest } from "../manifest.js";
 import { PROMPT_ID } from "../prompt.js";
-import { isSessionTranscriptReadPath, transcriptPath } from "../paths.js";
+import { isBashLogReadPath, isSessionTranscriptReadPath, transcriptPath } from "../paths.js";
 
 const at = "2026-10-28T13:58:00.000Z";
 function event(seq: number, type: string, data: Record<string, unknown>, surface: unknown = null): SessionEventEnvelopeV1 {
@@ -157,6 +157,33 @@ describe("session transcript plugin", () => {
     } finally { await root.dispose(); }
   });
 
+  it("refreshes a subagent transcript mid-Turn with its parent's facts, coalescing overlapping calls", async () => {
+    const childEvents = [event(0, "turn/start", { turnId: "t1" }), userMessage(1, "review auth"), event(2, "tool/call", { callId: "c1", name: "bash", args: { command: "pnpm test" } })];
+    let reads = 0;
+    const child: Fixture = { header: header("child-2", { parentSessionId: "s-main", parentBoundarySeq: 4, origin: "delegation", delegationDepth: 1, parentCallId: "p1" }), open: false, get events() { reads++; return childEvents; } };
+    const sessions: Record<string, Fixture> = {
+      "s-main": { header: header("s-main"), open: true, events: [
+        event(0, "subagent/spawned", { agentId: "child-2", callId: "p1", kind: "local", preset: "general", description: "review auth module", transcriptPath: "/x", createdAt: at }),
+        event(1, "subagent/activation", { op: "start", agentId: "child-2", activationId: "a1", trigger: "spawn", callId: "p1", background: true, model: "gpt-5.5", startedAt: at }),
+      ] },
+      "child-2": child,
+    };
+    const { dataRoot, root, service } = await setup(sessions);
+    try {
+      await Promise.all([service.refresh("child-2"), service.refresh("child-2"), service.refresh("child-2")]);
+      // One pass plus one more for the calls that overlapped it.
+      expect(reads).toBe(2);
+      const path = transcriptPath(dataRoot, "child-2");
+      const text = await readFile(path, "utf8");
+      expect(text).toContain("- Description: review auth module\n- Preset: general\n- Model: gpt-5.5");
+      expect(text).toContain("- [#2] bash: pnpm test\n  → running");
+      expect((await stat(path)).mode & 0o777).toBe(0o600);
+      childEvents.push(event(3, "tool/result", { callId: "c1", name: "bash", status: "completed", modelOutput: [{ type: "text", text: "12 passed" }], detail: [] }));
+      await service.refresh("child-2");
+      expect(await readFile(path, "utf8")).toContain("- [#2] bash: pnpm test\n  → completed: 12 passed");
+    } finally { await root.dispose(); }
+  });
+
   it("skips sessions without a Journal on disk", async () => {
     const sessions: Record<string, Fixture> = { ephemeral: { header: header("ephemeral"), open: true, events: [userMessage(0, "hi")] } };
     const { dataRoot, root, service } = await setup(sessions, { withJournal: [] });
@@ -179,5 +206,19 @@ describe("transcript read paths", () => {
     expect(isSessionTranscriptReadPath(dataRoot, "/data/actspace/secrets.json")).toBe(false);
     expect(isSessionTranscriptReadPath(dataRoot, "/data/actspace/transcript.md")).toBe(false);
     expect(() => transcriptPath(dataRoot, "../escape")).toThrow();
+  });
+
+  it("accepts only bash_<uuid>.log files inside a Session's bash-log directory", () => {
+    const dataRoot = "/data/actspace";
+    const log = "/data/actspace/sessions-v2/abc-123/bash-log/bash_1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed.log";
+    expect(isBashLogReadPath(dataRoot, log)).toBe(true);
+    expect(isBashLogReadPath(dataRoot, "/data/actspace/sessions-v2/abc-123/bash-log")).toBe(false);
+    expect(isBashLogReadPath(dataRoot, "/data/actspace/sessions-v2/abc-123/bash-log/notes.log")).toBe(false);
+    expect(isBashLogReadPath(dataRoot, "/data/actspace/sessions-v2/abc-123/bash-log/bash_1.log")).toBe(false);
+    expect(isBashLogReadPath(dataRoot, "/data/actspace/sessions-v2/abc-123/journal.jsonl")).toBe(false);
+    expect(isBashLogReadPath(dataRoot, "/data/actspace/sessions-v2/abc-123/bash_1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed.log")).toBe(false);
+    expect(isBashLogReadPath(dataRoot, "/data/actspace/sessions-v2/abc-123/x/bash-log/bash_1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed.log")).toBe(false);
+    expect(isBashLogReadPath(dataRoot, "/elsewhere/sessions-v2/abc-123/bash-log/bash_1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed.log")).toBe(false);
+    expect(isBashLogReadPath(dataRoot, "/data/actspace/sessions-v2/abc-123/bash-log/../bash-log/bash_1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed.log")).toBe(true);
   });
 });

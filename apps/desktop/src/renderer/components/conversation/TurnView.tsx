@@ -6,7 +6,7 @@ import { TodoListBlock } from "../messages/TodoListBlock";
 import { ReplyStreamingContext } from "../messages/reply-streaming-context";
 import { ToolActivityGroup } from "../messages/ToolActivityGroup";
 import { USER_ANNOTATIONS_ROW_CLASS, UserMessage } from "../messages/UserMessage";
-import { renderMessageList, type AgentTranscriptHandler, type ReadMessageBlock } from "./render-message";
+import { renderMessageList, type SubagentOpenHandler, type ReadMessageBlock } from "./render-message";
 import { TurnTail } from "../turn-tail/TurnTail";
 import { TurnActions } from "./TurnActions";
 import { finalAssistantMessages, getLatestTodoMessage, hasToolLikeItem, splitTurnMessages, workDurationMs, type ConversationTurn } from "./turns";
@@ -23,7 +23,7 @@ function renderProcessContent(
   processItems: MessageBlock[],
   isActive: boolean,
   finalReply: MessageBlock[],
-  onOpenAgentTranscript?: AgentTranscriptHandler,
+  onOpenSubagent?: SubagentOpenHandler,
   replyCompleted = false,
   onOpenReadFile?: (message: ReadMessageBlock) => void,
   onOpenWorkspaceFile?: (path: string, line?: number) => void,
@@ -31,7 +31,7 @@ function renderProcessContent(
 ): ReactNode[] {
   return [
     <ToolActivityGroup key="work" running={isActive} durationMs={completeTurn ? workDurationMs(processItems, finalReply) : undefined}>
-      {renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
+      {renderMessageList(processItems, onOpenSubagent, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
     </ToolActivityGroup>,
   ];
 }
@@ -40,12 +40,14 @@ function TurnPrompt({
   turn,
   onOpenAttachmentPreview,
   sessionId,
+  onOpenSubagent,
 }: {
   turn: ConversationTurn;
   onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
   sessionId?: string | null;
+  onOpenSubagent?: SubagentOpenHandler;
 }) {
-  if (!turn.user) return turn.notice ? <BackgroundNoticeRow message={turn.notice} /> : null;
+  if (!turn.user) return turn.notice ? <BackgroundNoticeRow message={turn.notice} onOpenSubagent={onOpenSubagent} /> : null;
   const latestTodo = getLatestTodoMessage(turn.messages);
 
   return (
@@ -77,7 +79,7 @@ function TurnPrompt({
 function renderTurnBody(
   turn: ConversationTurn,
   isActive: boolean,
-  onOpenAgentTranscript?: AgentTranscriptHandler,
+  onOpenSubagent?: SubagentOpenHandler,
   onOpenReadFile?: (message: ReadMessageBlock) => void,
   onOpenWorkspaceFile?: (path: string, line?: number) => void,
 ) {
@@ -92,19 +94,19 @@ function renderTurnBody(
   const processContent = processItems.length === 0
     ? null
     : hasToolLikeItem(processItems)
-      ? renderProcessContent(processItems, isActive, finalReply, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile, Boolean(turn.user))
-      : renderMessageList(processItems, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile);
+      ? renderProcessContent(processItems, isActive, finalReply, onOpenSubagent, replyCompleted, onOpenReadFile, onOpenWorkspaceFile, Boolean(turn.user))
+      : renderMessageList(processItems, onOpenSubagent, replyCompleted, onOpenReadFile, onOpenWorkspaceFile);
 
   if (!hasToolLikeItem(processItems) && !latestTodo) {
-    return renderMessageList(turn.messages, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile);
+    return renderMessageList(turn.messages, onOpenSubagent, replyCompleted, onOpenReadFile, onOpenWorkspaceFile);
   }
 
   return (
     <>
-      {preparationItems.length > 0 ? renderMessageList(preparationItems, onOpenAgentTranscript, false, onOpenReadFile, onOpenWorkspaceFile) : null}
+      {preparationItems.length > 0 ? renderMessageList(preparationItems, onOpenSubagent, false, onOpenReadFile, onOpenWorkspaceFile) : null}
       {processContent}
-      {finalReply.length > 0 ? <div className={`message-flow${processContent ? " message-flow-final" : ""}`}>{renderMessageList(finalReply, onOpenAgentTranscript, false, onOpenReadFile, onOpenWorkspaceFile)}</div> : null}
-      {failures.length > 0 ? renderMessageList(failures, onOpenAgentTranscript, false, onOpenReadFile, onOpenWorkspaceFile) : null}
+      {finalReply.length > 0 ? <div className={`message-flow${processContent ? " message-flow-final" : ""}`}>{renderMessageList(finalReply, onOpenSubagent, false, onOpenReadFile, onOpenWorkspaceFile)}</div> : null}
+      {failures.length > 0 ? renderMessageList(failures, onOpenSubagent, false, onOpenReadFile, onOpenWorkspaceFile) : null}
     </>
   );
 }
@@ -122,7 +124,7 @@ type TurnViewProps = {
   /** 有用户输入的轮次登记到轮次导航；没有用户输入的（压缩、工作树准备）不登记。 */
   setTurnElement: (turnId: string, element: HTMLElement | null) => void;
   onOpenAttachmentPreview?: (attachment: ComposerAttachment) => void;
-  onOpenAgentTranscript?: AgentTranscriptHandler;
+  onOpenSubagent?: SubagentOpenHandler;
   onOpenReadFile?: (message: ReadMessageBlock) => void;
   onOpenWorkspaceFile?: (path: string, line?: number) => void;
 };
@@ -137,7 +139,7 @@ export const TurnView = memo(function TurnView({
   turnNumber,
   setTurnElement,
   onOpenAttachmentPreview,
-  onOpenAgentTranscript,
+  onOpenSubagent,
   onOpenReadFile,
   onOpenWorkspaceFile,
 }: TurnViewProps) {
@@ -149,11 +151,11 @@ export const TurnView = memo(function TurnView({
       style={{ contentVisibility: "auto", containIntrinsicSize: "auto 240px" }}
       data-conversation-turn-id={turn.user ? turn.id : undefined}
     >
-      <TurnPrompt turn={turn} onOpenAttachmentPreview={onOpenAttachmentPreview} sessionId={sessionId} />
+      <TurnPrompt turn={turn} onOpenAttachmentPreview={onOpenAttachmentPreview} sessionId={sessionId} onOpenSubagent={onOpenSubagent} />
       <div className={ASSISTANT_TURN_GROUP_CLASS}>
         <ReplyStreamingContext.Provider value={isActive}>
           <div className={TURN_BODY_CLASS}>
-            {renderTurnBody(turn, isActive, onOpenAgentTranscript, onOpenReadFile, onOpenWorkspaceFile)}
+            {renderTurnBody(turn, isActive, onOpenSubagent, onOpenReadFile, onOpenWorkspaceFile)}
           </div>
         </ReplyStreamingContext.Provider>
         {splitTurnMessages(turn.messages).finalReply.length > 0 && !isActive ? (

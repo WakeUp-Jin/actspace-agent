@@ -77,7 +77,7 @@ export function TaskModelDefaultsSection({
     <SettingGroup title="模型与生成" headingLevel={3} description="新请求使用的模型和生成参数，只影响之后的请求。">
       <SettingLinkRow
         title="用途模型"
-        description="会话默认、轻量任务、自动审批、子 Agent 探索和看图，在「模型」中设置。"
+        description="会话默认、轻量任务、自动审批和看图，在「模型」中设置。"
         ariaLabel="前往模型设置用途模型"
         disabled={!onNavigate}
         onClick={() => onNavigate?.("model")}

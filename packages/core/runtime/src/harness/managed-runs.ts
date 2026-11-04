@@ -21,6 +21,14 @@ export class ManagedRuns {
         await background?.reconcile(session);
         return session;
       },
+      // A subagent's Session belongs to the subagent manager, running or not.
+      providerOwnedEvents: async id => {
+        const open = sessions.getOpen(id);
+        if (open) return open.header.lineage?.origin === "delegation" ? open.journal.readEvents() : undefined;
+        let lineage: unknown;
+        try { lineage = (await sessions.inspect(id)).lineage; } catch { return undefined; }
+        return isRecord(lineage) && lineage.origin === "delegation" ? await sessions.inspectEvents(id) : undefined;
+      },
       hasPendingNotifications: session => new MainAgentInbox(session).hasPendingNotifications(),
       runIdForTask: (sessionId, task) => { const key = `${sessionId}/${task.submissionId}`; const id = this.#requestedRunIds.get(key); this.#requestedRunIds.delete(key); return id; },
       operationForTask: (session, task) => {
@@ -86,6 +94,8 @@ export class ManagedRuns {
     return { sessionId, taskId: receipt.task.taskId, agentRunId: run?.runId ?? null,
       outcome: run?.state ?? task.state, value: run?.result ?? null, snapshot: this.sessions.snapshot(session) };
   }
+  /** A message the user queued is waiting for this Session. */
+  hasQueuedTask(sessionId: string): boolean { return (this.#states.get(sessionId)?.queue.length ?? 0) > 0; }
   isActive(sessionId: string): boolean { return this.#states.get(sessionId)?.runs.some(run => run.state === "running") ?? false; }
   abort(sessionId: string): boolean {
     const runId = this.#states.get(sessionId)?.runs.find(run => run.state === "running")?.runId;
@@ -96,4 +106,8 @@ export class ManagedRuns {
   isIdle(): boolean { return [...this.#states.values()].every(state => !state.queue.length && state.runs.every(run => run.state !== "running")); }
   quiesce(): void { this.#closed = true; void this.service.dispose().catch(() => undefined); }
   async dispose(): Promise<void> { this.#closed = true; await this.service.dispose(); }
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

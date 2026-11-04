@@ -56,6 +56,20 @@ describe("background task tools", () => {
     await expect(run("task_list", {})).rejects.toMatchObject({ failure: { code: "TOOL_NOT_FOUND" } });
   });
 
+  it("reads Bash output from an offset and reports the log size, the next offset and a pruned log", async () => {
+    const { registry, run } = setup();
+    const reads: (number | undefined)[] = [];
+    await registry.register({ ...source("bash_1"), bash: { command: "make", cwd: "/w", sandboxed: true, outputPath: "/tmp/bash_1.log" }, output: async (options?: { since?: number }) => { reads.push(options?.since); return { text: "fresh lines", outputPath: "/tmp/bash_1.log", logSize: 120, nextOffset: 120 }; } });
+    const read = await run("task_output", { taskId: "bash_1", since: 100 });
+    expect(reads).toEqual([100]);
+    expect(read.text).toContain("fresh lines\\n\\nlog_size: 120\\nnext_offset: 120");
+    expect((await run("task_output", { taskId: "bash_1", since: -1 })).text).toContain("INVALID_ARGUMENTS");
+    await registry.markPruned("parent", "bash_1");
+    const pruned = await run("task_output", { taskId: "bash_1" });
+    expect(pruned.text).toContain("output_path: /tmp/bash_1.log\\n\\nlog pruned");
+    expect(pruned.text).not.toContain("fresh lines");
+  });
+
   it("waits for a running task and reports it instead of a notification", async () => {
     const { registry, sessions, run } = setup();
     const task = source("bash_2");

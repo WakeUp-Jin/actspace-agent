@@ -93,12 +93,13 @@ type OverviewProps = RecordBodyProps & {
   readonly onOpenSubagent?: (childSessionId: string) => void;
 };
 
-/** 子智能体名称：委派时写的任务描述，其次是预设名。 */
+/** 子智能体名称：种类加委派时写的任务描述（老会话没有描述时回退到调用参数里的 description）。 */
 function subagentLabel(args: unknown, delegation: TrajectoryDelegation): string {
   let value = args;
   if (typeof value === 'string') { try { value = JSON.parse(value); } catch { value = null; } }
-  const description = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>).description : undefined;
-  return typeof description === 'string' && description.trim() !== '' ? description.trim() : delegation.presetId ?? '子智能体';
+  const fromArgs = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>).description : undefined;
+  const description = delegation.description.trim() !== '' ? delegation.description.trim() : typeof fromArgs === 'string' ? fromArgs.trim() : '';
+  return description === '' ? delegation.kindLabel : `${delegation.kindLabel} · ${description}`;
 }
 
 /** 记录概述：标签列表加可跳转的预览小节（照 DSH 概述页签）。 */
@@ -154,8 +155,8 @@ export function RecordOverview(props: OverviewProps) {
             <dt>{T.subagent}</dt>
             <dd>
               <span className="tj-overviewSubagentName">{subagentLabel(record.toolArguments, subagent)}</span>
-              {onOpenSubagent && (
-                <Button size="xs" aria-label={T.openSubagentTrajectory} title={T.openSubagentTrajectory} onClick={() => { onOpenSubagent(subagent.childSessionId); }}>
+              {onOpenSubagent && subagent.agentId !== null && (
+                <Button size="xs" aria-label={T.openSubagentTrajectory} title={T.openSubagentTrajectory} onClick={() => { onOpenSubagent(subagent.agentId!); }}>
                   <PanelRight size={12} aria-hidden="true" />{T.viewTrajectory}
                 </Button>
               )}
