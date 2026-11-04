@@ -1,5 +1,7 @@
 # 桌面端验收结果（2026-11-04）
 
+**最新结论：`d5dffac4` 修复后的 X1 / X4 / X6 / X8 / X21 五点定向复验全部通过，见本文末尾「修复后 Electron 复验」。下方 `07f853da` 的失败与原因是修复前历史记录；其余未覆盖范围不因本次复验自动通过。**
+
 目标：`feat/subagent-background-redesign`，HEAD `07f853da`。本轮只验收与定位，没有修复、修改源码或测试，没有提交或推送。交互由 `gpt-6.1-sol` 子智能体执行，主智能体核查源码及 Journal。
 
 ## 方法、范围与操作路线
@@ -111,3 +113,41 @@ Session 1ea4aa5c-717f-4ef4-9bc9-90e9640a1014 is owned by runtime f30e2416-d29d-4
 保留的缺口以逐点表为准，主要包括 Codex 成功链路、进行中 transcript 工具标记、旧 Explore/未收尾委派样本及对应特殊主题状态。本报告不构成整个分支验收通过。
 
 文档交付验证：`pnpm check:docs` 通过，`git diff --check` 通过。Git 变更范围仅本验收报告与交接文档，HEAD 仍为 `07f853da`；未修复或提交。
+
+## 修复后 Electron 复验（2026-11-04，d5dffac4）
+
+结论：BUG-01 / BUG-02 / BUG-03 对应的 **X1、X4、X6、X8、X21 五点定向复验全部通过**，本轮未复现这三个缺陷。只复验交接清单指定的修复范围；修复前已通过项目未重复整套执行，其他部分覆盖项目保留原缺口，不据此宣称整个分支或 Web 端完成验收。
+
+### 构建、方法与路线
+
+目标 HEAD 为 `d5dffac4008374fbc18455ecce02180df40ac101`，开始时工作区干净。先执行 `build:deps:dev`（含依赖、Client bundle 和 Default Harness 48 个 ESM 文件）、`package-browser-components.mjs`、`build:electron`，全部退出 0；独立核对构建产物包含 `sessionGrantOwner`、`providerOwnedEvents`。随后启动真实 Electron 39.8.10，使用正常 ActSpace 数据、默认工作区和 `deepseek:deepseek-flash`。启动证据为本轮 `build.log`、`electron-first.log`、`electron-restart.log`、`environment.json`；启动成功不计作界面通过。
+
+交互由 `gpt-6.1-sol` 使用 **Playwright/CDP 连接真实 Electron** 完成，点击和输入经过界面，没有 mock 或直接 IPC。本轮没有重试原生 CU 主窗口连接，不将 CDP 结果写成原生 CU 通过。主智能体独立检查 Journal、transcript、写锁及进程，并复看关键截图。
+
+操作前先列出五个验收点及预期，再按三条路线执行：①新会话内完成运行中通知、同步及后台空闲续聊，复用状态检查 live / 保存后投影和子会话跳转；②同父会话通过审批 UI 授予 `ls` 本会话权限，检查子智能体消费、未授权拒绝及授权列表前后对照；③同父会话同时保留后台 Bash 和运行中的子智能体，正常退出重开，先看中断状态，再发新消息消费恢复通知并读取原日志。
+
+父会话为 `3e5cf08e-21eb-4d70-8bf6-5bfa915c13b4`，标题「CU验收修复后仅验收PF同步」。本轮证据统一位于本地忽略目录 `tmp/codex-acceptance/20261103-subagent-background-redesign/postfix-d5dffac4/`，以下文件名均相对此目录。
+
+### 逐点结果
+
+| 点 | 结果与实际方法 | 复现过程、实际结果与证据 |
+| --- | --- | --- |
+| X1 / BUG-01 | 通过；真实 Electron CDP，Journal 独立佐证 | 后台探索 `923295a9-34fe-40e9-829b-f266ea529b87` 在父仍运行时完成。展开本轮 Worked for，通知位于 `list_agents` 调用之间，正文为 `42`，可打开正确子智能体；reload 后该通知仍存在。父 Journal settle / enqueue 为 `3077/3078`，claim `3087` 无 `opensTurn`，父继续工具调用后才于 `3654` 结束本轮。截图 `X1-live-notice-expanded.png`、`X1-open-child.png`、`X1-persisted-notice-expanded.png`；运行时证据 `x1-x4-journal-findings.json`。 |
+| X4 / BUG-02 | 通过；真实 Electron CDP，transcript / 锁独立检查 | 同步探索 `95413eba-b23b-4518-bf55-6653bc3f90eb` 首轮完成 `15`；后台探索 `923295a9…` 首轮完成 `42`。两者空闲后定向 `send_message`，父结果 `3873/3875` 均成功，第二轮 settle `3894/3896` 均 completed；界面两条均「空闲 / 第 2 轮」，打开详情仍为原 id。两个原 transcript 均追加父来信和第二次回复，各有两次 turn/end；空闲时均无 `.writer-lock`。未见本轮新会话 `SESSION_WRITER_LOCKED`，未删锁或重启绕过续聊。截图 `X4-sync-bg-round2-list.png`；`x1-x4-journal-findings.json`、`x4-transcript-findings.json`。 |
+| X6 / BUG-03 | 通过；真实 Electron CDP，授权 Journal 独立佐证 | 父 `ls` 实际出现审批，通过 UI 选「本会话允许」；父 `4340` 新增唯一 `ls` 前缀授权 `0908c711…`。General 子智能体 `d4cacd40-cf96-49fc-bb70-208f153fa479` 的 `ls` 在子 `67` 使用同一 grant，`69` completed / exit 0；未授权的 `pwd` 在 `136` denied / APPROVAL_REQUIRED，展开显示需要用户批准、子智能体无法请求，无审批窗。前后授权列表都只有原 `ls`，父 grant-added 共 1、子为 0。截图 `X6-parent-session-ls-approval.png`、`X6-grants-before-child.png`、`X6-child-ls-success-pwd-denied.png`、`X6-grants-after-child.png`；`x6-permission-findings.json`。 |
+| X8 / BUG-01 | 通过；真实 Electron CDP + 标准退出重启，Journal 独立佐证 | 退出前子智能体 `5b0b1983-6f2f-4f10-a56f-9874387e08ea` / PF-exit-running 确在运行；正常 quit 退出 0 后重开，下一用户消息前卡片为「已停止 · 中断（应用退出）」、列表为「已中断」。新消息后本轮 Worked for 出现「子智能体 PF-exit-running 中断（应用退出）」通知，展开为英文摘要及打开子智能体入口。恢复 settle / enqueue `5921/5922`，新用户消息 `5926` 后 claim `5929`，无 `opensTurn`，没有自动唤醒。截图 `X8-X21-running-before-quit.png`、`X8-restored-card-list-before-message.png`、`X8-recovery-child-notice-expanded.png`；`before-quit-findings.json`、`x8-x21-restart-findings.json`。 |
+| X21 / BUG-01 | 通过；真实 Electron CDP + 同次退出重启，日志独立检查 | Bash `bash_e16ab14a-44c4-4c0e-8d37-3aeb94de0ab1` 先输出 `PF_BEFORE_EXIT` 再 sleep 900，退出前仍运行。恢复 settle / enqueue `5919/5920`，同一新用户轮 claim `5928`，Worked for 中可见 Bash「已失联」通知。`read_file` `6243/6245` 无审批成功读原日志，保留退出前标记，没有退出后标记；独立核实日志存在。截图 `X8-X21-recovery-notices-expanded.png`、`X21-preserved-log-read.png`；`x8-x21-restart-findings.json`。 |
+
+### 观察边界与收尾
+
+初始算术题被模型误解成清单编号，派探索读取历史而受权限限制；纠正后同 id 续聊成功。该样本单独保留于 `initial-followup-findings.json`，正式 X4 使用后来题意明确的同步 / 后台两个样本。父模型曾声称 `ls` 没有审批，此自述不采信；实际审批 UI 和 `permission/decided`、`grant-added` 是判据。
+
+Bash 失联通知展开显示原始 `<task_notification>` XML；子智能体失联通知提取英文 summary。这是现有分支差异：`BackgroundNoticeRow.tsx:30–38` 只对子智能体 / 来信解析，Bash 原样返回 content；与修复前 `07f853da` 相同，设计 05 对 Bash 通知要求「不变」。记录为既有展示行为，不列为本次新增缺陷。未修复或调整文案。
+
+本轮未重验 Web、Codex CLI 成功链路或原 23 点剩余缺口。本机损坏的 Homebrew Codex 仍沿用之前的环境阻塞结论，本轮没有执行安装修复或改变 PATH。
+
+最终 UI 核对浅色、子智能体「跟随主智能体」、Codex / Claude 两插件关闭；本轮未改变这些设置，截图 `final-theme-light.png`、`final-model-follow-main.png`、`final-plugins-off.png`。没有创建工作区测试文件；仅在新的验收父会话保留当前工作区 `ls` 前缀授权，无全局授权。最终 Electron 正常退出 0，renderer 主动 Ctrl-C 退出 130；5173 / 9227 不再监听，测试 sleep 无残留。保留新验收会话与本地证据供复核。
+
+文档交付检查：`pnpm check:docs`、`pnpm check:current-docs`、`git diff --check` 全部通过。收尾证据为 `cleanup-findings.json`，本轮五个会话均无残留写锁、没有 SESSION_WRITER_LOCKED failure，默认工作区为空。
+
+本轮仅更新本报告与交接文档，没有修改源码、测试或配置，没有提交或推送。

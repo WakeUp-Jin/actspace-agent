@@ -134,3 +134,19 @@ B-A6（日志超 50MB 删最早的）、B-A7（第 6 个后台任务）、B-A8�
 | X21 | BUG-01 | 后台 Bash 运行中退出应用，重开后在该会话发一条新消息（可与 X8 同一次退出） | 新这一轮里出现「后台任务 · Bash: … · 已失联」通知行；日志文件还在、能读 |
 
 结果写在本节下面，格式同「结果怎么写」。Codex 成功链路仍被本机 `/opt/homebrew/bin/codex`（缺 vendor 二进制）挡住，修好或删掉这份安装后再验 X14；它不是本分支缺陷。
+
+### 修复后复验结果（2026-11-04，d5dffac4）
+
+已重新构建依赖、Runtime Harness、Electron main/preload，全部退出 0。由 `gpt-6.1-sol` 使用 **Playwright/CDP 操作真实 Electron**；主智能体独立核查 Journal、transcript、写锁与进程。本轮没有重试原生 CU，不将 CDP 标记为原生 CU 通过。
+
+| 点 | 结果 | 方法与证据 |
+| --- | --- | --- |
+| X1 | 通过 | CDP：父运行中消费的完成通知在本轮 Worked for 中出现，展开结论、打开子智能体和 reload 后投影均通过。`X1-live-notice-expanded.png`、`X1-open-child.png`、`X1-persisted-notice-expanded.png`；Journal claim `3087` 无 opensTurn。 |
+| X4 | 通过 | CDP：同步及后台各一个空闲子智能体续派成功，两个原 id 均「空闲 / 第 2 轮」；独立核实原 transcript 追加、空闲时无 `.writer-lock`，没有写锁错误。`X4-sync-bg-round2-list.png`、`x4-transcript-findings.json`。 |
+| X6 | 通过 | CDP：父真实审批授予 ls 本会话前缀，子 ls 消费同一 grant 成功；pwd 直接 denied，说明无法请求用户批准；授权前后仅原 ls，子无新增授权。`X6-child-ls-success-pwd-denied.png`、`X6-grants-before-child.png`、`X6-grants-after-child.png`、`x6-permission-findings.json`。 |
+| X8 | 通过 | CDP + 标准退出重启：退出前 child 运行，重开卡片「已停止 · 中断（应用退出）」；新消息后 Worked for 内出现中断通知，展开英文摘要。`X8-restored-card-list-before-message.png`、`X8-recovery-child-notice-expanded.png`。 |
+| X21 | 通过 | CDP + 同次重启：新消息轮内有 Bash 已失联通知，原日志无审批读取成功，保留退出前标记。`X8-X21-recovery-notices-expanded.png`、`X21-preserved-log-read.png`、`x8-x21-restart-findings.json`。 |
+
+本轮证据位于本地忽略目录 `tmp/codex-acceptance/20261103-subagent-background-redesign/postfix-d5dffac4/`。父会话 `3e5cf08e-21eb-4d70-8bf6-5bfa915c13b4`。完整步骤、子 id、Journal 序号、构建与观察边界见 [acceptance-results.md](acceptance-results.md) 末尾「修复后 Electron 复验」。五点修复范围全部通过，未发现新的相关缺陷；其余部分覆盖项目保持原缺口，未将 Web / Codex 成功链路写成通过。
+
+最终确认浅色、跟随主智能体、两外部插件关闭；仅新验收父会话保留 ls 工作区前缀授权，无全局授权，无工作区测试文件。应用标准退出 0，renderer 主动停止；5173 / 9227 无监听，测试 sleep 无残留。本轮仅补充验收记录，没有修源码、测试或配置，没有提交或推送。
