@@ -1,170 +1,101 @@
-# 一次性 Subagent 运行规范
+# 子智能体运行规范
 
-> 状态：当前 v2 设计与实现事实。Subagent 是工具触发的一次性 child Session，不使用 v1 transcript sidecar，也不支持续跑。
+> 状态：已实施（2026-11-04，分支 `子智能体功能完善`，S1–S6；界面见 [05 界面与设置](../子智能体和后台任务设计规范/05-界面与设置设计规范.md)）。设计依据与逐字的模型可见文字见 [子智能体和后台任务设计规范](../子智能体和后台任务设计规范/README.md)（[01 决策](../子智能体和后台任务设计规范/01-设计决策.md)、[02 子智能体](../子智能体和后台任务设计规范/02-子智能体设计规范.md)、[04 外部子智能体](../子智能体和后台任务设计规范/04-外部子智能体设计规范.md)）；实际做了什么、与设计不同的地方见[执行过程](../../exec-runs/20261103-subagent-background-redesign/execution-process.md)。本文只写现状的结构与边界，不重复每一句工具描述。
 
-公共契约见 [`agent-spec-agent-and-subagent.md`](../agent-plugin-runtime/agent-spec-agent-and-subagent.md)，实现位于 `packages/subagent/subagent/`。
+公共契约见 [`agent-spec-agent-and-subagent.md`](../agent-plugin-runtime/agent-spec-agent-and-subagent.md)，实现位于 `packages/subagent/`（包表见 [`packages/subagent/README.md`](../../../packages/subagent/README.md)）。
 
 ## 定位
 
-主 Agent 通过 `agent` 或 `explore`（所属 plugin 为 `actspace.subagent`） 工具委托一个独立任务。每次调用创建：
+子智能体是主会话派出的、在自己子会话里工作的 Agent。`agent_id` 就是子会话 ID。参考 DeepSeek Harness 的运行模型（默认后台、可续聊、可写、预设与模型可选），再加 ActSpace 自己的「留痕」：子会话 transcript 路径全程交给主智能体，并进入上下文的活跃 / 睡眠路径。
 
-- 独立 `invocationId`；
-- 独立 `childAgentId`；
-- 独立 `childSessionId`；
-- 独立 Harness 租约，以及该租约 Scope 下的 child `AgentScope`；
-- child Session 自己的 TaskLedger / Run 记录；
-- 静态 Preset；
-- 父 Agent 当前可见工具与 Preset 工具的交集；
-- 与父 Tool Call 关联的 lineage。
+旧的一次性、只读、不能续聊的实现和 `explore` 工具已删除；原 `agent-explore-subagent.md` 随之退役，由设计 02 取代。
 
-主 Agent 只接收结构化 terminal result；需要查看完整过程时，Host 读取 child Session 的 Journal projection。
+## 工具
 
-## Child Session
+主会话（`agent` 模式）有七个工具，所属插件 `actspace.subagent`；`plan` 模式只有 `agent`、`agent_fork` 和管理类工具，`chat` 模式没有。
 
-Subagent 不把内部事件写进父 Session，也不创建：
+| 工具 | 作用 |
+|---|---|
+| `agent` | 创建子智能体。参数 `description`、`prompt`、`agent_preset`（`general` / `explore`）、`background`（默认 `true`）、`model`、`reasoning_effort` |
+| `agent_fork` | 创建继承当前会话上下文的子智能体，沿用父的工具与模型（没有 `agent_preset`） |
+| `send_message` | 给运行中的子智能体插话；给空闲的续派一轮；子智能体也能发给父会话和兄弟 |
+| `wait_agent` | 等新输入到来（完成通知、`agent_message`、用户消息） |
+| `list_agents` | 列出子智能体树：id、状态、transcript 路径 |
+| `interrupt_agent` | 停止当前这一轮，之后还能续派（只有主会话有） |
+| `list_subagent_models` | 列出设置里可用的模型与思考档位；不写进工具描述，避免模型列表变化破坏 prompt cache |
 
-```text
-subagents/<runId>.jsonl
-```
+另有两个默认关闭的外部插件工具 `agent_codex`、`agent_claude_code`，见下文「外部子智能体」。
 
-它创建普通的 v2 Session：
+## 状态与事件
 
-```text
-sessions-v2/<childSessionId>/journal.jsonl
-```
+主会话 Journal 里只有两类事件，所有状态（列表、并发计数、面板）都从它们折叠出来（`@actspace/shared/runtime-v2` 的 `foldSubagentTree`），不另存：
 
-Header lineage 固定包含：
+- `subagent/spawned`：创建时一次，含 `agentId`、`callId`、`kind`、`preset`、`description`、`transcriptPath`、创建时固定的 `toolNames`，fork 另有 `inheritedThroughSeq`；
+- `subagent/activation`：每次激活的 `start` 与 `settle`。激活是子智能体的一轮工作：创建一次，之后每次 `send_message` 续派又一次。
 
-- `origin: "delegation"`；
-- `parentSessionId`；
-- `parentBoundarySeq`；
-- `parentCallId`；
-- `seedDigest`；
-- `delegationDepth`。
+状态：`running`、`inactive`（空闲，可续派）、`closed`（外部子智能体结束后不能续派）。`settle` 的 `delivery` 为 `returned`（同步返回）、`notified`（通知）、`lost`（重启补记）。
 
-Child Session 不能通过主会话恢复入口当作普通 main Session 续跑。它的用途是一次委托、完整记录、终态发布和只读回放。
+老会话的 `delegation/*` 和 `background/task` 的 `kind: "agent"` 事件编解码器保留，只读显示，不转换；老会话的统计继续读 `delegation/*`。
 
-## 调用流程
+## 子会话
 
-```text
-parent tool/call
-→ delegation/requested
-→ create child Session
-→ acquire independent Harness lease + child Scope
-→ child TaskLedger submit/start
-→ create AgentLoop with static Preset
-→ child runTurn(task)
-→ child flush + Loop quiesce/waitForIdle
-→ child TaskLedger finish
-→ delegation/child-terminal
-→ child close + scope dispose + Harness lease release
-→ parent delegation/completed
-→ parent tool/result
-```
+子会话是普通的 v2 Session：`sessions-v2/<agent_id>/journal.jsonl`，头部 `lineage` 为 `origin: "delegation"`、`parentSessionId`、`parentCallId`、`delegationDepth: 1`（fork 另有 `inheritedThroughSeq`）。不能当作主会话通过恢复入口续跑，续派走管理器自己的冷恢复：重新打开子会话，补上未正常结束的 `turn/end`，再按首次激活的路径取运行租约和 Ledger。工具集沿用创建时固定的那份，保持子会话提示词前缀稳定。
 
-父 Session 通过 `delegation/requested` 和 `delegation/completed` 记录稳定关联；child Session 通过 `delegation/child-terminal` 保存自己的 terminal publication。
+## 能力与权限
 
-如果 child 已经 durable 发布 terminal，但进程在父 Session 写回前中断，`repairSubagentPublications()` 可以扫描合法 child Session，按父 Tool Call 顺序补齐 parent link 和 tool result。它不能为没有 lineage、没有 terminal 或校验失败的 Session 猜测关系。
+| 预设 | 工具 |
+|---|---|
+| `general` | 父会话创建时所在模式允许的工具，去掉委派类、`task_*`、`present`、`plugin_manager`、`harness_inspect` 等；加上 `send_message`、`list_agents`、`wait_agent`。可写文件、跑命令 |
+| `explore` | `read_file`、`list_directory`、`grep`、`glob` 加上面三个消息类工具 |
+| fork | 与父会话完全相同的工具列表（为了命中缓存）；不该用的在执行时拦下，返回 `Subagents cannot use <name>.` |
 
-## Static Preset
+- 深度固定 1：子会话里委派工具执行时被拦。每个主会话最多 10 个**正在运行**的子智能体（同步加后台、含外部，空闲的不算）。
+- 子智能体**不弹审批**：工具环境没有审批代理，需要审批的操作直接失败，返回「需要用户批准，子智能体无法请求」的说明文字。权限模式每次激活从父会话读取并写进子会话；会话授权只读父会话的，不能新增；沙箱照常。
+- 子会话里的 Bash 不转后台，最多 10 分钟，超时报 `BASH_TIMEOUT`。
+- 在 `plan` 模式下创建的 `general` 只拿到 `plan` 模式的工具，天然只读。
 
-Preset 是不可变启动配置：
+## 模型
 
-```text
-id / version
-routeId / model
-promptContributorIds
-allowedToolNames
-readOnly
-maxSteps
-maxDurationMs
-maxDelegationDepth
-```
+一次激活的模型：调用参数 `model` > 设置 `subagentDefaultModel` > 父会话当前的模型与思考档位。设置只有这一项，第一项「跟随主智能体」；旧的 explore 用途（`taskModels.exploreModel` 等）已删除，旧值不迁移，设置 schema 的 `layersVersion` 升到 3。默认模型不可用时退回跟随父会话。`agent_fork` 不给 `model` 时用父会话的模型与档位，不读这项设置，续派也一样。
 
-当前内置：
+## 留痕与通知
 
-- `actspace.agent`：一次性只读分析 Agent，当前只开放 read_file、list_directory、grep、glob 与父可见工具的交集；
-- `actspace.explore`：只读 Explore，只允许 `read_file`、`list_directory`、`grep`、`glob`。
+- **transcript**：就是子会话自己的 `sessions-v2/<agent_id>/transcript.md`，不另写一份；启动时先写出头部，此后每走完一步增量重写，细节见[会话记录 Markdown](../agent-runtime/agent-session-transcript.md)。路径在四处交给主智能体：同步结果、后台启动返回、`list_agents`、完成通知。读取免审批。
+- **活跃路径**：`agent` / `agent_fork` 的工具结果带 `actspace.context.trace`，上下文引擎登记成活跃路径，之后照常按「一个压缩周期内没读过就转入睡眠」处理。
+- **完成通知**：后台激活结束时，主会话收件箱收到 `<subagent_notification>`（来源 `subagent_notification`），带状态、一句 summary、transcript 路径和最多 8KB 的结论；主会话空闲则唤醒。子智能体之间或发给父会话的消息是 `<agent_message>`（来源 `agent_message`）。
+- **运行中清单**：新上下文来源 [`context-subagents`](../../../packages/context/context-subagents) 每轮写一段「运行中的子智能体」清单，压缩或重启后模型仍知道谁在跑；没有运行中的就不写。fork 不带这段。
+- 任务消息末尾追加固定说明：最终回复只写结论和关键证据，不能向用户提问或请求审批，并行的写任务各改各的文件。
 
-最终工具集是：
+## Fork
 
-```text
-parentVisibleToolIds ∩ preset.allowedToolNames
-```
+`agent_fork` 复用侧边对话的复制机制：按边界把父会话事件原样复制进子会话（seq 不变），边界是本轮里最后一个完整的步骤（只去掉包含 fork 调用的那一步），再追加 `turn/end`（`reason: "forked"`）。子智能体看到的是父模型当时看到的上下文，系统提示词、工具、模型都与父会话相同，所以第一次请求能命中父会话的 prompt cache（进程测试用录制型 fake LLM 逐项比对过）。真实模型上的缓存命中还没在 Electron 里验过。
 
-Preset 不能扩大父 Agent 看不到的能力，也不能超过 Host capability ceiling。
+## 外部子智能体
+
+`@actspace/subagent-codex`（`agent_codex`）、`@actspace/subagent-claude-code`（`agent_claude_code`）是两个**默认关闭**的会话插件，在 扩展 › 插件 里开启（标题分别是「Codex 子智能体」「Claude Code」）。
+
+- 用本机已装的 CLI（登录 shell 里 `command -v` 找，找不到就不注册工具），不打包可执行文件；
+- 一次调用就是一个进程、一轮，**不续聊**，结束后状态 `closed`；`send_message` 给它返回错误；
+- 用 CLI **自己的权限与模型设置**，不走 ActSpace 的审批和沙箱（开启插件就是授权）；Codex 默认 `approvalPolicy: never`、`sandbox: workspace-write`，Claude Code 默认 `permissionMode: dontAsk`，在插件设置里改；
+- 不另存留痕，返回 CLI 原生的会话 JSONL 路径（Codex 的 rollout 文件、`~/.claude/projects/…/<id>.jsonl`），这个文件按精确路径免审批读取，每次从主会话的子智能体投影判断，重启后无需恢复；
+- 与本地子智能体共用并发上限、事件、通知和 `list_agents`；应用退出时杀进程，重开后补 `lost`。
+
+CLI 启动失败（没装、没登录、进程退出、启动超时）直接返回工具错误，不登记子智能体。
 
 ## 生命周期
 
-- Provider 进入 quiescing 后拒绝新委托；
-- 每个 invocation 有独立 AbortController；
-- 父 AbortSignal 级联到 child；
-- Preset timeout 会中止 child；
-- Runtime shutdown 调用 `abortAll()`，再等待全部 inflight invocation settle；
-- child Session、child Scope、Harness lease release 和 publication cleanup 都必须等待完成；
-- delegation depth 达到 Preset 上限时拒绝启动。
+- 同步等待最多 30 分钟，之后转后台继续跑；后台激活没有时长上限（可 `interrupt_agent`）；单次激活最多 1000 步。
+- 用户停止主会话这一轮：同步等待中的子智能体一起中断，后台的不受影响。
+- Host 关闭时先停子智能体、再停后台任务。重启打开会话时，有 `start` 没有 `settle` 的激活补写 `lost` 并通知主会话；`local` / `fork` 之后仍可续派，外部子智能体变 `closed`。
+- 子会话照旧不向界面发 `session/event`，右侧「子 Agent」面板从父会话 Journal 与子会话投影读取。
 
-当前最大 delegation depth 为 1，因此 Subagent 不能继续创建新的 Subagent 层级。
+## 界面
 
-## Terminal result
+对话卡片、右侧「子 Agent」面板、设置与插件页的行为见[设计 05](../子智能体和后台任务设计规范/05-界面与设置设计规范.md)。后台 Bash 见[后台任务](agent-background-tasks.md)。
 
-终态至少包含：
+## 已知边界
 
-```text
-invocationId
-childAgentId
-childSessionId
-presetId
-status
-text
-usage
-toolUseCount
-durationMs
-artifacts
-failure
-```
-
-`status` 可以是：
-
-```text
-completed
-failed
-denied
-aborted
-outcome-unknown
-```
-
-父 Agent 的 tool result 只包含完成任务所需的结构化摘要和 child reference，不展开复制 child Journal 全部工具过程。
-
-## 后台模式
-
-`agent` / `explore` 的参数 `background: true` 让子 Agent 在后台运行，详见 [后台任务](agent-background-tasks.md)：
-
-- `OneShotSubagentProvider.launch()` 完成 `delegation/requested`、创建 child Session、取得 Harness 租约并登记 child Ledger 后立即返回；`invoke()` 是 `launch()` 加等待结果，前台行为不变。
-- 后台调用不接父工具调用的中断信号；只有 `task_stop`（映射为 `aborted` → 登记表 `stopped`）、超时或 Host 关闭会停止它。
-- 每个会话最多 4 个运行中的后台子 Agent，超出时工具返回 `BACKGROUND_TASK_LIMIT`，不创建 child Session。
-- 工具立即返回 `task_id`、`child_session_id` 与「完成后自动通知、不要轮询」；`detail.delegation.background` 为 `true`。
-- 完成通知内联最终文本（UTF-8 超过 8KB 截断并附 child 引用）；运行中的 `task_output` 给步数、工具调用数和最近 3 次工具调用。
-- `delegation/completed` 仍在 child 结束时写入父会话，父卡片状态取它而不是工具结果。
-- 重启后不恢复后台子 Agent，会话打开时标为 `lost` 并提醒模型。
-
-## 当前不提供
-
-- 用户对 child Session 继续追问；
-- continuable Subagent；
-- 多层递归委托；
-- 运行期自定义 Preset；
-- 长期协作成员 Runtime（见 `多智能体协作/` 的 Space 设计）；
-- 独立 transcript sidecar。
-
-## 验收
-
-- 每次委托都有独立 child Session 和 lineage；
-- Explore 不能获得副作用工具；
-- 父取消和 Runtime shutdown 会中止并等待 child；
-- child terminal 已 durable、父 link 缺失时可以保守修复；
-- child Session 不被普通 main Session resume；
-- 父上下文不会包含 child 全量 Journal；
-- child / parent 两侧都不会因失败留下未释放 Scope 或 writer lease。
-
-当前内置 Agent / Explore 均采用 1000 步（最后一步无工具总结）与 30 分钟时限。限制原因、部分结果及父子 live 活动关联见 [Explore 与 Agent 只读边界](agent-explore-subagent.md)。
+- 真实模型下 fork 的缓存命中、Electron 里的完整流程（含外部子智能体免审批读取）尚未实机验收。
+- Claude Code 对很长的目录名会截断加哈希，路径编码没有照做，路径可能对不上。
+- Host 被强杀时外部 CLI 子进程可能残留，下次启动只补 `lost`，不清理进程。
+- 本机 `codex` 命令若是损坏的安装，登录 shell 会先找到它，导致启动失败，需用户自行修复。

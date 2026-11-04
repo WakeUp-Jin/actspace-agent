@@ -25,7 +25,7 @@ import { TrajectoryTimeline } from './trajectory/TrajectoryTimeline';
 import { TrajectoryToolbar } from './trajectory/TrajectoryToolbar';
 import { TrajectoryTable } from './trajectory/TrajectoryTable';
 import { DetailPanel } from './trajectory/details/DetailPanel';
-import { trajectoryDelegations } from '../trajectory/subagents';
+import { trajectoryAfterSeq, trajectoryDelegations } from '../trajectory/subagents';
 import { useTrajectoryNavigation } from './trajectory/TrajectoryNavigation';
 import { useTrajectorySource } from './trajectory/use-trajectory-source';
 import { useTrajectorySelection } from './trajectory/use-trajectory-selection';
@@ -54,15 +54,18 @@ export type TrajectoryViewProps = {
   readonly variant?: 'main' | 'panel';
   /** Opens a delegated child agent's own trajectory (the right panel); the parent trajectory keeps only the `agent` row. */
   readonly onOpenSubagent?: (childSessionId: string) => void;
+  /** Fork 子智能体：只显示 seq 大于它的部分（见 `trajectoryAfterSeq`）。 */
+  readonly afterSeq?: number;
 };
 
 /** 轨迹视图：只做装配 —— 数据源、搜索、折叠、时间轴范围、选中与跳转。 */
-export function TrajectoryView({ snapshot, onAbort, isAborting, sessionId: watchedSessionId, variant = 'main', onOpenSubagent }: TrajectoryViewProps) {
+export function TrajectoryView({ snapshot, onAbort, isAborting, sessionId: watchedSessionId, variant = 'main', onOpenSubagent, afterSeq }: TrajectoryViewProps) {
   const source = useTrajectorySource(snapshot, watchedSessionId);
+  const shown = useMemo(() => trajectoryAfterSeq(source.snapshot ?? null, afterSeq), [source.snapshot, afterSeq]);
   const bridge = source.projection?.bridge;
   const projectionCell = source.projection?.cell;
   // 定稿层（DSH finalized）：正在输出的助手只留空占位。流式时只有 chunk 在长，定稿键不变，builder 和布局都不重算。
-  const split = useMemo(() => source.snapshot ? splitLiveChunks(source.snapshot) : null, [source.snapshot]);
+  const split = useMemo(() => shown ? splitLiveChunks(shown) : null, [shown]);
   const splitRef = useRef(split);
   splitRef.current = split;
   const runtime = useMemo(() => {
@@ -70,7 +73,7 @@ export function TrajectoryView({ snapshot, onAbort, isAborting, sessionId: watch
     return current ? buildTrajectorySnapshot(current.settled(), { placeholders: new Set(current.live.keys()) }) : null;
   }, [split?.settledKey]);
   const layout = useMemo(() => runtime ? deriveLayout(runtime) : null, [runtime]);
-  const delegations = useMemo(() => new Map(trajectoryDelegations(source.snapshot ?? null).map(item => [item.parentCallId, item])), [source.snapshot]);
+  const delegations = useMemo(() => new Map(trajectoryDelegations(shown).map(item => [item.parentCallId, item])), [shown]);
   const subagentFor = useCallback((callId: string) => delegations.get(callId) ?? null, [delegations]);
   const cellsById = useMemo(() => new Map((layout?.cells ?? []).map(cell => [cell.recordId, cell])), [layout]);
   // 流式层（DSH streamingCells）：累加器只折叠新到的 chunk，表格和详情按 recordId 把占位换成流式 cell。
@@ -79,7 +82,7 @@ export function TrajectoryView({ snapshot, onAbort, isAborting, sessionId: watch
     if (!split || split.live.size === 0) return NO_STREAMING;
     return liveCells(cellsById, accumulator.update(split.live));
   }, [split, cellsById, accumulator]);
-  const remoteHistory = !source.isFixture ? source.snapshot?.history : undefined;
+  const remoteHistory = !source.isFixture ? shown?.history : undefined;
 
   const [actualDuration, setActualDuration] = useState(false);
   const mode = actualDuration ? 'duration' : 'sequence';

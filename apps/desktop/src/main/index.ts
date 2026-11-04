@@ -5,7 +5,7 @@ import { registerPerformanceIpc } from "./performance-ipc";
 import { ModelCatalogService } from "./model-catalog-service";
 import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
-import { BROWSER_PLUGIN_ID, disabledPluginIds, ENGLISH_LEARNING_PLUGIN_ID, resolvePluginSwitches } from "./plugins/plugin-switches";
+import { BROWSER_PLUGIN_ID, disabledPluginIds, ENGLISH_LEARNING_PLUGIN_ID, resolvePluginSettings, resolvePluginSwitches } from "./plugins/plugin-switches";
 import { registerPluginsIpc } from "./plugins/plugins-ipc";
 import { registerDisabledEnglishLearningIpc } from "./plugins/optional-plugin-stubs";
 import { loadRuntimeV2Module } from "./runtime-v2/runtime-loader";
@@ -183,6 +183,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   // changing the setting only takes effect after a restart (see plugin-switches.ts).
   const runtimeModule = await loadRuntimeV2Module();
   const startupSwitches = resolvePluginSwitches(settingsService.getV4().settings, runtimeModule.PLUGIN_CATALOG);
+  const startupPluginSettings = resolvePluginSettings(settingsService.getV4().settings);
   const browserEnabled = startupSwitches.get(BROWSER_PLUGIN_ID) === true;
   const englishLearningEnabled = startupSwitches.get(ENGLISH_LEARNING_PLUGIN_ID) === true;
   browserBridgeService = browserEnabled ? new BrowserBridgeService({
@@ -207,6 +208,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   runtimeV2Registry = new DesktopRuntimeV2Registry({
     speech,
     disabledPlugins: disabledPluginIds(startupSwitches),
+    pluginConfig: startupPluginSettings,
     roots,
     models: modelRuntimeService,
     approvals: approvalRegistry,
@@ -252,7 +254,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   disposeEnglishLearningIpc = englishLearningEnabled
     ? registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow })
     : registerDisabledEnglishLearningIpc({ getMainWindow: () => getMainWindow() ?? null });
-  disposePluginsIpc = registerPluginsIpc({ getMainWindow, catalog: runtimeModule.PLUGIN_CATALOG, startupSwitches, settings: settingsService });
+  disposePluginsIpc = registerPluginsIpc({ getMainWindow, catalog: runtimeModule.PLUGIN_CATALOG, startupSwitches, startupPluginSettings, settings: settingsService });
   remoteHosts = new RemoteHostRegistry(roots.dataRoot);
   await remoteHosts.open();
   disposeRemoteHostIpc = registerRemoteHostIpc(remoteHosts, getMainWindow, async sessionId => { await remoteDesktop?.activate(sessionId); });

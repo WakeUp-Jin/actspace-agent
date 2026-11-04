@@ -115,4 +115,21 @@ describe("PluginsSection", () => {
     rerender(<PluginsSection query="不存在" />);
     expect(await screen.findByText("没有找到匹配的插件。")).toBeVisible();
   });
+  it("subagent plugins show why they are unavailable and write their settings", async () => {
+    const plugins = [
+      ...extensionPlugins(),
+      { id: "subagent-codex", title: "Codex 子智能体", description: "用本机 Codex 跑子任务", scope: "session" as const, directory: "subagent", canDisable: true, loaded: true, enabled: true, settings: { approvalPolicy: "never", sandbox: "workspace-write" }, settingsPendingRestart: false },
+      { id: "subagent-claude-code", title: "Claude Code", description: "用本机 Claude Code 跑子任务", scope: "session" as const, directory: "subagent", canDisable: true, loaded: false, enabled: false, unavailableReason: "本机没有找到 claude 命令", settings: { permissionMode: "dontAsk" } },
+    ];
+    const { updateV4 } = setup(plugins);
+    render(<PluginsSection />);
+    expect(await screen.findByText("不可用：本机没有找到 claude 命令")).toBeVisible();
+    // 只有开启的插件才展开设置；没开的 Claude Code 不显示。
+    expect(screen.queryByRole("region", { name: "Claude Code设置" })).not.toBeInTheDocument();
+    const panel = screen.getByRole("region", { name: "Codex 子智能体设置" });
+    expect(within(panel).getByText(/不经过 ActSpace 的审批与沙箱/)).toBeVisible();
+    await userEvent.click(within(panel).getByRole("combobox", { name: "Codex 子智能体沙箱" }));
+    await userEvent.click(await screen.findByRole("option", { name: /^read-only/ }));
+    await waitFor(() => expect(updateV4).toHaveBeenCalledWith({ expectedRevision: "r1", namespace: "tools", patch: { externalSubagents: { codex: { sandbox: "read-only" } } } }));
+  });
 });

@@ -112,7 +112,7 @@ Journal 保留原有 assistant/chunk 容器；新增工具 kind 时保存 callId
 
 ### 只读子任务活动（2026-09-15）
 
-Child live event 携带 parentSessionId / parentCallId，Main adapter 将事件投影到仍在运行的父 agent/explore 工具行，携带 transcriptRef；同一文本阶段不逐 token 发布父预览，父调用结束后忽略迟到子事件。只开放读取和搜索；消息行使用轻边框与 180ms 上移淡入淡出活动提示（4px，无三维翻转），具体运行预算见 [子代理设计](../collaboration/agent-explore-subagent.md)。
+Child live event 携带 parentSessionId / parentCallId，Main adapter 将事件投影到仍在运行的父 agent/explore 工具行，携带 transcriptRef；同一文本阶段不逐 token 发布父预览，父调用结束后忽略迟到子事件。只开放读取和搜索；消息行使用轻边框与 180ms 上移淡入淡出活动提示（4px，无三维翻转），子智能体的运行规则见 [子智能体运行规范](../collaboration/agent-subagent-runtime.md)，卡片与面板的新文字见[设计 05](../子智能体和后台任务设计规范/05-界面与设置设计规范.md)。
 
 
 ### 子智能体头像与状态（2026-09-20）

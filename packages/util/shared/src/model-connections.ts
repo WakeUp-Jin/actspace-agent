@@ -9,8 +9,8 @@ import type { ProviderConnectionErrorKind, ProviderConnectionState, ProviderProx
  * 每个修改都返回整份视图，renderer 不自己拼状态。
  */
 
-export type PurposeId = "chat" | "utility" | "autoReview" | "vision";
-export const PURPOSE_IDS: readonly PurposeId[] = ["chat", "utility", "autoReview", "vision"];
+export type PurposeId = "chat" | "utility" | "autoReview" | "subagent" | "vision";
+export const PURPOSE_IDS: readonly PurposeId[] = ["chat", "utility", "autoReview", "subagent", "vision"];
 
 /** model 为 null 表示「跟随」：会话默认之外的用途跟随会话默认。thinking 为 null 表示用模型的默认档位。 */
 export type PurposeBinding = { model: ModelKey | null; thinking: ThinkingLevel | null };

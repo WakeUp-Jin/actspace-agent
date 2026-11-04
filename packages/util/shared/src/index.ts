@@ -25,6 +25,7 @@ export * from "./context-buckets";
 export * from "./context-panel";
 export * from "./data-root";
 export * from "./session";
+export * from "./subagent-labels";
 export * from "./session-transcript";
 export * from "./session-locator";
 export * from "./usage-cost";

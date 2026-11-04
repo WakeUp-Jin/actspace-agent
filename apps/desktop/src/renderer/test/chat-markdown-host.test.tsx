@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import type { MessageBlock, WorkspaceReadFileResult, WorkspaceStatFileResult } from "@actspace/shared";
+import type { MessageBlock, SubagentListItem, WorkspaceReadFileResult, WorkspaceStatFileResult } from "@actspace/shared";
 import { ChatMarkdownHostProvider } from "../components/conversation/ChatMarkdownHostProvider";
 import { AssistantReply } from "../components/messages/AssistantReply";
 import { MarkdownProse } from "../components/messages/MarkdownProse";
@@ -144,8 +144,7 @@ describe("三处使用方", () => {
   it("右栏子 Agent 面板：执行记录里的回复从宿主拿到 openPath", async () => {
     install();
     const openPath = vi.fn();
-    type Agent = Extract<MessageBlock, { kind: "agent" }>;
-    const agent: Agent = { kind: "agent", id: "first", description: "first", displayText: "first", subagentType: "explore", status: "completed", createdAt: "now", display: "panel", transcriptRef: { kind: "subagent_transcript", sessionId: "parent", agentRunId: "run", runId: "first" } };
+    const agent: SubagentListItem = { agentId: "first", kind: "local", preset: "explore", description: "first", status: "idle", activationCount: 1, background: false, createdAt: "now", activeSince: "now", transcriptPath: "/data/first.md" };
     overrideBridge({
       "sessions.getSubagents": vi.fn().mockResolvedValue([agent]),
       "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue([{ kind: "assistant", id: "a1", content: "结论在 `docs/report.md:9`。", createdAt: "now" }]),
@@ -157,7 +156,7 @@ describe("三处使用方", () => {
         </MarkdownHostContext.Provider>
       </TooltipProvider>,
     );
-    fireEvent.click(await screen.findByRole("button", { name: /first/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /^first/ }));
     fireEvent.click(await screen.findByRole("button", { name: byName("docs/report.md:9") }));
     expect(openPath).toHaveBeenCalledWith("docs/report.md", 9);
   });

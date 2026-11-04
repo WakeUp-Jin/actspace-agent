@@ -1,5 +1,5 @@
 /** settings 旧版本迁移和 v4 解析：v1 / v2 / v3 → v4，v4 → 旧结构。冻结，最早支持 v1。 */
-import { DEFAULT_SPEECH_SETTINGS } from "@actspace/shared";
+import { DEFAULT_SPEECH_SETTINGS, sanitizeExternalSubagentSettings, type ExternalSubagentSettings } from "@actspace/shared";
 import {
   LEGACY_MODEL_KEY_MAP,
   PROVIDER_IDS,
@@ -269,6 +269,7 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
       showFileChangeStats: tools.showFileChangeStats !== false,
       deepseekFetchEnabled: tools.deepseekFetchEnabled === true,
       ...sanitizePluginSwitches(tools.plugins),
+      ...sanitizeExternalSubagents(tools.externalSubagents),
       searchProviders: Object.fromEntries(SEARCH_PROVIDER_IDS.map((id) => {
         const provider = isRecord(searchProviders[id]) ? searchProviders[id] : {};
         return [id, { enabled: id === "deepseek" ? provider.enabled === true : provider.enabled !== false }];
@@ -358,6 +359,11 @@ export function hasRemovedDuckCodingSettings(raw: Record<string, unknown>): bool
 export function hasRequiredSettingsSections(raw: Record<string, unknown>): boolean {
   return ["providers", "installedModels", "customModels", "taskModels", "imageGeneration", "agent", "skills"]
     .every((key) => isRecord(raw[key]));
+}
+
+function sanitizeExternalSubagents(value: unknown): { externalSubagents?: ExternalSubagentSettings } {
+  const sanitized = sanitizeExternalSubagentSettings(value);
+  return sanitized ? { externalSubagents: sanitized } : {};
 }
 
 /** Keeps only boolean switches; an empty result is omitted so a missing key keeps meaning "manifest default". */

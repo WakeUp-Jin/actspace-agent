@@ -75,6 +75,7 @@ export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   getSubagents: "runtime-v2:fixed-renderer:get-subagents",
   getSubAgentTranscript: "runtime-v2:fixed-renderer:get-subagent-transcript",
   interruptSubagent: "runtime-v2:fixed-renderer:interrupt-subagent",
+  revealSubagentRecord: "runtime-v2:fixed-renderer:reveal-subagent-record",
   listPendingApprovals: "runtime-v2:fixed-renderer:list-pending-approvals",
   submitApproval: "runtime-v2:fixed-renderer:submit-approval",
   getSettings: "runtime-v2:fixed-renderer:get-settings",

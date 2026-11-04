@@ -97,10 +97,13 @@ export const desktopBridgeContract = {
     /** 原始页；`apps/desktop/src/renderer/api/sessions.ts` 负责投影成 MessageBlock。 */
     getToolDetail: invoke<{ sessionId: string; callId: string }, DesktopToolDetailPage>(CH.getSessionToolDetail),
     getPreview: invoke<S.SessionPreviewInput, S.SessionPreviewResult | null>(CH.getSessionPreview),
-    getSubagents: invoke<{ sessionId: string }, S.MessageBlock[]>(CH.getSubagents),
+    /** 右侧子 Agent 面板的列表：每个子智能体一行（跨所有激活），由父 Journal 折叠。 */
+    getSubagents: invoke<{ sessionId: string }, S.SubagentListItem[]>(CH.getSubagents),
     getSubAgentTranscript: invoke<S.SubAgentTranscriptGetInput, S.SessionEvent[]>(CH.getSubAgentTranscript),
     /** 子 Agent 面板的「停止」：效果同主会话调用 `interrupt_agent`；message 是给模型看的同一句话。 */
     interruptSubagent: invoke<{ sessionId: string; agentId: string }, { ok: boolean; message: string }>(CH.interruptSubagent),
+    /** 外部子智能体详情的「在 Finder 中显示」：路径由主进程从父 Journal 的 `subagent/spawned` 取，renderer 不传路径。 */
+    revealSubagentRecord: invoke<{ sessionId: string; agentId: string }, { ok: boolean }>(CH.revealSubagentRecord),
     /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */
     create: invokeWithDefault<S.SessionCreateInput, RV2.RuntimeV2DesktopSessionProjection>(CH.createSession, {}),
     /** 原始投影；`apps/desktop/src/renderer/api/sessions.ts` 负责 `projectChatWindow`。 */

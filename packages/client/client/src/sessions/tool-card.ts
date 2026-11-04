@@ -1,7 +1,7 @@
 import { isAbsolute, relative, resolve } from "pathe";
 const sep = "/";
-import type { ToolUiPreview } from "@actspace/shared";
-import type { RuntimeV2JsonValue, RuntimeV2ToolView, SubagentView } from "@actspace/shared/runtime-v2";
+import { subagentActivationStatusLabel, type ToolUiPreview } from "@actspace/shared";
+import type { RuntimeV2JsonValue, RuntimeV2ToolView, SubagentKind, SubagentView } from "@actspace/shared/runtime-v2";
 type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
 type FileChangeStats = { readonly additions: number; readonly deletions: number };
 
@@ -63,13 +63,23 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
   if (localName === "inspect_image") return { kind: "media_analysis", mediaName: string(args.artifact_id) ?? "image", mediaKind: "image", displayText: summary };
   if (localName === "generate_image") { const images = tool?.artifacts.filter((artifact) => artifact.kind === "image").map((artifact) => ({ type: "image" as const, name: artifact.label, path: artifact.artifactId, mimeType: artifact.mimeType })) ?? (Array.isArray(data.artifacts) ? data.artifacts.map(record).filter((artifact) => string(artifact.mediaType)?.startsWith("image/")).map((artifact) => ({ type: "image" as const, name: string(artifact.artifactId) ?? "image", path: string(artifact.artifactId) ?? "", mimeType: string(artifact.mediaType) ?? undefined })) : []); return { kind: "image_generation", status: !terminal ? "running" : failed ? "failed" : images.length > 0 ? "completed" : "partial", promptPreview: string(args.prompt)?.slice(0, 240) ?? "", requestedCount: Math.max(1, nonNegative(args.n) || 1), generatedCount: images.length, size: string(args.size) ?? "1024x1024", displayText: summary, images, ...(errorMessage ? { errorMessage } : {}) }; }
   if (["todo_read", "todo_write", "actspace.todo/todo_read", "actspace.todo/todo_write"].includes(toolName)) { const value = detailValue(data, "todo"); const todo = record(value); const todos = Array.isArray(todo.todos) ? todo.todos.map((entry) => { const item = record(entry); const status: "pending" | "in_progress" | "completed" = item.status === "in_progress" || item.status === "completed" ? item.status : "pending"; return { id: string(item.id) ?? "todo", content: string(item.content) ?? "", status, ...(typeof item.activeForm === "string" ? { activeForm: item.activeForm } : {}), createdAt: string(item.createdAt) ?? tool?.startedAt ?? new Date(0).toISOString(), updatedAt: string(item.updatedAt) ?? tool?.finishedAt ?? tool?.startedAt ?? new Date(0).toISOString() }; }) : []; return { kind: "todo", todos, totalCount: todos.length, completedCount: todos.filter((item) => item.status === "completed").length, revision: nonNegative(todo.revision), displayText: `${todos.filter((item) => item.status === "completed").length}/${todos.length} completed` }; }
-  if (toolName === "agent" && child?.subagent) return subagentPreview(child.subagent, child, sessionId, agentRunId, { summary, output, errorMessage, durationMs: tool?.durationMs ?? 0 });
+  const spawnKind = SUBAGENT_SPAWN_TOOLS[toolName];
+  if (spawnKind && child?.subagent) return subagentPreview(child.subagent, child, sessionId, agentRunId, { summary, output, errorMessage, durationMs: tool?.durationMs ?? 0 });
+  // Before `subagent/spawned` (arguments still streaming, or the CLI could not start): a card from the arguments alone.
+  if (spawnKind && toolName !== "agent") return { kind: "agent", description: string(args.description) ?? firstLine(string(args.prompt)) ?? toolName, status: !terminal ? "running" : failed ? "failed" : "completed", subagentType: "explore", subagentKind: spawnKind, ...(args.background !== false ? { background: true } : {}), displayText: summary, summary: output, stats: { durationMs: tool?.durationMs ?? 0, toolCallCount: 0 }, display: "panel", ...(errorMessage ? { error: errorMessage } : failed && output ? { error: output } : {}) };
   // Old Sessions: `agent` / `explore` with `delegation/*` facts.
   if (["agent", "explore", "actspace.subagent/agent", "actspace.subagent/explore"].includes(toolName)) { const detail = record(detailValue(data, "delegation")); const childSessionId = string(detail.childSessionId) ?? child?.childSessionId ?? ""; const presetId = string(detail.presetId) ?? child?.presetId ?? (toolName.endsWith("explore") ? "actspace.explore" : "actspace.agent"); const isBackground = detail.background === true; const status = isBackground && terminal && !failed ? agentBackgroundStatus(child?.status) : string(detail.status) === "aborted" || child?.status === "aborted" || state === "aborted" ? "aborted" : child?.status === "failed" || failed ? "failed" : !terminal ? "running" : "completed"; return { kind: "agent", description: string(args.description) ?? string(args.task) ?? (toolName.endsWith("explore") ? "Explore" : "Agent"), status, subagentType: "explore", ...(isBackground ? { background: true } : {}), agentKind: presetId === "actspace.explore" || toolName.endsWith("explore") ? "explore" : "agent", ...(child?.model ? { model: child.model } : {}), displayText: summary, summary: output, ...(childSessionId ? { transcriptRef: { kind: "subagent_transcript", sessionId, agentRunId, runId: childSessionId } } : {}), stats: { durationMs: tool?.durationMs ?? 0, toolCallCount: 0 }, display: "panel", ...(errorMessage ? { error: errorMessage } : {}) }; }
   const artifacts = tool?.artifacts.filter((artifact) => artifact.kind === "image").map((artifact) => ({ type: "image" as const, name: localName.startsWith("browser_") ? "Chrome 截图" : artifact.label, path: artifact.artifactId, mimeType: artifact.mimeType })) ?? [];
   const subagentTitle = subagentToolTitle(toolName, args, describeAgent);
-  return { kind: "generic", title: subagentTitle ?? toolName, content: [toolName === "send_message" ? string(args.message) : undefined, summary, output, errorMessage].filter(Boolean).join("\n\n"), ...(artifacts.length ? { artifacts } : {}) };
+  const linkedAgent = toolName === "send_message" || toolName === "interrupt_agent" ? string(args.agent_id) : null;
+  const subagentLink = linkedAgent ? { agentId: linkedAgent, verb: toolName === "send_message" ? "发消息给" : "停止", target: describeAgent?.(linkedAgent) ?? linkedAgent } : undefined;
+  return { kind: "generic", title: subagentTitle ?? toolName, content: [toolName === "send_message" ? string(args.message) : undefined, summary, output, errorMessage].filter(Boolean).join("\n\n"), ...(artifacts.length ? { artifacts } : {}), ...(subagentLink ? { subagentLink } : {}) };
 }
+
+/** Tools that create a subagent, and the kind they create. */
+const SUBAGENT_SPAWN_TOOLS: Readonly<Record<string, SubagentKind>> = Object.freeze({ agent: "local", agent_fork: "fork", agent_codex: "codex", agent_claude_code: "claude-code" });
+
+function firstLine(value: string | null): string | null { return value?.split(/\r?\n/).find((line) => line.trim())?.trim() || null; }
 
 /** One-line rows for the subagent management tools (design 05 §1); `describe` turns an agent id into its description. */
 export function subagentToolTitle(toolName: string, args: EventRecord, describe: (agentId: string) => string | undefined = () => undefined): string | undefined {
@@ -92,7 +102,8 @@ function subagentPreview(view: SubagentView, child: { readonly status: string; r
     kind: "agent", description: view.description, status, subagentType: "explore",
     subagentKind: view.kind, ...(view.preset ? { preset: view.preset } : {}), activationCount: view.activations.length, transcriptPath: view.transcriptPath,
     ...(child.model ? { model: child.model } : {}), ...(view.activations[0]?.background ? { background: true } : {}),
-    displayText: result.summary, summary: settle?.result ?? result.output,
+    // No final reply (stopped, lost, failed): how it ended in words, not the model-facing "Started …" / settle summary.
+    displayText: result.summary, summary: settle ? settle.result ?? subagentActivationStatusLabel(settle.status) : result.output,
     transcriptRef: { kind: "subagent_transcript", sessionId, agentRunId, runId: view.agentId, path: view.transcriptPath },
     stats: { durationMs: result.durationMs, toolCallCount: 0 }, display: "panel",
     ...(result.errorMessage ? { error: result.errorMessage } : {}),

@@ -16,6 +16,7 @@ import type {
 } from "./session";
 import { convertUsageCostToUsd } from "./usage-cost";
 import { hasVisibleText } from "./visible-text";
+import { INBOX_WAKE_SOURCES } from "./runtime-v2/subagents";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -317,6 +318,7 @@ function messageBlockFromToolPreview(
         title: preview.title,
         content: preview.content,
         artifacts: preview.artifacts,
+        ...(preview.subagentLink ? { subagentLink: preview.subagentLink } : {}),
         createdAt: getDisplayTime(timestamp),
         isError
       };
@@ -475,8 +477,8 @@ export function createMessageBlocks(events: SessionEvent[]): MessageBlock[] {
     switch (event.type) {
       case "user_message": {
         const payload = event.payload as UserMessagePayload;
-        // 任务通知只给模型消费；只有开启空闲唤醒那一轮的通知渲染成一行分隔行。
-        if (payload.source === "task_notification") {
+        // 收件箱通知（后台 Bash、子智能体完成、子智能体来信）只给模型消费；只有开启空闲唤醒那一轮的通知渲染成一行分隔行。
+        if (payload.source && (INBOX_WAKE_SOURCES as readonly string[]).includes(payload.source)) {
           const notice = payload.backgroundNotice;
           return notice ? [{ kind: "background_notice", id: event.id, renderKey: nextRenderKey(event, "background-notice"), content: payload.content, createdAt: getDisplayTime(event.timestamp), ...notice }] : [];
         }

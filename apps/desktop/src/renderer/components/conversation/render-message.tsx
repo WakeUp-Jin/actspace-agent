@@ -19,14 +19,15 @@ import { UserMessage } from "../messages/UserMessage";
 
 export type AgentMessageBlock = Extract<MessageBlock, { kind: "agent" }>;
 export type ReadMessageBlock = Extract<MessageBlock, { kind: "read" }>;
-export type AgentTranscriptHandler = (message: AgentMessageBlock) => void;
+/** 打开右侧「子 Agent」并选中这个子智能体（对话卡片、通知行、`send_message` / `interrupt_agent` 行共用）；没有 id 时只打开列表。 */
+export type SubagentOpenHandler = (agentId: string | undefined) => void;
 
 const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-act-sm leading-[1.4]";
 const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
 const MODEL_WAITING_DELAY_MS = 300;
 
-function DeferredToolMessage({ message, className, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile }: {
-  message: MessageBlock; className?: string; onOpenAgentTranscript?: (message: AgentMessageBlock) => void; replyCompleted: boolean; onOpenReadFile?: (message: ReadMessageBlock) => void; onOpenWorkspaceFile?: (path: string, line?: number) => void;
+function DeferredToolMessage({ message, className, onOpenSubagent, replyCompleted, onOpenReadFile, onOpenWorkspaceFile }: {
+  message: MessageBlock; className?: string; onOpenSubagent?: SubagentOpenHandler; replyCompleted: boolean; onOpenReadFile?: (message: ReadMessageBlock) => void; onOpenWorkspaceFile?: (path: string, line?: number) => void;
 }) {
   const [blocks, setBlocks] = useState<MessageBlock[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -40,7 +41,7 @@ function DeferredToolMessage({ message, className, onOpenAgentTranscript, replyC
   };
   const visible = blocks ?? [{ ...message, deferredToolDetail: undefined }];
   return <div className={className} aria-busy={loading}>
-    {visible.map(block => renderMessage({ ...block, renderKey: block.id === message.id ? message.renderKey : block.renderKey }, undefined, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile, blocks ? undefined : () => { void load(); }))}
+    {visible.map(block => renderMessage({ ...block, renderKey: block.id === message.id ? message.renderKey : block.renderKey }, undefined, onOpenSubagent, replyCompleted, onOpenReadFile, onOpenWorkspaceFile, blocks ? undefined : () => { void load(); }))}
     {loading && <p role="status">正在加载工具详情…</p>}
     {error && <p role="alert" className="text-act-xs leading-4 text-text-muted">{error}（收起后重新展开可重试）</p>}
   </div>;
@@ -49,7 +50,7 @@ function DeferredToolMessage({ message, className, onOpenAgentTranscript, replyC
 export function renderMessage(
   message: MessageBlock,
   className?: string,
-  onOpenAgentTranscript?: (message: AgentMessageBlock) => void,
+  onOpenSubagent?: SubagentOpenHandler,
   replyCompleted = false,
   onOpenReadFile?: (message: ReadMessageBlock) => void,
   onOpenWorkspaceFile?: (path: string, line?: number) => void,
@@ -57,7 +58,7 @@ export function renderMessage(
 ) {
   const renderKey = message.renderKey ?? message.id;
   // Child-session cards already have a compact summary and their own detail panel.
-  if (message.deferredToolDetail && message.kind !== "agent") return <DeferredToolMessage key={renderKey} message={message} className={className} onOpenAgentTranscript={onOpenAgentTranscript} replyCompleted={replyCompleted} onOpenReadFile={onOpenReadFile} onOpenWorkspaceFile={onOpenWorkspaceFile} />;
+  if (message.deferredToolDetail && message.kind !== "agent") return <DeferredToolMessage key={renderKey} message={message} className={className} onOpenSubagent={onOpenSubagent} replyCompleted={replyCompleted} onOpenReadFile={onOpenReadFile} onOpenWorkspaceFile={onOpenWorkspaceFile} />;
 
   switch (message.kind) {
     case "user":
@@ -67,13 +68,13 @@ export function renderMessage(
     case "thinking":
       return <ThinkingBlock key={renderKey} message={message} className={className} replyCompleted={replyCompleted} />;
     case "agent":
-      return <AgentRunBlock key={renderKey} message={message} className={className} onOpenTranscript={onOpenAgentTranscript} />;
+      return <AgentRunBlock key={renderKey} message={message} className={className} onOpen={onOpenSubagent} />;
     case "bash":
       return <BashRunBlock key={renderKey} message={message} replyCompleted={replyCompleted} onExpand={onExpand} />;
     case "context_compaction":
       return <CompactCommandBlock key={renderKey} message={message} className={className} />;
     case "background_notice":
-      return <BackgroundNoticeRow key={renderKey} message={message} />;
+      return <BackgroundNoticeRow key={renderKey} message={message} onOpenSubagent={onOpenSubagent} />;
     case "workspace_preparation":
       return <WorkspacePreparationBlock key={renderKey} message={message} />;
     case "todo":
@@ -95,7 +96,7 @@ export function renderMessage(
       if (message.kind === "tool" && message.toolName?.startsWith("browser_") && message.status === "pending") {
         return <BrowserApprovalBlock key={renderKey} message={message} className={className} />;
       }
-      return <ToolLogLine key={renderKey} message={message} className={className} onOpenFile={onOpenReadFile} onExpand={onExpand} />;
+      return <ToolLogLine key={renderKey} message={message} className={className} onOpenFile={onOpenReadFile} onExpand={onExpand} onOpenSubagent={onOpenSubagent} />;
     case "error":
       // 运行失败：独立的错误状态行，不进工具过程。
       return <div key={renderKey} className={`${TURN_STATUS_LINE_CLASS} ${TURN_STATUS_LINE_ERROR_CLASS}`}>{message.content || message.title}</div>;
@@ -173,11 +174,11 @@ function ModelWaitingStatus({ content }: { content: string }) {
   );
 }
 
-export function renderMessageList(messages: MessageBlock[], onOpenAgentTranscript?: AgentTranscriptHandler, replyCompleted = false, onOpenReadFile?: (message: ReadMessageBlock) => void, onOpenWorkspaceFile?: (path: string, line?: number) => void) {
+export function renderMessageList(messages: MessageBlock[], onOpenSubagent?: SubagentOpenHandler, replyCompleted = false, onOpenReadFile?: (message: ReadMessageBlock) => void, onOpenWorkspaceFile?: (path: string, line?: number) => void) {
   // Preserve message/usage data, but do not give empty assistant text a prose gap.
   return messages.filter((message) => message.kind !== "assistant" || message.content.trim().length > 0).map((message) =>
     <div key={message.renderKey ?? message.id} className="message-flow-item" data-flow-kind={messageFlowKind(message)}>
-      {renderMessage(message, undefined, onOpenAgentTranscript, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
+      {renderMessage(message, undefined, onOpenSubagent, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
     </div>,
   );
 }

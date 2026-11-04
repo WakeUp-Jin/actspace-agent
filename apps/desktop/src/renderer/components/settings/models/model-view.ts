@@ -14,13 +14,14 @@ import {
 
 /** 设置 › 模型的格式化与判断。纯函数，组件只管排版。 */
 
-export type PurposeMeta = { id: PurposeId; label: string; description: string; follow?: PurposeId; needImage?: boolean };
+export type PurposeMeta = { id: PurposeId; label: string; description: string; follow?: PurposeId; followLabel?: string; needImage?: boolean; noThinking?: boolean };
 
 // 自动审批不设时由后端退回会话默认模型（不是轻量任务），这里照实写。
 export const PURPOSES: readonly PurposeMeta[] = [
   { id: "chat", label: "会话默认", description: "新会话一开始用的模型" },
   { id: "utility", label: "轻量任务", description: "起标题、写摘要、压缩上下文", follow: "chat" },
   { id: "autoReview", label: "自动审批", description: "判断工具调用能否自动放行", follow: "chat" },
+  { id: "subagent", label: "子智能体", description: "子智能体不指定模型时用它", follow: "chat", followLabel: "跟随主智能体", noThinking: true },
   { id: "vision", label: "看图", description: "当前模型看不了图时，由它代看", follow: "chat", needImage: true },
 ];
 

@@ -61,6 +61,5 @@ Agent 文档按强关联专题进入 `docs/design-docs/` 下的一级目录；�
 
 ## 协作形态
 
-- `collaboration/agent-subagent-runtime.md`：当前一次性 Subagent 与 child Session 边界。
-- `collaboration/agent-explore-subagent.md`：当前 Explore 静态 Preset 与只读工具限制。
+- `collaboration/agent-subagent-runtime.md`：当前子智能体（默认后台、可续聊、可写、fork、外部 Codex / Claude Code）与 child Session 边界。
 - `多智能体协作/`：多个 Actor 协作的 Space 设计（取代原 Member / Room / Team 产品稿），当前只做前端演示，不是 v2 Runtime 事实。

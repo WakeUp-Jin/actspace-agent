@@ -1866,6 +1866,8 @@ sessionId,
       "sessions.pin": async () => ({ ok: true }),
       "usage.getStatistics": async () => null,
       "approvals.listPending": async () => [],
+      // 卡片按子智能体 id 打开右侧面板，面板从列表里找到它。
+      "sessions.getSubagents": async () => [{ agentId: "run-1", kind: "local", preset: "explore", description: "Explore renderer flow", status: "running", activationCount: 1, background: false, createdAt: "2026-06-03T10:00:00.000Z", activeSince: "2026-06-03T10:00:00.000Z", transcriptPath: "/tmp/run-1.md" }],
       "sessions.getSubAgentTranscript": async () => [{ ...transcriptEvent, type: "tool_result", payload: { toolCallId: "tool-read-app", status: "running", uiPreview: { kind: "read", filePath: "apps/desktop/src/renderer/App.tsx", displayText: "Read apps/desktop/src/renderer/App.tsx" } } }],
       ...settingsApiStub,
       "review.getSnapshot": getReviewSnapshot,
@@ -1943,11 +1945,12 @@ sessionId: input.sessionId,
     await userEvent.type(composer, "delegate exploration");
     await userEvent.click(screen.getByLabelText("发送消息"));
 
-    expect(await screen.findByText("Explore renderer flow")).toBeTruthy();
-    expect(await screen.findByText("正在读取 · App.tsx")).toBeTruthy();
+    // 卡片在对话里；右侧「子 Agent」列表里也有同名的一行。
+    const card = await screen.findByRole("button", { name: /Open SubAgent transcript for Explore renderer flow/ });
+    expect(await within(card).findByText("正在读取 · App.tsx")).toBeTruthy();
     expect(await screen.findByRole("button", { name: "审查待处理变更 +7 -2" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /Open SubAgent transcript for Explore renderer flow/ }));
+    await userEvent.click(card);
 
     const panel = await screen.findByRole("region", { name: "子 Agent 详情" });
     expect(panel).toBeTruthy();

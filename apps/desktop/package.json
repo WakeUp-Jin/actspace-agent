@@ -47,6 +47,7 @@
     "@actspace/session-transcript": "workspace:*",
     "@actspace/shared": "workspace:*",
     "@actspace/side-chat": "workspace:*",
+    "@actspace/subagent": "workspace:*",
     "@actspace/tool-browser": "workspace:*",
     "@actspace/tool-fs-read": "workspace:*",
     "@actspace/tool-fs-search": "workspace:*",

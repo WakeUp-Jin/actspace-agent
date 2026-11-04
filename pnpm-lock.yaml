@@ -145,6 +145,9 @@ importers:
       '@actspace/side-chat':
         specifier: workspace:*
         version: link:../../packages/side-chat/side-chat
+      '@actspace/subagent':
+        specifier: workspace:*
+        version: link:../../packages/subagent/subagent
       '@actspace/tool-browser':
         specifier: workspace:*
         version: link:../../packages/browser/tool-browser

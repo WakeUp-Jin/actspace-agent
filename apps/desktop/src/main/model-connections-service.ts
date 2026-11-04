@@ -351,6 +351,7 @@ export class ModelConnectionsService {
         } else {
           bindings[PURPOSE_BINDING_FIELD[purpose]] = null;
         }
+        if (purpose === "subagent") continue;
         if (binding.thinking) thinking[purpose] = binding.thinking;
         else delete thinking[purpose];
       }
@@ -380,6 +381,8 @@ export class ModelConnectionsService {
       chat: { model: task.defaultChatModel ?? null, thinking: thinking.chat ?? null },
       utility: { model: task.utilityModel ?? null, thinking: thinking.utility ?? null },
       autoReview: { model: task.autoReviewModel ?? null, thinking: thinking.autoReview ?? null },
+      // 子智能体默认模型没有思考档位（thinking 恒为 null），子智能体按所选模型的默认档位运行。
+      subagent: { model: task.subagentDefaultModel ?? null, thinking: null },
       vision: { model: task.visionModel ?? null, thinking: thinking.vision ?? null },
     };
   }
@@ -554,6 +557,7 @@ const PURPOSE_BINDING_FIELD: Record<PurposeId, keyof Omit<SettingsV4Models["task
   chat: "defaultChat",
   utility: "utility",
   autoReview: "autoReview",
+  subagent: "subagentDefaultModel",
   vision: "vision",
 };
 

@@ -14,7 +14,7 @@
 
 | 范围 | 说明 |
 | --- | --- |
-| 包含 | 用 `MarkdownProse` 渲染的三处：助手回复（`AssistantReply`）、子 Agent 记录（`SubAgentTranscriptModal`，现在只是 `SubAgentTranscriptPanel` 的别名，没有单独的弹窗）、右侧子 Agent 面板（`SubagentsPanel`） |
+| 包含 | 用 `MarkdownProse` 渲染的两处：助手回复（`AssistantReply`）、右侧子 Agent 面板（`SubagentsPanel`：本地 / Fork 子智能体的对话记录，Codex / Claude Code 的最终结果） |
 | 不包含 | 「文档」面板（CodeMirror 6，见 [Markdown 编辑与渲染规范](front-Markdown编辑与渲染规范.md)）；轨迹详情里的 Markdown（`trajectory/details/shared.tsx`）；用户消息；生成图片的轮尾列表（`TurnOutputArtifacts`） |
 
 与「文档」面板的关系：
@@ -80,7 +80,7 @@ MarkdownProse（content, onOpenWorkspaceFile）
 
 `onOpenWorkspaceFile` 的签名改成 `(path: string, line?: number) => void`。行号只在打开 Markdown 时生效，跳到「文档」面板对应的行（依赖 T11）；其他文件交给系统应用，行号忽略。
 
-现在只有 `AssistantReply` 传了 `onOpenWorkspaceFile`，`SubAgentTranscriptModal` 和 `SubagentsPanel` 都没传，里面的路径不能点。按 C4，这两处也接上 `useWorkspaceFileLinks`。
+现在只有 `AssistantReply` 传了 `onOpenWorkspaceFile`，`SubagentsPanel` 没传，里面的路径不能点。按 C4，它也接上 `useWorkspaceFileLinks`。
 
 ## 5. 元素规则
 
@@ -374,7 +374,7 @@ MarkdownProse（content, onOpenWorkspaceFile）
 | 插件 | `components/messages/markdown/remark-callouts.ts`、`remark-code-meta.ts`、`remark-math-guard.ts`、`rehype-inline-paths.ts`、`rehype-stream-tail.ts`、`lazy-plugins.ts`、`definitions.ts`（脚注与引用式定义）、`merge-html-blocks.ts` |
 | 组件 | `components/messages/markdown/CodeBlock.tsx`、`MarkdownLink.tsx`、`InlineCode.tsx`、`MarkdownImage.tsx`、`MarkdownTable.tsx` |
 | 平滑输出 | `components/messages/markdown/smooth-text.ts`（`useSmoothText`、`snapCut`） |
-| 宿主 | `components/messages/markdown/host.ts`（context）；`components/conversation/use-workspace-file-links.ts`（`openWorkspaceFile` 加 `line`）；`AssistantReply.tsx`、`SubAgentTranscriptModal.tsx`、`right-panel/SubagentsPanel.tsx` 接上打开文件 |
+| 宿主 | `components/messages/markdown/host.ts`（context）；`components/conversation/use-workspace-file-links.ts`（`openWorkspaceFile` 加 `line`）；`AssistantReply.tsx`、`right-panel/SubagentsPanel.tsx` 接上打开文件 |
 | 共享 | `components/markdown-common/paths.ts`、`callouts.ts` |
 | 样式 | `styles/markdown.css`、`styles/tokens.css`（`--act-font-reading`） |
 | 依赖 | `apps/desktop/package.json`：`remark-math`、`rehype-katex`、`rehype-raw`、`rehype-sanitize`、`remark-breaks`、`unist-util-visit`（`katex` 与文档面板共用） |

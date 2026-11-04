@@ -32,7 +32,7 @@ it.each(["agent", "explore"] as const)("renders deferred %s as a directly usable
   expect(screen.getByText("检查完成")).toBeVisible();
   expect(screen.getByText("已完成")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: /Open SubAgent transcript/ }));
-  expect(open).toHaveBeenCalledWith(message);
+  expect(open).toHaveBeenCalledWith("child-session");
   expect(load).not.toHaveBeenCalled();
   expect(screen.queryByText("展开完整工具结果")).not.toBeInTheDocument();
 });

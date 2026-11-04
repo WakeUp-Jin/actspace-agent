@@ -23,6 +23,8 @@ export type DesktopRuntimeV2BootOptions = {
   readonly browser?: DesktopRuntimeV2BrowserPort;
   /** Plugin ids switched off for this process; global ones become an invocation `disable` patch, session ones skip the Harness entry. */
   readonly disabledPlugins?: readonly string[];
+  /** Per plugin Entry id settings, passed to `bootProfileRuntime` as `pluginConfig` (merged over each manifest `config`). */
+  readonly pluginConfig?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   /** The bundled nono; absent when it was not found (see `resolveDesktopNonoPath`). */
   readonly nonoPath?: string;
   readonly disabledSkillIds?: () => readonly string[];
@@ -152,6 +154,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
       },
       composition,
       disabledPlugins: switched.filter(entry => !entry.loaders.includes("host")).map(entry => entry.id),
+      ...(options.pluginConfig ? { pluginConfig: options.pluginConfig } : {}),
       cordis: { configPath: options.module.runtimeCordisConfigPath(), admission: await options.module.inspectCordisAdmission() },
       disposeCordis: options.disposeCordis,
       onLiveEvent: options.onRuntimeLive,

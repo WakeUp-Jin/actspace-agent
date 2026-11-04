@@ -18,6 +18,7 @@ import {
 } from "@actspace/shared";
 import { foldSubagentTree, lastActivationModel, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView, type SubagentView } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import { inheritedThroughSeq } from "@actspace/shared/session-list-page";
 
 type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
 
@@ -339,7 +340,10 @@ function projectPendingChunks(snapshot: RuntimeV2SessionSnapshot, journal: reado
 }
 
 export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): SessionEvent[] {
-  const events = projectChatEvents(snapshot, journal, { includePendingChunks: true });
+  // A forked subagent's Journal starts with the parent's events; the panel shows only what it did after the fork.
+  const inherited = inheritedThroughSeq(snapshot.lineage);
+  const events = projectChatEvents(snapshot, journal, { includePendingChunks: true })
+    .filter(event => event.sourceSeq === undefined || event.sourceSeq > inherited);
   const index = buildIndex(snapshot, journal);
   for (const tool of snapshot.tools.filter((tool) => tool.state === "running")) {
     if (events.some(event => event.type === "tool_result" && (event.payload as { toolCallId?: string }).toolCallId === tool.callId)) continue;
@@ -369,7 +373,8 @@ export function subagentChildrenWithoutModel(journal: readonly SessionEventEnvel
   }
   // New Sessions: the model is on each activation's start; one without a model follows the parent's request facts.
   for (const view of Object.values(foldSubagentTree(journal).agents)) {
-    if (view.legacy) continue;
+    // External subagents have no ActSpace Session to read a request from.
+    if (view.legacy || view.kind === "codex" || view.kind === "claude-code") continue;
     requested.add(view.agentId);
     if (lastActivationModel(view)) known.add(view.agentId);
     // An inactive local subagent can be continued and send more requests; only a closed one cannot.
@@ -387,28 +392,6 @@ export function latestRequestModel(journal: readonly SessionEventEnvelopeV1[]): 
     if (model) return model;
   }
   return undefined;
-}
-
-/**
- * `childModels` fills in the model of children the parent Journal has no model
- * for yet (keyed by child Session id, from `latestRequestModel`); a model
- * recorded on `delegation/completed` always wins.
- */
-export function projectSubagentList(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[], childModels: ReadonlyMap<string, string> = new Map()): MessageBlock[] {
-  const index = buildIndex(snapshot, journal);
-  return journal.filter((event) => event.type === "tool/call" && ["agent", "explore"].includes(String(record(event.data).name))).flatMap((event) => {
-    const call = record(event.data);
-    const callId = String(call.callId);
-    const tool = index.toolByCall.get(callId);
-    const indexed = index.childByCall.get(callId);
-    const requestModel = indexed && !indexed.model ? childModels.get(indexed.childSessionId) : undefined;
-    const child = indexed && requestModel ? { ...indexed, model: requestModel } : indexed;
-    const terminalEvent = journal.find((candidate) => isToolTerminal(candidate.type) && record(candidate.data).callId === callId);
-    const identity = identityFor(event, call, index);
-    const preview = toolPreview(String(call.name), tool, terminalEvent ? record(terminalEvent.data) : {}, call, child, snapshot.sessionId, identity.agentRunId, terminalEvent ? "finished" : "running", snapshot.workspaceRoot ?? undefined, undefined, index.backgroundByCall.get(callId));
-    if (preview.kind === "agent" && !terminalEvent) preview.stats = { durationMs: Math.max(0, Date.now() - Date.parse(event.time)), toolCallCount: 0 };
-    return createMessageBlocks([{ id: `subagent:${callId}`, sessionId: snapshot.sessionId, agentRunId: identity.agentRunId, timestamp: event.time, type: "tool_result", payload: { toolCallId: callId, uiPreview: preview, status: terminalEvent ? tool?.state : "running" } } as SessionEvent]);
-  });
 }
 
 type UsageSession = Pick<RuntimeV2SessionSnapshot, "sessionId" | "throughJournalSeq" | "workspaceRoot" | "metadata">;
@@ -765,7 +748,8 @@ type ChildFacts = { readonly childSessionId: string; readonly presetId: string; 
 function subagentCardStatus(view: SubagentView): string {
   if (view.status === "running") return "running";
   const settled = view.activations.at(-1)?.settle?.status;
-  return settled === "completed" ? "completed" : settled === "interrupted" ? "aborted" : "failed";
+  // Lost (the app exited) is an interruption the user can continue, not a failure.
+  return settled === "completed" ? "completed" : settled === "interrupted" || settled === "lost" ? "aborted" : "failed";
 }
 
 function identityFor(event: SessionEventEnvelopeV1, data: EventRecord, index: EventIndex) {

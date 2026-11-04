@@ -351,7 +351,7 @@ function runtime(scale: number): HarnessStatsRuntime {
     endReasons: { completed: 545, aborted: 41, failed: 26, stepLimit: 6, other: 0 },
     retries: { total: 57, byCode: [{ code: "限流", count: 31 }, { code: "超时", count: 18 }, { code: "其他", count: 8 }] },
     interventions: { aborted: 41, steering: 38, queued: 14 },
-    delegations: { byPreset: [{ presetId: "explore", count: 57 }, { presetId: "agent", count: 38 }], failed: 3, avgSteps: 14.2, avgDurationMs: 72_000, avgReturnTokens: 1700 },
+    delegations: { byPreset: [{ presetId: "actspace.subagent.explore", count: 57, avgDurationMs: 41_000 }, { presetId: "actspace.subagent.general", count: 31, avgDurationMs: 96_000 }, { presetId: "actspace.subagent.fork", count: 7, avgDurationMs: 88_000 }, { presetId: "actspace.subagent.codex", count: 3, avgDurationMs: 210_000 }], failed: 3, avgSteps: 14.2, avgDurationMs: 72_000, avgReturnTokens: 1700 },
     background: { byKind: [{ kind: "bash", count: 131 }, { kind: "agent", count: 11 }], completed: 118, failed: 9, stopped: 15, avgDurationMs: 246_000, unread: 6 },
     sideChats: { sessions: 23, avgTurns: 4.3 },
     modeSwitches: 71,

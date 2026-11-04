@@ -317,7 +317,7 @@ function applySettingsV4NamespacePatch(settings: SettingsV4, input: SettingsV4Up
       };
       break;
     case "tools":
-      next.tools = { ...next.tools, ...input.patch, bash: { ...next.tools.bash, ...(input.patch.bash ?? {}) }, plugins: { ...(next.tools.plugins ?? {}), ...(input.patch.plugins ?? {}) }, searchProviders: { ...next.tools.searchProviders, ...(input.patch.searchProviders ?? {}) } };
+      next.tools = { ...next.tools, ...input.patch, bash: { ...next.tools.bash, ...(input.patch.bash ?? {}) }, plugins: { ...(next.tools.plugins ?? {}), ...(input.patch.plugins ?? {}) }, ...(input.patch.externalSubagents || next.tools.externalSubagents ? { externalSubagents: { codex: { ...(next.tools.externalSubagents?.codex ?? {}), ...(input.patch.externalSubagents?.codex ?? {}) }, claudeCode: { ...(next.tools.externalSubagents?.claudeCode ?? {}), ...(input.patch.externalSubagents?.claudeCode ?? {}) } } } : {}), searchProviders: { ...next.tools.searchProviders, ...(input.patch.searchProviders ?? {}) } };
       break;
     case "media":
       next.media = { ...next.media, ...input.patch, imageGeneration: { ...next.media.imageGeneration, ...(input.patch.imageGeneration ?? {}) } };

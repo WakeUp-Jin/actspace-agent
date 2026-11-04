@@ -87,6 +87,16 @@ describe("设置 › 模型", () => {
     expect(within(list).getByText("只列出能看图的模型")).toBeInTheDocument();
   });
 
+  it("子智能体用途：第一项「跟随主智能体」，选模型保存、不带思考档位", async () => {
+    await renderModels();
+    await userEvent.click(screen.getByRole("button", { name: "子智能体模型" }));
+    const list = await screen.findByRole("menu", { name: "子智能体可选模型" });
+    expect(within(list).getByRole("button", { name: "跟随主智能体" })).toBeInTheDocument();
+    expect(within(list).queryByRole("button", { name: /^编辑 / })).not.toBeInTheDocument();
+    await userEvent.click(within(list).getByRole("button", { name: /Claude Haiku 4\.5/ }));
+    await waitFor(() => expect(api.updatePurposes).toHaveBeenLastCalledWith({ subagent: { model: relayKey("claude-haiku-4-5"), thinking: null } }));
+  });
+
   it("添加官方连接：填 Key 后直接建好，弹窗里一个都不预选，勾了才添加", async () => {
     await renderModels();
     await userEvent.click(screen.getByRole("button", { name: /添加连接/ }));

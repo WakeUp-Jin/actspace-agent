@@ -429,9 +429,40 @@ export type AgentToolPreview = {
    * - `panel`（默认/缺省）：点击打开 Composer 上方 transcript Panel。
    * - `inline`：历史事件兼容值；当前 renderer 对 Agent/Explore 统一使用 panel 入口。
    *
-   * 见 docs/design-docs/collaboration/agent-explore-subagent.md。
+   * 见 docs/design-docs/collaboration/agent-subagent-runtime.md。
    */
   display?: "panel" | "inline";
+};
+
+/**
+ * One row of the right-side 子 Agent panel (design 05 §2): one subagent across all its activations,
+ * folded from the parent Journal (`subagent/*`, plus old `delegation/*`).
+ */
+export type SubagentListItem = {
+  /** The child Session id for `local` / `fork` / old subagents; an opaque id for external ones. */
+  agentId: string;
+  kind: import("./runtime-v2/subagents").SubagentKind;
+  preset?: import("./runtime-v2/subagents").SubagentPreset;
+  /** Old `delegation/*` record: shown, never continued; its kind label stays Agent / Explore. */
+  legacy?: boolean;
+  description: string;
+  status: import("./subagent-labels").SubagentListStatus;
+  /** Activations started so far (spawn counts as 1, each continuation adds 1). */
+  activationCount: number;
+  model?: string;
+  background: boolean;
+  createdAt: string;
+  /** Start of the latest activation. */
+  activeSince: string;
+  /** End of the latest activation; absent while it runs. */
+  endedAt?: string;
+  /** Absolute path of the transcript (local / fork) or the CLI's native session log (external). */
+  transcriptPath: string;
+  /** Fork only: the parent Journal seq the fork copied through. */
+  inheritedThroughSeq?: number;
+  /** The latest activation's final reply and summary. */
+  result?: string;
+  summary?: string;
 };
 
 export type ToolPreviewKind =
@@ -555,7 +586,10 @@ export type ToolUiPreview =
   | BashPreview
   | AgentToolPreview
   | TodoUiPreview
-  | { kind: "generic"; title: string; content: string; artifacts?: ToolArtifact[] };
+  | { kind: "generic"; title: string; content: string; artifacts?: ToolArtifact[]; subagentLink?: SubagentToolLink };
+
+/** `send_message` / `interrupt_agent` 行：动词加目标子智能体，点目标名打开它（设计 05 §1）。 */
+export type SubagentToolLink = { agentId: string; verb: string; target: string };
 
 export type BashStatus =
   | "pending"
@@ -954,6 +988,7 @@ export type MessageBlock = {
       title: string;
       content: string;
       artifacts?: ToolArtifact[];
+      subagentLink?: SubagentToolLink;
       createdAt: string;
       isError?: boolean;
       status?: "pending" | "running" | "completed" | "failed" | "denied";

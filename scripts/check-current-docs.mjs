@@ -32,7 +32,6 @@ export const currentTruthFiles = [
   "docs/design-docs/execution-safety/README.md",
   "docs/design-docs/execution-safety/agent-权限设计规则和原则.md",
   "docs/design-docs/collaboration/agent-subagent-runtime.md",
-  "docs/design-docs/collaboration/agent-explore-subagent.md",
   "docs/design-docs/tool-system/agent-web-tools.md",
   "docs/design-docs/tool-system/agent-image-generation-tool.md",
   "docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md",

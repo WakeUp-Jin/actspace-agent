@@ -7,6 +7,7 @@ import { isDeepStrictEqual } from "node:util";
 import { randomUUID } from "node:crypto";
 import { prepareExecutionContext, rollbackPreparedExecution } from "../workspace-git-context-service";
 import { homedir } from "node:os";
+import { stat } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
 import { dialog, nativeImage, nativeTheme, shell, type BrowserWindow } from "electron";
 import { spawn } from "node:child_process";
@@ -36,6 +37,7 @@ import {
 } from "@actspace/shared";
 import {
   RUNTIME_V2_FIXED_RENDERER_CHANNELS,
+  foldSubagentTree,
   type RuntimeV2JsonValue,
   type RuntimeV2SessionListItem,
   type RuntimeV2SessionSnapshot,
@@ -72,7 +74,7 @@ import {
   projectContextState,
   projectChatEvents,
   projectSubagentTranscript,
-  projectSubagentList,
+  projectSubagentItems,
   subagentChildrenWithoutModel,
   latestRequestModel,
   toolPreview,
@@ -665,9 +667,15 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       if (finished) rememberFinishedChildModel(childSessionId, model);
       if (model) childModels.set(childSessionId, model);
     }));
-    return projectSubagentList(await options.registry.inspectSession(input.sessionId), journal, childModels);
+    return projectSubagentItems(journal, childModels);
   });
   ipc.handle(contract.sessions.interruptSubagent, async (input) => options.registry.interruptSubagent(input.sessionId, input.agentId));
+  ipc.handle(contract.sessions.revealSubagentRecord, async (input) => {
+    const path = foldSubagentTree(await options.registry.inspectSessionEvents(input.sessionId)).agents[input.agentId]?.transcriptPath;
+    if (!path || !(await stat(path).then(info => info.isFile(), () => false))) return { ok: false };
+    shell.showItemInFolder(path);
+    return { ok: true };
+  });
   ipc.handle(contract.sessions.getSubAgentTranscript, async (input) => {
     const snapshot = await options.registry.inspectSession(input.transcriptRef.runId);
     const journal = await options.registry.inspectSessionEvents(input.transcriptRef.runId);

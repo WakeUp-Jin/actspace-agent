@@ -680,15 +680,15 @@ describe("SettingsPage", () => {
     }
 
     await userEvent.click(screen.getByRole("button", { name: "子 Agent" }));
-    expect(screen.getByRole("heading", { name: "Explore", level: 3 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "前往模型设置 Explore 模型" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "子智能体", level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "前往模型设置子智能体默认模型" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "扩展管理" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Skill 管理" })).not.toBeInTheDocument();
   });
 
-  it("子 Agent 页的 Explore 模型入口跳到「模型」页", async () => {
+  it("子 Agent 页的默认模型入口跳到「模型」页", async () => {
     renderSettingsPage({ onBack: () => {}, initialSection: "subagents" });
-    await userEvent.click(await screen.findByRole("button", { name: "前往模型设置 Explore 模型" }));
+    await userEvent.click(await screen.findByRole("button", { name: "前往模型设置子智能体默认模型" }));
     expect(await screen.findByRole("heading", { name: "模型", level: 2 })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "看图模型" })).toBeInTheDocument();
   });

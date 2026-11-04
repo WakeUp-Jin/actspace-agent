@@ -5,7 +5,7 @@
 - **关联计划**：`docs/exec-plans/active/20261103-subagent-background-redesign/README.md`
 - **执行模式**：交互（连续执行）
 - **开始时间**：2026-11-03
-- **结束时间**：—
+- **结束时间**：2026-11-04（本地部分；Electron 验收待做）
 
 ## 执行时间线
 
@@ -319,6 +319,54 @@
     - 以下检查都是 exit 0：`check:packages`、`check:plugin-catalog`、`check:desktop-build-graph`、`check:ipc-channels`、`check:docs`、`check:current-docs`、`check:repo`、`check:harness-events`、`check:renderer-bridge`、`test:plugin-catalog`、`test:package-readmes`、`test:contract-matrix`。
     - `pnpm --filter @actspace/desktop build` exit 0。
 
+### 步骤 6：S6 界面、设置与文档
+
+- **操作**：按 `s6-frontend-and-docs.md` 做。主进程与设置、插件页、轨迹与统计、文档这几块互不依赖，分给子智能体并行写；对话区、面板、客户端投影、mock 和截图由主智能体自己写。子智能体的 diff 都逐个读过，测试自己重跑过。
+  - 对话区：
+    - `AgentRunBlock` 用 `subagentKindLabel` 显示通用 / 探索 / Fork / Codex / Claude Code（老会话仍是 Agent / Explore），四个创建工具都走这张卡片；点卡片按子智能体 id 打开右侧「子 Agent」；
+    - `send_message` / `interrupt_agent` 是一行 `SubagentToolLine`（客户端给 `subagentLink`），点描述打开该子智能体；另外三个管理工具是固定行名；
+    - `BackgroundNoticeRow`：子智能体完成和来信两种文字，展开显示结论或信的正文，加「打开子智能体」；
+    - `SubAgentTranscriptModal` 删掉，入口都改到右侧面板。
+  - 右侧「子 Agent」面板（`SubagentsPanel`）：重写为一个子智能体一行（数据来自新 IPC `sessions.getSubagents`，即 `projectSubagentItems`），「运行中 / 其他」两组、行内停止（`sessions.interruptSubagent`）；详情按种类分支：本地和 Fork 对话 / 轨迹切换，Fork 写「从主会话 #N 分出」，轨迹用 `afterSeq` 只显示分出之后；外部只有结果和记录文件。
+  - 设置：模型 › 用途加「子智能体」（`purposes.subagent`，默认跟随主智能体，迁移不继承旧 explore 值）；`SubagentSection` 改成两个预设、并发上限和指向模型设置的一行。
+  - 插件页：两个外部插件的开关、不可用原因（主进程用 `@actspace/subagent` 的 `resolveCommand` 查命令）、插件设置（`tools.externalSubagents`，经 runtime `pluginConfig` 传入）。
+  - 轨迹：父轨迹委派一行按 `subagent/*` 取种类、描述和子会话，续派一行指向同一个子会话。`RuntimeTab` 按种类 / 预设统计，数据来自 `subagent/activation`。
+  - Web：`EventRow` 用同一套种类文字和通知行。
+  - mock：`subagent-trajectory` 重写为三轮，覆盖同步探索（空闲）、两轮 Fork（来信、续派）、Codex、被停止、应用退出中断（lost）、仍在运行；`background-tasks` 改为新事件。
+  - 文档：`collaboration/agent-subagent-runtime.md`、`agent-background-tasks.md` 改写为现状，删 `agent-explore-subagent.md`，官网文档（子智能体、Bash、模型选择、设置与数据、Harness 工具、ActSpace 是什么）同步；设计规范、计划、索引状态改为已实施。
+- **决定**（与计划或设计不同的地方）：
+  - 新增 IPC `sessions.revealSubagentRecord`：外部子智能体详情的「在 Finder 中显示」。设计只说「可在 Finder 中显示」，没有指定接口；主进程只放行该子智能体登记过的记录文件。
+  - 客户端给工具行加 `subagentLink` 字段（目标 id、动词、描述），让 `send_message` / `interrupt_agent` 行能点开目标。
+  - 通知行展开后加「打开子智能体」按钮。设计写「点击打开该子智能体」，但这一行本身点击是展开 / 收起，所以把打开放进展开区。
+  - 列表分「运行中 / 其他」两组：设计只规定了一行的内容。
+  - 老会话里没收尾的 `delegation/*` 委派显示「已中断」；`lost` 在列表里也显示「已中断」（状态集合按设计只有五种）。`max_steps` 在通知和卡片里写「达到步数上限」，列表算「失败」。
+  - 卡片没有最终回复时（停止、应用退出、失败）第二行写怎么结束的（「已中断」「中断（应用退出）」「达到步数上限」），不显示工具结果里给模型看的「Started …」，也不显示 settle 的英文 summary。`lost` 的卡片状态算「已停止」，不算「失败」。
+  - 通知展开显示结论（`<closing_message>`）或信的正文，不显示原始 XML；没有结论时显示 summary 和 note。
+  - 外部插件开关和插件设置都是重启后生效，和其他会话插件一致。
+  - 删掉了详情底部「停止后会告诉模型是你停的」这句提示：停止后模型收到的是 `interrupt_agent` 同样的通知，不区分是谁停的，这句话不准。
+  - Fork 的轨迹保留子会话第一个 `turn/start`（分出点之后的第一轮），否则轨迹第一行没有轮次。
+  - S4 的 `inheritedThroughSeq` 补到 Harness 统计：Fork 子会话复制来的父会话请求不再重复计入。
+  - 右侧面板入口「子 Agent」的说明从「这次对话派出的一次性助手」改为「这次对话派出的子智能体，空闲后还能继续派活」。Space 工作台里同一句没改（另一个功能）。
+  - `scripts/native-button-baseline.json` 里 `ToolLogLine` 从 3 改为 5：`SubagentToolLine` 沿用 `tool-file-link` / `tool-result-toggle` 两种原生按钮的写法，用脚本 `--update-native-button-baseline` 更新。
+  - 契约矩阵重新生成：desktop 主进程依赖 `@actspace/subagent`（查命令）。
+- **影响文件**：
+  - desktop 主进程：`index.ts`、`model-connections-service.ts`、`plugins/plugin-switches.ts`、`plugins/plugins-ipc.ts`、`runtime-v2/desktop-host-adapter.ts`、`fixed-renderer-ipc.ts`、`harness-stats-query.ts`、`runtime-registry.ts`、`settings/facades/general.ts`、`settings/migrations.ts`、`package.json`；
+  - desktop 渲染：`ConversationView`、`RightPanel`、`TrajectoryView`、`conversation/TurnView`、`render-message`、`extensions/PluginsSection`、`harness-stats/RuntimeTab`、`messages/AgentIdentity`、`AgentRunBlock`、`BackgroundNoticeRow`、`ToolLogLine`、删 `SubAgentTranscriptModal`、`right-panel/RightPanelContext`、`SubagentsPanel`、`settings/SettingsPage`、`settings/models/PurposePicker`、`model-view.ts`、`settings/sections/SubagentSection`、`trajectory/subagents.ts`、`trajectory/details`、`mock/*`；
+  - 客户端：`sessions/chat.ts`、`tool-card.ts`、`subagent-list.ts`；shared：`subagent-labels.ts`、`session-selectors.ts`、`desktop-bridge` 类型、设置类型；Web：`EventRow`；
+  - 测试：desktop 渲染 11 个文件（新 `background-notice-row.test.tsx`）、主进程 5 个、client、shared、web、两个外部插件包；
+  - 文档、官网、脚本基线、契约矩阵、`pnpm-lock.yaml`。
+- **验证**：
+  - 单测：
+    - `background-notice-row.test.tsx` 4 个：四种通知文字；结论 / summary+note / 信的正文 / Bash 原文；展开后打开；以通知开头的轮次（`TurnView`）也能打开（去掉修复后这条失败）。
+    - `subagent-card.test.ts` 新增卡片文字：有最终回复用回复，没有时写怎么结束的，`lost` 算已停止（改之前失败）。
+    - `subagents-panel.test.tsx` 10 个、`agent-run-block.test.tsx`、`session-selectors.test.ts`（子智能体通知和来信不显示成用户气泡）。
+  - 浏览器 mock 截图（`?mock=subagent-trajectory`、`?mock=background-tasks`，1440×900，浅色和深色各一套，脚本在 `tmp/s6-shots/`）：`screenshots/` 下 U1 对话与通知、U2 列表 / 详情 / 停止后、U3 Fork 对话与轨迹、U4 Codex、U5 后台任务、U6 设置用途 / 子 Agent / 插件页。逐张看过，问题见「遇到的问题」。
+  - 统一验证：
+    - `pnpm typecheck` exit 0；desktop `typecheck` exit 0。
+    - `pnpm test` exit 0：69 组 vitest 共 4434 个通过（desktop 2687 passed / 7 skipped，client 64，shared 189，web 126），根目录 node:test 98 个，0 失败。
+    - 以下检查都是 exit 0：`check:docs`、`check:current-docs`、`check:site`、`check:repo`、`check:packages`、`check:plugin-catalog`、`check:frontend-theme`、`check:frontend-tokens`、`check:ipc-channels`、`check:renderer-bridge`、`check:desktop-build-graph`、`check:secrets`、`check:v2-legacy-removal`、`check:package-cutover`、`check:harness-events`、`test:contract-matrix`、`test:package-boundaries`、`test:package-readmes`。
+  - Electron 实机检查未做，交接清单见 [acceptance-handoff.md](acceptance-handoff.md)。
+
 ## 遇到的问题
 
 - 步骤 1：`default-harness.test.ts` 里替换 Loop 的测试插件继承了 agent-factory 的 `provides`，新增服务后报 `Harness service missing: agent-factory/actspace.host-readable-files`。已在测试插件里补上该服务（替换实现必须提供全部声明的服务，这是契约本身的要求）。
@@ -341,6 +389,13 @@
 - 步骤 5：`pnpm -r test` 和桌面构建同时跑时，context-engine 解析不到 `@actspace/shared`（构建正在重写 dist）。分开跑就通过。
 - 步骤 5：claude-code 的 SIGTERM 用例在全量并行时偶发失败：固定等 200 毫秒，假 CLI 还没输出。已改为等它写出 `ready` 标记再中断。
 
+- 步骤 6：子智能体完成通知和来信在对话里显示成原始 XML 的用户气泡：`session-selectors` 只认 `task_notification` 来源。改为按 `INBOX_WAKE_SOURCES` 判断，并补测试。
+- 步骤 6：截图发现三处显示问题：列表行和详情标题里状态文字固定宽度，后面留一段空；通知展开是原始 XML；被停止的后台卡片第二行是给模型看的「Started subagent …」。已分别改为状态不定宽、展开显示结论、卡片写怎么结束的。
+- 步骤 6：截图发现以通知开头的轮次（通知唤醒的那一轮）没有「打开子智能体」：`TurnView` 渲染这行时没传打开回调。已补，并加测试。
+- 步骤 6：mock 加上应用退出中断（lost）后发现卡片显示「失败」并露出英文 summary（列表是「已中断」）。卡片状态改为已停止、第二行写「中断（应用退出）」；mock 的 settle summary 也改成和后端一致的英文句子，免得截图里看起来比实际好。
+- 步骤 6：面板测试里 `/first/` 同时匹配了「停止 first」按钮，改为按描述开头匹配；`app-streaming-user-message` 测试因列表也显示描述找到多个元素，改为限定在卡片内。
+- 步骤 6：根目录 `pnpm test` 有一次 exit 1 但没有失败输出；逐项重跑和 `pnpm -r --no-bail test` 都通过，没有复现。
+
 ## 跳过或推迟的事项
 
 - 客户端已在 S3 第 7 步把新 inbox 来源转成 `BackgroundNotice`；`BackgroundNoticeRow` / Web `EventRow` 的文字还没改，留给 S6。
@@ -357,3 +412,8 @@
   - Host 被强杀时 CLI 子进程可能残留，下次启动只补 `lost`，不清理进程。
 - S5 真实运行是直接驱动后端，没有在 Electron 里经过完整 Host，所以免审批读取只有单测覆盖。Electron 里的验收归 S6。
 - 本机的 `/opt/homebrew/bin/codex` 是坏的（npm 包缺 vendor 二进制），登录 shell 会先找到它。要在 ActSpace 里用 Codex 子智能体，需要修复或删掉这份安装。是否处理由用户决定。
+- S6 之后仍待做：
+  - Electron 实机验收（交接清单 X1–X23），包括 S4 推迟的真实模型 fork 缓存命中检查（X10）和 S5 推迟的 Electron 里免审批读取外部记录（X15）；
+  - 卡片第二行和列表里最终回复的 Markdown 标记原样显示（改造前就这样），没动；
+  - `lost` 通知展开后是英文 summary（没有结论段），没再翻译；
+  - Space 工作台里「子 Agent」的说明仍是「一次性助手」，属于 Space 功能，没改。

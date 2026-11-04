@@ -32,7 +32,7 @@ ActSpace 是一个桌面 Agent 应用。选定本地目录、连接模型后，�
 | 切换模型、了解上下文和费用 | [模型选择](../model-selection/)、[上下文与压缩](../context/)、[使用统计](../usage/) |
 | 读写文件、运行测试、收集网络资料 | [文件工具](../files-and-search/)、[Bash](../bash/)、[联网工具](../web-tools/) |
 | 审阅变更、预览文件 | [代码审阅](../review/)、[文件预览](../file-preview/) |
-| 复用工作流程、委派研究、练习英语 | [Skills](../skills/)、[子 Agent](../subagents/)、[英语辅助学习](../english-learning/) |
+| 复用工作流程、委派研究、练习英语 | [Skills](../skills/)、[子智能体](../subagents/)、[英语辅助学习](../english-learning/) |
 
 ## 产品理念
 
@@ -62,6 +62,6 @@ ActSpace 的一切都是插件。模型之外的部分，包括工具、上下�
 
 ## 当前能力范围
 
-当前文档介绍 v2 桌面应用和 CLI。内置子 Agent 用于只读检索与分析；博客中的 Agent Team、Agent Room、Kairos、记忆和评估模块文章包含历史探索或独立项目设计，不表示这些能力已成为桌面应用入口。
+当前文档介绍 v2 桌面应用和 CLI。子智能体可以在后台并行处理独立任务（通用预设能改文件，探索预设只读），也可以交给本机的 Codex 或 Claude Code；博客中的 Agent Team、Agent Room、Kairos、记忆和评估模块文章包含历史探索或独立项目设计，不表示这些能力已成为桌面应用入口。
 
 遇到连接或执行问题时，先看[常见问题](../troubleshooting/)。需要修改 ActSpace 本身，进入[开发与贡献](../contributing/)。

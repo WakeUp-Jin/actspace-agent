@@ -214,6 +214,22 @@ it("resolves vision from the purpose table, then the chat model, then the first 
   expect(settings.getModelStorageState().taskModels.thinking).toMatchObject({ utility: "off", autoReview: "off", vision: "off" });
 });
 
+it("saves the subagent purpose as taskModels.subagentDefaultModel without a thinking level", async () => {
+  const { service, runtime, settings } = await fixture();
+  const created = await service.create({ templateId: "custom", apiKey: "k", baseUrl: "https://relay.example/v1", models: [{ apiModel: "m1" }] });
+  if (!created.ok) throw new Error(created.error.message);
+  const key = created.view.connections[0]!.models[0]!.key;
+  expect(runtime.subagentDefaultModel()).toBeNull();
+  const saved = await service.updatePurposes({ subagent: { model: key, thinking: "high" } });
+  if (!saved.ok) throw new Error(saved.error.message);
+  expect(saved.view.purposes.subagent).toEqual({ model: key, thinking: null });
+  expect(runtime.subagentDefaultModel()).toBe(key);
+  expect(settings.getModelStorageState().taskModels.subagentDefaultModel).toBe(key);
+  expect(settings.getModelStorageState().taskModels.thinking?.subagent).toBeUndefined();
+  await service.updatePurposes({ subagent: { model: null, thinking: null } });
+  expect(runtime.subagentDefaultModel()).toBeNull();
+});
+
 it("maps purpose thinking levels to request options only for levels the model declares", () => {
   expect(thinkingLevelOptions("off", undefined)).toEqual({ reasoning: false });
   expect(thinkingLevelOptions("high", { input: ["text"], toolUse: "declared", reasoning: true, thinkingToggle: true, reasoningEfforts: ["low", "high"] })).toEqual({ reasoning: true, reasoningEffort: "high" });

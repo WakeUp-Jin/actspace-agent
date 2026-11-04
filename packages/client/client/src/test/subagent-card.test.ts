@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
-import { projectChatSession, projectSubagentList, subagentChildrenWithoutModel } from "../sessions/chat.js";
+import { projectChatSession, projectSubagentTranscript, subagentChildrenWithoutModel } from "../sessions/chat.js";
+import { projectSubagentItems } from "../sessions/subagent-list.js";
 import { FixedRendererStreamAdapter } from "../live/stream-adapter.js";
 
 // S3 第 7 步：agent 卡片读 subagent/* 新事件；五个管理工具的行名；收件箱两种新来源转成 BackgroundNotice。
@@ -31,34 +32,80 @@ function journal(extra: SessionEventEnvelopeV1[] = []): SessionEventEnvelopeV1[]
 }
 
 describe("subagent cards from subagent/* events", () => {
-  it("fills kind, preset, description, activation count and transcript path while running", () => {
-    const [block] = projectSubagentList(snapshot(), journal());
-    expect(block).toMatchObject({
-      kind: "agent", description: "Map the repo", status: "running", subagentKind: "local", preset: "explore", activationCount: 1,
-      transcriptPath: TRANSCRIPT, model: "deepseek:deepseek-flash", background: true,
-      transcriptRef: { kind: "subagent_transcript", sessionId: "s", runId: "sa-1", path: TRANSCRIPT },
+  it("lists one row per subagent with kind, preset, description, activation count and transcript path", () => {
+    const [item] = projectSubagentItems(journal());
+    expect(item).toEqual({
+      agentId: "sa-1", kind: "local", preset: "explore", description: "Map the repo", status: "running", activationCount: 1,
+      model: "deepseek:deepseek-flash", background: true, createdAt: "2026-11-04T00:00:01.000Z", activeSince: "2026-11-04T00:00:01.000Z",
+      transcriptPath: TRANSCRIPT,
     });
-    expect((block as { agentKind?: string }).agentKind).toBeUndefined();
   });
 
-  it("follows the latest activation: a continuation counts, an interrupt shows as aborted", () => {
+  it("follows the latest activation: idle after completing, a continuation counts, an interrupt shows as interrupted", () => {
     const settled = journal([
       envelope(6, "subagent/activation", { op: "settle", agentId: "sa-1", activationId: "act-1", status: "completed", summary: "done", result: "Found 3 packages", delivery: "notified", endedAt: "2026-11-04T00:01:00.000Z" }),
     ]);
-    expect(projectSubagentList(snapshot(), settled)[0]).toMatchObject({ status: "completed", activationCount: 1, summary: "Found 3 packages" });
+    expect(projectSubagentItems(settled)[0]).toMatchObject({ status: "idle", activationCount: 1, result: "Found 3 packages", endedAt: "2026-11-04T00:01:00.000Z" });
     const continued = [...settled,
       envelope(7, "tool/call", { agentRunId: "run-1", callId: "call-send", name: "send_message", args: { agent_id: "sa-1", message: "Also check docs" } }),
       envelope(8, "subagent/activation", { op: "start", agentId: "sa-1", activationId: "act-2", trigger: "message", senderId: "s", callId: "call-send", background: true, startedAt: "2026-11-04T00:02:00.000Z" }),
+    ];
+    expect(projectSubagentItems(continued)[0]).toMatchObject({ status: "running", activationCount: 2, activeSince: "2026-11-04T00:02:00.000Z", model: "deepseek:deepseek-flash" });
+    const stopped = [...continued,
       envelope(9, "subagent/activation", { op: "settle", agentId: "sa-1", activationId: "act-2", status: "interrupted", summary: "stopped", delivery: "notified", endedAt: "2026-11-04T00:03:00.000Z" }),
     ];
-    expect(projectSubagentList(snapshot(), continued)).toHaveLength(1);
-    expect(projectSubagentList(snapshot(), continued)[0]).toMatchObject({ status: "aborted", activationCount: 2 });
+    expect(projectSubagentItems(stopped)).toHaveLength(1);
+    expect(projectSubagentItems(stopped)[0]).toMatchObject({ status: "interrupted", activationCount: 2 });
+    const failed = [...settled.slice(0, -1), envelope(6, "subagent/activation", { op: "settle", agentId: "sa-1", activationId: "act-1", status: "max_steps", summary: "too long", delivery: "notified", endedAt: "2026-11-04T00:01:00.000Z" })];
+    expect(projectSubagentItems(failed)[0]!.status).toBe("failed");
+  });
+
+  it("ends external subagents after their one run and fills a missing model from the child's requests", () => {
+    const external = [
+      envelope(1, "tool/call", { agentRunId: "run-1", callId: "call-codex", name: "agent_codex", args: { description: "Review auth", prompt: "review" } }),
+      envelope(2, "subagent/spawned", { agentId: "sa-2", kind: "codex", description: "Review auth", transcriptPath: "/codex/rollout.jsonl", callId: "call-codex", createdAt: "2026-11-04T00:00:01.000Z" }),
+      envelope(3, "subagent/activation", { op: "start", agentId: "sa-2", activationId: "act-1", trigger: "spawn", callId: "call-codex", background: true, startedAt: "2026-11-04T00:00:01.000Z" }),
+    ];
+    expect(projectSubagentItems(external, new Map([["sa-2", "gpt-5"]]))[0]).toMatchObject({ kind: "codex", status: "running", model: "gpt-5" });
+    const done = [...external, envelope(4, "subagent/activation", { op: "settle", agentId: "sa-2", activationId: "act-1", status: "completed", summary: "ok", result: "Looks fine", delivery: "notified", endedAt: "2026-11-04T00:01:00.000Z" })];
+    expect(projectSubagentItems(done)[0]).toMatchObject({ kind: "codex", status: "ended", result: "Looks fine" });
+    expect(subagentChildrenWithoutModel(external)).toEqual([]);
+  });
+
+  it("keeps the fork's inherited sequence", () => {
+    const fork = [
+      envelope(1, "subagent/spawned", { agentId: "sa-3", kind: "fork", description: "Try B", transcriptPath: "/t/sa-3.md", callId: "call-fork", createdAt: "2026-11-04T00:00:01.000Z", inheritedThroughSeq: 40 }),
+    ];
+    expect(projectSubagentItems(fork)[0]).toMatchObject({ kind: "fork", inheritedThroughSeq: 40, status: "interrupted", activationCount: 0 });
+  });
+
+  it("shows a forked subagent only what it did after the fork", () => {
+    const message = (seq: number, messageId: string, content: string) => ({ ...envelope(seq, "user/message", { agentRunId: "run-1", messageId, content }), surface: { kind: "append", node: { kind: "user", messageId, content } } }) as SessionEventEnvelopeV1;
+    const child = [message(2, "u-1", "Parent question"), message(3, "u-2", "Fork task")];
+    const forked = { ...snapshot(), messages: ["u-1", "u-2"].map(messageId => ({ kind: "user", messageId, content: "" })) as RuntimeV2SessionSnapshot["messages"] };
+    const texts = (lineage: RuntimeV2SessionSnapshot["lineage"]) => projectSubagentTranscript({ ...forked, lineage }, child).flatMap(event => event.type === "user_message" ? [JSON.stringify(event.payload)] : []);
+    expect(texts(null)).toHaveLength(2);
+    const after = texts({ origin: "delegation", parentSessionId: "s", parentBoundarySeq: 2, delegationDepth: 1, inheritedThroughSeq: 2 });
+    expect(after).toHaveLength(1);
+    expect(after[0]).toContain("Fork task");
   });
 
   it("asks for request models only while an activation has none", () => {
     const withoutModel = journal().map(event => event.type === "subagent/activation" ? { ...event, data: { ...(event.data as object), model: undefined } } as SessionEventEnvelopeV1 : event);
     expect(subagentChildrenWithoutModel(withoutModel)).toEqual([{ childSessionId: "sa-1", finished: false }]);
     expect(subagentChildrenWithoutModel(journal())).toEqual([]);
+  });
+
+  it("shows the final reply on the card, how it ended when there is none, and the tool output before settling", () => {
+    const card = (events: SessionEventEnvelopeV1[]) => projectChatSession(snapshot(["call-agent"]), events, "/w").events
+      .flatMap(event => event.type === "tool_result" && event.payload.uiPreview?.kind === "agent" ? [event.payload.uiPreview] : [])[0]!;
+    expect(card(journal()).summary).toBe("Started sa-1");
+    const settled = (data: Record<string, string>) => journal([envelope(6, "subagent/activation", { op: "settle", agentId: "sa-1", activationId: "act-1", delivery: "notified", endedAt: "2026-11-04T00:01:00.000Z", ...data })]);
+    expect(card(settled({ status: "completed", summary: "done", result: "Found 3 packages" })).summary).toBe("Found 3 packages");
+    // 没有最终回复：不显示给模型看的「Started …」或 settle 摘要，显示怎么结束的；应用退出算停止，不算失败。
+    expect(card(settled({ status: "interrupted", summary: "Subagent sa-1 was stopped before it finished." }))).toMatchObject({ status: "aborted", summary: "已中断" });
+    expect(card(settled({ status: "lost", summary: "Subagent sa-1 (Map the repo) was interrupted because the app exited." }))).toMatchObject({ status: "aborted", summary: "中断（应用退出）" });
+    expect(card(settled({ status: "max_steps", summary: "Subagent sa-1 reached the step limit before it finished." }))).toMatchObject({ status: "failed", summary: "达到步数上限" });
   });
 
   it("names the management tool rows and shows the message sent", () => {
@@ -77,6 +124,9 @@ describe("subagent cards from subagent/* events", () => {
       .flatMap(event => event.type === "tool_result" && event.payload.uiPreview?.kind === "generic" ? [event.payload.uiPreview] : []);
     expect(titles.map(preview => preview.title)).toEqual(["发消息给 Map the repo", "停止 Map the repo", "等待子智能体", "查看子智能体", "查看可选模型"]);
     expect(titles[0]!.content).toContain("Also check docs");
+    expect(titles[0]!.subagentLink).toEqual({ agentId: "sa-1", verb: "发消息给", target: "Map the repo" });
+    expect(titles[1]!.subagentLink).toEqual({ agentId: "sa-1", verb: "停止", target: "Map the repo" });
+    expect(titles[2]!.subagentLink).toBeUndefined();
   });
 });
 

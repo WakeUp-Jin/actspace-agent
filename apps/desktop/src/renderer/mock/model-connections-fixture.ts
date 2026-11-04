@@ -143,6 +143,7 @@ function seed(): { connections: MockConnection[]; purposes: PurposesView } {
       chat: { model: keyFor(relay, "claude-sonnet-4-5"), thinking: null },
       utility: { model: keyFor("deepseek:default", "deepseek-chat"), thinking: null },
       autoReview: { model: null, thinking: "off" },
+      subagent: { model: null, thinking: null },
       vision: { model: null, thinking: null },
     },
   };

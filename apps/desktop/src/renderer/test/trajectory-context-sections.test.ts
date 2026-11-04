@@ -40,11 +40,25 @@ it('keeps the delegated agent call as one parent row and exposes its child sessi
     ['turn/start', { turnId: 't' }], ['step/start', { turnId: 't', stepId: 'p' }],
     ['request/context', { turnId: 't', stepId: 'p', requestId: 'r', snapshot: { renderedSystemPrompt: 'parent', tools: [] } }],
     ['tool/call', { turnId: 't', stepId: 'p', callId: 'same', name: 'agent', args: { description: 'Read storage' } }],
-    ['delegation/requested', { parentCallId: 'same', childSessionId: 'child', presetId: 'explore' }],
-    ['delegation/requested', { parentCallId: 'self', childSessionId: 's' }],
+    ['delegation/requested', { invocationId: 'i1', parentCallId: 'same', childSessionId: 'child', presetId: 'actspace.explore' }],
+    ['delegation/requested', { invocationId: 'i2', parentCallId: 'self', childSessionId: 's' }],
     ['tool/result', { callId: 'same', status: 'completed', result: 'agent completed' }],
   ]);
-  expect(trajectoryDelegations(parentSnapshot)).toEqual([{ parentCallId: 'same', childSessionId: 'child', presetId: 'explore' }]);
+  expect(trajectoryDelegations(parentSnapshot)).toEqual([{ parentCallId: 'same', agentId: 'child', kindLabel: 'Explore', description: '', continuation: false }]);
   const layout = deriveLayout(buildTrajectorySnapshot(parentSnapshot));
   expect(layout.cells.filter(cell => cell.kind === 'tool' || cell.kind === 'subtool').map(cell => [cell.kind, cell.record.toolName])).toEqual([['tool', 'agent']]);
+});
+
+it('maps spawn, send_message and external subagent calls to delegation rows', () => {
+  const parent = snapshot([
+    ['subagent/spawned', { agentId: 'sa-1', callId: 'c1', kind: 'local', preset: 'explore', description: 'Map', transcriptPath: '/t', createdAt: '2026-01-01T00:00:00Z' }],
+    ['subagent/activation', { op: 'start', agentId: 'sa-1', activationId: 'a1', trigger: 'spawn', callId: 'c1', background: false, startedAt: '2026-01-01T00:00:00Z' }],
+    ['subagent/activation', { op: 'start', agentId: 'sa-1', activationId: 'a2', trigger: 'message', callId: 'c2', background: false, startedAt: '2026-01-01T00:01:00Z' }],
+    ['subagent/spawned', { agentId: 'cx-1', callId: 'c3', kind: 'codex', description: 'Review', transcriptPath: '/t2', createdAt: '2026-01-01T00:02:00Z' }],
+  ]);
+  expect(trajectoryDelegations(parent)).toEqual([
+    { parentCallId: 'c1', agentId: 'sa-1', kindLabel: '探索', description: 'Map', continuation: false },
+    { parentCallId: 'c2', agentId: 'sa-1', kindLabel: '探索', description: 'Map', continuation: true },
+    { parentCallId: 'c3', agentId: null, kindLabel: 'Codex', description: 'Review', continuation: false },
+  ]);
 });

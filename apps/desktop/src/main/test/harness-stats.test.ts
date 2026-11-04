@@ -89,7 +89,7 @@ describe("Harness 统计投影", () => {
     expect(runtime).toMatchObject({ turns: 1, avgSteps: 2 });
     expect(runtime.endReasons.completed).toBe(1);
     expect(runtime.background).toMatchObject({ completed: 1, unread: 1 });
-    expect(runtime.delegations.byPreset).toEqual([{ presetId: "explore", count: 1 }]);
+    expect(runtime.delegations.byPreset).toEqual([{ presetId: "explore", count: 1, avgDurationMs: 5000 }]);
     expect(runtime.delegations.avgDurationMs).toBe(5000);
 
     const disclosure = query(db, "disclosure");
@@ -140,7 +140,7 @@ describe("Harness 统计投影", () => {
     const once = database();
     projectHarnessJournalBatch(once, "s2", events);
     const delegations = query(once, "runtime").delegations;
-    expect(delegations.byPreset).toEqual([{ presetId: "actspace.subagent.explore", count: 2 }, { presetId: "actspace.subagent.general", count: 2 }]);
+    expect(delegations.byPreset).toEqual([{ presetId: "actspace.subagent.explore", count: 2, avgDurationMs: 3000 }, { presetId: "actspace.subagent.general", count: 2, avgDurationMs: 6000 }]);
     expect(delegations.failed).toBe(2);
     expect(delegations.avgDurationMs).toBe((4000 + 2000 + 10_000 + 2000) / 4);
     expect(delegations.avgReturnTokens).toBe(10);

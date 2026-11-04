@@ -314,7 +314,7 @@ export type HarnessStatsRuntime = {
   readonly retries: { readonly total: number; readonly byCode: readonly { readonly code: string; readonly count: number }[] };
   readonly interventions: { readonly aborted: number; readonly steering: number; readonly queued: number };
   /** 子智能体：新会话每次激活一行（`subagent/activation`，presetId 为 `actspace.subagent.<preset>`），老会话每次委托一行（`delegation/*`）。 */
-  readonly delegations: { readonly byPreset: readonly { readonly presetId: string; readonly count: number }[]; readonly failed: number; readonly avgSteps: number | null; readonly avgDurationMs: number | null; readonly avgReturnTokens: number | null };
+  readonly delegations: { readonly byPreset: readonly { readonly presetId: string; readonly count: number; readonly avgDurationMs: number | null }[]; readonly failed: number; readonly avgSteps: number | null; readonly avgDurationMs: number | null; readonly avgReturnTokens: number | null };
   readonly background: { readonly byKind: readonly { readonly kind: string; readonly count: number }[]; readonly completed: number; readonly failed: number; readonly stopped: number; readonly avgDurationMs: number | null; readonly unread: number };
   readonly sideChats: { readonly sessions: number; readonly avgTurns: number | null };
   readonly modeSwitches: number;

@@ -15,7 +15,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [子智能体与后台任务改造](active/20261103-subagent-background-redesign/README.md) | 2026-11-03 立项，设计规范与 S1–S6 子计划已写；下一步：用户审阅后开工，从 S1 契约与留痕地基开始。 |
+| [子智能体与后台任务改造](active/20261103-subagent-background-redesign/README.md) | 2026-11-04 S1–S6 已实施（分支 `子智能体功能完善`，每个子计划一个本地提交，未推送）；浏览器 mock 截图完成；下一步：Electron 实机验收，见[验收交接](../exec-runs/20261103-subagent-background-redesign/acceptance-handoff.md)。 |
 | [Harness 统计](active/20261101-harness-stats.md) | 2026-11-01 T1–T12 已实现（未提交），自动化验证完成；待 Electron 真实 Host 验收后移入 completed。执行记录见 [exec-runs](../exec-runs/20261101-harness-stats/execution-summary.md)。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
