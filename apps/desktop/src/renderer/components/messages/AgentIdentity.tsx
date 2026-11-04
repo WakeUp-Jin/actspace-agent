@@ -31,28 +31,69 @@ export function agentModelLabel(model: string | undefined): string | undefined {
   return resolveModelSpecByApiModel(model)?.label ?? model;
 }
 
-export function AgentAvatar({ identity, size = 32 }: { identity: string; size?: 28 | 32 }) {
+const avatarSizeClass = { 18: "h-[18px] w-[18px] rounded-act-xs", 28: "h-7 w-7 rounded-act-md", 32: "h-8 w-8 rounded-act-md" } as const;
+
+export function AgentAvatar({ identity, size = 32 }: { identity: string; size?: 18 | 28 | 32 }) {
   return <img src={agentAvatarSource(identity)} alt="" aria-hidden="true" draggable={false} width={size} height={size}
-    className={`shrink-0 rounded-act-md bg-surface-subtle object-cover ${size === 28 ? "h-7 w-7" : "h-8 w-8"}`} />;
+    className={`shrink-0 bg-surface-subtle object-cover ${avatarSizeClass[size]}`} />;
 }
 
 const labels: Record<AgentMessage["status"], string> = { running: "运行中", completed: "已完成", failed: "失败", aborted: "已停止" };
 
-export function AgentStatus({ status }: { status: AgentMessage["status"] }) {
+export function agentStatusLabel(status: AgentMessage["status"]): string { return labels[status]; }
+
+const spinClass = "animate-spin text-operational motion-reduce:animate-none";
+
+/** 只有图标的状态：运行中转圈（绿色），其余跟随外层文字颜色。 */
+export function AgentStatusIcon({ status, size = 13 }: { status: AgentMessage["status"]; size?: number }) {
   const Icon = status === "running" ? Loader2 : status === "completed" ? Check : status === "failed" ? CircleAlert : Square;
-  return <StatusLine icon={Icon} spinning={status === "running"} danger={status === "failed"} label={labels[status]} fixedWidth />;
+  return <Icon size={size} aria-hidden="true" className={`shrink-0 ${status === "running" ? spinClass : ""}`} />;
 }
 
-/** 右侧面板列表的状态：运行中、空闲（可续派）、已中断、失败、已结束。 */
-export function SubagentStatus({ status }: { status: SubagentListStatus }) {
+/** 右侧面板的状态图标：运行中、空闲（可续派）、已中断、失败、已结束。 */
+export function SubagentStatusIcon({ status, size = 13 }: { status: SubagentListStatus; size?: number }) {
   const Icon = status === "running" ? Loader2 : status === "idle" ? Pause : status === "failed" ? CircleAlert : status === "interrupted" ? Square : Check;
-  return <StatusLine icon={Icon} spinning={status === "running"} danger={status === "failed"} label={subagentListStatusLabel(status)} />;
+  return <Icon size={size} aria-hidden="true" className={`shrink-0 ${status === "running" ? spinClass : ""}`} />;
 }
 
-/** `fixedWidth`：卡片标题行右端的状态固定宽度，状态切换时描述不跳；面板列表里状态在行内，按文字宽度。 */
-function StatusLine({ icon: Icon, spinning, danger, label, fixedWidth = false }: { icon: typeof Check; spinning: boolean; danger: boolean; label: string; fixedWidth?: boolean }) {
-  return <span className={`inline-flex ${fixedWidth ? "w-[68px] " : ""}shrink-0 items-center gap-1.5 whitespace-nowrap text-act-xs leading-[1.4] ${danger ? "text-danger" : "text-text-muted"}`}>
-    <Icon size={13} aria-hidden="true" className={spinning ? "animate-spin text-operational motion-reduce:animate-none" : ""} />
-    {label}
+/** 对话卡片标题行右端的状态：固定宽度，状态切换时描述不跳。 */
+export function AgentStatus({ status }: { status: AgentMessage["status"] }) {
+  return <span className={`inline-flex w-[68px] shrink-0 items-center gap-1.5 whitespace-nowrap text-act-xs leading-[1.4] ${status === "failed" ? "text-danger" : "text-text-muted"}`}>
+    <AgentStatusIcon status={status} />
+    {labels[status]}
   </span>;
+}
+
+/** 右侧面板的状态：图标加文字，按文字宽度。 */
+export function SubagentStatus({ status }: { status: SubagentListStatus }) {
+  return <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap ${status === "failed" ? "text-on-danger" : ""}`}>
+    <SubagentStatusIcon status={status} size={12} />
+    {subagentListStatusLabel(status)}
+  </span>;
+}
+
+function compactText(value: string | undefined): string | undefined {
+  const compact = value?.replace(/\s+/g, " ").trim();
+  return compact || undefined;
+}
+
+/** 子 Agent 现在在做什么（运行中）或结果第一行（结束后）；失败时是错误。对话卡片和右侧列表共用。 */
+export function agentLatestActivity(message: AgentMessage): string {
+  if (message.error) return compactText(message.error) ?? "执行失败";
+  if (message.status === "running") {
+    // Only event-derived labels may appear here, never streamed model output.
+    const live = compactText(message.displayText);
+    return live && /^(正在|达到|已停止|执行失败)/.test(live) ? live : "正在思考";
+  }
+  const summaryLine = message.summary?.split(/\r?\n/).find((line) => line.trim().length > 0);
+  return compactText(summaryLine) ?? labels[message.status];
+}
+
+/** 子 Agent 耗时：38s / 1m 12s / 1h 05m。 */
+export function formatAgentDuration(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
 }

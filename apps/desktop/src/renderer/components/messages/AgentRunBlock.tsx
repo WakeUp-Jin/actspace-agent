@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { subagentKindLabel, type MessageBlock } from "@actspace/shared";
 import "./agent-activity.css";
-import { AgentAvatar, AgentStatus, agentIdentity, agentModelLabel } from "./AgentIdentity";
+import { AgentAvatar, AgentStatus, agentIdentity, agentLatestActivity, agentModelLabel } from "./AgentIdentity";
 import { BackgroundTag } from "./BashRunBlock";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
@@ -15,28 +15,8 @@ const TYPE_CLASS = "shrink-0 text-act-xs leading-[1.4] text-text-faint";
 const LATEST_CLASS = "min-w-0 truncate text-act-xs leading-[1.45] text-text-muted";
 const ERROR_LATEST_CLASS = "text-on-danger";
 
-function statusLabel(status: AgentMessage["status"]): string {
-  return status === "running" ? "运行中" : status === "completed" ? "已完成" : status === "aborted" ? "已停止" : "失败";
-}
-
 function kindLabel(message: AgentMessage): string {
   return subagentKindLabel({ ...(message.subagentKind ? { subagentKind: message.subagentKind } : {}), ...(message.preset ? { preset: message.preset } : {}), ...(message.agentKind ? { agentKind: message.agentKind } : {}) });
-}
-
-function compactText(value: string | undefined): string | undefined {
-  const compact = value?.replace(/\s+/g, " ").trim();
-  return compact || undefined;
-}
-
-function latestActivity(message: AgentMessage): string {
-  if (message.error) return compactText(message.error) ?? "执行失败";
-  if (message.status === "running") {
-    // Only event-derived labels may appear here, never streamed model output.
-    const live = compactText(message.displayText);
-    return live && /^(正在|达到|已停止|执行失败)/.test(live) ? live : "正在思考";
-  }
-  const summaryLine = message.summary?.split(/\r?\n/).find((line) => line.trim().length > 0);
-  return compactText(summaryLine) ?? statusLabel(message.status);
 }
 
 function ActivityLine({ text, running }: { text: string; running: boolean }) {
@@ -64,7 +44,7 @@ export function AgentRunBlock({
   onOpen?: (agentId: string | undefined) => void;
 }) {
   const isRunning = message.status === "running";
-  const latest = latestActivity(message);
+  const latest = agentLatestActivity(message);
   const latestClass = message.error ? `${LATEST_CLASS} ${ERROR_LATEST_CLASS}` : LATEST_CLASS;
   const model = agentModelLabel(message.model);
 

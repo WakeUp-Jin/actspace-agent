@@ -25,29 +25,51 @@ const panel = (focus?: Parameters<typeof SubagentsPanel>[0]["focus"]) => render(
 // 行按钮的可读名称以描述开头；运行中的行旁边还有「停止 <描述>」按钮。
 const row = (description: string) => screen.getByRole("button", { name: new RegExp(`^${description}`) });
 
-it("groups running and other agents, shows kind, model, rounds and start time, and stops a running one from its row", async () => {
+it("groups running and other agents as cards, shows status, rounds, tokens and duration, and stops a running one from its row", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date("2026-11-04T09:06:12.000Z") });
   const interrupt = vi.fn().mockResolvedValue({ ok: true });
   overrideBridge({
     "sessions.getSubagents": vi.fn().mockResolvedValue([
-      item("scan", "running", { model: "deepseek/deepseek-v4", activationCount: 3 }),
-      item("review", "idle", { kind: "fork", preset: undefined }),
-      item("port", "ended", { kind: "codex", preset: undefined }),
+      item("scan", "running", { model: "deepseek/deepseek-v4", activationCount: 3, totalTokens: 12_630 }),
+      item("review", "idle", { kind: "fork", preset: undefined, activationCount: 2, result: "提交顺序没问题\n细节见下", endedAt: "2026-11-04T09:05:09.000Z" }),
+      item("port", "ended", { kind: "codex", preset: undefined, result: "Looks fine" }),
+      item("broken", "failed"),
       item("old", "interrupted", { legacy: true, preset: "explore" }),
     ]),
     "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue([]),
     "sessions.interruptSubagent": interrupt,
   });
-  panel();
-  expect(await screen.findByText("运行中 · 1")).toBeInTheDocument();
-  expect(screen.getByText("其他 · 3")).toBeInTheDocument();
-  expect(row("scan")).toHaveTextContent(/运行中.*通用.*deepseek-v4.*第 3 轮/);
-  expect(row("review")).toHaveTextContent(/空闲.*Fork/);
-  expect(row("port")).toHaveTextContent(/已结束.*Codex/);
-  // 老会话的委派仍按 Agent / Explore 显示。
-  expect(row("old")).toHaveTextContent(/已中断.*Explore/);
-  expect(screen.getAllByRole("button", { name: /^停止 / })).toHaveLength(1);
-  fireEvent.click(screen.getByRole("button", { name: "停止 scan" }));
-  await waitFor(() => expect(interrupt).toHaveBeenCalledWith({ sessionId: "parent", agentId: "scan" }));
+  try {
+    panel();
+    expect(await screen.findByRole("group", { name: "运行中 · 1" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "其他 · 4" })).toBeInTheDocument();
+    // 运行中：正在执行、第 N 轮和耗时，右上 token；列表不显示种类和模型。
+    expect(row("scan")).toHaveTextContent(/正在执行.*12\.6K tokens.*第 3 轮 · 1m 12s/);
+    expect(row("scan")).not.toHaveTextContent(/通用|deepseek/);
+    // 结束的：最终回复第一行，状态、第 N 轮和最近一次激活的耗时；没有 token 时不显示。
+    expect(row("review")).toHaveTextContent(/提交顺序没问题.*空闲.*· 第 2 轮 · 9s/);
+    expect(row("review")).not.toHaveTextContent(/tokens|Fork/);
+    expect(row("port")).toHaveTextContent(/Looks fine.*已结束/);
+    expect(row("broken").querySelector(".text-on-danger")).toHaveTextContent("失败");
+    expect(row("old")).toHaveTextContent(/已中断.*已中断/);
+    expect(screen.getAllByRole("button", { name: /^停止 / })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "停止 scan" }));
+    await waitFor(() => expect(interrupt).toHaveBeenCalledWith({ sessionId: "parent", agentId: "scan" }));
+  } finally { vi.useRealTimers(); }
+});
+
+it("puts model, rounds and status in a one-line detail header, the kind in its hover text, and the view toggle last", async () => {
+  overrideBridge({
+    "sessions.getSubagents": vi.fn().mockResolvedValue([item("scan", "idle", { preset: "explore", model: "claude-sonnet-5-5", activationCount: 2, endedAt: "2026-11-04T09:06:12.000Z" })]),
+    "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue([]),
+  });
+  panel({ agentId: "scan", view: "chat", revision: 1 });
+  const header = (await screen.findByRole("heading", { name: "scan" })).closest("header")!;
+  expect(header).toHaveTextContent(/sonnet.*第 2 轮.*空闲.*1m 12s/i);
+  expect(header).not.toHaveTextContent("探索");
+  expect(header.querySelector('[title="scan · 探索"]')).not.toBeNull();
+  expect(header).not.toHaveTextContent("子 Agent /");
+  expect(header.lastElementChild).toHaveAccessibleName("查看执行轨迹");
 });
 
 it("reports a failed stop on the list", async () => {
@@ -65,7 +87,7 @@ it("navigates within the panel while rejecting stale transcript responses", asyn
   const transcript = vi.fn().mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; })).mockResolvedValue([]);
   overrideBridge({ "sessions.getSubagents": vi.fn().mockResolvedValue([item("first", "idle"), item("second", "ended")]), "sessions.getSubAgentTranscript": transcript });
   const { unmount } = panel();
-  await screen.findByText("其他 · 2");
+  await screen.findByRole("group", { name: "其他 · 2" });
   fireEvent.click(row("first"));
   await waitFor(() => expect(transcript).toHaveBeenCalledTimes(1));
   // 记录按子智能体 id 和记录文件路径取。
@@ -180,5 +202,5 @@ it("returns to the list with a note when the focused agent is not found", async 
   overrideBridge({ "sessions.getSubagents": vi.fn().mockResolvedValue([item("first", "ended")]), "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue([]) });
   panel({ agentId: "gone", view: "trajectory", revision: 1 });
   expect(await screen.findByText("找不到这个子智能体。")).toBeInTheDocument();
-  expect(screen.getByText("其他 · 1")).toBeInTheDocument();
+  expect(screen.getByRole("group", { name: "其他 · 1" })).toBeInTheDocument();
 });

@@ -466,6 +466,8 @@ export type SubagentListItem = {
   transcriptPath: string;
   /** Fork only: the parent Journal seq the fork copied through. */
   inheritedThroughSeq?: number;
+  /** Cumulative `usage.totalTokens` of the child Session (local / fork); absent for external subagents or while unreadable. */
+  totalTokens?: number;
   /** The latest activation's final reply and summary. */
   result?: string;
   summary?: string;

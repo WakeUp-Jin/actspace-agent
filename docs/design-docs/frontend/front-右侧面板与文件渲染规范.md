@@ -417,6 +417,8 @@ Context Tab 回答三个问题：现在占了多少、由哪些条目组成、�
 
 列表通过 `getSubagents` 每秒更新；模型名优先取父会话 `delegation/completed` 记下的模型，运行中（或停止时没记模型）取子会话最近一次 `request/header` 的实际模型，不按用途绑定猜；已结束子会话的查询结果在主进程缓存，不每秒重读。详情通过 `getSubAgentTranscript` 读取规范 SessionEvent，运行中每 750ms 更新。组件卸载、切任务或切会话时取消后续刷新，迟到响应不更新新视图。详情复用会话 MessageBlock 渲染，支持正文、Thinking 和工具，不再附着在 Composer 上方。
 
+2026-11-03 起列表改为设置页分组卡（右上 token、右下耗时），详情顶部栏精简为一行（返回 · 头像标题 · 模型 · 状态耗时 · 对话 / 轨迹切换），见 [子 Agent 列表与详情顶部栏](front-子Agent列表与详情顶部栏.md)。token 取子会话快照的 `usage.totalTokens`，已结束的同样在主进程缓存。
+
 ## 侧边对话（2026-10-21）
 
 设计见 `docs/design-docs/collaboration/side-chat-design.md`。右侧面板 Tab 类型 `sideChat`：`{ id: "side-chat:<sessionId>", title, sessionId, parentSessionId, inheritedTurnCount?, runningTurnExcluded? }`。视图为 `right-panel/side-chat/SideChatView.tsx`，外包 `SessionProjectionScope`（`session/SessionProjectionContext.tsx`）：通过 `bridge.watch` 给非选中会话一份投影，复用外层 store / bridge，不改变当前选中会话。

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Check, Copy, FolderOpen, Square } from "lucide-react";
-import { createMessageBlocks, subagentKindLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
+import { Check, ChevronLeft, Copy, FolderOpen, Square } from "lucide-react";
+import { createMessageBlocks, subagentKindLabel, subagentListStatusLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
 import { IconButton } from "../ui/IconButton";
 import { Button } from "../ui/Button";
-import { AgentAvatar, SubagentStatus, agentModelLabel } from "../messages/AgentIdentity";
+import { AgentAvatar, SubagentStatus, SubagentStatusIcon, agentModelLabel, formatAgentDuration } from "../messages/AgentIdentity";
 import { MarkdownProse } from "../messages/MarkdownProse";
 import { renderMessageList } from "../conversation/render-message";
 import { sessionsApi } from "../../api/sessions";
+import { formatTokenCount } from "../../context-format";
 import { SessionViewToggle, type SessionMainView } from "../SessionViewToggle";
 import { TrajectoryView } from "../TrajectoryView";
 import type { SubagentFocus } from "./RightPanelContext";
@@ -14,7 +15,8 @@ import type { SubagentFocus } from "./RightPanelContext";
 // 列表每秒轮询；结束后记录可能拉取失败（父会话还在输出时主进程繁忙），拿到非空结果前继续重试，最多这么多次。
 const POLL_MS = 1000;
 const COMPLETED_TRANSCRIPT_RETRIES = 20;
-const rowClass = "min-w-0 flex-1 rounded-act-md px-3 py-3 text-left hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus-ring";
+// 列表行：设置页分组卡里的一行，规范见 docs/design-docs/frontend/front-子Agent列表与详情顶部栏.md。
+const rowClass = "flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring";
 
 /** 右侧「子 Agent」面板（设计 05 §2）：一个子智能体一行；详情按种类分支，本地 / Fork 看对话与轨迹，Codex / Claude Code 看结果与原生记录。 */
 export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null; focus?: SubagentFocus }) {
@@ -82,37 +84,50 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
       onStop={() => void stop(active.agentId)}
     />;
   }
-  return <section className="h-full overflow-y-auto p-4" aria-label="子 Agent 列表">
-    {error ? <p role="status" className="text-act-xs text-text-muted">{error}</p> : null}
-    {missingAgent ? <p role="status" className="mb-3 px-3 text-act-xs text-text-muted">找不到这个子智能体。</p> : null}
-    {stopError ? <p role="alert" className="mb-3 px-3 text-act-xs text-on-danger">停止失败：{stopError}</p> : null}
+  return <section className="h-full overflow-y-auto px-3 py-3.5" aria-label="子 Agent 列表">
+    {error ? <p role="status" className="mb-3 px-1.5 text-act-xs text-text-muted">{error}</p> : null}
+    {missingAgent ? <p role="status" className="mb-3 px-1.5 text-act-xs text-text-muted">找不到这个子智能体。</p> : null}
+    {stopError ? <p role="alert" className="mb-3 px-1.5 text-act-xs text-on-danger">停止失败：{stopError}</p> : null}
     {([true, false] as const).map((running) => {
       const items = agents.filter((agent) => (agent.status === "running") === running);
       if (!items.length) return null;
-      return <div key={String(running)} className="mb-6"><h2 className="mb-2 px-3 text-act-xs font-normal text-text-faint">{running ? "运行中" : "其他"} · {items.length}</h2>
-        {items.map((agent) => <div key={agent.agentId} className="flex items-center gap-1">
-          <button type="button" className={rowClass} onClick={() => { setSelectedId(agent.agentId); setView("chat"); setMissingAgent(false); setStopError(undefined); }}>
-            <span className="flex items-center gap-3">
-              <AgentAvatar identity={agent.agentId} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-act-sm text-text-main" title={agent.description}>{agent.description}</span>
-                <span className="mt-1 flex min-w-0 items-center gap-1.5 text-act-xs text-text-muted">
-                  <SubagentStatus status={agent.status} /><span aria-hidden="true">·</span><span className="shrink-0">{kindLabel(agent)}</span>
-                  {agentModelLabel(agent.model) ? <><span aria-hidden="true">·</span><span className="min-w-0 truncate" title={agent.model}>{agentModelLabel(agent.model)}</span></> : null}
-                  {agent.activationCount > 1 ? <><span aria-hidden="true">·</span><span className="shrink-0">第 {agent.activationCount} 轮</span></> : null}
-                  <span aria-hidden="true">·</span><span className="shrink-0 text-text-faint tabular-nums">{clock(agent.createdAt)}</span>
-                </span>
-              </span>
-            </span>
-          </button>
-          {agent.status === "running"
-            ? <IconButton label={`停止 ${agent.description}`} tooltip="停止" disabled={stopping === agent.agentId} onClick={() => void stop(agent.agentId)}><Square size={12} fill="currentColor" /></IconButton>
-            : null}
-        </div>)}
+      const title = running ? "运行中" : "其他";
+      return <div key={String(running)} className="mb-4.5" role="group" aria-label={`${title} · ${items.length}`}>
+        <h2 className="mb-1.5 flex items-center justify-between px-1.5 text-act-xs font-normal text-text-faint"><span>{title}</span><span className="tabular-nums">{items.length}</span></h2>
+        <div className="divide-y divide-line/60 overflow-hidden rounded-act-group border border-line bg-surface">
+          {items.map((agent) => <SubagentRow key={agent.agentId} agent={agent} stopping={stopping === agent.agentId}
+            onOpen={() => { setSelectedId(agent.agentId); setView("chat"); setMissingAgent(false); setStopError(undefined); }}
+            onStop={() => void stop(agent.agentId)} />)}
+        </div>
       </div>;
     })}
-    {loaded && !agents.length && !error ? <p className="px-3 text-act-sm text-text-muted">此会话还没有子智能体。</p> : null}
+    {loaded && !agents.length && !error ? <p className="px-1.5 text-act-sm text-text-muted">此会话还没有子智能体。</p> : null}
   </section>;
+}
+
+/** 一行：头像、描述、最近一句（结论或怎么结束的）；右上 token，右下状态 / 第 N 轮 / 耗时。运行中的行右侧有停止。 */
+function SubagentRow({ agent, stopping, onOpen, onStop }: { agent: SubagentListItem; stopping: boolean; onOpen: () => void; onStop: () => void }) {
+  const running = agent.status === "running";
+  const timing = [agent.activationCount > 1 ? `第 ${agent.activationCount} 轮` : undefined, formatAgentDuration(durationMs(agent))].filter(Boolean).join(" · ");
+  return <div className="flex items-center hover:bg-surface-subtle">
+    <button type="button" className={rowClass} onClick={onOpen}>
+      <AgentAvatar identity={agent.agentId} size={28} />
+      <span className="flex min-w-0 flex-1 flex-col gap-px">
+        <span className="truncate text-act-sm text-text-main" title={agent.description}>{agent.description}</span>
+        <span className={`truncate text-act-xs ${agent.status === "failed" ? "text-on-danger" : "text-text-faint"}`}>{latestLine(agent)}</span>
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-0.5 text-act-xs tabular-nums text-text-faint">
+        {agent.totalTokens ? <span className="text-text-muted">{formatTokenCount(agent.totalTokens)} <span className="text-text-faint">tokens</span></span> : null}
+        <span className={`inline-flex items-center gap-1 ${running ? "text-operational" : ""}`}>
+          {running ? <SubagentStatusIcon status="running" size={12} /> : <SubagentStatus status={agent.status} />}
+          {running ? timing : `· ${timing}`}
+        </span>
+      </span>
+    </button>
+    {running
+      ? <span className="shrink-0 pr-2"><IconButton label={`停止 ${agent.description}`} tooltip="停止" disabled={stopping} onClick={onStop}><Square size={12} fill="currentColor" /></IconButton></span>
+      : null}
+  </div>;
 }
 
 function SubagentDetail({ sessionId, item, view, onToggleView, onBack, stopping, stopError, onStop }: {
@@ -129,19 +144,20 @@ function SubagentDetail({ sessionId, item, view, onToggleView, onBack, stopping,
   const running = item.status === "running";
   const model = agentModelLabel(item.model);
   return <section className="flex h-full min-h-0 flex-col" aria-label="子 Agent 详情">
-    <header className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3">
-      <IconButton label="返回子 Agent 列表" tooltip="返回" onClick={onBack}><ArrowLeft size={16} /></IconButton>
-      {external ? null : <SessionViewToggle view={view} onToggle={onToggleView} />}
-      <AgentAvatar identity={item.agentId} size={28} />
-      <div className="min-w-0 flex-1">
-        <h2 className="m-0 truncate text-act-sm font-medium" title={item.description}>{item.description}</h2>
-        <p className="m-0 mt-1 flex min-w-0 items-center gap-2 text-act-xs text-text-muted">
-          <span className="shrink-0">{kindLabel(item)}</span>
-          {model ? <><span aria-hidden="true">·</span><span className="min-w-0 truncate" title={item.model}>{model}</span></> : null}
-          {item.activationCount > 1 ? <><span aria-hidden="true">·</span><span className="shrink-0">第 {item.activationCount} 轮</span></> : null}
-          <span aria-hidden="true">·</span><SubagentStatus status={item.status} />
-        </p>
+    <header className="flex h-11 shrink-0 items-center gap-1.5 border-b border-line pl-1.5 pr-2">
+      <IconButton label="返回子 Agent 列表" tooltip="返回" onClick={onBack}><ChevronLeft size={16} /></IconButton>
+      <div className="flex min-w-28 flex-1 items-center gap-2" title={[item.description, kindLabel(item), item.background ? "后台" : undefined].filter(Boolean).join(" · ")}>
+        <AgentAvatar identity={item.agentId} size={18} />
+        <h2 className="m-0 min-w-0 truncate text-act-sm font-medium">{item.description}</h2>
       </div>
+      <span className="flex min-w-0 shrink items-center gap-2 px-1 text-act-xs text-text-faint">
+        {model ? <><span className="min-w-8 max-w-24 truncate text-text-muted" title={item.model}>{model}</span><Dot /></> : null}
+        {item.activationCount > 1 ? <><span className="shrink-0">第 {item.activationCount} 轮</span><Dot /></> : null}
+        <span className={`inline-flex shrink-0 items-center gap-1 tabular-nums ${running ? "text-operational" : item.status === "failed" ? "text-on-danger" : ""}`}>
+          <SubagentStatusIcon status={item.status} size={12} /><span className="sr-only">{subagentListStatusLabel(item.status)}</span>{formatAgentDuration(durationMs(item))}
+        </span>
+      </span>
+      {external ? null : <SessionViewToggle view={view} onToggle={onToggleView} />}
     </header>
     {item.kind === "fork" && item.inheritedThroughSeq !== undefined
       ? <p className="m-0 shrink-0 border-b border-line px-5 py-2 text-act-xs text-text-faint">从主会话 #{item.inheritedThroughSeq} 分出</p>
@@ -247,10 +263,18 @@ function kindLabel(item: SubagentListItem): string {
     : subagentKindLabel({ subagentKind: item.kind, ...(item.preset ? { preset: item.preset } : {}) });
 }
 
-/** 开始时间：本地 HH:MM。 */
-function clock(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+function Dot() { return <span aria-hidden="true" className="size-[3px] shrink-0 rounded-full bg-line-strong" />; }
+
+/** 最近一次激活的耗时：运行中到现在，结束的到结束时间。 */
+function durationMs(item: SubagentListItem): number {
+  const start = Date.parse(item.activeSince);
+  const end = item.endedAt ? Date.parse(item.endedAt) : Date.now();
+  return Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : 0;
+}
+
+/** 列表第二行：运行中写「正在执行」；结束后是最终回复的第一行（去掉加粗、行内代码、标题、列表的 Markdown 标记），没有回复时写怎么结束的。 */
+function latestLine(item: SubagentListItem): string {
+  if (item.status === "running") return "正在执行";
+  const first = item.result?.split(/\r?\n/).map((line) => line.replace(/\*\*|`/g, "").replace(/^\s*(#+|[-*]|\d+\.)\s+/, "").replace(/\s+/g, " ").trim()).find(Boolean);
+  return first ?? subagentListStatusLabel(item.status);
 }
