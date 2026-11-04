@@ -1,6 +1,6 @@
 # 前端基础组件层建设计划
 
-状态：部分实施；`components/ui/` 已有 Tooltip、HoverCard、Button、IconButton（2026-09-26），以及 Menu（DropdownMenu）、ContextMenu、Popover、Dialog、ConfirmDialog、Select（2026-10-06，Desktop 前端重构 16）；Sheet 已在重构 10 删除。Switch/Textarea/Tabs 尚未形成公共层。
+状态：只剩 Switch、Textarea、Tabs 三个基础组件未落地。`components/ui/` 已有 Button、IconButton（2026-09-26）、Tooltip、HoverCard，以及 Menu、ContextMenu、Popover、Dialog、ConfirmDialog、Select（2026-10-06，Desktop 前端重构 16）；开关目前写在 `settings/SettingsPrimitives.tsx`，没有 Textarea，`UnderlineTabs` 只服务 Harness 统计页，右侧面板标签条仍是手写。
 
 ## 目标
 
@@ -20,9 +20,9 @@ Radix primitives / 原生 HTML
 
 - 包含：
   - 新增 `apps/desktop/src/renderer/components/ui/*` 基础组件层。
-  - 首批封装 `Button`、`IconButton`、`Tooltip`、`DropdownMenu`、`Switch`、`Textarea`、`Tabs`。
-  - 逐步迁移 Composer mode/model 菜单、Thinking toggle、消息操作菜单、右侧 tabs 和常见 icon button。
-  - 抽出必要的业务组合组件，例如 `ModelSelector`、`ModeSelector`、`MessageActionsMenu`。
+  - 剩余封装 `Switch`、`Textarea`、`Tabs`（其余组件已落地，见上方状态）。
+  - 迁移设置页开关、各处输入框、右侧面板标签条和 Composer 的 Thinking toggle。
+  - 视重复情况抽出必要的业务组合组件，例如 `ModelSelector`、`ModeSelector`。
   - 同步维护前端设计文档、history 和必要测试。
 - 不包含：
   - 不全量接入 `shadcn/ui` CLI 生成体系。
@@ -36,12 +36,10 @@ Radix primitives / 原生 HTML
 - 相关文档：
   - `docs/REPO_COLLAB_GUIDE.md`
   - `docs/ARCHITECTURE.md`
-  - `docs/design-docs/core-beliefs.md`
-  - `docs/design-docs/frontend/front-全局视觉语言规范.md`
-  - `docs/design-docs/frontend/front-基础组件封装规范.md`
+  - `docs/design-docs/frontend/front-视觉token规范.md`
+  - `docs/design-docs/frontend/front-组件与交互模式规范.md`
   - `docs/FRONTEND_VERIFICATION.md`
   - `docs/HISTORY_GUIDE.md`
-  - `docs/QUALITY_SCORE.md`
 - 相关代码路径：
   - `apps/desktop/src/renderer/components/Composer.tsx`
   - `apps/desktop/src/renderer/components/ConversationView.tsx`
@@ -74,18 +72,15 @@ Radix primitives / 原生 HTML
 1. 调研与方案收敛。
    - 盘点现有重复控件和手写浮层逻辑。
    - 确认 `components/ui/*` 的组件边界和命名。
-2. 建立基础组件层。
-   - 新增 `Button`、`IconButton`、`Tooltip`。
-   - 新增 `DropdownMenu`、`Switch`。
+2. 建立剩余基础组件（`Button`、`IconButton`、`Tooltip`、`Menu` 等已完成）。
+   - 新增 `Switch`。
    - 新增 `Textarea`、`Tabs`。
 3. 低风险迁移。
-   - 迁移消息操作菜单。
+   - 迁移设置页开关到 `ui/Switch`。
    - 迁移右侧 panel tabs。
-   - 迁移 Composer mode/model 菜单和 Thinking toggle。
+   - 迁移 Composer 的 Thinking toggle。
 4. 业务组合组件收口。
-   - 抽出 `MessageActionsMenu`。
-   - 抽出 `ModeSelector`、`ModelSelector`。
-   - 视重复情况抽出 `ContextUsageButton` 或 `SessionRow`。
+   - 视重复情况抽出 `ModeSelector`、`ModelSelector`、`ContextUsageButton` 或 `SessionRow`。
 5. 验证、交付与收尾。
    - 跑类型检查和测试。
    - 按前端验证规范完成浏览器或 Electron 验收。
@@ -109,15 +104,16 @@ Radix primitives / 原生 HTML
 ## 进度记录
 
 - [x] 确认基础组件层采用 Radix primitives / 原生 HTML -> 项目 UI wrapper -> 业务组件的分层。
-- [x] 新增 `docs/design-docs/frontend/front-基础组件封装规范.md`。
-- [ ] 盘点现有重复控件和第一批迁移目标。
-- [x] 公共 `components/ui/Tooltip.tsx` 已存在；另有 HoverCard、Sheet。这里只确认文件落地，不代替本计划的统一迁移验收。
-- [x] 新增 `components/ui/Button.tsx`、`IconButton.tsx`。2026-09-26 由 `completed/20260926-frontend-design-token-convergence.md` 的 T12 完成，并迁移了设置中心、审批卡、Composer、Sidebar、右侧面板工具条和各对话框按钮。仍未迁移的按钮形态（菜单项、下拉触发器、分段控件）见 `front-基础组件封装规范.md`「已落地：Button 与 IconButton」，随下面的 `DropdownMenu`、`Tabs` 一起迁移。
-- [x] 新增 `components/ui/DropdownMenu.tsx`。2026-10-06 由 [Desktop 前端重构 16](../completed/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md) 完成，实现为 `ui/Menu.tsx`（另含 Popover、Dialog、ConfirmDialog、Select、ContextMenu），消息操作菜单、设置页下拉、侧栏右键等已迁移；Composer 内的菜单随 09 迁移。规范见 `front-基础组件封装规范.md`「弹层原语」。
+- [x] 基础组件规范已并入 `docs/design-docs/frontend/front-组件与交互模式规范.md`。
+- [x] 盘点现有重复控件：按钮、菜单、弹层已收口，剩 Switch / Textarea / Tabs。
+- [x] 公共 `components/ui/Tooltip.tsx` 已存在；另有 HoverCard（Sheet 已在重构 10 删除）。这里只确认文件落地，不代替本计划的统一迁移验收。
+- [x] 新增 `components/ui/Button.tsx`、`IconButton.tsx`。2026-09-26 由 `completed/20260926-frontend-design-token-convergence.md` 的 T12 完成，并迁移了设置中心、审批卡、Composer、Sidebar、右侧面板工具条和各对话框按钮。仍未迁移的按钮形态（菜单项、下拉触发器、分段控件）见 `front-组件与交互模式规范.md`，随下面的 `Tabs` 一起迁移。
+- [x] 新增 `components/ui/DropdownMenu.tsx`。2026-10-06 由 [Desktop 前端重构 16](../completed/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md) 完成，实现为 `ui/Menu.tsx`（另含 Popover、Dialog、ConfirmDialog、Select、ContextMenu），消息操作菜单、设置页下拉、侧栏右键等已迁移；Composer 内的菜单随 09 迁移。规范见 `front-组件与交互模式规范.md`。
 - [ ] 新增 `components/ui/Switch.tsx`。
 - [ ] 新增 `components/ui/Textarea.tsx`、`Tabs.tsx`。
-- [ ] 迁移消息操作菜单和右侧 tabs。
-- [ ] 迁移 Composer mode/model 菜单和 Thinking toggle。
+- [x] 迁移消息操作菜单（2026-10-06，随 `ui/Menu`）。
+- [ ] 迁移右侧 tabs。
+- [ ] 迁移 Composer 的 Thinking toggle。
 - [ ] 抽出必要业务组合组件。
 - [ ] 完成验证、history 和收尾文档。
 
@@ -126,6 +122,6 @@ Radix primitives / 原生 HTML
 - 2026-05-26：当前阶段不全量采用 `shadcn/ui`，但参考其 Radix wrapper 模式，在项目内建设基础 UI 组件层。这样既保留仓库已确认的 Radix primitives 方向，也能降低业务组件重复实现基础交互和样式的成本。
 - 2026-05-26：`SplitView` 暂不纳入第一批基础组件迁移。它承载工作台布局和 resize 行为，应在基础控件层稳定后单独评估。
 
-## 2026-09-09 下一步
+## 下一步
 
-先盘点当前 Composer、消息操作和 RightPanel 中仍重复的按钮、菜单与 tabs，再确定每个 wrapper 的真实复用点。随后按本计划的组件切片实施和验收；不能因为 Tooltip 已存在就把整个基础组件计划归档，也不按 2026-05 的旧页面结构直接批量迁移。
+先盘点设置页开关、各处输入框和右侧面板标签条的真实复用点，再按 `Switch`、`Textarea`、`Tabs` 的顺序各做一个切片，每个切片单独 typecheck、test、视觉验收。规范写入 `docs/design-docs/frontend/front-组件与交互模式规范.md`。

@@ -1,6 +1,6 @@
 # 上下文渐进式披露设计
 
-状态：2026-10-06 第一版实现已接入；自动化与真实界面的验证范围见[执行摘要](../../exec-runs/20261006-context-management-engine/execution-summary.md)。本文维护设计契约，不承诺未执行的 Provider 验收。
+第一版实现已接入；自动化与真实界面的验证范围见[执行摘要](../../exec-runs/20261006-context-management-engine/execution-summary.md)。本文维护设计契约，不承诺未执行的 Provider 验收。
 
 完整的数据对象与插件职责分别见[数据结构规范](Context数据结构和模型输入数据结构的设计规范.md)和[插件拆分规范](上下文管理引擎的插件拆分和上下文的插件拆分.md)。本文件保留渐进式披露行为；`content`/`pathlist` 描述压缩产物语义，不要求增加新的公共条目对象。
 
@@ -179,10 +179,10 @@ flowchart TD
 
 - `packages/fs/tool-fs-read/src/node-ports.ts`：`read_file` 支持 `offset`、`limit`，默认 200 行；同一路径和范围可命中未变化缓存，支持 `force`。
 - `packages/shell/tool-shell/src/node-ports.ts`：Bash 内联正文上限 8,000 字符，超限时保存输出 artifact；磁盘输出另有安全上限。
-- `packages/context/src/conversion.ts`：将文本 artifact 解析为可读路径，并提示用分页读取或搜索访问。
+- `packages/context/context-engine/src/conversion.ts`：将文本 artifact 解析为可读路径，并提示用分页读取或搜索访问。
 - 本轮检查的工具运行层和 Agent Loop 中未发现“全部工具统一限制为 2,000 字符”的规则。
 
-统一路径登记、周期计数和活跃/睡眠整理现位于 `packages/context/src/disclosure/`；工具通过命名 detail 提交文件事实。普通文件只登记当前路径，不创建版本快照。
+统一路径登记、周期计数和活跃/睡眠整理现位于 `packages/context/context-disclosure/src/`；工具通过命名 detail 提交文件事实。普通文件只登记当前路径，不创建版本快照。
 
 相关当前规范：[工具输出与引用](../tool-system/agent-tool-output-references.md)、[Context 与 Usage](../model-context/agent-token-usage-and-context-state.md)、[Session 持久化](../agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
 

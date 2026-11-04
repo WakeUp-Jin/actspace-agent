@@ -47,7 +47,7 @@
 
 ## 原生桌面 Computer Use 验收（2026-10-19）
 
-2026-10-19按用户要求追加原生桌面Computer Use，由gpt-6.1-sol通过macOS截图、CGEvent鼠标键盘操作真实Electron，不使用CDP、DOM或内部业务接口驱动界面。U1–U7代表路线通过，逐项结果、操作分组与截图见[原生验收记录](native-computer-use-acceptance.md)。指定模型与跟随模型的请求路由、会话授权复用及人工兜底同时得到JSONL补充印证。本轮未修改产品代码。
+2026-10-19按用户要求追加原生桌面Computer Use，由gpt-6.1-sol通过macOS截图、CGEvent鼠标键盘操作真实Electron，不使用CDP、DOM或内部业务接口驱动界面。U1–U7代表路线通过，逐项结果、操作分组与截图见原生验收记录（原始记录已清理，见 git 历史）。指定模型与跟随模型的请求路由、会话授权复用及人工兜底同时得到JSONL补充印证。本轮未修改产品代码。
 
 审批详情曾因输出卡片内部滚动而误判缺失，滚动到底部后确认模式与原因正常，撤销该误报。原生关键证据为`artifacts/permission-auto-review-native-20261019/u4-inner-scrolled-bottom.png`；此前CDP报告不代替本轮原生验收。商业模型判断质量、全部命令矩阵等未覆盖边界仍保持。
 

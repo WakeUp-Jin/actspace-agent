@@ -1,7 +1,7 @@
 # Agent 工具体验与轨迹布局调整 — 执行摘要
 
 - 关联计划：[完成计划](../../exec-plans/completed/20260906-agent-tool-experience/README.md)
-- 执行过程：[过程记录](execution-process.md)
+- 执行过程：过程记录（原始记录已清理，见 git 历史）
 - 执行模式：交互；用户已批准全部实现范围。
 - 结果：实现、自动化与浏览器检查完成；真实 Electron IPC／Provider 验收未执行。
 

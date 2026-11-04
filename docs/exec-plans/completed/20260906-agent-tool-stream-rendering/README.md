@@ -10,7 +10,7 @@
 ## 必读与范围
 
 - 根目录 AGENTS.md、docs/REPO_COLLAB_GUIDE.md、docs/ARCHITECTURE.md、docs/design-docs/core-beliefs.md。
-- [修复设计](../../../design-docs/frontend/front-agent-tool-stream-rendering.md)：事件所有权、类型、状态和预览契约，以这份提案为本计划实施依据。
+- [修复设计](../design-archive/frontend/front-agent-tool-stream-rendering.md)：事件所有权、类型、状态和预览契约，以这份提案为本计划实施依据。
 - docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md、docs/design-docs/agent-plugin-runtime/agent-testing.md。
 - docs/CODING_BEHAVIOR.md、docs/FRONTEND_VERIFICATION.md、docs/HISTORY_GUIDE.md、docs/QUALITY_SCORE.md。
 - 若涉及颜色样式，先读 docs/design-docs/frontend/front-主题与配色规范.md；默认复用组件，不改变视觉设计。

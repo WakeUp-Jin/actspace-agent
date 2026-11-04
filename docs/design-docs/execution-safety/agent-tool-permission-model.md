@@ -1,6 +1,6 @@
 # Agent 工具权限模型设计规范
 
-> 状态：v2 权限事实源；基础 Runtime、once 与 Desktop 文件 Session Grant 已实施。
+> v2 权限事实源；基础 Runtime、once、Desktop 文件 Session Grant 与 `auto-review` 均已实现。
 >
 > 实施方式：直接切换，不保留旧 `trusted` / `yolo` 模式、旧 approval decision、旧 permission preset 或旧权限事件的兼容层。
 >
@@ -457,7 +457,7 @@ Session Journal 是 Session Grant 的唯一持久事实源，不增加独立 Hos
 
 ### Desktop
 
-- 支持 `default/full-access`；
+- 支持 `default/auto-review/full-access`（`auto-review` 见文末「自动审批与查询会话授权」）；
 - 支持 `once/session/deny`，main 校验 typed IPC，Renderer 不接触 Journal writer；
 - exact 默认可见，subtree 只有在用户展开目录范围选择后可选；
 - 当前 Session Grant 可查看并按 `grantId` 撤销。
@@ -526,7 +526,7 @@ Session Grant 自动化另外覆盖 exact/subtree 路径段匹配、多资源全
 - 为旧 permission API、事件或模式保留兼容 alias。
 
 
-## 2026-10 自动审批与查询会话授权
+## 自动审批与查询会话授权
 
 `auto-review` 沿用 default 的文件范围，先检查硬规则与已有 Grant；剩余 ask 交给 `packages/approval/auto-review` 的 `approval.auto-review` 服务。插件只有一次无工具 LLM 判断，输出 `{approved:boolean, reason?:string|null}`。Runtime 在 30 秒内接受 true 后仍执行资源/模式/取消复验；false、缺失插件、坏格式、错误、超时回原人工卡片。插件不发 Grant、不执行工具。切回 default 即停止自动判断。未配置自动审批 route 的 Host 会回人工，CLI 入口仍只显式提供 default/full-access。
 
@@ -536,4 +536,4 @@ Desktop「模型与生成 → 自动审批模型」默认为跟随会话模型�
 
 查询名单与限制以 [shell-tools README](../../../packages/shell/tool-shell/README.md) 为准。git -C 与明确查询目标做 realpath 工作区校验；未知选项、外部目标、敏感文件、跟随链接参数、复合命令不提供新会话建议。目录型查询的深层内容与项目脚本不构成文件系统隔离，本次不增强 sandbox。
 
-参考：Codex guardian 的 action/context 分离、Claude Code 2.1.302 本地制品对原始用户消息与普通工具输出的区别处理，以及 tmp/deepseek-harness 的 experimental/auto-review 接入位置；只借鉴职责与上下文取舍，不复制外部执行权限设置。
+参考：Codex guardian 的 action/context 分离、Claude Code 2.1.302 本地制品对原始用户消息与普通工具输出的区别处理，以及 DSH 外部参考快照的 experimental/auto-review 接入位置；只借鉴职责与上下文取舍，不复制外部执行权限设置。

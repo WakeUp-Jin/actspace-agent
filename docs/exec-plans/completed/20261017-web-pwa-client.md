@@ -34,9 +34,9 @@
 - 必读（新会话或子 Agent 开工前）：
   - `AGENTS.md`
   - 设计规范 [front-web-pwa客户端规范.md](../../design-docs/frontend/front-web-pwa客户端规范.md)
-  - 原型 [mobile-web-demo.html（已迁出）](../../design-docs/retired-html-demos.md) 的 V1 和「V1 宽屏」画面
+  - 原型 mobile-web-demo.html（已迁出）（原文已删除，见 git 历史） 的 V1 和「V1 宽屏」画面
   - [前端新功能开发清单](../../design-docs/frontend/front-新功能开发清单.md)
-  - [主题与配色规范](../../design-docs/frontend/front-主题与配色规范.md)
+  - [主题与配色规范](../../design-docs/frontend/front-视觉token规范.md)
 - 相关代码路径：
   - Host 网关 `packages/agent-host/src/server.ts`（`request` 处理在第 38 行附近，`Origin` 检查在第 40 行附近）
   - Host 配置 `packages/agent-host/src/config.ts`

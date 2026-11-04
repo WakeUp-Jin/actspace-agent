@@ -1,6 +1,6 @@
 # 侧边对话（Side Chat）设计
 
-> 状态：2026-10-21 用户确认概念与交互 Demo（`docs/design-docs/frontend/side-chat-demo.html`），进入实施。
+> 概念与交互 demo 已删除，见 git 历史；界面规范见 `docs/design-docs/frontend/`。
 > 执行计划：`docs/exec-plans/completed/20261021-side-chat.md`
 
 ## 为什么做

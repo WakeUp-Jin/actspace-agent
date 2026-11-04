@@ -3,7 +3,7 @@
 状态：已完成（2026-11-02，分支 `架构优化` 本地提交 e9e41914…15ceb558，未合入 main）。Electron 实机检查待用户执行，见[执行摘要](../../../exec-runs/20261101-feature-subtraction/execution-summary.md)。
 
 - 分支 / worktree：`架构优化` @ `../actspace-agent-arch-slim`，与[功能减法](../20261101-feature-subtraction/README.md)同一分支。
-- 设计真源：[02 插件结构设计](../../../design-docs/架构优化/02-插件结构设计.md)；插件页视觉以 demo [plugins-page-demo.html](../../../design-docs/frontend/plugins-page-demo.html) 方案 B 为准。
+- 设计真源：[02 插件结构设计](../../../design-docs/架构优化/02-插件结构设计.md)；插件页视觉以 demo plugins-page-demo.html（原文已删除，见 git 历史） 方案 B 为准。
 - 执行记录：与功能减法共用 `docs/exec-runs/20261101-feature-subtraction/`，在执行过程里按子计划分节。
 - 执行模式：连续执行。两步一起做完，只在遇到阻塞或需要用户决定的事时停下。
 

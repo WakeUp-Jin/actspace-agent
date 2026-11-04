@@ -25,7 +25,7 @@
 - 诊断和 native 实验脚本按用途归类；根目录基线 52 项，按处置表清理后 40 项；Finder 后续又自动生成一个已忽略的 `.DS_Store`，当前磁盘计数为 41 项。删除空 output、退役 target、已确认生成缓存与散落临时指令。artifacts 整体忽略，7 个原跟踪文件取消跟踪，本地文件保留。
 - 合并重复架构内容，校准 ABI、Task、设置、工具预览、模型与存储规范；三个已实施计划移入 completed，旧链接保留短入口。保留独立研究、未来计划、验收证据和已有工作台设计 WIP。
 
-逐项处置见 [cleanup-ledger.tsv](cleanup-ledger.tsv)，根路径见 [root-path-map.tsv](root-path-map.tsv)，模块证据与保留限制见 [module-review.md](module-review.md)，具体修复过程见 [execution-process.md](execution-process.md)。清单覆盖 1,112 个原始登记行，并单列新增/迁入文件；同一路径具有 module/root 双重职责时分别登记。保留不等于证明无冗余。执行期间另外出现前端 assets 图片和 docs/desktop-frontend-refactor 独立方案，属于并行工作，原样保护且不计本轮成果。
+逐项处置见 `cleanup-ledger.tsv`（原始记录已清理，见 git 历史），根路径见 `root-path-map.tsv`（原始记录已清理，见 git 历史），模块证据与保留限制见 `module-review.md`（原始记录已清理，见 git 历史），具体修复过程见 `execution-process.md`（原始记录已清理，见 git 历史）。清单覆盖 1,112 个原始登记行，并单列新增/迁入文件；同一路径具有 module/root 双重职责时分别登记。保留不等于证明无冗余。执行期间另外出现前端 assets 图片和 docs/desktop-frontend-refactor 独立方案，属于并行工作，原样保护且不计本轮成果。
 
 ## 自动化结果
 
@@ -76,9 +76,9 @@ CU4.3 另外发现远端队列编辑丢失附件，已修复持久 artifact 到 
 
 ## 规模与完成边界
 
-统计见 [before](refactor-stats-before.md) 与 [after](refactor-stats-after.md)。统计脚本覆盖当前整个工作树，HTML 设计稿也计入源代码，且包含执行期间的独立前端新增工作；全仓增减不是本轮净删减成果，不能归因到本轮清理。当前设计 Markdown 从 26,113 行降至 25,400 行；根入口减少 12 项。领域 packages 的生产源代码净减少 161 行，相关测试净增加 51 行；Desktop/CLI 生产源码合计增加 81 行，Desktop 测试增加 64 行，用于明确错误边界与失败诊断（统计不含把迁移算成删除）。新增确定性测试、可复建验收设施和结算记录会增加文件/行数，不能把总行数下降当成模块化目标，也不能把迁移与制品退出跟踪算作删除生产代码收益。
+统计见 before（原始记录已清理，见 git 历史） 与 after（原始记录已清理，见 git 历史）。统计脚本覆盖当前整个工作树，HTML 设计稿也计入源代码，且包含执行期间的独立前端新增工作；全仓增减不是本轮净删减成果，不能归因到本轮清理。当前设计 Markdown 从 26,113 行降至 25,400 行；根入口减少 12 项。领域 packages 的生产源代码净减少 161 行，相关测试净增加 51 行；Desktop/CLI 生产源码合计增加 81 行，Desktop 测试增加 64 行，用于明确错误边界与失败诊断（统计不含把迁移算成删除）。新增确定性测试、可复建验收设施和结算记录会增加文件/行数，不能把总行数下降当成模块化目标，也不能把迁移与制品退出跟踪算作删除生产代码收益。
 
-[Computer Use 逐项报告](computer-use-acceptance.md)由 gpt-6.1-sol 完成，35/35 项按约定分支及代表位置签收。SSH 使用隔离系统 ssh/sshd 的测试装配，界面路径必须另行实际操作。未来自进化工具、手机 Web 前端、数据库生产实现和独立工作台功能不属于本轮。
+Computer Use 逐项报告（原始记录已清理，见 git 历史）由 gpt-6.1-sol 完成，35/35 项按约定分支及代表位置签收。SSH 使用隔离系统 ssh/sshd 的测试装配，界面路径必须另行实际操作。未来自进化工具、手机 Web 前端、数据库生产实现和独立工作台功能不属于本轮。
 
 本轮未 commit/push。[最终计划](../../exec-plans/completed/20261005-agent-refactor-final-closeout/README.md)已移入 completed。
 

@@ -1,10 +1,8 @@
 # ActSpace Session Format v1 规范
 
-> 状态：v2 Session 逻辑契约已固定，可作为 execution plan 和 golden fixtures 的输入。
+> v2 Session 逻辑契约，可作为 execution plan 和 golden fixtures 的输入。
 >
 > 本文固定 Session 的领域语义、规范存储形态、兼容性状态和持久化保证。文件锁实现、`fsync` 调用序列、原子发布算法等平台细节留给 execution plan，但实现不得削弱本文定义的可观察语义。
->
-> 规范日期：2026-08-22。
 >
 > 本文维护 Header、Envelope、JSONL Provider 格式与兼容性边界；事件词汇见[事件模型](agent-spec-dsh-event-model.md)，Session/存储所有权见[存储规范](agent-spec-session-core-persistence-separation.md)，用户队列见[Task/Run](agent-task-run-lifecycle.md)。
 
@@ -379,7 +377,7 @@ Header 只承担创建时 provenance。所有会影响后续模型输入或副�
 - 超过记录大小、递归深度或字符串限制的事件应在分配 `seq` 前拒绝，不能静默截断；
 - cwd、用户文本、tool output 和 attachment ref 可能含敏感信息，export 必须显式区分 lossless canonical export 与经过脱敏的分享 export。
 
-v2 插件按受信任同进程代码处理；EventCodecRegistry 不是不可信代码沙箱。信任边界见 [Cordis 运行时采用决策](./agent-decision-cordis-adoption.md)。
+v2 插件按受信任同进程代码处理；EventCodecRegistry 不是不可信代码沙箱。信任边界见 [Cordis 运行时采用决策](./agent-harness-host-refactor-decisions.md)。
 
 ## 18. 版本轴与升级
 

@@ -1,6 +1,6 @@
 # Agent Skill 设计与加载规范
 
-当前 v2 Skill 发现、catalog 与按需正文加载规范，2026-10-05 对照 `packages/context/prompt/src/skills/` 校准。
+当前 v2 Skill 发现、catalog 与按需正文加载规范，对照 `packages/context/prompt/src/skills/` 校准。
 
 ## 目标与内容
 
@@ -62,4 +62,4 @@ Host 在构建运行所需的 prompt source 时调用 `discoverSkills()`。`core
 
 ## 验证入口
 
-`packages/context/prompt/src/test/discovery.test.ts`、`host-context.test.ts` 与 contributor 测试覆盖根目录优先级、去重、目录注入、显式正文及 Chat 隔离。脚本执行的真实权限和副作用仍由工具验收负责。
+`packages/context/prompt/src/test/host-context.test.ts`、`context-sources.test.ts` 与 contributor 测试覆盖根目录优先级、去重、目录注入、显式正文及 Chat 隔离。脚本执行的真实权限和副作用仍由工具验收负责。

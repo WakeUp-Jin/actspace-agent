@@ -11,7 +11,7 @@
 
 ## 必读
 
-- 设计 05；[前端新功能开发清单](../../../design-docs/frontend/front-新功能开发清单.md)、[全局视觉语言规范](../../../design-docs/frontend/front-全局视觉语言规范.md)
+- 设计 05；[前端新功能开发清单](../../../design-docs/frontend/front-新功能开发清单.md)、[全局视觉语言规范](../../../design-docs/frontend/front-视觉token规范.md)
 - S1 的共享类型；S3 的 `getSubagents` / `interruptSubagent` IPC
 - 下面各步列出的文件
 

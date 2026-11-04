@@ -1,10 +1,8 @@
 # ActSpace v2 插件 Runtime ABI 设计规范
 
-> 状态：v2 契约基线，2026-10-05 已校准 Host/Harness 启动与应用职责。当前 API 见 [Runtime 与 Composition](agent-target-runtime-architecture.md)；最终清理与验证由当前收尾计划跟踪。
+> v2 契约基线。当前 API 见 [Runtime 与 Composition](agent-target-runtime-architecture.md)。
 >
 > 本文固定插件 Runtime 的信任边界、组合语义、生命周期和失败行为。已实现字段与 TypeScript API 以包 exports/schema 为准，未收口部分仍需在对应计划中验证，但不得改变本文已经确认的语义。
->
-> 确认日期：2026-08-22。
 
 ## 1. 目标与适用范围
 

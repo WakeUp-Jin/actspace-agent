@@ -2,7 +2,7 @@
 
 - 日期：2026-09-07。
 - 状态：代码已实施；针对性自动化和浏览器预览通过。真实 Electron 与 MiniMax 音频尚未验收，不等同发布完成。
-- [设计](../../design-docs/agent-plugin-runtime/agent-english-learning.md) · [归档计划](../../exec-plans/completed/20260906-actspace-english-learning/README.md) · [执行过程](execution-process.md)。
+- [设计](../../design-docs/agent-plugin-runtime/agent-english-learning.md) · [归档计划](../../exec-plans/completed/20260906-actspace-english-learning/README.md) · 执行过程（原始记录已清理，见 git 历史）。
 
 ## 已交付行为
 

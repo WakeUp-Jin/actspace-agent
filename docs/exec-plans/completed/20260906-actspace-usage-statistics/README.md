@@ -9,7 +9,7 @@
 
 ## 设计事实来源
 
-- [页面设计](../../../design-docs/frontend/front-usage-statistics-refresh.md)：视觉、中文、表格、交互和页面状态。
+- [页面设计](../design-archive/frontend/front-usage-statistics-refresh.md)：视觉、中文、表格、交互和页面状态。
 - [目录与费用设计](../../../design-docs/model-context/agent-model-catalog-and-usage-cost.md)：模型身份、单位、来源、价格快照、历史、缓存与刷新。
 - 开始代码前读 `AGENTS.md`、`docs/REPO_COLLAB_GUIDE.md`、`docs/ARCHITECTURE.md`、`docs/CODING_BEHAVIOR.md`、`docs/QUALITY_SCORE.md`、`docs/HISTORY_GUIDE.md`；UI 阶段另读 `docs/FRONTEND_VERIFICATION.md` 与主题规范。
 - 本计划补充设置中心与模型设置重做计划，不重置它们的实现状态。现有工作区有大量相关及无关未提交修改，必须基于当前文件作小范围增量修改，不覆盖整个文件或回退他人改动。
@@ -83,7 +83,7 @@ P01 冻结 `ModelCatalogEntry`、`ModelPricingSnapshot`、`LlmUsage.costProvenan
 
 ## 2026-09-07 截图迭代
 
-用户批准保留四项指标并进一步对齐 Maka 日志结构，已交付八列表格、分类数量、模型与工具混合日志、整表详情开关及费用提示；当前视觉契约以[更新后的页面设计](../../../design-docs/frontend/front-usage-statistics-refresh.md)为准。单次开发历史清理获得用户明确授权，范围和验证记录在执行文档，不改变历史保留的产品默认策略。
+用户批准保留四项指标并进一步对齐 Maka 日志结构，已交付八列表格、分类数量、模型与工具混合日志、整表详情开关及费用提示；当前视觉契约以[更新后的页面设计](../design-archive/frontend/front-usage-statistics-refresh.md)为准。单次开发历史清理获得用户明确授权，范围和验证记录在执行文档，不改变历史保留的产品默认策略。
 
 ## 2026-09-07 悬浮明细收敛
 

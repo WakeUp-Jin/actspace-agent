@@ -39,7 +39,7 @@
 
 ## 运行数据确认的问题
 
-详细请求/压缩ID、计数和源码解释见[真实数据证据](./real-desktop-data-evidence-20261006.md)。以下均没有修复。
+详细请求/压缩ID、计数和源码解释见真实数据证据（原始记录已清理，见 git 历史）。以下均没有修复。
 
 - **B2 / P2：read_file带行号输出的路径未在压缩时收集。** 9分页manifest含106路径（UI实际回复106），首压缩candidate仅file-001/file-002/manifest共3；期望保留所有已进入历史的明确文件引用。复现：分页读manifest→`/compact`→检查导航。
 - **B3 / P2：压缩后的原Journal精确引用缺失。** A9请求模型实际回复“没有”精确原Journal路径，首三次压缩数据亦无历史引用，原Journal仍存在。期望导航提供当前可用的原历史路径和event seq；Host实际storageClass=JsonlSessionStorageService/isJsonlStorage=false，包装未通过instanceof检查，已确认。

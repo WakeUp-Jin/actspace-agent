@@ -7,7 +7,7 @@
 ## 证据
 
 - CU：当前对话中真实 Electron 的 AX、选中文本、截图与交互。测试会话 4a9fa08b-8931-49ec-9f50-700e29d63fdf。
-- RT：[runtime-proof.json](runtime-proof.json)，仅保留相关用户输入、模型投影和模式证据；不含完整系统提示与凭据。
+- RT：`runtime-proof.json`（原始记录已清理，见 git 历史），仅保留相关用户输入、模型投影和模式证据；不含完整系统提示与凭据。
 - AUTO：desktop 123、shared 137、core 24、compaction 7，共 291 条定向测试通过；固定 worktree 类型检查、颜色 token 和主题契约通过。
 - 主工作区 22:01 起受其他任务 HMR 干扰；随后在固定 9b70765 worktree 复核。受干扰阶段不单独计为固定基线通过。
 

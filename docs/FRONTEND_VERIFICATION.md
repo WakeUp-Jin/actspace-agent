@@ -1,191 +1,101 @@
 # 前端验证约定
 
-这份文档定义 `actspace` 前端改动完成后的验收方式。
-
-`actspace` 是桌面端应用，不能把浏览器里的 `http://127.0.0.1:5173/` 等同于完整产品。浏览器只能直接加载 renderer，完整桌面端还包含 Electron main、preload、IPC、本地文件和持久化能力。
+`actspace` 是桌面端应用，不能把浏览器里的 `http://127.0.0.1:5173/` 等同于完整产品。浏览器只加载 renderer；完整桌面端还包含 Electron main、preload、IPC、本地文件和持久化。本文定义前端改动的验收方式。
 
 ## 默认原则
 
-- 前端改动必须在计划和收尾中写清验证方式。
-- 工程验证优先使用仓库命令，不要只依赖人工目测。
-- UI 样式与组件打磨优先使用浏览器 renderer 验证，因为它更适合快速检查 CSS、布局、HMR、空态和不依赖 IPC 的局部交互。
-- 真实桌面链路必须使用 Electron 窗口验证，但它是完成流程的最终验收，不是每次样式微调的首选工具。
-- 有 Computer Use 的 Agent，完成重要 UI 修改后应在收尾阶段查看真实 Electron 窗口。
-- 没有 Computer Use 的 Agent，需要说明限制，并让用户提供截图或启动日志辅助确认。
+- 前端改动必须在计划和收尾中写清验证方式；工程验证优先用仓库命令，不只靠人工目测。
+- 样式与组件打磨优先用浏览器 renderer（快速检查 CSS、布局、HMR、空态和不依赖 IPC 的交互）。
+- 真实桌面链路必须在 Electron 窗口验证，它是完成流程的最终验收，不是每次样式微调的首选。
+- 有 Computer Use 的 Agent，完成重要 UI 修改后在收尾阶段查看真实 Electron 窗口；没有的，说明限制，并让用户提供截图或启动日志。
 
 ## 验证分层
 
 ### 1. 工程验证
 
-适用范围：
-
-- 所有实质性前端代码修改。
-- 组件结构、样式、状态管理、IPC 类型、构建脚本相关改动。
-
-默认命令：
+所有实质性前端改动（组件结构、样式、状态、IPC 类型、构建脚本）都要跑：
 
 ```sh
 pnpm typecheck
 pnpm build
 ```
 
-如果只改了局部包，可以使用更小的命令，但最终说明要写清原因。
+只改了局部包可以用更小的命令，最终说明要写清原因。这层确认类型、workspace 包边界、Vite renderer 与 Electron main/preload 都能构建。
 
-这层验证用于确认：
+相关自动检查：
 
-- TypeScript 类型没有破坏。
-- workspace 包边界没有漂移。
-- Vite renderer 可以构建。
-- Electron main/preload 可以构建。
+| 命令 | 检查什么 |
+| --- | --- |
+| `pnpm check:ipc-channels` | IPC channel 以契约为准 |
+| `pnpm check:renderer-bridge` | renderer 只经 `api/<域>` 访问 bridge |
+| `pnpm check:frontend-tokens`、`pnpm check:frontend-theme` | 设计 token 与主题色约束 |
+
+`check:renderer-bridge`、`check:ipc-channels` 及这些脚本自己的测试已包含在 `pnpm test`；`check:frontend-tokens`、`check:frontend-theme` 由 CI 的仓库卫生检查（`scripts/check-repo-hygiene.sh`）运行。
 
 ### 2. 浏览器 Renderer 验证
 
-适用范围：
+适用：纯 UI 样式、组件布局、普通前端交互、响应式、不依赖真实文件系统和 IPC 的页面状态、视觉密度与组件状态打磨。
 
-- 纯 UI 样式。
-- 组件布局。
-- 普通前端交互。
-- 响应式检查。
-- 不依赖真实本地文件系统和 IPC 的页面状态。
-- 设计图还原、视觉密度、间距、颜色、组件状态打磨。
+启动：`pnpm --filter @actspace/desktop dev:renderer`，地址 `http://127.0.0.1:5173/`（端口被占用时用 `VITE_DEV_PORT=<端口>` 换端口）。开发模式下没有 Electron preload 时，renderer 注入完整的 mock bridge，场景用 `?mock=<场景>` 选择（默认 `empty`）；生产构建没有 bridge 时显示「无法连接桌面服务」致命页。bridge 与 mock 的约定见 [Preload bridge 与 Mock 规范](design-docs/frontend/front-preload-bridge与mock规范.md)。
 
-推荐目标：
-
-```text
-http://127.0.0.1:5173/
-```
-
-浏览器验证只加载 renderer，不代表完整桌面产品。开发模式（`pnpm --filter @actspace/desktop dev:renderer`）下没有 Electron preload 时，renderer 注入完整的 mock bridge，场景用 `?mock=<场景>` 选择（默认 `empty`），见下文「浏览器 mock 场景」。生产构建没有 bridge 时显示「无法连接桌面服务」致命页，不渲染 App。bridge 与 mock 的约定见 [Preload bridge 与 Mock 规范](design-docs/frontend/front-preload-bridge与mock规范.md)。
-
-浏览器 renderer 验证不能用运行时假业务数据证明产品状态。稳定样例数据应放在测试、Story 或显式 demo 边界内。
-
-可以验证：
-
-- 左侧会话栏。
-- 中间消息区。
-- Composer。
-- Context popup。
-- Diff 卡片。
-- 右侧文件预览的视觉状态。
-
-不能证明：
-
-- preload 是否注入成功。
-- IPC 是否可用。
-- 本地会话是否真实落盘。
-- 文件读取、附件、持久化、恢复是否正常。
+- 浏览器验证不能用运行时假业务数据证明产品状态；稳定样例数据放在测试、Story 或显式 demo 边界内。
+- 不能证明：preload 是否注入、IPC 是否可用、会话是否真实落盘、文件读取 / 附件 / 持久化 / 恢复是否正常。
+- mock 中没有实现的成员调用时 reject `Mock bridge does not implement 域.成员`（包括新建工作树和 Git 写操作）；界面上看到这类报错属于 mock 的边界，不是缺陷。新增场景的做法见 mock 规范 §7，并同步更新下表。
 
 #### 浏览器 mock 场景
 
-目标地址：`http://127.0.0.1:5173/?mock=<场景>`。如果端口被占用，可以用 `VITE_DEV_PORT=<端口> pnpm --filter @actspace/desktop dev:renderer` 换端口。
-
-| `?mock=` | 种子数据 | 适合验证 | 不覆盖 |
-| --- | --- | --- | --- |
-| `empty`（默认） | 没有会话，只有一个工作区（相当于首次启动自动创建的「默认工作区」） | 首次启动空态、新建会话、Composer 各形态、设置页、浅色 / 深色、窄窗 | 任何已有历史的状态；首次启动建目录（main 单测覆盖） |
-| `no-workspace` | 没有会话，唯一的工作区已从侧栏移除 | 新建会话页发送按钮禁用并提示「请先选择工作区」、Composer 工作区按钮显示「选择工作区」 | 选择文件夹后恢复发送（mock 的目录选择器总是返回取消，由 Electron 验收） |
-| `streaming` | 两个会话。打开「检查 bridge 调用方」后约 300ms 开始逐段输出，停在运行态 | 「生成中」界面、流式中切换会话再切回、运行中发送进入队列 / 引导 / 撤回 | 回复完成后的工具调用细节 |
-| `long-session` | 一个 40 轮问答的长会话（含代码块），外加一个短会话 | 长列表滚动、分组、早期历史加载；右侧 Context 面板（任何有会话的场景都返回完整 mock 数据，见 `mock/context-panel-fixture.ts`），会话行跳轨迹 | 真实分页边界（mock 一次返回全部消息） |
-| `context-pagination` | 长会话、620 个额外工具条目，初始历史失败，重试后同步完成；有明细及原文分页；路径卡片活跃满 100、睡眠 1284 条多页，每页 400ms 延迟，首次读睡眠路径失败一次 | Context 错误/重试、条件刷新、加载更多、全文分段、路径满额提示/分页/重试及主题/窄窗 | 不证明真实 SQLite、Loop、披露引擎或后端权限 |
-| `approval-pending` | 一个会话停在高风险 `bash` 命令（`rm -rf …`）的审批上 | 审批卡片、允许 / 拒绝、刷新后经 `approvals.listPending` 恢复 | 真实工具执行结果 |
-| `approval-prefix` | pnpm test 待审批，含正式 command_prefix 建议 | 三按钮、会话授权文案和主题布局 | 真实授权复用、持久化与工具执行 |
-| `remote-host` | 三台 Host：devbox 已连接、GPU 服务器离线、旧笔记本已撤销；本机 / devbox / GPU 各一个会话 | 侧栏 Host 分组与离线标记、运行位置菜单、Host 删除 / 重连后的列表 | `hosts.call`（`host.describe`、`files.reference`）、`hosts.preview` / `download` 在 mock 中未实现，会 reject；因此 Host 工作区和模型显示为「等待 Host …」，远端读文件和下载产物只能由单测和真实 Host 覆盖 |
-| `sidebar` | 三个工作区，15 个未归档会话按真实「现在」分布在今天、昨天、近 7 天、本月更早、往月、往年；2 个置顶、2 个已归档 | 侧栏视图选项（按工作区 / 单列表 / 按时间、手动排序、归档筛选、恢复默认）、拖拽排序与「已切换为手动排序」、标题行搜索、取消归档、每组 5 条与「展开其余」 | 运行中、待审批、失败、跑完未看四种状态点和「需要处理」（状态来自真实运行，由单测覆盖） |
-| `side-chat` | 主会话「梳理 runtime 插件加载」三轮已完成、第 4 轮约 300ms 后开始流式且停在运行态；它下面有两个收起的侧边对话（各一问一答），另有一个普通会话 | 侧栏「⑂ 2」角标与侧边对话不进侧栏；右栏启动页「侧边对话」与「本会话的侧边对话 · 已收起」；分隔线「继承主会话 3 轮，不含进行中的第 4 轮」；侧边对话里发送（回复以「（侧边对话）」开头）、停止、收起后重开、切换主会话时 tab 隐藏；主会话输入框 `/side 问题` | 真实 Journal 复制与分叉点、插件提示词、Plan 权限拦截、重启后恢复（由 runtime / agent-service 单测和 Electron 验收覆盖） |
-| `markdown` | 「Markdown 历史回复」一条已完成的全元素回复（路径、提示框、公式、表格、任务列表、长代码块折叠、`<details>`、`<kbd>`、本地 / 远程图片、脚注、Mermaid）；「Markdown 流式回放」约 500ms 后按真实网络节奏（12–82 字一批、60–280ms 间隔、固定种子）流出同一条回复并落盘 | 聊天区「A 书页」排版、代码块头与折叠、点击路径、流式淡入 / 末尾渐显 / 光标、逐帧高度稳定性 | 真实模型的输出节奏、远端会话图片 |
-| `turn-deliverables` | 一个会话三轮：第 1 轮改 2 个文件、交付 1 个；第 2 轮最终改 6 个文件（另有新建后删除的临时脚本）、交付 5 个；第 3 轮只改报告 1 个文件（+1/-1）、交付 1 个；三轮回复都带用量，第 2 轮没有价格 | 轮尾改动卡与交付卡的单文件 / 多文件形态与折叠、悬停 diff 浮层、「第 N 轮改动」标签、交付卡网格与打开方式菜单、设置开关「显示本轮代码改动」；回复尾部的「用量 … tok」胶囊与本轮用量弹窗（预估花费、花费未知）；`workspaces.readFile` 只认识 `docs/report.md` 和 `docs/summary.csv` | 真实 `present` 工具调用、原生关联应用列表与图标、远端 Host 下载（见 [front-中间消息区规范.md](design-docs/frontend/front-中间消息区规范.md) §轮尾改动卡与交付文件卡） |
-| `subagent-trajectory` | 父会话「查看pi-durable设计」：bash、一次 `agent` 委派（带 `delegation/requested`，preset `explore`）、两次 read_file；子会话（不进侧栏）有任务、4 条助手消息和 7 次读工具；`getSubagents` 返回五个子 Agent（已完成的 Explore，外加运行中、后台运行中、失败、已停止各一个，带 token 和不同模型；后四个没有子会话） | 父轨迹只留 `agent` 一行；详情「子智能体」一栏的「查看轨迹」→ 右侧子 Agent 面板停在子轨迹；子 Agent 列表分组卡（token / 耗时 / 失败红字 / 无 token 行）与详情精简顶部栏（模型 · 状态耗时 · 最右对话 / 轨迹切换）；窄面板详情从下半部分弹出；浅色 / 深色、320–480px 面板 | 子 Agent 对话页的执行记录（`getSubAgentTranscript` 返回空，约 20 秒后退回摘要）；运行中子智能体的实时轨迹（需真实运行） |
-| `compaction` | 三个会话：「会话列表改游标分页」48 条消息后有一次已提交的自动压缩（182.4K → 约 9.1K tokens · 23s）；打开「压缩进行中」后停在压缩中；打开「压缩失败」后约 0.4s 压缩失败 | A1 压缩分隔线三态、两侧扫光、窄窗换行、「在轨迹中查看」选中轨迹压缩行、轨迹概述的触发方式 / 压缩消息数 / Token、浅深主题 | 手动 `/compact` 任务流程、重试后的真实压缩（mock 不处理压缩操作） |
-| `background-tasks` | 一个会话三轮：第 1 轮后台 `pnpm test` 与后台 `agent` 调研；第 2、3 轮由完成通知唤醒（无用户消息，以「后台任务 · …」分隔行开头）；第 3 轮另起一个仍在运行的后台 `pnpm dev` | Bash / 子 Agent 卡片的「后台」标签与状态（成功、已完成、运行中）、唤醒分隔行展开看通知原文、浅深主题 | 真实唤醒调度、`task_*` 工具输出、子 Agent 面板里的子会话内容（mock 没有子会话） |
-| `harness-stats` | 直接打开 设置 → Harness 统计；数据取自已确认的 demo（30 天、r8、4,812 次请求，见 `mock/harness-stats-fixture.ts`）。`&hsTab=<overview\|plugins\|tools\|context\|disclosure\|runtime\|versions>` 选 tab，`&theme=dark` 强制深色 | 7 个 tab 的布局、指标卡、「值得关注」跳转、表格排序与展开、图表 hover、筛选（改时间范围 / 会话类型按比例缩放计数，设模式 / 模型 / 工作区触发「运行时统计不按这些条件筛选」提示）、版本对比、浅深主题 | 真实汇总 Worker、会话日志同步与补历史进度、Host 运行时统计文件（由 main 单测 `harness-stats.test.ts` 与 Electron 验收覆盖） |
-
-mock 中没有实现的成员调用时 reject `Mock bridge does not implement 域.成员`，包括新建工作树和 Git 写操作。界面上看到的报错属于 mock 的边界，不是缺陷。如需新增场景，按规范 §7 处理，并同步更新本表。
-
-#### ModelPicker pinned 组件验收
-
-开发服务器打开 `/src/renderer/test/fixtures/model-picker-pinned-preview.html`，可用 `?theme=dark` 或页面按钮切换主题。页面直接复用 `ModelPickerMenu`，提供两条 pinned 行、普通模型、选择次数与意外表单提交计数，用于鼠标选择、Tab/Enter、搜索隐藏特殊行和 Escape 回焦。它不调用 IPC、不发模型请求、不持久化；当前产品没有传入非空 pinned 的调用入口，因此结果只能作为组件代表场景，不能签收产品入口。
-
-#### Composer `+` 面板布局回归
-
-`ACTSPACE_PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs pnpm --filter @actspace/desktop test:composer-palette-layout` 使用真实Chromium加载现有面板组件和样式，不读应用数据、调用IPC或Provider。覆盖合法最小窗口中实测的空/多行草稿锚点、480/1440px浅深主题，以及下方有空间的组件翻转样例；检查整卡和搜索边界、内部滚动/键盘活动行、搜索/返回/Esc回焦。组件样例不代签真实Electron入口或原生条件性翻转验收。
-
-#### 轨迹页 fixture（只在开发构建和测试中加载）
-
-在任意 mock 场景的地址后加 `&trajectoryFixture=<名称>`，切到轨迹视图后显示固定数据，例如 `http://127.0.0.1:5173/?mock=long-session&trajectoryFixture=complete`。加 `&trajectoryTheme=dark`（或 `light`）只临时覆盖轨迹样例的主题，卸载时恢复。数据在 `apps/desktop/src/renderer/fixtures/trajectory-complete.json` 和 `apps/desktop/src/renderer/trajectory/fixtures.ts`。
-
-| `trajectoryFixture=` | 内容 | 适合验证 |
+| `?mock=` | 种子数据 | 适合验证 / 不覆盖 |
 | --- | --- | --- |
-| `complete` | 6 轮：工具、重试、审批、压缩、缺计时的旧消息、运行中的回复 | 表格、请求圆点、时间轴、各类详情页签 |
-| `errors` | 在 `complete` 上加：上下文行（Context 补充、后台任务通知）、子工具失败、系统提示词差异、审批拒绝、请求失败 | 上下文 / 子工具类型标签、失败状态、差异页签、层级跳转 |
-| `running` | 去掉所有结束事件 | 等待中状态、请求占位行 |
-| `streaming` | `complete` 的运行中回复，每 120ms 追加一个 chunk | 流式时行在原地变长、不闪；时间轴不跟着重绘 |
-| `long` | `complete` 重复 24 次 | 虚拟化、加载更早的历史、帧耗时 |
-| `streaming-long` | `long` 加一条运行中的回复，每 120ms 追加 20 个 chunk，共 2000 个 | 长会话流式：行不重挂载、帧间隔、选中后详情实时变长；`TRAJECTORY_PERF=1` 跑 `trajectory-streaming-perf.test.ts` 测每帧耗时 |
-| `empty` | 没有事件 | 空态 |
+| `empty`（默认） | 无会话，一个「默认工作区」 | 首次启动空态、新建会话、Composer 各形态、设置页、浅深主题、窄窗。不覆盖有历史的状态与首次启动建目录（main 单测覆盖） |
+| `no-workspace` | 无会话，唯一工作区已从侧栏移除 | 发送按钮禁用并提示「请先选择工作区」。mock 的目录选择器总是取消，选择文件夹后的恢复由 Electron 验 |
+| `streaming` | 两个会话；打开「检查 bridge 调用方」约 300ms 后开始流式并停在运行态 | 「生成中」界面、流式中切会话再切回、运行中发送进入队列 / 引导 / 撤回。不覆盖回复完成后的工具细节 |
+| `long-session` | 40 轮长会话（含代码块）+ 一个短会话 | 长列表滚动、分组、早期历史加载；右侧 Context 面板（有会话的场景都返回完整 mock 数据，`mock/context-panel-fixture.ts`）、会话行跳轨迹。不覆盖真实分页边界 |
+| `context-pagination` | 长会话 + 620 个额外工具条目，初始历史失败、重试后同步；路径活跃满 100、睡眠 1284 条多页，每页 400ms 延迟，首次读睡眠失败一次 | Context 错误 / 重试、条件刷新、加载更多、全文分段、路径满额提示与分页重试。不证明真实 SQLite、Loop 或披露引擎 |
+| `approval-pending` | 会话停在高风险 `bash`（`rm -rf …`）审批 | 审批卡片、允许 / 拒绝、刷新后经 `approvals.listPending` 恢复。不覆盖真实工具执行 |
+| `approval-prefix` | `pnpm test` 待审批，含 command_prefix 建议 | 三按钮、会话授权文案、主题布局。不覆盖授权复用与持久化 |
+| `remote-host` | 三台 Host（已连接 / 离线 / 已撤销），各有会话 | 侧栏 Host 分组与离线标记、运行位置菜单、Host 删除 / 重连后的列表。`hosts.call` / `preview` / `download` 未实现，远端读文件与下载产物只能由单测和真实 Host 覆盖 |
+| `sidebar` | 三个工作区、15 个会话按真实时间分布，2 置顶、2 已归档 | 侧栏视图选项（按工作区 / 单列表 / 按时间、手动排序、归档筛选）、拖拽排序、标题行搜索、取消归档、每组 5 条与「展开其余」。状态点由真实运行产生，单测覆盖 |
+| `side-chat` | 主会话三轮完成、第 4 轮流式运行；下有两个收起的侧边对话，另有一个普通会话 | 侧栏角标、右栏启动页「侧边对话」与「已收起」分组、继承分隔线、侧边对话内发送 / 停止 / 收起重开、`/side 问题`。不覆盖 Journal 复制、Plan 拦截、重启恢复 |
+| `markdown` | 一条全元素 Markdown 历史回复 + 一条按真实网络节奏流式回放的同款回复 | 「A 书页」排版、代码块头与折叠、点击路径、流式淡入与逐帧高度稳定。不覆盖真实模型节奏 |
+| `turn-deliverables` | 三轮：改动卡 / 交付卡的单文件、多文件、折叠形态，回复带用量（第 2 轮无价格）；`readFile` 只认识 `docs/report.md`、`docs/summary.csv` | 轮尾改动卡与交付卡、悬停 diff、打开方式菜单、「显示本轮代码改动」开关、用量胶囊与弹窗。不覆盖真实 `present` 调用与原生关联应用 |
+| `subagent-trajectory` | 父会话含一次 `agent` 委派；`getSubagents` 返回五个子 Agent（已完成 Explore、运行中、后台运行中、失败、已停止） | 父轨迹只留 `agent` 一行、右侧子 Agent 面板分组卡与详情顶栏、「查看轨迹」、窄面板。`getSubAgentTranscript` 返回空，运行中的实时轨迹需真实运行 |
+| `compaction` | 三个会话：已提交压缩、压缩进行中、压缩失败 | 压缩分隔线三态、「在轨迹中查看」、轨迹概述。不覆盖手动 `/compact` 与真实压缩 |
+| `background-tasks` | 一个会话三轮：后台 `pnpm test`、后台 `agent`、完成通知唤醒（无用户消息）、仍在运行的 `pnpm dev` | Bash / 子 Agent 卡片的「后台」标签与状态、唤醒分隔行、右侧后台任务面板。不覆盖真实唤醒调度与 `task_*` 输出 |
+| `harness-stats` | 直接打开 设置 → Harness 统计；数据来自 `mock/harness-stats-fixture.ts`。`&hsTab=<overview\|plugins\|tools\|context\|disclosure\|runtime\|versions>` 选页签，`&theme=dark` 强制深色 | 7 个页签的布局、指标卡、表格排序与展开、图表 hover、筛选、版本对比。真实汇总 Worker 与日志同步由 main 单测和 Electron 覆盖 |
 
-#### Space 多 Actor 协作演示（只在开发构建出现）
+#### 轨迹页 fixture
 
-Space 是纯前端演示，数据来自 `components/space/model/` 的内存 store，不走 bridge，任何 `?mock=` 场景下都能打开；打包版看不到入口（`SPACE_DEMO_ENABLED = import.meta.env.DEV`）。设计见 [front-space-工作台设计.md](design-docs/多智能体协作/front-space-工作台设计.md)。走查步骤：
+在任意 mock 场景地址后加 `&trajectoryFixture=<名称>`，切到轨迹视图显示固定数据；`&trajectoryTheme=dark|light` 临时覆盖样例主题。数据在 `renderer/fixtures/trajectory-complete.json` 与 `renderer/trajectory/fixtures.ts`。
 
-1. 左栏「Space」分区点「支付链路提速」：中栏是协调 Agent，标题栏中间是 Space 标签栏，右栏默认 Actor / 库 / 记忆。
-2. 点消息里的引用胶囊（如「后端」）打开 Actor 标签：右栏换成 Review + 终端（有改动）或文件 + 终端。
-3. 点琥珀胶囊「等你决定」展开审批托盘，「运行」/「拒绝」后托盘收起，右栏分组行跟着移动。
-4. 协调 Agent 里对「环境巡检」点「留下」：星尘动画后左栏「Actor 名册」数量加一。
-5. 「Actor 名册」：右栏和右栏开关都隐藏；搜索；点卡片进入一对一对话，工作区列表里出现这条对话。
-6. 「新建 Space」弹窗创建后直接进入新 Space（空 Space 显示星空和成员头像）。
-7. 标签栏右侧「?」看演示说明；提示条「重置演示」回到初始状态。浅色、深色、480px 窄窗各看一遍。
+| 名称 | 内容 |
+| --- | --- |
+| `complete` | 6 轮：工具、重试、审批、压缩、缺计时旧消息、运行中的回复 |
+| `errors` | `complete` 加上下文行、子工具失败、系统提示词差异、审批拒绝、请求失败 |
+| `running` | 去掉所有结束事件，看等待中状态与请求占位行 |
+| `streaming` | 运行中的回复每 120ms 追加一个 chunk，行原地变长不闪 |
+| `long` / `streaming-long` | `complete` 重复 24 次（后者加 2000 个 chunk 的流式回复，`TRAJECTORY_PERF=1` 可测每帧耗时），验证虚拟化与加载更早历史 |
+| `empty` | 没有事件的空态 |
 
-单测：`space-*.test.ts(x)`。
+#### 组件级回归与预览页
+
+- 组件预览页在 `apps/desktop/src/renderer/test/fixtures/*-preview.html`（开发服务器直接打开，`?theme=dark` 切深色），只调用组件，不走 IPC；它们是代表场景，不能签收产品入口。
+- 真实 Chromium 布局回归（需本地 Playwright，`ACTSPACE_PLAYWRIGHT_MODULE=/绝对路径/playwright/index.mjs`）：`pnpm --filter @actspace/desktop test:composer-palette-layout`（Composer `+` 面板）、`test:file-grant-scope-layout`（文件授权范围弹层，长路径必须换行保留完整路径与读写权限）。它们不读应用数据、不调用 Provider，也不代替 Electron 的真实授权与入口验收。
 
 ### 3. Electron 真实验证
 
-适用范围：
-
-- 一轮前端改动完成后的最终桌面验收。
-- 桌面端窗口行为。
-- preload 注入。
-- IPC。
-- 本地持久化。
-- session 恢复。
-- 文件系统能力。
-- 任何涉及 `window.actspace` 的真实能力。
-
-默认启动：
+适用：一轮前端改动完成后的最终桌面验收；窗口行为、preload 注入、IPC、本地持久化、session 恢复、文件系统能力，以及任何涉及 `window.actspace` 的真实能力。
 
 ```sh
 pnpm dev
 ```
 
-启动器先完成依赖与本轮 Electron main/preload 构建，成功后才启动并行 watch、renderer 和 Electron。即使磁盘已有旧的 `dist-electron`，本轮构建失败也会停止启动。`dev:electron:run` 是内部运行阶段，文件存在检查不能替代上述构建屏障；请从 `pnpm dev` / `pnpm dev:log` 启动。
+- 启动器先完成依赖与本轮 Electron main/preload 构建，成功后才启动 watch、renderer 和 Electron。本轮构建失败会停止启动，磁盘上旧的 `dist-electron` 不能替代这道构建屏障；请从 `pnpm dev` / `pnpm dev:log` 启动，不直接运行内部的 `dev:electron:run`。
+- 修复 Runtime 内置行为包后，单独构建该 package 不足以验证 Desktop：执行实现会被打入 `packages/core/runtime/dist/default-harness/`。若用隔离验收启动器直接运行已构建入口，先重建 Runtime Harness（`pnpm --filter @actspace/runtime build`），确认制品包含本轮改动再重启；只检查源文件或依赖包 `dist` 不能证明运行中的 Harness 已更新。
+- macOS 开发启动会在系统临时目录缓存一份当前 workspace 专属的开发 runtime，带唯一应用名、bundle ID 与可执行文件名。启动日志里的 `[dev-runtime]` JSON 是本次运行的事实来源：Computer Use 必须使用其中的 `appName`（优先）或 `appId`，不要用通用的 `Electron`。不同 worktree 因此可并存。该身份只改系统识别与进程名，main 仍使用既有的 `actspace` userData 目录，会话与设置不受影响。
+- 缓存复用前会检查文件结构、资源大小、可执行权限、framework 符号链接与 Info.plist 身份，缺失或损坏时输出 `rebuilding cached Electron` 并重建；这不是签名或字节哈希验证，也不会清理会话、设置或 Chromium 缓存。可用 `node scripts/run-electron-dev.mjs --prepare-only` 单独验证，回归测试 `node --test scripts/test/electron-runtime-integrity.test.mjs`（macOS）。
+- 开发启动默认不弹独立 DevTools 窗口（避免抢走 Computer Use 焦点）；需要时 `ACTSPACE_OPEN_DEVTOOLS=1 pnpm dev:log`。
 
-对 Runtime 内置行为包做修复后，单独构建该 package 仍不足以验证 Desktop：执行实现会被打入 `packages/core/runtime/dist/default-harness/`。隔离验收启动器若直接运行已构建入口，必须先重建 Runtime Harness（依赖已构建时运行 `pnpm --filter @actspace/runtime build`），确认对应制品包含本轮改动，再正常重启应用。只检查源文件或依赖包 `dist` 不能证明运行中的 Harness 已更新；旧制品的失败记录要保留并注明实际版本。
-
-macOS 开发启动不会直接暴露依赖目录里的默认 `Electron.app`。启动器会在系统临时目录缓存一份当前 workspace 专属的开发 runtime，并为它设置唯一的应用名、bundle ID 与可执行文件名。启动日志中的 `[dev-runtime]` JSON 是本次运行的事实来源，例如：
-
-```text
-[dev-runtime] {"appName":"Actspace Dev d11e-ab10","appId":"com.actspace.desktop.dev.wab10a3c4",...}
-```
-
-Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的 `Electron`。优先使用可读的 `appName`；若自动化工具不接受 display name，就使用同一行日志里的 `appId`。不同 worktree 因此可以并存，自动化也不会被 macOS LaunchServices 路由到另一份源码的 Electron 欢迎页。临时开发身份只改变系统识别与进程名称；main 进程仍使用既有的 `actspace` userData 目录，因此会话和设置不会因 workspace hash 改变。
-
-开发 runtime 缓存复用前，启动器会对照已安装 Electron 检查文件结构、普通资源大小、可执行权限、framework 符号链接和 Info.plist 身份；缺失或损坏时输出 `rebuilding cached Electron` 并自动重建。新副本通过同一检查后才替换旧缓存。此检查用于发现临时目录里的残缺文件，不是安全签名或完整字节哈希验证；不会清理会话、设置或 Chromium 用户缓存。可用 `node scripts/run-electron-dev.mjs --prepare-only` 单独验证缓存准备，回归测试为 `node --test scripts/test/electron-runtime-integrity.test.mjs`（macOS）。
-
-开发启动默认不弹出独立 DevTools 窗口，避免它与主窗口共享应用身份并抢走 Computer Use 焦点。需要 DevTools 时显式运行 `ACTSPACE_OPEN_DEVTOOLS=1 pnpm dev:log`。
-
-需要确认：
-
-- Electron 窗口可以弹出。
-- renderer 正常加载，不是空白页。
-- `window.actspace` 注入后，页面可以加载 bootstrap state。
-- 首次启动可以创建或恢复会话。
-- 本地数据目录正常初始化。
-
-有 Computer Use 的 Agent 应该从 `[dev-runtime]` 读取当前 `appName` / `appId`，直接观察对应 Electron 窗口，必要时点击核心交互并截图确认。
-
-没有 Computer Use 的 Agent 应说明无法直接观察桌面窗口，并请用户提供：
-
-- Electron 窗口截图。
-- `pnpm dev` 终端日志。
-- 必要时提供 `sessions-v2/<sessionId>/journal.jsonl` 的脱敏摘要；不要发送完整 Journal、凭据或包含敏感工具输出的原始文件。
+需要确认：窗口弹出、renderer 正常加载而不是空白页、`window.actspace` 注入后能加载 bootstrap state、首次启动能创建或恢复会话、本地数据目录正常初始化。有 Computer Use 的 Agent 从 `[dev-runtime]` 读取 `appName` / `appId`，直接观察并截图；没有的，说明无法观察桌面窗口，请用户提供 Electron 窗口截图、`pnpm dev` 终端日志，必要时提供 `sessions-v2/<sessionId>/journal.jsonl` 的脱敏摘要（不要发完整 Journal、凭据或含敏感工具输出的原始文件）。
 
 ## 默认验收矩阵
 
@@ -197,65 +107,24 @@ Computer Use 必须使用这里的 `appName` 或 `appId`，不要使用通用的
 | 构建脚本、workspace、Electron 配置 | `pnpm typecheck`、`pnpm build`、`pnpm dev` | 检查 `dist-electron/main/index.js` 是否生成 |
 | 设计文档或图片更新 | 文档链接检查 | 对照设计图人工确认 |
 
-## Desktop 前端重构期间的验证矩阵
-
-来源：[08 测试与验证整理 §5](desktop-frontend-refactor/08-测试与验证整理.md)。每个阶段完成后按此表验证。「浏览器 mock」指上文的 mock 场景；「Electron」指真实桌面窗口，无 Computer Use 时用 CDP（`--remote-debugging-port`，临时 `ACTSPACE_DATA_DIR`），具体做法见 [00 总执行计划 §8](exec-plans/completed/20261005-desktop-frontend-refactor/00-总执行计划.md)。
-
-| 场景 | 单测 | 浏览器 mock | Electron |
-| --- | --- | --- | --- |
-| 新建本机会话 → 发送 → 流式 → 完成 | app-streaming | `?mock=streaming` | ✓（需要模型 key） |
-| 流式中切换会话再切回 | transcript | `?mock=streaming` | ✓ |
-| 流式中刷新窗口恢复 | app-approval-recovery | — | ✓ |
-| 加载早期历史后收到新消息 | app-earlier-history* | `?mock=long-session` | ✓ |
-| 运行中发送 → 进入队列 → 引导 → 撤回 → 删除 | app-message-queue | `?mock=streaming` | ✓ |
-| 审批弹出 → 允许 / 拒绝 / 重启后恢复 | app-approval-recovery | `?mock=approval-pending` | ✓ |
-| 新建远端会话（connected / offline / revoked） | readiness | `?mock=remote-host`（只看状态显示） | 需要真实 Host |
-| 远端会话中读文件、下载产物 | remoteArtifact | —（mock 未实现 `hosts.call` / `preview` / `download`） | 需要真实 Host |
-| Host 删除后历史会话显示 | app-remote-host-refresh | `?mock=remote-host` | ✓ |
-| 新建工作树（Git / 无提交 / 非 Git） | run-location-menu | `?mock=empty`（只看菜单） | ✓ |
-| 侧边对话：运行中主会话分出 → 分隔线 → 问早前内容 → Plan 只读 → 两条同时流式 → 收起再从启动页重开 → 重启恢复 → 侧栏只显示角标 | side-chat 相关单测 | `?mock=side-chat`（只看界面，不含上下文继承、Plan 拦截、重启恢复） | ✓（需要模型 key；按序检查：运行中主会话打开侧边对话看分隔线；问早前内容它能答；Plan 下让它改文件无写入工具、退出 Plan 后可改；两个侧边对话同时流式；收起后从启动页列表重开；重启应用后仍在且边界提示词仍生效；侧栏只显示数量） |
-| Composer：inline ↔ stacked、`+` 面板、模型、模式 chip | composer / composer-toolbar / composer-palette | ✓ | ✓ |
-| 中文输入法 | composer-ime | — | ✓（必须真机） |
-| 外链点击不导航主窗口 | window-security（window-navigation* 补全） | — | ✓（系统浏览器是否打开需真机） |
-| 退出后无残留子进程 | — | — | ✓ |
-| CSP 开启后 mermaid / 高亮 / HTML 预览正常 | — | — | 本轮不加主文档 CSP（11 J1=A），暂不适用 |
-| 浅色 / 深色、480px 窄窗 | — | ✓ | ✓ |
-| 键盘走查（`+` 面板、运行位置菜单、Settings 对话框） | ui-layering* | ✓ | ✓ |
-
-2026-10-18 核对：transcript、readiness、run-location-menu、composer-ime 及 Composer 系列测试已经落地。仍带 `*` 的 app-earlier-history、window-navigation、ui-layering 专项测试未找到同名文件，保留缺口；不能用相邻测试推定完整覆盖。
-
-相关自动检查：`pnpm check:ipc-channels`（IPC 以契约为准）、`pnpm check:renderer-bridge`（renderer 只经 `api/<域>` 访问 bridge）、`pnpm check:frontend-tokens`、`pnpm check:frontend-theme`。其中 `check:renderer-bridge`、`check:ipc-channels` 和这些检查脚本自己的测试（`test:renderer-bridge`、`test:ipc-channels`、`test:frontend-tokens`）已包含在 `pnpm test` 里；`check:frontend-tokens`、`check:frontend-theme` 由 CI 的仓库卫生检查（`scripts/check-repo-hygiene.sh`）运行。
-
-文件授权范围含长路径时，选项弹层必须受可用视口宽度约束，并换行保留完整路径、读写权限与“本会话”信息。不能只用触发器省略或悬停提示代替展开后的可读性。可选的真实 Chromium 布局回归：`ACTSPACE_PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs pnpm --filter @actspace/desktop test:file-grant-scope-layout`。该脚本需要本地已安装 Playwright 和 Chromium，使用临时 Vite 场景，不读取应用数据或调用 Provider；覆盖 480/1280px 浅深主题、全文边界、键盘选择与焦点返回。它不代替真实 Electron 授权、目录复用和撤销验收。
+以下场景只能或必须在 Electron 下验：流式中刷新窗口恢复、中文输入法（必须真机）、外链点击不导航主窗口（系统浏览器是否打开需真机）、退出后无残留子进程、真实 Host 的文件读取与产物下载、新建工作树（Git / 无提交 / 非 Git）、侧边对话的上下文继承 / Plan 只读 / 重启恢复。浅色 / 深色与 480px 窄窗、键盘走查（`+` 面板、运行位置菜单、设置对话框）在浏览器 mock 与 Electron 各看一遍。
 
 ## Web 客户端验证边界
 
-Web 使用独立 Host 协议与浏览器存储；Desktop renderer 的 `?mock=` 不覆盖 Web 连接、认证、重连、任务队列或浏览器下载。Web 工程检查运行 `pnpm --filter @actspace/web test` 与 `build`，真实路线还需隔离 Host、有效模型配置及浏览器交互。停止/失败后验证暂停状态、普通发送仍排队、显式继续、刷新后恢复入口；审批触控目标在 390px 浅深主题检查至少 44px。iPhone/Tailscale、PWA 安装与系统通知需真实设备单独验收。
+Web 使用独立 Host 协议与浏览器存储；Desktop renderer 的 `?mock=` 不覆盖 Web 连接、认证、重连、任务队列或浏览器下载。Web 工程检查运行 `pnpm --filter @actspace/web test` 与 `build`，真实路线还需隔离 Host、有效模型配置及浏览器交互。停止 / 失败后验证暂停状态、普通发送仍排队、显式继续、刷新后恢复入口；审批触控目标在 390px 浅深主题至少 44px。iPhone / Tailscale、PWA 安装与系统通知需真实设备单独验收。
 
 ## 计划与收尾写法
 
-计划阶段应该写明：
-
-- 这次改动属于哪一类。
-- 使用浏览器 renderer 还是 Electron 真实验证。
-- 是否需要用户截图或 Computer Use。
-
-收尾阶段应该写明：
-
-- 实际运行过的命令。
-- 是否看过浏览器或 Electron 窗口。
-- 没能验证的部分和原因。
-
-示例：
+计划阶段写明：这次改动属于哪一类；用浏览器 renderer 还是 Electron；是否需要用户截图或 Computer Use。收尾阶段写明：实际运行过的命令；是否看过浏览器或 Electron 窗口；没能验证的部分和原因。例如：
 
 ```text
 已运行 pnpm typecheck 和 pnpm build。
 本次只改 Composer 样式，使用浏览器 renderer 验证布局；未涉及 preload、IPC 和本地持久化。
 ```
 
-另一个示例：
-
 ```text
 已运行 pnpm typecheck、pnpm build 和 pnpm dev。
 本次涉及 preload 与 session 恢复，需要 Electron 窗口验证；当前环境没有 Computer Use，因此需要用户提供窗口截图和终端日志。
 ```
+
+历史验证矩阵、Space 演示走查与 ModelPicker pinned 验收见归档：[前端验证清单：归档材料](exec-plans/completed/design-archive/frontend/前端验证清单-重构期矩阵与演示走查.md)。

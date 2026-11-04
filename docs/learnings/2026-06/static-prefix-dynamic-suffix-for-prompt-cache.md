@@ -1,51 +1,71 @@
-# LLM 前缀缓存：静态前缀 + 动态尾部
+# LLM 前缀缓存：静态前缀 + 持久化的动态尾部
 
-> 提炼自 `docs/histories/2026-06/20260610-1030-kairos-prompt-cache-optimization.md`
+合并自两篇（Kairos 提示词缓存优化 2026-06；稳定 Prompt 前缀与持久化动态尾部 2026-09）。诊断与最终 wire 见 [prompt-cache 归因与最终 Wire](../2026-07/20260728-prompt-cache-diagnosis-controlled-variable-matrix.md)。
 
-## 是什么
+## 1. 前缀匹配与唯一设计原则
 
-LLM 供应商的 prompt 缓存（DeepSeek、Anthropic、OpenAI 都有）按**前缀匹配**：
-请求序列化后从头开始比对，遇到第一个不同的字节，之后的全部 token 都算 miss。
-DeepSeek 还按 64-token 块对齐——命中量永远是 64 的整数倍。
+LLM 供应商的 prompt 缓存（DeepSeek、Anthropic、OpenAI 都有）按**前缀匹配**：请求序列化后从头比对，遇到第一个不同字节，之后的全部 token 都算 miss。DeepSeek 还按 64-token 块对齐——命中量永远是 64 的整数倍。
 
-由此推出唯一的设计原则：**上下文中越靠前的内容，变化频率必须越低。**
+→ **上下文中越靠前的内容，变化频率必须越低。** 缓存断裂点 = 第一个变化的字节；“必变内容”在前面，后面稳定内容全部陪葬。
 
-## 为什么需要
+## 2. 案例：时间戳毒死缓存（Kairos）
 
-Kairos 每个 tick 重组 system prompt，开头第 ~640 token 处嵌了 `[当前时间] <ISO秒级时间戳>`。
-后果是诊断数据里非常规律的模式：
+Kairos 每个 tick 重组 system prompt，第 ~640 token 处嵌了 `[当前时间] <ISO 秒级时间戳>`：
 
 ```
 call 7 | hit=4480 miss= 107  ← tick 内第 2+ 次调用（前缀没动）
-call 8 | hit= 640 miss=3911  ← 新 tick 第 1 次调用：只命中时间戳前的 10 个块
+call 8 | hit= 640 miss=3911  ← 新 tick 第 1 次调用：只命中时间戳前 10 个块
 call 9 | hit=4608 miss= 127
 ```
 
-640 = 10 × 64，正好是时间戳出现的位置。一个秒级时间戳让每个 tick 白付 ~4000 token 的 miss。
+640 = 10 × 64，正好是时间戳位置；看到 `hit=640` 这种规整数字就能反推断裂位置。一个秒级时间戳让每个 tick 白付约 4000 token 的 miss。
 
-## 怎么做
-
-把上下文按变化频率分层，频率高的往后挪：
+修复不是“少放内容”，而是**重排**——按变化频率分层，高频往后挪（成本从每次 miss 变为一次 miss）：
 
 | 层 | 内容 | 变化时机 |
 |---|---|---|
 | system prompt 头部 | 指令、人设 | 改代码才变 |
 | system prompt 中部 | 配置 tips、用户规则 | 改配置才变 |
-| system prompt 末段 | 历史摘要 | 压缩产出新摘要才变（本来就会断历史，不额外亏） |
-| messages 历史 | 已落盘的对话 | 只追加，不改写 |
+| system prompt 末段 | 历史摘要 | 压缩产出新摘要才变（本来就断历史，不额外亏） |
+| messages 历史 | 已落盘对话 | 只追加，不改写 |
 | **最后一条 user message** | 时间、phase、观测增量 | **每 tick 必变 → 只能放这里** |
 
-时间精度也降到分钟（`YYYY-MM-DD HH:mm`）：秒级精度对决策无价值，纯属缓存毒药。
+时间精度也降到分钟（`YYYY-MM-DD HH:mm`）：秒级对决策无价值，纯属缓存毒药。历史也是前缀的一部分：落盘事件重放出的消息必须与现场发送逐字节一致（见 [事件回放保真块顺序](event-replay-must-preserve-block-order.md)），否则历史中段照样断。
 
-## 核心要点
+## 3. 三层事实模型（ActSpace v2 实现）
 
-1. 缓存断裂点 = 第一个变化的字节；只要"必变内容"在前面，后面的稳定内容全部陪葬。
-2. 修复不是"少放内容"，而是**重排**：同样的信息移到序列末尾，成本从每次 miss 变为一次 miss。
-3. 命中量是 64 的整数倍（DeepSeek）——诊断时看到 `hit=640` 这种规整数字，基本就能反推断裂位置。
-4. 历史也是前缀的一部分：落盘事件重放出的消息必须与现场发送逐字节一致（见 `event-replay-must-preserve-block-order.md`），否则历史中段照样断。
+随机 run ID 写进 system prompt 就足以让缓存从变化字节处失效。把输入分三层：
 
-## 自检问题
+1. `prompt-section`：稳定身份、安全规则、显式选择的完整指令正文；
+2. `model-fact`：模型需要看见的稳定结构化事实（descriptor、capability 摘要）；
+3. `request-fact`：只用于审计/诊断的动态事实（run、request、Host invocation identity）。
 
-- system prompt 里有没有时间戳、计数器、随机 id 这类每次必变的东西？
-- 如果必须注入实时信息，它能不能成为"最后一条消息"？
-- 用量日志里 cacheHit 是否呈现固定值反复出现？那个值 ×（1/64）就是断裂前的块数。
+snapshot 同时保存 `facts` 与 `modelFacts`，但 system prompt 只渲染 `modelFacts`——不为缓存牺牲可审计性。一个事实若只用于 Trajectory 调试，不该进 `modelFacts`。
+
+## 4. 逐轮动态信息必须随消息持久化
+
+若某项逐轮事实模型必须知道（如 Agent 当前是 Plan 还是 Agent），只在 dispatch 前临时拼接不够：下一轮从 Journal 重放旧消息，找不到当时的临时尾部，“现场请求”与“历史重放”不等价。正确做法是把动态块与用户消息一起持久化并放在当前上下文末尾：
+
+```text
+system:  stable prompt sections + stable model facts
+history: durable Journal Surface
+current user: text / attachments / runtime-context
+```
+
+UI、标题、自然语言摘要可以隐藏内部块，但 token 估算仍要计入，因为模型确实收到了它。
+
+文本附件同理：只在第一次 dispatch 从本地路径读取，重放时文件可能消失或变化。把校验后的正文随 `user/message` 持久化，Artifact 保留原始字节，才能同时获得可恢复性、用户可见附件、模型输入一致。
+
+## 常见陷阱
+
+- 把审计 ID 放进 system prompt，再用“模型需要上下文”解释缓存抖动。
+- 只在内存里追加动态尾部，后续重放缺失；为隐藏内部块而从 token estimate 中删掉，低估真实上下文。
+- 文本附件只存路径，重启后依赖易失文件；创建第一个 Artifact 后才校验后续文件，失败留孤儿数据。
+
+## 自检
+
+- system prompt 里有没有时间戳、计数器、随机 id 这类每次必变的东西？必须注入实时信息时，它能不能成为“最后一条消息”？
+- 用量日志里 cacheHit 是否呈现固定值反复出现？该值 ÷ 64 就是断裂前的块数。
+- 为什么逐轮 mode 不能只在 LLM adapter 内临时追加？附件正文、原始 Artifact、UI attachment chip 各承担什么职责？
+
+来源：`docs/histories/2026-06/20260610-1030-kairos-prompt-cache-optimization.md`、`docs/histories/2026-09/20260924-2308-main-chat-form.md`。

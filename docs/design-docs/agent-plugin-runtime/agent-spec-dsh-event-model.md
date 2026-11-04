@@ -1,24 +1,22 @@
 # DSH 风格 Session 事件模型
 
-> 2026-09-20 更新：[Session 事件持久化重构](agent-spec-session-core-persistence-separation.md)的核心行为已实施。Journal 接纳后先交给 persistence coordinator，再发布 observer 通知；`flush` 是独立 durability barrier。
+> [Session 事件持久化重构](agent-spec-session-core-persistence-separation.md)的核心行为已实现。Journal 接纳后先交给 persistence coordinator，再发布 observer 通知；`flush` 是独立 durability barrier。
 
 
-> 状态：12 个核心事件与默认 Loop 已实现；最终 CLI retry/error 已有真实 HTTP fixture 定向证据，完整收尾状态见本轮执行记录。2026-09-09 按 ActSpace 当前 codec / Session Format v1 校准 seq 描述。
->
-> 日期：2026-08-29
+> 12 个核心事件与默认 Loop 已实现；最终 CLI retry/error 已有真实 HTTP fixture 定向证据。seq 描述以当前 codec / Session Format v1 为准。
 
 本文定义 ActSpace 重构后的 Session 事实流。目标是把 DeepSeek Harness（DSH）已经验证的事件分层、顺序和可重放语义作为新的核心模型；不保留旧 ActSpace 事件名称或兼容分支。当前 CLI 只实现一次无头 `run`，`chat` 不在本轮范围内。
 
 ## 1. 依据与边界
 
-当前事件词汇与 envelope 以 ActSpace `packages/session/session-journal/src/core-codecs.ts`、默认 Agent Loop 和 [Session Format v1](agent-spec-session-format-v1.md)为准。以下保留 2026-08-29 设计时的参考资料顺序，不覆盖当前实现：
+当前事件词汇与 envelope 以 ActSpace `packages/session/session-journal/src/core-codecs.ts`、默认 Agent Loop 和 [Session Format v1](agent-spec-session-format-v1.md)为准。以下保留设计时的参考资料顺序，不覆盖当前实现：
 
-1. `tmp/deepseek-harness/packages/core/session/src/types.ts` 与 `tmp/deepseek-harness/packages/core/agent-loop/src/agent.ts` 的源码行为；
+1. DSH 外部参考快照的 `packages/core/session/src/types.ts` 与 `packages/core/agent-loop/src/agent.ts` 的源码行为；
 2. `tmp/deepseek-harness/docs/persistence-catalog.md` 的持久化目录；
 3. `/Users/wakeup-jin/Downloads/session/干预主链和相关通知.md` 的三平面整理；
 4. 当前 ActSpace 工具执行器的行为测试和实现。
 
-本文只规定 Session 事件、重放和事件到 UI/通知的投影。Cordis 插入点见 [Agent Loop Cordis Surface](./agent-spec-agent-loop-cordis-surface.md)，工具内核与可替换外壳见 [Tool Runtime Boundary](./agent-spec-tool-runtime-boundary.md)。
+本文只规定 Session 事件、重放和事件到 UI/通知的投影。Cordis 插入点见 [Agent Loop 插入面](./agent-spec-cordis-event-abi-and-eventhub-retirement.md)，工具内核与可替换外壳见 [Tool Runtime Boundary](./agent-spec-tool-runtime-boundary.md)。
 
 ## 2. 三个事件平面
 

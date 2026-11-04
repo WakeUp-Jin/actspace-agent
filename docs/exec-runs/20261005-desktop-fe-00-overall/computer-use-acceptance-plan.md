@@ -1,7 +1,7 @@
 # Desktop 前端重构：统一 Computer Use 验收计划
 
 - 整理日期：2026-10-07。
-- 状态：清单与操作分组已整理；2026-10-07 已开始执行，逐项结果见 [computer-use-acceptance-results.md](computer-use-acceptance-results.md)。
+- 状态：清单与操作分组已整理；2026-10-07 已开始执行，逐项结果见 `computer-use-acceptance-results.md`（原始记录已清理，见 git 历史）。
 - 目标版本：`main`。整理时 HEAD 为 `01c4f231`，合入提交为 `22fcec36`；实际执行及每轮修复后重新记录 HEAD。
 - 范围：9 份交接中的 **62 个专项项、3 个建议项**，以及去重后的回归冒烟。保留原项编号，不因分组删除检查内容。
 - 分工：主智能体只负责验收统筹、证据核对、Bug 记录与结果汇总；Computer Use 应用交互默认委派 **`gpt-6.1-sol`**，子智能体同样只验收、不修复。Sol 不可用时报告限制，不静默改用 Astra。此次用户消息中的“转给 Astra”是所引用交接的措辞，本轮未明确改指定验收模型。

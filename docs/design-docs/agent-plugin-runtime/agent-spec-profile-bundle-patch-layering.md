@@ -1,6 +1,6 @@
 # Profile / Bundle / Patch 分层规范
 
-> 状态：P5 当前分层，2026-10-04。Host/Profile 与可选择的 Harness 组合有不同生命周期；不得把运行中切换选择误写成重启整个 Host。
+> 当前分层。Host/Profile 与可选择的 Harness 组合有不同生命周期；不得把运行中切换选择误写成重启整个 Host。
 
 ## 1. 决策摘要
 
@@ -195,7 +195,7 @@ P1-C 不迁移 Session 数据、不改 Tool executor、不实现 CLI chat、不�
 
 - [DSH 风格 Runtime 插件组装规范](agent-spec-dsh-plugin-assembly-and-agent-startup.md)
 - [插件 Runtime ABI](./agent-spec-plugin-runtime-abi.md)
-- [核心 Service 分层规范](./agent-spec-service-definition-provider-consumer.md)
+- [核心 Service 分层规范](./agent-spec-package-layout-and-plugin-packaging.md)
 - `packages/composition/bundle/src/index.ts`
 - `packages/composition/composition/src/compose.ts`
 - `packages/core/runtime/src/profiles/composition.ts`

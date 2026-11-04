@@ -21,14 +21,14 @@ P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle
 
 ## 领域契约
 
-- [Session 事件持久化重构](agent-spec-session-core-persistence-separation.md)：2026-09-20 核心行为已实施；接纳、observer、durability barrier 与 checkpoint 语义以此为准，[执行记录](../../exec-plans/completed/20260920-session-event-persistence/README.md)。
+- [Session 事件持久化重构](agent-spec-session-core-persistence-separation.md)：核心行为已实现；接纳、observer、durability barrier 与 checkpoint 语义以此为准，[执行记录](../../exec-plans/completed/20260920-session-event-persistence/README.md)。
 
 | 主题 | 规范 |
 |---|---|
-| Plugin 与包边界 | [Plugin ABI](agent-spec-plugin-runtime-abi.md)、[Package layout](agent-spec-package-layout-and-plugin-packaging.md)、[包地图](../../../packages/README.md)、[包清单](agent-package-ledger.md) |
+| Plugin 与包边界 | [Plugin ABI](agent-spec-plugin-runtime-abi.md)、[Package layout 与包清单](agent-spec-package-layout-and-plugin-packaging.md)、[包地图](../../../packages/README.md) |
 | Session 与上下文 | [Session/Context](agent-spec-session-core-persistence-separation.md)、[Session Format v1](agent-spec-session-format-v1.md)、[DSH 事件模型](agent-spec-dsh-event-model.md)、[Prompt contributors](agent-spec-prompt-context-contributors.md) |
-| Agent 与 Loop | [Core 所有权](agent-target-agent-core.md)、[Agent/Subagent](agent-spec-agent-and-subagent.md)、[Scope](agent-spec-agent-scope-model.md)、[Loop surface](agent-spec-agent-loop-cordis-surface.md) |
-| Cordis Service 与事件 | [Service 所有权与契约](agent-spec-service-definition-provider-consumer.md)、[Cordis 原生事件 ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md) |
+| Agent 与 Loop | [Core 所有权](agent-target-agent-core.md)、[Agent/Subagent](agent-spec-agent-and-subagent.md)、[Scope](agent-spec-agent-scope-model.md)、[Loop 插入面](agent-spec-cordis-event-abi-and-eventhub-retirement.md#agent-loop-插入面) |
+| Cordis Service 与事件 | [Service 所有权与契约](agent-spec-package-layout-and-plugin-packaging.md)、[Cordis 原生事件 ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md) |
 | LLM | [Adapter](agent-target-llm-adapter.md)、[Core Pi 收敛目标（已实施）](agent-llm-core-pi.md)、[多供应商](../model-context/agent-multi-provider-llm.md) |
 | Tools | [内核与外壳](agent-spec-tool-runtime-boundary.md)、[Prepared execution ABI](agent-spec-tool-runtime-abi.md)、[Tool name](agent-spec-tool-name-contract.md) |
 | Projection | [Runtime Projection](agent-spec-runtime-projection.md)、[持久化与投影收敛](agent-spec-runtime-projection.md) |
@@ -52,7 +52,7 @@ Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧�
 - [Harness 插件化与 Agent Host 分离讨论](agent-harness-host-refactor-decisions.md)：最终目标与决定；P1–P5 及最终收尾的批准范围已验收；自进化功能后续独立开发。
 
 - [Profile-first 决策](agent-harness-host-refactor-decisions.md)：Profile 与应用操作所有权的历史理由。
-- [v2 foundation 决策](agent-harness-host-refactor-decisions.md)、[Cordis 采用](agent-decision-cordis-adoption.md)：方向、适用范围和证据边界。
+- [v2 foundation 决策](agent-harness-host-refactor-decisions.md)、[Cordis 采用决定](agent-harness-host-refactor-decisions.md)：方向、适用范围和证据边界。
 
 ## 验收边界
 

@@ -1,6 +1,6 @@
 # 会话记录 Markdown（Session Transcript）设计
 
-> 状态：2026-11-01 用户确认全部概念，已实施；Electron 实机检查未做，见执行摘要。
+> 已实现；验收证据见执行摘要。
 > 执行计划：`docs/exec-plans/completed/20261101-session-history-transcript.md`
 
 ## 为什么做
@@ -117,7 +117,7 @@ tools-runtime  evaluateGlobalBoundary 接受 isHostReadable：读操作且命中
 - **临时会话**：没有 `journal.jsonl` 的会话不写。
 - **提示词**：`session/created` 时用 `extensions.registerMainSession` 注册，`session/disposed` 时移除。子智能体会话不注册（fork 例外：它按主会话方式组装，读父会话的主会话扩展以保住 prompt cache）；Chat 模式没有读文件工具，不输出。提示词不进 Journal。
 - **权限放行范围**：只有 `sessions-v2/<安全 ID>/transcript.md`，只对读操作生效。沙箱读模式本来就是全部可读，不用改。
-  - `sessions-v2` 目录本身**不放行**（2026-11-01 用户确认）：搜索工具的权限资源只有目录、不含 glob，放行目录等于不弹审批就能 grep 到 `journal.jsonl`。代价是按描述找会话时，在目录里搜索会弹一次工作区外审批；按 ID 直接读不受影响。
+  - `sessions-v2` 目录本身**不放行**：搜索工具的权限资源只有目录、不含 glob，放行目录等于不弹审批就能 grep 到 `journal.jsonl`。代价是按描述找会话时，在目录里搜索会弹一次工作区外审批；按 ID 直接读不受影响。
 
 ## 被排除的方案
 

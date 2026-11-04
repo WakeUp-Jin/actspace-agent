@@ -1,6 +1,6 @@
 # ActSpace v2 Runtime Projection 规范
 
-> 状态：v2 公共契约基线。
+> v2 公共契约基线。
 >
 > 本文定义 Runtime 如何把 Session 与工具运行事实投影给固定 Desktop 与 CLI run。它收口 durable Session projection、live progress、runtime diagnostics、generic tool DTO 和 allowlisted renderer 的边界。实现可以调整 IPC channel、类名和缓存结构，但不得把三个平面重新混成一个事件流。
 

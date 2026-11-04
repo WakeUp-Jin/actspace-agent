@@ -20,11 +20,11 @@
 
 ## Computer Use
 
-由gpt-6.1-sol完成，见 [逐项验收](computer-use.md)。mock UI通过入口/费用、默认关闭、DeepSeek/智谱/Tavily三路启停组合、共享Key、抓取独立、浅深主题、480px与Space代表操作。TinyFish/Exa未逐一配置切换。真实Electron窗口已观察，但原生AX反复超时/索引失效，缺Key禁用和真实保存重开未获CU签收；缺Key禁用由组件单测覆盖。
+由gpt-6.1-sol完成，见 逐项验收（原始记录已清理，见 git 历史）。mock UI通过入口/费用、默认关闭、DeepSeek/智谱/Tavily三路启停组合、共享Key、抓取独立、浅深主题、480px与Space代表操作。TinyFish/Exa未逐一配置切换。真实Electron窗口已观察，但原生AX反复超时/索引失效，缺Key禁用和真实保存重开未获CU签收；缺Key禁用由组件单测覆盖。
 
-另补真实Electron工程验证：通过真实preload的 settings.getV4/updateV4 调用检查默认关闭、独立写入、JSON落盘，再退出进程重启读取一致；结果见 [工程证据](electron-ipc-result.json)。该检查没有写入Key，不调用外部Provider，也不是原生CU通过。退出时日志出现既有Usage read model disposed竞态提示，未影响设置断言，不扩大本轮修复范围。
+另补真实Electron工程验证：通过真实preload的 settings.getV4/updateV4 调用检查默认关闭、独立写入、JSON落盘，再退出进程重启读取一致；结果见 工程证据（原始记录已清理，见 git 历史）。该检查没有写入Key，不调用外部Provider，也不是原生CU通过。退出时日志出现既有Usage read model disposed竞态提示，未影响设置断言，不扩大本轮修复范围。
 
-可复验脚本：[verify-settings-ipc.cjs](verify-settings-ipc.cjs)。先完成Desktop构建，使用新的隔离目录（必须以 `/tmp/actspace-deepseek-ipc-` 开头）运行：
+可复验脚本：verify-settings-ipc.cjs（原始记录已清理，见 git 历史）。先完成Desktop构建，使用新的隔离目录（必须以 `/tmp/actspace-deepseek-ipc-` 开头）运行：
 
 ```sh
 ACTSPACE_DATA_DIR=/tmp/actspace-deepseek-ipc-review node scripts/run-electron-dev.mjs docs/exec-runs/20261018-deepseek-web-tools/verify-settings-ipc.cjs

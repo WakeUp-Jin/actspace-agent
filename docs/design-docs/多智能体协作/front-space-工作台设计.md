@@ -1,9 +1,9 @@
 # Space 工作台设计（多智能体协作 · 前端）
 
-> **状态：已实施（演示，2026-10-07），只在开发构建出现，数据全部 mock，后端不动；Electron 验收待做。交互以 [space-demo.html](space-demo.html) 为准。**
+> **状态：前端演示，只在开发构建出现，数据全部 mock，后端不动。交互以 [space-demo.html](space-demo.html) 为准。**
 > 执行计划：[多智能体协作前端演示](../../exec-plans/completed/20261007-multi-agent-collab-frontend-demo.md)。
-> 接入桌面端的问题 2026-10-07 全部确认（D18–D31）。界面样式以真实桌面端组件和 token 为准，demo 只定结构和交互。代码在 `apps/desktop/src/renderer/components/space/`，走查步骤见 [FRONTEND_VERIFICATION](../../FRONTEND_VERIFICATION.md)「Space 多 Actor 协作演示」。
-> 历史：2026-10-02 首版「主会话 + 线程」→ 2026-10-03「协调 Agent + 工作 Agent」→ 2026-10-05 按 [ActSpace 产品概念](../ActSpace产品概念思路初稿.md) 改为 Actor 模型（本文）。前两版的取舍记录在 `docs/histories/2026-10/` 下对应日期的 history 里。
+> 界面样式以真实桌面端组件和 token 为准，demo 只定结构和交互。代码在 `apps/desktop/src/renderer/components/space/`，走查步骤见 [FRONTEND_VERIFICATION](../../FRONTEND_VERIFICATION.md)「Space 多 Actor 协作演示」。
+> 本文按 [ActSpace 产品概念](../ActSpace产品概念思路初稿.md) 的 Actor 模型书写；更早的「主会话 + 线程」「协调 Agent + 工作 Agent」两版取舍见 `docs/histories/2026-10/`。
 
 ---
 
@@ -289,7 +289,7 @@ Space ─┬─ 名字、要解决的问题（一句话）、相关目录
 - 翡翠绿只用于工作中与成功，琥珀只用于等你决定，红只用于出错。全部走主题 token，深浅两套主题各自成立。
 - 头像只回答「是谁」，不表达状态；状态由分组、光环、点和文字表达。
 - 头像圆角约 28%；尺寸 16（引用胶囊）/ 18（标签、左栏）/ 22（右栏、托盘）/ 40（Actor 头部、空 Space 成员）/ 56（名册卡片、空 Space、一对一）。
-- 头像素材见 [assets/](assets/)：`space/`、`ball/` 是原图，`demo/` 是 256px 裁切版，`unused/` 是落选稿。名册 Actor 直接用桌面端 `apps/desktop/src/renderer/assets/subagents/companion-1..9.webp`。
+- 头像素材见 [assets/demo/](assets/demo/)（256px）。名册 Actor 直接用桌面端 `apps/desktop/src/renderer/assets/subagents/companion-1..9.webp`。
 
 ## 7. 动效
 
@@ -335,6 +335,6 @@ Space ─┬─ 名字、要解决的问题（一句话）、相关目录
 
 前端 mock 的数据形状按上面的实体拆分，方便以后换成真实数据源（见执行计划 T2）。
 
-## 10. 接入桌面端前端：已全部确认
+## 10. 接入桌面端前端
 
-Q1–Q8 已在 2026-10-07 确认，结论见 §2 的 D18–D31。
+接入桌面端的问题（Q1–Q8）的结论见 §2 的 D18–D31。

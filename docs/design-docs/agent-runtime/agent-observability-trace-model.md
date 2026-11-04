@@ -1,6 +1,6 @@
 # Agent Journal 观测数据模型
 
-> 状态：当前 v2 Journal 观测边界。2026-09-06 已删除分析观测页面及专用 Analysis / Trace 投影和 IPC；本文保留公共 Journal、Context、Usage 与 Trajectory 的数据和安全边界。
+> 当前 v2 Journal 观测边界。分析观测页面及专用 Analysis / Trace 投影和 IPC 已删除；本文保留公共 Journal、Context、Usage 与 Trajectory 的数据和安全边界。
 
 ## 目标
 

@@ -1,7 +1,7 @@
 # Chat 控件与附件错误修复 — 执行摘要
 
 - 状态：实现完成；真实 Electron 已通过已观察的控件隔离、UTF-8 中文错误、键盘移除与草稿重发、重启继续对话。完整附件/主题矩阵未全覆盖。
-- 计划：用户已批准的两项局部修复；执行过程见 [execution-process.md](execution-process.md)。
+- 计划：用户已批准的两项局部修复；执行过程见 `execution-process.md`（原始记录已清理，见 git 历史）。
 - 代码：Chat 形态屏蔽开发入口；附件错误使用可序列化的发送前拒绝结果，不把校验失败写成运行失败。
 - 已通过：8 个定向测试文件、76 项测试；Desktop typecheck；Renderer/Electron build；主题检查。
 - 当前 UI 初验：Chat 顶栏/输入框没有工作区、分支、运行位置、Review；右栏菜单与启动器仅显示 Context 和可视化回复；Agent 原入口存在。

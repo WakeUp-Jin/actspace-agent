@@ -1,35 +1,33 @@
-# ActSpace v2 Agent 与一次性 Subagent 设计规范
+# ActSpace v2 Agent 与 Subagent 设计规范
 
-> 状态：v2 产品与行为契约基线；应用操作通过 Profile App Service，启动生命周期见 [Runtime 与 Composition](agent-target-runtime-architecture.md)。精确事件名以 [DSH 事件模型](agent-spec-dsh-event-model.md)为准；下文 enqueue/claim 等描述表达行为，不新增同名 wire event。
+> v2 产品与行为契约基线；应用操作通过 Profile App Service，启动生命周期见 [Runtime 与 Composition](agent-target-runtime-architecture.md)。精确事件名以 [DSH 事件模型](agent-spec-dsh-event-model.md)为准；下文 enqueue/claim 等描述表达行为，不新增同名 wire event。当前的工具、事件（`subagent/spawned`、`subagent/activation`）、后台与续派、模型、transcript 和通知的现状见[子智能体运行规范](../collaboration/agent-subagent-runtime.md)；下文 §6–§13 里的 delegation 流程是对应的行为契约。
 >
-> 本文固定 v2 的 Agent 产品形态、Preset、子 Agent 生命周期、Session lineage、工具限制、取消和结果提交语义。字段名、TypeScript API、事件名称与预算数值可以在 execution plan 中细化，但不得改变本文已经确认的产品范围。
->
-> 确认日期：2026-08-22。
+> 本文固定 v2 的 Agent 产品形态、Preset、子 Agent 生命周期、Session lineage、工具限制、取消和结果提交语义。字段名、TypeScript API、事件名称与预算数值以代码与上面的运行规范为准，但不得改变本文固定的产品范围。
 
 ## 1. 产品范围
 
-ActSpace v2 采用一个主 Agent 和统一的一次性 Subagent seam：
+ActSpace v2 采用一个主 Agent 和统一的 Subagent seam：
 
 - **main Agent** 拥有用户的多轮 Session，接收 Desktop / CLI Host 发起的 turn，并保留最终决策权；
-- 现有 **Agent** 与 **Explore** 能力都重写为同一 Subagent seam 上的内置委派入口；
-- 每次委派创建独立 child Session、独立 Agent scope，并执行一次有明确终点的任务；
+- **general** 与 **explore** 是同一 Subagent seam 上的两个内置 Preset，由 `agent` 工具的 `agent_preset` 选择；`agent_fork` 创建继承父上下文的子 Agent；
+- 每次委派创建独立 child Session、独立 Agent scope，并按「激活」执行：每次激活是一轮有明确终点的工作；
 - **static Preset** 决定子 Agent 的 Prompt、模型路由、工具边界和预算；
 - 子 Agent 只向父 Agent 返回一个可持久化的终态结果，不把自己的可变 conversation 合并进父 Session；
 - Todo 状态使用 durable event 表达，由 Session 投影给模型和固定前端。
 
-这里的“一次性”指一次委派从创建运行到一个 terminal result 后结束。它不是可在以后继续发消息、恢复控制权或长期驻留的 Agent identity。
+子 Agent 默认后台运行；一次激活到一个 terminal result 后进入空闲，之后可由 `send_message` 续派下一次激活（冷恢复，沿用创建时固定的工具集）。续派不是转移控制权：父 Agent 始终保留决定权，子 Agent 不能再委派（深度固定 1）。本机 Codex / Claude Code 子 Agent 只跑一轮、不能续派。
 
 ## 2. 五个核心概念
 
 | 概念 | 语义 |
 |---|---|
 | main Agent | 用户 Session 的顶层执行者；一个 Session 同时最多一个 active turn |
-| Subagent invocation | 父 Agent 发起的一次有界委派，也是父 Session 中可审计的调用事实 |
+| Subagent invocation | 父 Agent 发起的一次有界委派，也是父 Session 中可审计的调用事实；每次激活（创建或续派）各有一个 terminal result |
 | child Session | 子任务自己的 append-only Journal、Surface、lineage 和恢复证据 |
 | Agent scope | 子 Agent 的身份、贡献可见性和资源所有权，不是安全沙箱 |
 | static Preset | Boot 时解析并验证、Runtime ready 后不可变的 Agent 配方 |
 
-“Agent”与“Explore”在本文中指两个内置委派 Preset / 入口，不再指各自拥有一套 ContextManager、ToolManager、Loop 和 SessionEvent bridge 的旧 executor。
+“general”与“explore”在本文中指两个内置委派 Preset，不再指各自拥有一套 ContextManager、ToolManager、Loop 和 SessionEvent bridge 的旧 executor。
 
 ## 3. main Agent
 
@@ -44,14 +42,14 @@ main Agent 必须遵守 ActSpace Agent Core 的共同不变量：
 
 子 Agent 不是控制权永久转移。父 Agent 不把自己的 Agent identity、writer、credential object 或可变 conversation 交给子 Agent。
 
-## 4. Agent 与 Explore 的重写
+## 4. general 与 explore 预设
 
-现有两项能力保留角色价值，替换执行实现：
+两个内置 Preset 共用同一 Subagent seam：
 
 | 内置入口 | 保留 | 新实现边界 |
 |---|---|---|
-| Agent | 通用子任务 prompt、结果摘要和已验证行为测试 | 使用统一 Subagent seam 和通用任务 Preset；工具由显式策略裁剪 |
-| Explore | 面向代码库或信息探索的 prompt、摘要和只读行为测试 | 使用同一 seam 和 Explore Preset；不得获得写入或其他副作用工具 |
+| general | 通用子任务 prompt、结果摘要和已验证行为测试 | 使用统一 Subagent seam 和通用任务 Preset；工具由显式策略裁剪，可写文件、跑命令 |
+| explore | 面向代码库或信息探索的 prompt、摘要和只读行为测试 | 使用同一 seam 和 explore Preset；不得获得写入或其他副作用工具 |
 
 两者不得直接创建旧 ContextManager、旧 ToolManager、旧 loop 或旧 SessionEvent。它们只提交委派请求；Agent Registry、Session、Scope、Tool Runtime 和 Agent Loop 负责真正执行。
 
@@ -171,7 +169,7 @@ v2 内置 Explore Preset 只允许只读能力。v2 child Preset 不授予再次
 
 ## 11. Terminal Result
 
-每次 Subagent invocation 对父 Agent 只产生一个终态结果。语义 schema 至少包含：
+每次激活对父 Agent 只产生一个终态结果。语义 schema 至少包含：
 
 - 调用的稳定引用，以及 child identity 已分配时对应的 child Agent / child Session 引用；
 - completed、failed、denied、aborted 或 outcome-unknown 等终态类别；
@@ -210,11 +208,11 @@ Todo 可以继续通过工具形态供模型操作，但工具 result 不是状�
 | child 执行失败 | child 写 terminal failure，父 Agent 收到一个 linked failed result |
 | parent 取消 | 级联取消 child，等待有界 flush / dispose，返回 aborted 事实 |
 | child 已完成但 parent result 未提交即崩溃 | 恢复时幂等补齐 link，不重新执行 child |
-| child 尚未完成时进程崩溃 | repair child 的 open Turn / Step / Tool，父调用提交 aborted 或 outcome-unknown；不通过 public continuation 恢复旧 child activation |
+| child 尚未完成时进程崩溃 | repair child 的 open Turn / Step / Tool，父调用提交 aborted 或 outcome-unknown（重启后补 `lost`）；旧 activation 不被恢复，需要时用 `send_message` 开新的一次激活 |
 | 外部副作用结果无法确认 | 标记 outcome-unknown，禁止把它伪装成未开始后自动重试 |
 | Runtime shutdown | 停止新委派，取消并 drain active child，flush 后再 dispose root Context |
 
-一次性 child Session 可以被检查、导出和用于审计，但不能通过 public continuation API 恢复为可继续对话的同一个 Subagent。
+child Session 可以被检查、导出和用于审计。续派走子 Agent 管理器自己的冷恢复：重新打开 child Session、补齐未正常结束的 Turn，再取运行租约；不通过主会话的 public continuation / resume 入口，也不接受主会话的任务调度。
 
 ## 14. Startup Validation 与诊断
 
@@ -234,33 +232,18 @@ Runtime diagnostics 至少展示 preset identity / version、child / parent line
 
 同一条 pending Task 可以调整顺序、指定交付、撤回或删除；不再维护 next-step/next-turn 两套用户队列。停止当前 Run 会暂停队列，显式继续后再调度；重启恢复不重复领取已结算内容。详细字段、幂等性和模式限制见[Task/Run 规范](agent-task-run-lifecycle.md)。
 
-Agent Inbox 仍用于后台 `task_notification` 等领域输入，因此对应 codec/replay 不能删除。它不再拥有主用户任务队列。one-shot child 不提供公开续聊入口；重新执行需新 invocation/child Session，并在启动时取得当前 Harness 租约。
+Agent Inbox 仍用于后台 `task_notification`、`subagent_notification`、`agent_message` 等领域输入，因此对应 codec/replay 不能删除。它不再拥有主用户任务队列。续派的每次激活启动时取得当前 Harness 租约。
 
 ## 16. 明确不做
 
 v2 明确不包含：
 
 - 通用 Workflow / DAG / 条件节点 / 重试编排引擎；
-- 可继续发送消息、resume、reopen 或 handoff 控制权的 continuable Subagent；
-- 长期驻留、无人持有或跨 main turn 自主运行的 background Agent；
+- 转移或 handoff 控制权的子 Agent；子 Agent 不能再委派；
+- 长期驻留、没有激活边界的自主 Agent；
 - Preset StandingMount、旧 Preset generation 保留和资源回收协议；
 - 已运行 Run 中更换 Loop 或 Harness；后续 Run 可采用新 Harness。
 - 旧 Agent / Explore executor、ContextManager、ToolManager 和 bridge 的兼容壳；
 - Kairos 作为 Agent 形态或候选插件。
 
-main Agent 自身仍是正常的多轮 Session，并通过 TaskLedger 接受用户输入；“不可 continuation”只约束一次性 Subagent。
-
-## 17. 实现前字段级评审清单
-
-以下内容需要在 Agent / Subagent implementation plan 前形成 JSON Schema、golden Session fixtures 和失败用例；它们不是重新选择产品形态：
-
-- Preset descriptor、delegation request、child Session lineage 和 terminal result 的精确字段名；
-- main / child Agent、invocation、Preset 和 parent link 的 id 规则；
-- Agent / Explore 的 Prompt、模型 route 和精确工具 allowlist；
-- token、Step、时间、工具调用、并发 child 和 delegation depth 的默认预算；
-- child seed context、artifact 引用和父 Session 摘要的大小与脱敏规则；
-- cancellation、timeout、denied、failure 和 outcome-unknown 的稳定错误码；
-- child completion 与 parent link 的幂等键、repair transaction 和 writer lease 细节；
-- Todo event payload、projection schema 和 fixed renderer 的 generic 展示 DTO；
-- child Session browse / export 的 Host 权限和 retention policy；
-- Task、Run 与后台通知的字段以各自类型及 codec 为准，不能重新引入旧 public Inbox API。
+main Agent 自身仍是正常的多轮 Session，并通过 TaskLedger 接受用户输入；子 Agent 的续派只发生在激活之间，不改变这一点。

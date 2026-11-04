@@ -11,11 +11,11 @@
 ## 第一项：近期功能验收
 
 - [验收汇总与工程验证](acceptance.md)
-- [Desktop逐点原生Computer Use验收](desktop-acceptance.md)
-- [Web/PWA与官网逐点工程UI验收](web-site-acceptance.md)
-- [真实连接Computer Use补验](real-provider-acceptance.md)
+- Desktop逐点原生Computer Use验收（原始记录已清理，见 git 历史）
+- `Web/PWA与官网逐点工程UI验收`（原始记录已清理，见 git 历史）
+- 真实连接Computer Use补验（原始记录已清理，见 git 历史）
 - [Bug修复交接](bugs.md)：问题、复现、证据、只读定位和定向复验要求；修复另行安排。
-- [过程记录](execution-process.md)
+- 过程记录（原始记录已清理，见 git 历史）
 
 范围为2026-10-11至18日合入main的近期功能。初轮列出Desktop37、Web24、官网25，共86个验收点；用户追加真实Key授权后再列8个补验点，单独统计。完整点只记通过、失败或未覆盖；部分子项已有实测证据的点仍保留未覆盖，不以执行分组代替验收范围。
 

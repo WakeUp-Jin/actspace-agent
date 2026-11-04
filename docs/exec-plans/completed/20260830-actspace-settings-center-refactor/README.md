@@ -45,7 +45,7 @@
 
 ### 3.1 设计真源
 
-- [设置中心重构规范](../../../design-docs/frontend/front-设置中心重构规范.md)
+- [设置中心重构规范](../design-archive/frontend/front-设置中心重构规范.md)
 - [存储与可观测性边界](../../../design-docs/core-storage-and-observability.md)
 - [Token Usage 与 Context Projection](../../../design-docs/model-context/agent-token-usage-and-context-state.md)
 - [多供应商 LLM、模型管理与任务模型设计](../../../design-docs/model-context/agent-multi-provider-llm.md)

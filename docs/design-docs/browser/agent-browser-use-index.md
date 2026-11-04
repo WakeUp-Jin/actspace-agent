@@ -34,12 +34,56 @@ Browser capability ready 后注册 9 个分类工具和 `browser_help`、`browse
 
 页面 Locator 源码为 TypeScript，构建为 JavaScript 后由 Go `go:embed` 打入二进制，经 CDP 注入页面。产品运行时不需要 Node 或 Playwright。模型使用 `browser_locator`；canonical ID 的 `playwright_*` 前缀仅为兼容命名。
 
+## Bridge：Host、协议与安装
+
+Bridge 主线实现位于仓库顶层 `browser-bridge/`，属于 Host capability。当前产品路径只有 Chrome Extension → Native Messaging Host → Browser Tools；不提供独立 CDP backend 或 IAB fallback。
+
+### 调用链与职责边界
+
+```text
+Agent → packages/browser/tool-browser → Unix socket
+      → Go command engine → Extension primitive RPC
+      → chrome.debugger / Chrome APIs → 用户真实 Chrome
+```
+
+- Browser Tools 负责工具定义、权限、结果转换和 Turn transport；Runtime Core 不承载 CDP 逻辑。
+- Desktop main 负责组件准备、安装注册、实例发现、只读 probe、目标绑定与状态展示。
+- Go 单二进制同时提供 CLI、Native Messaging Host 和 command engine，管理 registry、Session ownership、等待、事件和批处理。
+- Chrome Extension 负责真实浏览器宿主权限、Tabs/History/TabGroups/Downloads 和 `chrome.debugger` 原语。
+- Locator Runtime 负责页面内 DOM 语义，由 Go 构建嵌入并注入，不依赖用户机器上的 Node 或 Playwright。
+
+CDP 是 Extension 路线内部的页面执行协议，不代表另有一个可以脱离扩展运行的产品 backend。用户浏览器表面与页面操作共享这条连接链。
+
+### 连接细节
+
+Chrome Extension 通过 Native Messaging 拉起 Host，Desktop 不常驻 spawn 第二个服务。每个扩展实例在用户私有目录发布实例记录；Desktop 验证记录、socket 和只读 probe 后绑定目标。Go 按连接维护 ownership。连接授权仅允许准备本机组件和绑定 Chrome；Agent 写操作仍走 Tool Runtime 的 action 权限流程。
+
+### 协议
+
+- Runtime 与 Host 使用 Unix socket，版本化 JSON envelope 加 4 字节 little-endian 长度头。
+- Host 与 Extension 使用 Chrome Native Messaging 的 stdio 传输。
+- Envelope 使用 `protocolVersion: "0.2.0"`，请求含 id/method/params，响应含 id/ok/result 或 error；它不是 JSON-RPC 2.0。
+- 应用方法使用 `agent_browser_bridge.*` 命名空间；command execute、describe、list、preflight 和 run 共用 Go registry。
+- 协议保持为仓库内明确契约，不让 renderer 直接操作 Extension 私有接口或拼接 Bash 浏览器命令。
+
+### 安装、升级与诊断
+
+安装包资源、开发期构建、Native Host 注册和固定扩展身份由 Desktop Browser Bridge 服务负责。Native Host 的 `allowed_origins` 必须与 Extension manifest 的固定 key 对应 ID 一致。
+
+更新正在使用的 Host 二进制时，先复制到唯一临时文件，执行 `abb help` 验证，再 rename 原子替换。失败保留旧二进制；当前运行的进程继续持有旧 inode，新进程读取新文件。扩展或 Host 更新后的真实连接必须重新验证。
+
+CLI 保留 `help`、`doctor`、`capabilities` 和人工命令入口，供安装、诊断与机器可读 schema 查询使用。Agent 正常调用通过专用 Browser 工具，不经 CLI。命令语义和参数见 [命令面](agent-browser-use-command-surface.md)。
+
+状态探测应复用进行中的请求，避免重叠子进程；失败保留可诊断错误并退避，安装成功后使旧错误状态失效。绑定目标失效时不能静默切换到另一个 Chrome 实例。
+
+Desktop 绑定与 Runtime adapter：`apps/desktop/src/main/runtime-v2/browser-capability.ts`。
+
 ## 阅读与维护
 
 1. [集成设计](agent-browser-use-integration-design.md)：工具、传输、权限和输出边界。
 2. [命令面](agent-browser-use-command-surface.md)：62 条命令参数与行为。
 3. [命令实现](agent-browser-use-command-implementation.md)：实现分层、CDP 原语与源码导航。
-4. [Bridge 设计](agent-browser-bridge-design.md)：Host、安装、实例路由与宿主边界。
-5. [当前连接体验执行计划](../../exec-plans/active/20260928-chrome-connect-experience.md)：首次连接、安装打包与真实 Chrome 的未完成验收。
+4. 本文「Bridge：Host、协议与安装」：Host、安装、实例路由与宿主边界。
+5. [连接体验执行计划](../../exec-plans/completed/20260928-chrome-connect-experience.md)：首次连接、安装打包与真实 Chrome 验收的跟踪（计划已暂停，验收项未关闭）。
 
 源码入口：`packages/browser/tool-browser/src/plugin.ts`、`node-capability.ts`，`packages/core/agent/src/agent-mode-policy.ts`，`browser-bridge/apps/cli/internal/commands/registry.go`。命令变化先更新 Go registry，再运行 `node scripts/check-browser-command-registry.mjs`。该检查验证生成 metadata 和文档标题 parity，不替代真实 Chrome 验收。

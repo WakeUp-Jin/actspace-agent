@@ -1,6 +1,6 @@
 # Agent v2 测试策略
 
-> 状态：当前 v2 测试分层和最低覆盖契约。自动化通过不替代真实 Provider、Electron、Browser 或签名制品验收。
+> 当前 v2 测试分层和最低覆盖契约。自动化通过不替代真实 Provider、Electron、Browser 或签名制品验收。
 
 ## 目标
 

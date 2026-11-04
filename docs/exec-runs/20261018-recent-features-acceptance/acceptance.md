@@ -34,9 +34,9 @@ Desktop原生CU共37点：14通过、1失败、22未覆盖，其中14点已验�
 | Web 24点 | 独立浏览器工程UI + 真实隔离Host | 7 | 3 | 14（12点含部分证据） |
 | 官网 25点 | 独立浏览器工程UI | 23 | 0 | 2（均含部分证据） |
 
-- [Desktop 逐项验收](desktop-acceptance.md)：37 个验收点、7 条操作路线，覆盖边界和原生证据逐项列出。
-- [Web/PWA 与官网逐项验收](web-site-acceptance.md)：Web 24 点、官网 25 点，各自列明实际执行及限制。
-- [真实连接补充验收](real-provider-acceptance.md)：用户进一步授权后，沿用应用管理的真实 `deepseek-flash` 连接，以原生 Computer Use 补查8点，结果单独统计。
+- Desktop 逐项验收（原始记录已清理，见 git 历史）：37 个验收点、7 条操作路线，覆盖边界和原生证据逐项列出。
+- `Web/PWA 与官网逐项验收`（原始记录已清理，见 git 历史）：Web 24 点、官网 25 点，各自列明实际执行及限制。
+- 真实连接补充验收（原始记录已清理，见 git 历史）：用户进一步授权后，沿用应用管理的真实 `deepseek-flash` 连接，以原生 Computer Use 补查8点，结果单独统计。
 - [Bug 与后续修复交接](bugs.md)：已确认缺陷、工程门禁失败、复现证据和定向复验要求。
 
 本轮截图在相邻 `screenshots/`，按仓库约定为本地证据、不随仓库分发。临时 JSON、脱敏 Provider 记录及工程日志在 `tmp/codex-acceptance/`；不能假设其他克隆具备这些本地文件。

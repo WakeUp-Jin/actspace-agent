@@ -1,6 +1,6 @@
 # Web 工具设计：web_fetch 与 web_search
 
-本文是当前 v2 的 `web_fetch`、`web_search` 与 Chat 模式 `web` 门面的事实来源；2026-10-18 对照实现校准。
+本文是当前 v2 的 `web_fetch`、`web_search` 与 Chat 模式 `web` 门面的事实来源。
 
 ## 工具职责与模式
 

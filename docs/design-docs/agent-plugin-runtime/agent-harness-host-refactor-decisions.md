@@ -1,6 +1,6 @@
 # Harness 与 Host 重构：最终决定
 
-更新：2026-10-05。P1–P5 架构与[最终收尾计划](../../exec-plans/completed/20261005-agent-refactor-final-closeout/README.md)已完成本次批准范围：模块解耦、Host/客户端分离、冗余代码与根目录清理、文档校准及逐项验收。隔离源码自动化与 35/35 Computer Use 通过，证据和保留限制见[最终结算](../../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。这不表示全仓已被证明不存在任何冗余，也不包含未来自进化具体功能。
+本文是 Harness / Host 重构的最终决定，已由 P1–P5 与[最终收尾计划](../../exec-plans/completed/20261005-agent-refactor-final-closeout/README.md)实现，验收证据和保留限制见[最终结算](../../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。它不表示全仓已被证明不存在任何冗余，也不包含未来自进化具体功能。
 
 ## 目标与优先级
 
@@ -65,6 +65,18 @@
 - 扩展使用 Cordis 约定的 emit/waterfall/parallel/serial/bail，事件声明记录 @mode；不按名称猜测分发方式。
 - Context 释放只回收正确登记的资源，不自动撤回已发生的文件或业务副作用；Cordis 同进程插件不是恶意代码沙箱。
 - 共同应用操作、调度、Run 绑定与入口策略按职责区分。标题是可选 Desktop 行为，辅助文本调用保留现有用途；此次清理移除基类标题钩子，使用 Cordis 观察与独立资源所有者。
+
+### Cordis 采用决定
+
+ActSpace 采用 DSH 发布的 `@deepseek-ai/cordis` 族作为插件生命周期与事件基底；实际版本以依赖声明和 lockfile 为准，不在文档里重复维护版本表。
+
+- 选择理由：Service 注入、依赖驱动激活、Effect 所有权和可等待释放，使替换 Harness 后能停止旧树拥有的监听器、定时器、连接及其他注册资源。通知直接用 Cordis `emit`；需返回值或持久化屏障的业务操作用约定的干预模式或显式 await 服务接口，不新增独立 EventHub。
+- 释放资源不能撤回已写入文件、已发出请求或已发送消息的外部影响；补偿、权限、审计和将来的自进化流程仍需领域设计。Cordis Context/Scope 不提供不可信代码的安全隔离。
+- 采用约束：精确固定同一发布族，拒绝上游命名空间混装、私有 deep import、修改 `node_modules` 和生产 HMR；用户配置保持 JSON-safe，凭据只传引用。Loader pending 不是启动成功，required 服务和 capability 必须通过装配检查。
+- Cordis 可能并行释放同树 Effect，不能依赖注册逆序保证跨服务 durability。Host 退出显式先 drain Run，再关闭 Session，最后释放树；插件自己的 Effect 保留局部和失败路径的资源释放责任。
+- Node/Electron、fresh install、packaged runtime、单实例、异步释放和真实外部能力属于不同验收门禁，见[测试策略](agent-testing.md)；一次源码检查不能冒充全部发行门禁通过。
+- 只有上游停更缺陷、供应链不可用或公共 API 无法实现必需语义等证据，才重新评审 fork，且需同时明确维护、漏洞响应和退出路径。
+- Host 基底保持稳定；Harness 候选独立准备并验证，新 Run 使用新组合，旧 Run 的租约决定旧树何时释放；当前不复用新旧组合间的插件实例，不实现运行中换 Loop。
 
 ## 本次边界与验证
 

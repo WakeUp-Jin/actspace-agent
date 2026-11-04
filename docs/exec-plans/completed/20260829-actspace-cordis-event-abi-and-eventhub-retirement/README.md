@@ -35,7 +35,7 @@
 ## 设计真源
 
 - [Cordis 原生事件 ABI 与 EventHub 退役规范](../../../design-docs/agent-plugin-runtime/agent-spec-cordis-event-abi-and-eventhub-retirement.md)
-- [Agent Loop Cordis 插入面与通知面](../../../design-docs/agent-plugin-runtime/agent-spec-agent-loop-cordis-surface.md)
+- [Agent Loop Cordis 插入面与通知面](../../../design-docs/agent-plugin-runtime/agent-spec-cordis-event-abi-and-eventhub-retirement.md)
 - [DSH 风格 Session 事件模型](../../../design-docs/agent-plugin-runtime/agent-spec-dsh-event-model.md)
 - [DSH 风格 Runtime 插件组装规范](../../../design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md)
 - [Agent 测试策略](../../../design-docs/agent-plugin-runtime/agent-testing.md)

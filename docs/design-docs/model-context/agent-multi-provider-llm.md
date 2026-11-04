@@ -1,9 +1,7 @@
 # 多供应商 LLM、模型管理与任务模型设计
 
-## 文档状态
+## 当前范围
 
-- 状态：代码已落地，待用户统一手动验收。
-- 确认日期：2026-08-09。
 - 当前文字模型供应商：DeepSeek、Kimi、OpenRouter。
 - DuckCoding 文字模型供应商已退役；历史配置会在启动时清理，但图片生成仍使用独立的 `image-generation` 连接配置，默认端点可以继续是 DuckCoding Images API。
 - 对应 execution plan：`docs/exec-plans/completed/20260724-multi-provider-llm/README.md`。
@@ -14,7 +12,7 @@
 相关当前实现文档：
 
 - `packages/core/runtime/`、`packages/llm/` 与 `docs/design-docs/agent-plugin-runtime/`：当前 v2 Runtime、LLM 领域包与插件边界事实。
-- `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置中心的信息架构、模型统一流程和持久化边界；旧设置页仅作迁移追溯。
+- `docs/exec-plans/completed/design-archive/frontend/front-设置中心重构规范.md`：当前设置中心的信息架构、模型统一流程和持久化边界；旧设置页仅作迁移追溯。
 - `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：模型 usage、价格快照和成本统计。
 
 ## 背景
@@ -433,7 +431,7 @@ OpenRouter 连接成功后自动安装少量精选模型，覆盖：
 
 ## 设置页信息架构
 
-当前设置中心重构后，顶层不再提供“服务商”或“智能体”页面，只保留一个“模型”页面作为 Provider、Connection 和 Model 的统一用户入口。数据层仍然保持三者分离，详细的页面、交互和持久化目标以 [`front-设置中心重构规范.md`](../frontend/front-设置中心重构规范.md) 为准。
+当前设置中心重构后，顶层不再提供“服务商”或“智能体”页面，只保留一个“模型”页面作为 Provider、Connection 和 Model 的统一用户入口。数据层仍然保持三者分离，详细的页面、交互和持久化目标以 [`front-设置中心重构规范.md`](../../exec-plans/completed/design-archive/frontend/front-设置中心重构规范.md) 为准。
 
 ```text
 模型
@@ -518,7 +516,7 @@ settings.json
 └── activity.usage
 ```
 
-其中 `models.connections`、`models.definitions` 和 `models.installed` 使用稳定 ID，`taskBindings` 只保存稳定的 `modelKey` 引用。完整结构、v3 → v4 迁移和页面偏好边界见 [`front-设置中心重构规范.md`](../frontend/front-设置中心重构规范.md)。
+其中 `models.connections`、`models.definitions` 和 `models.installed` 使用稳定 ID，`taskBindings` 只保存稳定的 `modelKey` 引用。完整结构、v3 → v4 迁移和页面偏好边界见 [`front-设置中心重构规范.md`](../../exec-plans/completed/design-archive/frontend/front-设置中心重构规范.md)。
 
 敏感值：
 

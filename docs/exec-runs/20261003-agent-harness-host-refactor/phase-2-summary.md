@@ -35,14 +35,14 @@
 
 执行统一委派 GPT-6.1 Sol，使用独立临时数据、本机模型夹具与假凭据。不是对真实模型供应商的验证。
 
-- [首轮及解锁补验](phase-2-computer-use-acceptance.md)：U1–U6 的模式、队列、补充、后台、审批、恢复记录。
-- [取消修复复验](phase-2-fix-computer-use-acceptance.md)：不重载即可 Stopped/空闲、未读补充归普通暂停队列、继续后完成。CU-B01 已解决。
-- [最终交互补验](phase-2-final-computer-use-acceptance.md)：新 PNG 提交成功并预览、回复批注提交/查看、/compact 排队→停止暂停→继续压缩通过；最终实例停止→暂停→继续普通消息亦通过。11 子项中 10 通过、1 无现有 FileReference UI 入口，0 新增确认 Bug。
+- 首轮及解锁补验（原始记录已清理，见 git 历史）：U1–U6 的模式、队列、补充、后台、审批、恢复记录。
+- 取消修复复验（原始记录已清理，见 git 历史）：不重载即可 Stopped/空闲、未读补充归普通暂停队列、继续后完成。CU-B01 已解决。
+- 最终交互补验（原始记录已清理，见 git 历史）：新 PNG 提交成功并预览、回复批注提交/查看、/compact 排队→停止暂停→继续压缩通过；最终实例停止→暂停→继续普通消息亦通过。11 子项中 10 通过、1 无现有 FileReference UI 入口，0 新增确认 Bug。
 
 FileReference 后端字段与 IPC 转换有自动化兼容证据，但当前 Composer 没有生成文件引用的 UI 入口。工作区文件预览不是引用提交。P2 不新增此功能，也不将回复批注当成 FileReference 验收；两者分开记录。
 
 ## 统计与后续阶段
 
-使用原 `architecture-refactor` before 基线生成 [after 统计](../architecture-refactor/refactor-stats-after.md)，未覆盖 before。该统计包含 P1+P2 和原基线以来的工作区变更，不是纯 P2 diff；源码行数并非质量评分。精简以解耦为前提，最终文档/目录集中整理属于 P5。
+使用原 `architecture-refactor` before 基线生成 after 统计（原始记录已清理，见 git 历史），未覆盖 before。该统计包含 P1+P2 和原基线以来的工作区变更，不是纯 P2 diff；源码行数并非质量评分。精简以解耦为前提，最终文档/目录集中整理属于 P5。
 
 P3 将讨论 Patch 的候选准备、基线冲突、审批、显式启用和回退；本轮没有实现任意插件打包或在线启用。P4 的独立 Host、远端 WSS/SSH 和后续手机服务仍未交付。真实 Provider、Chrome Extension、签名安装包属于独立外部验证门槛。

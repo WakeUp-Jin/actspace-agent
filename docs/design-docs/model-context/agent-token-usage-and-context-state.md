@@ -1,6 +1,6 @@
 # Token Usage 与 Context Projection
 
-> 状态：当前 v2 设计与实现事实。v1 的 `context_snapshot`、独立 Context state 文件和可变 conversation 持久化不再使用。
+> 当前 v2 设计与实现事实。v1 的 `context_snapshot`、独立 Context state 文件和可变 conversation 持久化不再使用。
 
 Session、Surface 和 request snapshot 的规范分别见：
 
@@ -69,7 +69,7 @@ Snapshot 的作用是：
 - 为 Context、Trajectory 和故障恢复提供确定输入；
 - 在恢复时结合 request/terminal 关系识别未结束请求；dispatch 的外部效果边界仍由对应恢复契约解释，snapshot 自身不证明请求已发送。
 
-Snapshot 不得包含 API Key、Authorization、Cookie、proxy credential 或其他 secret-like 字段。`packages/context/src/request-snapshot.ts` 会拒绝非 JSON 值、非有限数字、过深对象和敏感字段名。
+Snapshot 不得包含 API Key、Authorization、Cookie、proxy credential 或其他 secret-like 字段。`packages/context/context-engine/src/request-snapshot.ts` 会拒绝非 JSON 值、非有限数字、过深对象和敏感字段名。
 
 schema v2 中，`facts` 保留完整审计事实，`modelFacts` 只保存真正进入 system prompt 的稳定事实。动态 run/request/Host identity 可以出现在 `facts`，不得因此污染 `renderedSystemPrompt`。新请求的 Agent mode、日期与时区由 Context runtime 来源保存为 surface:null 的补充事件，转换时插入完整工具批次后的模型消息；Context 估算计入最终消息，UI 不伪造用户气泡，Compaction 不把这类导航/运行补充当作用户要求。旧消息中已有的 runtime-context 仍兼容转换。
 
@@ -154,7 +154,7 @@ sessions-v2/<sessionId>/journal.jsonl
 ```
 
 - `activity.usage` 由 Main Settings Authority 通过 typed IPC 读写，跨窗口和重启恢复；它不能被解释为计费数据，也不能改变历史聚合结果。
-- Usage 明细继续由 Journal Projection 提供，当前通过 typed `usage-activity:get` IPC 返回事件级快照。正在实施的 `runtime-v2/usage-read-model.sqlite` 是可删除、可重建的查询读模型。Main 通过 Provider 有界读取，SQLite Worker 按需同步并查询；Agent Loop 和轨迹详情仍读取 Session，实施及验收状态见[SQLite 专题](../筛选存储改版V2-增加SQLite/README.md)。
+- Usage 明细继续由 Journal Projection 提供，当前通过 typed `usage-activity:get` IPC 返回事件级快照。`runtime-v2/usage-read-model.sqlite` 是可删除、可重建的查询读模型。Main 通过 Provider 有界读取，SQLite Worker 按需同步并查询；Agent Loop 和轨迹详情仍读取 Session，设计见[数据存储结构与职责](../core-data-storage-design.md)第 15–16 节。
 - 清理或重建 Usage 派生数据不得删除 Session Journal、会话历史、设置或凭据。
 - 页面筛选状态可以改变查询参数，但不能回写 Journal 中的 usage，也不能用 Context estimate 修正 provider usage。
 
@@ -237,12 +237,12 @@ Compaction 不删除 Journal 历史，而是为有效 Session Surface 追加 rep
 
 ## 代码事实入口
 
-- `packages/context/src/assembly.ts`：contributor 排序、required / optional 语义；
-- `packages/context/src/request-snapshot.ts`：snapshot 冻结与 secret-like 字段拒绝；
+- `packages/context/prompt/src/assembler.ts`：contributor 排序、required / optional 语义；
+- `packages/context/context-engine/src/request-snapshot.ts`：snapshot 冻结与 secret-like 字段拒绝；
 - `packages/core/runtime/src/projection/durable-session.ts`：durable usage 聚合；
 - `packages/core/runtime/src/projection/durable-session.ts`：Host Context 与 Usage facts；`packages/client/client/src/sessions/selectors.ts`：Client Context 与 Usage projection；
-- `packages/compaction/src/plugin.ts`：Surface compaction transaction；
-- `packages/compaction/src/policy.ts`：默认 compaction policy。
+- `packages/context/context-compaction/src/plugin.ts`：Surface compaction transaction；
+- `packages/context/context-compaction/src/policy.ts`：默认 compaction policy。
 
 ## 验收
 

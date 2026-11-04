@@ -1,23 +1,20 @@
 # 本地模型目录与使用费用设计
 
-> 状态：2026-09-07 实现完成；自动化与浏览器验证已执行，真实 Electron / Provider 验收边界见执行摘要。
-> 执行入口：[使用统计更新计划](../../exec-plans/completed/20260906-actspace-usage-statistics/README.md)。页面设计：[使用统计页面更新](../frontend/front-usage-statistics-refresh.md)。
+> 执行入口：[使用统计更新计划](../../exec-plans/completed/20260906-actspace-usage-statistics/README.md)。页面设计：[使用统计页面更新](../../exec-plans/completed/design-archive/frontend/front-usage-statistics-refresh.md)。
 
 ## 目标与已有证据
 
 费用能够解释来源；没有价格或完整用量时显示未知；模型目录在断网时仍可使用；目录更新不阻塞启动、请求发送或统计页面。
 
-2026-09-06 历史问题快照（下列旧路径与缺陷用于解释修复动机，现行实现已迁至 pi-ai-adapter 与对应价格投影，不应据此恢复旧 wire engine）：
+现状与约束：
 
-- `packages/llm/llm-pi-ai/src/pi-ai-wire-engine.ts` 的 `createModel` 将四类 token 单价固定为零；`mapUsage` 又将 SDK 计算出的 `cost.total` 标记成 `provider-reported`。这不是供应商实际返回的账单金额。
-- `packages/llm/llm-pi-ai/src/legacy-proxy-wire-engine.ts` 缺少价格计算，费用保持空值。两条请求路径需要共用计价规则。
-- `apps/desktop/src/main/runtime-v2/legacy-llm-adapter.ts` 未将已解析模型的价格传入请求；现有 `model-runtime-service.ts` 已处理价格倍率，接入时必须避免乘两次。
+- 价格由已解析模型的目录价格经 `calculateUsageCost`（`packages/llm/llm-service/src/usage-cost.ts`）计入，`pi-ai-stream.ts` 与 `legacy-proxy-wire-engine.ts` 两条请求路径共用这套计价规则；没有价格或用量不完整时费用保持未知，不把 SDK 估算冒充供应商账单。
 - `packages/core/runtime/src/projection/durable-session.ts` 维护 durable provider usage，`packages/client/client/src/sessions/usage-aggregates.ts` 负责展示聚合；工具活动不混入 provider usage，缺失价格仍显示未知。
-- 本地脱敏样本中，144 条 assistant 记录为零费用且标记为供应商来源，另有 3 条没有费用。这是所检查样本的结果，不代表全部使用历史。
+- 价格倍率只在模型运行时服务里应用一次，请求链路不得重复相乘。
 
 ## 参考 pi，明确移植边界
 
-核验日期为 2026-09-06，参考上游 main；本仓库安装的 pi-ai 为 0.82.1，不能假定它自动包含上游 coding-agent 的目录刷新能力。
+参考上游 main；本仓库安装的 pi-ai 为 0.82.1，不能假定它自动包含上游 coding-agent 的目录刷新能力。
 
 - [pi 生成脚本](https://github.com/earendil-works/pi/blob/main/packages/ai/scripts/generate-models.ts)：提取 models.dev、OpenRouter 等来源，生成随包交付的模型数据。
 - [pi 远端目录实现](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/remote-catalog-provider.ts)：恢复本地数据，检查 4 小时 TTL，使用条件请求，刷新失败保留旧数据。

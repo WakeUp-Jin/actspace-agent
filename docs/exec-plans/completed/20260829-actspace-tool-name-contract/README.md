@@ -16,7 +16,7 @@
 - [Tool Runtime 内核与外壳边界](../../../design-docs/agent-plugin-runtime/agent-spec-tool-runtime-boundary.md)
 - [ActSpace v2 Tool Runtime ABI](../../../design-docs/agent-plugin-runtime/agent-spec-tool-runtime-abi.md)
 - [DSH 风格 Session 事件模型](../../../design-docs/agent-plugin-runtime/agent-spec-dsh-event-model.md)
-- [Agent Loop Cordis 插入面与通知面](../../../design-docs/agent-plugin-runtime/agent-spec-agent-loop-cordis-surface.md)
+- [Agent Loop Cordis 插入面与通知面](../../../design-docs/agent-plugin-runtime/agent-spec-cordis-event-abi-and-eventhub-retirement.md)
 - `tmp/deepseek-harness/packages/core/tools/src/index.ts`
 - `tmp/deepseek-harness/packages/core/session/src/types.ts`
 - `tmp/deepseek-harness/packages/llm/llm-deepseek/src/serialize.ts`

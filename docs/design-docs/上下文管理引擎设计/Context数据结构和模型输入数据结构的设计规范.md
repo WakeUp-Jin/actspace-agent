@@ -1,6 +1,6 @@
 # Context数据结构和模型输入数据结构的设计规范
 
-状态：2026-10-06 第一版实现已接入；自动化与真实界面的验证范围见[执行摘要](../../exec-runs/20261006-context-management-engine/execution-summary.md)。本文维护设计契约，不承诺未执行的 Provider 验收。
+第一版实现已接入；自动化与真实界面的验证范围见[执行摘要](../../exec-runs/20261006-context-management-engine/execution-summary.md)。本文维护设计契约，不承诺未执行的 Provider 验收。
 
 ## 1. 设计定位
 
@@ -290,4 +290,4 @@ LlmInput
 
 ## 实施接线
 
-已整理[执行计划](../../exec-plans/completed/20261006-context-management-engine/README.md)和[共享实施契约](../../exec-plans/completed/20261006-context-management-engine/shared-contracts.md)，明确补充生命周期、压缩持久化与 fork；实现入口是 `packages/context/src/engine.ts`，验证范围见执行摘要。
+已整理[执行计划](../../exec-plans/completed/20261006-context-management-engine/README.md)和[共享实施契约](../../exec-plans/completed/20261006-context-management-engine/shared-contracts.md)，明确补充生命周期、压缩持久化与 fork；实现入口是 `packages/context/context-engine/src/engine.ts`，验证范围见执行摘要。

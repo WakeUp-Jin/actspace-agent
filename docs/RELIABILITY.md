@@ -25,7 +25,7 @@ Desktop 启动必须初始化：
 ## Runtime 与 Host
 
 - 一个 Host 进程只允许存在一个 ready Profile root。
-- Desktop 与 CLI 共享 `bootRuntime()`、Profile / Bundle / Patch、领域插件和 shutdown 语义，不实现第二套 Agent engine。
+- Desktop 与 CLI 共享 `bootProfileRuntime()`、Profile / Bundle / Patch、领域插件和 shutdown 语义，不实现第二套 Agent engine。
 - Cordis 管理插件 Service / Effect 生命周期；Host 管理 credentials、filesystem、shell、browser 和 UI ports。
 - 配置或插件集合变化采用 restart-only。运行中的实例不热替换 Plugin Entry；diagnostics 必须能报告 `restartRequired`。
 - 沙箱继承模式只能由 Host 的显式启动参数打开（CLI `--sandbox-inherited` 写进 Host 沙箱端口），不读环境变量，也不来自插件配置。CLI `--harness` 按指定选择启动，要求 `--data-dir` 下没有选择历史，挂载失败以 `HARNESS_SELECTION_INVALID`（退出码 3）结束，不回退到默认 Harness。
@@ -42,7 +42,7 @@ Desktop 启动必须初始化：
 ## Projection 与可观测性
 
 - Durable Session、live progress 和 diagnostics 是三条不同投影：durable 数据可由 Journal 重建，live progress 允许进程结束后消失，diagnostics 不进入模型上下文。
-- Context 面板、Usage、Analysis 和 Trace 视图当前都从 `request/snapshot`、`llm/usage`、Turn、Tool 与 Compaction Journal event 派生，不读取独立 `context-state` 或 Trace sidecar。
+- Context 面板、Usage 与轨迹视图当前都从 `request/snapshot`、`llm/usage`、Turn、Tool 与 Compaction Journal event 派生，不读取独立 `context-state` 或 Trace sidecar。
 - `agentRunId -> turnId -> stepId -> requestId` 是运行层级。UI 可以使用 `llmCallId` 作为 request ID 的展示名称，但不得把一次 Agent Run、一次 Turn 和一次 provider request 合并成同一身份。
 - Runtime Projection 必须执行字段白名单、字符串上限、artifact 归一化与 secret redaction；renderer 不直接读取 Session 文件。
 
@@ -71,6 +71,6 @@ Desktop 启动必须初始化：
 
 - `packages/core/runtime` 的直接 lifecycle / shutdown 测试仍需补强；当前主要由 CLI 和 Host integration 间接覆盖。
 - 真实 Provider、Browser、DMG、签名与公证受当前网络或宿主能力限制，仍未形成最终发布证据。
-- Renderer 主 bundle 及部分大型组件需要后续性能和可维护性拆分，但不属于本轮文档真相修复。
+- Renderer 主 bundle 及部分大型组件需要后续性能和可维护性拆分，但尚未排期。
 
-CI/CD 与制品规则见 [`CICD.md`](CICD.md)；供应链边界见 [`SUPPLY_CHAIN_SECURITY.md`](SUPPLY_CHAIN_SECURITY.md)。
+CI/CD、制品规则与供应链边界见 [`CICD.md`](CICD.md)。

@@ -1,462 +1,141 @@
 # 中间消息区规范
 
-> 排版基线见[消息流排版与工具摘要规范](front-tool-stream-typography.md)：过程行 14px/22px、400；过程间距 5px、过程与正文 14px、正文之间 23px、最终回复边界 18px。外部间距统一由消息容器负责。
+只管消息流与工具流：消息语法、排版与间距、各类消息块、运行中态和工具审批。轮尾（操作、用量、改动卡、交付卡）、轮次导航、压缩分隔线、步数上限见 [front-轮尾与导航规范.md](front-轮尾与导航规范.md)；输入区与消息队列见 [front-聊天输入框规范.md](front-聊天输入框规范.md)；Markdown 正文见 [front-聊天区Markdown渲染规范.md](front-聊天区Markdown渲染规范.md)；子 Agent 卡与右侧面板见 [front-子Agent与后台任务规范.md](front-子Agent与后台任务规范.md)。
 
-## 定位
-
-中间区域是主工作区，承载对话、工具流和最终回复。
-
-工具流的数据契约遵循 [`工具预览设计规范`](../tool-system/agent-tool-preview-design-guidelines.md)。前端组件消费 `ToolUiPreview` 派生出的 `MessageBlock` 字段，不直接展示工具原始参数。
+工具流的数据契约遵循 [工具预览设计规范](../tool-system/agent-tool-preview-design-guidelines.md)：组件消费 `ToolUiPreview` 派生出的 `MessageBlock` 字段，不直接展示工具原始参数。颜色、字号阶梯等全局规则见 [front-视觉token规范.md](front-视觉token规范.md)，文案与状态表达见 [front-文案与状态表达规范.md](front-文案与状态表达规范.md)。
 
 ## 消息语法
 
-- 按模型执行顺序展示。
-- 一次消息可能包含多轮思考、工具调用、编辑和最终回复。
-- 每种消息类型使用不同组件，但保持同一条消息流里的节奏一致。
-- 同一轮里的 Thinking、Read/Grep/Glob/Web Search、Edit/Write File 和普通回复使用统一左边缘，不保留旧头像占位缩进。
-- 运行时平铺全部过程，完成后统一收进一个 `Worked for`，不再设置 `Explored` 分组；子 Agent 仍可点击打开右侧详情。
-
-## 消息类型
-
-- 用户消息。
-- 助手普通回复。
-- Thinking。
-- Read。
-- Grep。
-- Glob。
-- Web Search。
-- Directory List。
-- Bash。
-- Agent / SubAgent Run。
-- Edit File。
-- Write File。
-- Context Compaction。
-- Final reply。
-
-## 类型规则
-
-- 用户消息用卡片显示；超长内容两态折叠（2026-07-05 定稿，对齐 Cursor）：
-  - **默认折叠**：只露前几行（max-h 88px）、`overflow-hidden` 不出滚动条，底部用随主题翻转的渐隐遮罩（`from-surface to-transparent`）暗示还有内容。turn prompt 是 sticky 定位，折叠态让长消息对下方模型回复的遮挡降到最小。
-  - **点击展开**：撑到 `min(240px, 32vh)`、内部滚动；**收起只通过点击卡片以外的任意位置触发**，再点卡片不收起（避免在展开内容里点击/选择时意外合上）；用户拖选文字复制时（存在文本选区）不触发展开。
-  - 短消息（未超过折叠高度）不参与：无手型光标、无遮罩、无点击交互。
-- 用户消息中的图片缩略图是可点击、可键盘聚焦的对象入口；激活后在右侧打开 Image Tab，与 Composer 发送前预览保持一致。没有可用预览数据时按钮禁用，不尝试由 renderer 直接读取本地路径。
-- 图片预览恢复只对缺少预览的图片调用会话产物 IPC；无附件或无待加载图片时不更新预览状态，相同恢复结果保持原状态引用，避免纯文本消息触发 effect 反馈循环。
-- 上下文压缩只替换模型后续输入，不撤销历史消息的图片访问。main 在当前投影缺少引用时查该 Session 已验证 Journal 的 append surface；仍校验会话所有权、媒体类型和字节完整性，不接受文本中的 ID、其他 Session 或 renderer 本地路径。回滚暂存附件亦须保护已持久化的历史引用。
-- 助手普通回复用正常文本块显示，不在消息正文前重复展示头像、产品名或模型名。
-- 助手回复的 Markdown 排版、行内代码、代码块、路径、提示框、公式、图片和流式效果，以 [聊天区 Markdown 渲染规范](front-聊天区Markdown渲染规范.md) 为准。行内代码是 1px 细边框、5px 圆角、淡底，路径是强调色加文件图标，可以点开；代码块无边框，头部按钮在悬停时出现。
-- Markdown 链接按目的地处理：HTTPS 等外链保持系统外开；工作区文件使用既有文件入口（可带行号，只对 Markdown 生效）；远程图片不加载；`#fragment` 仅在当前回复内查找目标、滚动并转移键盘焦点，不改变 Electron 顶层 URL 或创建窗口。脚注引用、定义、回链及其无障碍描述使用每条回复稳定的命名空间，避免多回复同名脚注串跳；流式追加不改变已有目标身份。不得放宽导航安全策略来补偿正文链接分类错误。
-- 助手回复（含子 Agent 最终报告）中语言完整匹配 `mermaid` 且 fence 已闭合的代码块渲染为图表：外壳与顶栏复用代码块样式（跟随聊天区规范 §6.8），顶栏提供查看源码、复制源码、下载 PNG、放大；画布使用固定的 Codex 浅色预设，不随应用主题翻转；流式中未闭合的 fence 仍按代码块显示；渲染失败只在该块显示提示并展开源码。详见 [`front-chat-mermaid-diagrams.md`](front-chat-mermaid-diagrams.md)。
-- Thinking 运行时按消息默认状态展示，允许手动折叠；最终回复完成后随 Worked 一起收起，再展开 Worked 时 Thinking 详情也保持收起。
-- Read、Grep、Glob 和 Web Search 保持文本流感，不做重边框。
-- Bash 正常执行态保持类似 Read 的轻量日志行；只有展开后的命令输出区域使用单层浅色容器。
-- Bash 审核态可以使用轻量边框块，因为它承载用户操作，不属于普通执行日志。
-- Agent 是聚合执行对象：主消息流显示可点击的紧凑两行入口，展示状态点、任务名、Agent/Explore 类型、状态和最新一行活动；不展示额外 logo、机器人图标或全大写状态噪音。完整 transcript 通过右侧 Subagents Tab 展示，不使用全局遮罩弹窗，也不在主消息流原地展开。
-- Edit / Write File 与 Read 等保持同样的纯文本工具行节奏，仅在用户主动展开时显示 diff 详情容器。
-- Context Compaction 是系统执行事件，不属于工具调用，也不渲染为 Tool Preview；手动 `/compact` 和自动压缩共享同一消息块与同一套 UI。
-- Final reply 作为收束结果，保持最清晰的阅读层级。
-
-## Assistant 回复尾栏
-
-每个用户 turn 的最终可见 Assistant 回复下方提供一条轻量尾栏，把消息操作、本轮用量和时间放在同一行。布局和弹窗照 DeepSeek Harness 的 `TurnUsagePanel`（参考源码在 `tmp/deepseek-harness`），实现见 `conversation/TurnActions.tsx`、`TurnUsagePill.tsx`、`turn-usage.ts`。
-
-### 展示与交互
-
-- 从左到右：复制、回复可视化、更多操作，然后是「用量 88K tok」胶囊和回复时间。
-- 最新一轮（已结束）的尾栏一直显示；更早的轮次默认透明且不响应鼠标，悬浮或键盘 focus 进入该轮时淡入（`data-turn-actions-reveal="always" | "hover"`）。
-- 胶囊点开是「本轮用量」弹窗（`ui/Popover`），标题行右侧是精确总数，下面依次是：提供方 / 模型、缓存命中、未缓存输入、缓存读取、缓存写入、输出（有推理时附「其中推理 …」）、花费。弹窗内容组件 `stats/StatDialog.tsx` 和输入框状态栏的统计胶囊共用。
-- 480px 以下胶囊只留数据库图标，弹窗里照常有文字。
-- 用户消息、Thinking、工具日志和 Context Compaction 不单独展示用量尾栏。
-
-### Usage 语义
-
-- 本轮用量按 run 聚合该轮全部 `llm_usage`（`createMessageBlocks`），只挂到该 turn 最后一条可见 Assistant 回复；包括工具调用前后的多次模型请求和失败重试（`llm/retry`）的真实消耗。
-- `llm_usage` 由 `packages/client/client/src/sessions/chat.ts` 从 `step/end` 和 `llm/retry` 投影，每次请求一条；没有 usage 的 `step/end`（中断、失败）不记。`assistant/message` 带的是同一份 usage，不重复计。
-- 提供方 / 模型取每次请求计价快照里的 `providerId/apiModel`；request context 里的 route 常是 `default`，拿不到真实值时整行不显示。
-- 外部接口返回 CNY 时按 `7.2 CNY = 1 USD` 转成 USD；费用最多显示 6 位小数，避免低成本调用被舍成 `$0.00`。
-- 花费按请求的计价口径汇总：全部能算出价格时显示金额，有按参考价预估的请求时后面标灰色「预估」；有请求算不出价格时不给偏小的数，显示「部分未知」（其余请求有价格）或「未知」。
-- 一个 token 都没有（旧 session、全部中断）时不显示胶囊，只显示操作和时间，不伪造 token 或费用。
-
-## 长会话轮次导航与回到底部
-
-当会话内容已经超过消息视口、并且至少包含 3 个用户 turn 时，消息区左侧显示一条紧凑轮次导航轨。它服务于长会话定位，不是新的会话 Sidebar，也不改变 session 数据契约。
-
-### 轮次导航轨
-
-- 每条短横线对应一个由用户消息开始的 turn；Thinking、工具调用、Assistant 中间旁白和 Context Compaction 不单独生成刻度。
-- 当前阅读位置对应的刻度加长并使用主文字色；普通、hover、focus 使用中性灰阶，不使用 operational green 表达选中。
-- hover 或键盘 focus 某个刻度时，以该刻度为峰值、按相邻距离逐级缩短标记宽度，形成稳定的山峰波形；按钮命中宽度保持不变，离开后恢复为“当前 turn 加长、其余短线”的安静状态。
-- 悬浮或键盘 focus 刻度时，在右侧展示轻量摘要卡：用户输入最多两行，最终 Assistant 回复最多三行；正在执行且没有最终回复时显示 `正在执行…`。
-- 点击刻度滚动到该 turn 的用户消息，并暂停贴底跟随；用户回到底部后恢复自动跟随。
-- 当前 turn 由消息滚动容器内的阅读基准线计算，不依赖重新读取 session events，也不为导航复制一份消息状态。
-- 轮次过多时在有限高度内压缩刻度间距；消息视口小于 `640px` 时隐藏导航轨，优先保护正文与 Composer。
-
-### 回到底部按钮
-
-- 当消息区可滚动且距离底部至少 `80px` 时，在 Composer 上方居中显示圆形向下按钮。
-- 悬浮显示 `滚动到底部` Tooltip；按钮支持键盘 focus 和清晰的主题感知 focus ring。
-- 点击后直接滚到底部、恢复流式输出自动跟随并隐藏按钮。
-- 用户手动滚回距底 `80px` 内时按钮自动隐藏；点击历史刻度或主动上滚后按钮出现。
-- V0 不显示“未读消息数”等额外状态，避免建立第二套 unread 计数语义。
-
-### 滚动状态边界
-
-- `ConversationView` 的消息滚动容器是轮次导航、回底按钮和外层流式自动跟随的共同事实来源。
-- `ResizeObserver` 只在用户仍贴底时跟随内容增长；用户已经上滚时只能更新导航和按钮状态，不能重新把用户拉到底部。
-- `FileDiffBlock` 等内部滚动容器继续维护自己的贴底状态，不与会话外层合并。
-
-## Thinking 组件
-
-Thinking 是消息流中的折叠思考行。
-
-- 流式与历史消息都只在思考正文含非空白文字时展示 Thinking；空 delta、纯空白或只有签名/用量的响应不生成可见行。流式片段的原始空白仍保留，后续正文到达后按原格式展示。
-- 未收到有效正文时保留等待模型提示。签名属于供应商回传状态，reasoning tokens 属于用量事实，隐藏空 Thinking 不删除这些后台记录。
-
-### 结构
-
-- 一行简短标题，显示思考时长或状态。
-- 展开后在下方显示完整思考内容。
-- 不使用左侧竖线，不做卡片边框。
-
-### 交互
-
-- 运行时遵循消息默认展开状态，手动选择保留到整个回复结束；完成后默认折叠。
-- 点击后展开完整内容。
-- 展开与收起保持同一消息块内的连续性。
-- 折叠态使用向右箭头，展开态使用向下箭头；箭头仅在悬浮或键盘聚焦时可见。
-
-### 视觉原则
-
-- 保持文本流感。
-- 通过排版和间距体现层级，不靠重边框。
-- 与普通回复保持统一的主视觉语言。
-
-## 工具活动组与 Read / Grep / Glob / Web Search 组件
-
-Read、Search、Grep、Glob、Directory List、Web Search、Thinking、Bash、编辑记录和子 Agent 入口按原顺序统一纳入回合的 Worked 活动组。
-
-### 结构
-
-- 纯文本行展示。
-- 不使用图标（包括 Web Search，过去版本曾给它单独配 Globe 图标，已统一去掉）。
-- 不使用边框卡片。
-- 每行只保留工具类型和简短内容。
-- Read/List/Grep/Glob/Search 失败时仍保留动作与目标，并显示失败终态；诊断放入可展开详情，使用 danger 主题 token，允许长文本换行。失败 Read 不打开文件，也不展示旧成功预览。空目录明确显示 0 项，未获知结果时不伪造计数。
-
-### 交互
-
-- 工具行保持轻量展示，执行中平铺，最终回复完成后整个过程收起为一个 Worked。
-- 作为消息流中的日志条目存在。
-- 重新展开 Worked 后，每个工具的详情与 Thinking 均为收起状态；用户可以逐项展开。
-- 单独出现的工具行与 Thinking 保持同一语法体系，不依赖某一个具体工具组件。
-
-### 视觉原则
-
-- 保持最轻量的文本流感。
-- 用排版和留白区分层级，不靠装饰。
-- 更像执行日志，而不是功能卡片。
-
-## 图片生成工具与本轮产物
-
-- `Generate image` / `Generated image` 与 Read 使用同一单行工具日志语法，无图标、无外围卡片。
-- 行内依次展示尺寸、数量、prompt 摘要与模型名；超出消息宽度时单行省略，不能让 prompt 撑高过程区。
-- 生成成功后不在工具过程区直接放图片。只有当前 Agent Run 结束、最终回复完成后，才在回复下发布紧凑图片列表；流式文本、工具执行和审批期间都不提前出现。
-- 图片列表只收录生成的图片（`image_generation` 产物和工具 `artifacts` 中的图片），按路径去重。
-- 点击图片后打开右侧面板。加载中只在对应行显示小型 spinner，错误在组件底部显示轻量说明。
-- 悬浮图片行时用 Tooltip 展示完整绝对路径；列表本身仍只显示文件名和短路径，避免破坏消息密度。
-- 右键图片行打开 Electron 原生菜单，提供复制图片内容与 Finder 定位。Renderer 只传会话产物身份，main 必须重新校验 realpath 边界。
-- 工具过程与产物浏览分层：折叠 `Worked for` 不应隐藏最终产物栏。
-
-## 轮尾改动卡与交付文件卡
-
-最终回复之后、图片列表之前，按「改了什么」「交给你什么」分两张卡，接在尾栏（时间 / 费用 / 操作）上方。数据全部由本轮已完成的工具事件推导，不读 Git，也不从回复正文猜。当前规则以下文为准；早期轮尾卡片原型已迁出，见 [迁出清单](../retired-html-demos.md)。
-
-### 改动卡
-
-- 头部「已编辑 N 个文件」或单文件时「已编辑 {文件名}」，右侧给出 `+additions -deletions` 合计。行数按文件累加本轮 `write_file` / `edit_file` 的 diff，不冒充 Git 的工作区净 diff。
-- 新建文件去掉 diff 旧侧那行幽灵空行，不显示成「删除了 1 行」。同一文件多次编辑各段 hunk 按时间顺序排列，不尝试合并、不重算行号。
-- 文件列表超过 4 行折叠，展开后按顺序展示 workspace 相对路径、增删行数和新建 / 删除标记。
-- 悬停文件行 500ms 弹出该文件的 diff 浮层，宽度为卡片宽度减 48，最高 420px，鼠标移出 200ms 后关闭；浮层内不滚动整页。
-- 点击文件行在右侧面板打开「第 N 轮改动」标签：左侧文件列表，右侧左右对比 / 单栏、自动换行、文件菜单和「打开整个文件」；纯新增的文件即使开着左右对比也只渲染单栏。
-- 本轮新建又在同一轮删掉的文件直接去掉，不算改动；删除本轮之外已存在的文件时保留该行并标记为删除。
-- 远端会话只能预览或下载，不显示原生应用按钮。
-
-### 交付卡
-
-- 数据来自 Agent 调用的 `present` 工具，只收录工作区内的相对路径。同一路径多次声明时保留第一次出现的顺序，描述取最后一次。
-- 文件以卡片网格展示，带文件类型图标与描述；超过 4 个折叠。
-- 点击卡片在右侧面板预览（远端经 Host 读取）；卡片右侧的默认应用按钮用系统默认应用打开，下拉菜单列出关联应用，最后一项是「显示文件位置」。
-- 右键卡片：本地会话弹 main 的文件菜单（在 Finder 中显示、拷贝路径等），远端会话改为经 Host 下载。
-- 关联应用列表由 main 提供（macOS JXA 查询并缓存）。Renderer 只传 workspace 相对路径，main 重新校验 realpath 边界。
-
-### 设置开关
-
-- 设置中心「通用」里的「显示本轮代码改动」默认开，只隐藏改动卡；交付卡和图片列表不受影响。
-- 开关切换立即生效，不需要重开会话或刷新。
-
-### 可见性
-
-- 两张卡都在本轮最终回复完成后出现；流式文本、工具执行和审批期间不出现。
-- 本轮既没有改动也没有交付时，尾栏退回原有形态，不渲染空卡片。
-
-## Bash 组件
-
-Bash 是命令执行工具，包含正常执行态和审核 pending 态。
-
-### 正常执行态
-
-- 折叠行和 Read / Grep / Glob / Web Search 同级，不使用图标，不使用外围卡片。
-- 行文使用 `Ran ...`、`Running ...`、`Denied ...` 等状态前缀。
-- 行尾使用展开箭头。
-- 展开后只有一个浅色单层容器。
-- 容器内直接展示 `$ command`、cwd、exit code、stdout 和 stderr。
-- 命令行和输出不再各自嵌套边框。
-- 长输出在容器内滚动，不撑开整条消息流。
-
-### 审核态
-
-- 审核态使用「工具审批」小节的卡片形态：头行显示终端图标、intent（缺省“Bash 命令”）和淡色的命令名摘要（如 `git, tail`），下方一条分割线。
-- 主体显示带简单着色的 `$ command`（`shell-highlight.ts`：命令名、连接符、引号字符串、参数各一色，取 `.act-code-hl` 的主题变量），过长时在卡内滚动。
-- 不显示原因托盘：Bash 目前没有模型给出的真实原因，通用审批提示不展示，未知原因收进 Info 图标的 tooltip。
-- 底部左侧显示执行环境（“沙盒”/“真实环境”），cwd 只在不是工作区根目录时跟在后面；右侧显示“拒绝”“运行”。
-- 审核通过后，同一条工具调用应转换为 running/success/failed 展示，而不是生成一个割裂的新块。
-
-### 状态
-
-- `pending`：等待用户审核。
-- `running`：已允许，正在执行。
-- `success`：执行成功。
-- `failed`：执行失败或非零退出。
-- `denied`：用户拒绝。
-- `expired`：审核过期。
-- `cancelled`：被取消。
-
-## 工具执行中态规范
-
-所有工具行（包括 Read、Grep、Glob、Web Search、Directory List、Bash、Edit/Write File、图片分析和图片生成）在 running 阶段使用统一的 text shimmer 视觉，不引入额外的图标或动效层。流式 Thinking 标题和模型等待文案复用同一视觉语言，避免运行链路在工具之外重新变成静默。
-
-### 视觉
-
-- 采用 B 方案的高明度差中性组合：底层使用 `--act-color-text-faint`，扫光中心使用 `--act-color-text`。浅色主题呈现浅灰底字上的深墨扫光，深色主题由同一组 token 自动翻转为暗灰底字上的亮墨扫光。
-- 实现方式：running 文本统一使用 `.tool-log-text-running`。`::after` 通过 `content: attr(data-shimmer-text)` 复制同一段文字，再用 `background-clip: text` 裁出墨色扫光层。动画背景必须限制在 inline 文本盒子内，不允许占满整条工具行。
-- shimmer 使用中性色而不是 operational green；绿色只负责运行圆点等离散状态信号，不把整行文字染成绿色。
-- 颜色必须走主题 token，禁止在 running shimmer 中写死 `#hex` 作为基础色或高光色。
-- 完成态文字色直接回到默认 muted 灰，无切换动画。
-
-### 时序
-
-- 一轮 shimmer 约 1.1s。
-- shimmer 自然循环：工具执行时间长就多扫几次，执行时间短就直接进入完成态。
-- 不为了显示 shimmer 而人为延长 running 态；收到 `tool_finished` 后立即切换完成态，即使一轮扫光尚未结束。
-- 流式 Thinking 仅在它是当前最后一个 segment 时保持 running；工具或后续文本 segment 出现后立即停止。持久化回读的 Thinking 默认是 completed，不回放历史动画。
-- `prefers-reduced-motion` 下取消扫光，保留 faint 底字；running 语义由附近的状态文案、运行圆点和当前流式位置共同表达。
-
-### 文案
-
-- running 阶段只显示工具名 + 主参数，例如 `Read package.json`、`Grep ToolUiPreview in src`、`Write 秋日随笔.md`、`Edit index.ts`。
-- 进行中不展示数值统计（如 `+15`、`(12 entries)`）和折叠箭头。
-- 完成后才追加统计、entry 数、折叠 chevron 等额外字段。
-
-### 后端契约
-
-- 后端在 `tool_started.preview` 推送当前能确定的最小字段（filePath / command / query），不传未生成的数值（diff stats、entryCount 等）。
-- 完成态字段在 `tool_finished` / 持久化事件中补齐。
-- Agent 工具的内部 SubAgent transcript 不走普通 `tool_call_streaming`；bridge 用 `subagent_event.preview` 推送最新 `AgentToolPreview`，前端覆盖同一个 Agent block 的 running 状态。
-
-### 4 阶段工具生命周期
-
-LLM 生成工具调用是一段慢操作（write_file 一千多字符的 content 在国内 LLM 实测约 2–3s）。前端必须区分四个阶段，避免出现「assistant 文本后大段静默 → 突然蹦出完成态卡片」的体验断层：
-
-1. **dispatched**：bridge 收到首个 `tool_call_delta` chunk，emit `tool_call_streaming { isInitial: true, preview }`。此时 `preview.filePath` 等字段可能为空字符串，前端用 `Write file…` 等 fallback 文案展示 + shimmer。
-2. **argsProgress**：Write/Edit 在 Main 增量统计 content/new_string 字符量，每秒至多发布一次 generationProgress；不发送 streamingContent，不自动展开。其他工具保持稳定占位。
-3. **executing**：prepared 后一次补齐路径并显示“准备保存”；通过校验与审批、真正进入 body 后 emit tool_started，显示“正在保存” + shimmer。
-4. **finished**：bridge emit tool_finished，清除临时生成进度，使用真实结果的 diff + additions/deletions，切换为折叠摘要。
-
-前端实现要点：
-
-- `tool_call_streaming` 推过来的 preview 直接放进 `state.activeTools.get(toolCallId).preview`，复用与 `tool_started` 相同的 toolEntryToBlock 渲染分支，**不需要单独的 tool_pending segment 类型**。
-- `tool_call_streaming` 首帧（`isInitial=true`）才往 `state.segments` push tool segment；后续 frame 和 `tool_started` 都只是覆盖 preview，segment 位置保持不变，保证工具的位置在消息流中**严格反映 LLM 首次开始生成它的时机**。
-
-## Agent / SubAgent Run 组件
-
-Agent 是主 Agent 调用的聚合工具，用户可见为一个可点击执行块。它承载的是“另一个隔离上下文中的只读探索过程”，因此视觉上允许轻边框和块状入口，但内部仍遵守消息流语法。
-
-### 结构
-
-- 顶部显示 `description` 和进入 transcript 的箭头，不额外展示 logo、机器人图标或全大写状态行。
-- running / completed / failed / aborted 阶段都使用同一条紧凑两行入口：状态点、description、Agent/Explore 类型、状态和最新一行活动；入口带主题感知轻边框；running 的最新活动由真实 child 工具/模型阶段生成，语义变化即时显示，工具结束后保留“刚读取/刚搜索 + 对象”，使用 180ms、4px 上移交叉淡入淡出过渡，支持 reduced motion；正文生成显示“正在整理回复”，不展示流式正文，失败时最新一行承载具体错误原因。
-- 不在主消息区展示多行 transcript、stats 或独立的 `Explored N files · M tools · Ss` 卡片；完整过程统一进入右侧 SubAgent panel。
-
-### 交互
-
-- 整块可点击，打开右侧对象面板的 Subagents Tab，并选中对应子任务；详情顶部可返回列表。
-- 列表每秒刷新；运行中详情每 750ms 读取一次。关闭、切任务或切会话时释放轮询，忽略迟到响应。
-- 详情复用消息组件展示任务输入、Thinking、工具与最终回复；完成事实来自 child Session。
-- 不提供 child follow-up 输入，当前入口只负责观察执行流。
-
-### 数据边界
-
-- 组件只消费 `MessageBlock.kind === "agent"` 字段，不解析 raw args、raw output 或磁盘路径。
-- `transcriptRef.runId` 标识独立 child Session；主 Session 保存委派事实和工具结果，子任务内部事件保存在 child Journal，不存在独立 sidecar transcript。
-- `getSubAgentTranscript` 经 preload/main 读取 child Session snapshot 和 Journal，再转换为前端 SessionEvent；renderer 不直接访问文件系统。
-
-## Edit File / Write File 组件
-
-Edit File 和 Write File 是文件修改类工具消息。后端工具名为 `edit_file` 和 `write_file`（全部 snake_case），前端展示语义使用 `edit_diff` 和 `write_diff` 类型，共享同一个 `FileDiffBlock` 组件。
-
-它们与 Read / Grep / Glob / Web Search 在主消息流中保持同样的轻量行视觉重量，但比纯日志行多一层"展开看 diff"的能力。**不再使用 Edit File 独占的边框卡片样式**。
-
-### 结构
-
-- 单行折叠日志：`Edit index.ts +3 -1 ›`、`Write config.ts +15 ›`。
-- 行内不展示任何图标，保持与其他工具行的纯文本节奏。
-- 行左边缘与 Thinking、Read 等工具行对齐（共享同一 `conversation-text-inset`）。
-- 折叠箭头紧贴行尾文本，使用 `inline-flex` 布局，不被推到容器最右端。
-- 文件路径只展示文件名，不展示完整路径。
-- 修改统计 `+N` 用绿色、`-N` 用红色；删除数为 0 时不展示 `-0`。
-
-### 交互
-
-- 工具调用进行中：
-  - dispatched 阶段（filePath 还未解析出来）：显示 `Write file… · 正在生成` + shimmer；收到内容后每秒至多更新一次已生成字符量，不展示 `+0 -0`。
-  - argsProgress 阶段：保持一行，按一秒节奏显示取整后的已生成字符量；路径在 prepared 后一次补齐。
-  - executing 阶段（tool_started 后到 tool_finished 前）：显示“正在保存”，完成后才展示真实 diff。
-  - 整个 running 阶段无 chevron。
-- edit_file running 阶段**不展示** content/diff，只展示单行 `Edit index.ts` + shimmer（因为 partial old_string/new_string 无法生成有定位的 diff）。
-- 工具调用完成后：切换为折叠态 `Write short-story.txt +71 ›`，可点击展开。
-- 展开后下方出现 unified diff 容器，使用浅色单层背景，红绿区分增删行。
-- 折叠态使用向右箭头，展开态使用向下箭头，与 Thinking 保持一致。
-
-### 视觉原则
-
-- 与 Thinking 一致的"行内折叠"语法，不使用整张边框卡片包住摘要 + 折叠状态。
-- diff 内容容器仅在展开时出现，使用最低层级的浅色容器，不与摘要行重复装饰。
-- 与其它工具行保持同一左边缘和字号，避免在消息流中"突出"。
-
-## Context Compaction 组件
-
-Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接输入 `/compact` 手动触发，或回合结束后由后端自动触发；两者使用同一套 UI，消息流里不区分、不标注触发方式（触发方式只在轨迹详情里显示），都落到消息流中的 `context_compaction` 消息块。样式是一条居中分隔线（设计稿 `compaction-display-demo.html` 的 A1），当前展示以本节和正式应用为准。
-
-### 结构
-
-- 共同结构：一条居中分隔线，左右两段 1px 细线，线色比普通分隔线深一档（`border-strong` 40% 混入 `border`，类名 `compact-divider-line`），中间一组图标 + 文字，字号 `text-act-xs`。
-- running：中间是小转圈 + `正在压缩上下文` + 已用时间（`8s`，每秒刷新，来自 `startedAt`）；两侧细线各有一道 `operational` 色的光从外端收向中间文字（`compact-divider-running`，减少动态效果时不显示）。进行中不显示条数，手动和自动一致。手动 `/compact` 被任务服务领取后进入 running，等待时显示在队列中，不再显示淡色 `/compact` 命令行。
-- completed：中间是归档图标 + `以上 48 条消息已压缩` + `182K → 约 9.1K tokens · 23s` + `·` + `在轨迹中查看 ›`。
-  - 条数来自压缩区间大小。
-  - token 来自 `compaction/end.data.beforeTokens` / `afterTokens` / `beforeEstimated`。手动、自动压缩同一算法：压缩前 = 最近一次有效实测用量（往前跳过没有 usage 或 usage 全空的回复；若之后又发生过压缩，改用那次压缩的压缩后数）+ 之后新加内容的估算。压缩后 = 压缩前 − 被替换条目估算 + 摘要估算，总是写「约」。压缩前含估算时 `beforeEstimated: true`，也写「约」（如「约 182K → 约 9.1K tokens」）。自动压缩触发判断用的压力值不再参与显示。旧 journal 没有这两项时只显示条数和耗时。
-  - 耗时优先来自 `compaction/end.data.durationMs`，包含事务提交前的模型摘要等待；旧 journal 缺少该值时回退 `compaction/start` 与 `compaction/end` 的时间差，历史回放同样显示。
-  - `在轨迹中查看` 调用 `revealInTrajectory({ compactionId })`，切到轨迹并选中这次压缩的行；没有 `compactionId` 或不在工作台里（没有轨迹导航）时不显示。
-  - 摘要不在消息流里展开，只在轨迹详情里看。
-- failed：红色分隔线（`text-on-danger` + `bg-danger-soft` 细线），中间是警告图标 + `上下文压缩失败` + 原因 + 下划线文字按钮 `重试`，重试走同一 `/compact` 路径。任务失败状态由 TaskSnapshot 恢复；压缩未成功不提交摘要事务，失败展示可由任务结果恢复。
-- skipped（对话太短）：不进入消息流，只在 Composer 输入框顶部显示一行 `对话还很短，暂时不需要压缩`，约 3 秒后消失。
-
-### 交互
-
-- 被压缩的旧消息、工具调用继续在分隔线上方照常显示，不置灰；摘要不再投影成一张用户消息卡片，只在轨迹的压缩行详情里显示。
-- `/compact` 经统一 `submitTask` 接纳，由 Task 服务解释为压缩操作；繁忙时排队，不作为普通用户消息写入模型历史。任务契约见[Task/Run 规范](../agent-plugin-runtime/agent-task-run-lifecycle.md)。
-- 自动压缩属于当前 Agent Run：输入框为空时停止按钮可用，沿用 Run 的取消信号；取消请求处理中或 Host 不可达时禁用。独立 `/compact` 操作没有可取消的 Loop Run，停止按钮仍置灰并提示 `压缩完成后可继续`。压缩期间输入的消息进入消息队列（见下一节），后续执行遵守 Task 服务的暂停与恢复规则。
-- 自动压缩在工具批次全部完成后的 Step 安全点判断阈值，触发时先完成压缩再发下一模型请求；无工具的最终回复仍保留 Turn 收尾检查。非取消类压缩失败不使主运行失败；失败分隔线在 live run 结束后转由对应会话本地状态显示，直到下一次发送或压缩状态更新。该提示不跨应用重启持久化，不能等同于手动压缩的 Task 失败结果。
-- running 文本不做 opacity pulse、扫光或省略号动画；动态只交给进度条和计时数字。
-
-### 视觉原则
-
-- 所有状态保持轻量系统消息，不打断对话阅读节奏；它必须作为独立 timeline item 占据消息流位置，不能贴到上一条模型回复里。
-- 进度条宽度与中间内容列对齐，高度 3px；后端没有真实百分比，只用不确定样式，不伪造百分比。
-- 除展开 chevron 外不使用图标；状态由文案、位置、颜色和进度条表达。
-- 颜色只消费语义 token / 语义 Tailwind 类；同一属性的颜色类按状态二选一，不叠加。
-- `prefers-reduced-motion` 下进度条停止动画，状态仍能通过文案理解。
-
-## 消息队列与运行中引导
-
-回合运行中（包括上下文压缩中），用户仍可在 Composer 输入并发送。消息进入输入框上方的队列托盘，当前运行结束后按顺序自动发出，每条是一个新回合，不合并。队列托盘在输入框上方；早期 Composer 与 message-queue 原型均已迁出，当前行为以本节及 TaskLedger 生命周期规范为准。
-
-### 结构
-
-- 托盘在输入框外面、紧贴在它上方（间距 6px），与输入框同宽，外观是 `rounded-act-lg` + `border-composer` 细边 + `bg-surface`，不加阴影。没有标题行：计数和发送时机（`2 条排队，当前运行结束后依次发送` / `即将发送`，`N 条已引导`）在第一行左侧图标的提示里。暂停时列表下面多一行 `已暂停` + `继续发送`。列表最多露出 4 行（144px），再多在托盘内部滚动，不推动输入框。
-- 排队行：单行文本摘要，左侧 `ListOrdered` 图标；右侧依次是附件 / 引用数量（`1 个文件 · 2 条引用`，窄窗隐藏）、`↳ 引导`、删除图标、`···`，这三个动作平时 60% 不透明，悬停或键盘进入这一行时变实。`···` 菜单只有 `编辑`（输入框为空时可用，把这条放回输入框并移出队列）和 `上移`；删除不二次确认。
-- `/compact` 行用等宽字体，标 `命令`，没有引导。
-- 已引导行：排在最上方，行首是绿色呼吸圆点，文本降为 muted，右侧 `下一步读取` + `撤回`。
-
-### 交互
-
-- 发送按钮只有两种样子：输入框有内容时是 ↑（运行中点击或 Enter 即加入队列，aria-label / 提示为 `加入队列`）；运行中且输入框为空时是 ■ 停止（压缩中置灰）。运行中占位文案 `继续追问，运行中发送会进入队列…`。
-- `↳ 引导` 将同一 Task 指定给当前 Run，Host 在下一步边界交付内容，模型下一步开始时读到；如果模型当时正在写最后的回复，回合多跑一步。任务领取并生成用户消息后这条以普通用户消息出现在当前回合的对应位置，不加标记，并从托盘移除。
-- 没有运行中的回合时不显示 `引导`；压缩中、等待审批时显示但不可用，悬停说明原因。
-- `撤回` 或回合结束时还没被读到的引导，回到队首。引导被拒（附件 / 引用失效）时回到队首并在 Composer 顶部提示原因。
-- 回合停止、失败或发送被拒后队列暂停，不自动发出，点 `继续发送` 显式恢复。例外：暂停时没有运行中的回合、队列里也没有停止前遗留的待发消息，此时用户新发的消息由 Host 在接收时同时解除暂停并立即执行（fork 出的会话首次发送同理）；队列里还有遗留消息时，新消息排到队尾，整条队列保持暂停。Web 与 Desktop 采用相同 TaskLedger 语义。
-- 队列由 Host TaskLedger 按会话持久保存，Renderer 仅投影状态；客户端 Reload 不重复提交。Host 重启后队列需手动继续，后台会话由同一个调度器负责。
-
-## 步数上限提示
-
-- 一轮的步数打满（`turn/end` 的 `reason` 为 `step-limit`）时，轮尾追加一行中性灰（muted）状态：`本轮达到 N 步上限，已停止。发送「继续」可以接着做。`，不用红色错误样式；N 取本轮实际的步数，窗口里数不出来时省略数字。
-- main / chat 的上限是 1000 步；最后一步不给工具，模型会先输出已有发现和未完成部分，所以这行提示通常紧跟一段总结。
-- 这一轮在 Run 层仍记为 failed，但不再使队列暂停（见上文「交互」）。
-
-## 顺序原则
-
-- 严格按执行顺序展示。
-- 工具调用之间不要打乱顺序。
-- 同一条消息里的不同状态要保持连续和可读。
+- 严格按模型执行顺序展示；一条消息可含多轮思考、工具调用、编辑和最终回复，不得打乱顺序。
+- Thinking、工具行、编辑记录和普通回复共用同一左边缘（`--conversation-text-inset`），没有头像占位缩进；助手回复前不重复展示头像、产品名或模型名。
+- 运行时平铺全部过程；最终回复完全输出后，整个过程统一收进一个 `Worked for Xs`（`ToolActivityGroup`），最终回复留在组外。没有 `Explored` 之类的子分组。
+- 重新展开 Worked 后，Thinking 和每个工具详情都从收起开始（包括失败的 Bash），用户可逐项展开，普通重渲染不覆盖手动选择。
+- 工具行和 Thinking 保持文本流感：纯文本行、不用图标（Web Search 也没有）、不用边框卡片，靠排版和留白分层，像执行日志而不是功能卡片。
+
+## 排版与间距
+
+默认字体大小下的基线（用户字号设置仍有效）：
+
+| 对象 | 字号 / 行高 | 字重与颜色 |
+| --- | --- | --- |
+| 工具行、Thinking 标题 | 14px / 22px | 400；动作 muted，目标与元数据 faint；Thinking 标题 faint |
+| 助手回复正文 | 16.5px / 1.78（`--md-chat-size`） | 主文字色，语义强调保留 |
+| 展开的思考内容 | 14px / 1.65 | UI 字体，muted，保留原始换行与空行 |
+| Bash 输出、工具结果详情 | mono 字号设置，默认 13px / 1.6 | muted；保留语法与 diff 的专用样式 |
+
+- 同一种工具不得因「有无 resultPreview」「是否可点击文件」而改变字号、字重或行高。
+- 外部间距只由消息流（`.message-flow` 的相邻关系，`styles/tool-result.css` 里的 `--flow-*` 变量）决定，单个组件不决定自己与上一条的距离，外部 margin 归零，不用负 margin 抵消父级 gap；组件只拥有标题与展开详情之间的内部间距。
+
+| 相邻内容 | 距离 |
+| --- | --- |
+| 两条折叠过程行（含 Thinking ↔ Bash / Read / Edit / Write） | 5px（`--flow-process-gap`） |
+| 过程行 ↔ 正文段 | 14px（`--flow-prose-gap`） |
+| 两个独立正文块 | 23px（`--flow-paragraph-gap`），同块内部段落按 Markdown 规则 |
+| 过程结束 → 最终回复 | 18px（`--flow-final-gap`），位于 Worked 之外时只应用一次 |
+| 标题 → 展开详情 | 7px；Thinking 内容不包边框卡片 |
+| 展开的 Thinking → 下一过程行 | 5px |
+| 其他展开详情 → 下一过程行 | 13px（详情尾部 8px + 5px，统一由布局表达） |
+
+- 空白 assistant 文本不生成正文容器，避免只含思考与工具调用的消息额外叠加正文间距（原始消息与 usage 仍保留）。
+- 审批卡、媒体、Todo、系统通知、压缩分隔线不套过程行规则，由关系计算（`messageFlowKind`）显式回退为 `other`。
+
+## 用户消息
+
+- 用户消息用卡片显示；超长内容两态折叠：默认只露约 88px（`overflow-hidden`、无滚动条，底部随主题翻转的渐隐遮罩暗示还有内容）；点击展开到 `min(240px, 32vh)` 并内部滚动；**收起只通过点击卡片以外的任意位置**，再点卡片不收起；存在文本选区（拖选复制）时不触发展开。未超过折叠高度的短消息无手型光标、无遮罩、无点击交互。
+- 提问卡片不吸顶，跟着内容滚走；滚出视野后的一行提问条见轮次导航规范。
+- 用户消息里的图片缩略图是可点击、可键盘聚焦的入口，激活后在右侧打开 Image Tab，与 Composer 发送前预览一致；没有预览数据时按钮禁用，renderer 不直接读本地路径。
+- 图片预览恢复只对缺少预览的图片调用会话产物 IPC；无待加载图片时不更新预览状态，相同结果保持原状态引用，避免纯文本消息触发 effect 反馈循环。上下文压缩不撤销历史消息的图片访问：main 在投影缺少引用时查该 Session 已验证 Journal 的 append surface，仍校验会话所有权、媒体类型和字节完整性，不接受文本中的 ID、其他 Session 或 renderer 本地路径；回滚暂存附件须保护已持久化的历史引用。
+
+## 助手回复与 Markdown
+
+- 助手回复用正常文本块；Markdown 排版、行内代码、代码块、路径、提示框、公式、图片、Mermaid 与流式效果以 Markdown 渲染规范为准。
+- 链接按目的地处理：HTTPS 等外链系统外开；工作区文件走既有文件入口（可带行号，只对 Markdown 生效）；远程图片不加载；`#fragment` 只在当前回复内查找目标、滚动并转移焦点，不改 Electron 顶层 URL、不建窗口。脚注引用、定义、回链及其无障碍描述用每条回复稳定的命名空间，避免多回复同名脚注串跳，流式追加不改变已有目标身份。不得放宽导航安全策略来补偿链接分类错误。
+
+## Thinking
+
+- 一行标题（思考时长或状态）+ 展开后的完整内容；不用左侧竖线或卡片边框。
+- 只在思考正文含非空白文字时展示：空 delta、纯空白、只有签名 / 用量的响应不生成可见行；未收到有效正文时保留等待模型提示。签名与 reasoning tokens 是后台记录，隐藏空 Thinking 不删除它们。
+- 运行时按消息默认状态展示，手动选择保留到整个回复结束；回复完成后随 Worked 收起。折叠向右箭头、展开向下箭头。
+
+## 工具行（Read / Grep / Glob / Web Search / 目录 / 图片）
+
+主行信息结构「动作 · 目标 · 必要状态 / 统计 · 原地展开入口」，各段独立渲染，不把整句日志塞进一个不可区分的字符串。
+
+| 类型 | 主行示例 | 展开 / 其他入口 |
+| --- | --- | --- |
+| Read | `Read Demos/README.md 1–8` | 文件文字打开右侧文件；结果 disclosure 独立 |
+| Listed | `Listed Demos/ 25 entries` | 目录结果 |
+| Edit / Write | `Edit Demos/README.md +1 −1` | 真实 diff 与变动统计 |
+| Bash | `Ran ls -lt Demos/` / `Denied …` / `Failed …` | 见 Bash |
+
+- 动作与必要状态不参与目标的截断；目标 `min-width: 0` 视觉省略，完整路径 / 命令可键盘访问和展开。展示层截断不得改变实际打开文件的路径。溢出的工具行 hover / 聚焦时用 Tooltip 显示全文。
+- 失败时仍保留动作与目标并显示失败终态，诊断放进可展开详情（danger token、长文本换行）；失败 Read 不打开文件，不展示旧成功预览；空目录明确显示 0 项，未获知结果时不伪造计数。
+- 结果通过有界 `resultPreview` 进入通用 `tool-result-*` disclosure；Read 仅对当前 workspace 可确认的相对路径提供打开动作。
+- 点击提示：打开右侧文件或 SubAgent 视图的入口，文字 hover / 聚焦时提高对比度，不加箭头或 Open file 按钮；原地展开的箭头默认占位但隐藏（避免 hover 位移），hover / 聚焦 / 展开时可见；编辑记录和 Thinking 展开态保留箭头。
+- 生成图片（`Generate image`）与 Read 同一单行语法：行内依次是尺寸、数量、prompt 摘要、模型名，超宽单行省略；成功后不在过程区放图片，最终回复完成后由轮尾图片列表展示（见轮尾规范）。
+
+## Bash
+
+- 展示动作从结构化状态生成，目标优先 `commandPreview`，其次完整 command 的视觉截断，最后回退工具名；不能把原始 summary 加前缀当标题。`intent` 是补充，不替代实际命令。
+- 正常执行态与 Read 同级的轻量行：`Ran ...` / `Running ...` / `Denied ...` / `Failed ...`，行尾展开箭头；展开后只有一个浅色单层容器，直接展示 `$ command`、cwd、exit code、stdout / stderr，不再嵌套边框；长输出容器内滚动。
+- 被拒绝显示完整原因，未知原因不假定为审批超时；失败显示真实 stderr 与退出码，不得显示为成功。
+- `sandboxed: false`（真实环境）、`notExecuted`（未执行）、后台运行状态在主行可见；`sandboxed: true` 的普通沙盒信息进执行详情。缺失 sandboxed 表示未知，不展示「沙盒」；缺失 exitCode / durationMs 不补 0；未执行不显示伪造输出或成功退出码。完整 summary / 错误在详情保留，不用正则猜退出码、环境或审批状态。
+- 状态：`pending` / `running` / `success` / `failed` / `denied` / `expired` / `cancelled`。审批通过后同一条工具调用转为 running / success / failed，不生成割裂的新块。
+- 实时与历史回读经共享 preview builder（`packages/client/client/src/sessions/tool-card.ts`）生成一致摘要；详情按需加载，不把大输出塞回列表快照。结构化事实不足以生成短原因时只显示状态与命令，不为凑文案扩大 Runtime 协议。
+
+## Edit / Write File
+
+- 后端工具名 `edit_file` / `write_file`，前端类型 `edit_diff` / `write_diff`，共用 `FileDiffBlock`；与其他工具行同一左边缘、字号和行视觉重量，仅在用户展开时出现 diff 容器（最低层级浅色单层，红绿区分增删）。
+- 单行折叠日志 `Edit index.ts +3 -1 ›` / `Write config.ts +15 ›`：不用图标，只显示文件名，箭头紧贴行尾文本；`+N` 绿、`-N` 红，删除数为 0 不显示 `-0`。
+- 进行中无 chevron：dispatched 显示 `Write file… · 正在生成` + shimmer；参数生成中每秒至多更新一次已生成字符量（≥10 字符才显示 `已生成 N`，由 `showFileChangeStats` 控制）；prepared 后补齐路径并显示「准备保存」；进入执行体后显示「正在保存」；完成后才显示真实 diff 增删。`edit_file` 进行中不展示 content / diff（局部 old / new_string 无法生成有定位的 diff）。
+
+## 子 Agent 与其他消息块
+
+- `agent` 块是主消息流里可点击的紧凑两行入口（头像、任务名、类型、状态、最新活动），点击在右侧「子 Agent」面板打开详情，不在主流内展开 transcript；规则见子 Agent 规范。组件只消费 `MessageBlock.kind === "agent"` 字段，不解析 raw args 或磁盘路径。
+- Todo、后台任务通知分隔行（`BackgroundNoticeRow`）、压缩分隔线、错误块都是独立 timeline item，不贴到上一条回复里。
+
+## 运行中态
+
+所有工具行（含 Read、Grep、Glob、Web Search、目录、Bash、Edit / Write、图片分析与生成）running 时用统一的 text shimmer，不加额外图标或动效层。流式 Thinking 标题和等待模型的文案复用同一视觉，避免链路在工具之外静默。
+
+- 视觉：底层 `--act-color-text-faint`，扫光中心 `--act-color-text`（中性，不用 operational 绿；绿色只用于运行圆点等离散信号）。实现为 `.tool-log-text-running` 文字 span 里放一个 `ToolLogShimmer`（`.tool-log-shimmer`）：它是带两端透明 mask 的窗口，`::after` 用 `content: attr(data-shimmer-text)` 画同一段高亮文字，窗口和文字用方向相反的 `transform` 位移，扫光只在合成层移动，不每帧重绘渐变；扫光限制在文字盒内，不占满整行，也不进无障碍树。颜色走主题 token，不写 `#hex`。完成态直接回到 muted，无切换动画。
+- 时序：一轮约 1.1s 自然循环；不为显示 shimmer 人为延长 running，收到 `tool_finished` 立即切完成态；流式 Thinking 仅在它是当前最后一个 segment 时 running，历史回读的 Thinking 默认 completed、不回放动画；`prefers-reduced-motion` 取消扫光，保留 faint 底字。
+- 文案：running 只显示工具名 + 主参数（`Read package.json`、`Grep ToolUiPreview in src`、`Write 秋日随笔.md`），不展示数值统计和折叠箭头；完成后才追加统计、条目数、chevron。
+- 工具生命周期四阶段：
+  1. `dispatched`：收到首个 `tool_call_delta`，emit `tool_call_streaming { isInitial: true }`，preview 字段可为空，用 `Write file…` 等 fallback + shimmer。**只有首帧才在 `state.segments` 追加工具 segment**，后续帧和 `tool_started` 只覆盖 preview，使工具位置严格反映模型首次开始生成它的时机。
+  2. `argsProgress`：Write / Edit 在 Main 增量统计字符量（每秒至多一次 `generationProgress`，不发送正文、不自动展开）；其他工具保持稳定占位。
+  3. `executing`：prepared 后一次补齐路径；通过校验与审批、进入执行体后 emit `tool_started`。
+  4. `finished`：emit `tool_finished`，清除临时进度，用真实结果与 diff 增删，切换为折叠摘要。
+- 事件契约：`tool_started.preview` 只含当前能确定的最小字段（filePath / command / query），不传未生成的数值；完成态字段在 `tool_finished` / 持久化事件补齐；`tool_call_streaming`、`tool_started`、审批、`tool_finished` 必须 upsert 同一条目，终态先到也创建条目；终态之后迟到的参数、progress、approval-resolved 不得降级。进度 / 子 Agent 事件不得把终态改回 running。
 
 ## 工具审批
 
-设计稿：`approval-card-redesign.html`（D 方向 · Cursor 式为定稿，2026-10-11；B 方向为上一版）。共享部件在 `components/messages/ApprovalParts.tsx` 的 `ApprovalCard` / `ApprovalActions`。
+共享部件在 `components/messages/ApprovalParts.tsx` 的 `ApprovalCard` / `ApprovalActions`。
 
-### 统一卡片
-
-- 所有审批（read、grep、glob、edit_diff、write_diff、delete、bash、browser、通用工具）都用同一张卡：只有一个框，卡片上下不加文字行（「等待确认」只写在容器的 `aria-label` 上；等待状态的视觉提示另行设计），框是 `bg-surface` + `border-line` + `shadow-act-xs` 的圆角卡。
-- 头行：可选图标 · 动词（muted）· 目标（faint），按钮在行尾；Bash 例外，按钮放在命令下方的底栏。
-- 不使用彩色边框、彩色托盘、`Reason:` 行；危险程度只由主按钮颜色表达。
-- 只在需要补充说明时，卡片外包一层 `bg-surface-subtle` 托盘，说明文字写在卡下方（目前只有浏览器操作）。
-
-### 目标与动词
+- 所有审批（read、grep、glob、edit_diff、write_diff、delete、bash、browser、通用工具）用同一张卡：一个框（`bg-surface` + `border-line` + `shadow-act-xs` 圆角），卡片上下不加文字行，「等待确认」只写在容器 `aria-label`。头行「可选图标 · 动词（muted）· 目标（faint）」，按钮在行尾；Bash 例外，按钮在命令下方底栏。不用彩色边框、彩色托盘或 `Reason:` 行，危险程度只由主按钮颜色表达；需要补充说明时才在卡外垫 `bg-surface-subtle` 托盘（目前只有浏览器操作）。
 
 | 工具 | 动词 | 目标 | 主按钮 |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | read | 读取 | 路径 | 允许 |
 | grep / glob | 搜索 / 匹配 | `pattern 于 scope` | 允许 |
 | edit_diff | 编辑 | 路径 + `+N -M` | 应用 |
 | write_diff | 写入 | 路径 + `+N` | 写入 |
 | delete | 删除 | 路径 | 删除（danger-solid） |
-| bash | intent | 命令名摘要 | 运行 |
+| bash | intent（缺省「Bash 命令」） | 命令名摘要（如 `git, tail`） | 运行 |
 | browser | 确认浏览器操作 | 本次工具标题 | 允许这次 |
 
-- 路径：目录淡色、过长时中段折叠为 `…`，文件名优先保留；`title` 为完整路径。
-- 编辑与写入默认不展示 diff；`+N -M` 后跟一个淡色箭头（收起朝右、展开朝下），整组是一个按钮，点开在卡内展开 diff，`aria-expanded` 表达状态。
+- 路径：目录淡色、过长时中段折叠为 `…`，文件名优先保留，`title` 为完整路径。编辑 / 写入默认不展示 diff；`+N -M` 后跟淡色箭头，整组是一个按钮，点开在卡内展开 diff（`aria-expanded`）。
+- Bash 审批：头行终端图标 + intent + 命令名摘要，下一条分割线；主体是带简单着色的 `$ command`（`shell-highlight.ts`，取 `.act-code-hl` 主题变量），过长在卡内滚动；底部左侧显示执行环境（沙盒 / 真实环境），cwd 只在不是工作区根目录时跟在后面，右侧「拒绝」「运行」。
+- 按钮全是 xs 胶囊，固定三层：拒绝（ghost）→ 本会话允许（tonal，仅在有授权建议时出现，`title` 为建议说明）→ 主按钮（`accent` 跟随强调色，删除用 `danger-solid`）。提交中被点按钮前出现旋转图标、所有按钮禁用，Bridge 返回 `ok: false` 时恢复。
+- Bash 的「本会话允许 pnpm」只在后端返回正式 `process.execute` / `command_prefix` 建议时显示，前端不得从命令文本推导授权；建议与 requestId 绑定，切换审批或读取失败时不沿用旧建议；授权包含项目脚本、执行环境沿用现有设置，复杂语法与显式 no_sandbox 仍走单次审批。契约见 `docs/exec-plans/completed/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md`。
+- 「工作区外」「敏感文件」和通用审批提示不展示；未知原因收进 Info 图标 tooltip，不丢信息。不做键盘快捷键（Enter 与 Composer 发送冲突）；授权后工具行不再追加「本会话已授权」。
 
-### 按钮与原因
+## 颜色职责
 
-- 按钮全部是 xs 胶囊：拒绝（ghost）→ 本会话允许（tonal，仅在有授权建议时出现，`title` 为建议说明）→ 主按钮（`accent`，跟随外观强调色；删除用 `danger-solid`）。
-- Bash 的“本会话允许”在后端给出 `selector.kind === "command_prefix"` 的建议时显示，并在按钮里带上前缀（如 `本会话允许 pnpm`）；后端契约见 `docs/exec-plans/completed/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md`，未落地前不出现。
-- 提交中：被点按钮前出现旋转图标，所有按钮禁用；Bridge 返回 `ok: false` 时恢复可点。
-- “工作区外”“敏感文件”和通用审批提示都不展示；未知原因收进 Info 图标 tooltip，不丢信息。
-- 不做键盘快捷键：Enter 与 Composer 发送冲突，按钮上也不显示快捷键提示。
-- 工具日志行在授权后不再追加“本会话已授权”。
-
-## 当前阶段重点
-
-- 先把消息的层级和阅读节奏定清楚。
-- 先不追求过多色彩变化。
-- 先让组件语法明确，再做细节视觉优化。
-
-## Ink & Emerald 颜色职责
-
-- 普通回复、Thinking、Read、Grep、Glob、Web Search 和 completed 工具行默认使用黑灰文本。
-- running 状态点和细环可以使用少量 operational green；消息工具的 shimmer 使用中性主文字 + 主题浅灰扫光，避免绿色进入连续文本流。
-- completed 不逐条变绿，完成后回到 muted 灰阶。
-- approval 使用 warning，failed / error 使用 danger。
-- `+N` / `-N` 和 diff 行继续使用低饱和 addition / removal token，但不复用 Toggle 或危险按钮背景色。
-- 工具流仍以文本流和轻量行视觉为主，不引入彩色 timeline pill 或彩色卡片墙。
-
-### 工具点击提示
-
-- 打开右侧文件或 SubAgent 视图：文字悬浮或键盘聚焦时提高对比度，不展示箭头或独立 Open file 按钮。
-- 原地展开：箭头默认占位但隐藏，悬浮或键盘聚焦显示，展开后保持可见。编辑记录保留箭头。
-- Thinking 箭头在展开态保持可见，折叠态仅在悬浮或键盘聚焦时显示。浅色加深、深色提亮，使用主题文字 token。
+- 普通回复、Thinking、工具行、completed 工具默认黑灰文本，完成后回到 muted，不逐条变绿。
+- running 的圆点 / 细环可用少量 operational；approval 用 warning，failed / error 用 danger；`+N` / `-N` 与 diff 行用低饱和 addition / removal token，不复用 Toggle 或危险按钮底色。
+- 工具流以文本流为主，不引入彩色 timeline pill 或卡片墙。
 
 ## 会话浏览加载
 
-列表和长会话的按需读取、真实分页、加载/重试状态与索引边界，见[会话浏览按需加载](front-progressive-session-loading.md)。
-
-### Bash 前缀建议的数据来源
-
-「本会话允许 pnpm」只在后端返回正式 `process.execute` / `command_prefix` 建议时显示，前端不得从命令文本推导授权。建议与 requestId 绑定，切换审批或读取失败时不沿用旧建议。提示文案说明授权包含项目脚本、执行环境沿用现有设置；同一持久化会话的符合规则调用可复用，复杂语法和显式 no_sandbox 仍走单次审批或既有拒绝规则。
+列表和长会话的按需读取、分页、加载 / 重试状态见 [agent-progressive-session-loading.md](../agent-runtime/agent-progressive-session-loading.md)。

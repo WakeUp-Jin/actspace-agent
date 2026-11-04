@@ -1,6 +1,6 @@
 # CI/CD 说明
 
-`actspace` 当前仍沿用模板时期的 CI/CD 骨架，但已经开始接真实项目命令。常驻 CI 已经分成仓库基础门禁和 workspace 工程门禁两层。
+常驻 CI 分成仓库基础门禁和 workspace 工程门禁两层；release 流水线产出真实桌面应用 archive。
 
 ## 当前包含的内容
 
@@ -53,7 +53,7 @@
 - `apps/desktop` 的开发启动依赖 `packages/util/shared`、领域 packages 和 `packages/core/runtime` 的可消费构建产物；如果包边界被改回源码直引，Electron 启动链会再次失稳。
 - `scripts/release-package.sh` 会先构建 desktop workspace，再用当前平台的 Electron runtime 组装 portable desktop archive；默认不需要付费证书，也不会强制签名。
 
-也就是说，这套 CI/CD 现在已经不再是纯模板：默认 CI 已经能守住真实 TypeScript workspace 的基础健康；release 也已经开始产出真实桌面应用 archive。macOS release 会额外产出本地安装用 `.dmg`，但当前 release 不强依赖 Developer ID 证书，仍不包含正式 notarization 或自动更新。
+默认 CI 守住真实 TypeScript workspace 的基础健康；release 产出真实桌面应用 archive。macOS release 会额外产出本地安装用 `.dmg`，但当前 release 不强依赖 Developer ID 证书，仍不包含正式 notarization 或自动更新。
 
 开源用户可以直接从源码本地打包：
 
@@ -133,6 +133,24 @@ SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 3. 后续如需多平台 release，先把 `release.yml` 拆成 macOS/Linux runner matrix，并让 provenance 覆盖每个平台产物。
 4. 如果后续接 installer、Developer ID 签名、notarization、远程自动更新，再在现有 release 流水线上扩展。
 
+## 供应链安全
+
+默认控制项：
+
+- `actions/dependency-review-action`：审查 PR 中的依赖变更。`.github/dependency-review-config.yml` 设置了 `warn-only: true`，高风险变更只告警、不阻断；要升级为硬门禁时先移除该配置。
+- `google/osv-scanner-action`：在 PR、定时任务和手动触发时，对依赖声明和 lockfile 做已知漏洞扫描。
+- `anchore/sbom-action`：为 release 产物生成 SPDX 格式 SBOM。
+- `actions/attest-build-provenance`：为 release 产物生成签名 provenance。
+- `scripts/check-action-pinning.sh`：所有 GitHub Actions 必须固定到 commit SHA；出现浮动 tag 时 CI 直接失败。
+
+限制和前提：
+
+- Dependency Review 在 public repo 可直接使用；private repo 通常需要 GitHub Advanced Security。
+- OSV 和 SBOM 依赖仓库里存在可识别的依赖清单或 lockfile。
+- provenance 指向 `scripts/release-package.sh` 生成的真实 release artifact，但它不等于 Developer ID 代码签名或 notarization。默认无证书的 macOS 产物会移除外层 app 的旧签名，避免携带失效签名；ad-hoc signing 只是显式 opt-in 的本地临时签名，不提供开发者身份背书。
+- OpenSSF Scorecard 默认不启用：等分支保护、release 历史和 SAST 姿态配置完成后再按需加回。
+- 后续可把 attestation 校验下沉到部署平台或准入层。
+
 ## 默认 release 产物
 
 当前 release 流水线仍会产出：
@@ -143,7 +161,7 @@ SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 - `sbom.spdx.json`
 - 对 release artifact 生成的 GitHub artifact attestation
 
-`release-manifest.json` 会标明产物平台、架构、archive / dmg 大小，以及 `signed`、`notarized`、`signature`。`signature: "ad-hoc"` 代表本地临时签名，不是 Developer ID 分发签名。这说明当前交付链路已经从仓库元数据包推进到真实桌面应用 archive 和 macOS 本地安装介质，但仍不是正式签名分发包。
+`release-manifest.json` 会标明产物平台、架构、archive / dmg 大小，以及 `signed`、`notarized`、`signature`。`signature: "ad-hoc"` 代表本地临时签名，不是 Developer ID 分发签名。当前交付链路产出真实桌面应用 archive 和 macOS 本地安装介质，但不是正式签名分发包。
 
 ## 可选 macOS 签名接口
 

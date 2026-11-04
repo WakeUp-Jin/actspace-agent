@@ -10,7 +10,7 @@
 | T2 | 生产 ContextSource 显式依赖缓存；受影响来源重算，未变贡献复用；新切片校验冻结，已有切片保留引用 |
 | T3 | 每完整 Step 安全点自动压缩，含最后一步；大工具输出进入压力判断；压缩后刷新；取消、失败及请求前容量保护 |
 | T4 | disclosure 概要、活跃/睡眠路径元数据分页；Desktop IPC 类型与 guard；版本和实例代际保护 |
-| T5 | [CloudOps 前端交接](../../design-docs/frontend/front-Context面板Step刷新与路径展示交接.md)，明确字段、刷新、空态、版本、错误恢复及 P1–P8 UI 验收点 |
+| T5 | [CloudOps 前端交接](../../exec-plans/completed/design-archive/frontend/front-Context面板Step刷新与路径展示交接.md)，明确字段、刷新、空态、版本、错误恢复及 P1–P8 UI 验收点 |
 
 ## 自动化结果
 
@@ -41,4 +41,4 @@ CloudOps 按交接文档实现路径区块并逐项验收。存储设计交付�
 
 ## 后续联合 Computer Use 验收
 
-2026-10-18 已补充真实 Electron 联合验收：工具Step刷新、压缩后下一请求、移除隔离SQLite后的恢复与继续执行已有证据；发现压缩中取消入口禁用、自动失败终态无持续提示两项前端问题。部分恢复/路径边界仍未覆盖，不能据此声明全部通过。详见 [联合验收摘要](../20261018-context-storage-cu/execution-summary.md) 与 [问题记录](../20261018-context-storage-cu/issues.md)。本段是后续验收结果，不改写上文实施时点的自动化证据。
+2026-10-18 已补充真实 Electron 联合验收：工具Step刷新、压缩后下一请求、移除隔离SQLite后的恢复与继续执行已有证据；发现压缩中取消入口禁用、自动失败终态无持续提示两项前端问题。部分恢复/路径边界仍未覆盖，不能据此声明全部通过。详见 [联合验收摘要](../20261018-context-storage-cu/execution-summary.md) 与 问题记录（原始记录已清理，见 git 历史）。本段是后续验收结果，不改写上文实施时点的自动化证据。

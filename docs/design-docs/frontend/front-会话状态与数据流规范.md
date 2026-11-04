@@ -1,8 +1,6 @@
 # 会话状态与数据流规范
 
-> 状态：现行规范（2026-10-06，Desktop 前端重构计划 14 落地后）。
-> 设计来源：[02 Renderer 状态层与会话数据流](../../desktop-frontend-refactor/02-Renderer状态层与会话数据流.md)；执行记录见 [14 执行过程](../../exec-runs/20261005-desktop-fe-14-renderer-state/execution-process.md)。
-> 相关：bridge 与 `api/<域>` 的约定见 [Preload bridge 与 Mock 规范](front-preload-bridge与mock规范.md)；分页与浏览索引见 [会话浏览按需加载](front-progressive-session-loading.md)。
+bridge 与 `api/<域>` 的约定见 [Preload bridge 与 Mock 规范](front-preload-bridge与mock规范.md)；分页与浏览索引见[会话浏览按需加载](../agent-runtime/agent-progressive-session-loading.md)；设计由来见归档的 [Renderer 状态层与会话数据流](../../exec-plans/completed/design-archive/desktop-frontend-refactor/02-Renderer状态层与会话数据流.md)。
 
 renderer 里一个会话的数据分三类，每类只有一个归属：
 
@@ -37,7 +35,7 @@ App 只负责把这些 store 装配起来、把事件接到对应的 store，以
 
 （`R` = `apps/desktop/src/renderer`，`C` = `packages/client/client/src`，`S` = `packages/util/shared/src`。）
 
-不引入状态库。每个 store 是一个带 `subscribe` 的小对象，React 侧用 `useSyncExternalStore` 读取。
+不引入状态库。每个 store 是一个带 `subscribe` 的小对象，React 侧用 `useSyncExternalStore` 读取。`SessionProjectionProvider` 接收 App 传入的 store，不调用 `bridge.open`，bridge 只负责 live 订阅和 refresh；读页由 App 的 `readSessionPage` 负责。
 
 ## 2. durable：cell 是唯一事实源
 
@@ -62,14 +60,16 @@ App 只负责把这些 store 装配起来、把事件接到对应的 store，以
 
 流式输出时每个 delta 都会来事件，每秒可达上百个。渲染成本 = 渲染次数 × 渲染范围 × 每次解析量，三项都要压住：
 
-- **按帧合并通知**：`R/session/frame-batch.ts` 的 `scheduleFrame` 是渲染进程共用的帧调度器。`LiveRunStore`（`createLiveRunStore(limit, { scheduleNotify })`）对 `assistant_text_delta`、`assistant_thinking_delta`、`tool_call_streaming` 只登记、下一帧统一通知；Session bridge（`scheduleStreamFlush`）把 `assistant-delta`、`reasoning-delta` 和 `assistant/chunk` 的 journal-update 排队，下一帧在一次 `store.batch` 里应用。两个 store 的通知落在同一个帧回调里，React 只渲染一次。
+- **主进程先合并**：正文 / 思考增量只走 `agentStream` 一条通道（`FixedRendererStreamAdapter` 在桌面端以 33ms 合并同一条消息的连续增量）；`sessionLiveEvent` 不再转发 `assistant-delta` / `reasoning-delta`，只转发 `run-state` 与 journal 事件。`assistant/chunk` 的 journal-update 由 `main/runtime-v2/live-envelope-batcher.ts` 以 33ms 合成一条 `{ ...最后一条, batch: [...] }`，`api/live-events.ts` 拆回单条，下游无感。任何非增量事件（工具、run 边界、审批）先冲掉两边积压再发送，顺序不变。
+- **按帧合并通知**：`R/session/frame-batch.ts` 的 `scheduleFrame` 是渲染进程共用的帧调度器。`LiveRunStore`（`createLiveRunStore(limit, { scheduleNotify })`）对 `assistant_text_delta`、`assistant_thinking_delta`、`tool_call_streaming` 只登记、下一帧统一通知；Session bridge（`scheduleStreamFlush`）把 `assistant/chunk` 的 journal-update 排队，下一帧在一次 `store.batch` 里应用。两个 store 的通知落在同一个帧回调里，React 只渲染一次。
 - **结构性事件立即生效**：run 开始 / 结束、工具结果、`assistant/message` 等不排队；bridge 收到它们时先冲掉已排队的增量再应用，顺序不变。新增高频事件类型时才往延迟集合里加，结构性事件不能加。
 - **普通流式投影复用**：`useChatSessionRecord` 仅在非 recovered 模式下，新 cell 相对上一个只追加了 `assistant/chunk`、投影值和快照（除 `throughJournalSeq`、`updatedAt`）都没变时，复用上一次的 record（`onlyStreamChunksSince`）。普通 Chat 投影默认忽略 chunk，正文由 LiveRunStore 按帧显示，历史块保持引用不变。
 - **重载恢复投影**：App 将既有 `isRecoveredRun` 传给 `useChatSessionRecord`；恢复模式显式启用 Client 的 `includePendingChunks`，从 cell 的 Journal 窗口聚合尚未完成的正文及思考片段，并继续消费后续 chunk，不走普通流式复用。片段按 messageId/类型聚合，保留 run/turn/request 身份与首片段顺序；同消息的完整 `assistant/message` 到来后替换合成片段，不重复追加。片段仍是 durable 事实的派生结果，不新增 React 正文状态或第二个事实源；子轨迹复用同一片段投影。
+- **订阅隔离**：每帧变的数据不进 App 状态和粗粒度 context。消息序列在 `R/session/transcript-context.tsx` 的 transcript store 里，消息区用 `useTranscriptMessages()`，外壳只用 `useTranscriptSelect(selector, isEqual)` 取派生小值；投影派生值用 `SessionProjectionContext.tsx` 的 `useProjectionSelect(selector, isEqual)`，只认当前会话自己的 cell / overlay，后台会话的事件不触发重渲染。App 只从 live run 取 `useLiveRunSelect` 给的小状态。侧栏、右栏外壳、输入框外壳、`WorkbenchLayout` 用 `memo`，流式时不随帧渲染；selector 和 isEqual 用模块级函数。`render-isolation.test.tsx` 守住这条：100 帧流式下侧栏、右栏、输入框外壳渲染 0 次。
 - **按引用跳过**：`TurnView` 逐条比较消息块引用，`AssistantReply`、`MarkdownProse` 用 `memo`。新增给这些组件的 props 必须是稳定引用（`useCallback` / 常量），否则整页历史每帧都会重渲染。
-- **Markdown 分块**：`MarkdownProse` 用 `components/messages/markdown-blocks.ts` 按顶层块切分，除最后两块外冻结复用，只重新解析尾部；每块单独交给 react-markdown，`MarkdownSourceContext` 给的是本块源码。引用式链接定义、脚注会跨块生效：全文收集后，追加到引用它们的块，脚注区整条回复只渲染一次，不再退回一块。代码块不做语言自动识别，没标语言的按纯文本显示。流式时 `MarkdownProse` 按帧平滑放出积压的文字，每帧只重渲染最后一块；`ReplyStreamingContext` 结束后，要等积压放完才退出流式显示。详见 [聊天区 Markdown 渲染规范](front-聊天区Markdown渲染规范.md) §7、§8。
+- **Markdown 分块**：`MarkdownProse` 用 `components/messages/markdown-blocks.ts` 按顶层块切分，除最后两块外冻结复用，只重新解析尾部；每块单独交给 react-markdown，`MarkdownSourceContext` 给的是本块源码。引用式链接定义、脚注会跨块生效：全文收集后，追加到引用它们的块，脚注区整条回复只渲染一次，不再退回一块。代码块不做语言自动识别，没标语言的按纯文本显示。流式时 `MarkdownProse` 按帧平滑放出积压的文字，每帧只重渲染最后一块；`ReplyStreamingContext` 结束后，要等积压放完才退出流式显示。详见[聊天区 Markdown 渲染规范](front-聊天区Markdown渲染规范.md)的「流式输出」「分块与性能」。
 
-
+## 3. 块的身份字段
 
 `MessageBlock` 与 `SessionEvent` 上有两个可选字段，只在 renderer 本地计算，不属于 Runtime / Host / Session 协议：
 
@@ -106,7 +106,9 @@ mergeTranscript(
 3. **追加 live 块**。没有 durable 对应物的块（steer 插入的 user、workspace-preparation）保持原样显示，不套用「run 完成后整组让位」。
 4. **本地装饰**：不在流式时追加压缩失败块；后台 bash 状态（`bashUpdates`）覆写 durable bash 块的 `backgroundStatus` / `exitCode`。
 
-`mergeTranscript` 是纯函数。改动它时，`R/test/transcript.test.ts` 的场景必须全部通过；App 级用例经 `R/test/helpers/transcript-shadow.ts` 与旧实现（`apps/desktop/test-fixtures/legacy-transcript.ts`）逐次对照，有意改变行为时要同时更新对照基准，并在执行记录里写明。
+`mergeTranscript` 是纯函数。改动它时，`R/test/transcript.test.ts` 的场景必须全部通过；App 级用例经 `R/test/helpers/transcript-shadow.ts` 与基准实现（`apps/desktop/test-fixtures/legacy-transcript.ts`）逐次对照，有意改变行为时要同时更新对照基准。
+
+恢复中的 run 如果 durable 和 live 都有 todo，会出现两块 todo，这是保留的既有行为。
 
 ## 5. SessionLocalStore
 
@@ -114,7 +116,7 @@ mergeTranscript(
 type SessionLocalState = {
   composerText?: string;                       // 输入框正文（WorkbenchLayout 切会话时读回）
   annotationDraft?: ResponseAnnotationReference[];
-  attachments?: ComposerAttachment[];          // 输入框里还没发送的附件（16 T14）
+  attachments?: ComposerAttachment[];          // 输入框里还没发送的附件
   draft?: ComposerDraftRestore;                // 发送失败 / 未确认提交恢复到输入框的草稿
   composer?: ComposerSessionState;             // mode、selectedSkills
   compactionFailure?: CompactionBlock;
@@ -159,7 +161,6 @@ type SessionLocalState = {
 - 按引用计数：第一个消费者订阅底层源，最后一个退订时释放，之后再订阅会重新连上。同一个函数订阅两次算两个消费者；重复退订无效。
 - 一个消费者抛错只打控制台，不影响其他消费者。
 - 新增 live 事件消费者用 `liveEvents`，不要直接调 `eventsApi.sessionLive`。
-- Host 变化（`hosts.onChanged`）的订阅合并在计划 15 处理。
 
 ## 8. Context
 
@@ -170,11 +171,9 @@ type SessionLocalState = {
 | `SessionActionsContext` | 新建、选择、置顶、重命名、复制 id / 正文、分叉、归档、打开 / 归档 / 移除工作区 | `useSessionActions()` |
 
 - 三个 hook 缺 Provider 时都抛错，不静默渲染空值。
-- 嵌套顺序固定在 `AppProviders`：SessionProjection > SessionBrowse > SessionLocalStore > ActiveSession > Composer > SessionActions > RightPanel。
-- App 用 `useShallowStable`（`R/hooks/useShallowStable.ts`）生成每个 value：字段逐个相等时返回上一次的对象。动作函数用 `useCallback` 保持稳定引用。新增字段时同时检查它是否稳定；不稳定的上游（例如计划 15 之前的 `remoteTarget`）会让 value 每次重建。
+- 嵌套顺序固定在 `AppProviders`：SessionProjection > SessionBrowse > SessionLocalStore > ActiveSession > RunTarget > Composer > SessionActions > SideChatRuntime > RightPanel。`RunTargetContext` 提供工作区、分支、运行位置与远端目标。
+- App 用 `useShallowStable`（`R/hooks/useShallowStable.ts`）生成每个 value：字段逐个相等时返回上一次的对象。动作函数用 `useCallback` 保持稳定引用。新增字段时同时检查它是否稳定；不稳定的上游会让 value 每次重建。
 - **App 里不要用带工厂函数的 `useMemo` 拼 Context value，也不要把 cell 放成 App 的局部变量。** 同一函数里的闭包共用一个作用域，被任何闭包读到的局部变量都会进这个作用域。App 的 `useCallback` 之间会一层层留住旧渲染的作用域（`handleArchiveSession` → `handleForkSession` → 更早的 `handleArchiveSession` …），作用域里的 messages、contextState、cell 原始事件（系统提示词、技能列表）就跟着留下，归档后的会话释放不掉。cell 由 `useChatSessionRecord`（`R/session/session-store.ts`）在 hook 内部投影，App 只拿到 `sessionRecord` 和 `historyBefore`。
-  - 实测（Electron，新建→发送→归档循环）：改之前每轮涨约 1.9 MB，30 轮不停；改之后第 10 轮起稳定在 15 MB 左右。复测脚本思路见 14 的交接文档。
-- `RunTargetContext`（工作区、分支、运行位置、远端目标）在计划 15 加入。
 - 测试里单独渲染 `WorkbenchLayout` / `ConversationView` / `Sidebar` 时，用 `R/test/helpers/workbench.tsx` 的 `TestWorkbenchLayout`、`TestConversationView`、`TestSidebar`：它们接受平铺的 prop，拆进对应的 Provider。Context 增减字段时，那里的键表（`satisfies Record<keyof X, true>`）会编译失败，提醒同步。
 
 ## 9. 未确认提交（pending-submission）
@@ -220,11 +219,5 @@ type SessionLocalState = {
 - bridge refresh（live 事件触发）失败后按 1s、2s、4s 退避重试，最多 3 次；用完仍失败时停下，错误留在 cell 上并打控制台。等待期间会话被切走或 bridge 被 dispose 就不再重试。
 - `ConversationView` 显示 `browse.messageError ?? 「会话同步失败：<cell.error>」`，带「重试」。重试走 `browse.retryMessages`；单独挂 Provider 时重新 `bridge.open`。
 - 队列刷新 / 队列命令失败：`reportSessionFailure(sessionId, text)` 打控制台，并且只在该会话是当前会话时在输入框上方提示（「队列状态读取失败，请稍后重试。」「队列操作没有完成，请重试。」）。
-- 计划 14 只处理了会话打开、会话同步和任务队列这几条路径。有意只打控制台的：run 结束后侧栏列表的后台刷新（失败时列表保持原样，下一次刷新会补上）、`refreshSession` 外层的兜底 `.catch`（`readSessionPage` 内部已把错误写进 `messageError`）。
-- App 里其余的 `console.error`（设置、工作区、复制、重命名、分叉、归档等，约 25 处）仍只打控制台，不在本规范范围内。新增会话数据路径时，失败要像上面一样让用户看得到；确实只需打控制台的，在代码注释里写明理由。
-
-## 12. 已知限制
-
-- App.tsx 仍约 1550 行；RunTarget 与 Host 订阅在计划 15 迁出，WorkbenchLayout / ConversationView 的 prop 数（13 / 14）在 15 结束时验收 < 10。
-- `SessionProjectionProvider` 接收 App 传入的 store，不调用 `bridge.open`，bridge 只负责 live 订阅和 refresh；读页由 App 的 `readSessionPage` 负责。
-- 恢复中的 run 如果 durable 和 live 都有 todo，会出现两块 todo（旧行为原样保留，见 §4）。
+- 有意只打控制台的：run 结束后侧栏列表的后台刷新（失败时列表保持原样，下一次刷新会补上）、`refreshSession` 外层的兜底 `.catch`（`readSessionPage` 内部已把错误写进 `messageError`）。
+- 设置、工作区、复制、重命名、分叉、归档等其余路径的失败只打控制台，不在本规范范围内。新增会话数据路径时，失败要像上面一样让用户看得到；确实只需打控制台的，在代码注释里写明理由。

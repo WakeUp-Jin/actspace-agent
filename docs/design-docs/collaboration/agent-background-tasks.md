@@ -1,8 +1,8 @@
 # 后台任务：后台 Bash 与任务工具
 
-> 状态：已实施（2026-11-04，分支 `feat/subagent-background-redesign`，S2、S3、S6）。设计依据见 [03 后台 Bash 设计规范](../子智能体和后台任务设计规范/03-后台Bash设计规范.md) 与 [01 决策](../子智能体和后台任务设计规范/01-设计决策.md)；实现记录见[执行过程](../../exec-runs/20261103-subagent-background-redesign/execution-process.md)。
+> 设计依据见 [03 后台 Bash 设计规范](../子智能体和后台任务设计规范/03-后台Bash设计规范.md) 与 [01 决策](../子智能体和后台任务设计规范/01-设计决策.md)；实现记录见[执行过程](../../exec-runs/20261103-subagent-background-redesign/execution-process.md)。
 >
-> 本文原先把 Bash 和后台子智能体放在同一张登记表里。现在**后台任务只剩 Bash**；子智能体有自己的管理器、工具和事件，见[子智能体运行规范](agent-subagent-runtime.md)。
+> **后台任务只有 Bash**；子智能体有自己的管理器、工具和事件，见[子智能体运行规范](agent-subagent-runtime.md)。
 
 ## 要解决什么
 
@@ -40,7 +40,7 @@ Harness 侧                                   Host 侧
 
 沙箱里命令的 `TMPDIR` 仍在系统临时目录 `<tmpRoot>/bash-v2/<进程随机目录>/`。Harness 卸载只删这个目录；崩溃残留的、不属于当前进程且超过 1 天的目录在下次启动时清掉。
 
-转后台的 `bash` 结果带 `actspace.context.trace`，日志因此进入上下文的活跃路径（与子智能体 transcript 同一机制）。每个会话同时运行的后台 Bash 最多 5 个（原为 8）。子会话里的 Bash 不转后台。
+转后台的 `bash` 结果带 `actspace.context.trace`，日志因此进入上下文的活跃路径（与子智能体 transcript 同一机制）。每个会话同时运行的后台 Bash 最多 5 个。子会话里的 Bash 不转后台。
 
 ## 工具
 

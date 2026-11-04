@@ -16,7 +16,7 @@
 
 ## 背景
 
-- 相关文档：[交接文档](../../design-docs/frontend/front-Context面板Step刷新与路径展示交接.md)、[07 决策记录](../../design-docs/上下文管理引擎设计/上下文管理引擎V2/07-Step增量更新与披露面板决策记录.md)、Demo `docs/design-docs/frontend/context-paths-demo.html`（2026-10-18 用户确认：方案 A、两格统计常显、仅列表默认收起、保留预判标签、标题「路径」）。
+- 相关文档：[交接文档](design-archive/frontend/front-Context面板Step刷新与路径展示交接.md)、[07 决策记录](../../design-docs/上下文管理引擎设计/上下文管理引擎V2/07-Step增量更新与披露面板决策记录.md)、Demo `docs/design-docs/frontend/context-paths-demo.html`（2026-10-18 用户确认：方案 A、两格统计常显、仅列表默认收起、保留预判标签、标题「路径」）。
 - 相关代码路径：`apps/desktop/src/main/runtime-v2/context-paths.ts`、`packages/context/disclosure/src/policy.ts`、`packages/context/engine/src/disclosure-contract.ts`、`apps/desktop/src/renderer/components/right-panel/context/`。
 - 已知约束：路径列表不计入 Token；`revision` 只用 `view.disclosure.revision`；stale / cursor 错误先刷新面板再从首屏读取，不无界自动重试；查看 / 复制不触发读文件。
 

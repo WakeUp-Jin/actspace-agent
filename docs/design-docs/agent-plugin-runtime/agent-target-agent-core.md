@@ -1,6 +1,6 @@
 # ActSpace v2 Agent Core 目标边界
 
-> 状态：核心所有权、产品范围、行为不变量、公共语义和 DSH 风格领域包边界已确认；启动与应用职责已按 Profile-first 原位校准；精确 API 以当前 exports 和 execution plan 的实施状态为准。
+> 核心所有权、产品范围、行为不变量、公共语义和 DSH 风格领域包边界已确认；启动与应用职责已按 Profile-first 原位校准；精确 API 以当前 exports 和 execution plan 的实施状态为准。
 >
 > 本文定义“什么必须由 ActSpace 拥有”和“什么允许由插件替换”，不定义实施顺序。
 

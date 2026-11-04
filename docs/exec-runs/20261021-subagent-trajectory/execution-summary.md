@@ -45,7 +45,7 @@
 
 ## 未覆盖与已知限制
 
-- **Electron 真实会话（待验收，步骤见 [acceptance-handoff.md](acceptance-handoff.md)）**：真实运行一次 Explore 子智能体，在运行中和完成后各看一次：
+- **Electron 真实会话（待验收，步骤见 `acceptance-handoff.md`（原始记录已清理，见 git 历史））**：真实运行一次 Explore 子智能体，在运行中和完成后各看一次：
   - 父轨迹只有一行 `agent`。
   - 详情「查看轨迹」打开右侧面板并停在轨迹页。
   - 运行中子轨迹实时增长。

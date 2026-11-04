@@ -12,10 +12,10 @@
 
 | 点 | 结果与验证方式 | 证据与边界 |
 | --- | --- | --- |
-| F01 手动耗时与恢复 | 通过（CU + RT + 自动化）。第一次手动 831ms→1s；Kimi 重试 34,816ms→35s。切换返回与正常重启后保留。 | [手动进行中](F01-manual-started.png)、[手动完成](F01-manual-completed.png)、[Kimi 完成](F01-F04-kimi-completed.png)、[重启](F01-F02-restarted-durations.png)。捕捉到进行中 1s；未验证连续多秒增长精度。 |
-| F02 自动耗时 | 通过（CU + RT）。Chat 阈值临时 50%，真实请求 input=73,580、output=11、cacheRead=1,152，达到策略触发线 48,000；回复后自动压缩 1,383ms→1s。后续回复与重启记录正常。 | [输入](F02-large-input-before-send.png)、[自动完成与后续发送](F02-auto-completed-followup.png)、[切换后](F01-F02-after-session-switch.png)、重启 AX 同时包含 35s/1s。自动 running 的短暂状态未捕捉，不声称验证该状态外观。 |
-| F03 辅助故障与恢复 | 通过（CU + RT + 自动化）。主模型 DeepSeek 正常回复；Kimi 地址指向本机不可达端口，手动压缩 Connection error，零新压缩事务。恢复默认地址后点击重试成功。 | [失败](F03-utility-compaction-failure.png)、[重试](F03-kimi-retry-started.png)、[完成](F01-F04-kimi-completed.png)、[运行证据](runtime-evidence.json)。本次是手动故障，原自动故障与压缩中队列项仍未完整覆盖。 |
-| F04 模型设置热更新 | 通过（CU + RT + 自动化）。同一进程从 DeepSeek 辅助模型切为 Kimi K2.6，下一次成功压缩 metadata 为 utility/kimi-k2.6；切回后自动压缩为 utility/deepseek-flash。 | [选择模型](F04-utility-selector.png)、Kimi 完成与运行证据。 |
+| F01 手动耗时与恢复 | 通过（CU + RT + 自动化）。第一次手动 831ms→1s；Kimi 重试 34,816ms→35s。切换返回与正常重启后保留。 | 手动进行中（截图 `F01-manual-started.png`，原图未入库）、手动完成（截图 `F01-manual-completed.png`，原图未入库）、Kimi 完成（截图 `F01-F04-kimi-completed.png`，原图未入库）、重启（截图 `F01-F02-restarted-durations.png`，原图未入库）。捕捉到进行中 1s；未验证连续多秒增长精度。 |
+| F02 自动耗时 | 通过（CU + RT）。Chat 阈值临时 50%，真实请求 input=73,580、output=11、cacheRead=1,152，达到策略触发线 48,000；回复后自动压缩 1,383ms→1s。后续回复与重启记录正常。 | 输入（截图 `F02-large-input-before-send.png`，原图未入库）、自动完成与后续发送（截图 `F02-auto-completed-followup.png`，原图未入库）、切换后（截图 `F01-F02-after-session-switch.png`，原图未入库）、重启 AX 同时包含 35s/1s。自动 running 的短暂状态未捕捉，不声称验证该状态外观。 |
+| F03 辅助故障与恢复 | 通过（CU + RT + 自动化）。主模型 DeepSeek 正常回复；Kimi 地址指向本机不可达端口，手动压缩 Connection error，零新压缩事务。恢复默认地址后点击重试成功。 | 失败（截图 `F03-utility-compaction-failure.png`，原图未入库）、重试（截图 `F03-kimi-retry-started.png`，原图未入库）、完成（截图 `F01-F04-kimi-completed.png`，原图未入库）、运行证据（原始记录已清理，见 git 历史）。本次是手动故障，原自动故障与压缩中队列项仍未完整覆盖。 |
+| F04 模型设置热更新 | 通过（CU + RT + 自动化）。同一进程从 DeepSeek 辅助模型切为 Kimi K2.6，下一次成功压缩 metadata 为 utility/kimi-k2.6；切回后自动压缩为 utility/deepseek-flash。 | 选择模型（截图 `F04-utility-selector.png`，原图未入库）、Kimi 完成与运行证据。 |
 | F05 旧格式、显式路由、CLI 回退 | 通过（自动化）；真实旧分隔线仍能显示。新字段优先（包括 0）、负数/字符串回退，旧字段缺失兼容；显式 routeId 优先，default-only 与 fixture 首条回退通过。 | client/compaction 回归；没有执行真实 CLI 场景，不将其写成 CU 验收。 |
 
 ## 自动化与构建
@@ -34,9 +34,9 @@
 
 ## 环境恢复与证据说明
 
-已核对 [原设置](initial-settings.json) 与 [最终设置](final-settings.json)：utility=DeepSeek、Chat 阈值 80%、Moonshot/DeepSeek 默认地址均恢复。API Key 未读取或更改。正常 quit 后新进程启动，真实 Electron 留在专用验收会话运行。误点新建留下一个空白会话，未删除用户数据。
+已核对 原设置（原始记录已清理，见 git 历史） 与 最终设置（原始记录已清理，见 git 历史）：utility=DeepSeek、Chat 阈值 80%、Moonshot/DeepSeek 默认地址均恢复。API Key 未读取或更改。正常 quit 后新进程启动，真实 Electron 留在专用验收会话运行。误点新建留下一个空白会话，未删除用户数据。
 
-CU 截图与 AX 来自真实窗口；RT 仅读取 journal，不改写事件、不注入 usage、不调用内部压缩入口。工具返回有约 60 秒延迟，AX 与截图可能相邻状态不同；判定优先实际内容，不以文件名作为完成证据。[CU 记录](cu-observations.json) 与运行证据独立于原验收保存。
+CU 截图与 AX 来自真实窗口；RT 仅读取 journal，不改写事件、不注入 usage、不调用内部压缩入口。工具返回有约 60 秒延迟，AX 与截图可能相邻状态不同；判定优先实际内容，不以文件名作为完成证据。CU 记录（原始记录已清理，见 git 历史） 与运行证据独立于原验收保存。
 
 ## 人工复核路线
 

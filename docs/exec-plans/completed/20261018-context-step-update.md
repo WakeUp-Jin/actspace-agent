@@ -40,4 +40,4 @@
 
 ## 完成记录
 
-[执行摘要](../../exec-runs/20261018-context-step-update/execution-summary.md) · [前端交接](../../design-docs/frontend/front-Context面板Step刷新与路径展示交接.md)。文档检查仍有一处基线旧失效链接；未将其写成通过。
+[执行摘要](../../exec-runs/20261018-context-step-update/execution-summary.md) · [前端交接](design-archive/frontend/front-Context面板Step刷新与路径展示交接.md)。文档检查仍有一处基线旧失效链接；未将其写成通过。

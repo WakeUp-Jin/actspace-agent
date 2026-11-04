@@ -1,6 +1,6 @@
-# 独立 Agent Host（P4 首版）
+# 独立 Agent Host
 
-Host 在服务器持有 Session、任务、审批及 Provider 凭据。Desktop Main 通过 WSS 或系统 SSH 隧道连接；网络断开不取消任务。手机前端尚未实现。完整交付门禁见 [P4 计划](../../exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)及[过程记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-4-process.md)，P4 首版 T1–T7 已验收，证据见 [第十轮复验](../../exec-runs/20261003-agent-harness-host-refactor/phase-4-cu-round10.md)。本地夹具不代表用户云部署或外部 Provider 已验证。
+Host 在服务器持有 Session、任务、审批及 Provider 凭据。Desktop Main 通过 WSS 或系统 SSH 隧道连接；网络断开不取消任务。浏览器 / PWA 客户端 `apps/web` 已实现：手机和电脑浏览器经 WebSocket `/rpc` 连接同一台 Host，可由 Host 的 `webRoot` 同源托管，设计见 [front-web-pwa客户端规范](../frontend/front-web-pwa客户端规范.md)，开发与托管流程见 [apps/web/README.md](../../../apps/web/README.md)。完整交付门禁见 [P4 计划](../../exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)及[过程记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-4-process.md)，P4 T1–T7 的验收证据见 [第十轮复验](../../exec-runs/20261003-agent-harness-host-refactor/phase-4-cu-round10.md)。本地夹具不代表用户云部署或外部 Provider 已验证。
 
 ## 启动
 

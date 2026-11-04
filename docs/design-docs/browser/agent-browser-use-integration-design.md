@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-本文档定义 Browser 工具、Go Bridge 与 Chrome Extension 的当前集成边界。62 条 canonical command 由 Go registry 管理；capability ready 时注册 11 个工具，模型可见集合由 Agent mode 白名单、registry 和调用范围共同决定。连接、启动、打包与真实 Chrome 验收见 `docs/exec-plans/active/20260928-chrome-connect-experience.md`。
+本文档定义 Browser 工具、Go Bridge 与 Chrome Extension 的当前集成边界。62 条 canonical command 由 Go registry 管理；capability ready 时注册 11 个工具，模型可见集合由 Agent mode 白名单、registry 和调用范围共同决定。连接、启动、打包与真实 Chrome 验收见 `docs/exec-plans/completed/20260928-chrome-connect-experience.md`。
 
 ## 设计决策
 
@@ -329,7 +329,7 @@ Go backend capability 仍可在命令执行前拒绝不可用动作；用户审�
 
 ## 与现有文档的关系
 
-- `docs/design-docs/browser/agent-browser-bridge-design.md`：定义浏览器桥接层本身的三层架构、协议和 CLI 设计。本文档是其消费侧补充。
+- `docs/design-docs/browser/agent-browser-use-index.md`：定义浏览器桥接层本身的架构、协议和 CLI 设计（含「Bridge：Host、协议与安装」一节）。本文档是其消费侧补充。
 - `docs/design-docs/browser/agent-browser-use-command-surface.md`：完整命令面参考。本文档引用其中命令作为实现目标。
 - `docs/design-docs/browser/agent-browser-use-command-implementation.md`：CDP 原语、实现职责和源码入口。
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`：工具前端预览契约。浏览器工具的预览需遵守。

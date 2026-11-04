@@ -3,7 +3,7 @@
 状态：已完成（2026-11-01，分支 `架构优化` 本地提交 281aa868…37457c0c，未合入 main）。P1–P5 已实施；P6 并入[插件结构 S3](../20261101-plugin-structure/s3-plugin-page.md)，不单独执行。
 
 - 分支 / worktree：`架构优化` @ `../actspace-agent-arch-slim`（从 `main@b590e02f` 切出）。
-- 设计真源：[01 功能减法设计](../../../design-docs/架构优化/01-功能减法设计.md)、[文档面板规范](../../../design-docs/frontend/front-文档面板规范.md)、demo [md-file-tree-demo.html](../../../design-docs/frontend/md-file-tree-demo.html)（方案 A）。
+- 设计真源：[01 功能减法设计](../../../design-docs/架构优化/01-功能减法设计.md)、[文档面板规范](../../../design-docs/frontend/front-文档面板规范.md)、demo md-file-tree-demo.html（原文已删除，见 git 历史）（方案 A）。
 - 执行记录：开始执行时创建 `docs/exec-runs/20261101-feature-subtraction/execution-process.md` 与 `execution-summary.md`（从 `docs/exec-runs/templates/` 复制）。
 - 执行模式：连续执行，与[插件结构](../20261101-plugin-structure/README.md)合起来按 P1–P5 → S1–S4 的顺序做完，只在遇到阻塞或需要用户决定的事时停下。
 
@@ -97,4 +97,4 @@ pnpm test:contract-matrix
 
 ## 暂停的计划
 
-[Chrome 扩展连接、启动与使用体验闭环](../../active/20260928-chrome-connect-experience.md) 与 P6 方向冲突，随本计划暂停；是否删除由用户决定。
+[Chrome 扩展连接、启动与使用体验闭环](../20260928-chrome-connect-experience.md) 与 P6 方向冲突，随本计划暂停；是否删除由用户决定。

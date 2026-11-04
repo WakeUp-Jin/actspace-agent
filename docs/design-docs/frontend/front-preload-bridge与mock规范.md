@@ -1,8 +1,6 @@
 # Preload bridge 与 Mock 规范
 
-> 状态：现行规范（2026-10-06，Desktop 前端重构计划 13 落地后）。
-> 设计来源：[04 Preload 接口与 MockBridge](../../desktop-frontend-refactor/04-Preload接口与MockBridge.md)；执行记录见 [13 执行过程](../../exec-runs/20261005-desktop-fe-13-preload-bridge/execution-process.md)。
-> 验证方式（mock 场景表、验证矩阵）见 [前端验证约定](../../FRONTEND_VERIFICATION.md)。
+验证方式（mock 场景表）见[前端验证约定](../../FRONTEND_VERIFICATION.md)；设计由来见归档的 [Preload 接口与 MockBridge](../../exec-plans/completed/design-archive/desktop-frontend-refactor/04-Preload接口与MockBridge.md)。
 
 renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的全部成员由一份契约生成，preload、main、mock 和测试都以这份契约为准。
 
@@ -10,7 +8,7 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
 
 | 位置 | 作用 |
 | --- | --- |
-| `packages/util/shared/src/desktop-bridge/contract.ts` | **契约**：`desktopBridgeContract`，22 个域，每个成员一条 spec。唯一事实来源 |
+| `packages/util/shared/src/desktop-bridge/contract.ts` | **契约**：`desktopBridgeContract`，按业务域分组，每个成员一条 spec。唯一事实来源 |
 | `packages/util/shared/src/desktop-bridge/types.ts` | spec 构造函数（`invoke` / `invokeWithDefault` / `event` / `send` / `local`）与类型推导（`BridgeOf`、`SpecInput`、`SpecOutput`、`SpecPayload`） |
 | `packages/util/shared/src/desktop-bridge/build-bridge.ts` | `buildBridge(contract, transport, locals)`：按契约生成冻结的 bridge 对象。preload 和 mock 共用 |
 | `apps/desktop/src/preload/index.ts` | 用 `ipcRenderer` 作为 transport 调 `buildBridge`，`exposeInMainWorld("actspace", bridge)`。不写任何业务逻辑 |
@@ -87,7 +85,7 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
   - 其余情况 → `missing`，渲染「无法连接桌面服务 / Desktop bridge missing」致命页，不渲染 App。
 - App 没有 mock 分支：浏览器里跑的是同一套 App 代码，只是 bridge 换成了 mock。
 
-## 6.1 侧边对话 IPC（2026-10-21）
+## 6.1 侧边对话 IPC
 
 - `sessions.openSideChat({ parentSessionId })` → `{ session, inheritedTurnCount, runningTurnExcluded }`。
 - `sessions.listSideChats({ parentSessionId })` → `SessionListItem[]`。

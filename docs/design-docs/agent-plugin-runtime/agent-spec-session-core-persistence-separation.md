@@ -1,8 +1,8 @@
 # Session 业务与存储后端边界
 
-本规范描述当前实现。它替代早期新增 `session-core` 包、将 write-behind 放进 JSONL Provider 的方案。实施及验收进度见[第二轮清理计划](../../exec-plans/completed/20261004-agent-storage-and-cleanup/README.md)；接口落地不等于整个清理计划或应用验收已完成。
+本规范描述当前实现。它替代早期新增 `session-core` 包、将 write-behind 放进 JSONL Provider 的方案。实施及验收进度见[第二轮清理计划](../../exec-plans/completed/20261004-agent-storage-and-cleanup/README.md)；接口落地不等于应用验收已完成。
 
-2026-10-18 增量运行态重构已落地，验证见[执行摘要](../../exec-runs/20261018-session-storage-refactor/execution-summary.md)，整体结构见[数据存储设计](../core-data-storage-design.md)。JSONL 与受管附件为完整会话事实；Agent 执行和恢复不依赖 SQLite，查询索引不拥有独有会话事实。
+增量运行态重构已落地，验证见[执行摘要](../../exec-runs/20261018-session-storage-refactor/execution-summary.md)，整体结构见[数据存储设计](../core-data-storage-design.md)。JSONL 与受管附件为完整会话事实；Agent 执行和恢复不依赖 SQLite，查询索引不拥有独有会话事实。
 
 ## 1. 依赖与所有权
 

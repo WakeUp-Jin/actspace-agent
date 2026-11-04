@@ -1,12 +1,12 @@
 # ActSpace v2 Tool Runtime ABI
 
-> 状态：已确认的目标语义合同。
+> 已确认的目标语义合同。
 >
 > 本文定义 Tool definition、executor、registration、prepared execution、policy、approval、durability、结果提交和卸载之间的稳定边界。实现可以调整内部类名和包位置，但不得改变本文规定的顺序、不变量和失败语义。
 >
-> 2026-08-29 起，工具事件、Cordis hooks 和内核/外壳所有权以 [Tool Runtime 内核与外壳边界](./agent-spec-tool-runtime-boundary.md) 为准；本文保留为 prepared execution ABI 背景。
+> 工具事件、Cordis hooks 和内核/外壳所有权以 [Tool Runtime 内核与外壳边界](./agent-spec-tool-runtime-boundary.md) 为准；本文保留为 prepared execution ABI 背景。
 >
-> 2026-08-29 起，本文中关于工具稳定身份的 `toolId` 语义由 [Tool Name 与 Plugin Namespace 契约](./agent-spec-tool-name-contract.md) 取代。新的公共身份是扁平 `name`，`pluginId` 独立表示归属，`registrationId` 表示进程内 lease；本文其余 prepared execution、policy、approval、lease 和 parity 语义仍然有效。本文中的旧字段名不构成兼容要求。
+> 本文中关于工具稳定身份的 `toolId` 语义由 [Tool Name 与 Plugin Namespace 契约](./agent-spec-tool-name-contract.md) 取代。新的公共身份是扁平 `name`，`pluginId` 独立表示归属，`registrationId` 表示进程内 lease；本文其余 prepared execution、policy、approval、lease 和 parity 语义仍然有效。本文中的旧字段名不构成兼容要求。
 
 上位插件身份、Host ceiling、Host 重启与 Harness 租约生命周期合同见 [插件 Runtime ABI](./agent-spec-plugin-runtime-abi.md)；固定 Host DTO 见 [Runtime Projection 规范](./agent-spec-runtime-projection.md)。
 

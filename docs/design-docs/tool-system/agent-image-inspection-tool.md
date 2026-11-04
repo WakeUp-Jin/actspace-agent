@@ -1,6 +1,6 @@
 # Agent 图片分析工具设计
 
-状态：当前 v2 工具与 Host 接线规范；2026-10-23 补齐辅助请求的持久生命周期。真实 Provider 与 Electron 验收不由本次文档核对替代。
+当前 v2 工具与 Host 接线规范，含辅助请求的持久生命周期。真实 Provider 与 Electron 验收不由本次文档核对替代。
 
 ## 目标与调用边界
 
@@ -17,7 +17,7 @@ Desktop 使用 `ModelRuntimeService.resolveImageInspectionModel()` 解析用户�
 
 Desktop 的 Harness 和工具端口可跨设置修改存活，因此必须在每次 `inspect_image` 调用时解析当前视觉模型，不得在 `createPorts` 中缓存解析结果。首次配置、替换及移除最后一个可用配置应在下一次调用生效，无需重启；没有可用模型时返回未配置错误，不读取图片或发送请求。用途“跟随”仍遵循现有可用模型回退。已经 prepare 的请求保持其请求身份，设置修改不重路由进行中的请求。
 
-设置中的模型与凭据选择仍独立于主会话模型；UI 仅展示非敏感状态。设置入口以当前[设置中心规范](../frontend/front-设置中心重构规范.md)为准。
+设置中的模型与凭据选择仍独立于主会话模型；UI 仅展示非敏感状态。设置入口以当前[设置中心规范](../../exec-plans/completed/design-archive/frontend/front-设置中心重构规范.md)为准。
 
 ## 工具契约
 

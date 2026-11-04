@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261101-harness-stats.md`
+- **关联计划**：`docs/exec-plans/completed/20261101-harness-stats.md`
 - **执行过程**：`docs/exec-runs/20261101-harness-stats/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：部分完成。T1–T12 代码、自动化验证和本机数据烟测都完成了；Electron 真实 Host 验收还没做；改动未提交

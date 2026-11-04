@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="480" height="200" viewBox="0 0 480 200">
-  <rect width="480" height="200" rx="12" fill="#e8f1f9"/>
-  <g fill="none" stroke="#3978b8" stroke-width="3" stroke-linejoin="round">
-    <path d="M60 150 L150 70 L210 120 L270 80 L420 150 Z" fill="#cfe1f2"/>
-    <circle cx="370" cy="60" r="18" fill="#f7eedb" stroke="#91600e"/>
-  </g>
-  <text x="240" y="186" text-anchor="middle" font-family="-apple-system, PingFang SC, sans-serif" font-size="13" fill="#3978b8">工作区本地图片 assets/md-demo-image.svg</text>
-</svg>

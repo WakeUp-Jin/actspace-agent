@@ -1,6 +1,6 @@
 # ActSpace v2 Agent Scope 模型设计规范
 
-> 状态：P0 Scope contract、fused dispatcher 与 main/child 生产接线已实现；真实 Host/Electron/Provider 与全仓库回归仍属于外部验收。
+> P0 Scope contract、fused dispatcher 与 main/child 生产接线已实现；真实 Host/Electron/Provider 与全仓库回归属于外部验收。
 >
 > 本文只定义 Agent Scope 的身份、父子关系、注册可见性、事件准入、资源所有权和 Agent subject 绑定。它不重新定义 Agent Loop 的 9 个事件、Session 的 12 个核心事件，也不重新定义工具执行本体；这些契约分别由 Agent Loop、Session 和 Tool Runtime 专题拥有。
 >

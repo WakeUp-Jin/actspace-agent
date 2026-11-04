@@ -1,75 +1,50 @@
 # actspace-agent
 
-这个仓库是一个面向 Agent 协作开发的基础模板。
+ActSpace 是一个本地优先的 Agent 工作台：桌面端（Electron）、Web / PWA 客户端和插件化的 Agent Runtime 都在这个仓库里。
 
-`AGENTS.md` 故意保持简短，只负责做导航，不负责塞满所有规则。仓库内的 `docs/` 才是本地知识的正式来源。
+`AGENTS.md` 故意保持简短，只负责做导航，不负责塞满所有规则。仓库内的 `docs/` 才是本地知识的正式来源，总导航是 `docs/README.md`。
 
 如果一次代码或流程变更会让某份文档过期，就在同一轮任务里顺手把它改掉。
 
 ## 每轮开始先读
 
-- `docs/REPO_COLLAB_GUIDE.md`：仓库级协作、提交、文档同步与测试约定。
+- `docs/REPO_COLLAB_GUIDE.md`：仓库级协作、提交、文档同步、测试约定和编码行为纪律。
 - `docs/ARCHITECTURE.md`：仓库整体结构、依赖边界和架构专题导航。
 - `packages/README.md`：`packages/` 的地图。改包、加插件前先读；每个能力目录有自己的 README，由 `pnpm check:docs` 校验。
-- `docs/design-docs/core-beliefs.md`：Agent-first 的工作原则和这个模板的设计出发点。
+
+## 做前端前必读
+
+- `docs/design-docs/frontend/front-新功能开发清单.md`：**新增或改动前端功能前必读**。第 1 节是交付前的 UI 自检，其余是样式、组件、文件拆分、状态、IPC、安全、测试和验收规则，每条链到对应规范和检查命令。
+- 清单之后读三份全局规范：`front-视觉token规范.md`（颜色、字号、圆角、主题硬约束）、`front-文案与状态表达规范.md`（说明文字、状态表达、空值写法）、`front-组件与交互模式规范.md`（按钮、弹层、设置行、表格、对标与 demo）。
+- 再按 `docs/design-docs/frontend/README.md` 的路由表读对应区域规范；验收方式见 `docs/FRONTEND_VERIFICATION.md`。
 
 ## 代码改完前要读
 
 - `docs/HISTORY_GUIDE.md`：什么时候记 history、怎么命名、怎么脱敏。
-- `docs/QUALITY_SCORE.md`：当前质量分层和主要短板。
 
 ## 按任务需要选读
 
-- `docs/README.md`：文档总导航；当前 v2 专题、执行计划的阅读边界。
-
 - `docs/PLANS_GUIDE.md`：什么时候要写 execution plan，怎么维护，两种执行模式。
 - `docs/exec-runs/README.md`：执行计划时的过程记录和验收文档怎么写。
-- `docs/nono-profiles/README.md`：夜间模式的 nono 沙箱配置和启动方式。
-
-- `docs/PRODUCT_SENSE.md`：产品价值、取舍方式和优先级判断。
-- `docs/RELIABILITY.md`：运行稳定性、观测性和上线前的基本要求。
-
-- `docs/SECURITY.md`：认证、数据处理、外部集成等安全默认约束。
-- `docs/SUPPLY_CHAIN_SECURITY.md`：依赖、SBOM、制品 provenance 和仓库级供应链安全默认做法。
-
-- `docs/CICD.md`：仓库的 CI/CD 骨架以及后续如何接入真实项目。
-
-- `docs/ARCHITECTURE_GRAPH_GUIDE.md`：交互式架构依赖图谱的生成规范（含扫描脚本、数据 Schema、配色 token、万能提示词与完整 HTML 模板）；需要为项目生成/更新 `ARCHITECTURE_GRAPH.html`（产物为 HTML）时照此执行。
-
-- `docs/design-docs/frontend/front-新功能开发清单.md`：**新增或改动前端功能前必读**。一页列出样式、组件与弹层、文件拆分、状态归属、IPC、安全、测试和验收的规则，每条链到对应规范和检查命令。
-- `docs/FRONTEND.md`：前端协作入口、设计文档和验证规范导航。
-- `docs/FRONTEND_VERIFICATION.md`：桌面端前端修改后的浏览器 mock、Electron 真实验证和 Computer Use 验收方式。
-- `docs/design-docs/frontend/front-主题与配色规范.md`：**改任何带颜色的样式前必读**。三态主题机制 + 「颜色必须随主题翻转、禁止 `text-black`/`bg-white`/`#hex` 等非主题感知字面量」的硬约束，且要求浅/深双主题都验过。
-
-- `docs/design-docs/index.md`：设计文档总索引；按根层入口或一级强关联专题目录进入对应设计。
+- `docs/design-docs/index.md`：设计文档唯一索引；后端、Runtime、工具、安全等设计从这里进入。
 - `docs/design-docs/agent-plugin-runtime/agent-testing.md`：v2 后端 Agent 测试策略、package lifecycle、Runtime 与 Host 覆盖边界。
-
-- `docs/CODING_BEHAVIOR.md`：编码行为纪律——改代码时的操作级约束。
-- `docs/coding-standards/README.md`：编码规范、Skill 推荐清单和团队自定义约定。
-
+- `docs/RELIABILITY.md`：运行稳定性、观测性和上线前的基本要求。
+- `docs/SECURITY.md`：认证、数据处理、外部集成等安全默认约束。
+- `docs/CICD.md`：CI/CD 与供应链安全。
+- `docs/coding-standards/README.md`：编码规范和团队自定义约定。
+- `docs/nono-profiles/README.md`：夜间模式的 nono 沙箱配置和启动方式。
 - `CONTRIBUTING.md`：提 PR 前后的默认检查项和协作要求。
 - `docs/releases/README.md`：如何维护面向用户的发布记录。
 - `docs/references/README.md`：沉淀到仓库里的外部参考资料。
-- `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档；需要追溯历史修复方案时再读。
 
 ## 外部能力代码
 
 - `browser-bridge/`：Browser Use / Browser Bridge 代码（Go CLI + Chrome Extension + 协议层），是顶层 Host capability，不属于通用 workspace `plugins/` 目录。操控浏览器（`browser-tools`）和英语学习（`english-learning`）默认不加载，用户在 扩展 › 插件 中开启后重启生效；开关存在 `settings.tools.plugins`，可关闭与否、默认值来自 `PLUGIN_CATALOG` 的 `display`。
 - 旧 `plugins/fs-watch/`：已退役的历史路径；v2 不再加载或启动它。
-- `/Users/wakeup-jin/Desktop/code-project/side-project/agent-browser-bridge/`：Browser Bridge 最早期来源仓库；仅作历史上下文。
 
 ## 阶段完成后的学习沉淀
 
-完成一轮代码变更后，检查本次变更是否**至少命中以下两条**：
-
-- **新概念**：开发者之前没接触过或理解模糊的技术点。
-- **可迁移**：这个知识在其他项目中也能复用。
-- **有深度**：不是一句话能说清的，需要理解原理或权衡。
-- **有陷阱**：容易踩坑、反直觉、或曾经踩过坑的点。
-- **有模式**：代表一种可重复使用的设计模式或架构思路。
-
-命中则读 `docs/learnings/WRITING_GUIDE.md`，按指南生成学习文档到 `docs/learnings/YYYY-MM/`。
-未命中可在 history 中顺带提一句，不需要单独写学习文档。
+只记「下次还会踩、读代码看不出来」的教训。动笔前先读 `docs/learnings/WRITING_GUIDE.md`，并在 `docs/learnings/README.md` 里搜同主题：已有同类就补进那一篇，不新建。不够格的在 history 里顺带提一句即可。
 
 ## 工作规则
 

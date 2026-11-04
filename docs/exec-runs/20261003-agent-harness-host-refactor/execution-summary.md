@@ -2,7 +2,7 @@
 
 状态：2026-10-04 原 P1–P5 批准范围验收完成。后续代码/文档清理单独执行，不沿用这里的通过结论。原阶段提交已存在；报告中的未提交/未推送措辞仅是当时快照。
 
-- [P1 固定产物与组合](phase-1-summary.md)
+- P1 固定产物与组合（原始记录已清理，见 git 历史）
 - [P2 Task/Run](phase-2-summary.md)
 - [P3 控制服务](phase-3-summary.md)
 - [P4 完整覆盖矩阵](phase-4-acceptance-matrix.md)及[修复后定向证据](phase-4-cu-round10.md)

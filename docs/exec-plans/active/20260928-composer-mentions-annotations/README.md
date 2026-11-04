@@ -36,7 +36,7 @@ PA 与 PB 都只依赖 P0，彼此文件范围基本不重叠（冲突点只有 
 
 - 执行前先读仓库根 `AGENTS.md`，再按子计划「必读」列表读文档。
 - renderer 不新增 `fs` / `path` 调用；不在 Markdown 组件里写 journal；不用全局可变单例保存批注状态。
-- 所有新颜色走主题 token，改样式前读 `docs/design-docs/frontend/front-主题与配色规范.md`；浅色 / 深色都要验。
+- 所有新颜色走主题 token，改样式前读 `docs/design-docs/frontend/front-视觉token规范.md`；浅色 / 深色都要验。
 - 日志只记录引用数量、长度和校验结果，不记录选中原文、评论或文件内容。
 - 选中文本、评论、文件名、路径一律作为不可信文本，用 React text children 渲染，不用 `dangerouslySetInnerHTML`。
 

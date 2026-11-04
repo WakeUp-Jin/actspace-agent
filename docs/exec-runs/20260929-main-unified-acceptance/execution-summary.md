@@ -6,7 +6,7 @@
 
 ## 已确认的问题
 
-1. **Chat 越界调用拒绝后会话不能续聊。** 从已有工具历史切到 Chat，模型产生 read_file/todo_write 调用；运行时拒绝不可见工具，但下一轮纯文本请求仍出现 provider 400：assistant tool_calls 缺对应 tool messages。界面未清楚说明错误。证据：[chat-boundary-failure.json](chat-boundary-failure.json)，会话 `54d5deb2-bfeb-460a-9339-2679afe7c4e8`。权限边界拒绝生效不能抵消续聊失败。
+1. **Chat 越界调用拒绝后会话不能续聊。** 从已有工具历史切到 Chat，模型产生 read_file/todo_write 调用；运行时拒绝不可见工具，但下一轮纯文本请求仍出现 provider 400：assistant tool_calls 缺对应 tool messages。界面未清楚说明错误。证据：`chat-boundary-failure.json`（原始记录已清理，见 git 历史），会话 `54d5deb2-bfeb-460a-9339-2679afe7c4e8`。权限边界拒绝生效不能抵消续聊失败。
 2. **Explore 和通用子 Agent 失败。** Plan Explore 两次快速失败；Agent 通用子任务约214秒后失败，均提示 `Agent turn failed and its settlement checkpoint also failed.`。主 Agent 回退直接读取成功不算子任务通过。子 Agent 错误 UI 已观察，根因未定位。
 3. **外观设置预览含开发文案。** 用户界面显示“已完成设置页重构”和测试命令，记录为产品文案问题。
 
@@ -46,11 +46,11 @@
 
 ## 证据
 
-- [执行过程](execution-process.md)：各组操作、状态、失败及后续纠正。早期“进行中”条目由后续追加结果更新。
-- [请求工具集合](runtime-tool-sets.json)：辅助运行时证据，不代替交互验收。
-- [Chat 失败记录](chat-boundary-failure.json)：已脱敏的失败证据。
-- [Mermaid PNG](mermaid-sequence.png)：真实导出图片。
-- [当前包清单](package-manifest.json)：本次构建版本与制品信息。
+- 执行过程（原始记录已清理，见 git 历史）：各组操作、状态、失败及后续纠正。早期“进行中”条目由后续追加结果更新。
+- 请求工具集合（原始记录已清理，见 git 历史）：辅助运行时证据，不代替交互验收。
+- Chat 失败记录（原始记录已清理，见 git 历史）：已脱敏的失败证据。
+- Mermaid PNG（截图 `mermaid-sequence.png`，原图未入库）：真实导出图片。
+- 当前包清单（原始记录已清理，见 git 历史）：本次构建版本与制品信息。
 - 关键 UI 截图与 AX 中间态保留在本任务 Computer Use 工具记录中；未将其虚构为仓库截图文件。
 
 ## 收尾与剩余门槛

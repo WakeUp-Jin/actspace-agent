@@ -1,10 +1,10 @@
 # 存储与可观测性边界
 
-> 状态：当前 v2 实现事实。旧 `sessions/`、可变 conversation 文件、独立 Context state 文件和 Trace sidecar 属于 v1，不是当前持久化契约。
+> 当前 v2 实现事实。旧 `sessions/`、可变 conversation 文件、独立 Context state 文件和 Trace sidecar 属于 v1，不是当前持久化契约。
 
 Runtime 公共契约见 [`agent-plugin-runtime/`](agent-plugin-runtime/README.md)，Session schema 见 [`agent-spec-session-format-v1.md`](agent-plugin-runtime/agent-spec-session-format-v1.md)。
 
-整体结构及读写流程见[数据存储结构与职责](core-data-storage-design.md)；模块 API、默认预算与已知限制见[职责与决策记录](core-data-storage-responsibilities.md#7-2026-10-18-实现落点与边界)。本文维护物理布局、Host 配置和观测边界。
+整体结构及读写流程见[数据存储结构与职责](core-data-storage-design.md)；模块 API、默认预算与已知限制见该文第 11–14 节。本文维护物理布局、Host 配置和观测边界。
 
 ## 数据根目录
 
@@ -39,7 +39,7 @@ Desktop 以这个 canonical root 作为 Electron `userData`，并解析以下根
 
 ## 存储接口与当前 JSONL 实现
 
-Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；创建、读写、列表、恢复、fork 和投影缓存经同一后端。JSONL 的目录、writer lease、fsync 和物理修复归 `@actspace/session-persistence-jsonl`。独立内存实现验证契约可替换；SQLite/MySQL 作为 Session 事实存储后端尚未实现。当前 `runtime-v2/usage-read-model.sqlite` 仅为 Usage/历史查询派生索引，通过 Provider 的有界事件读取同步，不能据此推导为已支持 SQLite Session 后端；状态见[SQLite 专题](筛选存储改版V2-增加SQLite/README.md)。详见[存储规范](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
+Session 业务依赖 `@actspace/session-storage` 的 provider/handle 契约；创建、读写、列表、恢复、fork 和投影缓存经同一后端。JSONL 的目录、writer lease、fsync 和物理修复归 `@actspace/session-persistence-jsonl`。独立内存实现验证契约可替换；SQLite/MySQL 作为 Session 事实存储后端尚未实现。当前 `runtime-v2/usage-read-model.sqlite` 仅为 Usage/历史查询派生索引，通过 Provider 的有界事件读取同步，不能据此推导为已支持 SQLite Session 后端；详见[数据存储结构与职责](core-data-storage-design.md)第 15 节。详见[存储规范](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
 
 下列是默认 JSONL 后端的物理布局，不是所有后端必须使用的公共格式：
 
@@ -146,7 +146,7 @@ Desktop fork 会将该前缀实际引用的附件与工具制品复制为子会�
 
 ## 设置与凭据
 
-- `settings.json`：main-owned 非敏感设置。P0 后物理写入 `version: 4` 逻辑 namespace，包括 provider/connection、模型选择、Prompt 路径、工具开关和快捷键；v1/v2/v3 只作为迁移输入并保留备份，具体结构见 [`front-设置中心重构规范.md`](frontend/front-设置中心重构规范.md)；
+- `settings.json`：main-owned 非敏感设置。P0 后物理写入 `version: 4` 逻辑 namespace，包括 provider/connection、模型选择、Prompt 路径、工具开关和快捷键；v1/v2/v3 只作为迁移输入并保留备份，具体结构见 [`front-设置中心重构规范.md`](../exec-plans/completed/design-archive/frontend/front-设置中心重构规范.md)；
 - `secrets.json` v2：main-only 明文凭据，文件权限收紧为 `0600`；
 - renderer 只接收 `hasApiKey`、连接状态、模型目录和脱敏错误；
 - Desktop provider key 不从仓库 `.env` 读取；CLI 才读取启动进程显式提供的环境变量。

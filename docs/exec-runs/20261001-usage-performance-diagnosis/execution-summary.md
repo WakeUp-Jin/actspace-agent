@@ -17,7 +17,7 @@
 - 从 71 个已有 checkpoint 恢复约 98ms，snapshot 约 134ms；从所有事件提取 usage rows 约 22ms。现有统计索引只有 79 条记录，汇总首轮约 10ms，之后约 0.07–0.16ms。
 - 同进程点击刷新后，主进程 CPU 峰值 5.4%、渲染 0.8%，主进程 CPU 时间约增加 0.09 秒，没有相同持续高负载。随后切换 7 天显示 79 条记录，恢复 24 小时并返回通用设置成功；已核对持久化范围为 24h。
 
-结构化数字见 [measurements.json](measurements.json)。原始 native sample、CPU profiles 和临时诊断脚本只保存在本机 /tmp/actspace-perf-20261001，未把完整用户历史写入报告或提交。
+结构化数字见 `measurements.json`（原始记录已清理，见 git 历史）。原始 native sample、CPU profiles 和临时诊断脚本只保存在本机 /tmp/actspace-perf-20261001，未把完整用户历史写入报告或提交。
 
 后续实施结果见 [性能优化执行摘要](../20261001-performance-monitor-projection/execution-summary.md)。本文数值、源码路径与建议均保留为修复前证据，不作为当前实现说明。
 

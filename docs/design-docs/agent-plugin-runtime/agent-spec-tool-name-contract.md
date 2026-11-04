@@ -1,10 +1,8 @@
 # ActSpace Tool Name 与 Plugin Namespace 契约
 
-> 2026-09-28：当前 `read_file` owner 为 `actspace.filesystem-read`；下文旧聚合插件 id 仅用于解释早期名称契约错误，当前包见 [工具边界](agent-tool-plugin-boundaries.md)。
+> 当前 `read_file` owner 为 `actspace.filesystem-read`；下文旧聚合插件 id 仅用于解释早期名称契约错误，当前包见 [工具边界](agent-tool-plugin-boundaries.md)。
 
-> 状态：已实施（2026-08-29；真实 Provider smoke 待凭据）
->
-> 日期：2026-08-29
+> 本契约已实现；真实 Provider smoke 需要凭据。
 >
 > 本文只规定 Agent 工具的身份、命名、Provider wire 和跨层传递方式。它不替换具体工具 executor，也不改变读取、list、编辑、bash、Browser Bridge 等工具的业务行为。
 
@@ -50,7 +48,7 @@ DSH 也把 `toolName` 作为某些错误对象的字段，但它仍然代表同�
 | 2026-08-29 旧 `core-tools` 与 Browser definitions | 曾生成 `actspace.core-tools/read_file` 等值 | 所有 Core/Browser 工具进入问题路径 |
 | `packages/core/agent-loop/src/loop.ts` | LLM definition 继续暴露 `definition.toolId` | 模型 schema 收到 namespaced 值 |
 | `packages/llm/llm-pi-ai/src/legacy-proxy-wire-engine.ts` | `function.name`、Responses `name`、Anthropic `name` 均使用 `tool.toolId` | Provider 收到非法函数名 |
-| `packages/llm/llm-pi-ai/src/pi-ai-wire-engine.ts` | pi-ai schema 使用 `tool.toolId` | pi-ai 路径同样受影响 |
+| `packages/llm/llm-pi-ai/src/pi-ai-stream.ts` | pi-ai schema 使用 `tool.toolId` | pi-ai 路径同样受影响 |
 
 DeepSeek 返回的错误正是这一链路的直接结果：`actspace.core-tools/read_file` 不符合 `^[a-zA-Z0-9_-]+$`。
 
