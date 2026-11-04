@@ -1,4 +1,4 @@
-import type { SessionHeaderV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
+import type { SessionHeaderV1, SessionEventEnvelopeV1, SessionAccessState, SessionValidationResult } from "@actspace/session-journal";
 
 /** Opaque revision: compare only within one storage identity and session. */
 export interface SessionStorageSnapshot {
@@ -7,7 +7,20 @@ export interface SessionStorageSnapshot {
   readonly events: readonly SessionEventEnvelopeV1[];
   readonly integrity: "complete" | "repair-required";
   readonly problem?: string;
+  /** Physical size of the Journal this snapshot reflects; consumers use it only to estimate retention cost. */
+  readonly bytes?: number;
+  /** Validation the provider already ran over exactly `events`. Valid only for the codec set whose digest matches; otherwise re-validate. */
+  readonly validated?: { readonly codecDigest: string; readonly accessState: SessionAccessState; readonly result: SessionValidationResult };
 }
+
+/** Result of `SessionStorage.refresh`: how the physical Journal relates to the base snapshot. */
+export type SessionStorageRefresh =
+  /** Nothing changed; `snapshot` is the base object itself and no Journal content was read. */
+  | { readonly kind: "unchanged"; readonly snapshot: SessionStorageSnapshot }
+  /** The Journal only grew. `snapshot.events` starts with all of the base events; events from index `fromEvent` are new. */
+  | { readonly kind: "appended"; readonly snapshot: SessionStorageSnapshot; readonly fromEvent: number }
+  /** Anything else (rewrite, truncation, repair, new file identity, torn tail): a full, independent read. */
+  | { readonly kind: "replaced"; readonly snapshot: SessionStorageSnapshot };
 
 /** Lightweight physical descriptor; metadata projection remains the consumer's job. */
 export interface SessionQuerySource {
@@ -65,6 +78,10 @@ export interface SessionStorage {
   querySource?(sessionId: string): Promise<SessionQuerySource>;
   readEventBatch?(sessionId: string, input: SessionEventBatchInput): Promise<SessionEventBatch>;
   inspect(sessionId: string): Promise<SessionStorageSnapshot>;
+  /** Optional acceleration: bring a snapshot previously returned by `inspect`/`refresh` up to date without
+   * re-reading unchanged content. Must be observably equivalent to a fresh `inspect` (same events, integrity and problem).
+   * Providers without cheap change detection omit it and callers fall back to `inspect`. */
+  refresh?(sessionId: string, base: SessionStorageSnapshot): Promise<SessionStorageRefresh>;
   listSessionIds(): Promise<readonly string[]>;
   create(header: SessionHeaderV1): Promise<SessionStorageHandle>;
   open(sessionId: string, access: "read" | "write"): Promise<SessionStorageHandle>;

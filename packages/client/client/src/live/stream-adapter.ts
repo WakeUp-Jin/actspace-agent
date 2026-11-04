@@ -10,7 +10,14 @@ type Entry = { identity: Identity; args: RuntimeV2JsonValue; phase: "streaming" 
 
 /** Transient presentation state. Journal and tool execution remain the source of truth. */
 export class FixedRendererStreamAdapter {
-  constructor(private readonly workspaceFor: (sessionId: string) => string | undefined = () => undefined) {}
+  /**
+   * `coalesceMs` > 0 merges consecutive text/reasoning deltas of one message into a single event every
+   * `coalesceMs`. Any other event flushes the pending delta first, so order never changes; the run end,
+   * `clearTransient` and `dispose` flush as well. 0 (default) emits every delta immediately.
+   */
+  constructor(private readonly workspaceFor: (sessionId: string) => string | undefined = () => undefined, private readonly coalesceMs = 0) {}
+  #pendingDelta: Extract<RuntimeStreamEvent, { type: "assistant_text_delta" | "assistant_thinking_delta" }> | undefined;
+  #deltaTimer: ReturnType<typeof setTimeout> | undefined;
   readonly #calls = new Map<string, Entry>();
   readonly #closedRuns = new Set<string>();
   readonly #listeners = new Set<(event: RuntimeStreamEvent) => void>();
@@ -22,12 +29,35 @@ export class FixedRendererStreamAdapter {
     this.clearTransient();
     this.#listeners.clear();
   }
+  /** Emit a buffered delta now. Hosts call this before sending a related message through another path. */
+  flush(): void {
+    if (this.#deltaTimer !== undefined) { clearTimeout(this.#deltaTimer); this.#deltaTimer = undefined; }
+    const pending = this.#pendingDelta;
+    if (pending === undefined) return;
+    this.#pendingDelta = undefined;
+    this.#send(pending);
+  }
   clearTransient(): void {
+    this.flush();
     for (const entry of this.#calls.values()) this.#clearTimer(entry);
     this.#calls.clear();
     this.#closedRuns.clear();
   }
   #emit(event: RuntimeStreamEvent): void {
+    this.flush();
+    this.#send(event);
+  }
+  #emitDelta(event: Extract<RuntimeStreamEvent, { type: "assistant_text_delta" | "assistant_thinking_delta" }>): void {
+    if (this.coalesceMs <= 0) { this.#send(event); return; }
+    const pending = this.#pendingDelta;
+    if (pending !== undefined) {
+      if (sameDeltaTarget(pending, event)) { this.#pendingDelta = { ...pending, delta: pending.delta + event.delta }; return; }
+      this.flush();
+    }
+    this.#pendingDelta = event;
+    this.#deltaTimer = setTimeout(() => { this.#deltaTimer = undefined; this.flush(); }, this.coalesceMs);
+  }
+  #send(event: RuntimeStreamEvent): void {
     for (const listener of this.#listeners) {
       try { listener(event); } catch { /* Presentation observers cannot fail the run. */ }
     }
@@ -67,7 +97,7 @@ export class FixedRendererStreamAdapter {
     // A subagent's Run carries its main Session, so clients leave the child's task queue alone.
     const child = event.parentSessionId ? { parentSessionId: event.parentSessionId } : {};
     if (event.kind === "assistant-delta" || event.kind === "reasoning-delta") {
-      this.#emit({ type: event.kind === "assistant-delta" ? "assistant_text_delta" : "assistant_thinking_delta", ...ids, llmCallId: event.requestId, messageId: event.messageId, delta: event.message });
+      this.#emitDelta({ type: event.kind === "assistant-delta" ? "assistant_text_delta" : "assistant_thinking_delta", ...ids, llmCallId: event.requestId, messageId: event.messageId, delta: event.message });
       return;
     }
     if (event.kind === "run-state") {
@@ -170,4 +200,9 @@ export class FixedRendererStreamAdapter {
 
 function isNoticeKind(kind: string): kind is "bash" | "agent" | "subagent" | "agent_message" {
   return kind === "bash" || kind === "agent" || kind === "subagent" || kind === "agent_message";
+}
+
+type DeltaEvent = Extract<RuntimeStreamEvent, { type: "assistant_text_delta" | "assistant_thinking_delta" }>;
+function sameDeltaTarget(a: DeltaEvent, b: DeltaEvent): boolean {
+  return a.type === b.type && a.sessionId === b.sessionId && a.agentRunId === b.agentRunId && a.turnId === b.turnId && a.llmCallId === b.llmCallId && a.messageId === b.messageId;
 }

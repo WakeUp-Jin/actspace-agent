@@ -9,13 +9,11 @@ import { OpenerCapture } from "./OpenerCapture";
 // 包住一个元素，或传 virtualRef（例如选区的 getBoundingClientRect）。
 // 外框只给层级、边框、背景、阴影；圆角用 radius 选，内边距和宽度由调用方给。
 
-export type PopoverRadius = "md" | "lg" | "xl" | "2xl";
+export type PopoverRadius = "md" | "lg";
 
 const RADIUS_CLASS: Record<PopoverRadius, string> = {
   md: "rounded-act-md",
   lg: "rounded-act-lg",
-  xl: "rounded-act-xl",
-  "2xl": "rounded-2xl",
 };
 
 const Popover = PopoverPrimitive.Root;

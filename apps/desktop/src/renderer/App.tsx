@@ -9,8 +9,9 @@ import { upsertStreamingTool } from "./session/live-runs/stream-state";
 import type { CompactionBlock } from "./session/live-runs/stream-blocks";
 import { getSessionTitle } from "./session/session-title";
 import { createSessionCellRetention } from "./session/session-store";
-import { useSessionTranscript } from "./session/use-session-transcript";
-import { createLiveRunStore, TERMINAL_RUN_LIMIT, useBusySessionIds, type StreamEvent } from "./session/live-runs/live-run-store";
+import { useChatSessionRecord } from "./session/session-store";
+import { SessionTranscriptProvider } from "./session/transcript-context";
+import { createLiveRunStore, TERMINAL_RUN_LIMIT, useBusySessionIds, useLiveRunSelect, type LiveRunView, type StreamEvent } from "./session/live-runs/live-run-store";
 import { scheduleFrame } from "./session/frame-batch";
 import { applyTaskSnapshot as applyHostTaskSnapshot, createTaskQueueStore } from "./session/task-queue";
 import { loadEarlier } from "./session/session-pages";
@@ -93,6 +94,17 @@ const DRAFT_COMPOSER_KEY = "__draft__";
 const EMPTY_EVENTS: SessionEvent[] = [];
 const QUEUE_REFRESH_FAILED = "队列状态读取失败，请稍后重试。";
 const QUEUE_COMMAND_FAILED = "队列操作没有完成，请重试。";
+/** App 只关心 live run 的运行状态；流式 blocks 每帧都变，不进 App 的订阅（见 SessionTranscriptProvider）。 */
+type LiveStatus = { readonly isStreaming: boolean; readonly isAborting: boolean; readonly recovered: boolean; readonly isCompacting: boolean; readonly hasStreamingBlocks: boolean };
+const selectLiveStatus = (view: LiveRunView): LiveStatus => ({
+  isStreaming: view.isStreaming,
+  isAborting: view.isAborting,
+  recovered: view.recovered,
+  isCompacting: view.blocks.some((block) => block.kind === "context_compaction" && block.status === "running"),
+  hasStreamingBlocks: view.blocks.length > 0,
+});
+const sameLiveStatus = (left: LiveStatus, right: LiveStatus) => left.isStreaming === right.isStreaming && left.isAborting === right.isAborting
+  && left.recovered === right.recovered && left.isCompacting === right.isCompacting && left.hasStreamingBlocks === right.hasStreamingBlocks;
 const selectComposerState = (state: SessionLocalState) => state.composer;
 const selectApprovalPending = (state: SessionLocalState) => state.approvalPending;
 const selectFailed = (state: SessionLocalState) => state.failed;
@@ -261,8 +273,10 @@ export function App() {
   const composerDraftRestore = useSessionLocalState(localStore, selectedSessionId, selectDraft);
   const messageQueue = useSessionLocalState(localStore, selectedSessionId, selectMessageQueue);
   // durable 历史从 store 的 cell 派生；cell 不放进 App 的作用域，见 useChatSessionRecord。
-  const { sessionRecord, historyBefore, live: liveView, messages, isCompacting } = useSessionTranscript({ sessionStore, liveRuns, localStore }, selectedSessionId, bootstrapState?.workspaceRoot);
-  const { blocks: streamingBlocks, isStreaming, isAborting } = liveView;
+  // live run 只订阅运行状态（流式每帧都变的 blocks 不进 App）；消息序列由 SessionTranscriptProvider 单独订阅。
+  const liveStatus = useLiveRunSelect(liveRuns, selectedSessionId, selectLiveStatus, sameLiveStatus);
+  const { isStreaming, isAborting, isCompacting, hasStreamingBlocks } = liveStatus;
+  const { sessionRecord, historyBefore } = useChatSessionRecord(sessionStore, selectedSessionId, bootstrapState?.workspaceRoot, liveStatus.recovered);
   const runTarget = useRunTarget({
     sessionId: selectedSessionId,
     sessionWorkspacePath: sessionRecord?.meta.workspaceRoot,
@@ -1205,7 +1219,7 @@ export function App() {
   const handleSelectedSkillsChange = useCallback((selectedSkills: string[]) => {
     localStore.update(composerStateKey, (state) => ({ ...state, composer: { mode: state.composer?.mode ?? "agent", selectedSkills } }));
   }, [localStore, composerStateKey]);
-  const isSessionReady = Boolean(sessionRecord || streamingBlocks.length > 0 || sessionBootstrapComplete);
+  const isSessionReady = Boolean(sessionRecord || hasStreamingBlocks || sessionBootstrapComplete);
   const title = getSessionTitle(sessionRecord, visibleSessions, activeSessionId);
   const workspaceOptions = useMemo(
     () => {
@@ -1481,6 +1495,7 @@ export function App() {
     await handleArchivedSessionsChange();
   }, [handleArchivedSessionsChange]);
 
+  const visibleWorkspaces = useMemo(() => workspaceRegistry?.items.filter((workspace) => !workspace.hidden), [workspaceRegistry]);
   const getSessionPreview = useCallback(async (session: SessionListItem) => {
     return sessionsApi.getPreview({ sessionId: session.id });
   }, []);
@@ -1498,7 +1513,7 @@ export function App() {
     hasEarlier: historyBefore !== null, earlierLoading, earlierError, loadEarlier: loadEarlierMessages,
   });
   const activeSession = useShallowStable<ActiveSessionValue>({
-    sessionId: activeSessionId, title, messages, contextSnapshot, contextState, isStreaming, isAborting, isCompacting, isSessionReady,
+    sessionId: activeSessionId, title, contextSnapshot, contextState, isStreaming, isAborting, isCompacting, isSessionReady,
     sendScrollRequestId, composerFocusRequestId, onSend: handleSend, onAbort: activeSessionId && liveRuns.get(activeSessionId)?.operationTaskId ? undefined : handleAbort, onRetryCompaction: handleRetryCompaction,
   });
   const drafts = useSessionDrafts(localStore, activeSessionId);
@@ -1556,17 +1571,19 @@ export function App() {
 
   return (
     <AppProviders sessionStore={sessionStore} browse={browse} localStore={localStore} activeSession={activeSession} composer={composer} sessionActions={sessionActions} runTarget={runTargetValue} sideChat={sideChat}>
-      <WorkbenchLayout
-        sessions={visibleSessions}
-        busySessionIds={busySessionIds}
-        sessionStatuses={sessionStatuses}
-        onSettingsChange={handleSettingsChange}
-        onArchivedSessionsChange={handleArchivedSessionsChange}
-        workspaces={workspaceRegistry?.items.filter((workspace) => !workspace.hidden)}
-        getSessionPreview={getSessionPreview}
-        reviewSummary={reviewSummary}
-        onReviewChanged={handleReviewChanged}
-      />
+      <SessionTranscriptProvider liveRuns={liveRuns} localStore={localStore} sessionId={selectedSessionId} sessionRecord={sessionRecord}>
+        <WorkbenchLayout
+          sessions={visibleSessions}
+          busySessionIds={busySessionIds}
+          sessionStatuses={sessionStatuses}
+          onSettingsChange={handleSettingsChange}
+          onArchivedSessionsChange={handleArchivedSessionsChange}
+          workspaces={visibleWorkspaces}
+          getSessionPreview={getSessionPreview}
+          reviewSummary={reviewSummary}
+          onReviewChanged={handleReviewChanged}
+        />
+      </SessionTranscriptProvider>
       <ShutdownOverlay />
     </AppProviders>
   );

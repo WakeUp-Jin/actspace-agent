@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MessageBlock, WorkspaceEnvironmentSnapshot } from "@actspace/shared";
 import { WorkspaceChromeControls } from "../components/workspace/WorkspaceChromeControls";
+import { createTranscriptStore, TranscriptStoreProvider } from "../session/transcript-context";
 import { setupBridge, type BridgeOverrides } from "./helpers/bridge";
 
 const environment: WorkspaceEnvironmentSnapshot = {
@@ -94,15 +95,16 @@ function installBridge(overrides: BridgeOverrides = {}) {
 
 function renderControls(overrides: Partial<Parameters<typeof WorkspaceChromeControls>[0]> = {}) {
   return render(
-    <WorkspaceChromeControls
-      workspaceRoot="/tmp/workspace"
-      title="Environment controls"
-      messages={messages}
-      reviewSummary={{ status: "changes", additions: 5, deletions: 1 }}
-      onOpenReview={vi.fn()}
-      onWorkspaceChanged={vi.fn()}
-      {...overrides}
-    />,
+    <TranscriptStoreProvider store={createTranscriptStore(messages)}>
+      <WorkspaceChromeControls
+        workspaceRoot="/tmp/workspace"
+        title="Environment controls"
+        reviewSummary={{ status: "changes", additions: 5, deletions: 1 }}
+        onOpenReview={vi.fn()}
+        onWorkspaceChanged={vi.fn()}
+        {...overrides}
+      />
+    </TranscriptStoreProvider>,
   );
 }
 

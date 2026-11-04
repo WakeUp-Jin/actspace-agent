@@ -191,6 +191,7 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         for (const sessionId of sessionIds) requireSession(db, sessionId).archived = true;
         return { ok: true, archivedSessionIds: sessionIds, failedSessionIds: [] };
       },
+      setObserved: () => undefined,
       describeContext: async ({ sessionId }) => db.sessions.has(sessionId) ? mockContextState(mockContextPanelView(sessionId, db.sessions.get(sessionId))) : null,
       listContextPaths: async input => {
         if (input.revision !== MOCK_CONTEXT_PATHS_REVISION) throw new Error("Context revision stale; reload the panel.");

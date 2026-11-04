@@ -3,6 +3,7 @@ import type { EnglishLearningService, SpeechHostPort } from "@actspace/english-l
 import { formatChatAttachmentIssue, type ChatAttachmentIssue, type EnglishLearningTargetInput, type EnglishLearningState } from "@actspace/shared";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "../workspace-registry-service";
 import { FixedRendererStreamAdapter } from "./fixed-renderer-stream-adapter";
+import { LIVE_BATCH_INTERVAL_MS } from "./live-envelope-batcher";
 import { randomUUID } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
@@ -46,9 +47,15 @@ export type DesktopRuntimeV2RegistryOptions = {
   readonly log?: (message: string, details?: Record<string, unknown>) => void;
 };
 
+/** The slice of the Session controller the Host drives to keep idle Sessions from piling up in memory. */
+type SessionReleaseControl = {
+  setObserved(sessionIds: readonly string[]): void;
+  addPin(pin: (sessionId: string) => boolean): () => void;
+};
+
 export class DesktopRuntimeV2Registry {
   readonly #streamWorkspaces = new Map<string, string>();
-  readonly #rendererStream = new FixedRendererStreamAdapter((sessionId) => this.#streamWorkspaces.get(sessionId));
+  readonly #rendererStream = new FixedRendererStreamAdapter((sessionId) => this.#streamWorkspaces.get(sessionId), LIVE_BATCH_INTERVAL_MS);
   readonly #listeners = new Set<(event: RuntimeV2DesktopLiveEnvelope) => void>();
   #profile: BootedRuntimeProfile | undefined;
   #workspaceDiscovery?: { controller: AbortController; task: Promise<void> };
@@ -387,6 +394,30 @@ export class DesktopRuntimeV2Registry {
     } finally { this.#admittedWork--; }
   }
 
+  /**
+   * The Sessions the renderer shows or subscribes to (the whole set, replaced on every change). They are
+   * never released as idle; every other idle Session beyond the LRU limit is closed and resumed on demand.
+   */
+  setObservedSessions(sessionIds: readonly string[]): void {
+    this.#observedSessions = sessionIds.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 256);
+    this.#sessionRelease()?.setObserved(this.#observedSessions);
+  }
+  #observedSessions: readonly string[] = [];
+  #sessionRelease(): SessionReleaseControl | undefined { return this.#profile?.context.get?.("session.runtime") as SessionReleaseControl | undefined; }
+  /** A fresh boot starts without viewers: replay the renderer's set and pin what Host features hold open. */
+  #installSessionRelease(profile: BootedRuntimeProfile): void {
+    const control = profile.context.get?.("session.runtime") as SessionReleaseControl | undefined;
+    if (control === undefined) return;
+    control.setObserved(this.#observedSessions);
+    // English learning keeps the target Session's handle to read each finished turn.
+    control.addPin((sessionId) => {
+      const learning = profile.context.get?.("english-learning") as EnglishLearningService | undefined;
+      const state = learning?.getState();
+      return state?.enabled === true && state.targetSessionId === sessionId;
+    });
+  }
+  /** Emit a buffered text/reasoning delta now (before a message that must not overtake it). */
+  flushRendererStream(): void { this.#rendererStream.flush(); }
   subscribeRendererStream(listener: (event: import("@actspace/shared").RuntimeStreamEvent) => void): () => void { return this.#rendererStream.subscribe(listener); }
 
   subscribe(listener: (event: RuntimeV2DesktopLiveEnvelope) => void): () => void {
@@ -549,9 +580,8 @@ export class DesktopRuntimeV2Registry {
     if (update.workspaceRoot) this.#streamWorkspaces.set(update.sessionId, update.workspaceRoot);
     this.#rendererStream.accept(update);
     if (update.kind === "run-state" && ["completed", "failed", "aborted", "step-limit"].includes(update.message)) this.#streamWorkspaces.delete(update.sessionId);
-    if (update.kind === "assistant-delta" || update.kind === "reasoning-delta" || update.kind === "run-state") {
-      this.#emit({ ...update, throughJournalSeq: 0 });
-    }
+    // Delta text already travels on the renderer stream and, durably, as journal chunks; a third copy as a live envelope has no reader.
+    if (update.kind === "run-state") this.#emit({ ...update, throughJournalSeq: 0 });
   }
 
   async #boot(): Promise<void> {
@@ -574,6 +604,7 @@ export class DesktopRuntimeV2Registry {
         onRuntimeLive: (update) => this.#emitRuntimeLive(update),
       });
       this.#profile = booted.profile;
+      this.#installSessionRelease(booted.profile);
       const learningTarget = this.#learningTargetToRestore;
       if (learningTarget?.enabled && learningTarget.sessionId) {
         await this.requireApp().resumeMainSession(learningTarget.sessionId);

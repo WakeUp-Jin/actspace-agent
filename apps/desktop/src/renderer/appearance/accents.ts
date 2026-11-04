@@ -3,7 +3,7 @@
  * :root[data-accent="<id>"] 块里（pnpm check:frontend-theme 校验两边一一对应）。
  * 强调色只驱动发送按钮、开关开启态、焦点、普通链接与文字选中；
  * 默认调色板不定义源值，全部回落到原有 action / operational / info / 中性 token。
- * 设计：docs/design-docs/frontend/front-accent-palette.md。
+ * 设计：docs/design-docs/frontend/front-视觉token规范.md §4。
  */
 import type { AccentPaletteId } from "./types";
 

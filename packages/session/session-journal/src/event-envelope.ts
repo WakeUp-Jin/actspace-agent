@@ -29,6 +29,21 @@ export function snapshotSessionJson<T>(value: T): Readonly<T> {
   return deepFreeze(JSON.parse(serialized) as T);
 }
 
+/**
+ * Validate-only twin of `snapshotSessionJson`: rejects exactly the same inputs with the same errors, but
+ * produces no copy. Use it where the snapshot would be discarded (e.g. replaying a Journal).
+ * The 1 MiB limit is decided from a cheap upper bound on the serialized size; only values whose bound
+ * exceeds the limit are actually serialized to get the exact size.
+ */
+export function validateSessionJson(value: unknown): void {
+  const bound = validateJsonValue(value, 0);
+  if (bound <= MAX_JSON_BYTES) return;
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined || Buffer.byteLength(serialized, "utf8") > MAX_JSON_BYTES) {
+    throw new SessionError("INVALID_EVENT", "Session record exceeds the 1 MiB JSON limit.");
+  }
+}
+
 export function validateEventEnvelopeShape(value: unknown): asserts value is SessionEventEnvelopeV1 {
   if (!isPlainRecord(value) || value.recordKind !== "event") invalid("Event envelope must be an event object.");
   if (!Number.isSafeInteger(value.seq) || (value.seq as number) < 0) invalid("Event seq must be a non-negative integer.");
@@ -46,7 +61,7 @@ export function validateEventEnvelopeShape(value: unknown): asserts value is Ses
     invalid("runtimeSelectionSeq must be null or a non-negative integer.");
   }
   if (value.surface !== null) validateSurfaceOperation(value.surface);
-  snapshotSessionJson(value);
+  validateSessionJson(value);
 }
 
 export function defaultSessionProvenance(): SessionEventProvenanceV1 {
@@ -76,23 +91,32 @@ function validateSurfaceNode(value: unknown): asserts value is SessionSurfaceNod
   }
 }
 
-function validateJsonValue(value: unknown, depth: number): void {
+/** Validates a plain JSON value and returns an upper bound of its serialized UTF-8 size in bytes. */
+function validateJsonValue(value: unknown, depth: number): number {
   if (depth > MAX_JSON_DEPTH) invalid("Session JSON exceeds maximum nesting depth.");
-  if (value === null || typeof value === "string" || typeof value === "boolean") return;
+  if (value === null) return 4;
+  if (typeof value === "string") return jsonStringBound(value);
+  if (typeof value === "boolean") return 5;
   if (typeof value === "number") {
     if (!Number.isFinite(value)) invalid("Session JSON numbers must be finite.");
-    return;
+    return 25;
   }
   if (Array.isArray(value)) {
-    for (const child of value) validateJsonValue(child, depth + 1);
-    return;
+    let bound = 2;
+    for (const child of value) bound += validateJsonValue(child, depth + 1) + 1;
+    return bound;
   }
   if (!isPlainRecord(value)) invalid("Session records may contain only plain JSON values.");
+  let bound = 2;
   for (const [key, child] of Object.entries(value)) {
     if (FORBIDDEN_SECRET_KEYS.has(key.toLowerCase())) invalid(`Session record contains forbidden secret field ${key}.`);
-    validateJsonValue(child, depth + 1);
+    bound += jsonStringBound(key) + 1 + validateJsonValue(child, depth + 1) + 1;
   }
+  return bound;
 }
+
+/** Each UTF-16 unit serializes to at most 6 bytes (\\uXXXX escape); plus the quotes. */
+function jsonStringBound(value: string): number { return value.length * 6 + 2; }
 
 function validateIntegerArray(value: unknown, field: string): asserts value is number[] {
   if (!Array.isArray(value) || value.some((item) => !Number.isSafeInteger(item) || item < 0)) invalid(`${field} must contain non-negative integers.`);

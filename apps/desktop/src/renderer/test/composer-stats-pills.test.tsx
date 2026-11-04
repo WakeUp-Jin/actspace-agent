@@ -24,7 +24,8 @@ let projection: SessionProjectionContextValue | null = null;
 
 vi.mock("../session", async (importOriginal) => ({
   ...await importOriginal<typeof import("../session")>(),
-  useOptionalSessionProjection: () => projection,
+  // 胶囊只订阅 cell 派生出的模型：这里直接用夹具里的 cell 跑 selector。
+  useProjectionSelect: (selector: (cell: unknown, overlay: unknown) => unknown) => selector(projection?.cell ?? null, null),
 }));
 
 const NO_STATS: ComposerSessionStats = { turns: 0, steps: 0, llmMs: 0, toolMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 };

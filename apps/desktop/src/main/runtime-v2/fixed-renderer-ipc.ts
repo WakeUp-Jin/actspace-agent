@@ -1,3 +1,4 @@
+import { LiveEnvelopeBatcher } from "./live-envelope-batcher";
 import { ContextPanelService } from "./context-panel-service";
 import { validateRunReferences as validateSharedRunReferences } from "@actspace/shared/composer-reference-validation";
 import type { RemoteDesktopAdapter } from "../remote-hosts/desktop-adapter";
@@ -99,6 +100,8 @@ export type FixedRendererIpcOptions = {
 };
 
 export type FixedRendererIpcRegistration = {
+  /** Send buffered stream deltas now; call before pushing a related message through another path. */
+  readonly flushLive: () => void;
   readonly dispose: () => void;
   readonly requestQuickOpen: () => void;
 };
@@ -304,15 +307,21 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return true;
   });
 
-  const unsubscribeLive = options.registry.subscribe((envelope) => {
-    if (envelope.event.kind === "runtime-live" || envelope.event.kind === "journal-update") usageReadModels.get(options.registry)?.invalidate();
+  // Streaming sends one IPC message per token on two channels. Both coalesce within ~33ms; any other
+  // message flushes the pending chunks first so order never changes.
+  const liveBatcher = new LiveEnvelopeBatcher((message) => {
     const target = options.getMainWindow();
     if (target === undefined || target.isDestroyed()) return;
-    target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.sessionLiveEvent, envelope);
-
+    target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.sessionLiveEvent, message);
+  });
+  const unsubscribeLive = options.registry.subscribe((envelope) => {
+    if (envelope.event.kind === "runtime-live" || envelope.event.kind === "journal-update") usageReadModels.get(options.registry)?.invalidate();
+    liveBatcher.push(envelope);
   });
 
   const unsubscribeRendererStream = options.registry.subscribeRendererStream((event) => {
+    // A run boundary or tool event must not overtake the journal chunks that came before it.
+    if (event.type !== "assistant_text_delta" && event.type !== "assistant_thinking_delta") liveBatcher.flush();
     const target = options.getMainWindow();
     if (target !== undefined && !target.isDestroyed()) target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.agentStream, event);
   });
@@ -340,13 +349,19 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return result.ok ? result : { ...result, settings: options.settings.get() };
   });
 
+  ipc.on(contract.sessions.setObserved, (sessionIds) => {
+    options.registry.setObservedSessions(Array.isArray(sessionIds) ? sessionIds : []);
+  });
+
   ipc.on(contract.appearance.setNativeTheme, (mode) => {
     if (mode === "light" || mode === "dark" || mode === "system") nativeTheme.themeSource = mode;
   });
 
   return {
+    flushLive: () => { options.registry.flushRendererStream(); liveBatcher.flush(); },
     dispose: () => {
       unsubscribeLive();
+      liveBatcher.dispose();
       void usageReadModels.get(options.registry)?.dispose();
       usageReadModels.delete(options.registry);
       unsubscribeRendererStream();

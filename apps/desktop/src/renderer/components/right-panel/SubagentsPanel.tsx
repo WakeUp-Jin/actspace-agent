@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Check, ChevronLeft, Copy, FolderOpen, Square } from "lucide-react";
-import { createMessageBlocks, subagentKindLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
+import { subagentKindLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
 import { IconButton } from "../ui/IconButton";
 import { Button } from "../ui/Button";
 import { AgentAvatar, SubagentStatus, agentModelLabel, formatAgentDuration } from "../messages/AgentIdentity";
@@ -11,11 +11,12 @@ import { formatTokenCount } from "../../context-format";
 import { SessionViewToggle, type SessionMainView } from "../SessionViewToggle";
 import { TrajectoryView } from "../TrajectoryView";
 import type { SubagentFocus } from "./RightPanelContext";
+import { reconcileSubagents, reconcileTranscript, type TranscriptState } from "./subagent-transcript";
 
 // 列表每秒轮询；结束后记录可能拉取失败（父会话还在输出时主进程繁忙），拿到非空结果前继续重试，最多这么多次。
 const POLL_MS = 1000;
 const COMPLETED_TRANSCRIPT_RETRIES = 20;
-// 列表行：设置页分组卡里的一行，规范见 docs/design-docs/frontend/front-子Agent列表与详情顶部栏.md。
+// 列表行：设置页分组卡里的一行，规范见 docs/design-docs/frontend/front-子Agent与后台任务规范.md。
 const rowClass = "flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring";
 
 /** 右侧「子 Agent」面板（设计 05 §2）：一个子智能体一行；详情按种类分支，本地 / Fork 看对话与轨迹，Codex / Claude Code 看结果与原生记录。 */
@@ -31,6 +32,8 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
   const [missingAgent, setMissingAgent] = useState(false);
   const [stopping, setStopping] = useState<string>();
   const [stopError, setStopError] = useState<string>();
+  // 运行中的耗时用 Date.now() 现算；列表没变化时不 setState，所以靠这个每秒一次的计数让耗时继续走。
+  const [, setTick] = useState(0);
   useEffect(() => {
     if (!focus) return;
     setPendingAgent(focus.agentId);
@@ -50,7 +53,11 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
     async function refresh() {
       try {
         const items = await sessionsApi.getSubagents({ sessionId: sessionId! });
-        if (!disposed) { setAgents(items); setLoaded(true); setError(undefined); }
+        if (disposed) return;
+        // 数据没变就不 setState（保持引用），只在有运行中的子智能体时推进耗时。
+        setAgents((previous) => reconcileSubagents(previous, items));
+        setLoaded(true); setError(undefined);
+        if (items.some((item) => item.status === "running")) setTick((value) => value + 1);
       } catch { if (!disposed) setError("无法加载子智能体，请稍后重试。"); }
       finally { if (!disposed) timer = setTimeout(refresh, POLL_MS); }
     }
@@ -171,14 +178,16 @@ function SubagentDetail({ sessionId, item, view, onToggleView, onBack, stopping,
 }
 
 /** 本地 / Fork：子会话的对话记录（Fork 去掉了复制来的前缀，见 `projectSubagentTranscript`）。 */
-function TranscriptDetail({ sessionId, item }: { sessionId: string; item: SubagentListItem }) {
+const TranscriptDetail = memo(function TranscriptDetail({ sessionId, item }: { sessionId: string; item: SubagentListItem }) {
   const [messages, setMessages] = useState<MessageBlock[]>([]);
+  // 上一次拉到的事件与块：轮询拿到相同内容时不换引用，变化时已有的块复用，只更新变化的尾部。
+  const transcript = useRef<TranscriptState | null>(null);
   // 执行记录的错误单独存：列表每秒轮询成功时会清掉列表错误，不能把这条也清掉。
   const [transcriptError, setTranscriptError] = useState<string>();
   const [settled, setSettled] = useState(false);
   const running = item.status === "running";
   // 只在换了子智能体时清空；从运行中变为结束时保留已显示的记录，不闪回结论。
-  useEffect(() => { setMessages([]); setTranscriptError(undefined); setSettled(false); }, [item.agentId]);
+  useEffect(() => { transcript.current = null; setMessages([]); setTranscriptError(undefined); setSettled(false); }, [item.agentId]);
   useEffect(() => {
     const ref: SubAgentTranscriptRef = { kind: "subagent_transcript", sessionId, agentRunId: "", runId: item.agentId, path: item.transcriptPath };
     let disposed = false;
@@ -187,10 +196,12 @@ function TranscriptDetail({ sessionId, item }: { sessionId: string; item: Subage
     async function refresh() {
       let loaded = false;
       try {
-        const blocks = createMessageBlocks(await sessionsApi.getSubAgentTranscript({ transcriptRef: ref }));
+        const events = await sessionsApi.getSubAgentTranscript({ transcriptRef: ref });
         if (disposed) return;
-        loaded = blocks.length > 0;
-        if (loaded || running) setMessages(blocks);
+        const next = reconcileTranscript(transcript.current, events);
+        transcript.current = next;
+        loaded = next.blocks.length > 0;
+        if (loaded || running) setMessages(next.blocks);
         setTranscriptError(undefined);
       } catch { if (!disposed) setTranscriptError("执行记录暂不可用，正在重试。"); }
       if (disposed) return;
@@ -213,7 +224,7 @@ function TranscriptDetail({ sessionId, item }: { sessionId: string; item: Subage
       ? conclusion ? <MarkdownProse content={conclusion} /> : <p className="text-act-sm text-text-muted">没有执行记录。</p>
       : null}
   </div>;
-}
+});
 
 /** Codex / Claude Code：只有最终回复和 CLI 自己的记录文件，没有 ActSpace 子会话，也就没有轨迹。 */
 function ExternalDetail({ sessionId, item }: { sessionId: string; item: SubagentListItem }) {

@@ -3,8 +3,9 @@ import { PerformancePanel } from "./PerformancePanel";
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
 import type { AppSettings, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
 import { FlaskConical } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useActiveSession } from "../session/active-session-context";
+import { sameStringList, useTranscriptSelect } from "../session/transcript-context";
 import { useSessionActions } from "../session/session-actions-context";
 import { useComposerContext } from "./composer/composer-context";
 import { ConversationView } from "./ConversationView";
@@ -21,10 +22,8 @@ import { WorkspaceChromeControls } from "./workspace/WorkspaceChromeControls";
 import type { ComposerReviewSummary } from "./Composer";
 import { useRunTargetContext } from "../target/run-target-context";
 import type { SessionPreviewResolver } from "./SessionHoverPreview";
-import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages } from "@actspace/client/sessions";
-import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
-import { ExtensionsPage } from "./extensions/ExtensionsPage";
-import { SettingsPage } from "./settings/SettingsPage";
+import { useOptionalProjectionTarget, useProjectionSelect } from "../session";
+import { sameSessionView, selectSessionView, type SessionProjectionView } from "./workbench/projection-view";
 import type { SettingsSectionId } from "./settings/SettingsNav";
 import { usageApi } from "../api/usage";
 import { collectEditedFilePaths } from "./workbench/edited-files";
@@ -33,12 +32,7 @@ import { LEFT_MAX_WIDTH, LEFT_MIN_WIDTH, MAIN_MIN_WIDTH, RIGHT_MIN_WIDTH, usePan
 import { useSessionHistory } from "./workbench/use-session-history";
 import { useCurrentContext } from "./workbench/use-current-context";
 import { SPACE_DEMO_ENABLED } from "./space/space-demo-enabled";
-import { SpaceWorkbench } from "./space/SpaceWorkbench";
-import { SpaceRightPanel } from "./space/SpaceRightPanel";
-import { SpaceObjectMenu } from "./space/panel/SpaceObjectMenu";
-import { SpaceTabBar } from "./space/tabs/SpaceTabBar";
-import { NewSpaceDialog } from "./space/dialogs/NewSpaceDialog";
-import { SpaceDemoHelpButton } from "./space/dialogs/SpaceDemoHelpDialog";
+import { ExtensionsPage, NewSpaceDialog, SettingsPage, SpaceDemoHelpButton, SpaceObjectMenu, SpaceRightPanel, SpaceTabBar, SpaceWorkbench } from "./lazy-pages";
 import { useSpacePanelBinding } from "./space/use-space-panel-binding";
 import { TrajectoryNavigationProvider } from "./trajectory/TrajectoryNavigation";
 import { devStartSettingsSection, devStartView } from "./harness-stats/dev-start";
@@ -48,7 +42,7 @@ import { ChatMarkdownHostProvider } from "./conversation/ChatMarkdownHostProvide
 /** 「文档」标签的右栏默认宽度；窗口放不下时由 rightMaxWidth 截断。 */
 const DOCS_RIGHT_DEFAULT_WIDTH = 720;
 
-export function WorkbenchLayout({
+export const WorkbenchLayout = memo(function WorkbenchLayout({
   sessions,
   busySessionIds,
   sessionStatuses,
@@ -69,7 +63,7 @@ export function WorkbenchLayout({
   reviewSummary?: ComposerReviewSummary | null;
   onReviewChanged?: () => void;
 }) {
-  const { sessionId: activeSessionId, title, messages, contextSnapshot, contextState, isStreaming, isSessionReady, composerFocusRequestId, onSend } = useActiveSession();
+  const { sessionId: activeSessionId, title, contextSnapshot, contextState, isStreaming, isSessionReady, composerFocusRequestId, onSend } = useActiveSession();
   const { composerMode, selectedModelId, defaultModelId, selectedSkills } = useComposerContext();
   const { onSelectSession } = useSessionActions();
   const { target, capabilities, selectedWorkspaceRoot } = useRunTargetContext();
@@ -105,23 +99,19 @@ export function WorkbenchLayout({
   } = usePanelLayout(isSpace
     ? { isOpen: spacePanelOpen, openPanel: openSpacePanel, closePanel: closeSpacePanel }
     : { isOpen: isRightPanelOpen, openPanel: openRightPanel, closePanel: closeRightPanel });
-  const sessionProjection = useOptionalSessionProjection();
-  const projectionCell = sessionProjection?.cell ?? null;
-  const projectedSurfaceMessages = projectionCell ? selectSurfaceMessages(projectionCell) : [];
-  const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
-  const projectedComposer = projectionCell ? selectComposer(projectionCell) : null;
-  const projectedContextSnapshot = projectedContextEstimate
-    ? contextEstimateToSnapshot(projectedContextEstimate)
-    : null;
+  // 投影只订阅这一小块派生值：流式时 cell 每帧换一次，但它们几乎不变，外壳不随帧重渲染（见 workbench/projection-view.ts）。
+  const projectionBridge = useOptionalProjectionTarget()?.bridge ?? null;
+  const projectionView = useProjectionSelect<SessionProjectionView | null>(selectSessionView, sameSessionView);
+  const projectedContextSnapshot = projectionView?.contextSnapshot ?? null;
   // The fixed request-context projection shares the popup's complete bucket estimate.
-  const liveContextState = projectedContextEstimate?.contextState;
-  const currentContextState = useCurrentContext(activeSessionId, projectionCell?.snapshot?.throughJournalSeq, view === "chat");
+  const liveContextState = projectionView?.contextState;
+  const currentContextState = useCurrentContext(activeSessionId, projectionView?.contextRevision, view === "chat");
   const useLiveContext = liveContextState && (!contextState || (liveContextState.throughJournalSeq ?? -1) > (contextState.throughJournalSeq ?? -1));
   const effectiveContextState = currentContextState ?? (useLiveContext ? liveContextState : contextState);
   const effectiveContextSnapshot = useLiveContext ? projectedContextSnapshot : contextSnapshot ?? projectedContextSnapshot;
-  const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
-  const permissionMode = projectionCell?.snapshot?.permissionMode ?? "default";
-  const effectiveIsSessionReady = (projectedComposer != null && projectedComposer.phase !== "blank") || isSessionReady || projectionSessionReady;
+  const projectionSessionReady = projectionView !== null && projectionView.status !== "error";
+  const permissionMode = projectionView?.permissionMode ?? "default";
+  const effectiveIsSessionReady = (projectionView?.composerPhase != null && projectionView.composerPhase !== "blank") || isSessionReady || projectionSessionReady;
   const sessionViewByIdRef = useRef(new Map<string, SessionMainView>());
   const [sessionMainView, setSessionMainView] = useState<SessionMainView>("chat");
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>(() => devStartSettingsSection() ?? "general");
@@ -264,22 +254,25 @@ export function WorkbenchLayout({
 
   // UsageStatisticsPage requests its persisted range after mounting.
 
-  const permissionControl = activeSessionId && composerMode !== "chat" ? (
+  // 元素引用保持稳定：它作为 prop 传给输入框外壳，每次渲染都新建会让外壳白白重渲染。
+  const permissionControl = useMemo(() => activeSessionId && composerMode !== "chat" ? (
     <PermissionModeControl
       sessionId={activeSessionId}
       mode={permissionMode}
       disabled={false}
-      onChanged={async () => { await sessionProjection?.bridge?.open(activeSessionId); }}
+      onChanged={async () => { await projectionBridge?.open(activeSessionId); }}
     />
-  ) : null;
+  ) : null, [activeSessionId, composerMode, permissionMode, projectionBridge]);
 
   let mainContent;
   if (isSpace) {
-    mainContent = <SpaceWorkbench />;
+    mainContent = <Suspense fallback={null}><SpaceWorkbench /></Suspense>;
   } else if (view === "extensions") {
     mainContent = (
       <div className="h-full min-h-0 pt-[var(--window-chrome-strip-height)]">
-        <ExtensionsPage onSettingsChange={onSettingsChange} onConfigureSpeech={() => { setSettingsSection("general"); setFocusSpeech(true); setView("settings"); }} />
+        <Suspense fallback={null}>
+          <ExtensionsPage onSettingsChange={onSettingsChange} onConfigureSpeech={() => { setSettingsSection("general"); setFocusSpeech(true); setView("settings"); }} />
+        </Suspense>
       </div>
     );
   } else if (view === "lab") {
@@ -302,8 +295,8 @@ export function WorkbenchLayout({
       <ConversationView
         contextSnapshot={effectiveContextSnapshot}
         contextState={effectiveContextState}
-        durableSurfaceMessageCount={projectedSurfaceMessages.length > 0 ? projectedSurfaceMessages.length : undefined}
-        composerPhase={projectedComposer?.phase}
+        durableSurfaceMessageCount={projectionView && projectionView.surfaceMessageCount > 0 ? projectionView.surfaceMessageCount : undefined}
+        composerPhase={projectionView?.composerPhase}
         isSessionReady={effectiveIsSessionReady}
         reviewSummary={composerMode === "chat" || !reviewEnabled ? null : reviewSummary}
         onOpenReview={composerMode === "chat" || !reviewEnabled ? undefined : openReviewTab}
@@ -323,8 +316,20 @@ export function WorkbenchLayout({
   // ① Agent 本轮编辑过的文件路径 → 精确打过期标记；
   // ② turn 从「进行中」变为「结束」时递增一个 key → 触发一次 mtime 兜底重校验，
   //    覆盖 bash 脚本写文件这类不产生 diff 块的间接改动。
-  const agentEditedPaths = useMemo(() => collectEditedFilePaths(messages), [messages]);
+  const agentEditedPaths = useTranscriptSelect(collectEditedFilePaths, sameStringList);
   useAgentEditSignals(agentEditedPaths, executionRoot);
+  // usePanelLayout 的 toggle 每次渲染都是新函数；侧栏经 ref 取最新的，自己的 props 保持稳定。
+  const toggleSidebarModeRef = useRef(toggleSidebarMode);
+  toggleSidebarModeRef.current = toggleSidebarMode;
+  const stableToggleSidebarMode = useCallback(() => toggleSidebarModeRef.current(), []);
+  const openNewSpace = useCallback(() => setNewSpaceOpen(true), []);
+  // 右栏的「发送给 Agent」：回调保持稳定，右栏外壳不因这里的重渲染而重渲染。
+  const sendToAgent = useMemo(() => onSend ? (text: string) => onSend(text, {
+    model: selectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID,
+    mode: composerMode ?? "agent",
+    selectedSkills: selectedSkills ?? [],
+    thinkingEnabled: false,
+  }) : undefined, [onSend, selectedModelId, defaultModelId, composerMode, selectedSkills]);
   const [fileRevalidateKey, setFileRevalidateKey] = useState(0);
   const wasStreamingRef = useRef(isStreaming);
   useEffect(() => {
@@ -338,6 +343,7 @@ export function WorkbenchLayout({
   // 该返回必须位于本组件的 Hooks 之后，确保切换页面时 Hook 调用顺序稳定。
   if (view === "settings") {
     return (
+      <Suspense fallback={<div className="h-full bg-surface" aria-busy="true" />}>
       <SettingsPage
         onBack={() => { setView("chat"); setReturnFocusRequest((value) => value + 1); }}
         initialSection={settingsSection}
@@ -360,6 +366,7 @@ export function WorkbenchLayout({
         }}
         workspaces={workspaces}
       />
+      </Suspense>
     );
   }
 
@@ -372,27 +379,22 @@ export function WorkbenchLayout({
       view={view}
       busySessionIds={busySessionIds}
       sessionStatuses={sessionStatuses}
-      onToggleMode={toggleSidebarMode}
+      onToggleMode={stableToggleSidebarMode}
       onSelectView={handleSelectView}
-      onNewSpace={SPACE_DEMO_ENABLED ? () => setNewSpaceOpen(true) : undefined}
+      onNewSpace={SPACE_DEMO_ENABLED ? openNewSpace : undefined}
     />
   );
-  const rightPanel = isSpace ? <SpaceRightPanel /> : (
+  const rightPanel = isSpace ? <Suspense fallback={null}><SpaceRightPanel /></Suspense> : (
     <RightPanel
       developmentEnabled={composerMode !== "chat" && workspacePanelsEnabled}
       contextState={effectiveContextState}
-      contextRevision={projectionCell?.snapshot?.throughJournalSeq}
+      contextRevision={projectionView?.contextRevision}
       sessionId={activeSessionId}
       workspaceRoot={executionRoot}
       fileRevalidateKey={fileRevalidateKey}
       agentEditedPaths={agentEditedPaths}
       onOpenReview={openReviewTab}
-      onSendToAgent={onSend ? (text) => onSend(text, {
-        model: selectedModelId ?? defaultModelId ?? DEFAULT_MODEL_ID,
-        mode: composerMode ?? "agent",
-        selectedSkills: selectedSkills ?? [],
-        thinkingEnabled: false,
-      }) : undefined}
+      onSendToAgent={sendToAgent}
     />
   );
 
@@ -429,9 +431,9 @@ export function WorkbenchLayout({
         getSessionPreview={view === "chat" ? getSessionPreview : undefined}
         sessionView={view === "chat" ? sessionMainView : undefined}
         onToggleSessionView={view === "chat" ? toggleSessionMainView : undefined}
-        center={isSpace ? <SpaceTabBar /> : undefined}
-        centerTrailing={isSpace ? <SpaceDemoHelpButton /> : view === "chat" ? <>
-          {reviewEnabled && composerMode !== "chat" && executionRoot ? <WorkspaceChromeControls workspaceRoot={executionRoot} title={title} messages={messages} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
+        center={isSpace ? <Suspense fallback={null}><SpaceTabBar /></Suspense> : undefined}
+        centerTrailing={isSpace ? <Suspense fallback={null}><SpaceDemoHelpButton /></Suspense> : view === "chat" ? <>
+          {reviewEnabled && composerMode !== "chat" && executionRoot ? <WorkspaceChromeControls workspaceRoot={executionRoot} title={title} reviewSummary={reviewSummary} onOpenReview={openReviewTab} onWorkspaceChanged={onReviewChanged} /> : null}
         </> : undefined}
         rightLeading={
           view === "chat" ? (
@@ -444,7 +446,7 @@ export function WorkbenchLayout({
                 />
               ) : null}
             </>
-          ) : isSpace && rightPanelShown ? <SpaceObjectMenu /> : undefined
+          ) : isSpace && rightPanelShown ? <Suspense fallback={null}><SpaceObjectMenu /></Suspense> : undefined
         }
       />
       <SplitView
@@ -494,9 +496,9 @@ export function WorkbenchLayout({
           </div>
         </div>
       ) : null}
-      {SPACE_DEMO_ENABLED ? <NewSpaceDialog open={newSpaceOpen} onOpenChange={setNewSpaceOpen} onCreated={() => handleSelectView("space")} /> : null}
+      {SPACE_DEMO_ENABLED ? <Suspense fallback={null}><NewSpaceDialog open={newSpaceOpen} onOpenChange={setNewSpaceOpen} onCreated={() => handleSelectView("space")} /></Suspense> : null}
       </ChatMarkdownHostProvider>
       </OpenFileFallbackProvider>
     </TrajectoryNavigationProvider>
   );
-}
+});

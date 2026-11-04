@@ -1,8 +1,10 @@
 import { Database, Gauge, type LucideIcon } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useState } from "react";
 import { STAT_DIALOG_CONTENT_CLASS, StatDialogBody, type StatDialog, type StatRow } from "../stats/StatDialog";
 import type { RuntimeV2UsageSummary } from "@actspace/shared/runtime-v2/projection";
-import { useOptionalSessionProjection } from "../../session";
+import { useProjectionSelect } from "../../session";
+import { jsonEqual } from "../../json-equal";
+import type { ClientSessionCell } from "@actspace/client/sessions";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/Popover";
 import {
   billedInputTokens,
@@ -97,6 +99,13 @@ export function usagePillModel(usage: RuntimeV2UsageSummary | null | undefined):
   };
 }
 
+type StatsModels = { readonly activity: PillModel | null; readonly usage: PillModel | null };
+
+function selectStatsModels(cell: ClientSessionCell | null): StatsModels {
+  const snapshot = cell?.snapshot ?? null;
+  return { activity: activityPillModel(sessionStats(snapshot)), usage: usagePillModel(snapshot?.usage) };
+}
+
 /**
  * 读当前会话投影，在状态行右侧渲染两个胶囊；没有投影或两个都不显示时什么都不渲染。
  * @param overlay - 受控的面板开关；不传时由组件自己维护。
@@ -106,10 +115,8 @@ export function ComposerStatsPills({ overlay }: { overlay?: ComposerStatsOverlay
   const openStat = overlay ? overlay.openStat : localOpen;
   const onOpenChange = overlay?.onOpenChange
     ?? ((stat: ComposerStat, open: boolean) => setLocalOpen((current) => (open ? stat : current === stat ? null : current)));
-  const projection = useOptionalSessionProjection();
-  const snapshot = projection?.cell.snapshot ?? null;
-  const activity = useMemo(() => activityPillModel(sessionStats(snapshot)), [snapshot]);
-  const usage = useMemo(() => usagePillModel(snapshot?.usage), [snapshot?.usage]);
+  // 只订阅两个胶囊的模型：流式时 cell 每帧换一次，模型几乎不变，状态行不随帧重渲染。
+  const { activity, usage } = useProjectionSelect<StatsModels>(selectStatsModels, jsonEqual);
   if (activity === null && usage === null) return null;
   return (
     <span className="flex min-w-0 shrink flex-wrap items-center gap-1" data-composer-stats="">

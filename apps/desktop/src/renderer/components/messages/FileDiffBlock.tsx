@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import { ApprovalActions, ApprovalCard, ApprovalPath, ApprovalReason, useApprovalDecision, useFileGrantSuggestions } from "./ApprovalParts";
+import { ToolLogShimmer } from "./ToolLogShimmer";
 import {
   getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_CLASS,
@@ -174,6 +175,7 @@ export function FileDiffBlock({ message, className, onExpand }: { message: FileD
           {...getToolLogRunningTextAttrs(text)}
         >
           {text}
+          <ToolLogShimmer text={text} />
         </span>
       </div>
     );

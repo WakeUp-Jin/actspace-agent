@@ -261,8 +261,8 @@ describe("文档面板", () => {
     const user = userEvent.setup();
     await renderDocs();
     await within(tree()).findByRole("treeitem", { name: /AGENTS\.md/ });
-    await user.type(screen.getByRole("textbox", { name: "搜索文档文件名" }), "V2失败");
-    const hit = within(tree()).getByRole("treeitem", { name: /11-\s*V2失败\s*触发说明\.md/ });
+    await user.type(screen.getByRole("textbox", { name: "搜索文档文件名" }), "Harness统计");
+    const hit = within(tree()).getByRole("treeitem", { name: /11-\s*Harness统计\s*设计\.md/ });
     expect(hit.querySelector("mark")).not.toBeNull();
     expect(within(tree()).queryByRole("treeitem", { name: /AGENTS\.md/ })).toBeNull();
     await user.clear(screen.getByRole("textbox", { name: "搜索文档文件名" }));

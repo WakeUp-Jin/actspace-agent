@@ -23,7 +23,19 @@ export class RuntimeSessionController {
   readonly #models = new Map<string, SessionReadModel>();
   readonly #changes = new Map<string, Map<number, RuntimeV2ProjectionValues>>();
   readonly #projectionListeners = new Set<(update: RuntimeV2SessionUpdate) => void>();
+  /** Recency of open Sessions, oldest first; a touch moves a Session to the end. */
+  readonly #recent = new Map<string, true>();
+  readonly #pins = new Set<(sessionId: string) => boolean>();
+  readonly #gates = new Set<SessionReleaseGate>();
+  /** Sessions leaving `#open`: a reopen must wait for the old handle to release its writer lease. */
+  readonly #closing = new Map<string, Promise<void>>();
+  #observed: ReadonlySet<string> = new Set();
+  #sweeping: Promise<void> | undefined;
+  #sweepAgain = false;
+  #sweepQueued = false;
+  #disposed = false;
   readonly #cache: SessionProjectionCache;
+  readonly #coldModels = new WeakMap<ProjectionCacheRead, { readonly model: SessionReadModel; readonly snapshot: RuntimeV2SessionSnapshot }>();
   readonly #globalIndex: GlobalSessionIndex;
   #globalIndexBuild: Promise<void> | undefined;
   #globalIndexReady = false;
@@ -46,10 +58,14 @@ export class RuntimeSessionController {
     const live = this.#open.get(sessionId);
     if (live) { const model = this.liveModel(live); return { model, snapshot: model.snapshot(live.journal.validation.accessState) }; }
     const read = await this.#cache.read(sessionId);
+    // The cache returns the same read object until the journal grows, so an unchanged Session keeps its restored model.
+    const built = this.#coldModels.get(read);
+    if (built !== undefined) return { ...built, read };
     const model = new SessionReadModel(read.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService);
     model.projections.restore(sessionId, read.checkpoint);
     const snapshot = model.snapshot(read.accessState);
     await this.repairGlobalIndex(snapshot, model.header.createdWith.profileId);
+    this.#coldModels.set(read, { model, snapshot });
     return { model, snapshot, read };
   }
 
@@ -216,7 +232,7 @@ export class RuntimeSessionController {
     return { ...source, throughSeq, codecSetDigest: digest, stamp: `${physical}:${throughSeq}:${digest}` };
   }
   async globalSessionSummaries(): Promise<readonly import("@actspace/shared/runtime-v2").RuntimeV2GlobalSessionSummary[]> { await this.ensureGlobalIndex(); return this.#globalIndex.values(); }
-  constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; projectionService?: SessionProjectionService; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void> }, store: SessionStore) { this.store = store; this.#cache = new SessionProjectionCache({ storage: store.storage, codecs: options.registry, createRegistry: header => new SessionReadModel(header, options.registry, options.rendererAllowlist, options.projectionService).projections }); this.#globalIndex = new GlobalSessionIndex(); }
+  constructor(readonly options: { dataRoot: string; runtimeId: string; registry: EventCodecRegistry; profileId: string; manifestDigest: string; plugins: readonly { id: string; version: string }[]; rendererAllowlist?: RendererAllowlist; projectionService?: SessionProjectionService; beforeRecovery?: (session: SessionHandle, store: SessionStore) => Promise<void>; onEvent?: (sessionId: string, event: SessionEventEnvelopeV1) => void | Promise<void>; onFlush?: (sessionId: string, throughSeq: number) => void | Promise<void>; onCreated?: (sessionId: string) => void | Promise<void>; onDisposed?: (sessionId: string, outcome: { readonly ok: boolean; readonly error?: unknown }) => void | Promise<void>; maxIdleSessions?: number }, store: SessionStore) { this.store = store; this.#cache = new SessionProjectionCache({ storage: store.storage, codecs: options.registry, createRegistry: header => new SessionReadModel(header, options.registry, options.rendererAllowlist, options.projectionService).projections }); this.#globalIndex = new GlobalSessionIndex(); }
   private onEvent(sessionId: string): (event: SessionEventEnvelopeV1) => void | Promise<void> {
     return event => {
       const model = this.#models.get(sessionId);
@@ -262,9 +278,9 @@ export class RuntimeSessionController {
       codecSetDigest: this.options.registry.digest,
     };
   }
-  async create(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent", worktree?: import("@actspace/shared").SessionWorktreeContext): Promise<SessionHandle> { const session = await this.store.create({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), ...(worktree ? { worktree } : {}), lineage: null, createdWith: this.creationProvenance(agentForm) }, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); const model = this.liveModel(session); if (this.#globalIndexReady) { this.#globalIndex.replace(this.summary(model.snapshot(session.journal.validation.accessState), this.options.profileId)); } await this.options.onCreated?.(sessionId); return session; }
-  async createEphemeral(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent"): Promise<SessionHandle> { const header = createSessionHeader({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: this.creationProvenance(agentForm) }); const session = RuntimeSessionHandle.createEphemeral({ header, registry: this.options.registry, onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.liveModel(session); this.#ephemeral.add(sessionId); await this.options.onCreated?.(sessionId); return session; }
-  async resume(sessionId: string): Promise<SessionHandle> { const existing = this.#open.get(sessionId); if (existing !== undefined) return existing; const session = await this.store.open(sessionId, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); try { this.liveModel(session); await this.options.beforeRecovery?.(session, this.store); await applySessionRecovery(session); this.#open.set(sessionId, session); this.liveModel(session); await this.options.onCreated?.(sessionId); return session; } catch (error) { await session.close().catch(() => undefined); throw error; } }
+  async create(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent", worktree?: import("@actspace/shared").SessionWorktreeContext): Promise<SessionHandle> { const session = await this.store.create({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), ...(worktree ? { worktree } : {}), lineage: null, createdWith: this.creationProvenance(agentForm) }, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.touch(sessionId); const model = this.liveModel(session); if (this.#globalIndexReady) { this.#globalIndex.replace(this.summary(model.snapshot(session.journal.validation.accessState), this.options.profileId)); } await this.options.onCreated?.(sessionId); this.requestSweep(); return session; }
+  async createEphemeral(sessionId: string = randomUUID(), cwd?: string, agentForm: MainAgentForm = "agent"): Promise<SessionHandle> { const header = createSessionHeader({ sessionId, createdAt: new Date().toISOString(), ...(cwd === undefined ? {} : { cwd }), lineage: null, createdWith: this.creationProvenance(agentForm) }); const session = RuntimeSessionHandle.createEphemeral({ header, registry: this.options.registry, onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); this.#open.set(sessionId, session); this.touch(sessionId); this.liveModel(session); this.#ephemeral.add(sessionId); await this.options.onCreated?.(sessionId); return session; }
+  async resume(sessionId: string): Promise<SessionHandle> { const existing = this.#open.get(sessionId); if (existing !== undefined) { this.touch(sessionId); return existing; } const closing = this.#closing.get(sessionId); if (closing !== undefined) { await closing; return this.resume(sessionId); } const session = await this.store.open(sessionId, { onEvent: this.onEvent(sessionId), onFlush: this.onFlush(sessionId) }); try { this.liveModel(session); await this.options.beforeRecovery?.(session, this.store); await applySessionRecovery(session); if (this.#open.has(sessionId)) { await session.close().catch(() => undefined); return this.#open.get(sessionId)!; } this.#open.set(sessionId, session); this.touch(sessionId); this.liveModel(session); await this.options.onCreated?.(sessionId); this.requestSweep(); return session; } catch (error) { await session.close().catch(() => undefined); throw error; } }
   /** Provider-owned sessions participate in checkpoints without transferring close ownership. */
   registerExternal(session: SessionHandle): () => void {
     const id = session.header.sessionId;
@@ -273,8 +289,85 @@ export class RuntimeSessionController {
     return () => { if (this.#external.get(id) === session) this.#external.delete(id); };
   }
   isEphemeral(sessionId: string): boolean { return this.#ephemeral.has(sessionId); }
-  getOpen(sessionId: string): SessionHandle | undefined { return this.#open.get(sessionId) ?? this.#external.get(sessionId); }
-  closeOpen(sessionId: string): void { this.#open.delete(sessionId); this.#ephemeral.delete(sessionId); this.#models.delete(sessionId); this.#changes.delete(sessionId); }
+  getOpen(sessionId: string): SessionHandle | undefined { const open = this.#open.get(sessionId); if (open !== undefined) { this.touch(sessionId); return open; } return this.#external.get(sessionId); }
+  /** Mark a Session as recently used, so the idle limit evicts others first. */
+  touch(sessionId: string): void {
+    if (!this.#open.has(sessionId)) return;
+    this.#recent.delete(sessionId);
+    this.#recent.set(sessionId, true);
+  }
+  /** A pin keeps a Session open while it answers true (running work, a viewer, a pending approval). Returns the unregister function. */
+  addPin(pin: (sessionId: string) => boolean): () => void { this.#pins.add(pin); return () => { this.#pins.delete(pin); }; }
+  /** A gate owns per-Session state that holds the handle. `release` must drop that state in the same tick as a true `canRelease`. */
+  addReleaseGate(gate: SessionReleaseGate): () => void { this.#gates.add(gate); return () => { this.#gates.delete(gate); }; }
+  /** Sessions a renderer shows or subscribes to; replaces the previous set. */
+  setObserved(sessionIds: readonly string[]): void {
+    this.#observed = new Set(sessionIds);
+    for (const id of sessionIds) this.touch(id);
+    this.requestSweep();
+  }
+  /** Idle Sessions that stay resident: the LRU keeps the newest ones and releases the rest. */
+  get maxIdleSessions(): number { const configured = this.options.maxIdleSessions; return configured !== undefined && Number.isInteger(configured) && configured >= 0 ? configured : DEFAULT_MAX_IDLE_SESSIONS; }
+  /** True when nothing needs this Session resident: not ephemeral, no pin, no holder, no open child. */
+  isReleasable(sessionId: string): boolean {
+    if (!this.#open.has(sessionId) || this.#ephemeral.has(sessionId) || this.#observed.has(sessionId)) return false;
+    for (const pin of this.#pins) { try { if (pin(sessionId)) return false; } catch { return false; } }
+    for (const gate of this.#gates) { try { if (!gate.canRelease(sessionId)) return false; } catch { return false; } }
+    // A side chat reads its parent while it is open.
+    for (const [id, open] of this.#open) if (id !== sessionId && open.header.lineage?.parentSessionId === sessionId) return false;
+    return true;
+  }
+  /** Close one idle Session and drop everything derived from it. Returns false, changing nothing, when it is pinned. */
+  async release(sessionId: string): Promise<boolean> {
+    if (this.#closing.has(sessionId) || !this.isReleasable(sessionId)) return false;
+    const session = this.#open.get(sessionId)!;
+    // Check and removal are one synchronous step: nothing can acquire the handle in between.
+    this.#open.delete(sessionId);
+    this.#recent.delete(sessionId);
+    const holders = [...this.#gates].map(gate => gate.release(sessionId));
+    const closing = (async () => {
+      let error: unknown;
+      const note = (caught: unknown) => { error = error === undefined ? caught : new AggregateError([error, caught], "Session release failed."); };
+      for (const result of await Promise.allSettled(holders)) if (result.status === "rejected") note(result.reason);
+      try { await session.flush(); } catch (caught) { note(caught); }
+      try { await session.close(); } catch (caught) { note(caught); }
+      try { if (this.#globalIndexReady) this.#globalIndex.replace(this.summary(this.snapshot(session), this.options.profileId)); } catch { /* summaries are a rebuildable cache */ }
+      this.#models.delete(sessionId);
+      this.#changes.delete(sessionId);
+      try { await this.options.onDisposed?.(sessionId, error === undefined ? { ok: true } : { ok: false, error }); } catch (caught) { note(caught); }
+      if (error !== undefined) throw error;
+    })();
+    const tracked = closing.catch(() => undefined).finally(() => { if (this.#closing.get(sessionId) === tracked) this.#closing.delete(sessionId); });
+    this.#closing.set(sessionId, tracked);
+    await closing;
+    return true;
+  }
+  /** Release the oldest idle Sessions beyond the limit. Concurrent calls share one pass and a pass that overlaps a change runs again. */
+  sweep(): Promise<void> {
+    if (this.#sweeping) { this.#sweepAgain = true; return this.#sweeping; }
+    const pass = (async () => {
+      // Let the assignment below happen first, so the pass can clear itself in the same step it decides to stop.
+      await undefined;
+      try {
+        do {
+          this.#sweepAgain = false;
+          if (this.#disposed) break;
+          const idle = [...this.#recent.keys()].filter(id => this.isReleasable(id));
+          for (const id of idle.slice(0, Math.max(0, idle.length - this.maxIdleSessions))) {
+            try { await this.release(id); } catch { /* the Session left #open; its failure is reported by onDisposed */ }
+          }
+        } while (this.#sweepAgain);
+      } finally { this.#sweeping = undefined; }
+    })();
+    this.#sweeping = pass;
+    return pass;
+  }
+  /** Coalesce triggers (a Run settling, a viewer change) into one pass after the current tick. */
+  requestSweep(): void {
+    if (this.#sweepQueued || this.#disposed) return;
+    this.#sweepQueued = true;
+    queueMicrotask(() => { this.#sweepQueued = false; void this.sweep(); });
+  }
   snapshot(session: SessionHandle): RuntimeV2SessionSnapshot { return this.liveModel(session).snapshot(session.journal.validation.accessState); }
   async inspect(sessionId: string): Promise<RuntimeV2SessionSnapshot> { return (await this.readModel(sessionId)).snapshot; }
   async recoveryAccess(sessionId: string): Promise<SessionRecoveryAccess> { const open = this.#open.get(sessionId); if (open !== undefined) return open.durabilityState === "blocked" ? "read-only" : "read-write"; return classifySessionRecoveryAccess(await this.store.inspect(sessionId)); }
@@ -295,9 +388,13 @@ export class RuntimeSessionController {
   openSessions(): readonly SessionHandle[] { return Object.freeze([...this.#open.values()]); }
   async flushAll(): Promise<void> { for (const session of this.#open.values()) await session.flush(); }
   async closeAll(): Promise<void> {
+    this.#disposed = true;
+    await this.#sweeping?.catch(() => undefined);
+    await Promise.allSettled([...this.#closing.values()]);
     await this.#cache.idle();
     const entries = [...this.#open];
     this.#open.clear();
+    this.#recent.clear();
     const closed = await Promise.allSettled(entries.map(async ([sessionId, session]) => {
       let error: unknown;
       try {
@@ -319,6 +416,14 @@ export class RuntimeSessionController {
     if (failed.length) throw new AggregateError(failed.map(result => result.reason), "Session shutdown failed.");
   }
 }
+
+const DEFAULT_MAX_IDLE_SESSIONS = 3;
+
+/** Holder of per-Session state that keeps a handle alive (the run scheduler, for one). */
+export type SessionReleaseGate = {
+  canRelease(sessionId: string): boolean;
+  release(sessionId: string): Promise<unknown>;
+};
 
 // 一页历史按 turn 计：20 轮覆盖绝大多数会话，只有长会话上滑时才需要继续分页。
 const HISTORY_PAGE_TURNS = 20;

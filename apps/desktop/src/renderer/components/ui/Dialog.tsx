@@ -21,7 +21,7 @@ const SIZE_CLASS: Record<DialogSize, string> = {
 };
 
 const SURFACE_CLASS: Record<DialogSurface, string> = {
-  float: "rounded-act-xl border border-line bg-surface shadow-act-float",
+  float: "rounded-act-lg border border-line bg-surface shadow-act-float",
   raised: "rounded-act-lg border border-line bg-surface-raised shadow-act-popover",
 };
 

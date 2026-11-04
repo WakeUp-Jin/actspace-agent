@@ -9,7 +9,7 @@ import { useRunTargetContext } from "../../target/run-target-context";
 import { FileGrantScope, grantScopeLabel } from "./FileGrantScope";
 
 // 工具审批的共享外壳：只有一张卡片（标题一句话 + 可选内容 + 底部按钮），可选的说明底托垫在卡片下方；卡片上下不加文字行，「等待确认」只作为容器的 aria-label。
-// 设计稿见 docs/design-docs/frontend/approval-card-redesign.html（D 方向，2026-10-11）。
+// 规则见 docs/design-docs/frontend/front-中间消息区规范.md「工具审批」。
 
 export type ApprovalChoice = "once" | "session" | "deny";
 

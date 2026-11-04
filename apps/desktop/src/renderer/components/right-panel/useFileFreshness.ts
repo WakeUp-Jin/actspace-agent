@@ -10,7 +10,7 @@ import { workspacesApi } from "../../api/workspaces";
  * 早期实现没有任何刷新机制，右侧会一直显示旧内容且不给提示 —— 在 Agent 编码场景里会直接让人误判。
  *
  * 这里使用两级信号，不依赖后台目录监听（理由见
- * `docs/exec-plans/active/20260730-right-panel-file-view-optimization.md` 的决策记录：
+ * `docs/exec-plans/completed/20260730-right-panel-file-view-optimization.md` 的决策记录：
  * 那是用户可选安装的常驻进程，监听根与当前 workspaceRoot 无关，且输出是给 Agent 读的审计日志）：
  *
  * 1. **Agent 编辑事件**（主力，零成本）：`edit_diff` / `write_diff` 消息块自带 `filePath`，

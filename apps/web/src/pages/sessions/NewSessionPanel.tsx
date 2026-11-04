@@ -12,7 +12,7 @@ import { cx } from "../../ui/cx";
 import { ComposerBox } from "../session/ComposerBox";
 import { ModelSheet } from "../session/ModelSheet";
 
-/** 新建会话弹层（front-web-pwa客户端规范 §9.2）：工作区芯片 + 两层输入框；窄屏底部弹层，宽屏居中对话框。 */
+/** 新建会话弹层（front-web-pwa客户端规范 §8.2）：工作区芯片 + 两层输入框；窄屏底部弹层，宽屏居中对话框。 */
 export function NewSessionPanel({ onClose }: { readonly onClose: () => void }) {
   const store = useConnectionStore();
   const state = useConnection();

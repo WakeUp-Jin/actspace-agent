@@ -21,7 +21,7 @@ import { SELECT_TRIGGER_CLASS, Select, type SelectOption } from "../ui/Select";
 /**
  * 设置页通用展示原子组件。样式所有权：这些组件只负责"长什么样"，
  * 业务状态由调用方（各分区）持有，遵循 frontend-style-scope-conventions。
- * 视觉契约见 docs/exec-plans/active/20260925-settings-visual-redesign.md「设计契约」。
+ * 视觉规则见 docs/design-docs/frontend/front-设置页规范.md。
  */
 
 function cx(...parts: Array<string | false | null | undefined>): string {

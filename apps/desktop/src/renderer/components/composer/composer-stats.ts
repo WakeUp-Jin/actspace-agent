@@ -2,7 +2,7 @@ import type { RuntimeV2SessionSnapshot, RuntimeV2UsageSummary } from "@actspace/
 
 /**
  * 输入区用量胶囊的数字口径，逐条对应 DeepSeek Harness 的 `StatsPills.tsx` +
- * `token-format.ts`（参考实现见 docs/design-docs/frontend/composer-usage-dock-demo.html）。
+ * `token-format.ts`（规则见 docs/design-docs/frontend/front-聊天输入框规范.md）。
  * 这里只做投影，不碰 DOM；两个胶囊的显示/隐藏分支在 ComposerStatsPills 里。
  */
 

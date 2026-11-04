@@ -5,7 +5,7 @@
 // 基础组件约束（16 S8）：原生 <button> 按文件不超过基线；createPortal 和 role="dialog" 只能写在 components/ui/。
 // 扫描根是一个列表（SCAN_PROFILES）：desktop = apps/desktop/src/renderer，web = apps/web/src（目录不存在时静默跳过）。
 // 每个根读自己的 token 定义；web 的原生 <button>、createPortal、role="dialog" 只允许在 apps/web/src/ui/，其余基线为 0，没有字面量例外。
-// 规范见 docs/design-docs/frontend/front-全局视觉语言规范.md 和 front-web-pwa客户端规范.md §10。
+// 规范见 docs/design-docs/frontend/front-视觉token规范.md 和 front-web-pwa客户端规范.md §1。
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,8 +55,8 @@ export const CSS_BLOCK_RULES = [
   {
     id: "tool-log-running-no-operational",
     file: "styles/base.css",
-    // 扫光颜色写在 ::after 里，两个块都要守。
-    selector: [".tool-log-text-running", ".tool-log-text-running::after"],
+    // 扫光颜色写在 .tool-log-shimmer::after（窗口里的高亮文字）里，几个块都要守。
+    selector: [".tool-log-text-running", ".tool-log-shimmer", ".tool-log-shimmer::after"],
     forbid: [/--act-color-operational/],
     require: [],
     hint: "运行中的工具日志用中性墨色扫光，不用 operational（绿色）",
@@ -65,7 +65,7 @@ export const CSS_BLOCK_RULES = [
     id: "tool-log-running-reduced-motion",
     file: "styles/base.css",
     // 全局兜底只把动画缩到 0.01ms，扫光层仍会停在原地，所以 reduced motion 下要整个隐藏。
-    selector: ".tool-log-text-running::after",
+    selector: ".tool-log-shimmer",
     forbid: [],
     require: [/display\s*:\s*none/],
     hint: "prefers-reduced-motion 下隐藏工具日志的扫光层（display: none）",

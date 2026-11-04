@@ -1,7 +1,7 @@
 import { useRunTargetContext } from "../target/run-target-context";
 import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, WheelEvent as ReactWheelEvent } from "react";
 import type { ComposerAttachment, ContextState, ContextUsageSnapshot } from "@actspace/shared";
 import { ResponseAnnotationContext, annotatableMessageIds } from "./messages/response-annotation-context";
@@ -15,9 +15,10 @@ import { useRightPanel } from "./right-panel/RightPanelContext";
 import { BackgroundTaskLinkContext } from "./messages/BashRunBlock";
 import { CompactionRetryContext } from "./messages/CompactCommandBlock";
 import type { SessionMainView } from "./SessionViewToggle";
-import { TrajectoryView } from "./TrajectoryView";
-import { selectComposer, selectRequestContextEstimate, selectSurfaceMessages } from "@actspace/client/sessions";
-import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../session";
+import { TrajectoryView } from "./lazy-pages";
+import { useOptionalProjectionTarget, useProjectionSelect } from "../session";
+import { sameStringList, useTranscriptMessages, useTranscriptSelect } from "../session/transcript-context";
+import { sameSessionView, selectSessionView, type SessionProjectionView } from "./workbench/projection-view";
 import { useActiveSession } from "../session/active-session-context";
 import { useComposerContext } from "./composer/composer-context";
 import { ConversationComposerSlot } from "./conversation/ConversationComposerSlot";
@@ -77,34 +78,34 @@ export function ConversationView({
   /** 返回整页设置后，通过已有 Composer 聚焦通道恢复键盘入口。 */
   focusRequest?: number;
 }) {
-  const { sessionId, messages, isStreaming, isAborting, sendScrollRequestId, composerFocusRequestId, onAbort, onRetryCompaction } = useActiveSession();
+  const { sessionId, isStreaming, isAborting, sendScrollRequestId, composerFocusRequestId, onAbort, onRetryCompaction } = useActiveSession();
+  const messages = useTranscriptMessages();
   const { draftRestore, draftKey, readAnnotationDraft, writeAnnotationDraft } = useComposerContext();
-  const sessionProjection = useOptionalSessionProjection();
-  const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && (sessionId === null || sessionId === undefined || sessionProjection.sessionId === sessionId)
-    ? sessionProjection.cell
-    : null;
+  // 投影只订阅派生出的小块（见 workbench/projection-view.ts）：流式时 cell 每帧换一次，这几个值几乎不变。
+  const projectionTarget = useOptionalProjectionTarget();
+  const projectionMatches = projectionTarget !== null && projectionTarget.sessionId !== null && (sessionId === null || sessionId === undefined || projectionTarget.sessionId === sessionId);
+  const projectionView = useProjectionSelect<SessionProjectionView | null>(selectSessionView, sameSessionView, projectionMatches ? undefined : null);
   const browse = useSessionBrowse();
   const { target, selectedWorkspaceRoot } = useRunTargetContext();
   // 14 S9：App 读页失败用 browse.messageError；投影 cell 的打开 / refresh 失败（bridge 重试用完前也会先显示）用 cell 的 status/error。
-  const projectionError = projectionCell?.status === "error" ? `会话同步失败：${projectionCell.error ?? "未知错误"}` : null;
+  const projectionError = projectionView?.status === "error" ? `会话同步失败：${projectionView.error ?? "未知错误"}` : null;
   // 15 S2：key 损坏时不去读页，也不给「重试」。
   const locatorError = target.kind === "invalid" ? "会话标识损坏，无法打开这个会话。" : null;
   const sessionError = locatorError ?? browse?.messageError ?? projectionError;
-  const projectionBridge = sessionProjection?.bridge ?? null;
-  const projectionSessionId = sessionProjection?.sessionId ?? null;
+  const projectionBridge = projectionTarget?.bridge ?? null;
+  const projectionSessionId = projectionTarget?.sessionId ?? null;
   const retrySession = useCallback(() => {
     if (browse) { browse.retryMessages(); return; }
     // 没有 App（单独挂 SessionProjectionProvider）时直接重新打开；失败会再次写进 cell。
     if (projectionBridge && projectionSessionId) void projectionBridge.open(projectionSessionId).catch(() => undefined);
   }, [browse, projectionBridge, projectionSessionId]);
   const historyAnchor = useRef<{ sessionId: string | null | undefined; height: number; top: number } | null>(null);
-  const projectedSurfaceMessages = projectionCell ? selectSurfaceMessages(projectionCell) : [];
-  const projectedComposer = projectionCell ? selectComposer(projectionCell) : null;
-  const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
-  const effectiveContextSnapshot = contextSnapshot
-    ?? (projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null);
+  const projectedSurfaceMessageCount = projectionView?.surfaceMessageCount ?? 0;
+  const projectedComposerPhase = projectionView?.composerPhase;
+  const effectiveContextSnapshot = contextSnapshot ?? projectionView?.contextSnapshot ?? null;
   const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
-  const inputHistory = useMemo(() => userInputHistory(messages), [messages]);
+  // 输入历史只在用户消息变化时换新：输入框外壳靠它保持稳定，不随流式每帧重渲染。
+  const inputHistory = useTranscriptSelect(userInputHistory, sameStringList);
   // Review 标签的「第 N 轮」：只有历史从头加载全了，已加载的用户轮次序号才是真实轮次。
   const turnNumbers = useMemo(() => {
     if (browse?.hasEarlier) return null;
@@ -116,14 +117,14 @@ export function ConversationView({
     () => createTurnNavigationItems(turns, isStreaming),
     [isStreaming, turns],
   );
-  const durableMessageCount = durableSurfaceMessageCount ?? (projectedSurfaceMessages.length > 0 ? projectedSurfaceMessages.length : messages.length);
+  const durableMessageCount = durableSurfaceMessageCount ?? (projectedSurfaceMessageCount > 0 ? projectedSurfaceMessageCount : messages.length);
   const hasConversationContent = durableMessageCount > 0 || messages.length > 0;
-  const requestedComposerPhase = composerPhase ?? projectedComposer?.phase;
+  const requestedComposerPhase = composerPhase ?? projectedComposerPhase;
   const resolvedComposerPhase = requestedComposerPhase === "blank" && hasConversationContent
     ? "active"
     : requestedComposerPhase ?? (durableMessageCount === 0 ? "blank" : "active");
-  const projectionSessionReady = projectionCell !== null && projectionCell.status !== "error";
-  const resolvedSessionReady = (projectedComposer != null && projectedComposer.phase !== "blank") || isSessionReady || projectionSessionReady;
+  const projectionSessionReady = projectionView !== null && projectionView.status !== "error";
+  const resolvedSessionReady = (projectedComposerPhase != null && projectedComposerPhase !== "blank") || isSessionReady || projectionSessionReady;
   const waitingForInitialList = browse?.listLoading && !resolvedSessionReady;
   const isInitialComposer = !browse?.messageLoading && !sessionError && !waitingForInitialList && resolvedSessionReady && resolvedComposerPhase === "blank" && !isStreaming;
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -148,7 +149,7 @@ export function ConversationView({
   const { sync: syncTurnNavigator, scrollToTurn } = turnNavigator;
   const openedSubagentRuns = useRef(new Set<string>());
   const { openTab } = useRightPanel();
-  const openContextTab = () => openTab({ id: "context", kind: "context", title: "上下文" });
+  const openContextTab = useCallback(() => openTab({ id: "context", kind: "context", title: "上下文" }), [openTab]);
   const openAttachmentPreview = useCallback((attachment: ComposerAttachment) => {
     if (!attachment.previewUrl) return;
     openTab({
@@ -397,7 +398,7 @@ export function ConversationView({
         </div>
         {activeView === "trajectory" ? <div className="flex h-full min-h-0 flex-col">
           {/* 「停止」放在轨迹工具栏最右侧（DSH 工具栏只有 32px，不再单独占一行）。 */}
-          <div className="min-h-0 flex-1"><TrajectoryView onAbort={isStreaming ? onAbort : undefined} isAborting={isAborting} onOpenSubagent={openSubagentTrajectory} /></div>
+          <div className="min-h-0 flex-1"><Suspense fallback={null}><TrajectoryView onAbort={isStreaming ? onAbort : undefined} isAborting={isAborting} onOpenSubagent={openSubagentTrajectory} /></Suspense></div>
         </div> : null}
       </div>
       {/* 放在消息区之后：React 按树序挂 ref 并跑 layout effect，放前面时首帧拿不到 scrollContainerRef。 */}

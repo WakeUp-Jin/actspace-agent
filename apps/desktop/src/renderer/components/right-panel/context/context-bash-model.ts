@@ -1,6 +1,6 @@
 import type { ContextPanelBashCount, ContextPanelBashStats } from "@actspace/shared";
 
-/** 「Bash 命令」卡片的显示规则，见 `front-Context面板Bash命令统计.md` §5。 */
+/** 「Bash 命令」卡片的显示规则，见 `front-Context面板规范.md` §5。 */
 
 export const BASH_OTHER_LABEL = "其他";
 

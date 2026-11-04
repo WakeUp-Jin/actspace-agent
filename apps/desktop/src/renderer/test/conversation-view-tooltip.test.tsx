@@ -439,7 +439,7 @@ it("hides the trajectory composer without losing the draft and keeps Stop availa
   fireEvent.change(input, { target: { value: "keep this draft" } });
   rendered.rerender(view("trajectory"));
   expect(rendered.container.querySelector(".composer-zone")).toHaveStyle({ display: "none" });
-  fireEvent.click(screen.getByRole("button", { name: "停止" }));
+  fireEvent.click(await screen.findByRole("button", { name: "停止" }));
   expect(abort).toHaveBeenCalledTimes(1);
   rendered.rerender(view("chat"));
   expect(rendered.container.querySelector("textarea")).toBe(input);

@@ -78,4 +78,19 @@ describe("live event hub", () => {
     expect(after).toHaveBeenCalledTimes(3);
     error.mockRestore();
   });
+  it("unrolls a batched message into individual envelopes, in order, for every consumer", () => {
+    const { source, emit } = fakeSource();
+    const hub = createLiveEventHub(source);
+    const first = vi.fn();
+    const second = vi.fn();
+    hub.subscribe(first);
+    hub.subscribe(second);
+    const parts = ["a", "b", "c"].map((message, index) => ({ ...envelope(message), event: { ...envelope(message).event, liveSeq: index + 1 } }));
+    emit({ ...parts[2]!, batch: parts });
+    for (const consumer of [first, second]) expect(consumer.mock.calls.map((call) => call[0].event.message)).toEqual(["a", "b", "c"]);
+    // 单条消息照旧一次分发；空 batch 不分发任何东西。
+    emit(envelope("solo"));
+    emit({ ...envelope("empty"), batch: [] });
+    expect(first.mock.calls.map((call) => call[0].event.message)).toEqual(["a", "b", "c", "solo"]);
+  });
 });

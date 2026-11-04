@@ -1,7 +1,7 @@
 import type { ApprovalRequest, RuntimeV2SessionListItem } from "@actspace/shared/runtime-v2";
 import type { HostWorkspace } from "../connection/connection-store";
 
-// 列表行的纯函数模型（front-web-pwa客户端规范 §9.1）。
+// 列表行的纯函数模型（front-web-pwa客户端规范 §8.1）。
 export type RowStatus = "approval" | "running" | "unread" | "idle";
 
 export const UNTITLED = "新会话";

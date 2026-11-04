@@ -2,7 +2,7 @@ import type { TrajectoryRecord } from "./contract";
 
 /**
  * 从别处（例如右侧 Context 面板、对话里的压缩分隔线）跳到轨迹里的某条记录。
- * 映射规则见 `front-右侧面板与文件渲染规范.md`「Context 面板 · 跳到轨迹」。
+ * 映射规则见 `front-Context面板规范.md` §7。
  */
 export type TrajectoryRevealTarget =
   | { readonly callId: string }

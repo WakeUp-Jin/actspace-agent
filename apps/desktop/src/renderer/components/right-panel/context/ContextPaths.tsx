@@ -11,7 +11,7 @@ import { useContextPaths } from "./use-context-paths";
 const LABEL: Record<ContextPathVisibility, string> = { active: "活跃", sleeping: "睡眠" };
 
 /**
- * 「路径」卡片（交接文档 front-Context面板Step刷新与路径展示交接.md）：周期和活跃 / 睡眠两格统计始终显示，
+ * 「路径」卡片（front-Context面板规范.md §4）：周期和活跃 / 睡眠两格统计始终显示，
  * 两格兼当切换；下面的列表默认收起，点开关才按版本分页读取。
  */
 export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: {

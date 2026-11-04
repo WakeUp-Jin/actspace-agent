@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "../../ui/cn";
 import { Button } from "../../ui/Button";
 
-/** Context 面板各区块共用的外观；视觉对照 `docs/design-docs/frontend/context-panel-demo.html`。 */
+/** Context 面板各区块共用的外观；规则见 `docs/design-docs/frontend/front-Context面板规范.md`。 */
 
 export const CARD_CLASS = "rounded-act-group border border-line bg-surface";
 export const CARD_HEAD_CLASS = "flex items-center gap-2 px-3 pt-2.5";

@@ -59,7 +59,7 @@ export const mockContextState: ContextState = {
       title: "AGENTS.md / 协作规则",
       estimatedTokens: 681,
       included: true,
-      preview: "每轮先读 REPO_COLLAB_GUIDE / ARCHITECTURE / core-beliefs；改样式前读主题与配色规范。",
+      preview: "每轮先读 REPO_COLLAB_GUIDE / ARCHITECTURE；改样式前读视觉 token 规范。",
     },
     {
       id: "ctx-skills-1",

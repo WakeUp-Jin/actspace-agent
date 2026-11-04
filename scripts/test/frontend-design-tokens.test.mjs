@@ -181,7 +181,7 @@ test("runCheck reports a portal, a dialog and an extra native button in a render
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "frontend-tokens-"));
   try {
     fs.mkdirSync(path.join(root, "styles"));
-    fs.writeFileSync(path.join(root, "styles/base.css"), ".tool-log-text-running { color: red; }\n.tool-log-text-running::after { display: none; }\n");
+    fs.writeFileSync(path.join(root, "styles/base.css"), ".tool-log-text-running { color: red; }\n.tool-log-shimmer { display: none; }\n.tool-log-shimmer::after { color: red; }\n");
     fs.writeFileSync(path.join(root, "styles/diff.css"), ".file-diff-content { max-height: 4px; overflow-y: auto; overflow-x: auto; }\n");
     fs.mkdirSync(path.join(root, "components/ui"), { recursive: true });
     fs.writeFileSync(path.join(root, "components/ui/Dialog.tsx"), 'createPortal(<div role="dialog"><button /></div>, document.body);');

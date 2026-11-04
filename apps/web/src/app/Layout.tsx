@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * 窄屏只渲染当前页面；宽屏左栏 360px 放列表，右栏放详情（front-web-pwa客户端规范 §7）。
+ * 窄屏只渲染当前页面；宽屏左栏 360px 放列表，右栏放详情（front-web-pwa客户端规范 §6）。
  * 每个栏都是 relative 的满高容器：页面的玻璃顶栏、底部输入坞相对栏定位，而不是相对视口。
  */
 export function Layout({ wide, list, detail, overlay }: { readonly wide: boolean; readonly list: ReactNode; readonly detail: ReactNode; readonly overlay?: ReactNode }) {

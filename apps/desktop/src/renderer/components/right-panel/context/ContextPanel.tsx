@@ -16,7 +16,7 @@ const EMPTY_CLASS = "p-[18px] text-act-sm text-text-muted";
 const NOTE_CLASS = "m-0 text-center text-act-xxs text-text-faint";
 
 /**
- * 右侧面板的 Context Tab（见 `front-右侧面板与文件渲染规范.md`「Context 面板」）：
+ * 右侧面板的 Context Tab（见 `front-Context面板规范.md`）：
  * 当前上下文、会话统计、路径、上下文明细、趋势、事件、Bash 命令七块。只看占用，会话原文在轨迹里读。
  * 后端 `describeContextPanel` 未实现时是过渡视图：没有对比、趋势和事件，底部写明。
  */

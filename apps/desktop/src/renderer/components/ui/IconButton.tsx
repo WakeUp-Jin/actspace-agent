@@ -2,7 +2,7 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./Tooltip";
 import { BUTTON_VARIANT_CLASS, cx } from "./Button";
 
-// 纯图标按钮。label 必填：同时生成 aria-label 和 Tooltip（front-icon-button-tooltip-guidelines.md），
+// 纯图标按钮。label 必填：同时生成 aria-label 和 Tooltip（front-组件与交互模式规范.md §3），
 // 从类型上保证不会再出现没有名字的图标按钮。className 只放布局与显隐类，不要覆盖尺寸、圆角、颜色。
 
 export type IconButtonVariant = "ghost" | "danger" | "soft" | "inherit" | "secondary" | "primary" | "accent" | "operational" | "warning";
@@ -30,7 +30,7 @@ const ICON_BUTTON_SHAPE_CLASS: Record<IconButtonShape, string> = {
 // danger 是行内的删除：平时和 ghost 一样淡，hover 才变红。
 // secondary / primary 与 Button 共用。展开态用 aria-expanded 统一变深。
 // accent / operational / warning 只给 Composer 发送，分别对应 Agent / Chat / Plan：accent 跟随外观强调色，
-// 默认调色板下与 primary 完全一致（front-accent-palette.md）；warning 的实心底配 on-warning-solid，不能用浅底上的 on-warning。
+// 默认调色板下与 primary 完全一致（front-视觉token规范.md §4）；warning 的实心底配 on-warning-solid，不能用浅底上的 on-warning。
 const ICON_BUTTON_VARIANT_CLASS: Record<IconButtonVariant, string> = {
   ghost: "border-transparent bg-transparent text-text-faint enabled:hover:bg-hover-overlay enabled:hover:text-text-main aria-expanded:bg-selected aria-expanded:text-text-main",
   danger: "border-transparent bg-transparent text-text-faint enabled:hover:bg-danger-soft enabled:hover:text-on-danger",

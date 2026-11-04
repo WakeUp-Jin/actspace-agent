@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { PerformancePanel } from "./PerformancePanel";
 import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Blocks, Settings, SquarePen } from "lucide-react";
@@ -13,6 +14,7 @@ export type SidebarView = "chat" | "lab" | "settings" | "extensions" | "space";
 export type { NewSessionInput } from "../session/session-actions-context";
 export type { SessionUiStatusKind } from "./sidebar/session-status";
 
+const EMPTY_WORKSPACES: WorkspaceEntry[] = [];
 const SIDEBAR_CLASS =
   "sidebar relative flex h-full min-h-0 min-w-0 flex-col gap-3 bg-sidebar pb-2.5 pl-2.5 pr-2 pt-[var(--window-chrome-strip-height)]";
 const SIDEBAR_PRIMARY_ACTIONS_CLASS = "mt-1.5 flex min-w-0 flex-col gap-px p-0";
@@ -25,9 +27,9 @@ const SESSION_NAV_CLASS = "sidebar-scrollbar flex min-h-0 min-w-0 flex-1 flex-co
 const SETTINGS_ENTRY_CLASS =
   "flex min-h-[34px] min-w-0 items-center gap-[9px] rounded-act-md border-0 bg-transparent px-2.5 py-0 text-left text-act-sm font-medium text-text-muted transition-[background,color] duration-(--motion-fast) ease-in-out hover:bg-[var(--act-color-hover-overlay)] hover:text-text-main";
 
-export function Sidebar({
+export const Sidebar = memo(function Sidebar({
   sessions,
-  workspaces = [],
+  workspaces = EMPTY_WORKSPACES,
   activeSessionId,
   mode,
   view,
@@ -135,4 +137,4 @@ export function Sidebar({
       <PerformancePanel />
     </aside>
   );
-}
+});

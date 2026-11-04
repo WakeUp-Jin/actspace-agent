@@ -6,6 +6,9 @@ import { taskCodecs } from "@actspace/agent-service";
 import { ManagedRuns } from "./managed-runs.js";
 import { AgentRuntimeService } from "./agent-runtime-plugin.js";
 
+/** Release hooks the runtime plugin registers on the Session controller. */
+const releaseHooks = { addPin: () => () => undefined, addReleaseGate: () => () => undefined, requestSweep: () => undefined };
+
 describe("agent runtime service lifecycle", () => {
   it("publishes committed queue changes to Host Cordis observers", async () => {
     const ctx = new CordisContextClass();
@@ -13,7 +16,7 @@ describe("agent runtime service lifecycle", () => {
     const session = SessionHandle.createEphemeral({ registry: codecs, header: createSessionHeader({ sessionId: "notifications", createdAt: "2026-10-03T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "2", manifestDigest: "test", plugins: [], codecSetDigest: codecs.digest } }) });
     ctx.provide("actspace.host.agent", { host: {}, plugins: [] });
     ctx.provide("agent.registry", { list: () => [] });
-    ctx.provide("session.runtime", { store: {}, getOpen: () => session });
+    ctx.provide("session.runtime", { store: {}, getOpen: () => session, ...releaseHooks });
     const runtime = new AgentRuntimeService(ctx as never);
     const states: { paused: boolean; queue: readonly string[] }[] = [];
     ctx.on("agent/tasks-updated", snapshot => { states.push(snapshot); });
@@ -33,12 +36,37 @@ describe("agent runtime service lifecycle", () => {
     } finally { await runtime.dispose(); await session.close(); await ctx.fiber.dispose(); }
   });
 
+  it("registers the idle-release pin and gate, answers for its own work, and unregisters both on dispose", async () => {
+    const ctx = new CordisContextClass();
+    ctx.provide("actspace.host.agent", { host: {}, toolEnvironment: {}, workspaceRoot: "/workspace", compositionDigest: "composition", plugins: [] });
+    ctx.provide("agent.registry", { list: () => [] });
+    const pins = new Set<(id: string) => boolean>();
+    const gates = new Set<{ canRelease(id: string): boolean; release(id: string): Promise<unknown> }>();
+    ctx.provide("session.runtime", { store: {}, requestSweep: () => undefined,
+      addPin: (pin: (id: string) => boolean) => { pins.add(pin); return () => { pins.delete(pin); }; },
+      addReleaseGate: (gate: { canRelease(id: string): boolean; release(id: string): Promise<unknown> }) => { gates.add(gate); return () => { gates.delete(gate); }; } });
+    const runtime = new AgentRuntimeService(ctx as never);
+    expect([pins.size, gates.size]).toEqual([1, 1]);
+    const [pin] = [...pins]; const [gate] = [...gates];
+    // Nothing running, queued, spawned or backgrounded: the Session may go.
+    expect(pin!("idle")).toBe(false);
+    expect(gate!.canRelease("idle")).toBe(true);
+    vi.spyOn(runtime.backgroundTasks, "hasRunning").mockImplementation(id => id === "busy-bg");
+    vi.spyOn(runtime.subagents, "runningCount").mockImplementation(id => id === "busy-agent" ? 1 : 0);
+    expect(pin!("busy-bg")).toBe(true);
+    expect(pin!("busy-agent")).toBe(true);
+    expect(await gate!.release("idle")).toBe(true);
+    await runtime.dispose();
+    expect([pins.size, gates.size]).toEqual([0, 0]);
+    await ctx.fiber.dispose();
+  });
+
   it("owns Host scheduling without creating a session-long Loop", async () => {
     const ctx = new CordisContextClass();
     ctx.provide("actspace.host.agent", { host: {}, toolEnvironment: {}, workspaceRoot: "/workspace", compositionDigest: "composition", plugins: [] });
     const registry = { list: () => [] };
     ctx.provide("agent.registry", registry);
-    ctx.provide("session.runtime", { store: {} });
+    ctx.provide("session.runtime", { store: {}, ...releaseHooks });
     const runtime = new AgentRuntimeService(ctx as never);
     expect(runtime.registry).toBe(registry);
     expect(runtime.harnesses).toBeUndefined();

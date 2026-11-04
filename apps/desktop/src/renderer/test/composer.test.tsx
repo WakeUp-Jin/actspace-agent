@@ -590,7 +590,7 @@ describe("Composer follow-up bar", () => {
   it("renders the send button as an accent round arrow button", () => {
     renderComposer();
 
-    // bg-accent 在默认调色板下回落为 action 反色，其它调色板取强调色（front-accent-palette.md）。
+    // bg-accent 在默认调色板下回落为 action 反色，其它调色板取强调色（front-视觉token规范.md §4）。
     const sendButton = screen.getByRole("button", { name: "输入消息后发送" });
     expect(sendButton).toHaveClass("bg-accent", "text-on-accent", "rounded-act-pill", "size-7");
     expect(sendButton).toHaveAttribute("data-mode", "agent");

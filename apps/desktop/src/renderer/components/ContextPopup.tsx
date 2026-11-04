@@ -86,7 +86,7 @@ export function ContextPopup({
         align="start"
         sideOffset={CONTEXT_POPOVER_GAP_PX}
         avoidCollisions={false}
-        radius="2xl"
+        radius="lg"
         // 焦点放在浮层本身：落到第一个按钮上会立刻弹出它的 Tooltip。
         onOpenAutoFocus={(event) => {
           event.preventDefault();

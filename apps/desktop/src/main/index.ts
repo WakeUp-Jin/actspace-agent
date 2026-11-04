@@ -85,6 +85,7 @@ const approvalRegistry = new PendingApprovalRegistry({
         approvalScope: request.approvalScope,
         executionEnvironment: request.executionEnvironment,
       };
+      fixedRendererIpc?.flushLive();
       mainWindow.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.agentStream, event);
     }
   },
@@ -99,6 +100,7 @@ const approvalRegistry = new PendingApprovalRegistry({
       decision: decision.decision,
       approvalScope: request.approvalScope,
     };
+    fixedRendererIpc?.flushLive();
     mainWindow.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.agentStream, event);
   },
 });

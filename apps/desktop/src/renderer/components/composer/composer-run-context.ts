@@ -1,6 +1,7 @@
 import type { ContextState, ContextUsageSnapshot } from "@actspace/shared";
-import { selectRequestContextEstimate } from "@actspace/client/sessions";
-import { contextEstimateToSnapshot, useOptionalSessionProjection } from "../../session";
+import { selectRequestContextEstimate, type ClientSessionCell } from "@actspace/client/sessions";
+import { contextEstimateToSnapshot, useOptionalProjectionTarget, useProjectionSelect } from "../../session";
+import { jsonEqual } from "../../json-equal";
 import type { ComposerExecutionContext, ComposerWorkspaceOption } from "./composer-types";
 import type { RunTargetRowProps } from "./RunTargetRow";
 
@@ -9,11 +10,10 @@ import type { RunTargetRowProps } from "./RunTargetRow";
  * 投影只在它属于当前会话时才用（没传 sessionId 时视为当前会话）。
  */
 export function useComposerContextSnapshot(sessionId: string | null | undefined, contextState: ContextState | null | undefined, contextSnapshot: ContextUsageSnapshot | null): ContextUsageSnapshot | null {
-  const sessionProjection = useOptionalSessionProjection();
-  const projectionCell = sessionProjection !== null && sessionProjection.sessionId !== null && sessionProjection.sessionId === (sessionId ?? sessionProjection.sessionId)
-    ? sessionProjection.cell
-    : null;
-  const projectedContextEstimate = projectionCell ? selectRequestContextEstimate(projectionCell) : null;
+  const target = useOptionalProjectionTarget();
+  const belongs = target !== null && target.sessionId !== null && target.sessionId === (sessionId ?? target.sessionId);
+  // 只订阅派生出的用量快照：流式时 cell 每帧换一次，快照几乎不变，输入框外壳不随帧重渲染。
+  const projectedSnapshot = useProjectionSelect<ContextUsageSnapshot | null>(selectProjectedContextSnapshot, jsonEqual, belongs ? undefined : null);
   return (contextState ? {
     basis: contextState.basis,
     totalTokens: contextState.totalEstimatedTokens,
@@ -23,7 +23,12 @@ export function useComposerContextSnapshot(sessionId: string | null | undefined,
     buckets: contextState.buckets,
   } : null)
     ?? contextSnapshot
-    ?? (projectedContextEstimate ? contextEstimateToSnapshot(projectedContextEstimate) : null);
+    ?? projectedSnapshot;
+}
+
+function selectProjectedContextSnapshot(cell: ClientSessionCell | null): ContextUsageSnapshot | null {
+  const estimate = cell ? selectRequestContextEstimate(cell) : null;
+  return estimate ? contextEstimateToSnapshot(estimate) : null;
 }
 
 /** 本机的分支和运行位置：没有分支名但 HEAD 分离时写「分离的 HEAD」；空仓库（no_head）也算有分支。 */

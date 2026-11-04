@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import type { ComposerMode, ResponseAnnotationReference } from "@actspace/shared";
 import { ContextPopup } from "./ContextPopup";
 import { ComposerPalette } from "./composer/ComposerPalette";
@@ -66,7 +66,7 @@ function getComposerPanelClass(surface: ComposerSurface, layout: ComposerLayout,
   ].filter(Boolean).join(" ");
 }
 
-export function Composer({
+export const Composer = memo(function Composer({
   surface = "followup", sessionId, contextSnapshot, contextState, statusNotice = null, permissionControl, placeholder, statusRow,
   isStreaming = false, isAborting = false, isCompacting = false, messageQueue, onSend, onAbort, onOpenSideChat,
   models, defaultModelId, selectedModelId: controlledSelectedModelId, onSelectedModelChange,
@@ -504,4 +504,4 @@ export function Composer({
       {renderComposerStatusRow()}
     </footer>
   );
-}
+});

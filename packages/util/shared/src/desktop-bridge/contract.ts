@@ -118,6 +118,11 @@ export const desktopBridgeContract = {
     setAgentMode: invoke<S.SessionAgentModeInput, S.SessionAgentModeResult>(CH.setSessionAgentMode),
     archive: invoke<S.SessionArchiveInput, S.SessionArchiveResult>(CH.archiveSession),
     archiveMany: invoke<S.SessionArchiveManyInput, S.SessionArchiveManyResult>(CH.archiveSessions),
+    /**
+     * 渲染进程当前选中/订阅的会话 id 全集（每次变化整体替换）。主进程据此保护这些会话不被空闲回收；
+     * 不在其中且已空闲的会话按 LRU 最多保留 3 个，其余释放（重新打开时 resume）。
+     */
+    setObserved: send<readonly string[]>(CH.setObservedSessions),
     describeContext: invoke<S.DescribeContextInput, S.ContextState | null>(CH.describeContext),
     /** 当前 Context 与异步历史摘要，支持条件读取和有界明细。 */
     describeContextPanel: invoke<S.DescribeContextPanelInput, S.ContextPanelResponse | null>(CH.describeContextPanel),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
   Check,
   Bookmark,
@@ -24,6 +24,8 @@ import type {
   WorkspaceGitMutationResult,
 } from "@actspace/shared";
 import type { ComposerReviewSummary } from "../Composer";
+import { useTranscriptSelect } from "../../session/transcript-context";
+import { jsonEqual } from "../../json-equal";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { Button } from "../ui/Button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../ui/Dialog";
@@ -104,14 +106,12 @@ function collectSources(workspaceRoot: string, messages: MessageBlock[]): Source
 export function WorkspaceChromeControls({
   workspaceRoot,
   title,
-  messages,
   reviewSummary,
   onOpenReview,
   onWorkspaceChanged,
 }: {
   workspaceRoot: string;
   title: string;
-  messages: MessageBlock[];
   reviewSummary?: ComposerReviewSummary | null;
   onOpenReview: () => void;
   onWorkspaceChanged?: () => void;
@@ -124,7 +124,8 @@ export function WorkspaceChromeControls({
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger" | "neutral"; message: string } | null>(null);
   const [dialog, setDialog] = useState<GitDialogState>(null);
   const environmentToggleRef = useRef<HTMLButtonElement>(null);
-  const sources = useMemo(() => collectSources(workspaceRoot, messages), [messages, workspaceRoot]);
+  // 附件来源从消息序列派生；只订阅这个小列表，流式输出时不随每帧重渲染。
+  const sources = useTranscriptSelect<SourceItem[]>(useCallback((messages: MessageBlock[]) => collectSources(workspaceRoot, messages), [workspaceRoot]), jsonEqual);
 
   const loadEnvironment = async () => {
     const api = workspacesApi.getEnvironment;
@@ -239,7 +240,7 @@ export function WorkspaceChromeControls({
           </TooltipTrigger>
           <TooltipContent>工作区环境</TooltipContent>
         </Tooltip>
-        <PopoverContent aria-label="工作区环境" align="end" sideOffset={8} radius="xl" className="w-[304px] overflow-hidden">
+        <PopoverContent aria-label="工作区环境" align="end" sideOffset={8} radius="lg" className="w-[304px] overflow-hidden">
           <section className="p-2">
             <div className="flex items-center justify-between px-0.5 pb-1 text-act-xs font-medium text-text-faint">
               <span>工作区环境</span>
@@ -415,7 +416,7 @@ function BranchMenu({
   }, [branches, query]);
 
   return (
-    <PopoverContent role="menu" aria-label="分支" side="left" align="start" radius="xl" className="flex w-[288px] flex-col overflow-hidden">
+    <PopoverContent role="menu" aria-label="分支" side="left" align="start" radius="lg" className="flex w-[288px] flex-col overflow-hidden">
       <div className="p-2">
         <label className="flex h-8 items-center gap-2 rounded-act-md border border-line bg-surface-subtle px-2.5 text-text-faint focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-ring/20">
           <Search size={13} aria-hidden="true" />

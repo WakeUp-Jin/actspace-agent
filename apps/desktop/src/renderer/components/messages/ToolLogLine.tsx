@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, File, Search } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
+import { ToolLogShimmer } from "./ToolLogShimmer";
+import { observeOverflow } from "./overflow-observer";
 import {
   ApprovalActions,
   ApprovalPath,
@@ -87,18 +89,7 @@ function OverflowToolLine({
       return undefined;
     }
 
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(updateOverflow)
-        : null;
-
-    resizeObserver?.observe(element);
-    window.addEventListener("resize", updateOverflow);
-
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateOverflow);
-    };
+    return observeOverflow(element, updateOverflow);
   }, [text, updateOverflow]);
 
   useLayoutEffect(() => {
@@ -127,7 +118,7 @@ function OverflowToolLine({
       }}
       onMouseLeave={() => setIsTooltipOpen(false)}
     >
-      <span ref={textRef} {...getToolLogLineTextProps(status, text)}>{text}</span>
+      <span ref={textRef} {...getToolLogLineTextProps(status, text)}>{text}{status === "running" ? <ToolLogShimmer text={text} /> : null}</span>
       {isOverflowing ? (
         <span className={`${TOOL_LOG_TOOLTIP_CLASS} ${isTooltipOpen ? "block" : "hidden"}`} role="tooltip">
           {text}
@@ -185,7 +176,7 @@ function WebToolBlock({
   if (status === "running" || !hasContent) {
     return (
       <div className={getToolLogLineClass(status, className)}>
-        <span {...getToolLogLineTextProps(status, displayText)}>{displayText}</span>
+        <span {...getToolLogLineTextProps(status, displayText)}>{displayText}{status === "running" ? <ToolLogShimmer text={displayText} /> : null}</span>
       </div>
     );
   }
@@ -238,7 +229,7 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
   const canOpenFile = onOpenFile && (status === "completed" || status === undefined);
   const summary = canOpenFile ? (
     <button className="tool-file-link" type="button" onClick={onOpenFile}>{summaryContent ?? displayText}</button>
-  ) : <span {...getToolLogLineTextProps(status, displayText)}>{status === "running" ? displayText : summaryContent ?? displayText}</span>;
+  ) : <span {...getToolLogLineTextProps(status, displayText)}>{status === "running" ? <>{displayText}<ToolLogShimmer text={displayText} /></> : summaryContent ?? displayText}</span>;
   const detailItems = status === "completed" || status === undefined
     ? resultPreview?.length ? resultPreview : detail ? [detail] : []
     : detail ? [detail] : [];
@@ -340,6 +331,7 @@ export function ToolLogLine({ message, className, onOpenFile, onExpand, onOpenSu
       <div className={lineClassName}>
         <span {...getToolLogLineTextProps(message.status, message.displayText)}>
           {message.displayText}
+          {message.status === "running" ? <ToolLogShimmer text={message.displayText} /> : null}
         </span>
       </div>
     );

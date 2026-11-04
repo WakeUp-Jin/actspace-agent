@@ -15,6 +15,7 @@ import { ThinkingBlock } from "../messages/ThinkingBlock";
 import { TodoListBlock } from "../messages/TodoListBlock";
 import { ToolLogLine } from "../messages/ToolLogLine";
 import { getToolLogRunningTextAttrs, TOOL_LOG_LINE_TEXT_RUNNING_CLASS } from "../messages/toolLogStyles";
+import { ToolLogShimmer } from "../messages/ToolLogShimmer";
 import { UserMessage } from "../messages/UserMessage";
 
 export type AgentMessageBlock = Extract<MessageBlock, { kind: "agent" }>;
@@ -169,6 +170,7 @@ function ModelWaitingStatus({ content }: { content: string }) {
         {...getToolLogRunningTextAttrs(content)}
       >
         {content}
+        <ToolLogShimmer text={content} />
       </span>
     </div>
   );

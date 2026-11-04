@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { ApprovalActions, ApprovalCard, getCommandPrefixGrant, useApprovalDecision, useCommandPrefixGrantSuggestion } from "./ApprovalParts";
 import { getShellCommandHeads, tokenizeShellCommand, type ShellTokenKind } from "./shell-highlight";
 import { TOOL_LOG_LINE_TEXT_RUNNING_CLASS, getToolLogRunningTextAttrs } from "./toolLogStyles";
+import { ToolLogShimmer } from "./ToolLogShimmer";
 
 type BashMessage = Extract<MessageBlock, { kind: "bash" }>;
 
@@ -131,6 +132,7 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
           {...getToolLogRunningTextAttrs(summary)}
         >
           {summary}
+          <ToolLogShimmer text={summary} />
         </span>
       ) : (
         <span className={BASH_RUN_SUMMARY_CLASS}>{summary}</span>

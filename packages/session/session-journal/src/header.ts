@@ -1,5 +1,5 @@
 import { SessionError } from "./errors.js";
-import { snapshotSessionJson } from "./event-envelope.js";
+import { snapshotSessionJson, validateSessionJson } from "./event-envelope.js";
 
 export const SESSION_FORMAT = "actspace-session" as const;
 export const SESSION_FORMAT_VERSION = 1 as const;
@@ -127,7 +127,7 @@ export function validateSessionHeader(value: unknown, expectedSessionId?: string
     if (pluginIds.has(plugin.id)) throw invalidHeader(`Duplicate plugin provenance ${plugin.id}.`);
     pluginIds.add(plugin.id);
   }
-  snapshotSessionJson(value);
+  validateSessionJson(value);
 }
 
 function validateLineage(value: unknown): asserts value is SessionLineageV1 {
