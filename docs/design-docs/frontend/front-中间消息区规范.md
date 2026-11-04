@@ -403,7 +403,7 @@ Context Compaction 展示上下文压缩生命周期。用户在 Composer 直接
 
 ### 统一卡片
 
-- 所有审批（read、grep、glob、edit_diff、write_diff、delete、bash、browser、通用工具）都用同一张卡：上方一行淡色“等待确认”，下面是 `bg-surface` + `border-line` + `shadow-act-xs` 的圆角卡。
+- 所有审批（read、grep、glob、edit_diff、write_diff、delete、bash、browser、通用工具）都用同一张卡：只有一个框，卡片上下不加文字行（「等待确认」只写在容器的 `aria-label` 上；等待状态的视觉提示另行设计），框是 `bg-surface` + `border-line` + `shadow-act-xs` 的圆角卡。
 - 头行：可选图标 · 动词（muted）· 目标（faint），按钮在行尾；Bash 例外，按钮放在命令下方的底栏。
 - 不使用彩色边框、彩色托盘、`Reason:` 行；危险程度只由主按钮颜色表达。
 - 只在需要补充说明时，卡片外包一层 `bg-surface-subtle` 托盘，说明文字写在卡下方（目前只有浏览器操作）。

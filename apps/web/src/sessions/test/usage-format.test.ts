@@ -15,7 +15,7 @@ it("builds the usage pill label and rows in desktop order", () => {
   const view = turnUsageView(usage())!;
   expect(view.label).toBe("用量 88.4K tok");
   expect(view.rows.map(row => row.label)).toEqual(["提供方 / 模型", "缓存命中", "未缓存输入", "缓存读取", "缓存写入", "输出", "花费"]);
-  expect(view.rows.find(row => row.label === "输出")?.note).toBe("其中推理 1,200 tok");
+  expect(view.rows.find(row => row.label === "输出")?.note).toBeUndefined();
   expect(view.rows.find(row => row.label === "花费")?.note).toBe("预估");
 });
 

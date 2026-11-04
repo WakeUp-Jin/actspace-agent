@@ -39,7 +39,7 @@ export function ToolsTab({ data, focusKey }: { data: HarnessStatsTools; focusKey
     { key: "name", label: "工具", width: "160px", sortValue: (row) => row.name, render: (row) => <NameCell name={row.name} sub={row.pluginId ?? undefined} /> },
     { key: "calls", label: "调用", numeric: true, sortValue: (row) => row.calls, render: (row) => fmtInt(row.calls) },
     {
-      key: "rate", label: "调用率", numeric: true, tip: "被调用次数 ÷ 工具出现在请求里的次数", sortValue: (row) => callRate(row.calls, row.exposures),
+      key: "rate", label: "调用率", numeric: true, sortValue: (row) => callRate(row.calls, row.exposures),
       render: (row) => {
         const rate = callRate(row.calls, row.exposures);
         return rate == null ? <Dash /> : <Meter value={rate} max={maxRate} label={fmtPct(rate)} warn={rate < TOOL_FLAG_RULES.lowRate && (row.schemaTokens ?? 0) >= TOOL_FLAG_RULES.minSchema} />;
@@ -47,14 +47,14 @@ export function ToolsTab({ data, focusKey }: { data: HarnessStatsTools; focusKey
     },
     { key: "schema", label: "定义 token", numeric: true, sortValue: (row) => row.schemaTokens, render: (row) => fmtInt(row.schemaTokens) },
     {
-      key: "perCall", label: "每次调用摊到", numeric: true, tip: "定义 token × 出现次数 ÷ 调用次数", sortValue: (row) => costPerCall(row.schemaTokens, row.exposures, row.calls),
+      key: "perCall", label: "每次调用摊到", numeric: true, sortValue: (row) => costPerCall(row.schemaTokens, row.exposures, row.calls),
       render: (row) => {
         const value = costPerCall(row.schemaTokens, row.exposures, row.calls);
         return value == null ? <Dash /> : <span className={value > 100_000 ? "font-medium" : undefined}>{fmtTokens(value)}</span>;
       },
     },
     {
-      key: "output", label: "平均输出", numeric: true, tip: "每次调用返回给模型的 token；P95 在展开行里", sortValue: (row) => row.outputTokensAvg,
+      key: "output", label: "平均输出", numeric: true, sortValue: (row) => row.outputTokensAvg,
       render: (row) => (row.outputTokensAvg == null ? <Dash /> : fmtTokens(row.outputTokensAvg)),
     },
     {
@@ -65,7 +65,7 @@ export function ToolsTab({ data, focusKey }: { data: HarnessStatsTools; focusKey
       },
     },
     {
-      key: "duration", label: "耗时 P50", numeric: true, tip: "纯执行耗时，取直方图所在档的上界，所以写「约」；P95 在展开行里", sortValue: (row) => row.durationP50Ms,
+      key: "duration", label: "耗时 P50", numeric: true, sortValue: (row) => row.durationP50Ms,
       render: (row) => (row.durationP50Ms == null ? <Dash /> : fmtApproxDuration(row.durationP50Ms)),
     },
   ];
@@ -96,7 +96,7 @@ export function ToolsTab({ data, focusKey }: { data: HarnessStatsTools; focusKey
 
   return (
     <Stack>
-      <Card title="成本 vs 使用" hint="左上角：定义占上下文多、却很少被调用"><CostScatter tools={data.rows} /></Card>
+      <Card title="成本 vs 使用"><CostScatter tools={data.rows} /></Card>
       <div className="flex flex-wrap items-center gap-2">
         <span className="relative flex min-w-0 flex-[0_1_260px] max-[600px]:flex-[1_1_100%]">
           <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle" />
@@ -109,7 +109,6 @@ export function ToolsTab({ data, focusKey }: { data: HarnessStatsTools; focusKey
           />
         </span>
         <SettingsSelect size="sm" ariaLabel="筛选工具所属插件" value={plugin} options={pluginOptions} onChange={setPlugin} />
-        <span className="ml-auto text-act-xs text-text-faint">点击行查看失败原因与浪费信号</span>
       </div>
       <DataTable
         ariaLabel="工具列表"

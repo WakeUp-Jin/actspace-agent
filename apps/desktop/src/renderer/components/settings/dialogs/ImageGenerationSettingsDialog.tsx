@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ChevronRight, CircleAlert, KeyRound, ShieldCheck, X } from "lucide-react";
 import type { SecretProviderId } from "@actspace/shared";
 import { Button } from "../../ui/Button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/Dialog";
+import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { settingsApi } from "../../../api/settings";
 
 export function ImageGenerationSettingsDialog({
@@ -74,15 +74,12 @@ export function ImageGenerationSettingsDialog({
   return (
     // 保存或断开进行中不能关闭；点遮罩不关闭，免得丢掉刚输入的 Key。
     <Dialog open onOpenChange={(open) => { if (!open && !busy) onClose(); }}>
-      <DialogContent size="lg" withDescription closeOnOutsideClick={false} returnFocus={returnFocus} className="max-h-[86vh] overflow-y-auto p-5">
+      <DialogContent size="lg" closeOnOutsideClick={false} returnFocus={returnFocus} className="max-h-[86vh] overflow-y-auto p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <DialogTitle className="text-act-lg font-semibold text-text-main">
               配置图片生成服务
             </DialogTitle>
-            <DialogDescription className="mt-1 text-act-xs leading-relaxed text-text-faint">
-              密钥只在 main 进程解密使用；保存后从下一次图片生成调用生效。
-            </DialogDescription>
           </div>
           <button
             type="button"
@@ -103,7 +100,6 @@ export function ImageGenerationSettingsDialog({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="text-act-sm font-semibold text-text-main">API Key 已安全保存</div>
-                <p className="mt-0.5 text-act-xxs text-text-faint">出于安全原因，已保存的 Key 不会回显。</p>
               </div>
               <Button variant="secondary" autoFocus  onClick={() => setReplaceKey(true)}>
                 更换 Key
@@ -163,7 +159,7 @@ export function ImageGenerationSettingsDialog({
                 {baseUrl.trim().toLowerCase().startsWith("http://") ? (
                   <p className="flex gap-1.5 text-act-xxs leading-relaxed text-on-danger">
                     <CircleAlert size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
-                    当前 Base URL 使用 HTTP，API Key 和请求内容可能以未加密网络流量传输。
+                    Base URL 使用 HTTP，Key 和请求内容将明文传输。
                   </p>
                 ) : null}
               </div>

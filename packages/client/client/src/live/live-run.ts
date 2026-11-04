@@ -257,6 +257,8 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
       case "tool_started": {
         state.waitingForModel = false;
         upsertStreamingTool(state, event.toolCallId, event.toolName, event.preview);
+        const started = state.activeTools.get(event.toolCallId);
+        if (started) started.started = true;
         break;
       }
 

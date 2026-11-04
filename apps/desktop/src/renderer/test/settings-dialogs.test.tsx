@@ -45,7 +45,6 @@ describe("ImageGenerationSettingsDialog", () => {
     );
     await user.click(screen.getByRole("button", { name: "配置" }));
     const dialog = screen.getByRole("dialog", { name: "配置图片生成服务" });
-    expect(dialog).toHaveAccessibleDescription("密钥只在 main 进程解密使用；保存后从下一次图片生成调用生效。");
     expect(screen.getByLabelText("图片生成服务 API Key")).toHaveFocus();
     for (let index = 0; index < 6; index += 1) await user.tab();
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
@@ -133,7 +132,7 @@ describe("ProviderKeyModal", () => {
     await user.click(screen.getByRole("button", { name: "连接" }));
     const dialog = screen.getByRole("dialog", { name: "连接 Tavily" });
     expect(screen.getByRole("heading", { name: "连接 Tavily", level: 3 })).toBeInTheDocument();
-    expect(dialog).toHaveAccessibleDescription(/输入你的 Tavily API Key/);
+    expect(dialog).toHaveAccessibleDescription("Key 只保存在本机");
     expect(screen.getByLabelText("Tavily API Key")).toHaveFocus();
     await user.tab();
     await user.tab();

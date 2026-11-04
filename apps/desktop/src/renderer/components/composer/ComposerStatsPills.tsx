@@ -40,9 +40,6 @@ type PillModel =
   | { readonly kind: "plain"; readonly label: readonly string[] }
   | { readonly kind: "dialog"; readonly label: readonly string[]; readonly ariaLabel: string; readonly dialog: StatDialog };
 
-const USAGE_DESCRIPTION = "每次模型请求的输入（含缓存）加输出之和；每一步都会重发上下文，所以远大于当前窗口占用。";
-const CACHE_HIT_FOOTNOTE = "缓存命中 = 缓存读 ÷（未缓存输入 + 缓存读 + 缓存写），按累计计算。";
-
 const tokenCount = (value: string) => `${value} tok`;
 
 /**
@@ -95,9 +92,7 @@ export function usagePillModel(usage: RuntimeV2UsageSummary | null | undefined):
     dialog: {
       title: "会话累计消耗",
       titleValue: tokenCount(formatExactTokens(total)),
-      description: USAGE_DESCRIPTION,
       rows,
-      ...(hit !== null ? { footnote: CACHE_HIT_FOOTNOTE } : {}),
     },
   };
 }

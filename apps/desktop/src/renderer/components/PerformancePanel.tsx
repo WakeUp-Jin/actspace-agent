@@ -63,7 +63,7 @@ export function PerformancePanel({ compact = false }: { compact?: boolean }) {
   const memory = sample?.processes.reduce((sum, row) => sum + row.workingSetKiB, 0);
   return (
     <div aria-label="性能监控" className={`${compact ? "fixed bottom-0 left-0 z-10" : "mt-auto shrink-0 max-[820px]:fixed max-[820px]:bottom-0 max-[820px]:left-0 max-[820px]:z-10"} bg-sidebar text-act-xxs text-text-muted`}>
-      <span className="whitespace-nowrap" title={stale ? "等待采样，数据可能过期" : "当前应用进程 CPU 与工作集内存之和"}>
+      <span className="whitespace-nowrap" title={stale ? "等待采样，数据可能过期" : undefined}>
         {stale ? "◷ " : ""}CPU {cpu === undefined ? "—" : `${cpu.toFixed(1)}%`} · 内存 {memory === undefined ? "—" : `${(memory / 1024).toFixed(0)} MB`}
       </span>
     </div>

@@ -68,7 +68,6 @@ export function ConnectionSetupPage({ draft }: { draft: ConnectionDraft }) {
     <>
       <PageHeader
         title={relay ? "自定义中转" : template.label}
-        description={relay ? "填协议、地址和 Key，连上后选要用的模型。" : "填入 API Key，连上后选要用的模型。"}
         leading={<ProviderLogo logoKey={template.logoKey} />}
         onBack={() => go({ name: "catalog" })}
         backLabel="添加连接"
@@ -78,21 +77,18 @@ export function ConnectionSetupPage({ draft }: { draft: ConnectionDraft }) {
           <>
             <FieldRow label="协议">
               <SegmentedControl ariaLabel="协议" value={draft.protocol} options={PROTOCOLS} onChange={(protocol) => update({ protocol })} />
-              <span className="whitespace-nowrap text-act-xs text-text-faint">按中转站文档选</span>
             </FieldRow>
             {address}
           </>
         ) : null}
         <FieldRow label="API Key">
           <SettingsInput width="full" mono type="password" autoComplete="off" value={draft.apiKey} onChange={(event) => update({ apiKey: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter") void connect(); }} placeholder="粘贴 Key" aria-label="API Key" />
-          <span className="whitespace-nowrap text-act-xs text-text-faint">只保存在本机</span>
         </FieldRow>
         {advanced ? (
           <>
             {relay ? null : address}
             <FieldRow label="代理">
               <SettingsInput width="full" mono value={draft.proxyUrl} onChange={(event) => update({ proxyUrl: event.target.value })} placeholder="http://127.0.0.1:7890" aria-label="代理" />
-              <span className="whitespace-nowrap text-act-xs text-text-faint">留空走系统代理</span>
             </FieldRow>
           </>
         ) : null}
@@ -102,7 +98,7 @@ export function ConnectionSetupPage({ draft }: { draft: ConnectionDraft }) {
             高级设置
           </Button>
           <span role={error ? "alert" : undefined} className={cx("min-w-0 flex-1 text-right text-act-xs max-[600px]:text-left", error ? "text-on-danger" : "text-text-faint")}>
-            {error ?? "会请求一次 /models，看看这个 Key 能用哪些模型。"}
+            {error}
           </span>
           <Button variant="primary" busy={busy} disabled={busy} onClick={() => void connect()}>{busy ? "正在连接" : "连接"}</Button>
         </div>

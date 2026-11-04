@@ -186,7 +186,6 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         session.agentModeRevision += 1;
         return { ok: true, mode, revision: session.agentModeRevision };
       },
-      revokeGrant: async () => ({ ok: true }),
       archive: async ({ sessionId, archived }) => { touchSession(sessionId, (session) => { session.archived = archived; }); return { ok: true }; },
       archiveMany: async ({ sessionIds }) => {
         for (const sessionId of sessionIds) requireSession(db, sessionId).archived = true;

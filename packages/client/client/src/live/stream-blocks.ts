@@ -389,6 +389,18 @@ export function toolEntryToBlock(toolCallId: string, tool: ToolEntry, now: strin
   };
 }
 
+/**
+ * 同一批工具调用在 runtime 里是串行放行的：前一个还在等审批，后面的只收到了 `tool-prepared`，没有 `tool_started`。
+ * 这样的调用不是在运行，不投影成「Running」行，等审批结束或它真正开始后再出现。
+ */
+function isQueuedBehindApproval(state: StreamingState, tool: ToolEntry): boolean {
+  if (tool.started || tool.finished || tool.terminalStatus || tool.approvalPending || tool.transcriptEvents) return false;
+  for (const other of state.activeTools.values()) {
+    if (other.approvalPending && !other.terminalStatus) return true;
+  }
+  return false;
+}
+
 export function streamingStateToBlocks(state: StreamingState, agentRunId?: string): MessageBlock[] {
   const now = new Date().toISOString();
   const blocks: MessageBlock[] = [];
@@ -418,7 +430,7 @@ export function streamingStateToBlocks(state: StreamingState, agentRunId?: strin
       });
     } else if (seg.type === "tool") {
       const tool = state.activeTools.get(seg.toolCallId);
-      if (tool) {
+      if (tool && !isQueuedBehindApproval(state, tool)) {
         blocks.push(toolEntryToBlock(seg.toolCallId, tool, now, agentRunId));
       }
     } else if (seg.type === "compaction") {

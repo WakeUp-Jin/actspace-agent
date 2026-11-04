@@ -84,7 +84,7 @@ describe("设置 › 模型", () => {
     const list = await screen.findByRole("menu", { name: "看图可选模型" });
     expect(within(list).queryByRole("button", { name: /DeepSeek/ })).not.toBeInTheDocument();
     expect(within(list).getByRole("button", { name: /Claude Sonnet 4\.5/ })).toBeInTheDocument();
-    expect(within(list).getByText("只列出能看图的模型")).toBeInTheDocument();
+    expect(within(list).queryByText("只列出能看图的模型")).not.toBeInTheDocument();
   });
 
   it("子智能体用途：第一项「跟随主智能体」，选模型保存、不带思考档位", async () => {
@@ -109,7 +109,7 @@ describe("设置 › 模型", () => {
     // 弹窗打开时页面其余部分对读屏隐藏，所以标题用 hidden 查。
     expect(await screen.findByRole("heading", { name: "Anthropic", level: 2, hidden: true })).toBeInTheDocument();
     const dialog = await screen.findByRole("dialog", { name: "选择要添加的模型" });
-    expect(dialog).toHaveTextContent("连接好了。Anthropic 一共有 3 个模型");
+    expect(dialog).toHaveTextContent("Anthropic · 3 个模型");
     expect(within(dialog).getAllByRole("checkbox").every((box) => box.getAttribute("aria-checked") === "false")).toBe(true);
     expect(within(dialog).getByRole("button", { name: "添加所选" })).toBeDisabled();
 
@@ -141,7 +141,7 @@ describe("设置 › 模型", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("没拿到模型列表：这个服务没有开放模型列表。");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("模型 ID"), "gpt-5");
-    expect(await screen.findByText(/认出来了，是 GPT-5/)).toBeInTheDocument();
+    expect(await screen.findByText(/认出来了：GPT-5/)).toBeInTheDocument();
     expect(screen.getByLabelText("上下文")).toHaveValue("400K");
     await userEvent.click(screen.getByRole("button", { name: "添加" }));
     await waitFor(() => expect(api.addModels).toHaveBeenCalledWith({ connectionId: "custom:relay-2", models: [{ apiModel: "gpt-5" }] }));
@@ -175,7 +175,7 @@ describe("设置 › 模型", () => {
     await userEvent.click(screen.getByRole("button", { name: "收起 Claude Sonnet 4.5" }));
 
     await userEvent.click(screen.getByRole("button", { name: "展开 claude-sonnet-4-5-20250929" }));
-    expect(screen.getByText(/没认出这个模型/)).toBeInTheDocument();
+    expect(screen.getByText(/没认出来/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "按 Claude Sonnet 4.5 填" }));
     await waitFor(() => expect(api.updateModel).toHaveBeenLastCalledWith({ key: relayKey("claude-sonnet-4-5-20250929"), overrides: { canonical: "claude-sonnet-4-5" } }));
     expect(await screen.findByRole("button", { name: "不按 Claude Sonnet 4.5 填" })).toBeInTheDocument();
@@ -201,7 +201,7 @@ describe("设置 › 模型", () => {
     await openConnection(/^Claude 中转/);
     await userEvent.click(screen.getByRole("button", { name: "获取可用模型" }));
     const dialog = await screen.findByRole("dialog", { name: "选择要添加的模型" });
-    expect(dialog).toHaveTextContent("以下是 Claude 中转 的可用模型，已添加的不会重复添加。");
+    expect(dialog).toHaveTextContent("Claude 中转 · ");
     const added = within(dialog).getByRole("checkbox", { name: "Claude Sonnet 4.5" });
     expect(added).toHaveAttribute("aria-checked", "true");
     expect(added).toHaveAttribute("aria-disabled", "true");

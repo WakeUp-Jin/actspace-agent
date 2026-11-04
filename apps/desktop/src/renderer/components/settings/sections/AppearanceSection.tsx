@@ -168,18 +168,17 @@ export function AppearanceSection() {
 
   return (
     <>
-      <SectionShell title="主题" description="“跟随系统”会随 macOS 外观自动切换。">
+      <SectionShell title="主题">
         <ThemeTiles value={prefs.theme} onChange={(value) => update({ theme: value })} />
       </SectionShell>
 
-      <SectionShell title="强调色" description="用于发送按钮、开关、焦点和链接；导航选中和状态颜色保持不变。">
+      <SectionShell title="强调色">
         <AccentPicker value={prefs.accentPalette} onChange={(value) => update({ accentPalette: value })} />
       </SectionShell>
 
       <SettingGroup title="字体与字号" headingLevel={3}>
         <SettingRow
           title="界面字体"
-          description="界面与 AI 回复正文。"
           control={
             <SettingsSelect
               size="sm"
@@ -207,7 +206,6 @@ export function AppearanceSection() {
         />
         <SettingRow
           title="代码字体"
-          description="代码块、diff 与终端输出。"
           control={
             <SettingsSelect
               size="sm"

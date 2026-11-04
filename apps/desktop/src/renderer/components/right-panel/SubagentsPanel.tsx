@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Check, ChevronLeft, Copy, FolderOpen, Square } from "lucide-react";
-import { createMessageBlocks, subagentKindLabel, subagentListStatusLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
+import { createMessageBlocks, subagentKindLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
 import { IconButton } from "../ui/IconButton";
 import { Button } from "../ui/Button";
-import { AgentAvatar, SubagentStatus, SubagentStatusIcon, agentModelLabel, formatAgentDuration } from "../messages/AgentIdentity";
+import { AgentAvatar, SubagentStatus, agentModelLabel, formatAgentDuration } from "../messages/AgentIdentity";
 import { MarkdownProse } from "../messages/MarkdownProse";
 import { renderMessageList } from "../conversation/render-message";
 import { sessionsApi } from "../../api/sessions";
@@ -105,23 +105,20 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
   </section>;
 }
 
-/** 一行：头像、描述、最近一句（结论或怎么结束的）；右上 token，右下状态 / 第 N 轮 / 耗时。运行中的行右侧有停止。 */
+/** 一行：头像、描述、最近一句（结论或怎么结束的）；右上 token，右下状态文字 · 耗时。运行中的行右侧有停止。 */
 function SubagentRow({ agent, stopping, onOpen, onStop }: { agent: SubagentListItem; stopping: boolean; onOpen: () => void; onStop: () => void }) {
   const running = agent.status === "running";
-  const timing = [agent.activationCount > 1 ? `第 ${agent.activationCount} 轮` : undefined, formatAgentDuration(durationMs(agent))].filter(Boolean).join(" · ");
+  const latest = latestLine(agent);
   return <div className="flex items-center hover:bg-surface-subtle">
     <button type="button" className={rowClass} onClick={onOpen}>
       <AgentAvatar identity={agent.agentId} size={28} />
       <span className="flex min-w-0 flex-1 flex-col gap-px">
         <span className="truncate text-act-sm text-text-main" title={agent.description}>{agent.description}</span>
-        <span className={`truncate text-act-xs ${agent.status === "failed" ? "text-on-danger" : "text-text-faint"}`}>{latestLine(agent)}</span>
+        {latest ? <span className={`truncate text-act-xs ${agent.status === "failed" ? "text-on-danger" : "text-text-faint"}`}>{latest}</span> : null}
       </span>
       <span className="flex shrink-0 flex-col items-end gap-0.5 text-act-xs tabular-nums text-text-faint">
         {agent.totalTokens ? <span className="text-text-muted">{formatTokenCount(agent.totalTokens)} <span className="text-text-faint">tokens</span></span> : null}
-        <span className={`inline-flex items-center gap-1 ${running ? "text-operational" : ""}`}>
-          {running ? <SubagentStatusIcon status="running" size={12} /> : <SubagentStatus status={agent.status} />}
-          {running ? timing : `· ${timing}`}
-        </span>
+        <SubagentStatus status={agent.status} duration={formatAgentDuration(durationMs(agent))} />
       </span>
     </button>
     {running
@@ -152,10 +149,7 @@ function SubagentDetail({ sessionId, item, view, onToggleView, onBack, stopping,
       </div>
       <span className="flex min-w-0 shrink items-center gap-2 px-1 text-act-xs text-text-faint">
         {model ? <><span className="min-w-8 max-w-24 truncate text-text-muted" title={item.model}>{model}</span><Dot /></> : null}
-        {item.activationCount > 1 ? <><span className="shrink-0">第 {item.activationCount} 轮</span><Dot /></> : null}
-        <span className={`inline-flex shrink-0 items-center gap-1 tabular-nums ${running ? "text-operational" : item.status === "failed" ? "text-on-danger" : ""}`}>
-          <SubagentStatusIcon status={item.status} size={12} /><span className="sr-only">{subagentListStatusLabel(item.status)}</span>{formatAgentDuration(durationMs(item))}
-        </span>
+        <SubagentStatus status={item.status} duration={formatAgentDuration(durationMs(item))} />
       </span>
       {external ? null : <SessionViewToggle view={view} onToggle={onToggleView} />}
     </header>
@@ -272,9 +266,9 @@ function durationMs(item: SubagentListItem): number {
   return Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : 0;
 }
 
-/** 列表第二行：运行中写「正在执行」；结束后是最终回复的第一行（去掉加粗、行内代码、标题、列表的 Markdown 标记），没有回复时写怎么结束的。 */
-function latestLine(item: SubagentListItem): string {
-  if (item.status === "running") return "正在执行";
+/** 列表第二行：最终回复的第一行（去掉加粗、行内代码、标题、列表的 Markdown 标记）；运行中或没有回复时不写，状态已在右侧。 */
+function latestLine(item: SubagentListItem): string | undefined {
+  if (item.status === "running") return undefined;
   const first = item.result?.split(/\r?\n/).map((line) => line.replace(/\*\*|`/g, "").replace(/^\s*(#+|[-*]|\d+\.)\s+/, "").replace(/\s+/g, " ").trim()).find(Boolean);
-  return first ?? subagentListStatusLabel(item.status);
+  return first;
 }

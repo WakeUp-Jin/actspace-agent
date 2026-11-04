@@ -234,15 +234,6 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipc.handle(contract.sessions.revokeGrant, async (input) => {
-    if (!input.sessionId || !input.grantId) return { ok: false, error: "invalid_grant_revoke" };
-    try {
-      await options.registry.revokeSessionGrant(input.sessionId, input.grantId);
-      return { ok: true };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
   ipc.handle(contract.sessions.archive, async (input) => {
     await options.registry.updateSessionMetadata(input);
     return { ok: true };

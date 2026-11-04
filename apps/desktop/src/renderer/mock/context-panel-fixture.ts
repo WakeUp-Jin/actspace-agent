@@ -105,6 +105,10 @@ export const MOCK_CONTEXT_BASH: ContextPanelBashStats = {
     ...([["cat", 6], ["grep", 5], ["rg", 4], ["tail", 4], ["ls", 3], ["sed", 2], ["node", 2, 1], ["find", 1], ["sleep", 1], ["python3", 1]] as const)
       .map(([name, count, failed]) => ({ ...bashCount(name, count, failed), subcommands: [] })),
   ],
+  slowest: { command: "pnpm --filter @actspace/desktop test -- --run context-bash", durationMs: 74_300 },
+  mostFailedProgram: { program: "pnpm", count: 2 },
+  mostRepeated: { command: "git status --short", count: 4 },
+  backgroundCount: 2,
 };
 
 /** Composer and panel share the same complete mock totals, independent of entry paging. */

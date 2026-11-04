@@ -40,7 +40,7 @@ export function TemplateCatalogPage() {
   };
   return (
     <>
-      <PageHeader title="添加连接" description="选一个服务商。官方服务只要填 Key。" onBack={() => go({ name: "list" })} backLabel="模型" />
+      <PageHeader title="添加连接" onBack={() => go({ name: "list" })} backLabel="模型" />
       <label className="flex h-9 items-center gap-2 rounded-act-group border border-line bg-surface px-3 text-text-subtle">
         <Search size={14} aria-hidden="true" />
         <input
@@ -63,7 +63,7 @@ export function TemplateCatalogPage() {
                   key={template.id}
                   leading={<ProviderLogo logoKey={template.logoKey} size="sm" />}
                   title={template.label}
-                  description={template.description ?? hostOf(template.defaultBaseUrl)}
+                  description={hostOf(template.defaultBaseUrl) || undefined}
                   trailing={added ? <SettingTag tone="ok">已添加</SettingTag> : undefined}
                   onClick={() => pick(template)}
                 />

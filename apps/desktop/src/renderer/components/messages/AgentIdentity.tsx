@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Loader2, Pause, Square } from "lucide-react";
+import { Check, CircleAlert, Loader2, Square } from "lucide-react";
 import { resolveModelSpecByApiModel, subagentListStatusLabel, type MessageBlock, type SubagentListStatus } from "@actspace/shared";
 import companion1 from "../../assets/subagents/companion-1.webp";
 import companion2 from "../../assets/subagents/companion-2.webp";
@@ -50,12 +50,6 @@ export function AgentStatusIcon({ status, size = 13 }: { status: AgentMessage["s
   return <Icon size={size} aria-hidden="true" className={`shrink-0 ${status === "running" ? spinClass : ""}`} />;
 }
 
-/** 右侧面板的状态图标：运行中、空闲（可续派）、已中断、失败、已结束。 */
-export function SubagentStatusIcon({ status, size = 13 }: { status: SubagentListStatus; size?: number }) {
-  const Icon = status === "running" ? Loader2 : status === "idle" ? Pause : status === "failed" ? CircleAlert : status === "interrupted" ? Square : Check;
-  return <Icon size={size} aria-hidden="true" className={`shrink-0 ${status === "running" ? spinClass : ""}`} />;
-}
-
 /** 对话卡片标题行右端的状态：固定宽度，状态切换时描述不跳。 */
 export function AgentStatus({ status }: { status: AgentMessage["status"] }) {
   return <span className={`inline-flex w-[68px] shrink-0 items-center gap-1.5 whitespace-nowrap text-act-xs leading-[1.4] ${status === "failed" ? "text-danger" : "text-text-muted"}`}>
@@ -64,11 +58,10 @@ export function AgentStatus({ status }: { status: AgentMessage["status"] }) {
   </span>;
 }
 
-/** 右侧面板的状态：图标加文字，按文字宽度。 */
-export function SubagentStatus({ status }: { status: SubagentListStatus }) {
-  return <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap ${status === "failed" ? "text-on-danger" : ""}`}>
-    <SubagentStatusIcon status={status} size={12} />
-    {subagentListStatusLabel(status)}
+/** 右侧面板的状态：只写文字（可带耗时），不配图标；运行中文字为绿色。 */
+export function SubagentStatus({ status, duration }: { status: SubagentListStatus; duration?: string }) {
+  return <span className={`inline-flex shrink-0 items-center whitespace-nowrap tabular-nums ${status === "running" ? "text-operational" : status === "failed" ? "text-on-danger" : ""}`}>
+    {subagentListStatusLabel(status)}{duration ? ` · ${duration}` : ""}
   </span>;
 }
 

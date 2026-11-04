@@ -5,16 +5,14 @@ import { Button } from "../../ui/Button";
 import { cn } from "../../ui/cn";
 import { PATH_INITIAL_ROWS, PATH_ROW_STEP, type ContextPathVisibility } from "./context-paths-model";
 import { ContextPathList } from "./ContextPathList";
-import { CARD_CLASS, CARD_HEAD_CLASS, CARD_META_CLASS, CARD_TITLE_CLASS, FILTER_CHIP_CLASS, HelpHint, ROW_FOCUS_CLASS, TRACK_CLASS } from "./ContextPanelParts";
+import { CARD_CLASS, CARD_HEAD_CLASS, CARD_META_CLASS, CARD_TITLE_CLASS, FILTER_CHIP_CLASS, ROW_FOCUS_CLASS, TRACK_CLASS } from "./ContextPanelParts";
 import { useContextPaths } from "./use-context-paths";
 
-const PATHS_HINT = "活跃路径以一行「路径 — 说明」放进模型上下文，告诉模型有哪些文件可以读，不包含文件全文。活跃最多 100 条；超出的或本周期没再用到的，会在压缩时转为睡眠，只留在索引里，模型仍可按需读取。睡眠路径被重新读到后，下次压缩时回到活跃。";
-const CYCLE_HINT = "每次上下文压缩开启一个新周期；活跃集合只在压缩时重新排定，读取文件不会立刻改变活跃 / 睡眠。";
 const LABEL: Record<ContextPathVisibility, string> = { active: "活跃", sleeping: "睡眠" };
 
 /**
  * 「路径」卡片（交接文档 front-Context面板Step刷新与路径展示交接.md）：周期和活跃 / 睡眠两格统计始终显示，
- * 两格兼当切换；下面的列表默认收起，点开关才按版本分页读取。路径列表不计入 Token。
+ * 两格兼当切换；下面的列表默认收起，点开关才按版本分页读取。
  */
 export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: {
   sessionId: string;
@@ -32,7 +30,7 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
   if (!ready) {
     return (
       <section className={CARD_CLASS} aria-label="路径">
-        <div className={CARD_HEAD_CLASS}><span className={CARD_TITLE_CLASS}>路径</span><HelpHint text={PATHS_HINT} /></div>
+        <div className={CARD_HEAD_CLASS}><span className={CARD_TITLE_CLASS}>路径</span></div>
         <p className="m-0 px-3 pb-3 pt-1.5 text-act-xs text-text-faint">当前会话没有路径记录。</p>
       </section>
     );
@@ -53,8 +51,7 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
     <section className={CARD_CLASS} aria-label="路径">
       <div className={CARD_HEAD_CLASS}>
         <span className={CARD_TITLE_CLASS}>路径</span>
-        <HelpHint text={PATHS_HINT} />
-        <span className={cn(CARD_META_CLASS, "inline-flex items-center gap-1")}>第 {ready.cycle} 压缩周期<HelpHint text={CYCLE_HINT} /></span>
+        <span className={CARD_META_CLASS}>第 {ready.cycle} 压缩周期</span>
       </div>
       <div className="mx-3 mt-2 grid grid-cols-2 gap-px overflow-hidden rounded-act-md border border-line bg-line">
         <SummaryCell selected={visibility === "active"} onSelect={() => setVisibility("active")} label="活跃"
@@ -64,13 +61,11 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
           </span>
         </SummaryCell>
         <SummaryCell selected={visibility === "sleeping"} onSelect={() => setVisibility("sleeping")} label="睡眠" sleeping
-          value={ready.sleepingCount.toLocaleString()}>
-          <span className="mt-0.5 block text-act-xxs text-text-faint">在索引中，按需读取</span>
-        </SummaryCell>
+          value={ready.sleepingCount.toLocaleString()} />
       </div>
       {full ? <p className="m-0 mx-3 mt-2 rounded-act-md bg-warning-soft px-2.5 py-1.5 text-act-xxs text-warning">活跃路径已满 {ready.activeLimit} 条，之后新出现的路径会先进入睡眠。</p> : null}
       {ready.activeCount + ready.sleepingCount === 0 ? (
-        <p className="m-0 px-3 pb-3 pt-2.5 text-center text-act-xs text-text-faint">还没有记录到文件路径。Agent 读写文件后会出现在这里。</p>
+        <p className="m-0 px-3 pb-3 pt-2.5 text-center text-act-xs text-text-faint">还没有记录到文件路径。</p>
       ) : (
         <>
           <div className="flex items-center gap-1.5 px-3 pb-1 pt-2">
@@ -104,7 +99,6 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
                   {list.loading ? "正在读取…" : `再显示 ${Math.min(PATH_ROW_STEP, hidden)} 项（共 ${total.toLocaleString()}）`}
                 </Button>
               ) : null}
-              <p className="m-0 px-3 pt-2 text-center text-act-xxs text-text-faint">导航行已计入「补充上下文」，不重复计 Token</p>
             </div>
           ) : <div className="h-1.5" />}
         </>
@@ -119,7 +113,7 @@ function SummaryCell({ selected, onSelect, label, value, sleeping, children }: {
   label: string;
   value: ReactNode;
   sleeping?: boolean;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     // 两格统计兼当列表切换，整格可点，Button 原语的尺寸和底色不适合。

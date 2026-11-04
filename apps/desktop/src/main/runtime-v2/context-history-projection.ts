@@ -11,9 +11,13 @@ import { CONTEXT_PROJECTOR_VERSION } from "./context-history-version";
 
 /** 每会话最多记多少个（程序, 子命令）组合，超出的归入「其他」。 */
 export const CONTEXT_BASH_PROGRAM_LIMIT = 500;
+/** 「值得注意」里每会话最多追踪多少条不同的命令原文（用来找重复最多的），超出的新命令不再参与重复统计。 */
+export const CONTEXT_BASH_COMMAND_LIMIT = 500;
+/** 命令原文最多存多少个字符；重复判断按截断后的文本。 */
+export const CONTEXT_BASH_COMMAND_TEXT_LIMIT = 1_000;
 
 const associationTables = ["usage_projection_events", "usage_projection_requests", "usage_projection_groups", "usage_projection_turns"];
-export const contextTables = ["context_state", "context_request", "context_manifest_entry", "context_event", "context_session_stats", "context_identity", "context_usage_row", "context_bash_stats", "context_bash_program", "context_bash_call", ...associationTables.map(name => `context_${name}`)];
+export const contextTables = ["context_state", "context_request", "context_manifest_entry", "context_event", "context_session_stats", "context_identity", "context_usage_row", "context_bash_stats", "context_bash_program", "context_bash_call", "context_bash_command", "context_bash_notable", ...associationTables.map(name => `context_${name}`)];
 const pattern = new RegExp(`\\b(${[...contextTables, ...associationTables].join("|")})\\b`, "g");
 const connections = new WeakMap<DatabaseSync, Map<boolean, ProjectionDatabase>>();
 export function contextConnection(db: DatabaseSync, stage: boolean): ProjectionDatabase {
@@ -27,12 +31,16 @@ export function contextConnection(db: DatabaseSync, stage: boolean): ProjectionD
 }
 /**
  * Bash 命令统计（`front-Context面板Bash命令统计.md` §4）。`program_failed` 让每个失败调用对每个程序只记一次失败：
- * 记在该程序在这次调用里第一次出现的那一行上。`context_bash_call.occurrences_json` 为 NULL 表示已计入，行保留用来去重。
+ * 记在该程序在这次调用里第一次出现的那一行上。`context_bash_call.occurrences_json` 为 NULL 表示已计入，行保留用来去重；
+ * 未计入时它是 `{ occurrences: [程序, 子命令][], command }`（旧格式是只有 occurrences 的数组）。
+ * 「值得注意」（§5.1）：`context_bash_command` 按命令原文计数找重复最多的，`context_bash_notable` 记最慢的一条与后台调用数。
  */
 const BASH_TABLES_SQL = `
     CREATE TABLE IF NOT EXISTS context_bash_stats(session_id TEXT PRIMARY KEY,calls INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0,duration_ms INTEGER NOT NULL DEFAULT 0) STRICT;
     CREATE TABLE IF NOT EXISTS context_bash_program(session_id TEXT NOT NULL,program TEXT NOT NULL,subcommand TEXT NOT NULL,count INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0,program_failed INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(session_id,program,subcommand)) STRICT;
     CREATE TABLE IF NOT EXISTS context_bash_call(session_id TEXT NOT NULL,call_id TEXT NOT NULL,occurrences_json TEXT,started_at TEXT NOT NULL,PRIMARY KEY(session_id,call_id)) STRICT;
+    CREATE TABLE IF NOT EXISTS context_bash_command(session_id TEXT NOT NULL,command TEXT NOT NULL,count INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(session_id,command)) STRICT;
+    CREATE TABLE IF NOT EXISTS context_bash_notable(session_id TEXT PRIMARY KEY,slowest_command TEXT NOT NULL DEFAULT '',slowest_ms INTEGER NOT NULL DEFAULT 0,background_count INTEGER NOT NULL DEFAULT 0) STRICT;
 `;
 /** 使用统计库 Schema 版本不变；Worker 打开老库时补建 Bash 统计表（含 `building_*`）。 */
 export function ensureContextBashTables(db: DatabaseSync): void {
@@ -89,6 +97,7 @@ export async function commitContextBatch(db: DatabaseSync, source: SessionQueryS
     prepare(target, "INSERT OR IGNORE INTO context_state VALUES(?,?,-1,NULL,?,?,?,?)").run(id, source.throughSeq, source.stamp, source.codecSetDigest ?? "", randomUUID(), CONTEXT_PROJECTOR_VERSION);
     prepare(target, "INSERT OR IGNORE INTO context_session_stats(session_id) VALUES(?)").run(id);
     prepare(target, "INSERT OR IGNORE INTO context_bash_stats(session_id) VALUES(?)").run(id);
+    prepare(target, "INSERT OR IGNORE INTO context_bash_notable(session_id) VALUES(?)").run(id);
     await projectContextEvents(target, source, events, yieldBatch);
     prepare(target, "UPDATE context_state SET target=?,revision=?,cursor=?,stamp=?,codec=? WHERE session_id=?").run(source.throughSeq, final ? source.throughSeq : events.at(-1)?.seq ?? saved?.revision ?? -1, cursor, source.stamp, source.codecSetDigest ?? "", id);
     db.exec("COMMIT");
@@ -170,7 +179,7 @@ function projectBashEvent(db: ProjectionDatabase, id: string, event: SessionEven
     const command = record(data.args).command;
     if (data.name !== "bash" || typeof command !== "string") return;
     const occurrences = parseBashPrograms(command).map(item => [item.program, item.subcommand]);
-    prepare(db, "INSERT OR IGNORE INTO context_bash_call VALUES(?,?,?,?)").run(id, callId, JSON.stringify(occurrences), event.time);
+    prepare(db, "INSERT OR IGNORE INTO context_bash_call VALUES(?,?,?,?)").run(id, callId, JSON.stringify({ occurrences, command: command.trim().slice(0, CONTEXT_BASH_COMMAND_TEXT_LIMIT) }), event.time);
     return;
   }
   if (event.type === "tool-workflow/run-start") {
@@ -186,8 +195,12 @@ function projectBashEvent(db: ProjectionDatabase, id: string, event: SessionEven
   const started = Date.parse(call.started_at); const ended = Date.parse(event.time);
   const duration = Number.isFinite(started) && Number.isFinite(ended) ? Math.max(0, Math.round(ended - started)) : 0;
   prepare(db, "UPDATE context_bash_stats SET calls=calls+1,failed=failed+?,duration_ms=duration_ms+? WHERE session_id=?").run(Number(failed), duration, id);
+  const saved = JSON.parse(call.occurrences_json) as [string, string][] | { occurrences: [string, string][]; command?: string };
+  const pairs = Array.isArray(saved) ? saved : saved.occurrences;
+  const commandText = Array.isArray(saved) ? "" : saved.command ?? "";
+  if (commandText) projectBashNotable(db, id, commandText, duration, hasBackgroundTask(data.detail));
   const failedPairs = new Set<string>(); const failedPrograms = new Set<string>();
-  for (const [rawProgram, rawSubcommand] of JSON.parse(call.occurrences_json) as [string, string][]) {
+  for (const [rawProgram, rawSubcommand] of pairs) {
     const known = prepare(db, "SELECT 1 FROM context_bash_program WHERE session_id=? AND program=? AND subcommand=?").get(id, rawProgram, rawSubcommand);
     const full = !known && Number((prepare(db, "SELECT COUNT(*) AS n FROM context_bash_program WHERE session_id=?").get(id) as { n: number }).n) >= CONTEXT_BASH_PROGRAM_LIMIT;
     const [program, subcommand] = full ? ["", ""] : [rawProgram, rawSubcommand];
@@ -197,6 +210,18 @@ function projectBashEvent(db: ProjectionDatabase, id: string, event: SessionEven
     if (programFailed) failedPrograms.add(program);
     prepare(db, "INSERT INTO context_bash_program VALUES(?,?,?,1,?,?) ON CONFLICT(session_id,program,subcommand) DO UPDATE SET count=count+1,failed=failed+excluded.failed,program_failed=program_failed+excluded.program_failed").run(id, program, subcommand, Number(pairFailed), Number(programFailed));
   }
+}
+/** 与 `tool-card.ts` 同一判据：Bash 结果带 `background-task` 明细即转入（或本来就在）后台运行。 */
+function hasBackgroundTask(detail: unknown): boolean {
+  return Array.isArray(detail) && detail.some(entry => record(entry).label === "background-task");
+}
+/** 最慢的一条（耗时与「合计耗时」同一个 `duration`，同耗时保留先出现的）、命令原文重复次数、后台调用数。 */
+function projectBashNotable(db: ProjectionDatabase, id: string, command: string, duration: number, background: boolean): void {
+  prepare(db, "UPDATE context_bash_notable SET slowest_command=?,slowest_ms=? WHERE session_id=? AND ?>slowest_ms").run(command, duration, id, duration);
+  if (background) prepare(db, "UPDATE context_bash_notable SET background_count=background_count+1 WHERE session_id=?").run(id);
+  const known = prepare(db, "SELECT 1 FROM context_bash_command WHERE session_id=? AND command=?").get(id, command);
+  if (!known && Number((prepare(db, "SELECT COUNT(*) AS n FROM context_bash_command WHERE session_id=?").get(id) as { n: number }).n) >= CONTEXT_BASH_COMMAND_LIMIT) return;
+  prepare(db, "INSERT INTO context_bash_command VALUES(?,?,1) ON CONFLICT(session_id,command) DO UPDATE SET count=count+1").run(id, command);
 }
 function applyUsage(db: ProjectionDatabase, id: string, row: Pick<UsageActivityRow, "tokens" | "costAmount" | "costCurrency">, sign: number): void {
   const t = row.tokens; const knownUsage = [t.inputTokens, t.outputTokens, t.cacheReadTokens, t.cacheWriteTokens].some(value => value !== null);

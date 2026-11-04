@@ -116,7 +116,6 @@ export const desktopBridgeContract = {
     setWorkspace: invoke<S.SessionWorkspaceInput, S.SessionWorkspaceResult>(CH.setSessionWorkspace),
     setPermissionMode: invoke<S.SessionPermissionModeInput, S.SessionPermissionModeResult>(CH.setSessionPermissionMode),
     setAgentMode: invoke<S.SessionAgentModeInput, S.SessionAgentModeResult>(CH.setSessionAgentMode),
-    revokeGrant: invoke<S.SessionGrantRevokeInput, S.SessionGrantRevokeResult>(CH.revokeSessionGrant),
     archive: invoke<S.SessionArchiveInput, S.SessionArchiveResult>(CH.archiveSession),
     archiveMany: invoke<S.SessionArchiveManyInput, S.SessionArchiveManyResult>(CH.archiveSessions),
     describeContext: invoke<S.DescribeContextInput, S.ContextState | null>(CH.describeContext),

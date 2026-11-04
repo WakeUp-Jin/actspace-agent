@@ -9,12 +9,10 @@ import { formatPrice, formatTokens } from "./model-view";
 
 /**
  * 「获取可用模型」：连接返回的模型列表，用户自己勾。默认一个都不勾；已经在连接里的打勾置灰、标「已添加」。
- * 列表来自模型目录（连接的 /models 没响应）时，描述里说清楚。拿不到列表的情况由调用方处理，不会打开这个弹窗。
+ * 列表来自模型目录（连接的 /models 没响应）时，副标题里标出来。拿不到列表的情况由调用方处理，不会打开这个弹窗。
  */
-export function FetchModelsDialog({ label, fresh, probe, onClose, onAdd, returnFocus }: {
+export function FetchModelsDialog({ label, probe, onClose, onAdd, returnFocus }: {
   label: string;
-  /** 连接里还没有模型（刚建好）：描述换成「连接好了」。 */
-  fresh: boolean;
   probe: ConnectionProbeResult;
   onClose: () => void;
   onAdd: (models: ProbedModel[]) => Promise<boolean>;
@@ -54,9 +52,7 @@ export function FetchModelsDialog({ label, fresh, probe, onClose, onAdd, returnF
     if (ok) onClose();
   };
 
-  const description = probe.listSource === "catalog"
-    ? `${fresh ? "连接好了。" : ""}${label} 没有返回模型列表，下面是模型目录里它的 ${total} 个模型，${fresh ? "勾选你要用的。" : "已添加的不会重复添加。"}`
-    : fresh ? `连接好了。${label} 一共有 ${total} 个模型，勾选你要用的。` : `以下是 ${label} 的可用模型，已添加的不会重复添加。`;
+  const description = probe.listSource === "catalog" ? `${label} · 模型目录中的 ${total} 个模型` : `${label} · ${total} 个模型`;
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -105,7 +101,7 @@ export function FetchModelsDialog({ label, fresh, probe, onClose, onAdd, returnF
               </button>
             );
           }) : (
-            <p className="px-2.5 py-7 text-center text-act-xs text-text-faint">没有匹配「{query.trim()}」的模型。也可以关掉窗口，用「手动添加」按 ID 添加。</p>
+            <p className="px-2.5 py-7 text-center text-act-xs text-text-faint">没有匹配的模型。</p>
           )}
         </div>
         <div className="flex items-center gap-2 border-t border-line/60 px-5 py-3">

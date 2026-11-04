@@ -40,7 +40,7 @@ export function turnUsageView(usage: TurnUsageSummary | undefined): TurnUsageVie
   if (usage.routes.length) rows.push({ label: "提供方 / 模型", value: usage.routes.join(", ") });
   if (hit !== null) rows.push({ label: "缓存命中", value: `${hit}%` });
   rows.push({ label: "未缓存输入", value: tok(usage.inputTokens) }, { label: "缓存读取", value: tok(usage.cacheReadTokens) }, { label: "缓存写入", value: tok(usage.cacheWriteTokens) });
-  rows.push({ label: "输出", value: tok(usage.outputTokens), ...(usage.reasoningTokens > 0 ? { note: `其中推理 ${tok(usage.reasoningTokens)}` } : {}) });
+  rows.push({ label: "输出", value: tok(usage.outputTokens) });
   if (usage.unpricedRequestCount > 0) rows.push({ label: "花费", value: usage.costUsd > 0 ? "部分未知" : "未知" });
   else rows.push({ label: "花费", value: formatUsd(usage.costUsd), ...(usage.costEstimated ? { note: "预估" } : {}) });
   return { label: `用量 ${formatTokens(usage.totalTokens)} tok`, rows };

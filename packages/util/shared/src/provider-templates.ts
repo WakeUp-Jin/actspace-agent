@@ -21,7 +21,6 @@ export interface ProviderTemplate {
   readonly balance?: ProviderBalanceKind;
   /** 旧存储里的内置 provider 连接（`<id>:default`）。 */
   readonly legacyProviderId?: ProviderId;
-  readonly description?: string;
   readonly hidden?: boolean;
 }
 
@@ -35,7 +34,7 @@ export const PROVIDER_TEMPLATES: readonly ProviderTemplate[] = [
   { id: "volcengine-coding-plan", label: "火山方舟 Coding Plan", group: "official", logoKey: "volcengine", protocol: "openai-completions", defaultBaseUrl: "https://ark.cn-beijing.volces.com/api/coding/v3" },
   { id: "xiaomi", label: "小米 MiMo", group: "official", logoKey: "xiaomi", protocol: "openai-completions", defaultBaseUrl: "https://api.xiaomimimo.com/v1" },
   { id: "openrouter", label: "OpenRouter", group: "aggregator", logoKey: "openrouter", protocol: "openai-completions", defaultBaseUrl: "https://openrouter.ai/api/v1", catalogProvider: "openrouter", balance: "openrouter", legacyProviderId: "openrouter" },
-  { id: "custom", label: "自定义中转", group: "custom", logoKey: "generic", description: "任意兼容 Anthropic / OpenAI 协议的服务" },
+  { id: "custom", label: "自定义中转", group: "custom", logoKey: "generic" },
   // 旧版「自定义服务」按协议拆成的三个入口：不再出现在添加列表里，旧连接按自定义中转显示。
   { id: "openai-compatible", label: "自定义中转", group: "custom", logoKey: "generic", protocol: "openai-completions", hidden: true },
   { id: "openai-responses-compatible", label: "自定义中转", group: "custom", logoKey: "generic", protocol: "openai-responses", hidden: true },

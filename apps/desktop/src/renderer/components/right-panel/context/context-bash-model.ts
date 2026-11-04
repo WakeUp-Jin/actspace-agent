@@ -49,3 +49,22 @@ export function bashProgramRows(stats: ContextPanelBashStats): BashProgramRow[] 
 export function bashProgramCount(stats: ContextPanelBashStats): number {
   return stats.programs.filter(program => program.name !== "").length;
 }
+
+export type BashNotableTone = "slowest" | "failed" | "repeated" | "background";
+export type BashNotableRow = {
+  tone: BashNotableTone;
+  label: string;
+  /** 命令 / 程序原文；后台任务没有。 */
+  text: string;
+  value: string;
+};
+
+/** 「值得注意」：固定顺序，没有数据的项不出现（后端缺省字段视为没有）。 */
+export function bashNotableRows(stats: ContextPanelBashStats): BashNotableRow[] {
+  const rows: BashNotableRow[] = [];
+  if (stats.slowest && stats.slowest.durationMs > 0) rows.push({ tone: "slowest", label: "最慢", text: stats.slowest.command, value: formatBashDuration(stats.slowest.durationMs) });
+  if (stats.mostFailedProgram && stats.mostFailedProgram.count > 0) rows.push({ tone: "failed", label: "失败最多", text: stats.mostFailedProgram.program, value: `×${stats.mostFailedProgram.count}` });
+  if (stats.mostRepeated && stats.mostRepeated.count > 1) rows.push({ tone: "repeated", label: "重复最多", text: stats.mostRepeated.command, value: `×${stats.mostRepeated.count}` });
+  if (stats.backgroundCount && stats.backgroundCount > 0) rows.push({ tone: "background", label: "后台任务", text: "", value: `×${stats.backgroundCount}` });
+  return rows;
+}

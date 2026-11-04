@@ -8,13 +8,12 @@ import { useHostDirectory } from "../../target/host-directory";
 import { useRunTargetContext } from "../../target/run-target-context";
 import { FileGrantScope, grantScopeLabel } from "./FileGrantScope";
 
-// 工具审批的共享外壳：上方一行「等待确认」，下面是卡片（标题一句话 + 可选内容 + 底部按钮），可选的说明底托垫在卡片下方。
+// 工具审批的共享外壳：只有一张卡片（标题一句话 + 可选内容 + 底部按钮），可选的说明底托垫在卡片下方；卡片上下不加文字行，「等待确认」只作为容器的 aria-label。
 // 设计稿见 docs/design-docs/frontend/approval-card-redesign.html（D 方向，2026-10-11）。
 
 export type ApprovalChoice = "once" | "session" | "deny";
 
 const APPROVAL_FRAME_CLASS = "approval message-row w-full max-w-[var(--conversation-block-max-width)]";
-const APPROVAL_STATUS_CLASS = "approval-status mb-2 px-[var(--conversation-text-inset)] text-act-md leading-[22px] text-text-faint";
 const APPROVAL_TRAY_CLASS = "approval-tray rounded-act-lg bg-surface-subtle";
 const APPROVAL_CARD_CLASS = "approval-card rounded-act-lg border border-line bg-surface shadow-act-xs";
 const APPROVAL_CARD_HEAD_CLASS = "approval-card-head flex min-h-[30px] min-w-0 items-center gap-1.5 px-3 pt-2.5 text-act-md leading-5";
@@ -264,8 +263,7 @@ export function ApprovalCard({
     </div>
   );
   return (
-    <article className={`${APPROVAL_FRAME_CLASS}${className ? ` ${className}` : ""}`}>
-      <div className={APPROVAL_STATUS_CLASS}>等待确认</div>
+    <article aria-label="等待确认" className={`${APPROVAL_FRAME_CLASS}${className ? ` ${className}` : ""}`}>
       {note ? <div className={APPROVAL_TRAY_CLASS}>{card}<p className={APPROVAL_NOTE_CLASS}>{note}</p></div> : card}
     </article>
   );

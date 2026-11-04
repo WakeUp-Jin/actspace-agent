@@ -279,7 +279,7 @@ function context(): HarnessStatsContext {
     buckets: BUCKETS,
     avgEstimatedTokens: AVG_TOKENS,
     window: { p50: 0.38, p95: 0.79, overThreshold: 212 },
-    estimate: { deltaRate: -0.062, worstModel: "deepseek-v4", worstDeltaRate: -0.118, samples: 4690 },
+    estimate: { deltaRate: -0.062, worstModel: "anthropic/claude-haiku-5.5", worstDeltaRate: 0.384, samples: 4690 },
     cache: { hitRate: 0.814, systemChanges: 9, runtimeChanges: 1492 },
     sources: [
       { key: "context-system", kind: "section", owner: "core", id: "context-system", appearances: 4812, avgTokens: 3100, maxTokens: 3300, changeRate: 0.002 },

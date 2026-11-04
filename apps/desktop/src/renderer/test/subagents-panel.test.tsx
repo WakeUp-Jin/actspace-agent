@@ -25,7 +25,7 @@ const panel = (focus?: Parameters<typeof SubagentsPanel>[0]["focus"]) => render(
 // 行按钮的可读名称以描述开头；运行中的行旁边还有「停止 <描述>」按钮。
 const row = (description: string) => screen.getByRole("button", { name: new RegExp(`^${description}`) });
 
-it("groups running and other agents as cards, shows status, rounds, tokens and duration, and stops a running one from its row", async () => {
+it("groups running and other agents as cards, shows status text, tokens and duration, and stops a running one from its row", async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date("2026-11-04T09:06:12.000Z") });
   const interrupt = vi.fn().mockResolvedValue({ ok: true });
   overrideBridge({
@@ -43,29 +43,34 @@ it("groups running and other agents as cards, shows status, rounds, tokens and d
     panel();
     expect(await screen.findByRole("group", { name: "运行中 · 1" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "其他 · 4" })).toBeInTheDocument();
-    // 运行中：正在执行、第 N 轮和耗时，右上 token；列表不显示种类和模型。
-    expect(row("scan")).toHaveTextContent(/正在执行.*12\.6K tokens.*第 3 轮 · 1m 12s/);
-    expect(row("scan")).not.toHaveTextContent(/通用|deepseek/);
-    // 结束的：最终回复第一行，状态、第 N 轮和最近一次激活的耗时；没有 token 时不显示。
-    expect(row("review")).toHaveTextContent(/提交顺序没问题.*空闲.*· 第 2 轮 · 9s/);
-    expect(row("review")).not.toHaveTextContent(/tokens|Fork/);
+    // 运行中：第二行不写，右上 token，右下「运行中 · 耗时」；列表不显示种类、模型和第 N 轮。
+    expect(row("scan")).toHaveTextContent(/12\.6K tokens.*运行中 · 1m 12s/);
+    expect(row("scan")).not.toHaveTextContent("正在执行");
+    expect(row("scan")).not.toHaveTextContent(/通用|deepseek|第 \d+ 轮/);
+    // 结束的：最终回复第一行，右下只有状态文字和最近一次激活的耗时（没有图标、没有第 N 轮）；没有 token 时不显示。
+    expect(row("review")).toHaveTextContent(/提交顺序没问题.*空闲 · 9s/);
+    expect(row("review")).not.toHaveTextContent(/tokens|Fork|第 \d+ 轮/);
+    expect(row("review").querySelectorAll("svg")).toHaveLength(0);
     expect(row("port")).toHaveTextContent(/Looks fine.*已结束/);
     expect(row("broken").querySelector(".text-on-danger")).toHaveTextContent("失败");
-    expect(row("old")).toHaveTextContent(/已中断.*已中断/);
+    // 没有最终回复时左侧不再重复写状态，状态只在右侧出现一次。
+    expect(row("old").textContent?.match(/已中断/g)).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: /^停止 / })).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "停止 scan" }));
     await waitFor(() => expect(interrupt).toHaveBeenCalledWith({ sessionId: "parent", agentId: "scan" }));
   } finally { vi.useRealTimers(); }
 });
 
-it("puts model, rounds and status in a one-line detail header, the kind in its hover text, and the view toggle last", async () => {
+it("puts model and status text in a one-line detail header, the kind in its hover text, and the view toggle last", async () => {
   overrideBridge({
     "sessions.getSubagents": vi.fn().mockResolvedValue([item("scan", "idle", { preset: "explore", model: "claude-sonnet-5-5", activationCount: 2, endedAt: "2026-11-04T09:06:12.000Z" })]),
     "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue([]),
   });
   panel({ agentId: "scan", view: "chat", revision: 1 });
   const header = (await screen.findByRole("heading", { name: "scan" })).closest("header")!;
-  expect(header).toHaveTextContent(/sonnet.*第 2 轮.*空闲.*1m 12s/i);
+  expect(header).toHaveTextContent(/sonnet.*空闲 · 1m 12s/i);
+  expect(header).not.toHaveTextContent(/第 \d+ 轮/);
+  expect(header.querySelectorAll("svg")).toHaveLength(2);
   expect(header).not.toHaveTextContent("探索");
   expect(header.querySelector('[title="scan · 探索"]')).not.toBeNull();
   expect(header).not.toHaveTextContent("子 Agent /");

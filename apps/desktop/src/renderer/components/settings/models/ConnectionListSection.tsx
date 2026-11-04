@@ -31,7 +31,7 @@ export function ConnectionListSection({ connections }: { connections: readonly C
       )}
     >
       {connections.length === 0 ? (
-        <div className="px-4 py-4 text-act-sm text-text-muted">还没有连接。添加一个服务商，填入 API Key 就能用。</div>
+        <div className="px-4 py-4 text-act-sm text-text-muted">还没有连接。</div>
       ) : connections.map((connection) => {
         const pending = pendingCount(connection);
         const status = connectionStatus(connection);

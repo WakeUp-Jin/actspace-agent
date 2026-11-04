@@ -119,6 +119,10 @@ export type ContextPanelBashProgram = ContextPanelBashCount & {
   /** 只有 git / pnpm / npm / yarn / cargo / go / gh / docker 有内容；排序同 `programs`。 */
   subcommands: ContextPanelBashCount[];
 };
+/** 「值得注意」：没有数据的项为 `null`（不显示）；命令原文最多 1000 个字符。 */
+export type ContextPanelBashSlowest = { command: string; durationMs: number };
+export type ContextPanelBashMostFailed = { program: string; count: number };
+export type ContextPanelBashMostRepeated = { command: string; count: number };
 export type ContextPanelBashStats = {
   /** 已有结果、且没有被拒绝的 Bash 调用数。 */
   calls: number;
@@ -128,6 +132,14 @@ export type ContextPanelBashStats = {
   durationMs: number;
   /** 按 count 降序、同数按名字；`""` 固定排最后。 */
   programs: ContextPanelBashProgram[];
+  /** 耗时最长的单条命令（口径同 `durationMs`）；没有耗时记录时为 null。缺省表示旧后端。 */
+  slowest?: ContextPanelBashSlowest | null;
+  /** 失败调用次数最多的程序（不含「其他」）；没有失败时为 null。 */
+  mostFailedProgram?: ContextPanelBashMostFailed | null;
+  /** 命令原文完全相同、重复次数最多的一条；最多只出现 1 次时为 null。 */
+  mostRepeated?: ContextPanelBashMostRepeated | null;
+  /** 转入（或本来就在）后台运行的 Bash 调用数。 */
+  backgroundCount?: number;
 };
 
 export type ContextPanelTrendPoint = {

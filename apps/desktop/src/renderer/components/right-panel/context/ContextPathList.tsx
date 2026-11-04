@@ -68,8 +68,8 @@ function ContextPathRow({ path, cycle, showDir, workspaceRoot, open, onToggle }:
             {!showDir && path.description ? <span className="min-w-0 flex-1 truncate text-act-xxs text-text-faint">{path.description}</span> : null}
           </span>
           {fresh ? <span className={cn(TAG_CLASS, "bg-info-soft text-info")} title="本周期新加入">新</span> : null}
-          {path.nextCompaction === "wake" ? <span className={cn(TAG_CLASS, "bg-success-soft font-medium text-success")} title="本周期被读取过，下次压缩时会回到活跃">待唤醒</span> : null}
-          {path.nextCompaction === "sleep" ? <span className={cn(TAG_CLASS, "border border-line text-text-faint")} title="本周期没被读取，下次压缩时会转为睡眠">将睡眠</span> : null}
+          {path.nextCompaction === "wake" ? <span className={cn(TAG_CLASS, "bg-success-soft font-medium text-success")}>待唤醒</span> : null}
+          {path.nextCompaction === "sleep" ? <span className={cn(TAG_CLASS, "border border-line text-text-faint")}>将睡眠</span> : null}
           <span className={cn("w-[30px] shrink-0 text-right text-act-xxs tabular-nums", path.readsInCycle ? "text-text-muted" : "text-text-faint")} title="本周期读取次数">
             {path.readsInCycle ? `读 ${path.readsInCycle}` : "—"}
           </span>

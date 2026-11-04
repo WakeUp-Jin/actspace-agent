@@ -682,9 +682,6 @@ export type SessionPermissionModeResult = {
   error?: string;
 };
 
-export type SessionGrantRevokeInput = { sessionId: string; grantId: string };
-export type SessionGrantRevokeResult = { ok: boolean; error?: string };
-
 export type SessionArchiveInput = {
   sessionId: string;
   archived: boolean;

@@ -32,7 +32,7 @@ export function ContextPanel({ sessionId, contextRevision, contextState, workspa
   const view = data?.view ?? null;
   const categories = useMemo(() => (view ? buildCategories(view, { compare: compare && view.previous !== null && view.previous.comparable !== false }) : []), [view, compare]);
 
-  if (!sessionId) return <div className={EMPTY_CLASS}>开始对话后，这里会列出喂给模型的上下文。</div>;
+  if (!sessionId) return <div className={EMPTY_CLASS}>还没有上下文。</div>;
   const errorBar = error ? <ErrorBar message={error} onRetry={retry} /> : null;
   if (!view) {
     return (
@@ -51,7 +51,7 @@ export function ContextPanel({ sessionId, contextRevision, contextState, workspa
         <p className="m-0 rounded-act-md bg-warning-soft px-2.5 py-2 text-act-xxs text-warning">{view.current.basis === "last-request" ? "当前 Context 尚未加载，以下显示最近请求输入。" : "上下文正在重建，数字可能滞后。"}</p>
       ) : null}
       {status === "unavailable" ? (
-        <div className={EMPTY_CLASS}>当前没有可展示的上下文。开始对话后，这里会列出喂给模型的上下文。</div>
+        <div className={EMPTY_CLASS}>当前没有可展示的上下文。</div>
       ) : (
         <ContextOverview view={view} categories={categories} focus={focus} onFocus={setFocus} />
       )}
@@ -73,7 +73,7 @@ export function ContextPanel({ sessionId, contextRevision, contextState, workspa
       ) : (
         <p className={NOTE_CLASS}>趋势、事件、路径和 Bash 命令需要后端数据，暂未提供</p>
       )}
-      <p className={NOTE_CLASS}>≈ 为本地估算 · 实际值来自服务商返回的用量</p>
+      <p className={NOTE_CLASS}>≈ 为本地估算</p>
     </div>
   );
 }

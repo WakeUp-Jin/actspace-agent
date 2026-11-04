@@ -57,9 +57,9 @@ export function OverviewTab({ data, onOpenFlag }: { data: HarnessStatsOverview; 
   if (harness.statsWriteFailures > 0) rows.push({ label: "统计写入失败", value: `${fmtInt(harness.statsWriteFailures)} 次`, tone: "warn" });
   return (
     <Stack>
-      <SecHead title="值得关注" hint="按固定规则从统计里挑出来，不经过模型" />
+      <SecHead title="值得关注" />
       {data.flags.length === 0 ? (
-        <EmptyNote>所选范围内没有触发任何规则，当前 harness 没有明显问题。</EmptyNote>
+        <EmptyNote>没有需要关注的项。</EmptyNote>
       ) : (
         <div className="flex flex-col divide-y divide-line/60 overflow-hidden rounded-act-group border border-line bg-surface">
           {data.flags.map((flag, index) => <FlagRow key={`${flag.rule}-${index}`} flag={flag} onOpen={onOpenFlag} />)}

@@ -127,16 +127,12 @@ export function ShortcutSettings({
       <SettingGroup title="快捷键" headingLevel={3}>
         <SettingRow
           title="快速唤起"
-          description="在任何应用中唤起紧凑窗口，焦点直达输入框。"
           control={<Toggle checked={quickOpen.enabled} disabled={saving} ariaLabel="启用快速唤起" onChange={(enabled) => void update({ enabled })} />}
         />
         <SettingRow
-          indent
           disabled={dependentDisabled}
           title="快捷键"
-          description={status?.error
-            ? <span className="text-on-danger">{status.error}</span>
-            : isRecording ? "按下新的组合键，Esc 取消。" : quickOpen.enabled && status?.registered ? "已生效。" : "点击按键后录制新的组合键。"}
+          description={status?.error ? <span className="text-on-danger">{status.error}</span> : undefined}
           control={
             <>
               <button
@@ -183,10 +179,8 @@ export function ShortcutSettings({
           }
         />
         <SettingRow
-          indent
           disabled={dependentDisabled}
           title="打开目标"
-          description="目标不可用时回到第一个项目；没有项目时打开空白会话。"
           control={
             <SettingsSelect
               value={choosingSession ? "session" : targetKind}
@@ -204,7 +198,6 @@ export function ShortcutSettings({
         />
         {targetKind === "workspace" && !choosingSession ? (
           <SettingRow
-            indent
             disabled={dependentDisabled}
             title="默认工作区"
             control={
@@ -222,10 +215,9 @@ export function ShortcutSettings({
         ) : null}
         {targetKind === "session" || choosingSession ? (
           <SettingRow
-            indent
             disabled={dependentDisabled}
             title="默认会话"
-            description={chosenTitle ?? (targetKind === "session" ? "已保存指定会话，可搜索标题或消息片段更换。" : "选择会话后保存打开目标。")}
+            description={chosenTitle ?? undefined}
             control={<SessionSearch buttonLabel="选择快速唤起会话" disabled={dependentDisabled || saving} onSelect={(sessionId, title) => {
               void update({ target: { kind: "session", sessionId } }).then(saved => {
                 if (saved) { setChosenTitle(title ?? null); setChoosingSession(false); }

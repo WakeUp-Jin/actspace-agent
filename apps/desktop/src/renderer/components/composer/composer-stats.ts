@@ -56,7 +56,7 @@ export function sessionStats(snapshot: RuntimeV2SessionSnapshot | null | undefin
 }
 
 /** 计费输入 = 未缓存输入 + 缓存读取 + 缓存写入（三个互不重叠的提示侧桶）。 */
-export function billedInputTokens(usage: RuntimeV2UsageSummary): number {
+export function billedInputTokens(usage: Pick<RuntimeV2UsageSummary, "inputTokens" | "cacheReadTokens" | "cacheWriteTokens">): number {
   return usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
 }
 

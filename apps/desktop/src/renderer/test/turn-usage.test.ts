@@ -17,7 +17,6 @@ describe("turnUsageModel", () => {
       cacheRead: "64,512 tok",
       cacheWrite: "0 tok",
       output: "3,061 tok",
-      reasoning: null,
       cost: { kind: "known", text: "$0.0123", estimated: false },
     });
   });
@@ -27,9 +26,10 @@ describe("turnUsageModel", () => {
     expect(turnUsageModel(usage({ totalTokens: 0 }))).toBeNull();
   });
 
-  it("drops empty routes, keeps reasoning, and marks estimated cost", () => {
+  it("drops empty routes and marks estimated cost", () => {
     const model = turnUsageModel(usage({ routes: [], reasoningTokens: 1_200, costEstimated: true }));
-    expect(model).toMatchObject({ routes: null, reasoning: "1,200 tok", cost: { kind: "known", estimated: true } });
+    expect(model).toMatchObject({ routes: null, cost: { kind: "known", estimated: true } });
+    expect(model).not.toHaveProperty("reasoning");
   });
 
   it("never shows an undercounted cost when some requests have no price", () => {

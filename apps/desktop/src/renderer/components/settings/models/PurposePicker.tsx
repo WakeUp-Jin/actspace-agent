@@ -115,7 +115,6 @@ export function PurposePicker({
           align="end"
           ariaLabel={`${purpose.label}可选模型`}
           pinned={purpose.follow ? [{ id: FOLLOW_ID, label: followLabel }] : []}
-          footer={purpose.needImage ? "只列出能看图的模型" : undefined}
         />
       ) : null}
     </Popover>

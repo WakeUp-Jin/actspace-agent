@@ -136,12 +136,6 @@ export function LocalUpdateProgressDialog({
           <span className="break-all text-act-xs text-text-subtle">日志：{state.logPath}</span>
         </div>
 
-        {isActive ? (
-          <p className="mt-3 text-act-xs leading-relaxed text-text-faint">
-            构建阶段不会退出应用；构建完成后才会关闭窗口并执行替换。
-          </p>
-        ) : null}
-
         {!isActive ? (
           <div className="mt-5 flex justify-end">
             <Button variant="secondary" onClick={onClose}>

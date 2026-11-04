@@ -85,11 +85,13 @@ export function EnvironmentIcon({ sandboxed, className = "" }: { sandboxed: bool
   );
 }
 
-function EnvironmentBadge({ sandboxed, notExecuted }: Pick<BashMessage, "sandboxed" | "notExecuted">) {
+// 行尾的执行环境标记（沙盒盾牌 / 划掉的盾牌）只在命令运行中显示，结束后收掉，
+// 避免一轮里十几条命令把整列盾牌铺满右侧；环境仍写在展开详情的 `# environment:` 里。
+function EnvironmentBadge({ sandboxed, notExecuted, status }: Pick<BashMessage, "sandboxed" | "notExecuted" | "status">) {
   if (notExecuted) {
     return <span className={BASH_NOT_EXECUTED_BADGE_CLASS}>未执行</span>;
   }
-  if (sandboxed === undefined) return null;
+  if (sandboxed === undefined || status !== "running") return null;
   return <EnvironmentIcon sandboxed={sandboxed} />;
 }
 
@@ -135,7 +137,7 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
       )}
       <span className={BASH_COMMAND_PREVIEW_CLASS} title={target}>{target}</span>
       <span className={BASH_RUN_TRAILING_CLASS}>
-        <EnvironmentBadge sandboxed={message.sandboxed} notExecuted={message.notExecuted} />
+        <EnvironmentBadge sandboxed={message.sandboxed} notExecuted={message.notExecuted} status={message.status} />
         {message.background && !backgroundLink ? <BackgroundTag /> : null}
         {chevron}
       </span>

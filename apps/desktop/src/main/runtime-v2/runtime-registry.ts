@@ -304,17 +304,6 @@ export class DesktopRuntimeV2Registry {
     return snapshot;
   }
 
-  async revokeSessionGrant(sessionId: string, grantId: string) {
-    this.assertAdmission();
-    this.#admittedWork++;
-    try {
-      this.options.approvals.expireAll?.(sessionId);
-      const snapshot = await this.requireApp().revokeSessionGrant(sessionId, grantId);
-      this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-grant-revoked");
-      return snapshot;
-    } finally { this.#admittedWork--; }
-  }
-
   async readArtifact(sessionId: string, artifactId: string): Promise<RuntimeV2ReadArtifactResult> {
     const artifact = await this.resolveArtifact(sessionId, artifactId);
     return Object.freeze({ artifactId, mimeType: artifact.mediaType, bytesBase64: Buffer.from(artifact.bytes).toString("base64") });

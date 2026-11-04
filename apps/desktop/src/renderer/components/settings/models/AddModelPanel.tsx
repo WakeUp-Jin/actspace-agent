@@ -73,19 +73,19 @@ export function AddModelPanel({ connectionId, onAdd, onCancel }: { connectionId:
       fill = (
         <p className="flex flex-wrap items-center gap-1.5 text-operational">
           <Check size={13} strokeWidth={2.2} aria-hidden="true" />
-          按 {effective.catalog.name} 填好了，不对可以改
+          按 {effective.catalog.name} 填好了
           <Button variant="ghost" size="xs" onClick={() => { setNoAlias(true); change("canonical", undefined); }}>不是它</Button>
         </p>
       );
     } else if (effective.catalog?.exact) {
-      fill = <p className="flex items-center gap-1.5 text-operational"><Check size={13} strokeWidth={2.2} aria-hidden="true" />认出来了，是 {effective.catalog.name}，下面已经帮你填好</p>;
-    } else fill = <p>没认出来。填上上下文和价格，用量和费用才算得准；不填也能添加。</p>;
+      fill = <p className="flex items-center gap-1.5 text-operational"><Check size={13} strokeWidth={2.2} aria-hidden="true" />认出来了：{effective.catalog.name}</p>;
+    } else fill = <p>没认出来：填上上下文和价格，用量和费用才算得准</p>;
   }
 
   return (
     <div className={cx(CARD_FRAME, "border-line-strong")} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); onCancel(); } }}>
       <div className="flex gap-1.5 max-[600px]:flex-col">
-        <SettingsInput width="full" mono autoFocus value={apiModel} onChange={(event) => changeId(event.target.value)} onKeyDown={enter} placeholder="模型 ID，和服务商文档里写的一致" aria-label="模型 ID" className="h-[34px] flex-[1.4]" />
+        <SettingsInput width="full" mono autoFocus value={apiModel} onChange={(event) => changeId(event.target.value)} onKeyDown={enter} placeholder="模型 ID" aria-label="模型 ID" className="h-[34px] flex-[1.4]" />
         <SettingsInput width="full" value={label} onChange={(event) => setLabel(event.target.value)} onKeyDown={enter} placeholder="显示名称（可选）" aria-label="显示名称" className="h-[34px] flex-1" />
       </div>
       {fill ? <div className="px-1 pt-2 text-act-xs text-text-faint">{fill}</div> : null}

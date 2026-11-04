@@ -5,6 +5,8 @@ export type ToolEntry = {
   preview?: ToolUiPreview;
   isError?: boolean;
   finished?: boolean;
+  /** 已收到 `tool_started`（真正开始执行）。批内排在后面、还没轮到的调用没有它。 */
+  started?: boolean;
   terminalStatus?: Extract<RuntimeStreamEvent, { type: "tool_finished" }>["status"];
   approvalPending?: boolean;
   approvalRequestId?: string;

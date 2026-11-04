@@ -181,7 +181,7 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
     case "hosts": return <HostConnectionsSettings />;
     case "general":
       return (
-        <PageShell title="通用" description="ActSpace 与 Agent 的默认行为。">
+        <PageShell title="通用">
           <PerformanceSection {...rest} />
           <ConversationDisplaySection {...rest} />
           <GeneralSection {...rest} />
@@ -210,18 +210,18 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       );
     case "search":
       return (
-        <PageShell title="搜索与网页读取" description="管理聚合搜索来源与网页正文读取方式。Key 只保存在本机。">
+        <PageShell title="搜索与网页读取">
           <SearchSettings {...rest} />
         </PageShell>
       );
     case "tools":
-      return <PageShell title="工具" description="Agent 可以调用哪些工具，以及执行前是否需要你确认。联网搜索在「搜索与网页读取」中管理。"><ToolsSection {...rest} /></PageShell>;
+      return <PageShell title="工具"><ToolsSection {...rest} /></PageShell>;
     case "appearance":
-      return <PageShell title="外观" description="主题、强调色、字体与字号。"><AppearanceSection /></PageShell>;
+      return <PageShell title="外观"><AppearanceSection /></PageShell>;
     case "archivedChats":
       return <PageShell title="归档会话"><ArchivedChatsSection onArchivedSessionsChange={rest.onArchivedSessionsChange} /></PageShell>;
     case "subagents":
-      return <PageShell title="子 Agent" description="主智能体可以把任务委派给子智能体。"><SubagentSection onNavigate={rest.onNavigate} /></PageShell>;
+      return <PageShell title="子 Agent"><SubagentSection onNavigate={rest.onNavigate} /></PageShell>;
     case "usage":
       return (
         <UsageStatisticsPage
@@ -241,7 +241,7 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
     case "harnessStats":
       return <HarnessStatsPage initialTab={devHarnessStatsTab()} />;
     case "update":
-      return <PageShell title="更新" description="检查版本并从本机源码更新 ActSpace。"><LocalUpdateSection /></PageShell>;
+      return <PageShell title="更新"><LocalUpdateSection /></PageShell>;
     default:
       return null;
   }

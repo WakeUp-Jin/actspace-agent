@@ -72,7 +72,8 @@ describe("BashRunBlock tooltips", () => {
     expect(summary).toHaveClass("bash-run-summary", "flex-none", "whitespace-nowrap");
     expect(preview).toHaveClass("bash-command-preview", "min-w-0", "flex-1", "overflow-hidden", "text-ellipsis");
     expect(trailing).toHaveClass("bash-run-trailing", "flex-none");
-    expect(screen.getByRole("img", { name: "沙盒" })).toBeInTheDocument();
+    // 结束后盾牌收掉，行尾只剩 chevron。
+    expect(screen.queryByRole("img", { name: "沙盒" })).not.toBeInTheDocument();
   });
 
   it("stops the shimmer once the background task reaches a terminal state", () => {
@@ -107,15 +108,14 @@ describe("BashRunBlock tooltips", () => {
     expect(screen.getByText("后台")).toBeInTheDocument();
   });
 
-  it("marks sandboxed commands with the sandbox shield and keeps the environment in details", async () => {
+  it("shows the sandbox shield only while a sandboxed command is running", () => {
     renderBash({
-      id: "bash-sbx-1",
+      id: "bash-sbx-run",
       kind: "bash",
       createdAt: "2026-07-04T00:00:00.000Z",
       title: "Bash command",
-      status: "success",
+      status: "running",
       command: "pnpm test",
-      exitCode: 0,
       sandboxed: true,
     });
 
@@ -123,27 +123,73 @@ describe("BashRunBlock tooltips", () => {
     expect(badge).toHaveClass("bash-sandbox-badge");
     expect(badge).toHaveAttribute("title", expect.stringContaining("沙盒内运行"));
     expect(screen.queryByText("沙盒")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Ran/ }));
-    expect(screen.getByText(/# environment: 沙盒/)).toBeInTheDocument();
-    expect(screen.queryByRole("img", { name: "真实环境" })).not.toBeInTheDocument();
   });
 
-  it("shows a prominent real-environment badge for unsandboxed commands", () => {
-    renderBash({
-      id: "bash-sbx-2",
-      kind: "bash",
+  it.each([
+    ["success", "Ran"],
+    ["failed", "Failed"],
+    ["denied", "Denied"],
+    ["expired", "Expired"],
+    ["cancelled", "Cancelled"],
+  ] as const)(
+    "drops the sandbox shield once the command is %s but keeps the environment in details",
+    async (status, summary) => {
+      renderBash({
+        id: `bash-sbx-${status}`,
+        kind: "bash",
+        createdAt: "2026-07-04T00:00:00.000Z",
+        title: "Bash command",
+        status,
+        command: "pnpm test",
+        exitCode: status === "success" ? 0 : 1,
+        sandboxed: true,
+      });
+
+      expect(screen.queryByRole("img", { name: "沙盒" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("img", { name: "真实环境" })).not.toBeInTheDocument();
+      const toggle = screen.getByRole("button", { name: new RegExp(`^${summary}`) });
+      // 失败的命令默认展开，其余要点开才能看到详情。
+      if (toggle.getAttribute("aria-expanded") === "false") await userEvent.click(toggle);
+      expect(screen.getByText(/# environment: 沙盒/)).toBeInTheDocument();
+    },
+  );
+
+  it("keeps the trailing chevron in the same slot when the shield disappears", () => {
+    const base = {
+      id: "bash-sbx-layout",
+      kind: "bash" as const,
       createdAt: "2026-07-04T00:00:00.000Z",
       title: "Bash command",
-      status: "success",
-      command: "npm i -g foo",
-      exitCode: 0,
-      sandboxed: false,
-    });
+      command: "pnpm test",
+      sandboxed: true,
+    };
+    const { rerender } = renderBash({ ...base, status: "running" });
+    const trailing = () => document.querySelector(".bash-run-trailing")!;
+    expect(trailing().children).toHaveLength(2);
+    rerender(
+      <TooltipProvider delayDuration={0}>
+        <BashRunBlock message={{ ...base, status: "success", exitCode: 0 }} />
+      </TooltipProvider>,
+    );
+    // 预览文字是 flex-1，trailing 靠右；盾牌移除后只有 chevron，仍是同一个靠右的 flex-none 容器。
+    expect(trailing()).toHaveClass("flex-none");
+    expect(trailing().children).toHaveLength(1);
+    expect(trailing().querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("shows the real-environment badge only while an unsandboxed command runs", () => {
+    const base = { id: "bash-sbx-2", kind: "bash", createdAt: "2026-07-04T00:00:00.000Z", title: "Bash command", command: "npm i -g foo", sandboxed: false } as const;
+    const view = renderBash({ ...base, status: "running" });
 
     const badge = screen.getByRole("img", { name: "真实环境" });
     expect(badge).toHaveClass("bash-real-env-badge");
     expect(badge).toHaveAttribute("title", expect.stringContaining("沙盒外运行"));
     expect(screen.queryByText("真实环境")).not.toBeInTheDocument();
+
+    // 结束后与沙盒盾牌同一规则：收掉，避免完全权限下整列铺满。
+    view.unmount();
+    renderBash({ ...base, status: "success", exitCode: 0 });
+    expect(screen.queryByRole("img", { name: "真实环境" })).not.toBeInTheDocument();
   });
 
   it("shows no environment badge when sandboxed is unknown (historical data)", () => {
@@ -233,6 +279,10 @@ describe("BashRunBlock tooltips", () => {
 
     const card = screen.getByRole("article");
     expect(card).toHaveClass("approval");
+    // 待审批只有一个框：上方没有「等待确认」文字行，卡片下方也没有别的行；语义留在容器的可访问名称上。
+    expect(screen.queryByText("等待确认")).toBeNull();
+    expect(card).toHaveAccessibleName("等待确认");
+    expect(card.parentElement?.children).toHaveLength(1);
     expect(card.querySelector(".approval-card-head")).toHaveTextContent("构建桌面端pnpm");
     expect(card.querySelector(".bash-approval-command")).toHaveTextContent("$ pnpm build");
     // 命令名单独着色。

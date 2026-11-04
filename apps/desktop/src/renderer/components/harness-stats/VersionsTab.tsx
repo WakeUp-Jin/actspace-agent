@@ -60,7 +60,7 @@ export function VersionsTab({ data, onCompareChange }: { data: HarnessStatsVersi
         </>
       )}
       <Grid cols={2}>
-        <Card title="plugin_manager 操作" hint="自进化改动 harness 的步骤">
+        <Card title="plugin_manager 操作">
           {data.evolutionOps.length === 0 ? <p className="m-0 text-act-sm text-text-faint">所选范围内没有自进化操作</p> : (
             <KvList rows={data.evolutionOps.map((item) => ({ label: <span className="font-mono text-act-xs">{item.action}</span>, value: `${fmtInt(item.count)} 次${item.failed ? ` · ${fmtInt(item.failed)} 失败` : ""}`, tone: item.failed ? "warn" as const : undefined }))} />
           )}

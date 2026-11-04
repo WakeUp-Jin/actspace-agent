@@ -62,7 +62,6 @@ export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   setSessionWorkspace: "runtime-v2:fixed-renderer:set-session-workspace",
   setSessionPermissionMode: "runtime-v2:fixed-renderer:set-session-permission-mode",
   setSessionAgentMode: "runtime-v2:fixed-renderer:set-session-agent-mode",
-  revokeSessionGrant: "runtime-v2:fixed-renderer:revoke-session-grant",
   archiveSession: "runtime-v2:fixed-renderer:archive-session",
   archiveSessions: "runtime-v2:fixed-renderer:archive-sessions",
   getUsageStatistics: "runtime-v2:fixed-renderer:get-usage-statistics",

@@ -45,5 +45,15 @@ function queryBashStats(db: DatabaseSync, id: string): ContextPanelBashStats {
     if (BASH_SUBCOMMAND_PROGRAMS.has(row.program)) program.subcommands.push({ name: row.subcommand, count: Number(row.count), failed: Number(row.failed) });
   }
   for (const program of programs.values()) program.subcommands.sort(compareBashCounts);
-  return { calls: Number(total?.calls ?? 0), failed: Number(total?.failed ?? 0), durationMs: Number(total?.duration_ms ?? 0), programs: [...programs.values()].sort(compareBashCounts) };
+  const sorted = [...programs.values()].sort(compareBashCounts);
+  const notable = prepare(db, "SELECT slowest_command,slowest_ms,background_count FROM context_bash_notable WHERE session_id=?").get(id) as { slowest_command: string; slowest_ms: number; background_count: number } | undefined;
+  const repeated = prepare(db, "SELECT command,count FROM context_bash_command WHERE session_id=? AND count>=2 ORDER BY count DESC,command ASC LIMIT 1").get(id) as { command: string; count: number } | undefined;
+  const failedProgram = sorted.filter(program => program.name !== "" && program.failed > 0).sort((a, b) => b.failed - a.failed || a.name.localeCompare(b.name))[0];
+  return {
+    calls: Number(total?.calls ?? 0), failed: Number(total?.failed ?? 0), durationMs: Number(total?.duration_ms ?? 0), programs: sorted,
+    slowest: notable && Number(notable.slowest_ms) > 0 && notable.slowest_command ? { command: notable.slowest_command, durationMs: Number(notable.slowest_ms) } : null,
+    mostFailedProgram: failedProgram ? { program: failedProgram.name, count: failedProgram.failed } : null,
+    mostRepeated: repeated ? { command: repeated.command, count: Number(repeated.count) } : null,
+    backgroundCount: Number(notable?.background_count ?? 0),
+  };
 }

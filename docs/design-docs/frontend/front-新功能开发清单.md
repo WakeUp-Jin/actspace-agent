@@ -14,6 +14,7 @@
 | 颜色只用随主题翻转的语义类或变量，不写 `text-black`、`bg-white`、`#hex`、`rgba()`；浅色、深色都要看一遍 | [主题与配色规范](front-主题与配色规范.md)「硬约束：禁止非主题感知字面量」 | `pnpm check:frontend-theme` |
 | 普通 UI 样式写在组件的 Tailwind utility 里，不往全局 CSS 加；新增全局样式先确认归属和 cascade layer | [Tailwind 样式架构](front-tailwind-style-architecture.md)「样式所有权」 | 评审 |
 | 界面文案用中文；模式名、思考档位、工具名等按约定保留英文 | [日常桌面界面中文文案](front-desktop-chinese-ui.md) | 评审 |
+| 灰色说明小字默认不写：解释删、不改成悬停；页面副标题、分组说明默认不写；数据与警示可留且一句话；同一提示不重复；名字要自解释 | [全局视觉语言规范](front-全局视觉语言规范.md)「界面文案与说明文字」 | 评审 |
 
 ## 2. 组件与弹层
 

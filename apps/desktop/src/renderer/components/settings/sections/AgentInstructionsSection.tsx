@@ -83,7 +83,7 @@ export function AgentInstructionsSection({ settings }: SectionProps) {
       {editorOpen ? (
         <SettingEditor
           id="agent-system-prompt-editor"
-          hint={`保存后从下一次请求生效 · ${draftPrompt.length.toLocaleString("zh-CN")} / ${AGENT_SYSTEM_PROMPT_MAX_CHARS.toLocaleString("zh-CN")}`}
+          hint={`${draftPrompt.length.toLocaleString("zh-CN")} / ${AGENT_SYSTEM_PROMPT_MAX_CHARS.toLocaleString("zh-CN")}`}
           error={promptError}
           saving={saving}
           saveDisabled={!dirty}

@@ -1,7 +1,7 @@
 import { HARNESS_FLAG_RULES, type HarnessSkillRow, type HarnessSourceRow, type HarnessStatsContext } from "@actspace/shared";
 import { StackBar } from "./harness-stats-charts";
 import { DASH, bucketSegments, fmtDay, fmtInt, fmtPct, fmtSignedPct, fmtTokens } from "./harness-stats-format";
-import { Card, DataTable, Dash, EmptyNote, Grid, KvList, Meter, NameCell, Notice, SecHead, Stack, ToneText, type Column } from "./harness-stats-ui";
+import { Card, DataTable, Dash, EmptyNote, Grid, KvList, Meter, NameCell, Notice, SecHead, Stack, ToneText, TruncateValue, type Column } from "./harness-stats-ui";
 
 const SOURCE_KIND_LABEL: Record<HarnessSourceRow["kind"], string> = {
   tools: "工具定义",
@@ -18,7 +18,7 @@ const sourceColumns: Column<HarnessSourceRow>[] = [
   { key: "avg", label: "平均 token", numeric: true, sortValue: (row) => row.avgTokens, render: (row) => fmtInt(row.avgTokens) },
   { key: "max", label: "最大 token", numeric: true, sortValue: (row) => row.maxTokens, render: (row) => fmtInt(row.maxTokens) },
   {
-    key: "change", label: "内容变化频率", numeric: true, tip: "与同一会话上一次请求相比，这一块内容变了的比例；变化越频繁，提示词缓存越容易失效",
+    key: "change", label: "内容变化频率", numeric: true,
     sortValue: (row) => row.changeRate,
     render: (row) => (row.changeRate == null ? <Dash /> : <Meter value={row.changeRate} max={1} label={fmtPct(row.changeRate)} warn={row.changeRate > HARNESS_FLAG_RULES.contextChurn.minChangeRate && row.appearances >= HARNESS_FLAG_RULES.contextChurn.minAppearances} />),
   },
@@ -27,7 +27,7 @@ const sourceColumns: Column<HarnessSourceRow>[] = [
 const skillColumns: Column<HarnessSkillRow>[] = [
   { key: "skill", label: "Skill", sortValue: (row) => row.id, render: (row) => <NameCell name={row.id} sub={row.source ?? undefined} /> },
   { key: "listed", label: "列出次数", numeric: true, sortValue: (row) => row.listed, render: (row) => fmtInt(row.listed) },
-  { key: "selected", label: "被选用", numeric: true, tip: "用户或 Agent 明确选中这个 skill 的次数", sortValue: (row) => row.selected, render: (row) => fmtInt(row.selected) },
+  { key: "selected", label: "被选用", numeric: true, sortValue: (row) => row.selected, render: (row) => fmtInt(row.selected) },
   { key: "reads", label: "读取 SKILL.md", numeric: true, sortValue: (row) => row.skillReads, render: (row) => (row.skillReads ? fmtInt(row.skillReads) : <ToneText tone="warn">0</ToneText>) },
   { key: "assets", label: "读附属文件", numeric: true, sortValue: (row) => row.assetReads, render: (row) => fmtInt(row.assetReads) },
   { key: "last", label: "最后使用", numeric: true, render: (row) => <span className="text-text-muted">{fmtDay(row.lastReadAt)}</span> },
@@ -52,7 +52,7 @@ export function ContextTab({ data }: { data: HarnessStatsContext }) {
         <Card title="估算准确度" hint={data.estimate.samples ? `${fmtInt(data.estimate.samples)} 个样本` : undefined}>
           <KvList rows={[
             { label: "估算 vs 实际", value: fmtSignedPct(data.estimate.deltaRate) },
-            { label: "偏差最大的模型", value: data.estimate.worstModel ? `${data.estimate.worstModel}（${fmtSignedPct(data.estimate.worstDeltaRate)}）` : DASH },
+            { label: "偏差最大的模型", value: data.estimate.worstModel ? <TruncateValue text={data.estimate.worstModel} suffix={`（${fmtSignedPct(data.estimate.worstDeltaRate)}）`} /> : DASH },
           ]} />
         </Card>
         <Card title="缓存命中率">
@@ -63,7 +63,7 @@ export function ContextTab({ data }: { data: HarnessStatsContext }) {
           ]} />
         </Card>
       </Grid>
-      <SecHead title="上下文来源" hint="内容变化越频繁，提示词缓存越容易失效" />
+      <SecHead title="上下文来源" />
       <DataTable ariaLabel="上下文来源" columns={sourceColumns} rows={data.sources} rowKey={(row) => row.key} defaultSort={{ key: "avg", dir: -1 }} minWidth={640} empty={<EmptyNote>所选范围内没有上下文来源记录</EmptyNote>} />
       <SecHead title="Skills" hint={`列表本身每次请求占 ${data.skillsCatalogTokens == null ? DASH : fmtTokens(data.skillsCatalogTokens)} token · ${data.skills.length} 个 skill`} />
       <DataTable ariaLabel="Skills" columns={skillColumns} rows={data.skills} rowKey={(row) => row.id} defaultSort={{ key: "reads", dir: -1 }} minWidth={600} empty={<EmptyNote>没有 skill 记录</EmptyNote>} />

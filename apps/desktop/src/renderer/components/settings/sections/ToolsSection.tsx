@@ -38,11 +38,10 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
     tools.setToolEnabled(enabled ? [BROWSER_TOOL_GROUP, "browser_help"] : [BROWSER_TOOL_GROUP], enabled);
   };
 
-  const renderToolRow = (tool: (typeof PRIMARY_TOOL_ITEMS)[number], options: { indent?: boolean; disabled?: boolean; description?: ReactNode } = {}) => (
+  const renderToolRow = (tool: (typeof PRIMARY_TOOL_ITEMS)[number], options: { disabled?: boolean; description?: ReactNode } = {}) => (
     <SettingRow
       key={tool.name}
       tight
-      indent={options.indent}
       disabled={options.disabled}
       title={tool.label}
       description={options.description ?? tool.description}
@@ -50,24 +49,16 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
     />
   );
 
-  const renderBrowserItem = (tool: (typeof BROWSER_TOOL_ITEMS)[number]) => renderToolRow(tool, {
-    indent: true,
-    disabled: !browserEnabled,
-    description: tool.description,
-  });
+  const renderBrowserItem = (tool: (typeof BROWSER_TOOL_ITEMS)[number]) => renderToolRow(tool, { disabled: !browserEnabled });
 
-  const mediaDescription = (tool: (typeof PRIMARY_TOOL_ITEMS)[number]) => {
-    if (tool.name === "generate_image") {
-      return imageGenerationReady
-        ? "使用「通用 → 媒体」中配置的服务。"
-        : <InlineWarning>图片生成服务尚未配置，工具不会出现。</InlineWarning>;
-    }
-    return "使用「模型 › 用途 › 看图」中的模型。";
-  };
+  const mediaDescription = (tool: (typeof PRIMARY_TOOL_ITEMS)[number]) =>
+    tool.name === "generate_image" && !imageGenerationReady
+      ? <InlineWarning>图片生成服务尚未配置，工具不会出现。</InlineWarning>
+      : undefined;
 
   return (
     <>
-      <SettingGroup title="代码库" headingLevel={3} description="读取、搜索和修改工作区文件。" meta={`${enabledCodeTools} / ${codeTools.length} 已启用`}>
+      <SettingGroup title="代码库" headingLevel={3} meta={`${enabledCodeTools} / ${codeTools.length} 已启用`}>
         {codeTools.map((tool) => renderToolRow(tool))}
       </SettingGroup>
 
@@ -76,15 +67,12 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
           <SettingRow
             key={tool.name}
             title={tool.label}
-            description={tool.description}
             control={<Toggle checked={bashEnabled} onChange={(next) => tools.setToolEnabled(tool.name, next)} ariaLabel={tool.label} />}
           />
         ))}
         <SettingRow
-          indent
           disabled={!bashEnabled}
           title="执行前确认"
-          description="每条命令执行前询问你；硬性拒绝规则始终生效。"
           control={
             <Toggle
               checked={bashAlwaysAsk}
@@ -99,14 +87,11 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
       {browserPluginLoaded ? <SettingGroup title="浏览器" headingLevel={3}>
         <SettingRow
           title="浏览器工具"
-          description="需要 Browser Bridge 与 Chrome 扩展；修改从下一次模型调用开始生效。"
           control={<Toggle checked={browserEnabled} onChange={toggleBrowserGroup} ariaLabel="浏览器" />}
         />
         <SettingLinkRow
-          indent
           disabled={!browserEnabled}
           title="高级设置"
-          description="按类别启用浏览器操作。"
           ariaLabel="浏览器高级设置"
           expanded={browserDetailsOpen}
           controlsId="browser-tool-details"
@@ -114,14 +99,10 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
         />
         {browserDetailsOpen ? (
           <div id="browser-tool-details" className="divide-y divide-line/60">
-            <SettingSubhead indent>执行工具</SettingSubhead>
+            <SettingSubhead>执行工具</SettingSubhead>
             {browserExecutionTools.map(renderBrowserItem)}
-            <SettingSubhead indent>敏感能力</SettingSubhead>
-            {browserCapabilities.map((tool) => renderToolRow(tool, {
-              indent: true,
-              disabled: !browserEnabled,
-              description: tool.description,
-            }))}
+            <SettingSubhead>敏感能力</SettingSubhead>
+            {browserCapabilities.map(renderBrowserItem)}
           </div>
         ) : null}
       </SettingGroup> : null}
@@ -133,7 +114,6 @@ export function ToolsSection({ settings, onUpdate, settingsV4, onUpdateNamespace
       <SettingGroup title="显示" headingLevel={3}>
         <SettingRow
           title="显示写入变动"
-          description="写入时显示增删行数，不自动展开内容。"
           control={
             <Toggle
               checked={showFileChangeStats}
