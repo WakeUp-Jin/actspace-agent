@@ -15,7 +15,6 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [子智能体与后台任务改造](active/20261103-subagent-background-redesign/README.md) | 2026-11-04 S1–S6 已实施（分支 `feat/subagent-background-redesign`，每个子计划一个本地提交，未推送）；浏览器 mock 截图完成；下一步：Electron 实机验收，见[验收交接](../exec-runs/20261103-subagent-background-redesign/acceptance-handoff.md)。 |
 | [Harness 统计](active/20261101-harness-stats.md) | 2026-11-01 T1–T12 已实现（未提交），自动化验证完成；待 Electron 真实 Host 验收后移入 completed。执行记录见 [exec-runs](../exec-runs/20261101-harness-stats/execution-summary.md)。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
@@ -31,6 +30,7 @@
 
 ## 最近完成
 
+- [子智能体与后台任务改造](completed/20261103-subagent-background-redesign/README.md)：S1–S6（留痕、后台 Bash、子智能体核心、Fork、外部 Codex / Claude Code、界面与设置）完成，验收修复 BUG-01/02/03，合入 main 的 #32（「#32 外观 + S6 数据」）；Electron 实机验收 23 点 17 通过、0 失败、6 部分覆盖（Codex 成功链路受本机 CLI 环境阻塞）。分支 `feat/subagent-background-redesign`，提 PR 合入 main。见[执行摘要](../exec-runs/20261103-subagent-background-redesign/execution-summary.md)。
 - [Markdown 编辑与渲染](completed/20261102-md-render.md)：「文档」面板的预览和源码换成同一个 CodeMirror 6 实时预览编辑器（光标所在元素露出标记、可直接编辑，T1–T16，[规范](../design-docs/frontend/front-Markdown编辑与渲染规范.md)）；聊天区 Markdown 重做（「A 书页」排版、提示框、公式、脚注、原始 HTML 白名单、路径带行号、流式平滑输出，T17–T28，[规范](../design-docs/frontend/front-聊天区Markdown渲染规范.md)）。desktop 2662 项测试与前端检查通过；1MB 文档打开 ≤ 43ms、按键 p95 ≤ 12.5ms，30KB 回复流式每次提交中位 1.7ms（原版 20ms）；2026-11-03 Codex Electron 验收 15 通过 / 0 失败 / 2 局部未覆盖，复验 0 功能失败；展开面板时顶栏标题被盖住（N1）已修。分支 `feat/md-render`，未提交。见[执行摘要](../exec-runs/20261102-md-render/execution-summary.md)。
 - [Context 面板 · Bash 命令统计](completed/20261102-context-bash-stats.md)：右侧「上下文」最底下新增「Bash 命令」卡片（调用、失败、合计耗时、程序与子命令分布）；数据走上下文历史投影，投影版本 1→2 让老会话第一次打开时补齐，不升使用统计库 Schema；desktop 2201 项测试与前端检查通过，浏览器 mock 截图完成；Electron 真实 Host 未验证，见[执行摘要](../exec-runs/20261102-context-bash-stats/execution-summary.md)。
 - [昨日修复与今日功能统一验收](completed/20261101-unified-acceptance.md)：2026-11-01 同版本64点、7组执行结束，44通过/11失败/9未覆盖；确认7问题，按6组交接。2026-11-02 7问题全部修复（读模型 schema 15→16 整库重建），定向复验23点20通过/0失败/3局部未覆盖，见[复验摘要](../exec-runs/20261102-unified-reacceptance/execution-summary.md)。原始记录见[执行摘要](../exec-runs/20261101-unified-acceptance/execution-summary.md)与[修复交接](../exec-runs/20261101-unified-acceptance/repair-handoff.md)。

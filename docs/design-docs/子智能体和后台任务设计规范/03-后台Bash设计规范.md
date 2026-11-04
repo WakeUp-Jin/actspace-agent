@@ -1,6 +1,6 @@
 # 03 后台 Bash 设计规范
 
-更新：2026-11-04。状态：已实施（S1–S6，分支 `feat/subagent-background-redesign`），待 Electron 实机验收；与本文不同的地方见[执行过程](../../exec-runs/20261103-subagent-background-redesign/execution-process.md)。依据：[01-设计决策](01-设计决策.md) 的 L3、L4、S10、B1、B2、Q1。
+更新：2026-11-04。状态：已实施（S1–S6，分支 `feat/subagent-background-redesign`），Electron 实机验收已完成（见[执行摘要](../../exec-runs/20261103-subagent-background-redesign/execution-summary.md)）；与本文不同的地方见[执行过程](../../exec-runs/20261103-subagent-background-redesign/execution-process.md)。依据：[01-设计决策](01-设计决策.md) 的 L3、L4、S10、B1、B2、Q1。
 
 ## 1. 日志文件
 

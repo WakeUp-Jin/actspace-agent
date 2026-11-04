@@ -1,6 +1,6 @@
 # 子智能体与后台任务改造 — 执行计划总览
 
-状态：S1–S6 已实施（2026-11-04，分支 `feat/subagent-background-redesign`，每个子计划一个本地提交，未推送）；待 Electron 实机验收（[验收交接](../../../exec-runs/20261103-subagent-background-redesign/acceptance-handoff.md)），验收通过后移入 `completed/`。
+状态：已完成（2026-11-04，分支 `feat/subagent-background-redesign`，S1–S6 各一个提交，另有验收修复和合入 main 的 #32）；Electron 实机验收 23 点 17 通过、0 失败、6 部分覆盖（Codex 成功链路受本机 CLI 环境阻塞），见[执行摘要](../../../exec-runs/20261103-subagent-background-redesign/execution-summary.md)。
 
 - 分支：`feat/subagent-background-redesign`，就在主工作区（用户明确要求，不另建 worktree）。
 - 设计真源：[子智能体和后台任务设计规范](../../../design-docs/子智能体和后台任务设计规范/README.md)，[01 决策](../../../design-docs/子智能体和后台任务设计规范/01-设计决策.md)、[02 子智能体](../../../design-docs/子智能体和后台任务设计规范/02-子智能体设计规范.md)、[03 后台 Bash](../../../design-docs/子智能体和后台任务设计规范/03-后台Bash设计规范.md)、[04 外部子智能体](../../../design-docs/子智能体和后台任务设计规范/04-外部子智能体设计规范.md)、[05 界面与设置](../../../design-docs/子智能体和后台任务设计规范/05-界面与设置设计规范.md)。

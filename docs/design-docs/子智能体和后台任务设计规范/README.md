@@ -1,6 +1,6 @@
 # 子智能体和后台任务设计规范
 
-更新：2026-11-04。状态：S1–S6 已实施（本地提交，未推送），待 Electron 实机验收，交接清单见[验收交接](../../exec-runs/20261103-subagent-background-redesign/acceptance-handoff.md)。分支 `feat/subagent-background-redesign`。
+更新：2026-11-04。状态：S1–S6 已实施，Electron 实机验收 23 点 17 通过、0 失败、6 部分覆盖（Codex 成功链路受本机 CLI 环境阻塞），见[执行摘要](../../exec-runs/20261103-subagent-background-redesign/execution-summary.md)与[验收交接](../../exec-runs/20261103-subagent-background-redesign/acceptance-handoff.md)。分支 `feat/subagent-background-redesign`。
 
 ## 为什么做
 
@@ -18,7 +18,7 @@
 | [04-外部子智能体设计规范](04-外部子智能体设计规范.md) | Codex / Claude Code 两个可选插件 | 已实施（后端） |
 | [05-界面与设置设计规范](05-界面与设置设计规范.md) | 对话区、子 Agent 面板、设置、插件页、轨迹、统计 | 已实施（S6） |
 
-执行计划：[20261103-subagent-background-redesign](../../exec-plans/active/20261103-subagent-background-redesign/README.md)（S1–S6）。
+执行计划：[20261103-subagent-background-redesign](../../exec-plans/completed/20261103-subagent-background-redesign/README.md)（S1–S6）。
 
 ## 现行设计（已改写为现状）
 

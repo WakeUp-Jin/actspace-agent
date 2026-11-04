@@ -2,10 +2,10 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261103-subagent-background-redesign/README.md`
+- **关联计划**：`docs/exec-plans/completed/20261103-subagent-background-redesign/README.md`
 - **执行模式**：交互（连续执行）
 - **开始时间**：2026-11-03
-- **结束时间**：2026-11-04（本地部分；验收修复后 Electron 复验待做）
+- **结束时间**：2026-11-04（含验收修复、Electron 复验与合入 main 的 #32）
 
 ## 执行时间线
 
@@ -399,6 +399,20 @@
   - 统一验证：`pnpm typecheck` exit 0；`pnpm test` exit 0（vitest 4441 通过、0 失败，根目录 node:test 98 个通过）。第一次 `pnpm test` 只有契约矩阵过期，用 `pnpm gen:contract-matrix` 重新生成后通过。
   - Electron 复验未做：X1、X4、X6、X8、X21 待复验，见 [acceptance-handoff.md](acceptance-handoff.md)「修复后复验」。
 
+### 步骤 8：Electron 复验与合入 main 的 #32
+
+- **复验**：修复后 Electron 复验 X1、X4、X6、X8、X21 全部通过（真实 Electron + CDP，Journal 独立核对），见 [acceptance-handoff.md](acceptance-handoff.md)「修复后复验结果」。合计 23 点：17 通过、0 失败、6 部分覆盖（X2、X13、X14、X15、X17、X23；Codex 成功链路被本机坏掉的 `/opt/homebrew/bin/codex` 挡住）。
+- **合入 origin/main**：main 上已合并 PR #32（子 Agent 列表分组卡、详情顶部栏精简），和 S6 改的是同一批文件，8 处冲突。用户决定「#32 外观 + S6 数据」：
+  - 列表用 #32 的分组卡（头像、描述、最近一句，右上 token，右下耗时），数据仍是 S6 的一个子智能体一行；右下补状态文字和「第 N 轮」，运行中的行保留停止按钮；组名「运行中 / 其他」。
+  - 详情顶部栏用 #32 的一行布局，加「第 N 轮」；种类放进标题悬停提示，不占顶部栏宽度（放在栏里时 Fork 标题只剩一个字）。Fork 分出行、外部详情、底部停止照旧。
+  - `chat.ts` 保留 S6（#32 的 `projectSubagentList` / `subagentChildren` 已被 S6 删除），token 改在 IPC 里给 `SubagentListItem.totalTokens` 赋值。
+- **决定**：
+  - token 缓存键改为「子智能体 id + 激活次数」，只在不运行时写入：子智能体续派后会继续累加 token，#32 按「已结束」缓存会停在第一轮。
+  - 列表的最近一句去掉 `**`、反引号和标题 / 列表标记（#32 的 `agentLatestActivity` 针对的是调用，S6 的列表项没有活动流，运行中写「正在执行」）。
+  - mock 时间改为相对当前时间，否则运行中耗时显示成几百小时。
+- **影响文件**：`fixed-renderer-ipc.ts`、`shared/session.ts`（`totalTokens`）、`AgentIdentity.tsx`、`AgentRunBlock.tsx`、`SubagentsPanel.tsx`、`mock/scenarios/subagent-trajectory.ts`、`subagents-panel.test.tsx`、`runtime-v2-fixed-renderer-projection.test.ts`；文档：设计 05 §2、`front-子Agent列表与详情顶部栏.md`、更新日志。
+- **验证**：面板测试改为分组卡断言并新增顶部栏测试；浏览器 mock 浅色 / 深色截图看过列表、探索、Fork、Codex 详情。
+
 ## 遇到的问题
 
 - 步骤 1：`default-harness.test.ts` 里替换 Loop 的测试插件继承了 agent-factory 的 `provides`，新增服务后报 `Harness service missing: agent-factory/actspace.host-readable-files`。已在测试插件里补上该服务（替换实现必须提供全部声明的服务，这是契约本身的要求）。
@@ -449,4 +463,4 @@
   - 卡片第二行和列表里最终回复的 Markdown 标记原样显示（改造前就这样），没动；
   - `lost` 通知展开后是英文 summary（没有结论段），没再翻译；
   - Space 工作台里「子 Agent」的说明仍是「一次性助手」，属于 Space 功能，没改。
-- 步骤 7 之后：Electron 复验 X1、X4、X6、X8、X21；Codex 成功链路仍被本机坏掉的 `/opt/homebrew/bin/codex` 挡住（环境问题，不是代码缺陷）。
+- 步骤 8 之后：6 个部分覆盖的点（X2、X13、X14、X15、X17、X23）没有补验；Codex 成功链路仍被本机坏掉的 `/opt/homebrew/bin/codex` 挡住（环境问题，不是代码缺陷）。合入 #32 后的面板只在浏览器 mock 里看过，没有回到 Electron。

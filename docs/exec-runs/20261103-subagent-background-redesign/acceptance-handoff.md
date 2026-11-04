@@ -1,10 +1,10 @@
 # 子智能体与后台任务改造验收交接
 
 - **代码位置**：主仓库目录 `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent`，分支 `feat/subagent-background-redesign`。S1–S6 各一个本地提交，**未推送**。这次没有开 worktree。
-- **计划**：`docs/exec-plans/active/20261103-subagent-background-redesign/README.md`
+- **计划**：`docs/exec-plans/completed/20261103-subagent-background-redesign/README.md`
 - **设计**：`docs/design-docs/子智能体和后台任务设计规范/`（02 §10、03 §4、04 §6、05 §5 的验收表合在下面）
 - **执行过程**：`execution-process.md`（同目录），与设计不同的地方都写在各步骤的「决定」里。
-- **状态**：已执行桌面真实验收（2026-11-04），未修复。最新逐点结果、缺陷与外部环境缺口见 [acceptance-results.md](acceptance-results.md)；下文原始清单保留为覆盖依据。
+- **状态**：已完成（2026-11-04）。首轮 12 通过、5 失败、6 部分覆盖；三个缺陷修复后复验 X1/X4/X6/X8/X21 全部通过，合计 17 通过、0 失败、6 部分覆盖。逐点结果见 [acceptance-results.md](acceptance-results.md) 和文末「修复后复验结果」；下文原始清单保留为覆盖依据。
 
 ## 约束
 
