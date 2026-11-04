@@ -80,6 +80,11 @@ export type ToolPreparedEnvironment = {
   readonly approvalTimeoutMs?: number;
   readonly sessionGrants?: readonly SessionGrant[] | (() => readonly SessionGrant[]);
   readonly sessionGrantCapability?: boolean;
+  /**
+   * Whose Session Grants this agent may use without adding any (subagents: the parent's main agent).
+   * Set, it lets calls pass on those grants even when `sessionGrantCapability` is false.
+   */
+  readonly sessionGrantOwner?: { readonly sessionId: string; readonly agentId: string };
   readonly trustedGrantAudiences?: ReadonlySet<string>;
   readonly journal: ToolJournalPort;
   readonly onExecutionStarted?: (call: { readonly callId: string; readonly name: string }) => void;
@@ -510,7 +515,7 @@ export class PreparedToolExecution {
     if (canonicalJson(resources) !== canonicalJson(this.#resources)) throw new ToolRuntimeError({ code: "RESOURCE_SCOPE_CHANGED", message: "Tool resources changed while approval was pending.", retryable: true, phase: "guard" });
     if (this.#admittedBySessionGrant) {
       const audience = this.registration.permission.grantAudience;
-      if (!this.#isTrustedGrantAudience(audience) || !sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}`, audience })) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "The selected Session Grant no longer covers this call.", retryable: true, phase: "approval" });
+      if (!this.#isTrustedGrantAudience(audience) || !sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { ...this.#grantSubject(), audience })) throw new ToolRuntimeError({ code: "GRANT_REVOKED", message: "The selected Session Grant no longer covers this call.", retryable: true, phase: "approval" });
     }
     if (this.#onceApproval !== undefined) {
       if (this.#onceApproval.consumedAt !== undefined || Date.now() > new Date(this.#onceApproval.expiresAt).getTime()) throw new ToolRuntimeError({ code: "APPROVAL_STALE", message: "One-time approval is no longer valid.", retryable: false, phase: "approval" });
@@ -538,19 +543,27 @@ export class PreparedToolExecution {
     return typeof grants === "function" ? grants() : grants ?? [];
   }
 
+  /** Calls may pass on Session Grants: their own (`sessionGrantCapability`) or, read-only, an owner's. */
+  #usesSessionGrants(): boolean {
+    return this.environment.sessionGrantCapability === true || this.environment.sessionGrantOwner !== undefined;
+  }
+
+  /** The Session and agent the grants were issued to. */
+  #grantSubject(): { readonly sessionId: string; readonly agentId: string } {
+    return this.environment.sessionGrantOwner ?? { sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}` };
+  }
+
   #processGrant(): SessionGrant | undefined {
     const audience = this.registration.permission.grantAudience;
-    if (!this.environment.sessionGrantCapability || !this.#isTrustedGrantAudience(audience)) return undefined;
-    return matchingProcessGrant(this.#sessionGrants(), this.#resources, {
-      sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}`, audience,
-    });
+    if (!this.#usesSessionGrants() || !this.#isTrustedGrantAudience(audience)) return undefined;
+    return matchingProcessGrant(this.#sessionGrants(), this.#resources, { ...this.#grantSubject(), audience });
   }
 
   #resolveGlobalGrant(global: ReturnType<typeof evaluateGlobalBoundary>, tool: ToolPermissionDecision): ReturnType<typeof evaluateGlobalBoundary> {
-    if (global.kind !== "ask" || tool.kind !== "allow" || !this.environment.sessionGrantCapability) return global;
+    if (global.kind !== "ask" || tool.kind !== "allow" || !this.#usesSessionGrants()) return global;
     const audience = this.registration.permission.grantAudience;
     if (!this.#isTrustedGrantAudience(audience) || global.reasons.some((reason) => !reason.reusable)) return global;
-    if (!sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { sessionId: this.input.sessionId, agentId: this.input.agentId ?? `main:${this.input.sessionId}`, audience })) return global;
+    if (!sessionGrantsCoverResources(this.#sessionGrants(), this.#resources, { ...this.#grantSubject(), audience })) return global;
     this.#admittedBySessionGrant = true;
     return { kind: "pass" };
   }

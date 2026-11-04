@@ -5,7 +5,7 @@
 - **关联计划**：`docs/exec-plans/active/20261103-subagent-background-redesign/README.md`
 - **执行模式**：交互（连续执行）
 - **开始时间**：2026-11-03
-- **结束时间**：2026-11-04（本地部分；Electron 验收待做）
+- **结束时间**：2026-11-04（本地部分；验收修复后 Electron 复验待做）
 
 ## 执行时间线
 
@@ -367,6 +367,38 @@
     - 以下检查都是 exit 0：`check:docs`、`check:current-docs`、`check:site`、`check:repo`、`check:packages`、`check:plugin-catalog`、`check:frontend-theme`、`check:frontend-tokens`、`check:ipc-channels`、`check:renderer-bridge`、`check:desktop-build-graph`、`check:secrets`、`check:v2-legacy-removal`、`check:package-cutover`、`check:harness-events`、`test:contract-matrix`、`test:package-boundaries`、`test:package-readmes`。
   - Electron 实机检查未做，交接清单见 [acceptance-handoff.md](acceptance-handoff.md)。
 
+### 步骤 7：验收修复（BUG-01 / 02 / 03）
+
+- **背景**：Electron 验收（[acceptance-results.md](acceptance-results.md)）23 点中 12 通过、5 失败、6 部分覆盖，确认三个缺陷。用户决定：BUG-01「都显示，插在轮内」；BUG-02「两头都堵」；BUG-03 按设计 02 §5.2 只读父会话授权。
+- **BUG-02（P1，X4）空闲子智能体续聊被写锁拒绝**：
+  - 原因：子智能体 Run 结束时渲染层收到子会话的 `agent_run_finished`，照主会话的做法调 `continueQueue`，AgentService `#manager(子会话)` 经 `sessions.resume` 打开子会话并一直持有写锁；之后 `send_message` 冷恢复时 `store.open` 拿不到锁。
+  - Runtime 侧：AgentService 新增端口 `providerOwnedEvents`（`managed-runs.ts` 实现：子会话 `lineage.origin === "delegation"` 时返回 Journal 事件）。`snapshot` 对子会话只用 `projectTasks` 读投影，不打开；`#manager` 遇到子会话直接抛 `SESSION_BUSY`，并清掉缓存项。
+  - 渲染侧：Run 事件带上 `parentSessionId`（adapter 从 live 事件透传）；`App.tsx` 对子会话的 Run 不刷新任务队列、结束时不续跑队列。
+- **BUG-03（P2，X6）子智能体用不上父会话的 Bash 前缀授权**：
+  - 原因：`sessionGrantCapability: false` 同时挡住了「用」和「加」；授权匹配又要求 sessionId / agentId 与调用方一致。
+  - 修复：工具环境新增 `sessionGrantOwner`（agent-factory 给子智能体填父会话和 `main:<父会话>`）。`prepared-execution` 用它查授权、记 `grant-used`；新增授权（`#grantSuggestions`）仍只看 `sessionGrantCapability`，子智能体不能加。
+- **BUG-01（P2，X1 / X8 / X21）运行中完成、退出恢复的通知没有分隔行**：
+  - 原因：投影和 live 都只显示 `opensTurn` 的领取；主会话运行中读到的通知、退出重开后入队（不唤醒）、下一轮读到的 lost 通知都被隐藏。
+  - 修复：Loop 的 `inbox-claimed` live 事件凡有 notice 都带 notice、正文和 `opensTurn`；`chat.ts` 每条带 notice 的领取都投影成 `backgroundNotice`（`opensTurn` 为布尔）；live-run 中 `opensTurn !== false` 的通知放在开头，`false` 的追加在当前位置，按 messageId 去重；桌面 `groupMessagesIntoTurns` 与 Web `buildTurns` 把 `opensTurn: false` 的通知留在当前轮（有工具时收进过程组）。
+- **决定**：
+  - Journal 的 claim 事件仍只在开轮时写 `opensTurn: true`，读侧把缺省当作轮内；`BackgroundNotice.opensTurn` 缺省（老 mock、老客户端）按开轮处理，和修复前的显示一致。
+  - 退出恢复仍只入队、不唤醒；lost 通知在用户下一轮被读到时显示在那一轮里。
+- **影响文件**：
+  - core：`agent-loop/loop.ts`、`agent-service/service.ts`、`runtime/harness/managed-runs.ts`、`runtime/harness/agent-factory-plugin.ts`、`tool-runtime/prepared-execution.ts`；
+  - shared：`session.ts`、`session-selectors.ts`（注释）、`runtime-v2/live-event.ts`；客户端：`live/stream-adapter.ts`、`live/live-run.ts`、`live/run-state.ts`、`sessions/chat.ts`；
+  - 桌面：`App.tsx`、`conversation/turns.ts`；Web：`sessions/turn-model.ts`；
+  - 文档：设计 05 §1、`agent-background-tasks.md`、`agent-subagent-runtime.md`、`agent-task-run-lifecycle.md`；契约矩阵重新生成（只变 digest）。
+- **验证**：
+  - 新增回归测试：
+    - `default-harness.test.ts`：同步派出后子会话快照为已完成、子会话没被 Runtime 打开、`send_message` 续派成功，子会话有两次完成的 Run。去掉 `service.ts` 的修复后这条失败。
+    - `runtime.test.ts`：子智能体凭父会话前缀授权直接跑 `ls`（记 `grant-used`），`cat` 返回需要批准且不新增授权，没有 owner 时拒绝。
+    - `subagent-card.test.ts`：子会话 Run 事件带 `parentSessionId`；adapter 给通知标 `opensTurn`；投影保留每条通知并标出是否开轮。
+    - `steer.test.ts`：轮内领取也发 notice，`opensTurn: false`，Journal 不写 `opensTurn`；唤醒领取为 `true`。
+    - `live-run-store.test.ts`：轮内通知追加在当前位置、按 messageId 去重、编号接在后面。
+    - `conversation-turns.test.ts`、Web `turn-model.test.ts`：轮内通知留在本轮，唤醒通知仍单独开轮。
+  - 统一验证：`pnpm typecheck` exit 0；`pnpm test` exit 0（vitest 4441 通过、0 失败，根目录 node:test 98 个通过）。第一次 `pnpm test` 只有契约矩阵过期，用 `pnpm gen:contract-matrix` 重新生成后通过。
+  - Electron 复验未做：X1、X4、X6、X8、X21 待复验，见 [acceptance-handoff.md](acceptance-handoff.md)「修复后复验」。
+
 ## 遇到的问题
 
 - 步骤 1：`default-harness.test.ts` 里替换 Loop 的测试插件继承了 agent-factory 的 `provides`，新增服务后报 `Harness service missing: agent-factory/actspace.host-readable-files`。已在测试插件里补上该服务（替换实现必须提供全部声明的服务，这是契约本身的要求）。
@@ -417,3 +449,4 @@
   - 卡片第二行和列表里最终回复的 Markdown 标记原样显示（改造前就这样），没动；
   - `lost` 通知展开后是英文 summary（没有结论段），没再翻译；
   - Space 工作台里「子 Agent」的说明仍是「一次性助手」，属于 Space 功能，没改。
+- 步骤 7 之后：Electron 复验 X1、X4、X6、X8、X21；Codex 成功链路仍被本机坏掉的 `/opt/homebrew/bin/codex` 挡住（环境问题，不是代码缺陷）。

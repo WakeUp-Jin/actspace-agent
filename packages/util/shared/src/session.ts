@@ -26,7 +26,7 @@ export type LlmUsageCost = {
 };
 
 export type RuntimeStreamEvent =
-  | { type: "agent_run_started"; sessionId: SessionId; agentRunId: AgentRunId; recoveredReset?: boolean }
+  | { type: "agent_run_started"; sessionId: SessionId; agentRunId: AgentRunId; recoveredReset?: boolean; /** Set for a subagent's Run: the main Session it belongs to. */ parentSessionId?: SessionId }
   | { type: "agent_turn_started"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; turnIndex: number }
   | { type: "agent_turn_finished"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; turnIndex: number }
   | {
@@ -115,9 +115,9 @@ export type RuntimeStreamEvent =
       maxAttempts: number;
       reason: string;
     }
-  | { type: "agent_run_aborted"; sessionId: SessionId; agentRunId: AgentRunId }
-  | { type: "agent_run_finished"; sessionId: SessionId; agentRunId: AgentRunId; resultEventIds: EventId[] }
-  | { type: "agent_run_failed"; sessionId: SessionId; agentRunId: AgentRunId; error: SessionError };
+  | { type: "agent_run_aborted"; sessionId: SessionId; agentRunId: AgentRunId; parentSessionId?: SessionId }
+  | { type: "agent_run_finished"; sessionId: SessionId; agentRunId: AgentRunId; resultEventIds: EventId[]; parentSessionId?: SessionId }
+  | { type: "agent_run_failed"; sessionId: SessionId; agentRunId: AgentRunId; error: SessionError; parentSessionId?: SessionId };
 
 export type SessionEventType =
   | "user_message"
@@ -172,6 +172,12 @@ export type BackgroundNotice = {
   taskKind: "bash" | "agent" | "subagent" | "agent_message";
   title: string;
   status: string;
+  /**
+   * true：这条通知唤醒了空闲会话、开启了这一轮，作为这一轮开头的分隔行；
+   * false：在进行中的一轮里被读到（运行中完成的任务、重启后补报的通知），分隔行留在这一轮里它被读到的位置。
+   * 老数据没有这个字段，按开启一轮处理。
+   */
+  opensTurn?: boolean;
 };
 
 export type AssistantMessagePayload = AssistantReply;
@@ -1020,7 +1026,7 @@ export type MessageBlock = {
       createdAt: string;
     }
   | ({
-      /** 空闲会话被后台任务通知唤醒的那一轮的开头分隔行；content 是通知原文。 */
+      /** 收件箱通知（后台 Bash、子智能体完成、子智能体来信）的分隔行；content 是通知原文。 */
       kind: "background_notice";
       id: EventId;
       content: string;

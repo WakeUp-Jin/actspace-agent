@@ -92,6 +92,22 @@ describe("live run store", () => {
     store.applyStreamEvent({ type: "background_notice_claimed", sessionId: "s1", agentRunId: "run-w", messageId: "n-1", notice, content: "<task_notification/>" } as never, () => undefined);
     expect(store.view("s1").blocks[0]).toMatchObject({ kind: "background_notice", id: "turn:run-w:background-notice:0", renderKey: "turn:run-w:background-notice:0", ...notice });
   });
+
+  it("keeps a notice read inside a running turn where it was read, numbered after the earlier ones", () => {
+    const store = createLiveRunStore();
+    store.start(run("s1", "run-r"));
+    const claim = (messageId: string, title: string) => store.applyStreamEvent({ type: "background_notice_claimed", sessionId: "s1", agentRunId: "run-r", messageId,
+      notice: { taskId: messageId, taskKind: "subagent", title, status: "completed", opensTurn: false }, content: "<subagent_notification/>" } as never, () => undefined);
+    store.applyStreamEvent({ type: "assistant_text_delta", sessionId: "s1", agentRunId: "run-r", delta: "working" } as never, () => undefined);
+    claim("sa-1", "探索");
+    claim("sa-1", "探索");
+    claim("sa-2", "Fork");
+    expect(store.view("s1").blocks.map((block) => [block.kind, block.id])).toEqual([
+      ["assistant", "turn:run-r:assistant:0"],
+      ["background_notice", "turn:run-r:background-notice:0"],
+      ["background_notice", "turn:run-r:background-notice:1"],
+    ]);
+  });
 });
 
 describe("task queue store", () => {

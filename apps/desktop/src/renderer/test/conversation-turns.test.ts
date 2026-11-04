@@ -33,6 +33,22 @@ describe("groupMessagesIntoTurns", () => {
     ]);
   });
 
+  it("keeps a notice read inside a running turn in that turn, where it was read", () => {
+    const notice = { taskId: "sa-1", taskKind: "subagent", title: "探索", status: "completed" };
+    const turns = groupMessagesIntoTurns([
+      msg("user", "u1"),
+      msg("agent", "spawn"),
+      msg("background_notice", "n1", { ...notice, opensTurn: false }),
+      msg("assistant", "a1"),
+      msg("background_notice", "n2", { ...notice, opensTurn: true }),
+      msg("assistant", "a2"),
+    ]);
+    expect(turns.map((turn) => [turn.user?.id ?? null, turn.notice?.id ?? null, ids(turn.messages)])).toEqual([
+      ["u1", null, ["spawn", "n1", "a1"]],
+      [null, "n2", ["a2"]],
+    ]);
+  });
+
   it("starts a turn at each user message and keeps compaction and worktree preparation on their own", () => {
     const turns = groupMessagesIntoTurns([
       msg("status", "orphan"),

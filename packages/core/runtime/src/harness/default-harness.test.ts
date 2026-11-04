@@ -132,10 +132,19 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       observeChild = undefined;
       expect(childResult).toMatchObject({ ok: true, text: expect.stringContaining("fixed loop result") });
       const childSessionId = /Subagent (\S+) \(short result\) finished\./.exec(childResult.text)![1]!;
+      // A client reading the finished child's task queue gets it without taking the child over,
+      // so the parent can still continue it (acceptance BUG-02).
+      expect((await runtime.runs.service.snapshot(childSessionId)).runs).toEqual([expect.objectContaining({ state: "completed" })]);
+      expect(sessions.getOpen(childSessionId)).toBeUndefined();
+      expect(await runtime.subagents.sendMessage({ sessionId: "conversation", callId: "follow-up", scope: parentScope, agentId: childSessionId, message: "One more" })).toMatchObject({ ok: true });
+      await vi.waitFor(() => expect(runtime.subagents.activeCount).toBe(0));
       const child = await sessions.resume(childSessionId);
       const childLedger = await TaskLedger.open(child);
-      expect(childLedger.snapshot().runs).toEqual([expect.objectContaining({ state: "completed", harness: expect.objectContaining({ revision: 1 }), result: { status: "completed", text: "fixed loop result" } })]);
-      expect(childLedger.snapshot().tasks).toEqual([expect.objectContaining({ state: "completed" })]);
+      expect(childLedger.snapshot().runs).toEqual([
+        expect.objectContaining({ state: "completed", harness: expect.objectContaining({ revision: 1 }), result: { status: "completed", text: "fixed loop result" } }),
+        expect.objectContaining({ state: "completed", result: { status: "completed", text: "fixed loop result" } }),
+      ]);
+      expect(childLedger.snapshot().tasks).toEqual([expect.objectContaining({ state: "completed" }), expect.objectContaining({ state: "completed" })]);
       expect(parentLease.revision).toBe(1);
       expect(harnesses.inspect().instances.find(item => item.generationId === parentLease.generationId)?.users).toBe(1);
       expect(harnesses.inspect().instances.find(item => item.state === "current")?.users).toBe(0);

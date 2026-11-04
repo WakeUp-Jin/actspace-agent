@@ -638,6 +638,33 @@ describe("process Session Grant execution", () => {
     expect((await run("revoked", "pnpm test"))[0]?.status).toBe("denied");
     expect(calls).toBe(2);
   });
+
+  it("lets a subagent use its parent's prefix Grant read-only, without adding one", async () => {
+    const runtime = new ToolRuntime();
+    const audience = { pluginId: "plugin.test", permissionDomain: "bash", policyVersion: 1 };
+    let calls = 0;
+    runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { calls++; return success(); } }, permission: {
+      grantAudience: audience,
+      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: "/workspace", workspaceRoot: "/workspace", noSandbox: false, dynamic: false, argv: String(args.value).split(" "), grantPrefix: [String(args.value).split(" ")[0]!] }],
+      evaluate: () => ({ kind: "ask", risk: "high", reason: "run", reusable: true }),
+      suggestGrants: () => [{ action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: "/workspace" }, label: "ls" }],
+    } });
+    const parentGrant: SessionGrant = { schemaVersion: 1, grantId: "grant-1", sessionId: "parent-1", agentId: "main:parent-1", audience, action: "process.execute", access: "execute",
+      selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: "/workspace" }, sourceRequestId: "request-1", sourceCallId: "call-0", sourceToolName: "bash", issuedAt: new Date().toISOString() } as SessionGrant;
+    const records: Array<{ type: string; data: Readonly<Record<string, RuntimeV2JsonValue>> }> = [];
+    const child = { ...environment([], { sessionGrants: [parentGrant], trustedGrantAudiences: new Set(["plugin.test\u0000bash\u00001"]), permissionRecords: records }),
+      sessionGrantCapability: false, sessionGrantOwner: { sessionId: "parent-1", agentId: "main:parent-1" }, approvalUnavailableMessage: "needs approval" };
+    const childCall = (id: string, value: string) => ({ ...call(id, { value }), sessionId: "child-1", agentId: "child-1" });
+    expect((await runtime.executeBatch([childCall("ls", "ls notes.txt")], child))[0]?.status).toBe("completed");
+    expect(records.filter(row => row.type === "permission/grant-used").map(row => row.data.grantId)).toEqual(["grant-1"]);
+    // Another prefix still needs approval, which a subagent cannot ask for; it never adds a Grant.
+    expect((await runtime.executeBatch([childCall("cat", "cat notes.txt")], child))[0]?.failure).toMatchObject({ code: "APPROVAL_REQUIRED", message: "needs approval" });
+    expect(records.some(row => row.type === "permission/grant-added")).toBe(false);
+    // Without an owner the parent's Grant is not this agent's.
+    const { sessionGrantOwner: _owner, ...unowned } = child;
+    expect((await runtime.executeBatch([childCall("ls-unowned", "ls notes.txt")], unowned))[0]?.status).toBe("denied");
+    expect(calls).toBe(1);
+  });
 });
 
 describe("automatic approval", () => {

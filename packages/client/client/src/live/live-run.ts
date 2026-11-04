@@ -136,10 +136,16 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
       }
 
       case "background_notice_claimed": {
-        // id 与 durable 选择器的 renderKey 一致，run 结束后由 durable 块接手同一行。
-        const id = `turn:${event.agentRunId}:background-notice:0`;
-        if (state.segments.some((segment) => segment.type === "background_notice")) break;
-        state.segments.unshift({ type: "background_notice", block: { kind: "background_notice", id, renderKey: id, runId: event.agentRunId, content: event.content, createdAt: new Date().toISOString(), ...event.notice } });
+        // id 与 durable 选择器的 renderKey 一致（同一 run 内按读到的顺序编号），run 结束后由 durable 块接手同一行。
+        const notices = state.segments.filter((segment) => segment.type === "background_notice");
+        if (notices.some((segment) => segment.messageId === event.messageId)) break;
+        const id = `turn:${event.agentRunId}:background-notice:${notices.length}`;
+        const segment = { type: "background_notice" as const, messageId: event.messageId, block: { kind: "background_notice" as const, id, renderKey: id, runId: event.agentRunId, content: event.content, createdAt: new Date().toISOString(), ...event.notice } };
+        // 唤醒这一轮的通知排在最前；轮内读到的接在当时已有内容之后。
+        if (event.notice.opensTurn !== false) {
+          const first = state.segments.findIndex((item) => item.type !== "background_notice");
+          state.segments.splice(first === -1 ? state.segments.length : first, 0, segment);
+        } else state.segments.push(segment);
         break;
       }
 

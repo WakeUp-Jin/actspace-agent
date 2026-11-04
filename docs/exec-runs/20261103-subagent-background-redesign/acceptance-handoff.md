@@ -4,18 +4,18 @@
 - **计划**：`docs/exec-plans/active/20261103-subagent-background-redesign/README.md`
 - **设计**：`docs/design-docs/子智能体和后台任务设计规范/`（02 §10、03 §4、04 §6、05 §5 的验收表合在下面）
 - **执行过程**：`execution-process.md`（同目录），与设计不同的地方都写在各步骤的「决定」里。
-- **状态**：可以交给验收（2026-11-04）。自动化测试与浏览器 mock 截图已过；Electron 真实会话、真实 CLI、真实模型缓存命中还没验。
+- **状态**：已执行桌面真实验收（2026-11-04），未修复。最新逐点结果、缺陷与外部环境缺口见 [acceptance-results.md](acceptance-results.md)；下文原始清单保留为覆盖依据。
 
 ## 约束
 
 - 只验收，不改源码、测试或配置；不 `git commit` / `push`。
-- 优先用原生 Computer Use。做不到的项改用 Playwright 或 CDP，并在结果里逐项写明用了哪种方式，不能把自动化写成原生操作。
+- 原生 Computer Use 与真实 Electron 的 Playwright/CDP 均可使用，按场景选择（用户 2026-11-04 补充）。结果里逐项写明实际方式，不能把自动化写成原生操作。
 - 证据（截图、日志）放在 `tmp/codex-acceptance/20261103-subagent-background-redesign/`。截图文件名带编号，例如 `X4-second-round.png`。
 - 启动方式按 `docs/FRONTEND_VERIFICATION.md`「Electron」一节：在仓库根运行 `pnpm dev`，Computer Use 用启动日志里 `[dev-runtime]` 给出的 `appName` / `appId`。需要模型连接，用用户已有的 DeepSeek 连接即可。
 
 ## 准备
 
-- **外部 CLI**：本机 `/opt/homebrew/bin/codex` 是坏的（npm 包缺 vendor 二进制），登录 shell 会先找到它，Codex 插件会报启动失败。验 Codex 前先让登录 shell 的 `PATH` 里 nvm 下的 codex-cli（0.163.0）排在前面；处理不了就把 X15 记为「未覆盖」并写明原因。Claude Code 2.1.317 可直接用。
+- **外部 CLI**：本机 `/opt/homebrew/bin/codex` 是坏的（npm 包缺 vendor 二进制），登录 shell 会先找到它，Codex 插件会报启动失败。本轮只验收，不改 PATH 或 CLI 安装；先真实执行一次，记录环境错误和界面处理，成功链路记「未覆盖」。2026-11-04 复查插件使用的 `/bin/zsh -lc` 确实先找到该坏路径；nvm 下另一份 Codex 0.163.0 不代表插件实际调用成功。Claude Code 当前解析到 `/opt/homebrew/bin/claude`，版本 2.1.318，仍需真实插件执行。
 - **插件开关**：扩展 › 插件里「Codex 子智能体」「Claude Code」默认关闭。开关和插件设置（Codex 审批策略 / 沙箱、Claude Code 权限模式）都是**重启应用后生效**，界面上分别提示「重启后开启」「设置已更改，重启后生效。」。
 - **老会话**：本机已有的带 `agent` / `explore` 委派的老会话（`delegation/*` 事件）留着，X13 要用。
 
@@ -72,3 +72,65 @@ B-A6（日志超 50MB 删最早的）、B-A7（第 6 个后台任务）、B-A8�
 ## 结果怎么写
 
 在本文件末尾追加「验收结果（日期、执行者）」一节，按编号逐项写：通过 / 失败 / 部分覆盖 / 未覆盖、方式（原生 CU / Playwright / CDP）、证据文件名；失败项写复现步骤和实际现象。
+
+## 验收结果（2026-11-04，Codex 主智能体 / gpt-6.1-sol 交互子智能体）
+
+目标为 `feat/subagent-background-redesign`，HEAD `07f853da`。本轮只验收，未修复、未修改源码或测试、未提交或推送。
+
+本轮两次 `pnpm dev:log` 均完成依赖、Runtime Harness、Electron main/preload 构建，并记录 `runtime v2 ready`。开发应用身份为 `Actspace Dev actspace-agent-2067` / `com.actspace.desktop.dev.w2067fa05`。这只证明构建和运行时启动，不代表界面验收通过。
+
+**阻塞 CU-ENV-01**：原生 `mcp__cua_repl` 的 `cua.getState()` 能发现运行中的应用；按显示名称 `getApp()` 返回 `Invalid app`，按 bundle ID、完整 `.app` 路径连接均超时并发生 kernel reset。停止并重启本轮开发应用、重置 CU 内核后，最后一次 bundle ID 连接仍在 60 秒后超时。尚不能确定工具绑定失败的根因，不能将其判定为产品 Bug。未获得窗口 AX 树或截图，未创建验收会话、发送模型请求或更改 UI 设置；没有使用 Playwright/CDP 替代原生交互。
+
+| 验收点 | 结果 | 方法与证据 |
+| --- | --- | --- |
+| X1 | 未覆盖 | 原生 CU 连接受 CU-ENV-01 阻塞 |
+| X2 | 未覆盖 | 同上 |
+| X3 | 未覆盖 | 同上 |
+| X4 | 未覆盖 | 同上 |
+| X5 | 未覆盖 | 同上 |
+| X6 | 未覆盖 | 同上 |
+| X7 | 未覆盖 | 同上 |
+| X8 | 未覆盖 | 同上 |
+| X9 | 未覆盖 | 同上 |
+| X10 | 未覆盖 | 同上 |
+| X11 | 未覆盖 | 同上 |
+| X12 | 未覆盖 | 同上 |
+| X13 | 未覆盖 | 同上 |
+| X14 | 未覆盖 | 同上 |
+| X15 | 未覆盖 | 同上；未执行外部 CLI |
+| X16 | 未覆盖 | 同上；未执行外部 CLI |
+| X17 | 未覆盖 | 同上 |
+| X18 | 未覆盖 | 同上 |
+| X19 | 未覆盖 | 同上 |
+| X20 | 未覆盖 | 同上 |
+| X21 | 未覆盖 | 同上 |
+| X22 | 未覆盖 | 同上 |
+| X23 | 未覆盖 | 同上 |
+
+本地证据（不随仓库分发）：`tmp/codex-acceptance/20261103-subagent-background-redesign/cu-report.md`、`startup-first.log`、`startup-retry.log`。无界面截图。
+
+另外，重启日志中观察到旧会话 `SESSION_WRITER_LOCKED`。源码 `packages/session/session-persistence-jsonl/src/writer-lease.ts` 的接管条件要求旧进程已退出且心跳超过默认 30 秒；因此快速重启后旧锁仍可能被拒绝接管。这是日志及源码线索，未通过 CU 复现、未证明属于本分支回归，未修复或删除锁。
+
+收尾：停止了本轮启动的两次开发进程；无验收设置变更需要恢复。后续需要原生 CU 能连接该应用后，重新执行上述验收点；本轮不能提供产品通过或失败结论。
+
+## 继续验收结果（2026-11-04，后续轮次）
+
+用户要求继续后，原生 CU 的空数据、Finder 对照和 accessibility 启动诊断仍未解除主窗口连接超时。按用户明确允许的组合方式，由 `gpt-6.1-sol` 使用 Playwright/CDP 操作真实 Electron 完成部分功能验收；这不属于原生 CU 通过。
+
+**最新逐点状态及缺陷以 [acceptance-results.md](acceptance-results.md) 为准**，上节全未覆盖是首次受阻轮次的历史记录。最新 23 点共 12 项通过、5 项失败、6 项部分覆盖（部分点内部仍有未验子项）：X1/X8/X21 通知行缺失（BUG-01，P2，通知已消费但展示只接受空闲唤醒）；X4 空闲子智能体续聊失败（BUG-02，P1，与当前 Runtime 已持有的会话写锁冲突）；X6 父会话已授予 Bash 前缀权限仍不被子智能体消费（BUG-03，P2）。Codex 成功链路因本机 Homebrew vendor ENOENT 阻塞；Claude Code、Fork 缓存及多项本地/后台交互已有真实证据。报告包含复现、源码位置、Journal 序号、证据文件及尚未定位的原因边界。
+
+没有修复或改动源码、测试，没有提交或推送；仅补充验收记录。最终重启已确认恢复浅色主题、跟随主智能体、两外部插件关闭且无待重启提示；本轮应用及开发服务已退出，保留验收会话和仅该会话的测试授权供另一个修复会话接手。文档检查通过。
+
+## 修复后复验
+
+三个缺陷已在本地修复（见[执行过程](execution-process.md)步骤 7），单测与全量测试通过。请重新构建（依赖包、Runtime Harness、Electron main/preload）后，在 Electron 里复验下面五点；其余已通过的点不用重做。
+
+| 点 | 缺陷 | 复验步骤 | 期望 |
+|---|---|---|---|
+| X1 | BUG-01 | 让主会话一边继续干活（如连续读几个文件），一边有后台子智能体在这期间完成 | 每个完成的子智能体在这一轮里出现一行通知，位置是主智能体读到它的地方；这一轮有工具时这行在「Worked for」过程组里，不另开一轮；展开能看结论、能打开子智能体 |
+| X4 | BUG-02 | 同步派出一个子智能体，等它结束（空闲）后让主智能体用 `send_message` 续派；再对后台派出、已空闲的子智能体续派一次 | 两次续派都成功启动第二轮，列表显示「第 2 轮」；日志里没有 `SESSION_WRITER_LOCKED`；子会话目录在子智能体空闲时没有残留 `.writer-lock` |
+| X6 | BUG-03 | 主会话里对某个 Bash 前缀（如 `ls`）选「本会话允许」，再让子智能体执行该前缀的命令，以及一个没授权的命令 | 已授权前缀直接执行；没授权的命令失败并返回「需要用户批准，子智能体无法请求」的说明；主会话授权列表没有子智能体新增的项 |
+| X8 | BUG-01 | 留一个运行中的后台子智能体，正常退出并重开，然后在该会话发一条新消息 | 新这一轮里出现「中断（应用退出）」通知行，位置在主智能体读到它的地方 |
+| X21 | BUG-01 | 后台 Bash 运行中退出应用，重开后在该会话发一条新消息（可与 X8 同一次退出） | 新这一轮里出现「后台任务 · Bash: … · 已失联」通知行；日志文件还在、能读 |
+
+结果写在本节下面，格式同「结果怎么写」。Codex 成功链路仍被本机 `/opt/homebrew/bin/codex`（缺 vendor 二进制）挡住，修好或删掉这份安装后再验 X14；它不是本分支缺陷。

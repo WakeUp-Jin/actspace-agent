@@ -171,6 +171,7 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
         backgroundAllowed: false,
         blockedToolMessage: (name: string) => isSubagentBlockedTool(name) ? blockedTool(name) : undefined,
         sessionGrantCapability: false,
+        ...(parentId === undefined || !host.toolEnvironment.sessionGrantCapability ? {} : { sessionGrantOwner: { sessionId: parentId, agentId: `main:${parentId}` } }),
         sessionGrants: () => {
           const parent = parentId === undefined ? undefined : sessions.getOpen(parentId);
           return parent && host.toolEnvironment.sessionGrantCapability ? activeGrants(parent) : [];

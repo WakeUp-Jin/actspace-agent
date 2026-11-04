@@ -39,7 +39,7 @@
 
 ## 子会话
 
-子会话是普通的 v2 Session：`sessions-v2/<agent_id>/journal.jsonl`，头部 `lineage` 为 `origin: "delegation"`、`parentSessionId`、`parentCallId`、`delegationDepth: 1`（fork 另有 `inheritedThroughSeq`）。不能当作主会话通过恢复入口续跑，续派走管理器自己的冷恢复：重新打开子会话，补上未正常结束的 `turn/end`，再按首次激活的路径取运行租约和 Ledger。工具集沿用创建时固定的那份，保持子会话提示词前缀稳定。
+子会话是普通的 v2 Session：`sessions-v2/<agent_id>/journal.jsonl`，头部 `lineage` 为 `origin: "delegation"`、`parentSessionId`、`parentCallId`、`delegationDepth: 1`（fork 另有 `inheritedThroughSeq`）。不能当作主会话通过恢复入口续跑，也不接受主会话的任务调度（AgentService 对子会话只读快照，不打开、不占写锁），续派走管理器自己的冷恢复：重新打开子会话，补上未正常结束的 `turn/end`，再按首次激活的路径取运行租约和 Ledger。工具集沿用创建时固定的那份，保持子会话提示词前缀稳定。
 
 ## 能力与权限
 
@@ -50,7 +50,7 @@
 | fork | 与父会话完全相同的工具列表（为了命中缓存）；不该用的在执行时拦下，返回 `Subagents cannot use <name>.` |
 
 - 深度固定 1：子会话里委派工具执行时被拦。每个主会话最多 10 个**正在运行**的子智能体（同步加后台、含外部，空闲的不算）。
-- 子智能体**不弹审批**：工具环境没有审批代理，需要审批的操作直接失败，返回「需要用户批准，子智能体无法请求」的说明文字。权限模式每次激活从父会话读取并写进子会话；会话授权只读父会话的，不能新增；沙箱照常。
+- 子智能体**不弹审批**：工具环境没有审批代理，需要审批的操作直接失败，返回「需要用户批准，子智能体无法请求」的说明文字。权限模式每次激活从父会话读取并写进子会话；会话授权只读父会话的（工具环境的 `sessionGrantOwner` 指向父会话主智能体），不能新增；沙箱照常。
 - 子会话里的 Bash 不转后台，最多 10 分钟，超时报 `BASH_TIMEOUT`。
 - 在 `plan` 模式下创建的 `general` 只拿到 `plan` 模式的工具，天然只读。
 

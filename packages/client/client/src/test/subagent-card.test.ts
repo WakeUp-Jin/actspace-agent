@@ -139,9 +139,41 @@ describe("inbox notices from subagents", () => {
     adapter.accept({ ...base, messageId: "m1", source: "subagent_notification", notice: { taskId: "sa-1", kind: "subagent", title: "Map the repo", status: "completed" } });
     adapter.accept({ ...base, messageId: "m2", source: "agent_message", notice: { taskId: "sa-1", kind: "agent_message", title: "Map the repo", status: "message" } });
     adapter.accept({ ...base, messageId: "m3", source: "steer", notice: { taskId: "x", kind: "subagent", title: "x", status: "completed" } });
+    adapter.accept({ ...base, messageId: "m4", source: "subagent_notification", opensTurn: true, notice: { taskId: "sa-2", kind: "subagent", title: "Fork", status: "failed" } });
     expect(seen).toEqual([
-      { taskId: "sa-1", taskKind: "subagent", title: "Map the repo", status: "completed" },
-      { taskId: "sa-1", taskKind: "agent_message", title: "Map the repo", status: "message" },
+      { taskId: "sa-1", taskKind: "subagent", title: "Map the repo", status: "completed", opensTurn: false },
+      { taskId: "sa-1", taskKind: "agent_message", title: "Map the repo", status: "message", opensTurn: false },
+      { taskId: "sa-2", taskKind: "subagent", title: "Fork", status: "failed", opensTurn: true },
+    ]);
+  });
+
+  it("keeps every claimed notice in the saved session, marking which one opened the turn", () => {
+    const claim = (seq: number, messageId: string, opensTurn?: boolean) => ({
+      ...envelope(seq, "agent/inbox/spliced", { operation: "claim", agentRunId: "run-1", messageId, source: "subagent_notification", notice: { taskId: messageId, kind: "subagent", title: "Map the repo", status: "completed" }, ...(opensTurn === undefined ? {} : { opensTurn }) }),
+      surface: { kind: "append", node: { kind: "user", messageId, content: "<subagent_notification />" } },
+    }) as SessionEventEnvelopeV1;
+    const saved = { ...snapshot(), messages: ["m1", "m2"].map(messageId => ({ kind: "user", messageId, content: "" })) as RuntimeV2SessionSnapshot["messages"] };
+    const notices = projectChatSession(saved, [claim(1, "m1", true), claim(2, "m2")], "/w").events
+      .flatMap(event => event.type === "user_message" ? [event.payload.backgroundNotice] : []);
+    expect(notices).toEqual([
+      { taskId: "m1", taskKind: "subagent", title: "Map the repo", status: "completed", opensTurn: true },
+      { taskId: "m2", taskKind: "subagent", title: "Map the repo", status: "completed", opensTurn: false },
+    ]);
+  });
+
+  it("marks a subagent's Run with its main Session, so the client leaves the child's task queue alone", () => {
+    const adapter = new FixedRendererStreamAdapter(() => undefined);
+    const seen: Array<{ type: string; sessionId: string; parentSessionId?: string }> = [];
+    adapter.subscribe(event => { if (event.type.startsWith("agent_run_")) seen.push(event as never); });
+    const run = (sessionId: string, agentRunId: string, message: string, child?: object) =>
+      adapter.accept({ kind: "run-state", sessionId, agentRunId, turnId: "turn-1", message, ...child } as never);
+    run("sa-1", "child-run", "started", { parentSessionId: "main", parentCallId: "call-1" });
+    run("sa-1", "child-run", "completed", { parentSessionId: "main", parentCallId: "call-1" });
+    run("main", "main-run", "started");
+    run("main", "main-run", "completed");
+    expect(seen.map(event => [event.type, event.sessionId, event.parentSessionId])).toEqual([
+      ["agent_run_started", "sa-1", "main"], ["agent_run_finished", "sa-1", "main"],
+      ["agent_run_started", "main", undefined], ["agent_run_finished", "main", undefined],
     ]);
   });
 });

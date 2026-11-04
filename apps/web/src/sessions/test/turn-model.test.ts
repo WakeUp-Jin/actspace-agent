@@ -25,6 +25,16 @@ it("keeps a context compaction as its own turn", () => {
   expect(list.map(turn => [turn.user?.content ?? null, turn.tail.map(item => item.key), turn.reply.map(item => item.key)])).toEqual([["u1", [], ["a"]], [null, ["c"], []], [null, [], ["b"]]]);
 });
 
+it("keeps a notice read inside a running turn in that turn, and lets a wake notice open its own", () => {
+  const notice = (id: string, opensTurn: boolean, s: number) => ({ kind: "background_notice", id, taskId: id, taskKind: "subagent", title: id, status: "completed", opensTurn, content: "", createdAt: t(s) } as MessageBlock);
+  const list = turns([user("u1"), read("r", 1), notice("n1", false, 2), text("a", 3), notice("n2", true, 4), text("b", 5)]);
+  expect(list.map(turn => [turn.user?.content ?? null, turn.process.map(item => item.key), turn.reply.map(item => item.key), turn.tail.map(item => item.key)])).toEqual([
+    ["u1", ["explore:r", "n1"], ["a"], []],
+    [null, [], [], ["n2"]],
+    [null, [], ["b"], []],
+  ]);
+});
+
 it("measures worked time from the first process block to the reply", () => {
   const [turn] = turns([user("u1"), read("r", 1), text("reply", 73)]);
   expect(workedMs(turn!)).toBe(72_000);

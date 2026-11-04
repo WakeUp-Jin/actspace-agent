@@ -120,7 +120,7 @@ export function projectChatEvents(
     if (event.type === "user/message" || (event.type === "agent/inbox/spliced" && string(data.operation) === "claim")) {
       const node = appendNode(event);
       if (node === null || !activeSurface.showsMessage(node.messageId, event.seq)) continue;
-      projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index, string(data.source) ?? undefined, data.opensTurn === true ? backgroundNotice(data.notice) : undefined);
+      projectSurfaceNode(projected, node, { ...base, id: eventId(event) }, index, string(data.source) ?? undefined, backgroundNotice(data.notice, data.opensTurn === true));
       continue;
     }
     if (event.type === "assistant/message") {
@@ -764,9 +764,9 @@ function identityFor(event: SessionEventEnvelopeV1, data: EventRecord, index: Ev
   return { requestId, turnId, stepId, agentRunId };
 }
 
-function backgroundNotice(value: RuntimeV2JsonValue | undefined): BackgroundNotice | undefined {
+function backgroundNotice(value: RuntimeV2JsonValue | undefined, opensTurn: boolean): BackgroundNotice | undefined {
   const notice = record(value); const taskId = string(notice.taskId); const kind = notice.kind;
-  return taskId && (kind === "bash" || kind === "agent" || kind === "subagent" || kind === "agent_message") ? { taskId, taskKind: kind, title: string(notice.title) ?? taskId, status: string(notice.status) ?? "completed" } : undefined;
+  return taskId && (kind === "bash" || kind === "agent" || kind === "subagent" || kind === "agent_message") ? { taskId, taskKind: kind, title: string(notice.title) ?? taskId, status: string(notice.status) ?? "completed", opensTurn } : undefined;
 }
 function appendNode(event: SessionEventEnvelopeV1) { return event.surface?.kind === "append" ? event.surface.node : null; }
 function contentBlocks(value: RuntimeV2JsonValue): readonly EventRecord[] { return Array.isArray(value) ? value.filter(isRecord) : []; }

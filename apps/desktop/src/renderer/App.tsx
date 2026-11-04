@@ -762,7 +762,8 @@ export function App() {
       }
       if (event.type === "agent_run_started" && run && !event.recoveredReset) {
         run.recovered = false;
-        void refreshTaskQueue(event.sessionId);
+        // 子智能体的 run 不经过 Host 任务队列；查它的队列会让 Runtime 去接管子会话。
+        if (!event.parentSessionId) void refreshTaskQueue(event.sessionId);
       }
       if (run && run.agentRunId !== event.agentRunId) return;
       if ((event.type === "tool_approval_required" || event.type === "tool_approval_resolved") &&
@@ -802,6 +803,7 @@ export function App() {
         void readSessionPage(event.sessionId).finally(() => {
           if (!liveRuns.end(event.sessionId, run)) return;
           if (activeSessionIdRef.current === event.sessionId) void refreshReviewSummary();
+          if (event.parentSessionId) return;
           void continueQueueRef.current(event.sessionId, event.type === "agent_run_finished" ? "completed" : event.type === "agent_run_aborted" ? "aborted" : "failed");
         });
       }
