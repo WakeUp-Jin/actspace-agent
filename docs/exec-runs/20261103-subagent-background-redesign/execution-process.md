@@ -11,7 +11,7 @@
 
 ### 步骤 0：开工前基线
 
-- **操作**：在分支 `子智能体功能完善`（ae5be208 之上，只有文档改动）跑 `pnpm typecheck`、`pnpm test`。
+- **操作**：在分支 `feat/subagent-background-redesign`（ae5be208 之上，只有文档改动）跑 `pnpm typecheck`、`pnpm test`。
 - **验证**：`pnpm typecheck` 通过。第一次 `pnpm test` 在 `test:contract-matrix` 失败：`agent-contract-matrix.generated.md` 在 main（ae5be208）上已过期，与本次改动无关（stash 后在干净 main 上同样失败）。用 `node scripts/contract-matrix/generate.mjs` 重新生成（2 行 digest 变化）后完整 `pnpm test` 通过，desktop 2663 passed / 7 skipped。此后以「全部通过」为基线。
 
 ### 步骤 1：S1 契约与留痕地基

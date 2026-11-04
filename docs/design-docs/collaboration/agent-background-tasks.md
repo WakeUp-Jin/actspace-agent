@@ -1,6 +1,6 @@
 # 后台任务：后台 Bash 与任务工具
 
-> 状态：已实施（2026-11-04，分支 `子智能体功能完善`，S2、S3、S6）。设计依据见 [03 后台 Bash 设计规范](../子智能体和后台任务设计规范/03-后台Bash设计规范.md) 与 [01 决策](../子智能体和后台任务设计规范/01-设计决策.md)；实现记录见[执行过程](../../exec-runs/20261103-subagent-background-redesign/execution-process.md)。
+> 状态：已实施（2026-11-04，分支 `feat/subagent-background-redesign`，S2、S3、S6）。设计依据见 [03 后台 Bash 设计规范](../子智能体和后台任务设计规范/03-后台Bash设计规范.md) 与 [01 决策](../子智能体和后台任务设计规范/01-设计决策.md)；实现记录见[执行过程](../../exec-runs/20261103-subagent-background-redesign/execution-process.md)。
 >
 > 本文原先把 Bash 和后台子智能体放在同一张登记表里。现在**后台任务只剩 Bash**；子智能体有自己的管理器、工具和事件，见[子智能体运行规范](agent-subagent-runtime.md)。
 

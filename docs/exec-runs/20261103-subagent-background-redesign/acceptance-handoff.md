@@ -1,6 +1,6 @@
 # 子智能体与后台任务改造验收交接
 
-- **代码位置**：主仓库目录 `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent`，分支 `子智能体功能完善`。S1–S6 各一个本地提交，**未推送**。这次没有开 worktree。
+- **代码位置**：主仓库目录 `/Users/wakeup-jin/Desktop/code-project/side-project/actspace-agent`，分支 `feat/subagent-background-redesign`。S1–S6 各一个本地提交，**未推送**。这次没有开 worktree。
 - **计划**：`docs/exec-plans/active/20261103-subagent-background-redesign/README.md`
 - **设计**：`docs/design-docs/子智能体和后台任务设计规范/`（02 §10、03 §4、04 §6、05 §5 的验收表合在下面）
 - **执行过程**：`execution-process.md`（同目录），与设计不同的地方都写在各步骤的「决定」里。

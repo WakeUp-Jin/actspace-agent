@@ -1,6 +1,6 @@
 # 子智能体和后台任务设计规范
 
-更新：2026-11-04。状态：S1–S6 已实施（本地提交，未推送），待 Electron 实机验收，交接清单见[验收交接](../../exec-runs/20261103-subagent-background-redesign/acceptance-handoff.md)。分支 `子智能体功能完善`。
+更新：2026-11-04。状态：S1–S6 已实施（本地提交，未推送），待 Electron 实机验收，交接清单见[验收交接](../../exec-runs/20261103-subagent-background-redesign/acceptance-handoff.md)。分支 `feat/subagent-background-redesign`。
 
 ## 为什么做
 

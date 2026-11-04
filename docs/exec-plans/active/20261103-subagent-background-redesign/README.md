@@ -1,8 +1,8 @@
 # 子智能体与后台任务改造 — 执行计划总览
 
-状态：S1–S6 已实施（2026-11-04，分支 `子智能体功能完善`，每个子计划一个本地提交，未推送）；待 Electron 实机验收（[验收交接](../../../exec-runs/20261103-subagent-background-redesign/acceptance-handoff.md)），验收通过后移入 `completed/`。
+状态：S1–S6 已实施（2026-11-04，分支 `feat/subagent-background-redesign`，每个子计划一个本地提交，未推送）；待 Electron 实机验收（[验收交接](../../../exec-runs/20261103-subagent-background-redesign/acceptance-handoff.md)），验收通过后移入 `completed/`。
 
-- 分支：`子智能体功能完善`，就在主工作区（用户明确要求，不另建 worktree）。
+- 分支：`feat/subagent-background-redesign`，就在主工作区（用户明确要求，不另建 worktree）。
 - 设计真源：[子智能体和后台任务设计规范](../../../design-docs/子智能体和后台任务设计规范/README.md)，[01 决策](../../../design-docs/子智能体和后台任务设计规范/01-设计决策.md)、[02 子智能体](../../../design-docs/子智能体和后台任务设计规范/02-子智能体设计规范.md)、[03 后台 Bash](../../../design-docs/子智能体和后台任务设计规范/03-后台Bash设计规范.md)、[04 外部子智能体](../../../design-docs/子智能体和后台任务设计规范/04-外部子智能体设计规范.md)、[05 界面与设置](../../../design-docs/子智能体和后台任务设计规范/05-界面与设置设计规范.md)。
 - 执行记录：`docs/exec-runs/20261103-subagent-background-redesign/`（开工时从模板建 `execution-process.md`、`execution-summary.md`，按子计划分节）。
 - 执行模式：交互模式下连续执行。全部子计划一次做完，只在遇到阻塞或需要用户决定的事时停下。
