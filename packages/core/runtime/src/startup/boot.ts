@@ -8,7 +8,7 @@ import type { DiagnosticInput } from "../projection/diagnostics.js";
 import { sandboxStatusDiagnostic } from "./sandbox-status.js";
 import { SESSION_CODEC_HOST_PORT_ID } from "@actspace/session-journal";
 import { hostTransportPatches, loadBuiltinToolCodec, toolTransportPatches } from "../profiles/composition.js";
-import { harnessEntriesMissingHostCapabilities } from "../plugin-catalog.js";
+import { harnessEntriesMissingHostCapabilities, harnessEntriesOffByDefault } from "../plugin-catalog.js";
 import type { EventCodec } from "@actspace/session-journal";
 import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
 import { LlmService } from "@actspace/llm-service";
@@ -56,8 +56,13 @@ export type BootRuntimeOptions = {
   readonly hostServices?: RuntimeHostServices;
   /** Boot this Harness selection instead of the built-in one; the data root must hold no selection history. */
   readonly pinnedHarness?: import("../harness/agent-host-port.js").PinnedHarness;
-  /** Session plugin Entry ids the Host switched off; they join `disabledHarnessEntries` even when their Host capabilities are present. */
+  /**
+   * Session plugin Entry ids the Host switched off; they join `disabledHarnessEntries` even when their Host capabilities are present.
+   * Absent: the Host has no plugin switches and every plugin that is off by default stays off.
+   */
   readonly disabledPlugins?: readonly string[];
+  /** Plugin settings by plugin Entry id, over the manifest's `config` defaults (e.g. the external subagents' permission settings). */
+  readonly pluginConfig?: Readonly<Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>>>;
   /** Record Harness runtime stats under `<dataRoot>/harness-stats` (default true). Ephemeral runs pass false so they leave no stats behind. */
   readonly harnessStats?: boolean;
 };
@@ -147,8 +152,9 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
     // Hosts without a model list still publish the port, so subagent tools see an empty list rather than a missing service.
     [MODELS_HOST_PORT_ID]: hostServices.services[MODELS_HOST_PORT_ID] ?? EMPTY_MODELS_HOST_PORT,
     [AGENT_RUNTIME_HOST_PORT_ID]: Object.freeze({
-      disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...harnessEntriesMissingHostCapabilities(options.host.capabilityCeiling), ...(options.disabledPlugins ?? [])],
+      disabledHarnessEntries: [...toolTransportPatches(composition).filter(row => row.disabled).map(row => row.id), ...harnessEntriesMissingHostCapabilities(options.host.capabilityCeiling), ...(options.disabledPlugins ?? harnessEntriesOffByDefault())],
       authorizeHarness: options.authorizeHarness,
+      ...(options.pluginConfig ? { harnessEntryConfig: options.pluginConfig } : {}),
       ...(harnessStats ? { observeHarnessMount: harnessStats.observeMount } : {}),
       ...(options.pinnedHarness ? { pinnedHarness: options.pinnedHarness } : {}),
       evolution: {
@@ -318,6 +324,7 @@ function createSubagentHost(manager: () => import("@actspace/subagent").Subagent
   const port: import("@actspace/subagent").SubagentHostPort = {
     spawn: input => manager().spawn(input),
     spawnFork: input => manager().spawnFork(input),
+    spawnExternal: (backend, input) => manager().spawnExternal(backend, input),
     sendMessage: input => manager().sendMessage(input),
     waitForInput: input => manager().waitForInput(input),
     listAgents: input => manager().listAgents(input),

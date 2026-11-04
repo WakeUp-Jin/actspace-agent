@@ -41,7 +41,7 @@ kind: "package-map"
 | [`image/`](image/README.md) | 生成图片、看图片的工具 | 2 | 会话 |
 | [`todo/`](todo/README.md) | 待办工具与待办视图 | 1 | 全局、会话 |
 | [`background-tasks/`](background-tasks/README.md) | 后台任务登记表与后台任务工具 | 2 | 会话、库 |
-| [`subagent/`](subagent/README.md) | 子智能体管理器与子智能体工具 | 2 | 会话、库 |
+| [`subagent/`](subagent/README.md) | 子智能体管理器、子智能体工具，以及用本机 Codex / Claude Code 跑子任务 | 4 | 会话、库 |
 | [`sandbox/`](sandbox/README.md) | 命令沙箱：策略与后端 | 3 | 会话 |
 | [`approval/`](approval/README.md) | 危险操作的人工审批与模型自动审批 | 2 | 会话 |
 | [`harness-evolution/`](harness-evolution/README.md) | Harness 的选择、热替换、评估、运行时统计与插件开发 | 5 | 会话、库 |

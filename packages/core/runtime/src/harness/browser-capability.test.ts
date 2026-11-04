@@ -12,7 +12,10 @@ import { createRuntimeHostServices } from "../startup/host-services.js";
 
 const BASE_CAPABILITIES = ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const;
 
-/** Boot the checked-in tree and report the Harness's tool names. `browser-tools` is gated only by the Host capability ceiling. */
+/**
+ * Boot the checked-in tree and report the Harness's tool names. `browser-tools` needs the Host capability and an
+ * enabled switch; a Host that passes no switches keeps every default-off plugin off.
+ */
 async function bootToolNames(capabilities: readonly string[], disabledPlugins?: readonly string[]): Promise<readonly string[]> {
   const root = await mkdtemp(join(tmpdir(), "browser-capability-"));
   const host = { hostKind: "cli-run" as const, capabilityCeiling: capabilities as typeof BASE_CAPABILITIES, runtimeContract: "actspace.runtime.v2" as const, invocationId: "test" };
@@ -43,7 +46,8 @@ async function bootToolNames(capabilities: readonly string[], disabledPlugins?: 
 
 describe("Host capability rule for optional Harness entries", () => {
   it("lists only optional entries whose manifest requires a missing capability", () => {
-    expect(harnessEntriesMissingHostCapabilities(["filesystem.read"])).toEqual(["browser-tools"]);
+    // The external subagents need `process`.
+    expect(harnessEntriesMissingHostCapabilities(["filesystem.read"])).toEqual(["browser-tools", "subagent-codex", "subagent-claude-code"]);
     expect(harnessEntriesMissingHostCapabilities([...BASE_CAPABILITIES, "browser"])).toEqual([]);
   });
 
@@ -51,8 +55,10 @@ describe("Host capability rule for optional Harness entries", () => {
     expect(await bootToolNames(BASE_CAPABILITIES)).not.toContain("browser_help");
   }, 15_000);
 
-  it("loads browser-tools when the Host has the browser capability", async () => {
-    expect(await bootToolNames([...BASE_CAPABILITIES, "browser"])).toContain("browser_help");
+  it("loads browser-tools when the Host has the browser capability and the switch is on", async () => {
+    expect(await bootToolNames([...BASE_CAPABILITIES, "browser"], [])).toContain("browser_help");
+    // No switches at all: default-off plugins stay off.
+    expect(await bootToolNames([...BASE_CAPABILITIES, "browser"])).not.toContain("browser_help");
   }, 15_000);
 
   it("keeps browser-tools out when the plugin switch is off, even with the browser capability", async () => {

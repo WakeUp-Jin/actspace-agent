@@ -197,3 +197,15 @@ it("registers the sandbox manager and both backends as replaceable Harness entri
   expect(rows.get("sandbox-nono")).toEqual(["sandbox-nono", [], ["sandbox", "actspace.host.sandbox"]]);
   expect(rows.get("sandbox-seatbelt")).toEqual(["sandbox-seatbelt", [], ["sandbox", "actspace.host.sandbox"]]);
 });
+
+it("puts the Host's plugin settings over each manifest's config defaults", async () => {
+  const { prepareDefaultHarnessArtifact } = await import("./default-harness.js");
+  const artifactRoot = await mkdtemp(join(tmpdir(), "actspace-entry-config-"));
+  try {
+    const request = await prepareDefaultHarnessArtifact({ artifactRoot, hostCapabilities: ["process"], entryConfig: { "subagent-codex": { sandbox: "read-only" } } });
+    const config = (id: string) => request.composition.entries.find(entry => entry.entryId === id)?.config;
+    expect(config("subagent-codex")).toEqual({ approvalPolicy: "never", sandbox: "read-only" });
+    expect(config("subagent-claude-code")).toEqual({ permissionMode: "dontAsk" });
+    expect(config("shell-tools")).toEqual({});
+  } finally { await rm(artifactRoot, { recursive: true, force: true }); }
+});

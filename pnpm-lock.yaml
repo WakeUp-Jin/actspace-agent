@@ -1277,6 +1277,12 @@ importers:
       '@actspace/subagent':
         specifier: workspace:*
         version: link:../../subagent/subagent
+      '@actspace/subagent-claude-code':
+        specifier: workspace:*
+        version: link:../../subagent/subagent-claude-code
+      '@actspace/subagent-codex':
+        specifier: workspace:*
+        version: link:../../subagent/subagent-codex
       '@actspace/tool-background-tasks':
         specifier: workspace:*
         version: link:../../background-tasks/tool-background-tasks
@@ -2187,6 +2193,62 @@ importers:
         specifier: workspace:*
         version: link:../../core/tool-runtime
     devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/subagent/subagent-claude-code:
+    dependencies:
+      '@actspace/agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/subagent':
+        specifier: workspace:*
+        version: link:../subagent
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+    devDependencies:
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.12.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@24.12.4)(jsdom@26.1.0)(lightningcss@1.32.0)
+
+  packages/subagent/subagent-codex:
+    dependencies:
+      '@actspace/agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/subagent':
+        specifier: workspace:*
+        version: link:../subagent
+      '@actspace/tool-runtime':
+        specifier: workspace:*
+        version: link:../../core/tool-runtime
+    devDependencies:
+      '@actspace/shared':
+        specifier: workspace:*
+        version: link:../../util/shared
       '@types/node':
         specifier: ^24.0.3
         version: 24.12.4

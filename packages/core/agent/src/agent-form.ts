@@ -26,6 +26,8 @@ export const MAIN_AGENT_FORM = Object.freeze({
     Object.freeze({ id: "actspace.todo", version: 1, required: true, toolNames: Object.freeze(["todo_read", "todo_write"]) }),
     Object.freeze({ id: "actspace.background-tasks", version: 1, required: true, toolNames: Object.freeze(["task_list", "task_output", "task_stop", "task_wait"]) }),
     Object.freeze({ id: "actspace.subagent", version: 2, required: true, toolNames: Object.freeze(["agent", "agent_fork", "send_message", "wait_agent", "list_agents", "interrupt_agent", "list_subagent_models"]) }),
+    Object.freeze({ id: "actspace.subagent-codex", version: 1, required: false, toolNames: Object.freeze(["agent_codex"]) }),
+    Object.freeze({ id: "actspace.subagent-claude-code", version: 1, required: false, toolNames: Object.freeze(["agent_claude_code"]) }),
     Object.freeze({ id: "actspace.compaction", version: 1, required: true, toolNames: Object.freeze([]) }),
     Object.freeze({ id: "actspace.browser-tools", version: 2, required: false, toolNames: Object.freeze([
       "browser_cua", "browser_dom", "browser_locator", "browser_navigation", "browser_tabs", "browser_user",

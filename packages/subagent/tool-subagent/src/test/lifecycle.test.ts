@@ -17,7 +17,7 @@ function setup() {
     journal: { recordDispatch: async () => {}, checkpointBeforeBody: async () => {}, commitResult: async () => {} }, createArtifact: async () => { throw Error("unused"); },
   };
   const run = async (name: string, args: unknown) => (await tools.executeBatch([{ name, callId: `${name}-1`, arguments: args, sessionId: "s", agentRunId: "r", turnId: "t", stepId: "step" }], env))[0]!;
-  return { provided, run, calls, cleanup: () => cleanup!() };
+  return { provided, run, calls, tools, cleanup: () => cleanup!() };
 }
 
 describe("subagent tools plugin lifecycle", () => {
@@ -28,7 +28,7 @@ describe("subagent tools plugin lifecycle", () => {
   });
 
   it("registers the seven subagent tools, forwards calls to the Host and removes them on dispose", async () => {
-    const { provided, run, calls, cleanup } = setup();
+    const { provided, run, calls, tools, cleanup } = setup();
     expect((provided.get("tools.subagents") as { registrations: { name: string }[] }).registrations.map(item => item.name)).toEqual(["agent", "agent_fork", "send_message", "wait_agent", "list_agents", "interrupt_agent", "list_subagent_models"]);
     expect((await run("agent", {})).status).toBe("failed");
     const spawned = await run("agent", { description: "review auth", prompt: "Review it." });
@@ -40,6 +40,10 @@ describe("subagent tools plugin lifecycle", () => {
     expect((await run("agent_fork", { description: "try B", prompt: "Try the other approach.", background: false })).status).toBe("completed");
     expect(calls.at(-1)).toMatchObject({ name: "spawnFork", input: { sessionId: "s", callId: "agent_fork-1", description: "try B", prompt: "Try the other approach.", background: false } });
     expect((calls.at(-1) as { input: { parentToolNames: string[] } }).input.parentToolNames).toContain("agent_fork");
+    // Without a model the fork keeps the parent's, so its text differs from agent's.
+    const schema = (name: string) => tools.registry.listDefinitions().find(item => item.name === name)!.inputSchema as { properties: { model: { description: string } } };
+    expect(schema("agent_fork").properties.model.description).toBe("Model key from list_subagent_models. Omit to use the parent's model (keeps the prompt cache).");
+    expect(schema("agent").properties.model.description).toBe("Model key from list_subagent_models. Omit to use the default subagent model.");
     expect((await run("wait_agent", {})).status).toBe("completed");
     expect(calls.at(-1)).toMatchObject({ name: "waitForInput", input: { timeoutMs: 30000 } });
     expect((await run("wait_agent", { timeout_ms: 5000 })).status).toBe("failed");

@@ -1,18 +1,21 @@
 import { randomUUID } from "node:crypto";
+import { existsSync, realpathSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
 import { MainAgentInbox } from "@actspace/agent";
 import type { AgentLoop } from "@actspace/agent-loop";
 import type { AgentScope } from "@actspace/scope";
 import type { ModelsHostPort } from "@actspace/shared";
 import {
   BACKGROUND_WAKE_KIND, EMPTY_SUBAGENT_TREE, CONTEXT_TRACE_DETAIL_LABEL, lastActivationModel, listedSubagents, reduceSubagentTree, runningActivation,
-  type RuntimeV2AgentMode, type RuntimeV2JsonValue, type SubagentActivationStatus, type SubagentPreset, type SubagentTree, type SubagentView,
+  type RuntimeV2AgentMode, type RuntimeV2JsonValue, type SubagentActivationStatus, type SubagentKind, type SubagentPreset, type SubagentTree, type SubagentView,
 } from "@actspace/shared/runtime-v2";
 import { FORKED_SUBAGENT_PRESET_ID, resolveSessionWorkspaceRoot, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { applySessionRecovery, type SessionHandle, type SessionStore } from "@actspace/session-persistence";
 import { createChildSession } from "./child-session.js";
+import { firstErrorLine, type ExternalRun, type ExternalRunResult, type ExternalSubagentBackend, type SpawnExternalInput } from "./external.js";
 import { resolveForkBoundary } from "./fork-boundary.js";
 import {
-  agentMessage, backgroundStarted, blockedTool, CANNOT_MESSAGE_SELF, externalCannotReceive, INPUT_ARRIVED, interruptRequested, messageDelivered,
+  agentMessage, backgroundStarted, blockedTool, CANNOT_MESSAGE_SELF, EXTERNAL_LOG_WAIT_MS, externalCannotReceive, externalStartFailed, INPUT_ARRIVED, interruptRequested, messageDelivered,
   movedToBackground, notRunning, settleSummary, SUBAGENT_CONCURRENCY_LIMIT, SUBAGENT_LIMIT_REACHED, SUBAGENT_MAX_STEPS, SUBAGENT_SYNC_WAIT_MS,
   subagentNotification, syncResult, taskGuidance, truncateUtf8, unknownAgent, unknownEffort, unknownModel, waitTimedOut, type AgentRelation,
 } from "./messages.js";
@@ -73,6 +76,7 @@ export type SubagentManagerOptions = {
   readonly limit?: number;
   readonly maxSteps?: number;
   readonly pollMs?: number;
+  readonly externalLogWaitMs?: number;
 };
 
 type Settled = { readonly status: SubagentActivationStatus; readonly error?: string; readonly text: string; readonly truncated: boolean };
@@ -82,10 +86,11 @@ type Activation = {
   readonly agentId: string;
   readonly activationId: string;
   readonly description: string;
-  readonly kind: "local" | "fork";
+  readonly kind: SubagentKind;
   /** `local` only. */
   readonly preset?: SubagentPreset;
-  readonly transcriptPath: string;
+  /** An external run's record path is known only once its CLI has started. */
+  transcriptPath: string;
   readonly toolNames: readonly string[];
   readonly model: SubagentModelConfiguration;
   /** A fork's first Turn runs with the parent's selected skills. */
@@ -206,6 +211,47 @@ export class SubagentManager implements SubagentHostPort {
     return this.#awaitSync(activation, input.signal, detail);
   }
 
+  /**
+   * `agent_codex` / `agent_claude_code` (design 04): run the CLI once in the workspace. It shares the limit,
+   * events, notices and `list_agents` with local subagents; its record is the CLI's own session log.
+   */
+  async spawnExternal(backend: ExternalSubagentBackend, input: SpawnExternalInput): Promise<SubagentToolOutcome> {
+    const caller = await this.#caller(input);
+    if (!caller.ok) return caller.outcome;
+    if (!caller.isRoot) return fail("SUBAGENT_BLOCKED", blockedTool(backend.toolName));
+    if (this.#running(caller.rootId) >= this.#limit) return fail("SUBAGENT_LIMIT", SUBAGENT_LIMIT_REACHED);
+    const root = caller.root;
+    const cwd = resolveSessionWorkspaceRoot(root.header, root.journal);
+    if (!cwd) return fail("WORKSPACE_UNAVAILABLE", `Session ${caller.rootId} has no workspace.`);
+    const agentId = randomUUID();
+    const { kind, label } = backend;
+    const activation = this.#reserve({ rootId: caller.rootId, agentId, description: input.description, kind, transcriptPath: "", toolNames: [], model: input.model ? { model: input.model } : {}, delivery: input.background ? "parent" : "caller" });
+    let run: ExternalRun;
+    try {
+      run = await backend.start({ prompt: input.prompt, cwd, ...(input.model ? { model: input.model } : {}), signal: activation.controller.signal });
+    } catch (error) {
+      this.#active.delete(agentId);
+      return fail("SUBAGENT_FAILED", externalStartFailed(label, firstErrorLine(error)));
+    }
+    const transcriptPath = activation.transcriptPath = run.transcriptPath;
+    try {
+      await root.append(coreEvent("subagent/spawned", { agentId, callId: input.callId, kind, description: input.description, transcriptPath, createdAt: this.#now() }));
+      await root.append(coreEvent("subagent/activation", startData(activation, { trigger: "spawn", callId: input.callId, background: input.background, startedAt: this.#now() })));
+      await root.flush();
+    } catch (error) {
+      this.#active.delete(agentId);
+      await run.interrupt().catch(report(this.options.onError));
+      return fail("SUBAGENT_FAILED", errorText(error));
+    }
+    this.#track(this.#runExternal(activation, run));
+    // The path joins the active paths only once the CLI has written the file (design 04 §3.3).
+    const logReady = await waitForFile(transcriptPath, activation.result.promise, this.options.externalLogWaitMs ?? EXTERNAL_LOG_WAIT_MS);
+    const detail = details({ agentId, description: input.description, kind, transcriptPath, background: input.background, trace: logReady });
+    const text = { external: label, logMissing: !logReady };
+    if (input.background) return ok(backgroundStarted({ agentId, description: input.description, transcriptPath, ...text }), detail);
+    return this.#awaitSync(activation, input.signal, detail, text);
+  }
+
   async sendMessage(input: SubagentCaller & { readonly agentId: string; readonly message: string }): Promise<SubagentToolOutcome> {
     const caller = await this.#caller(input);
     if (!caller.ok) return caller.outcome;
@@ -315,7 +361,7 @@ export class SubagentManager implements SubagentHostPort {
     for (const agent of listedSubagents(subagentTree(root))) {
       const open = runningActivation(agent);
       if (!open || this.#active.get(agent.agentId)?.activationId === open.activationId) continue;
-      const summary = settleSummary({ agentId: agent.agentId, description: agent.description, status: "lost" });
+      const summary = settleSummary({ agentId: agent.agentId, description: agent.description, status: "lost", external: isExternal(agent.kind) });
       await root.append(coreEvent("subagent/activation", { op: "settle", agentId: agent.agentId, activationId: open.activationId, status: "lost", summary, delivery: "lost", endedAt: this.#now() }));
       await new MainAgentInbox(root).enqueue(subagentNotification({ agentId: agent.agentId, description: agent.description, status: "lost", summary, transcriptPath: agent.transcriptPath }), { taskId: agent.agentId, kind: "subagent", title: agent.description, status: "lost" }, { source: "subagent_notification" });
     }
@@ -369,9 +415,29 @@ export class SubagentManager implements SubagentHostPort {
   }
 
   #begin(activation: Activation, scope: AgentScope, first: FirstTurn): void {
-    const run = this.#run(activation, scope, first).catch(report(this.options.onError));
+    this.#track(this.#run(activation, scope, first));
+  }
+
+  /** Shutdown waits for every tracked run. */
+  #track(work: Promise<void>): void {
+    const run = work.catch(report(this.options.onError));
     this.#runs.add(run);
     void run.finally(() => this.#runs.delete(run));
+  }
+
+  /** Wait for the CLI to exit; stopping the activation stops the process. Settles under the child lock. */
+  async #runExternal(activation: Activation, run: ExternalRun): Promise<void> {
+    const { controller } = activation;
+    const stop = () => { void run.interrupt().catch(report(this.options.onError)); };
+    controller.signal.addEventListener("abort", stop, { once: true });
+    if (controller.signal.aborted) stop();
+    let result: ExternalRunResult;
+    try { result = await run.result; }
+    catch (error) { result = { status: "failed", text: "", error: firstErrorLine(error) }; }
+    finally { controller.signal.removeEventListener("abort", stop); }
+    const status = controller.signal.aborted && result.status !== "completed" ? "interrupted" : result.status;
+    const outcome = status === "failed" ? { status, error: result.error ?? "unknown error" } : { status };
+    await this.#lock.run(activation.agentId, () => this.#settle(activation, undefined, outcome, result.text));
   }
 
   /** Set up the Run, drive Turns until no message is left, then settle under the child lock. */
@@ -432,7 +498,7 @@ export class SubagentManager implements SubagentHostPort {
     if (!this.#disposing) {
       try {
         const root = await this.options.openSession(rootId);
-        const summary = settleSummary({ agentId, description: activation.description, status: outcome.status, ...(outcome.error === undefined ? {} : { error: outcome.error }) });
+        const summary = settleSummary({ agentId, description: activation.description, status: outcome.status, ...(outcome.error === undefined ? {} : { error: outcome.error }), external: isExternal(activation.kind) });
         const delivery = activation.delivery === "caller" ? "returned" : "notified";
         await root.append(coreEvent("subagent/activation", { op: "settle", agentId, activationId: activation.activationId, status: outcome.status, summary, ...(bounded.text ? { result: bounded.text } : {}), ...(bounded.truncated ? { resultTruncated: true } : {}), delivery, endedAt: this.#now() }));
         if (delivery === "notified") {
@@ -444,7 +510,7 @@ export class SubagentManager implements SubagentHostPort {
       } catch (error) { onError(error); }
     }
     // The transcript header shows the settled status before the parent reads the notice or the result.
-    await this.#refresh(agentId);
+    if (!isExternal(activation.kind)) await this.#refresh(agentId);
     if (notified) this.options.wake(rootId);
     await child?.close().catch(onError);
     await activation.scope?.dispose().catch(onError);
@@ -454,7 +520,7 @@ export class SubagentManager implements SubagentHostPort {
     activation.result.resolve({ status: outcome.status, ...(outcome.error === undefined ? {} : { error: outcome.error }), text: bounded.text, truncated: bounded.truncated });
   }
 
-  async #awaitSync(activation: Activation, signal: AbortSignal, detail: SubagentDetail): Promise<SubagentToolOutcome> {
+  async #awaitSync(activation: Activation, signal: AbortSignal, detail: SubagentDetail, external: { readonly external?: string; readonly logMissing?: boolean } = {}): Promise<SubagentToolOutcome> {
     const { agentId, description, transcriptPath } = activation;
     const winner = await new Promise<Settled | "moved">(resolve => {
       const done = (value: Settled | "moved") => { clearTimeout(timer); signal.removeEventListener("abort", abort); resolve(value); };
@@ -466,8 +532,8 @@ export class SubagentManager implements SubagentHostPort {
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted) abort();
     });
-    if (winner === "moved") return ok(movedToBackground({ agentId, description, transcriptPath }), withStatus(detail, "running"));
-    return ok(syncResult({ agentId, description, transcriptPath, status: winner.status, ...(winner.error === undefined ? {} : { error: winner.error }), result: winner.text, truncated: winner.truncated }), withStatus(detail, winner.status));
+    if (winner === "moved") return ok(movedToBackground({ agentId, description, transcriptPath, ...external }), withStatus(detail, "running"));
+    return ok(syncResult({ agentId, description, transcriptPath, ...(external.logMissing ? { logMissing: true } : {}), status: winner.status, ...(winner.error === undefined ? {} : { error: winner.error }), result: winner.text, truncated: winner.truncated }), withStatus(detail, winner.status));
   }
 
   #observe(activation: Activation, event: SessionEventEnvelopeV1): void {
@@ -552,6 +618,19 @@ export function subagentTree(root: SessionHandle): SubagentTree {
   return root.journal.project(TREE, () => EMPTY_SUBAGENT_TREE, reduceSubagentTree);
 }
 
+/**
+ * May an agent of this main Session's tree read this file without approval (design 04 §3.3)? Only the exact
+ * session log of one of its Codex / Claude Code subagents. The list folds from `subagent/spawned`, so it
+ * holds after a restart; a sibling subagent reads it like the parent does.
+ */
+export function isExternalRecordPath(root: SessionHandle, canonicalPath: string): boolean {
+  return listedSubagents(subagentTree(root)).some(agent => isExternal(agent.kind) && canonicalFile(agent.transcriptPath) === canonicalPath);
+}
+
+function canonicalFile(path: string): string {
+  try { return realpathSync(path); } catch { return resolvePath(path); }
+}
+
 /** `general · gpt-5.5 · started 14:02`, `fork · 2 turns`, `codex` (design 02 §2.5). */
 function agentSummary(agent: SubagentView): string {
   const label = agentLabel(agent);
@@ -584,14 +663,30 @@ function closingOmitted(child: SessionHandle, startSeq: number, rootId: string):
   return omitted;
 }
 
-function details(input: { readonly agentId: string; readonly description: string; readonly kind: "local" | "fork"; readonly preset?: SubagentPreset; readonly transcriptPath: string; readonly background: boolean; readonly inheritedThroughSeq?: number }): SubagentDetail {
+/** `trace: false`: an external record not written yet is returned but not registered as an active path. */
+function details(input: { readonly agentId: string; readonly description: string; readonly kind: SubagentKind; readonly preset?: SubagentPreset; readonly transcriptPath: string; readonly background: boolean; readonly inheritedThroughSeq?: number; readonly trace?: boolean }): SubagentDetail {
   return Object.freeze<SubagentDetail[number][]>([
-    { label: CONTEXT_TRACE_DETAIL_LABEL, value: { kind: "trace", path: input.transcriptPath, description: `Subagent transcript: ${input.description}` } },
+    ...(input.trace === false ? [] : [{ label: CONTEXT_TRACE_DETAIL_LABEL, value: { kind: "trace", path: input.transcriptPath, description: `Subagent transcript: ${input.description}` } }]),
     { label: "delegation", value: {
       childSessionId: input.agentId, agentId: input.agentId, kind: input.kind, ...(input.preset ? { preset: input.preset } : {}), description: input.description, transcriptPath: input.transcriptPath,
       background: input.background, ...(input.inheritedThroughSeq === undefined ? {} : { inheritedThroughSeq: input.inheritedThroughSeq }), status: "running",
     } },
   ]);
+}
+
+function isExternal(kind: SubagentKind): boolean { return kind === "codex" || kind === "claude-code"; }
+
+/** True once the file exists; gives up at the deadline or once the run has settled (checking one last time). */
+async function waitForFile(path: string, settled: Promise<unknown>, timeoutMs: number, pollMs = 100): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  let done = false;
+  void settled.then(() => { done = true; });
+  for (;;) {
+    if (existsSync(path)) return true;
+    const left = deadline - Date.now();
+    if (done || left <= 0) return existsSync(path);
+    await new Promise(resolve => setTimeout(resolve, Math.min(pollMs, left)));
+  }
 }
 
 /** The Agent mode of the Session's latest `turn/start`. */

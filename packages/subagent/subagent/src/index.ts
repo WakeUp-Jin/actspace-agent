@@ -1,6 +1,8 @@
 export { manifest } from "./manifest.js";
 export { apply } from "./plugin.js";
 export * from "./child-session.js";
+export * from "./external.js";
+export * from "./external-cli.js";
 export * from "./fork-boundary.js";
 export * from "./manager.js";
 export * from "./messages.js";

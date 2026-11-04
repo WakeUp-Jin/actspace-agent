@@ -3,8 +3,9 @@ import type { AgentScope } from "@actspace/scope";
 import type { JsonSchema, ToolBodyResult, ToolDefinition, ToolExecutionContext, ToolRuntime } from "@actspace/tool-runtime";
 import {
   AGENT_FORK_DESCRIPTION, AGENT_FORK_PARAMETERS, AGENT_PARAMETERS, AGENT_TOOL_DESCRIPTION, INTERRUPT_AGENT_DESCRIPTION, LIST_AGENTS_DESCRIPTION, LIST_SUBAGENT_MODELS_DESCRIPTION,
-  SEND_MESSAGE_DESCRIPTION, SEND_MESSAGE_PARAMETERS, WAIT_AGENT_DESCRIPTION,
+  SEND_MESSAGE_DESCRIPTION, SEND_MESSAGE_PARAMETERS, WAIT_AGENT_DESCRIPTION, externalAgentDescription, externalAgentParameters,
 } from "./messages.js";
+import type { ExternalSubagentBackend } from "./external.js";
 import type { SubagentCaller, SubagentHostPort, SubagentToolOutcome } from "./types.js";
 
 /** The tools belong to the `actspace.subagent` Agent form member (agent-form.ts). */
@@ -88,6 +89,39 @@ export function registerSubagentTools(runtime: ToolRuntime, port: SubagentHostPo
     const handle = runtime.register({ definition, executor: { concurrencySafe: true, execute: async (args, context) => toResult(name, await run(args, context)) } });
     return Object.freeze({ name, dispose: () => handle.dispose() });
   }
+}
+
+/**
+ * Register `agent_codex` / `agent_claude_code` for one external backend (design 04 §2). `pluginId` is the
+ * plugin that owns the backend, so the tool is a member of that plugin in the main Agent form.
+ */
+export function registerExternalSubagentTool(runtime: ToolRuntime, port: SubagentHostPort, backend: ExternalSubagentBackend, pluginId: string, mainScope: (sessionId: string) => AgentScope | undefined): SubagentToolRegistration {
+  const parameters = externalAgentParameters(backend.label);
+  const definition: ToolDefinition = Object.freeze({
+    abiVersion: 2, pluginId, name: backend.toolName, definitionVersion: 2, description: externalAgentDescription(backend.label),
+    inputSchema: {
+      type: "object",
+      properties: {
+        description: { type: "string", minLength: 1, maxLength: 60, description: parameters.description },
+        prompt: { type: "string", minLength: 1, description: parameters.prompt },
+        background: { type: "boolean", default: true, description: parameters.background },
+        model: { type: "string", minLength: 1, description: parameters.model },
+      },
+      required: ["description", "prompt"], additionalProperties: false,
+    },
+    effects: [], concurrency: "declared-safe", sensitiveArgumentPaths: [], resultSchemaVersion: 1,
+  });
+  const handle = runtime.register({ definition, executor: { concurrencySafe: true, execute: async (args, context) => {
+    const scope = mainScope(context.sessionId);
+    const outcome = await port.spawnExternal(backend, {
+      sessionId: context.sessionId, callId: context.callId, ...(scope ? { scope } : {}),
+      description: text(args.description), prompt: text(args.prompt), background: args.background !== false,
+      ...(typeof args.model === "string" && args.model.trim() ? { model: args.model.trim() } : {}),
+      signal: context.signal,
+    });
+    return toResult(backend.toolName, outcome);
+  } } });
+  return Object.freeze({ name: backend.toolName, dispose: () => handle.dispose() });
 }
 
 function toResult(name: string, outcome: SubagentToolOutcome): ToolBodyResult {

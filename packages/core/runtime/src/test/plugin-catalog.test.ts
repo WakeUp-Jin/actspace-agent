@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_HARNESS_ENTRIES } from "../harness/default-harness-definition.js";
 import { TRUSTED_LOADER_ENTRIES } from "../profiles/composition.js";
-import { PLUGIN_CATALOG, PLUGIN_PACKAGES_OUTSIDE_DEFAULT, pluginCatalogEntry } from "../plugin-catalog.js";
+import { harnessEntriesOffByDefault, PLUGIN_CATALOG, PLUGIN_PACKAGES_OUTSIDE_DEFAULT, pluginCatalogEntry } from "../plugin-catalog.js";
 
 const behavior = (id: string) => pluginCatalogEntry(id)!.manifest.behaviors[0]!;
 
@@ -27,13 +27,14 @@ describe("plugin catalog", () => {
       "llm-service", "auto-review", "tools-approval", "sandbox", "sandbox-nono", "sandbox-seatbelt", "tools-runtime", "context-engine", "prompt-runtime",
       "context-system", "context-rules", "context-skills", "context-runtime", "context-conversation", "context-tools", "context-background-tasks", "context-subagents",
       "context-disclosure", "compaction-runtime", "filesystem-read", "filesystem-search", "filesystem-write", "web-tools", "image-generation", "shell-tools",
-      "image-inspection", "todo-tools", "browser-tools", "background-tasks", "subagent-tools", "plugin-manager", "agent-factory",
+      "image-inspection", "todo-tools", "browser-tools", "background-tasks", "subagent-tools", "subagent-codex", "subagent-claude-code", "plugin-manager", "agent-factory",
     ]);
     const rows = new Map(DEFAULT_HARNESS_ENTRIES.map(row => [row[0], row]));
     expect(rows.get("llm-service")).toEqual(["llm-service", ["llm.service", "llm.routes", "llm.service.types"], ["actspace.host.llm"]]);
     expect(rows.get("shell-tools")).toEqual(["shell-tools", ["tools.shell-tools"], ["tools.runtime", "actspace.host.tools.shell-tools", "actspace.host.background-tasks", "actspace.host.session"], [{ id: "sandbox", fallback: "bash runs outside the sandbox after approval" }]]);
     expect(rows.get("todo-tools")).toEqual(["todo-tools", ["tools.todo"], ["tools.runtime", "session.runtime"]]);
     expect(rows.get("context-system")).toEqual(["context-system", ["context.source.system"], []]);
+    expect(rows.get("subagent-codex")).toEqual(["subagent-codex", ["tools.subagent-codex"], ["tools.runtime", "agent.registry", "actspace.host.subagents"]]);
     expect(rows.get("agent-factory")![1]).toEqual(["actspace.agent.factory", "agent.run-factory", "actspace.host-readable-files"]);
   });
 
@@ -44,9 +45,10 @@ describe("plugin catalog", () => {
     for (const entry of PLUGIN_CATALOG) expect(entry.module, entry.id).toMatch(/^@actspace\/[a-z-]+\/[a-z-]+$/);
   });
 
-  it("carries Harness behavior config in the manifest (only browser-tools has one)", () => {
+  it("carries Harness behavior config in the manifest (browser-tools and the external subagents have one)", () => {
+    const configs: Record<string, unknown> = { "browser-tools": { disposeHost: false }, "subagent-codex": { approvalPolicy: "never", sandbox: "workspace-write" }, "subagent-claude-code": { permissionMode: "dontAsk" } };
     for (const entry of PLUGIN_CATALOG.filter(item => item.loaders.includes("harness"))) {
-      expect(behavior(entry.id).config, entry.id).toEqual(entry.id === "browser-tools" ? { disposeHost: false } : {});
+      expect(behavior(entry.id).config, entry.id).toEqual(configs[entry.id] ?? {});
     }
   });
 
@@ -63,9 +65,11 @@ describe("plugin catalog", () => {
     expect(new Set(PLUGIN_PACKAGES_OUTSIDE_DEFAULT.map(item => item.package)).size).toBe(PLUGIN_PACKAGES_OUTSIDE_DEFAULT.length);
   });
 
-  it("only browser and english learning are off by default and can be disabled", () => {
+  it("only browser, english learning and the external subagents are off by default and can be disabled", () => {
     const optional = PLUGIN_CATALOG.filter(entry => entry.manifest.display!.canDisable).map(entry => entry.id);
-    expect(optional).toEqual(["english-learning", "browser-tools"]);
+    expect(optional).toEqual(["english-learning", "browser-tools", "subagent-codex", "subagent-claude-code"]);
     for (const id of optional) expect(pluginCatalogEntry(id)!.manifest.display!.defaultEnabled).toBe(false);
+    // A Host without plugin switches keeps the Harness ones off.
+    expect(harnessEntriesOffByDefault()).toEqual(["browser-tools", "subagent-codex", "subagent-claude-code"]);
   });
 });

@@ -218,6 +218,107 @@
     - `pnpm --filter @actspace/desktop build` exit 0。
   - 真实模型缓存命中（手工）：**未做**，见「跳过或推迟的事项」。
 
+### 步骤 5：S5 外部子智能体
+
+- **操作**：按 `s5-external-subagents.md` 第 1–6 步做，主智能体自己写（各步前后依赖，没有开子智能体）。
+  - 接口：`subagent/src/external.ts` 定义 `ExternalSubagentBackend`（`kind`、`label`、`toolName`、`available()`、`start()`）和 `ExternalRun`（`transcriptPath`、`result` 永不 reject、`interrupt()`）。
+  - 管理器：`SubagentManager.spawnExternal(backend, input)`：
+    - 只允许主会话调用；
+    - 与本地子智能体共用并发上限；
+    - cwd 取会话工作区；
+    - 先 `backend.start`，成功后才写 `subagent/spawned`（`kind: codex | claude-code`）和激活 `start`；
+    - 等记录文件出现，最多 10 秒；
+    - 运行跟踪与本地子智能体共用 `#track`；
+    - 结束时写 `settle`、发通知，状态 `closed`，不刷新 ActSpace transcript；
+    - 中断即永久停止，`send_message` 返回设计 04 的错误；
+    - 重启时 `recoverLost` 用外部文案补 `lost`。
+  - CLI 公共件 `external-cli.ts`：
+    - `resolveCommand`：`$SHELL -lc 'command -v <name>'`，超时 5 秒，名字只允许 `[A-Za-z0-9._-]`，结果缓存到插件卸载；
+    - `terminate`：SIGTERM，2 秒后 SIGKILL；
+    - `OutputTail`：保留 stderr 尾部 8 KB，用来找退出原因。
+  - Codex（`@actspace/subagent-codex`）：
+    - 流程：`codex app-server` 按行收发 JSON-RPC：`initialize` → `initialized` → `account/read`（没登录就拒绝启动）→ `thread/start { cwd, approvalPolicy, sandbox, model?, ephemeral: false }`；记录路径 = `thread.path`。
+    - 一轮：`turn/start` 后收集最后一条 `agentMessage`，`turn/completed` 结束。
+    - 服务端请求一律回 `-32601`。
+    - 停止：`turn/interrupt` 与 2 秒宽限竞速，超时就杀进程。
+    - 启动超时 60 秒。
+  - Claude Code（`@actspace/subagent-claude-code`）：
+    - 命令：会话 id 由 ActSpace 生成，跑 `claude -p --output-format stream-json --verbose --session-id <id> --permission-mode <模式> [--model]`，prompt 走 stdin；
+    - 结果：读 `type: "result"` 的 `result` / `is_error`；
+    - 停止：SIGTERM，2 秒后 SIGKILL；
+    - 记录路径：`$CLAUDE_CONFIG_DIR 或 ~/.claude` + `/projects/<realpath(cwd) 非字母数字换成 ->/<id>.jsonl`，编码函数单独导出。
+  - 插件：
+    - 两个插件找到命令才注册工具，并提供 `tools.subagent-codex` / `tools.subagent-claude-code`（含可用性和原因）；
+    - manifest `display` 为 `{ scope: "session", defaultEnabled: false, canDisable: true }`，`host.required: ["process"]`，设置放 entry `config`；
+    - 两个包加入 `PLUGIN_CATALOG` 和 `actspace.subagent-codex` / `actspace.subagent-claude-code` agent-form 成员；
+    - 工具描述照设计 04 §2 逐字写（`externalAgentDescription`）。
+  - 插件设置：
+    - runtime 新增 Host 选项 `pluginConfig`，经 `harnessEntryConfig` 传给 `prepareDefaultHarnessArtifact`，覆盖在 manifest 的 `config` 默认值上；
+    - 桌面端的设置存储和界面归 S6。
+  - 默认关的插件：`boot.ts` 没传 `disabledPlugins` 时，默认禁用 `harnessEntriesOffByDefault()`，即 catalog 里 `canDisable` 且 `defaultEnabled: false` 的会话插件（browser-tools 和两个外部子智能体）。CLI、远程 Host 这类没有开关的宿主因此不会默认加载它们。
+  - 免审批读取：
+    - `agent-factory` 的 `isHostReadablePath` 改为按会话判断（`composeSessionReadablePath`）：Host 可读文件之外，再放行主会话子智能体投影里登记过的外部记录文件（`isExternalRecordPath`，精确到文件）；
+    - 子智能体会话读父会话的投影。
+- **影响文件**：
+  - subagent：`external.ts`（新）、`external-cli.ts`（新）、`manager.ts`、`messages.ts`、`tools.ts`、`types.ts`、`index.ts`、`README.md`；
+  - 新包：`subagent-codex`、`subagent-claude-code`（`backend.ts`、`manifest.ts`、`plugin.ts`、`index.ts`、测试）；
+  - runtime：`plugin-catalog.ts`、`startup/boot.ts`、`harness/agent-host-port.ts`、`harness/agent-runtime-plugin.ts`、`harness/default-harness.ts`、`harness/agent-factory-plugin.ts`、`package.json`、`tsconfig.build.json`；
+  - agent：`agent-form.ts`；
+  - 文档：`packages/README.md`、`packages/subagent/README.md`；
+  - 脚本：`scripts/contract-matrix/source-registry.mjs`；
+  - 生成物：`cordis.yml`、契约矩阵、`pnpm-lock.yaml`。
+- **决定**（与计划或设计不同的地方）：
+  - 放行名单不写进 `actspace.host-readable-files`。计划第 1 步写的是「把路径加进 `host-readable-files`，重启时从 `subagent/spawned` 恢复」。改为每次读文件时，直接查主会话的子智能体投影：重启、Harness 重载后都不用恢复，也不会有别的会话的记录混进来。
+  - CLI 启动失败（没装、没登录、进程退出、启动超时）直接返回工具错误 `<CLI> could not start: <首行>`，不登记子智能体，也不占并发名额。设计只规定了运行中失败的文字，这句是我写的。
+  - 设计 04 说外部工具的文字「同 `agent`」，但 `agent` 的几句提到 `send_message`。外部子智能体不能续派，所以这几句去掉了：
+    - 后台启动的第三行改为「You will be notified when it finishes; do not wait for it unless you have nothing else to do.」；
+    - 中断后的 summary 是「Subagent X was stopped before it finished.」；
+    - `lost` 去掉「Send it a message with send_message to continue it.」。
+  - 记录文件 10 秒内没出现时，路径照样返回，后面注明 ` (the log file does not exist yet)`，不登记为上下文路径。这句是新增的模型可见文字，设计里没有。
+  - `model` 参数的说明「Model name passed to the <CLI> CLI as is. Omit to use the CLI's own default.」：设计没有给，是我写的。
+  - Claude Code 插件的标题是「Claude Code」，不是「Claude Code 子智能体」：manifest 标题限 12 个字符。
+  - 报错首行：stderr 优先取最后一条像报错的行（`Error:`、`TypeError:`、`error:`、`fatal:`），没有才取最后一行。真实运行发现 Node 启动器报错后面跟着堆栈和对象，最后一行只是 `}`。
+  - 无开关的宿主默认关掉 default-off 插件后，`browser-capability.test.ts` 原来「有 browser 能力就加载 browser-tools」的用例不再成立。真实宿主里只有桌面端有 browser 能力，它总是传开关，所以行为不变。用例改为显式传 `[]`（开关打开），并加一句「不传开关时不加载」。缺能力名单的用例也加上两个外部插件，它们要求 `process`。
+- **验证**：
+  - 单测（不调真实 CLI）：
+    - subagent `external.test.ts` 8 个：
+      - 后台 Codex：文字、detail、事件、`list_agents`、`running`、通知、`closed`、`send_message` 拒绝；
+      - 同步 Claude Code，记录没出现；
+      - 中断与失败首行；
+      - 启动失败不记录；
+      - 共用上限；
+      - 关机杀进程、重启补 `lost`，以及精确文件放行、邻居文件和目录不放行；
+      - 报错行选择；
+      - 描述文字。
+    - subagent-codex：后端 6 个 + lifecycle 3 个，用假 `codex app-server` 脚本，覆盖：
+      - 成功、`turn` 失败、中断（含不理中断被杀）；
+      - 没登录、进程崩溃；
+      - 设置取值、命令查找；
+      - 注册与卸载、找不到命令不注册。
+    - subagent-claude-code：后端 5 个 + lifecycle 3 个：
+      - 参数与记录路径、`is_error` 和 stderr 失败、SIGTERM；
+      - 目录编码；
+      - 不可用与设置。
+    - runtime：
+      - `plugin-catalog.test.ts`：两行登记，以及 `harnessEntriesOffByDefault`；
+      - `default-harness.test.ts`：Host 设置覆盖 manifest 默认值；
+      - `agent-factory-plugin.test.ts`：主会话、子智能体会话、父会话未打开、用户 fork 的放行判断。
+  - 真实运行（手工，`tmp/s5-real/run.mjs` 直接驱动构建后的后端，任务「列出 packages/subagent 下的包」）：
+    - Codex：
+      - 登录 shell 找到的 `/opt/homebrew/bin/codex` 是坏的，npm 包缺 vendor 二进制，启动即报 `Error: spawn …/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex/codex ENOENT`，按启动失败返回；
+      - 改用 nvm 下的 codex-cli 0.163.0：记录路径 `~/.codex/sessions/2026/11/04/rollout-….jsonl`，`turn/start` 返回时已存在，13.6 秒完成，回复「tool-subagent, subagent-claude-code, subagent, subagent-codex」，日志 125 KB。
+    - Claude Code 2.1.317（`dontAsk`）：
+      - 记录路径 `~/.claude/projects/-Users-wakeup-jin-Desktop-code-project-side-project-actspace-agent/<id>.jsonl`，启动时还不存在，结束时存在（235 KB），路径编码与真实一致；
+      - 8.4 秒完成，回复四个包名。
+  - `agent_fork` 的 `model` 说明按用户决定改为「Model key from list_subagent_models. Omit to use the parent's model (keeps the prompt cache).」，同步改设计 02 §2.2；tool-subagent lifecycle 断言两个工具的说明不同。
+  - 统一验证：
+    - `pnpm typecheck` exit 0。
+    - `pnpm test` exit 0：
+      - 69 组 vitest 共 4411 个通过，其中 subagent 29、tool-subagent 2、subagent-codex 9、subagent-claude-code 8、runtime 104、desktop 2672 passed / 7 skipped；
+      - 根目录 16 组 node:test 共 98 个，0 失败（含 `test:agent-host:process`）。
+    - 以下检查都是 exit 0：`check:packages`、`check:plugin-catalog`、`check:desktop-build-graph`、`check:ipc-channels`、`check:docs`、`check:current-docs`、`check:repo`、`check:harness-events`、`check:renderer-bridge`、`test:plugin-catalog`、`test:package-readmes`、`test:contract-matrix`。
+    - `pnpm --filter @actspace/desktop build` exit 0。
+
 ## 遇到的问题
 
 - 步骤 1：`default-harness.test.ts` 里替换 Loop 的测试插件继承了 agent-factory 的 `provides`，新增服务后报 `Harness service missing: agent-factory/actspace.host-readable-files`。已在测试插件里补上该服务（替换实现必须提供全部声明的服务，这是契约本身的要求）。
@@ -235,13 +336,24 @@
 - 步骤 4：同一个测试接着发现继承来的 navigation supplement 被渐进披露删掉，消息前缀对不上。已改为 `delegation` 来源不删。
 - 步骤 4：测试自身的两处小问题：父会话后续请求的 `agent_fork` 参数里也有 fork 的提示词，被误判成 fork 的请求；这个 provider 的系统消息角色是 `developer`。都已改测试。
 
+- 步骤 5：`check:packages` 要求两个新插件包有 lifecycle 测试，`test:contract-matrix` 要求把新 manifest 和 package.json 加进 `source-registry.mjs`，`check:docs` 要求更新目录 README 的包数和包表。都已补上。
+- 步骤 5：真实 Codex 第一次失败，错误文字只有 `}`：stderr 最后一行是 Node 对象的右括号。已改为优先取像报错的行（见决定）。根因在本机：登录 shell 的 PATH 里，坏掉的 Homebrew codex 排在 nvm 那份前面。
+- 步骤 5：`pnpm -r test` 和桌面构建同时跑时，context-engine 解析不到 `@actspace/shared`（构建正在重写 dist）。分开跑就通过。
+- 步骤 5：claude-code 的 SIGTERM 用例在全量并行时偶发失败：固定等 200 毫秒，假 CLI 还没输出。已改为等它写出 `ready` 标记再中断。
+
 ## 跳过或推迟的事项
 
 - 客户端已在 S3 第 7 步把新 inbox 来源转成 `BackgroundNotice`；`BackgroundNoticeRow` / Web `EventRow` 的文字还没改，留给 S6。
 - `isIdleForReconfigure`（`packages/core/agent-service/src/application.ts`）：S3 已同时排除 `subagent_notification`。`agent_message` 仍然算待办，因为它要唤醒会话。
-- `HostReadableFiles` 跟随 Harness，重载后为空：S5 按计划从 `subagent/spawned` 恢复放行名单。
+- `HostReadableFiles` 跟随 Harness，重载后为空：S5 改为每次从主会话的子智能体投影判断外部记录（见步骤 5 决定），不再依赖它。
 - 设置里的「子智能体默认模型」只有数据层，还没有写入口（settings 方法 / IPC）；`SubagentSection.tsx` 还留着 Explore 组和指向已删用途的文案：都归 S6。
 - 子 Agent 面板的实时活动只在 `agent` 调用运行期间显示（后台创建后调用很快结束），面板改造归 S6。
 - S4 真实模型缓存命中检查（手工，DeepSeek 或 Anthropic）还没做：需要真实 key 和在 Electron 里跑一次 fork，看首个请求 usage 里的缓存命中 token 是否接近父会话上一请求的输入 token。fake LLM 的请求逐项比对已经通过。
-- `agent_fork` 的 `model` 参数说明沿用了 `agent` 的「Omit to use the default subagent model」，和实际行为（不给时用父会话的模型）不一致，等用户决定是否改设计 02 §2.2 的文字。
+- `agent_fork` 的 `model` 参数说明：用户 2026-11-04 决定改为「Model key from list_subagent_models. Omit to use the parent's model (keeps the prompt cache).」，已在步骤 5 同步改设计 02 §2.2 和 `messages.ts`。
 - `agent_fork` 的卡片：客户端目前只有 `agent` 走子智能体卡片，`agent_fork` 显示为通用行。界面归 S6。
+- S5 插件设置（Codex `approvalPolicy` / `sandbox`、Claude Code `permissionMode`）只接到 runtime 的 `pluginConfig`。桌面端的存储、设置界面，以及插件页显示「本机没有找到 … 命令」都归 S6。
+- S5 没处理的边界：
+  - Claude Code 对很长的目录名会截断加哈希，这里没有照做，路径可能对不上；
+  - Host 被强杀时 CLI 子进程可能残留，下次启动只补 `lost`，不清理进程。
+- S5 真实运行是直接驱动后端，没有在 Electron 里经过完整 Host，所以免审批读取只有单测覆盖。Electron 里的验收归 S6。
+- 本机的 `/opt/homebrew/bin/codex` 是坏的（npm 包缺 vendor 二进制），登录 shell 会先找到它。要在 ActSpace 里用 Codex 子智能体，需要修复或删掉这份安装。是否处理由用户决定。

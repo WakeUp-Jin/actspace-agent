@@ -40,6 +40,8 @@ import { manifest as shellManifest } from "@actspace/tool-shell/manifest";
 import { manifest as sideChatManifest } from "@actspace/side-chat/manifest";
 import { manifest as sessionTranscriptManifest } from "@actspace/session-transcript/manifest";
 import { manifest as subagentToolsManifest } from "@actspace/tool-subagent/manifest";
+import { manifest as subagentCodexManifest } from "@actspace/subagent-codex/manifest";
+import { manifest as subagentClaudeCodeManifest } from "@actspace/subagent-claude-code/manifest";
 import { manifest as todoToolsManifest, projectionManifest as todoProjectionManifest } from "@actspace/tool-todo/manifest";
 import { manifest as webManifest } from "@actspace/tool-web/manifest";
 import { agentFactoryManifest, agentRuntimeManifest, runtimeManifest, sessionRuntimeManifest } from "./manifests.js";
@@ -119,6 +121,8 @@ export const PLUGIN_CATALOG: readonly PluginCatalogEntry[] = Object.freeze([
   { id: "browser-tools", manifest: browserToolsManifest, module: "@actspace/tool-browser/plugin", loaders: harness, directory: "browser" },
   { id: "background-tasks", manifest: backgroundTasksToolManifest, module: "@actspace/tool-background-tasks/plugin", loaders: harness, directory: "background-tasks" },
   { id: "subagent-tools", manifest: subagentToolsManifest, module: "@actspace/tool-subagent/plugin", loaders: harness, directory: "subagent" },
+  { id: "subagent-codex", manifest: subagentCodexManifest, module: "@actspace/subagent-codex/plugin", loaders: harness, directory: "subagent" },
+  { id: "subagent-claude-code", manifest: subagentClaudeCodeManifest, module: "@actspace/subagent-claude-code/plugin", loaders: harness, directory: "subagent" },
   { id: "plugin-manager", manifest: pluginManagerManifest, module: "@actspace/plugin-manager/plugin", loaders: harness, directory: "harness-evolution" },
   { id: "agent-factory", manifest: agentFactoryManifest, module: "@actspace/runtime/agent-factory", loaders: harness, directory: "core" },
 ]);
@@ -139,6 +143,16 @@ const byId = new Map(PLUGIN_CATALOG.map(entry => [entry.id, entry]));
 
 export function pluginCatalogEntry(id: string): PluginCatalogEntry | undefined {
   return byId.get(id);
+}
+
+/**
+ * Harness entries a user turns on in 扩展 › 插件 (`canDisable`, `defaultEnabled: false`). A Host without
+ * plugin switches (CLI, remote Host) leaves them off, e.g. the external subagents that run local CLIs.
+ */
+export function harnessEntriesOffByDefault(): readonly string[] {
+  return PLUGIN_CATALOG
+    .filter(entry => entry.loaders.includes("harness") && entry.manifest.display?.canDisable === true && entry.manifest.display.defaultEnabled === false)
+    .map(entry => entry.id);
 }
 
 /**

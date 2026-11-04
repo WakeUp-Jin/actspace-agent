@@ -9,6 +9,8 @@ import { SUBAGENT_RESULT_LIMIT_BYTES, type SubagentActivationStatus } from "@act
 export const SUBAGENT_CONCURRENCY_LIMIT = 10;
 /** A synchronous `agent` call returns after this long and the subagent moves to the background. */
 export const SUBAGENT_SYNC_WAIT_MS = 30 * 60 * 1000;
+/** An external subagent's call waits this long for the CLI to write its session log (design 04 §3.3). */
+export const EXTERNAL_LOG_WAIT_MS = 10_000;
 /** One activation runs at most this many steps. */
 export const SUBAGENT_MAX_STEPS = 1000;
 
@@ -29,14 +31,31 @@ export const AGENT_PARAMETERS = Object.freeze({
 
 export const AGENT_FORK_DESCRIPTION = "Start a subagent that inherits this conversation: it sees everything up to your last completed step in this turn (not the step that contains this call), with your tools and model, so its first request reuses this conversation's prompt cache. Use it for work that builds on the current context, such as trying an alternative, reviewing what was just done, or a side investigation, without spending this conversation's context on it. Choosing a different model loses the cache. It cannot start subagents of its own. Otherwise it behaves like agent: background by default, transcript path returned, notified when it finishes, continued with send_message.";
 
-/** `agent_fork` takes `agent`'s parameters without `agent_preset`; only `prompt` reads differently (design 02 §2.2). */
+/** `agent_fork` takes `agent`'s parameters without `agent_preset`; `prompt` and `model` read differently (design 02 §2.2). */
 export const AGENT_FORK_PARAMETERS = Object.freeze({
   description: AGENT_PARAMETERS.description,
   prompt: "What the forked subagent should do. It already sees this conversation, so state only what is new.",
   background: AGENT_PARAMETERS.background,
-  model: AGENT_PARAMETERS.model,
+  model: "Model key from list_subagent_models. Omit to use the parent's model (keeps the prompt cache).",
   reasoning_effort: AGENT_PARAMETERS.reasoning_effort,
 });
+
+/** `agent_codex` / `agent_claude_code` (design 04 §2): the same text with the CLI's name. */
+export function externalAgentDescription(label: string): string {
+  return `Run a task with the local ${label} CLI as a subagent, in this workspace. It runs once and cannot receive follow-up messages. It uses ${label}'s own permissions (no approval prompts) and its own model settings. You get its final message and the path of its native session log (JSONL; long lines). Background by default; you are notified when it finishes; interrupt_agent stops it for good.`;
+}
+
+export function externalAgentParameters(label: string) {
+  return Object.freeze({
+    description: AGENT_PARAMETERS.description,
+    prompt: "The complete, self-contained task. It does not see this conversation.",
+    background: AGENT_PARAMETERS.background,
+    model: `Model name passed to the ${label} CLI as is. Omit to use the CLI's own default.`,
+  });
+}
+
+/** An external CLI that could not start at all; nothing was recorded. */
+export function externalStartFailed(label: string, error: string): string { return `${label} could not start: ${error}`; }
 
 export const SEND_MESSAGE_DESCRIPTION = "Send a message to another agent in your subagent tree. A running agent receives it at its next step; an inactive agent starts a new turn with it. Returns at once.";
 export const SEND_MESSAGE_PARAMETERS = Object.freeze({ agent_id: "The id of another agent in your subagent tree, as shown by list_agents." });
@@ -58,20 +77,33 @@ export function externalCannotReceive(agentId: string): string { return `${agent
 export function unknownAgent(agentId: string): string { return `Unknown agent ${agentId}. Call list_agents to see your subagent tree.`; }
 export const CANNOT_MESSAGE_SELF = "You cannot send a message to yourself.";
 
-export function backgroundStarted(input: { readonly agentId: string; readonly description: string; readonly transcriptPath: string; readonly forked?: boolean }): string {
+/** `external`: the CLI label of an external subagent (design 04 §2), which takes no messages. */
+type StartedText = { readonly agentId: string; readonly description: string; readonly transcriptPath: string; readonly forked?: boolean; readonly external?: string; readonly logMissing?: boolean };
+
+export function backgroundStarted(input: StartedText): string {
+  const what = input.external ? `${input.external} subagent` : input.forked ? "forked subagent" : "subagent";
+  return [`Started ${what} ${input.agentId} (${input.description}) in the background.`, transcriptLine(input), whileRunning(input.external)].join("\n");
+}
+
+export function movedToBackground(input: Omit<StartedText, "forked">): string {
   return [
-    `Started ${input.forked ? "forked subagent" : "subagent"} ${input.agentId} (${input.description}) in the background.`,
-    `transcript: ${input.transcriptPath}`,
-    "You will be notified when it finishes. Use send_message to add instructions; do not wait for it unless you have nothing else to do.",
+    `Subagent ${input.agentId} (${input.description}) is still running and has moved to the background (30 minute wait limit).`,
+    transcriptLine(input),
+    whileRunning(input.external),
   ].join("\n");
 }
 
-export function movedToBackground(input: { readonly agentId: string; readonly description: string; readonly transcriptPath: string }): string {
-  return [
-    `Subagent ${input.agentId} (${input.description}) is still running and has moved to the background (30 minute wait limit).`,
-    `transcript: ${input.transcriptPath}`,
-    "You will be notified when it finishes. Use send_message to add instructions; do not wait for it unless you have nothing else to do.",
-  ].join("\n");
+/** Appended to an external subagent's record path when the CLI has not written the file within the wait (design 04 §3.3). */
+export const LOG_FILE_MISSING = "(the log file does not exist yet)";
+
+function transcriptLine(input: { readonly transcriptPath: string; readonly logMissing?: boolean }): string {
+  return `transcript: ${input.transcriptPath}${input.logMissing ? ` ${LOG_FILE_MISSING}` : ""}`;
+}
+
+function whileRunning(external: string | undefined): string {
+  return external
+    ? "You will be notified when it finishes; do not wait for it unless you have nothing else to do."
+    : "You will be notified when it finishes. Use send_message to add instructions; do not wait for it unless you have nothing else to do.";
 }
 
 export const RESULT_TRUNCATED_SUFFIX = "[truncated; read the transcript for the full answer]";
@@ -87,10 +119,10 @@ function statusPhrase(status: SubagentActivationStatus, error?: string): string 
   }
 }
 
-export function syncResult(input: { readonly agentId: string; readonly description: string; readonly transcriptPath: string; readonly status: SubagentActivationStatus; readonly error?: string; readonly result: string; readonly truncated: boolean }): string {
+export function syncResult(input: { readonly agentId: string; readonly description: string; readonly transcriptPath: string; readonly logMissing?: boolean; readonly status: SubagentActivationStatus; readonly error?: string; readonly result: string; readonly truncated: boolean }): string {
   return [
     `Subagent ${input.agentId} (${input.description}) ${statusPhrase(input.status, input.error)}.`,
-    `transcript: ${input.transcriptPath}`,
+    transcriptLine(input),
     "",
     resultBody(input.result, input.truncated),
   ].join("\n").trimEnd();
@@ -101,10 +133,10 @@ export function settleSummary(input: { readonly agentId: string; readonly descri
   const id = input.agentId;
   switch (input.status) {
     case "completed": return input.external ? `Subagent ${id} finished. It cannot receive follow-up messages.` : `Subagent ${id} finished and will do no further work unless you send it more.`;
-    case "interrupted": return `Subagent ${id} was stopped before it finished. Send it a message to continue.`;
+    case "interrupted": return input.external ? `Subagent ${id} was stopped before it finished.` : `Subagent ${id} was stopped before it finished. Send it a message to continue.`;
     case "failed": return `Subagent ${id} failed before it finished: ${sentence(input.error)}.`;
     case "max_steps": return `Subagent ${id} reached the step limit before it finished.`;
-    case "lost": return `Subagent ${id} (${input.description}) was interrupted because the app exited. Its transcript shows how far it got. Send it a message with send_message to continue it.`;
+    case "lost": return `Subagent ${id} (${input.description}) was interrupted because the app exited. Its transcript shows how far it got.${input.external ? "" : " Send it a message with send_message to continue it."}`;
   }
 }
 

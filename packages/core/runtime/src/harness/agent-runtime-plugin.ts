@@ -100,7 +100,7 @@ export class AgentRuntimeService {
     this.harnesses = new HarnessControl({ context: ctx, dataRoot: sessionHost.dataRoot,
       artifactRoot, runtimeId: sessionHost.runtimeId,
       // A pinned selection takes the bootstrap path of a fresh data root: mounted as "main", validated like any candidate.
-      builtin: pinned ? () => pinnedMount(artifactRoot, pinned.description) : () => prepareDefaultHarnessArtifact({ artifactRoot, hostCapabilities: host.host.capabilityCeiling, disabledEntries: host.disabledHarnessEntries ?? [] }), sharedServices: DEFAULT_HARNESS_SHARED_SERVICES,
+      builtin: pinned ? () => pinnedMount(artifactRoot, pinned.description) : () => prepareDefaultHarnessArtifact({ artifactRoot, hostCapabilities: host.host.capabilityCeiling, disabledEntries: host.disabledHarnessEntries ?? [], ...(host.harnessEntryConfig ? { entryConfig: host.harnessEntryConfig } : {}) }), sharedServices: DEFAULT_HARNESS_SHARED_SERVICES,
       compatibility: { capabilities: host.host.capabilityCeiling, requiredServices: [{ id: "agent.run-factory", version: 1 }, { id: "actspace.agent.factory", version: 1 }], services: DEFAULT_HARNESS_SHARED_SERVICES.map(id => ({ id, version: 1 })), events: [],
         sharedModules, codecArtifacts: [] },
       ...(pinned ? {} : { upgradePristineBuiltin: (record: import("@actspace/harness-control").SelectionRecord) => record.description.composition.entries.every(entry => entry.pluginId === "actspace.default-harness") }),

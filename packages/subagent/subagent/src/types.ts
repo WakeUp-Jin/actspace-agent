@@ -1,5 +1,6 @@
 import type { AgentScope } from "@actspace/scope";
 import type { RuntimeV2JsonValue, SubagentPreset } from "@actspace/shared/runtime-v2";
+import type { ExternalSubagentBackend, SpawnExternalInput } from "./external.js";
 
 /** Host service id of {@link SubagentHostPort}; the Harness tool plugin injects it. */
 export const SUBAGENT_HOST_SERVICE = "actspace.host.subagents" as const;
@@ -45,6 +46,8 @@ export type RunningSubagent = { readonly agentId: string; readonly description: 
 export interface SubagentHostPort {
   spawn(input: SpawnSubagentInput): Promise<SubagentToolOutcome>;
   spawnFork(input: SpawnForkInput): Promise<SubagentToolOutcome>;
+  /** `agent_codex` / `agent_claude_code` (design 04): one CLI run, scheduled like any subagent. */
+  spawnExternal(backend: ExternalSubagentBackend, input: SpawnExternalInput): Promise<SubagentToolOutcome>;
   sendMessage(input: SubagentCaller & { readonly agentId: string; readonly message: string }): Promise<SubagentToolOutcome>;
   waitForInput(input: SubagentCaller & { readonly timeoutMs: number; readonly signal: AbortSignal }): Promise<SubagentToolOutcome>;
   listAgents(input: SubagentCaller): Promise<SubagentToolOutcome>;

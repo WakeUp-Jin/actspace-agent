@@ -151,6 +151,12 @@
       "path": "./../../subagent/subagent/tsconfig.build.json"
     },
     {
+      "path": "./../../subagent/subagent-claude-code/tsconfig.build.json"
+    },
+    {
+      "path": "./../../subagent/subagent-codex/tsconfig.build.json"
+    },
+    {
       "path": "./../../background-tasks/tool-background-tasks/tsconfig.build.json"
     },
     {

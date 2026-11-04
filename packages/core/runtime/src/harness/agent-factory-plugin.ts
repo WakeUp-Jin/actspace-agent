@@ -18,11 +18,12 @@ import type { RuntimeSessionController } from "../session/session-controller.js"
 import type { CordisContext } from "@actspace/cordis-adapter";
 import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
 import { isBashLogReadPath, isSessionTranscriptReadPath } from "@actspace/session-transcript";
+import type { SessionHandle } from "@actspace/session-persistence";
 import { HOST_READABLE_FILES_SERVICE_ID, HostReadableFiles } from "@actspace/tool-runtime";
 import { projectPermissionMode, applySessionGrantEvent } from "@actspace/session-projection";
 import { isBackgroundWake } from "@actspace/shared/runtime-v2";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
-import { blockedTool, isSubagentBlockedTool, SUBAGENT_APPROVAL_UNAVAILABLE, type ChildLoopInput } from "@actspace/subagent";
+import { blockedTool, isExternalRecordPath, isSubagentBlockedTool, SUBAGENT_APPROVAL_UNAVAILABLE, type ChildLoopInput } from "@actspace/subagent";
 
 const PURPOSE_ROUTE_IDS = new Set(["utility", "auto-review"]);
 type AgentRole = "main" | "subagent" | "fork";
@@ -52,6 +53,24 @@ export const inject = Object.freeze([
  */
 export function composeHostReadablePath(dataRoot: string | undefined, files: HostReadableFiles): (canonicalPath: string) => boolean {
   return canonicalPath => (dataRoot !== undefined && (isSessionTranscriptReadPath(dataRoot, canonicalPath) || isBashLogReadPath(dataRoot, canonicalPath))) || files.has(canonicalPath);
+}
+
+/**
+ * Per Session: the Host-readable files plus the session logs of the external subagents in its tree,
+ * read from the main Session's subagent records (a subagent's own Session has none), so they survive
+ * a Harness reload or an app restart.
+ */
+export function composeSessionReadablePath(
+  isHostReadablePath: (canonicalPath: string) => boolean,
+  getOpen: (sessionId: string) => SessionHandle | undefined,
+  isRecordPath: (root: SessionHandle, canonicalPath: string) => boolean = isExternalRecordPath,
+): (session: SessionHandle) => (canonicalPath: string) => boolean {
+  return session => canonicalPath => {
+    if (isHostReadablePath(canonicalPath)) return true;
+    const lineage = session.header.lineage;
+    const root = lineage?.origin === "delegation" ? getOpen(lineage.parentSessionId) : session;
+    return root !== undefined && isRecordPath(root, canonicalPath);
+  };
 }
 
 function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableFiles): AgentFactoryService {
@@ -89,12 +108,13 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
 
   const sessionDataRoot = (ctx.get?.("actspace.host.session") as { readonly dataRoot?: string } | undefined)?.dataRoot;
   const isHostReadablePath = composeHostReadablePath(sessionDataRoot, hostReadableFiles);
+  const readableFor = composeSessionReadablePath(isHostReadablePath, id => sessions.getOpen(id));
   const toolEnvironmentFor = (session: import("@actspace/session-persistence").SessionHandle) => {
     activeSessions.set(session.header.sessionId, session);
     const configuredMode = host.toolEnvironment.permissionMode;
     return Object.freeze({
       ...host.toolEnvironment,
-      isHostReadablePath,
+      isHostReadablePath: readableFor(session),
       autoReview: async (input: import("@actspace/tool-runtime").AutoReviewInput) => {
         const reviewer = ctx.get?.("approval.auto-review") as AutoReviewer | undefined;
         if (!reviewer) throw new Error("Auto reviewer unavailable");
