@@ -2,14 +2,12 @@ import { localExecutionRoot } from "../target/run-target";
 import { PerformancePanel } from "./PerformancePanel";
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
 import type { AppSettings, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
-import { FlaskConical } from "lucide-react";
 import { Suspense, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useActiveSession } from "../session/active-session-context";
 import { sameStringList, useTranscriptSelect } from "../session/transcript-context";
 import { useSessionActions } from "../session/session-actions-context";
 import { useComposerContext } from "./composer/composer-context";
 import { ConversationView } from "./ConversationView";
-import { PlaceholderView } from "./PlaceholderView";
 import { RightPanel } from "./RightPanel";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { useAgentEditSignals } from "./right-panel/useFileFreshness";
@@ -275,21 +273,6 @@ export const WorkbenchLayout = memo(function WorkbenchLayout({
         </Suspense>
       </div>
     );
-  } else if (view === "lab") {
-    // Lab 仍在产品设计阶段，入口先显示占位页；功能定型后再实现。
-    mainContent = (
-      <PlaceholderView
-        eyebrow="Lab"
-        title="Lab 功能正在开发中"
-        description="实验台用于沉淀 Agent 的假说、验证证据与能力产物。当前功能还在设计与开发中，暂未开放使用。"
-        bullets={[
-          "假说构建 → 实证验证 → 能力锻造 → 晋升评审的四阶段实验流",
-          "实验证据与产物的统一归档",
-          "已完成实验的回溯与复盘",
-        ]}
-        icon={<FlaskConical size={22} strokeWidth={1.9} />}
-      />
-    );
   } else {
     mainContent = (
       <ConversationView
@@ -308,7 +291,7 @@ export const WorkbenchLayout = memo(function WorkbenchLayout({
     );
   }
 
-  const chromeTitle = view === "extensions" ? "扩展" : view === "lab" ? "Lab" : isSpace ? "Space" : title;
+  const chromeTitle = view === "extensions" ? "扩展" : isSpace ? "Space" : title;
   const currentSession = view === "chat"
     ? sessions.find((session) => session.id === activeSessionId) ?? null
     : null;

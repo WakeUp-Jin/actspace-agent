@@ -10,7 +10,7 @@ import { SPACE_DEMO_ENABLED } from "./space/space-demo-enabled";
 
 export type SidebarMode = "expanded" | "hidden";
 /** "space"：Space 演示区（协调 Agent、Actor 名册、一对一对话），具体页面由 Space 的 store 决定。 */
-export type SidebarView = "chat" | "lab" | "settings" | "extensions" | "space";
+export type SidebarView = "chat" | "settings" | "extensions" | "space";
 export type { NewSessionInput } from "../session/session-actions-context";
 export type { SessionUiStatusKind } from "./sidebar/session-status";
 

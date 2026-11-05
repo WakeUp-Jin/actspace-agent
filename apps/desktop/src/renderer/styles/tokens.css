@@ -97,8 +97,9 @@
   --act-color-success-soft: #e5f2ea;
   --act-color-on-success: #087a4b;
 
-  /* 浮层（卡片/模态/popover 高一层背景）与模态遮罩 */
+  /* 浮层（卡片/模态/popover 高一层背景）与模态遮罩；scrim 是普通弹窗用的轻一档遮罩 */
   --act-color-overlay: rgba(17, 24, 39, 0.32);
+  --act-color-scrim: rgba(17, 24, 39, 0.16);
 
   /*
    * 强调色（外观 → 强调色，front-视觉token规范.md §4）：只驱动发送按钮、开关开启态、焦点、普通链接与文字选中。
@@ -432,6 +433,7 @@
   --act-color-on-success: #55d99a;
 
   --act-color-overlay: rgba(0, 0, 0, 0.55);
+  --act-color-scrim: rgba(0, 0, 0, 0.4);
 
   --act-color-accent: var(--act-palette-dark-accent, var(--act-color-action));
 
@@ -621,6 +623,7 @@
     --act-color-on-success: #55d99a;
 
     --act-color-overlay: rgba(0, 0, 0, 0.55);
+    --act-color-scrim: rgba(0, 0, 0, 0.4);
 
     --act-color-accent: var(--act-palette-dark-accent, var(--act-color-action));
 

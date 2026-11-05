@@ -38,6 +38,8 @@
 | `surface-raised` | `#ffffff` | `#30312d` |
 | `selected` | `#e4e4e1` | `#30312d` |
 | `hover-overlay` | `#eaeae7` | `#2a2b27` |
+| `scrim`（普通弹窗遮罩） | `rgba(17,24,39,.16)` | `rgba(0,0,0,.4)` |
+| `overlay`（重遮罩） | `rgba(17,24,39,.32)` | `rgba(0,0,0,.55)` |
 | `border`（`line`） | `#deded9` | `#353630` |
 | `border-strong`（`line-strong`） | `#8c8c85` | `#787870` |
 | `text` | `#20201e` | `#f1f1ed` |
@@ -137,7 +139,7 @@
 | `shadow-act-xs` | 小按钮描边感 |
 | `shadow-act-knob` | Toggle 滑块 |
 | `shadow-act-thumb` | 附件、图片缩略图 |
-| `shadow-act-soft` | 大面积浮起：占位页、关机遮罩、Sheet |
+| `shadow-act-soft` | 大面积浮起：关机遮罩、Sheet |
 | `shadow-act-popover` | 菜单、tooltip、hover card |
 | `shadow-act-float` | dialog、窄窗口抽屉 |
 | `shadow-act-composer` / `-focus` | 仅 Composer |

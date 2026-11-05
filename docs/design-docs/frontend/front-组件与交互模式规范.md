@@ -65,7 +65,7 @@
 | 用户处理完才能回到背景的流程（表单、确认、全屏预览） | `Dialog` | 背景不可交互，Tab 不出对话框；只是「点开看一眼」用 Popover |
 | 破坏性或高风险操作的确认 | `ConfirmDialog` | 见第 5 节 |
 
-`Dialog`：`size` `sm` 420 / `md` 460 / `lg` 520 / `xl` 760 / `full`；`surface` `float`（设置、确认框）/ `raised`（Review、本地更新这类卡片），圆角都是 12px；`closeOnOutsideClick={false}` 用于确认框和正在编辑的表单；遮罩与浮层都是 `-webkit-app-region: no-drag`。
+`Dialog`：`size` `sm` 420 / `md` 460 / `lg` 520 / `xl` 760 / `full`；`surface` `float`（设置、确认框）/ `raised`（Review、本地更新这类卡片），圆角都是 12px；`backdrop` 默认 `scrim`（轻遮罩），需要压住背景、让人专注的弹窗（填 API Key、本地更新进度、图表预览）用 `overlay`；`closeOnOutsideClick={false}` 用于确认框和正在编辑的表单；遮罩与浮层都是 `-webkit-app-region: no-drag`。
 
 统一行为（原语已实现，新写法不得破坏）：
 

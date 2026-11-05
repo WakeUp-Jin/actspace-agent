@@ -68,7 +68,7 @@
 
 ## 4. `@` 文件引用（目标设计，未实现）
 
-现状：Composer 正文仍是原生 `textarea`；仓库里只有 `ProseMirror` 依赖与 `test/editor-poc.test.tsx` 的可行性验证，没有 `@` 菜单，也没有 `file_mention` 节点。initial 形态 placeholder 已写「@ 引用文件」，在 PB 落地前与实际能力不符（待 PB 实施或改文案，见 [聊天输入框规范](front-聊天输入框规范.md)）。实施前以下方案视为目标，不是当前行为。
+现状：Composer 正文仍是原生 `textarea`；仓库里只有 `ProseMirror` 依赖与 `test/editor-poc.test.tsx` 的可行性验证，没有 `@` 菜单，也没有 `file_mention` 节点。initial 形态 placeholder 暂不提 @，PB 落地时再加「@ 引用文件」（见 [聊天输入框规范](front-聊天输入框规范.md)）。实施前以下方案视为目标，不是当前行为。
 
 ### 4.1 编辑器
 

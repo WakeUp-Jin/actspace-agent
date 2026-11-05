@@ -69,6 +69,7 @@
   --color-on-success: var(--act-color-on-success);
   --color-surface-raised: var(--act-color-surface-raised);
   --color-overlay: var(--act-color-overlay);
+  --color-scrim: var(--act-color-scrim);
   --color-accent: var(--act-color-accent);
   --color-accent-hover: var(--act-color-accent-hover);
   --color-on-accent: var(--act-color-on-accent);

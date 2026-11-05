@@ -917,7 +917,7 @@ describe("Composer follow-up bar", () => {
   });
 
   it.each([
-    ["agent", "initial", false, "描述你要做的事，@ 引用文件，/ 调用命令"],
+    ["agent", "initial", false, "描述你要做的事，/ 调用命令"],
     ["agent", "followup", false, "继续追问…"],
     ["plan", "initial", false, "描述要规划的改动…"],
     ["plan", "followup", false, "描述要规划的改动…"],
