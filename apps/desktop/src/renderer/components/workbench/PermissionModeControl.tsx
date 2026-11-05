@@ -5,11 +5,14 @@ import { sessionsApi } from "../../api/sessions";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 
-const PERMISSION_MODES = ["default", "auto-review", "full-access"] as const satisfies readonly PermissionMode[];
+export const PERMISSION_MODES = ["default", "auto-review", "full-access"] as const satisfies readonly PermissionMode[];
 
-function permissionModeLabel(mode: PermissionMode): string {
+export function permissionModeLabel(mode: PermissionMode): string {
   return mode === "auto-review" ? "替我审批" : mode === "full-access" ? "完全权限" : "自动";
 }
+
+/** 切到「完全权限」前的确认文案；设置页的「新会话默认权限」共用。 */
+export const FULL_ACCESS_CONFIRM = { title: "开启完全权限？", description: "Bash 命令将不在沙箱中运行，可直接修改本机文件。" } as const;
 
 // 每种模式一个图标，触发按钮跟着当前模式换，菜单里也能一眼区分。
 const PERMISSION_MODE_META: Record<(typeof PERMISSION_MODES)[number], { icon: LucideIcon }> = {
@@ -97,8 +100,8 @@ export function PermissionModeControl({ sessionId, mode, disabled, onChanged }: 
     {confirmFull ? (
       <ConfirmDialog
         key={sessionId}
-        title="开启完全权限？"
-        description="Bash 命令将不在沙箱中运行，可直接修改本机文件。"
+        title={FULL_ACCESS_CONFIRM.title}
+        description={FULL_ACCESS_CONFIRM.description}
         confirmLabel="开启"
         pendingLabel="开启中…"
         returnFocus={trigger}

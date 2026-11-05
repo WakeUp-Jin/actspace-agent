@@ -41,7 +41,7 @@ describe("workspace directory picker IPC contract", () => {
     const registration = registerFixedRendererIpc({
       roots: { dataRoot: "/tmp/picker-test", workspaceRoot: "/work", defaultWorkspaceRoot: "/work" },
       registry: { subscribe: () => () => undefined, subscribeRendererStream: () => () => undefined },
-      settings: { subscribeV4Changes: () => () => undefined },
+      settings: { subscribeV4Changes: () => () => undefined, getV4: () => ({ settings: { general: {} } }) },
       getMainWindow: () => mainWindow,
     } as unknown as FixedRendererIpcOptions);
     try {
@@ -73,7 +73,7 @@ describe("workspace admission from the native picker", () => {
     const registration = registerFixedRendererIpc({
       roots,
       registry: { subscribe: () => () => undefined, subscribeRendererStream: () => () => undefined },
-      settings: { subscribeV4Changes: () => () => undefined },
+      settings: { subscribeV4Changes: () => () => undefined, getV4: () => ({ settings: { general: {} } }) },
       getMainWindow: () => mainWindow,
     } as unknown as FixedRendererIpcOptions);
     const review = new ReviewCoordinator({
@@ -127,7 +127,7 @@ describe("renderer-supplied workspace roots", () => {
     const registration = registerFixedRendererIpc({ roots, registry: {
       subscribe: () => () => {}, subscribeRendererStream: () => () => {},
       listSessions: async () => [{ sessionId: "tree", workspaceRoot: worktree }],
-    }, settings: { subscribeV4Changes: () => () => {} }, getMainWindow: () => trusted.window } as unknown as FixedRendererIpcOptions);
+    }, settings: { subscribeV4Changes: () => () => {}, getV4: () => ({ settings: { general: {} } }) }, getMainWindow: () => trusted.window } as unknown as FixedRendererIpcOptions);
     const call = (workspaceRoot?: string) => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.getWorkspaceEnvironment)!(trusted.event, { workspaceRoot });
     try {
       await expect(call(worktree)).resolves.toMatchObject({ workspaceRoot: await realpath(worktree), git: { branch: "actspace/test" } });
@@ -147,7 +147,7 @@ describe("renderer-supplied workspace roots", () => {
     const registration = registerFixedRendererIpc({ roots, registry: {
       subscribe: () => () => {}, subscribeRendererStream: () => () => {},
       inspectSession: async () => ({ workspaceRoot: roots.workspaceRoot }), updateSessionWorkspace,
-    }, settings: { subscribeV4Changes: () => () => {} }, getMainWindow: () => trusted.window } as unknown as FixedRendererIpcOptions);
+    }, settings: { subscribeV4Changes: () => () => {}, getV4: () => ({ settings: { general: {} } }) }, getMainWindow: () => trusted.window } as unknown as FixedRendererIpcOptions);
     const call = (input: object) => handlers.get(RUNTIME_V2_FIXED_RENDERER_CHANNELS.setSessionWorkspace)!(trusted.event, { sessionId: 's1', ...input });
     try {
       for (const selection of [{ workspaceId: target.workspaceId }, { workspaceRoot: target.workspaceRoot }, { workspaceId: target.workspaceId, workspaceRoot: target.workspaceRoot }]) {
@@ -180,7 +180,7 @@ describe("renderer-supplied workspace roots", () => {
         createSession,
         readSessionProjection: async () => ({ meta: { id: "s1" } }),
       },
-      settings: { subscribeV4Changes: () => () => undefined },
+      settings: { subscribeV4Changes: () => () => undefined, getV4: () => ({ settings: { general: {} } }) },
       getMainWindow: () => trusted.window,
     } as unknown as FixedRendererIpcOptions);
     const call = (channel: string, input: unknown) => handlers.get(channel)!(trusted.event, input);

@@ -1,4 +1,4 @@
-import { LiveEnvelopeBatcher } from "./live-envelope-batcher";
+import { LiveEnvelopeBatcher, isStreamChunkEnvelope } from "./live-envelope-batcher";
 import { ContextPanelService } from "./context-panel-service";
 import { validateRunReferences as validateSharedRunReferences } from "@actspace/shared/composer-reference-validation";
 import type { RemoteDesktopAdapter } from "../remote-hosts/desktop-adapter";
@@ -179,6 +179,11 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     if (input.title?.trim()) {
       snapshot = await options.registry.updateSessionMetadata({ sessionId: snapshot.sessionId, title: input.title.trim() });
     }
+    // 设置 → 通用 →「新会话默认权限」：写进新会话，第一轮就按它跑。Chat 形态没有工具，不需要。
+    const permissionMode = input.agentForm === "chat" ? "default" : options.settings.getV4().settings.general.defaultPermissionMode ?? "default";
+    if (permissionMode !== "default" && snapshot.permissionMode !== permissionMode) {
+      snapshot = await options.registry.updateSessionPermissionMode(snapshot.sessionId, permissionMode);
+    }
     return options.registry.readSessionProjection({ sessionId: snapshot.sessionId });
   });
   ipc.handle(contract.sessions.fork, async (input) => {
@@ -308,7 +313,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
 
   // Streaming sends one IPC message per token on two channels. Both coalesce within ~33ms; any other
-  // message flushes the pending chunks first so order never changes.
+  // message flushes the pending items of BOTH channels first so order never changes across them.
   const liveBatcher = new LiveEnvelopeBatcher((message) => {
     const target = options.getMainWindow();
     if (target === undefined || target.isDestroyed()) return;
@@ -316,6 +321,9 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
   const unsubscribeLive = options.registry.subscribe((envelope) => {
     if (envelope.event.kind === "runtime-live" || envelope.event.kind === "journal-update") usageReadModels.get(options.registry)?.invalidate();
+    // A finished message (or any other journal fact) must not overtake the text deltas streamed before it:
+    // a delta arriving after its message was committed is drawn as a new live segment that stays until the run ends.
+    if (!isStreamChunkEnvelope(envelope)) options.registry.flushRendererStream();
     liveBatcher.push(envelope);
   });
 

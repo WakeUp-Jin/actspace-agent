@@ -26,6 +26,7 @@ import { LocalUpdateSection } from "./sections/LocalUpdateSection";
 import { MediaDefaultsSection } from "./sections/MediaDefaultsSection";
 import { PerformanceSection } from "./sections/PerformanceSection";
 import { ConversationDisplaySection } from "./sections/ConversationDisplaySection";
+import { SessionDefaultsSection } from "./sections/SessionDefaultsSection";
 import { SubagentSection } from "./sections/SubagentSection";
 import { TaskModelDefaultsSection } from "./sections/TaskModelDefaultsSection";
 import { ToolsSection } from "./sections/ToolsSection";
@@ -183,6 +184,7 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       return (
         <PageShell title="通用">
           <PerformanceSection {...rest} />
+          <SessionDefaultsSection {...rest} />
           <ConversationDisplaySection {...rest} />
           <GeneralSection {...rest} />
           <AgentInstructionsSection {...rest} />

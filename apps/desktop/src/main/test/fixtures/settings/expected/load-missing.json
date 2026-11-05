@@ -6,6 +6,7 @@
       "general": {
         "performanceMonitoring": false,
         "showTurnCodeChanges": true,
+        "defaultPermissionMode": "default",
         "englishLearning": {
           "lastSessionId": null
         },

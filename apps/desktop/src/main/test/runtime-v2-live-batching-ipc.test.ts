@@ -142,6 +142,25 @@ describe("webContents.send per 100 streamed deltas", () => {
     } finally { registration.dispose(); adapter.dispose(); }
   });
 
+  it("a committed journal message never overtakes the text deltas streamed before it", () => {
+    const { send, adapter, registration, emit } = setup();
+    try {
+      adapter.accept(delta("I'll explore "));
+      emit(chunk("I'll explore "));
+      adapter.accept(delta("the project."));
+      emit(chunk("the project."));
+      // The step ends: the journal commits the message while the last text is still inside the 33 ms window.
+      emit(other("assistant/message"));
+      const order = send.mock.calls.map(call => call[0] === CH.agentStream
+        ? `stream:${(call[1] as { delta: string }).delta}`
+        : (call[1] as RuntimeV2DesktopLiveEnvelope).batch ? "chunks" : (call[1] as RuntimeV2DesktopLiveEnvelope).event.update!.event.type);
+      expect(order).toEqual(["stream:I'll explore the project.", "chunks", "assistant/message"]);
+      // Nothing is left to arrive late.
+      vi.advanceTimersByTime(1000);
+      expect(send).toHaveBeenCalledTimes(3);
+    } finally { registration.dispose(); adapter.dispose(); }
+  });
+
   it("disposal sends what is pending and then stops timers", () => {
     const { send, adapter, registration, emit } = setup();
     emit(chunk("a"));

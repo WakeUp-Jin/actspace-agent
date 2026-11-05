@@ -16,7 +16,7 @@ import { trustedWindow } from "./ipc-sender-fixture";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const dispose of cleanup.splice(0).reverse()) await dispose(); handlers.clear(); });
-async function fixture(fail = false) {
+async function fixture(fail = false, defaultPermissionMode?: string) {
   const root = await mkdtemp(join(tmpdir(), "create-worktree-"));
   const workspace = join(root, "repo");
   await mkdir(workspace);
@@ -27,20 +27,21 @@ async function fixture(fail = false) {
   await git(["add", "."]);
   await git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixture"]);
   await git(["branch", "feature/base"]);
-  let created: { sessionId: string; workspaceRoot: string; worktree?: SessionWorktreeContext } | undefined;
+  let created: { sessionId: string; workspaceRoot: string; worktree?: SessionWorktreeContext; permissionMode: string } | undefined;
   const createSession = vi.fn(async (_id: string | undefined, workspaceRoot: string, _form: string | undefined, worktree?: SessionWorktreeContext) => {
     if (fail) throw new Error("session storage unavailable");
-    created = { sessionId: "new", workspaceRoot, worktree }; return created;
+    created = { sessionId: "new", workspaceRoot, worktree, permissionMode: "default" }; return created;
   });
+  const updateSessionPermissionMode = vi.fn(async (_id: string, mode: string) => { created = { ...created!, permissionMode: mode }; return created; });
   const trusted = trustedWindow();
   const registration = registerFixedRendererIpc({
     roots: { dataRoot: join(root, "data"), workspaceRoot: workspace, defaultWorkspaceRoot: workspace },
-    registry: { subscribe: () => () => {}, subscribeRendererStream: () => () => {}, createSession, readSessionProjection: async () => created },
-    settings: { subscribeV4Changes: () => () => {} }, getMainWindow: () => trusted.window,
+    registry: { subscribe: () => () => {}, subscribeRendererStream: () => () => {}, createSession, updateSessionPermissionMode, readSessionProjection: async () => created },
+    settings: { subscribeV4Changes: () => () => {}, getV4: () => ({ settings: { general: { defaultPermissionMode } } }) }, getMainWindow: () => trusted.window,
   } as unknown as FixedRendererIpcOptions);
   cleanup.push(async () => registration.dispose());
   const create = (input: SessionCreateInput) => Promise.resolve().then(() => handlers.get(desktopBridgeContract.sessions.create.channel)!(trusted.event, input));
-  return { workspace, git, create, createSession };
+  return { workspace, git, create, createSession, updateSessionPermissionMode };
 }
 it("creates the selected base in a real worktree before binding the Session, keeping the original checkout", async () => {
   const f = await fixture();
@@ -66,4 +67,15 @@ it("rejects invalid execution choices and missing base branches without creating
   await expect(f.create({ hostId: "remote", runLocation: "worktree" })).rejects.toThrow("Remote worktree");
   await expect(f.create({ runLocation: "worktree", branch: "absent" })).rejects.toThrow();
   expect(f.createSession).not.toHaveBeenCalled();
+});
+it("writes the default permission mode from settings into a new Agent Session, but not into Chat or when it is the default", async () => {
+  const full = await fixture(false, "full-access");
+  expect((await full.create({ workspaceRoot: full.workspace, agentForm: "agent" })).permissionMode).toBe("full-access");
+  expect(full.updateSessionPermissionMode).toHaveBeenCalledWith("new", "full-access");
+  full.updateSessionPermissionMode.mockClear();
+  expect((await full.create({ workspaceRoot: full.workspace, agentForm: "chat" })).permissionMode).toBe("default");
+  expect(full.updateSessionPermissionMode).not.toHaveBeenCalled();
+  const plain = await fixture(false);
+  expect((await plain.create({ workspaceRoot: plain.workspace })).permissionMode).toBe("default");
+  expect(plain.updateSessionPermissionMode).not.toHaveBeenCalled();
 });
