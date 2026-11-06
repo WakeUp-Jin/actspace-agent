@@ -78,7 +78,6 @@ function mount() {
     "sessions.listPage": async () => ({ items, groups: [{ workspaceRoot: "/tmp/workspace", pinned: false, hasMore: false }], indexing: false, failed: 0 }),
     "sessions.getPage": async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(record(sessionId, items.find((entry) => entry.id === sessionId)!.title)),
     "approvals.listPending": async () => [],
-    "sessions.describeContext": async () => null,
     "tasks.command": async ({ sessionId }: { sessionId: string }) => ({ snapshot: { sessionId, revision: 1, paused: false, tasks: [], queue: [], runs: [] } }),
     "events.agentStream": (callback: (event: RuntimeStreamEvent) => void) => { stream.add(callback); return () => { stream.delete(callback); }; },
     "events.sessionLive": (callback: (payload: unknown) => void) => { live.add(callback); return () => { live.delete(callback); }; },

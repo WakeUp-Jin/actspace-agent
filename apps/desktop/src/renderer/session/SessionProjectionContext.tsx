@@ -2,7 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ClientSessionStore, emptyClientSessionCell, type ClientLiveOverlay, type ClientSessionCell } from "@actspace/client/sessions";
 import { createDesktopSessionBridge, type DesktopSessionBridge } from "./desktop-session-bridge";
 import { liveEvents } from "../api/live-events";
-import { scheduleFrame } from "./frame-batch";
 import { sessionsApi } from "../api/sessions";
 
 /** 会话投影的「当前会话 + 当时的 cell / overlay」。随当前会话的 cell 或 overlay 引用变化而换新（流式时每帧一次）。 */
@@ -90,7 +89,7 @@ export function SessionProjectionProvider({
       getSessionProjectionSnapshot: sessionsApi.getProjectionSnapshot,
       onSessionLiveEvent: liveEvents.subscribe,
       setObservedSessions: sessionsApi.setObserved,
-    }, store, { scheduleStreamFlush: scheduleFrame });
+    }, store);
     bridgeRef.current = created;
     created.start();
     setBridge(created);

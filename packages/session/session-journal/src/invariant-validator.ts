@@ -1,5 +1,5 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { EventCodecRegistry } from "./codec-registry.js";
+import { relationContext, type EventCodecRegistry } from "./codec-registry.js";
 import { validateEventEnvelopeShape, type SessionEventEnvelopeV1 } from "./event-envelope.js";
 import { SessionError } from "./errors.js";
 import { AUXILIARY_IDENTITY_FIELDS } from "./auxiliary-codec.js";
@@ -34,7 +34,7 @@ type MutableRelations = {
   openAgentRunId: string | null;
   auxiliary: Map<string, Readonly<Record<string, RuntimeV2JsonValue>>>;
   auxiliaryIds: Set<string>;
-  requests: Map<string, { header: boolean; context: boolean; terminal: boolean }>;
+  requests: Map<string, { header: boolean; context: boolean; terminal: boolean; systemPrompt?: boolean; tools?: boolean }>;
   tools: Map<string, { terminal: boolean; order: number }>;
   inbox: Map<string, { status: "pending" | "claimed" | "discarded"; target: "next-step" | "next-turn"; seq: number }>;
   requestIds: Set<string>;
@@ -82,7 +82,7 @@ export class SessionEventValidator {
           this.diagnostics.push(diagnostic(code, event, `Unavailable codec or version for ${event.type}.`));
           continue;
         }
-        if (resolution.codec.validateRelations) resolution.codec.validateRelations({ previous: [...previous(), ...events.slice(0, index)], candidate: event });
+        if (resolution.codec.validateRelations) resolution.codec.validateRelations(relationContext(resolution.codec, event, () => [...previous(), ...events.slice(0, index)]));
         if (this.kind !== null) {
           if (isTransactionStart(event.type) || transactionIdOf(resolution.data, this.kind) !== this.transactionId) invalid(`${this.kind} transaction ${this.transactionId} must be contiguous.`);
           this.pending.push({ event, data: resolution.data });
@@ -218,6 +218,16 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
       if (state.requestIds.has(requestId)) invalid(`Duplicate request ${requestId}.`);
       state.requestIds.add(requestId);
       state.requests.set(requestId, { header: true, context: false, terminal: false });
+      break;
+    }
+    // 提示词、工具只在变化时写，夹在 header 与 context 之间，每个请求每种最多一条。
+    case "request/system-prompt":
+    case "request/tools": {
+      requireOpenStep(state, data, event.type);
+      const request = state.requests.get(id(data.requestId, event.type));
+      const field = event.type === "request/tools" ? "tools" : "systemPrompt";
+      if (request === undefined || !request.header || request.context || request.terminal || request[field]) invalid(`${event.type} requires one open request header before its context.`);
+      request[field] = true;
       break;
     }
     case "request/context": {

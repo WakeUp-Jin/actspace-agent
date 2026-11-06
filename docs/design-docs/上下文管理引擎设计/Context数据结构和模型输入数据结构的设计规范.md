@@ -93,7 +93,7 @@ interface SystemSection {
 - `content` 兼容当前 contributor 的文本和结构化输出，不强制本轮将它们全部迁成字符串。
 - 使用稳定排序；同顺序时采用稳定身份作为次序依据，不依赖插件加载时机。
 - `modelFacts` 只包含明确需要向模型公开的事实，审计事实留在 `status.facts`。
-- 不在此保存一份可独立修改的 `renderedSystemPrompt`。渲染结果在转换时产生，需要审计时写入现有请求快照。
+- 不在此保存一份可独立修改的 `renderedSystemPrompt`。渲染结果在转换时由 `@actspace/shared` 的 `renderSystemPrompt(sections, modelFacts)` 产生；审计时从 `request/system-prompt` 记录重新推出，不另存文本。
 
 ### 3.3 动态补充
 
@@ -213,7 +213,7 @@ flowchart TD
 | 来源序号和 replaceGeneration | 保留 |
 | 压缩事务 | 通过现有 Session 接口提交 |
 | append、flush、恢复 | 继续使用现有业务与持久屏障 |
-| request/context.snapshot | 保留现有契约，不用整个 Context 替换 |
+| 请求记录 | `request/system-prompt`、`request/tools` 变化才写，`request/context.snapshot` 只留小字段（[请求记录规范](../agent-plugin-runtime/agent-spec-request-record.md)），不用整个 Context 替换 |
 | 新属性和补充记录 | 注册插件 Codec，追加 versioned 事件到同一 Journal |
 
 新增事件使用已有 envelope，类型位于 `plugin/<ownerPluginId>/...` 命名空间，状态数据放入 `data`，不改变对话时使用 `surface: null`。必须注册 Codec 并遵守 owner、版本、JSON-safe 和现有记录大小限制。
@@ -222,7 +222,7 @@ flowchart TD
 
 行为插件停止注册不应顺带失去历史解码能力；Codec 发现与行为启用按现有架构分离。新增状态保存必要变化，大目录复用 artifact 能力，不每次序列化整个 Context。睡眠目录应是可从状态重建的导航产物，不能成为另一份不可恢复的事实源。
 
-现有请求快照继续记录实际输入与必要来源；通过内部映射保留 `messages`、`systemSections`、`modelFacts`、`facts`、`renderedSystemPrompt` 等现有消费者需要的字段。快照不是第三个新公共模型。
+请求记录只保存模型输入里无法从对话事件重新拼出的部分：系统提示词各段、模型事实和提供方来源写在 `request/system-prompt`，工具写在 `request/tools`，两者只在内容变化时写；`request/context.snapshot` 只记 digest、prepared、requestOptions、`contextModel` 等小字段，不再存对话、渲染好的系统提示词和估算明细。请求记录不是第三个新公共模型。
 
 ## 6. 数据例子
 

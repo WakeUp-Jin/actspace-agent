@@ -24,16 +24,11 @@ export function createLiveEventHub(source: LiveSource): LiveEventHub {
       try { listener(envelope); } catch (error) { console.error("Live event listener failed", error); }
     }
   };
-  // 主进程把 ~33ms 内连续的流式 chunk 合成一条 IPC 消息；这里拆回单条，下游消费者无感。
-  const dispatch: LiveListener = (envelope) => {
-    if (envelope.batch === undefined) { deliver(envelope); return; }
-    for (const item of envelope.batch) deliver(item);
-  };
   const subscribe = (listener: LiveListener) => {
     // 同一个函数挂两次也各算一个消费者。
     const entry: LiveListener = (envelope) => listener(envelope);
     listeners.add(entry);
-    if (!release) release = source(dispatch);
+    if (!release) release = source(deliver);
     let active = true;
     return () => {
       if (!active) return;

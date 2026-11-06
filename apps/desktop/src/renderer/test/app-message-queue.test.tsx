@@ -118,7 +118,6 @@ function setupQueueFixture() {
     "tasks.abort": abort,
     "approvals.listPending": async () => [],
     "usage.getStatistics": async () => null,
-    "sessions.describeContext": async () => null,
     "review.getSnapshot": async () => ({ ok: false, reason: "not_git_repository" }),
     "appearance.setUiZoom": () => {},
     "appearance.setNativeTheme": () => {},

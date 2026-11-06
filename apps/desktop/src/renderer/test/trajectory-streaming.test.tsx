@@ -32,20 +32,23 @@ function withToolCall(snapshot: RuntimeV2TrajectorySnapshot): RuntimeV2Trajector
   return { ...snapshot, throughJournalSeq: call.eventSeq, nodes: [...snapshot.nodes, call] as RuntimeV2TrajectorySnapshot["nodes"] };
 }
 
+/** The Journal does not change while a reply streams; only the live run's output grows. */
+const settled = streamingFixture(0).snapshot;
+const at = (frame: number, snapshot: RuntimeV2TrajectorySnapshot = settled) => <TrajectoryView snapshot={snapshot} live={streamingFixture(frame).live} />;
 const runningRow = () => document.querySelector<HTMLTableRowElement>('tr[data-record-id$=":record:assistant:assistant-running"]');
 
 describe("trajectory streaming", () => {
   afterEach(() => { vi.useRealTimers(); });
 
   it("grows the streaming assistant row in place without rebuilding the settled layer", () => {
-    const view = render(<TrajectoryView snapshot={streamingFixture(0)} />);
+    const view = render(at(0));
     spies().forEach(spy => spy.mockClear());
     const lengths: number[] = [];
     let row: HTMLTableRowElement | null = null;
     const removed: Node[] = [];
     const observer = new MutationObserver(records => records.forEach(record => removed.push(...Array.from(record.removedNodes))));
     for (let frame = 1; frame <= 5; frame += 1) {
-      view.rerender(<TrajectoryView snapshot={streamingFixture(frame)} />);
+      view.rerender(at(frame));
       const current = runningRow();
       expect(current).not.toBeNull();
       if (row === null) {
@@ -59,9 +62,9 @@ describe("trajectory streaming", () => {
     expect(removed.filter(node => node === row)).toHaveLength(0);
     expect(lengths).toEqual([...lengths].sort((a, b) => a - b));
     expect(new Set(lengths).size).toBe(5);
-    // Only the frame that adds the assistant placeholder builds; later chunks go to the streaming layer.
+    // Only the frame that names the reply's message rebuilds; later text goes to the streaming layer.
     expect(calls()).toEqual([1, 1, 1]);
-    view.rerender(<TrajectoryView snapshot={withToolCall(streamingFixture(5))} />);
+    view.rerender(at(5, withToolCall(settled)));
     expect(calls()).toEqual([2, 2, 2]);
     expect(runningRow()).toBe(row);
     expect(row).toHaveAttribute("data-running", "true");
@@ -69,12 +72,12 @@ describe("trajectory streaming", () => {
   });
 
   it("grows the selected assistant's preview with the stream", () => {
-    const view = render(<TrajectoryView snapshot={streamingFixture(1)} />);
+    const view = render(at(1));
     fireEvent.click(runningRow()!);
     fireEvent.click(screen.getByRole("tab", { name: "预览" }));
     const lengths: number[] = [];
     for (let frame = 2; frame <= 4; frame += 1) {
-      view.rerender(<TrajectoryView snapshot={streamingFixture(frame)} />);
+      view.rerender(at(frame));
       lengths.push(screen.getByRole("tabpanel").textContent!.length);
     }
     expect(lengths[0]).toBeLessThan(lengths[1]!);
@@ -84,10 +87,10 @@ describe("trajectory streaming", () => {
 
   it("makes newly streamed text searchable after the index throttle", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    const view = render(<TrajectoryView snapshot={streamingFixture(1)} />);
+    const view = render(at(1));
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "圆点和类型" } });
     expect(runningRow()).toBeNull();
-    view.rerender(<TrajectoryView snapshot={streamingFixture(8)} />);
+    view.rerender(at(8));
     act(() => { vi.advanceTimersByTime(SEARCH_INDEX_THROTTLE_MS - 1); });
     expect(runningRow()).toBeNull();
     act(() => { vi.advanceTimersByTime(1); });

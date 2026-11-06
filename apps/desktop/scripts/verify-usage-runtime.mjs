@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { createCoreCodecRegistry } from '@actspace/session-journal';
 import { SessionStore } from '../../../packages/session/session-persistence/dist/index.js';
+import { JsonlSessionStorage } from '../../../packages/session/session-persistence-jsonl/dist/index.js';
 const require = createRequire(import.meta.url);
 const { ModelCatalogService } = require('../dist-electron/main/model-catalog-service.js');
 const { resolveModelPricing } = require('@actspace/shared');
@@ -13,7 +14,8 @@ const { BUILTIN_MODEL_CATALOG } = require('@actspace/shared/model-catalog-data')
 const { calculateUsageCost } = await import('@actspace/llm-service');
 const dataRoot = await mkdtemp(join(tmpdir(), 'actspace-usage-verification-'));
 const registry = createCoreCodecRegistry();
-const store = new SessionStore({ dataRoot, runtimeId: 'usage-verification', registry });
+const storage = new JsonlSessionStorage({ dataRoot, runtimeId: 'usage-verification', registry });
+const store = new SessionStore({ registry }, storage);
 const sessionId = 'usage-verification';
 const session = await store.create({ sessionId, createdAt: new Date().toISOString(), cwd: resolve(import.meta.dirname, '..'), lineage: null, createdWith: { profileId: 'base', runtimeContractVersion: 'actspace.runtime.v2', manifestDigest: 'verification', plugins: [{ id: '@actspace/core', version: '2.0.0' }], codecSetDigest: registry.digest } });
 const append = (type, data) => session.append({ type, eventVersion: 1, source: { ownerPluginId: '@actspace/core' }, data, surface: null });
@@ -22,7 +24,7 @@ for (let i=0; i<15; i++) {
   const ids = { turnId: `t${i}`, stepId: `s${i}`, requestId: `r${i}` };
   await append('turn/start', ids); await append('step/start', ids);
   await append('request/header', { ...ids, model: 'deepseek-v4-flash', routeId: 'deepseek' });
-  await append('request/context', { ...ids, snapshot: { renderedSystemPrompt: 'Verification fixture', tools: [], requestOptions: {} } });
+  await append('request/context', { ...ids, snapshot: { schemaVersion: 3, requestOptions: {} } });
   const pricing = resolveModelPricing(BUILTIN_MODEL_CATALOG, { apiModel: 'deepseek-v4-flash', modelKey: 'deepseek:deepseek-v4-flash', providerId: 'deepseek', baseUrl: 'https://api.deepseek.com' });
   const usage = i===0 ? { inputTokens: 100, outputTokens: 20, cost: 0, costCurrency: 'USD', source: 'provider-reported' } : calculateUsageCost({ inputTokens: 769, outputTokens: 145, cacheReadTokens: 36736, cacheWriteTokens: 0, reasoningTokens: null, cost: null, costCurrency: null, source: 'provider-reported' }, pricing);
   await append('assistant/message', { ...ids, messageId: `a${i}`, content: [], finishReason: 'stop', usage });

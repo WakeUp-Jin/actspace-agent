@@ -123,7 +123,7 @@ describe("buildInterimPanelView", () => {
     expect(interim.stats.cumulativeUsage).toEqual({ inputTokens: 10, outputTokens: 5, cacheReadTokens: 90, cacheWriteTokens: 0 });
   });
 
-  it("reports an unavailable context when describeContext returned nothing", () => {
+  it("reports an unavailable context without an estimate", () => {
     expect(buildInterimPanelView({ sessionId: "s1", contextState: null, activity: null, usage: null }).view.current.status).toBe("unavailable");
   });
 });

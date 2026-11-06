@@ -3,7 +3,8 @@ import { dirname } from "node:path";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import {
   HARNESS_ACTIVE_PATH_LIMIT, HARNESS_DURATION_BASE_MS, HARNESS_INDEX_CONVERSION_STEPS, HARNESS_REREAD_WINDOW_STEPS, HARNESS_TOKEN_BASE,
-  harnessHistogramIndex, harnessRevisionKey, HARNESS_UNKNOWN_REVISION,
+  harnessHistogramIndex, harnessRevisionKey, HARNESS_UNKNOWN_REVISION, estimateCharCount,
+  applyContextEstimate, initialContextEstimate, viewContextEstimate, type ContextEstimateState,
 } from "@actspace/shared";
 import { prepare, type ProjectionDatabase } from "./usage-sql";
 import { HarnessAccumulator, harnessHistogramPoint, HARNESS_SLEEP_BUCKETS, HARNESS_STATE_TABLE, HARNESS_TABLES } from "./harness-stats-schema";
@@ -44,6 +45,10 @@ type State = {
   tasks: Record<string, string>;
   /** Preset of each subagent (`subagent/spawned`), for its activations' rows. Absent in states saved before subagents. */
   subagents?: Record<string, string>;
+  /** 与会话投影 `contextEstimate` 同一个折叠（agent-spec-request-record.md §6.4）；只含非对话项与两个对话合计。 */
+  estimate: ContextEstimateState;
+  /** 最近一条 `request/tools` 的工具名，按请求计曝光。 */
+  toolNames: string[];
 };
 
 function emptyState(): State {
@@ -54,6 +59,7 @@ function emptyState(): State {
     disclosure: { cycle: 0, paths: {}, indexPaths: [], conversionSteps: 0, converted: false },
     compaction: { lastStep: 0, lastTurn: 0, windowRatio: null, readSince: [], pending: null, open: {} },
     tasks: {},
+    estimate: initialContextEstimate(), toolNames: [],
   };
 }
 
@@ -66,7 +72,6 @@ export function hourOf(time: string): string {
   const value = Date.parse(time);
   return Number.isFinite(value) ? new Date(value - (value % 3_600_000)).toISOString().slice(0, 13) : "unknown";
 }
-const tokensOf = (chars: number) => Math.ceil(chars / 4);
 
 export function clearHarnessSession(db: ProjectionDatabase, sessionId: string): void {
   prepare(db, `DELETE FROM ${HARNESS_STATE_TABLE} WHERE session_id=?`).run(sessionId);
@@ -107,6 +112,7 @@ class HarnessReplay {
 
   apply(event: SessionEventEnvelopeV1): void {
     const data = record(event.data);
+    this.s.estimate = applyContextEstimate(this.s.estimate, event);
     const owner = text(event.source?.ownerPluginId);
     if (owner) this.add("owner", this.dims(event), { owner }, { events: 1 });
     switch (event.type) {
@@ -119,6 +125,8 @@ class HarnessReplay {
       case "turn/end": return this.turnEnd(event, data);
       case "step/start": return this.step();
       case "request/header": return this.requestHeader(event, data);
+      case "request/system-prompt": return this.systemPrompt(data);
+      case "request/tools": { this.s.toolNames = list(data.tools).flatMap(tool => { const name = text(record(tool).name); return name ? [name] : []; }); return; }
       case "request/context": return this.requestContext(event, data);
       case "assistant/message": return this.assistant(data);
       case "llm/retry": { const code = text(record(data.failure).code) ?? "unknown"; this.add("session", this.dims(event, text(data.requestId)), {}, { retries: 1, retry_codes: { [code]: 1 } }); return; }
@@ -217,50 +225,49 @@ class HarnessReplay {
     this.add("request", dims, { request_id: requestId }, { ...dims, time: event.time, context_window: num(data.contextWindow) ?? null });
     this.add("session", dims, {}, { requests: 1 });
   }
-  private requestContext(event: SessionEventEnvelopeV1, data: Json): void {
-    const requestId = text(data.requestId); if (!requestId) return;
-    const dims = this.s.requests[requestId] ?? this.dims(event);
-    const snapshot = record(data.snapshot);
-    const manifest = record(snapshot.contextManifest);
-    const entries = list(manifest.entries).map(record);
-    const comparable = manifest.comparable !== false && entries.length > 0;
-    const buckets = record(manifest.buckets);
-    const window = num(record(snapshot.contextModel).contextWindow);
-    const estimated = num(manifest.totalEstimatedTokens);
-    this.add("request", dims, { request_id: requestId }, {
-      estimated: estimated ?? null, has_manifest: comparable ? 1 : 0, ...(window ? { context_window: window } : {}),
-      b_system: num(buckets.systemPrompt) ?? 0, b_tools: num(buckets.tools) ?? 0, b_rules: num(buckets.rules) ?? 0, b_skills: num(buckets.skills) ?? 0,
-      b_summarized: num(buckets.summarizedConversation) ?? 0, b_conversation: num(buckets.conversation) ?? 0,
-    });
-    if (estimated && window) this.s.compaction.windowRatio = estimated / window;
-    // 技能目录：位置用于判断“读了 SKILL.md / 附属文件”。
-    for (const fact of list(snapshot.contextModelFacts).map(record)) {
+  /** 技能目录（位置用于判断「读了 SKILL.md / 附属文件」）只在提示词变化时写一次。 */
+  private systemPrompt(data: Json): void {
+    for (const fact of list(data.modelFacts).map(record)) {
       if (fact.id !== "core/skills-catalog") continue;
       for (const skill of list(fact.content).map(record)) {
         const id = text(skill.id); const location = text(skill.location);
         if (id && location) this.s.skills[id] = { location, source: text(skill.source) ?? null };
       }
     }
+  }
+  /** 每次请求按当时的折叠状态记分类、总数、逐项与工具曝光；估算不再从 `request/context` 读。 */
+  private requestContext(event: SessionEventEnvelopeV1, data: Json): void {
+    const requestId = text(data.requestId); if (!requestId) return;
+    const dims = this.s.requests[requestId] ?? this.dims(event);
+    const view = viewContextEstimate(this.s.estimate);
+    const comparable = view.entries.length > 0;
+    const buckets = view.buckets;
+    const window = num(record(record(data.snapshot).contextModel).contextWindow) ?? view.contextWindow ?? undefined;
+    const estimated = view.totalEstimatedTokens;
+    this.add("request", dims, { request_id: requestId }, {
+      estimated, has_manifest: comparable ? 1 : 0, ...(window ? { context_window: window } : {}),
+      b_system: buckets.systemPrompt, b_tools: buckets.tools, b_rules: buckets.rules, b_skills: buckets.skills,
+      b_summarized: buckets.summarizedConversation, b_conversation: buckets.conversation,
+    });
+    if (estimated && window) this.s.compaction.windowRatio = estimated / window;
     const schemaTokens = new Map<string, number>();
-    if (comparable) for (const entry of entries) {
-      let key: unknown[]; try { key = JSON.parse(String(entry.key)) as unknown[]; } catch { continue; }
+    for (const entry of view.entries) {
+      let key: unknown[]; try { key = JSON.parse(entry.key) as unknown[]; } catch { continue; }
       const kind = String(key[0] ?? "");
       if (CONVERSATION_KINDS.has(kind)) continue;
-      const tokens = num(entry.estimatedTokens) ?? 0;
-      const entryKey = String(entry.key);
-      const previous = this.s.entries[entryKey];
+      const tokens = entry.estimatedTokens;
+      const previous = this.s.entries[entry.key];
       const id = kind === "tool" ? String(key[2] ?? "") : kind === "skill" ? String(key[3] ?? key[2] ?? "") : String(key[2] ?? key[1] ?? kind);
-      this.add("entry", dims, { entry_key: entryKey }, {
-        kind: KIND_OF[kind] ?? "other", bucket: text(entry.bucket) ?? null, owner: kind === "tool" || kind === "model-facts" ? null : text(key[1]) ?? null, entry_id: id,
+      this.add("entry", dims, { entry_key: entry.key }, {
+        kind: KIND_OF[kind] ?? "other", bucket: entry.bucket, owner: kind === "tool" || kind === "model-facts" ? null : text(key[1]) ?? null, entry_id: id,
         appearances: 1, tokens, max_tokens: tokens, compared: previous === undefined ? 0 : 1, changes: previous !== undefined && previous !== tokens ? 1 : 0,
       });
-      this.s.entries[entryKey] = tokens;
+      this.s.entries[entry.key] = tokens;
       if (kind === "tool") schemaTokens.set(id, tokens);
       if (kind === "skill") this.add("skill", dims, { skill_id: id }, { listed: 1, source: this.s.skills[id]?.source ?? null });
     }
     trim(this.s.entries, 1_000);
-    for (const tool of list(snapshot.tools).map(record)) {
-      const name = text(tool.name); if (!name) continue;
+    for (const name of this.s.toolNames) {
       const tokens = schemaTokens.get(name);
       this.add("tool", dims, { tool: name }, { exposures: 1, ...(tokens === undefined ? {} : { schema_tokens: tokens, schema_samples: 1 }) });
     }
@@ -317,7 +324,7 @@ class HarnessReplay {
     const status = text(data.status) ?? "unknown";
     const failure = record(data.failure);
     const output = list(data.modelOutput).map(record).filter(part => part.type === "text").map(part => String(part.text ?? "")).join("");
-    const outputTokens = tokensOf(output.length);
+    const outputTokens = estimateCharCount(output.length);
     const startAt = Date.parse(call?.runStartAt ?? call?.at ?? ""); const endAt = Date.parse(event.time);
     const duration = Number.isFinite(startAt) && Number.isFinite(endAt) ? Math.max(0, endAt - startAt) : undefined;
     const values: Record<string, unknown> = {
@@ -424,7 +431,7 @@ class HarnessReplay {
       d.cycle++;
       const sleeping = Object.values(d.paths).filter(value => value.v === "s").length;
       const index = record(data.index);
-      this.add("cycle", dims, { cycle: d.cycle - 1 }, { time: event.time, active: active.size, sleeping, cap_hit: active.size >= HARNESS_ACTIVE_PATH_LIMIT ? 1 : 0, index_tokens: num(index.size) === undefined ? null : tokensOf(num(index.size)!) });
+      this.add("cycle", dims, { cycle: d.cycle - 1 }, { time: event.time, active: active.size, sleeping, cap_hit: active.size >= HARNESS_ACTIVE_PATH_LIMIT ? 1 : 0, index_tokens: num(index.size) === undefined ? null : estimateCharCount(num(index.size)!) });
       if (slept) this.add("disclosure", dims, {}, { slept_paths: slept });
     }
   }
@@ -473,7 +480,7 @@ class HarnessReplay {
     const values: Record<string, unknown> = { preset_id: text(data.presetId) ?? null, child_session_id: text(data.childSessionId) ?? null };
     if (event.type === "delegation/requested") Object.assign(values, { ...dims, time: event.time, status: "running" });
     else Object.assign(values, { status: text(data.status) ?? null });
-    if (event.type === "delegation/child-terminal") Object.assign(values, { duration_ms: num(data.durationMs) ?? null, tool_uses: num(data.toolUseCount) ?? null, return_tokens: typeof data.text === "string" ? tokensOf(data.text.length) : null });
+    if (event.type === "delegation/child-terminal") Object.assign(values, { duration_ms: num(data.durationMs) ?? null, tool_uses: num(data.toolUseCount) ?? null, return_tokens: typeof data.text === "string" ? estimateCharCount(data.text.length) : null });
     this.acc.add("delegation", this.sessionId, { invocation_id: invocationId }, values);
   }
   private subagentActivation(event: SessionEventEnvelopeV1, data: Json): void {
@@ -493,7 +500,7 @@ class HarnessReplay {
       Object.assign(values, {
         status: status === "completed" ? "completed" : status === "interrupted" ? "aborted" : "failed",
         duration_ms: Number.isFinite(duration) ? Math.max(0, duration) : null,
-        return_tokens: typeof data.result === "string" ? tokensOf(data.result.length) : null,
+        return_tokens: typeof data.result === "string" ? estimateCharCount(data.result.length) : null,
       });
     } else return;
     this.acc.add("delegation", this.sessionId, { invocation_id: activationId }, values);

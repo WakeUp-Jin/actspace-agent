@@ -2,7 +2,7 @@ import { JsonlEventHistory } from "./event-history.js";
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { SessionError, SessionEventValidator, validateSessionHeader, type EventCodecRegistry, type SessionHeaderV1 } from "@actspace/session-journal";
+import { SessionError, SessionEventValidator, codecReadsHistory, validateSessionHeader, type EventCodecRegistry, type SessionHeaderV1 } from "@actspace/session-journal";
 import type { SessionStorage, SessionStorageHandle, SessionStorageRefresh, SessionStorageSnapshot } from "@actspace/session-storage";
 import { readJsonlSession, refreshJsonlSession, type JournalResume, type SessionInspection } from "./jsonl-reader.js";
 import { JsonlSessionWriter, type JsonlWriterHooks } from "./jsonl-writer.js";
@@ -16,7 +16,7 @@ export interface JsonlStorageOptions {
   readonly runtimeId: string;
   readonly registry: EventCodecRegistry;
   readonly writerHooks?: JsonlWriterHooks;
-  readonly lease?: Pick<AcquireWriterLeaseOptions, "heartbeatMs" | "staleMs" | "now" | "isProcessAlive" | "pid">;
+  readonly lease?: Pick<AcquireWriterLeaseOptions, "heartbeatMs" | "now" | "isProcessAlive" | "pid">;
 }
 
 /** Physical backend; file layout, fsync and cross-process writer ownership stay here. */
@@ -191,7 +191,7 @@ export class JsonlSessionStorage implements SessionStorage {
         const copied = structuredClone(events);
         return serialize(async () => {
           await assertOwned(); if (blocked) throw new SessionError("SESSION_DURABILITY_FAILED", "Storage writer is blocked.");
-          const needsHistory = copied.some(event => this.options.registry.get(event.type)?.validateRelations !== undefined);
+          const needsHistory = copied.some(event => codecReadsHistory(this.options.registry.get(event.type)));
           const previous = needsHistory ? (await this.inspect(header.sessionId)).events : [];
           const before = queryStamp(await stat(writer!.journalPath));
           if (before !== proof.stamp) { blocked = true; proof.stamp = undefined; throw new SessionError("SESSION_CORRUPT", "Journal changed outside its owned writer."); }

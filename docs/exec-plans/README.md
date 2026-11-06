@@ -15,6 +15,8 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [流式输出只走实时通道](active/20261105-live-assistant-stream.md) | 2026-11-05 T1–T13 已实现（未提交），run2 实机内存对比已完成；§9 功能清单待用户确认。 |
+| [请求记录只在变化时写完整内容](active/20261106-request-record.md) | 2026-11-06 T1–T11 已实现，自动化验证通过（未提交）；实机对比（规范 §9）待用户删除旧会话后重跑。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton / Tooltip / Menu / Popover / Dialog / Select 等已落地；只剩 Switch、Textarea、Tabs 三个基础组件及对应迁移。 |

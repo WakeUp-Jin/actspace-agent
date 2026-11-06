@@ -91,7 +91,7 @@ Session commit ── session/event ── 完成判断与英文提取
 
 ### 5.2 统一 Context 来源
 
-来源通过 `get(context, write)` 写入 `context.content.system.sections`，由引擎统一渲染为 LlmInput 和 request/context 快照；不再使用 continuation hook 修改组装候选。稳定节标识为 `english-learning/v1`，来源声明仅写 system，不能修改会话和管理状态。
+来源通过 `get(context, write)` 写入 `context.content.system.sections`，由引擎统一渲染为 LlmInput，并记进 `request/system-prompt`；不再使用 continuation hook 修改组装候选。稳定节标识为 `english-learning/v1`，来源声明仅写 system，不能修改会话和管理状态。
 
 回调检查当前绑定身份，记录实际注入的 turnId/stepId。只有该绑定中已注入且完成的回复允许英文提取和朗读。关闭不删历史快照，但后续请求不再获得该 system 节。
 

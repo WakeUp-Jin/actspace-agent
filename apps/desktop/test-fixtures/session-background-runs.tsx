@@ -50,7 +50,6 @@ const settingsApiStub = {
   setProviderKey: async () => ({ ok: true }),
   clearProviderKey: async () => ({ ok: true }),
   testProviderConnection: async () => ({ ok: true, message: "连接成功" }),
-  describeContext: async () => null,
   getReviewSnapshot: async () => createReviewChanges(0, 0),
   listWorkspaceMarkdownFiles: async () => ({ ok: true as const, files: [], truncated: false, source: "walk" as const }),
   readWorkspaceFile: async () => ({ relativePath: "", renderKind: "text" as const, size: 0, mtimeMs: 0, content: "" }),

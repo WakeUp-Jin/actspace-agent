@@ -9,6 +9,7 @@ import type {
 } from "@actspace/shared";
 import type { HostConnection } from "@actspace/shared/host-protocol";
 import { encodeSessionLocator } from "@actspace/shared/session-locator";
+import { foldContextEstimate, viewContextEstimate } from "@actspace/shared";
 import type {
   RuntimeV2DesktopSessionProjection,
   RuntimeV2JsonValue,
@@ -325,18 +326,8 @@ export function sessionProjection(session: MockSession): RuntimeV2DesktopSession
       metadata: snap.metadata,
       providerUsage: snap.usage,
       sessionStats: snap.activity,
-      requestContext: {
-        sessionId: session.id,
-        throughJournalSeq,
-        updatedAt: session.updatedAt,
-        basis: "last-request",
-        estimator: { name: "runtime-v2-request-snapshot", version: "2" },
-        totalEstimatedTokens: 0,
-        maxTokens: 0,
-        percentUsed: 0,
-        entries: [],
-        buckets: [],
-      },
+      // 和真实投影同一个折叠：mock 日志里的对话、压缩都会反映在估算上。
+      contextEstimate: viewContextEstimate(foldContextEstimate(events)) as unknown as RuntimeV2JsonValue,
     },
     window: { events, fromSeq: 0, throughJournalSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0 },
   };

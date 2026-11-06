@@ -111,11 +111,13 @@ describe("mergeTranscript matches the legacy merge", () => {
       { callId: "c2", preview: readPreview("b.md") },
     ]));
     const live = liveOf(runId, streaming("continued answer", [{ callId: "c2", preview: readPreview("b.md"), finished: false }]), { recovered: true });
-    const merged = compare(durable, live);
+    // 实时底稿起的 live 正文序号从 0 重新数，与 durable 同一 run 的 renderKey 撞上时换成 `:live`（旧实现会出现重复 key）。
+    const merged = mergeTranscript(durable, live, NO_LOCAL);
     expect(keys(merged)).toEqual([
       `user:turn:${runId}:user:0`, `read:turn:${runId}:tool:c1`, `assistant:turn:${runId}:assistant:0`,
-      `read:turn:${runId}:tool:c2`, `assistant:turn:${runId}:assistant:0`,
+      `read:turn:${runId}:tool:c2`, `assistant:turn:${runId}:assistant:0:live`,
     ]);
+    expect(new Set(keys(merged)).size).toBe(merged.length);
   });
 
   it("does not hide a durable todo for a recovered run (legacy only matched `:tool:` ids)", () => {
@@ -135,9 +137,10 @@ describe("mergeTranscript matches the legacy merge", () => {
     const merged = compare({ blocks: [], events: durableOf(events).events }, live);
     expect(merged.map((block) => block.runId)).toEqual(["run-old", "run-old", "run-new"]);
     compare({ blocks: undefined, events: durableOf(events).events }, liveOf(null, createEmptyStreamingState()));
-    // 恢复的 run 不按流式处理：events 里该 run 的内容保留。
-    const recovered = compare({ blocks: [], events: durableOf(events).events }, liveOf("run-new", streaming("new reply"), { recovered: true }));
-    expect(recovered.map((block) => block.runId)).toEqual(["run-old", "run-old", "run-new", "run-new", "run-new"]);
+    // 恢复的 run 不按流式处理：events 里该 run 的内容保留；live 里同样内容的正文已定稿，不再重复显示。
+    const recovered = mergeTranscript({ blocks: [], events: durableOf(events).events }, liveOf("run-new", streaming("new reply"), { recovered: true }), NO_LOCAL);
+    expect(recovered.map((block) => block.runId)).toEqual(["run-old", "run-old", "run-new", "run-new"]);
+    expect(recovered.filter((block) => block.kind === "assistant").map((block) => (block as { content: string }).content)).toEqual(["old reply", "new reply"]);
   });
 
   it("drops a live user block whose identity durable already has, keeping the durable one", () => {
@@ -167,7 +170,12 @@ describe("mergeTranscript matches the legacy merge", () => {
     compare(durable, liveOf(runId, state, { userBlock: userBlock(runId, "start") }));
     const lingering = compare(durable, liveOf(null, state, { userBlock: userBlock(runId, "start"), blockRunId: runId }));
     expect(lingering.filter((block) => block.kind === "user")).toHaveLength(3);
-    compare(durable, liveOf(runId, state, { userBlock: userBlock(runId, "start"), recovered: true }));
+    const recovered = mergeTranscript(durable, liveOf(runId, state, { userBlock: userBlock(runId, "start"), recovered: true }), NO_LOCAL);
+    const replies = recovered.filter((block) => block.kind === "assistant" && block.runId === runId).map((block) => (block as { content: string }).content);
+    // 夹具里两段 live 正文都还在；durable 已定稿的「after steer」只显示一次。
+    expect(replies.filter((content) => content === "after steer")).toHaveLength(1);
+    expect(replies).toContain("before steer");
+    expect(recovered.filter((block) => block.kind === "user" && block.runId === runId)).toHaveLength(2);
     compare(durable, liveOf(null, createEmptyStreamingState()));
   });
 

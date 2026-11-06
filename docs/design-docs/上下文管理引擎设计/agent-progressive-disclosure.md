@@ -199,5 +199,5 @@ flowchart TD
 
 - 文件提示抽取识别 read_file 的行号前缀，规范化后仍只接受真实文件。
 - 睡眠索引身份和规范路径由状态记录；工具结果、历史与摘要候选共用排除规则，索引不占普通文件名额。新增可选 indexPaths 字段用于重启和 fork 后保留历史索引路径身份；旧事件仍可解码，后续索引事件可纠正错误的派生条目。
-- 已成功处理但不含普通文件的工具结果也记空 fact，避免 fork 后重新解释。每次成功 applied 将恢复边界推进至对应 compaction/end，恢复补写较晚时不跳过之后的新工具结果；读取来源是否启用仍按 request/context provenance 判断。
+- 已成功处理但不含普通文件的工具结果也记空 fact，避免 fork 后重新解释。每次成功 applied 将恢复边界推进至对应 compaction/end，恢复补写较晚时不跳过之后的新工具结果；读取来源是否启用按边界前生效的 `request/system-prompt` 的 `contributorProvenance` 判断。
 - 原始 Journal 引用通过 SessionStorage 的可选 journalPath 能力取得，JSONL Cordis 包装服务透传，披露插件无需识别具体存储类；内存会话不提供该能力。

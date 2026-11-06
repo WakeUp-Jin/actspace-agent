@@ -40,7 +40,7 @@ export function useSessionTranscript(
   workspaceRoot: string | undefined,
 ): SessionTranscript {
   const live = useLiveRunView(stores.liveRuns, sessionId);
-  const { sessionRecord, historyBefore } = useChatSessionRecord(stores.sessionStore, sessionId, workspaceRoot, live.recovered);
+  const { sessionRecord, historyBefore } = useChatSessionRecord(stores.sessionStore, sessionId, workspaceRoot);
   const compactionFailure = useSessionLocalState(stores.localStore, sessionId, selectCompactionFailure);
   const messages = useMergedMessages(sessionRecord, live, compactionFailure);
   const isCompacting = live.blocks.some((block) => block.kind === "context_compaction" && block.status === "running");

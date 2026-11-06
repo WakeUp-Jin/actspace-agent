@@ -51,7 +51,11 @@ export class FixedRendererStreamAdapter {
     if (this.coalesceMs <= 0) { this.#send(event); return; }
     const pending = this.#pendingDelta;
     if (pending !== undefined) {
-      if (sameDeltaTarget(pending, event)) { this.#pendingDelta = { ...pending, delta: pending.delta + event.delta }; return; }
+      if (sameDeltaTarget(pending, event)) {
+        // The merged frame carries the newest live revision it contains.
+        this.#pendingDelta = { ...pending, delta: pending.delta + event.delta, ...(event.liveRevision === undefined ? {} : { liveRevision: event.liveRevision }) };
+        return;
+      }
       this.flush();
     }
     this.#pendingDelta = event;
@@ -97,7 +101,8 @@ export class FixedRendererStreamAdapter {
     // A subagent's Run carries its main Session, so clients leave the child's task queue alone.
     const child = event.parentSessionId ? { parentSessionId: event.parentSessionId } : {};
     if (event.kind === "assistant-delta" || event.kind === "reasoning-delta") {
-      this.#emitDelta({ type: event.kind === "assistant-delta" ? "assistant_text_delta" : "assistant_thinking_delta", ...ids, llmCallId: event.requestId, messageId: event.messageId, delta: event.message });
+      this.#emitDelta({ type: event.kind === "assistant-delta" ? "assistant_text_delta" : "assistant_thinking_delta", ...ids, llmCallId: event.requestId, messageId: event.messageId, delta: event.message,
+        ...(event.liveRevision === undefined ? {} : { liveRevision: event.liveRevision }) });
       return;
     }
     if (event.kind === "run-state") {

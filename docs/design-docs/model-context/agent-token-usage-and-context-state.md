@@ -4,6 +4,7 @@
 
 Session、Surface 和 request snapshot 的规范分别见：
 
+- [`agent-spec-request-record.md`](../agent-plugin-runtime/agent-spec-request-record.md)（请求记录与上下文估算，以它为准）
 - [`agent-spec-session-core-persistence-separation.md`](../agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)
 - [`agent-spec-session-format-v1.md`](../agent-plugin-runtime/agent-spec-session-format-v1.md)
 - [`agent-spec-prompt-context-contributors.md`](../agent-plugin-runtime/agent-spec-prompt-context-contributors.md)
@@ -13,8 +14,8 @@ Session、Surface 和 request snapshot 的规范分别见：
 Actspace 需要分别回答三类问题：
 
 1. **模型实际消耗了多少**：来自 provider / adapter 返回的 usage；
-2. **某次模型请求实际组装了什么**：来自 dispatch 前冻结的 request snapshot；
-3. **用户当前在 UI 中看到什么**：来自 Journal 与 request snapshot 的 Runtime Projection。
+2. **某次模型请求实际组装了什么**：对话来自 Journal 的对话事件，系统提示词与工具来自当时生效的 `request/system-prompt` / `request/tools`，其余配置来自 `request/context`；
+3. **用户当前在 UI 中看到什么**：来自 Journal 折叠出的 Runtime Projection（上下文估算是 `contextEstimate`）。
 
 这三类数据有关联，但不能合并为一个可覆盖文件。
 
@@ -29,7 +30,9 @@ sessions-v2/<sessionId>/journal.jsonl
 当前 Agent Loop 产生的关键事件包括：
 
 - `request/header`：requestId、turnId、stepId、routeId、model、attempt 和 contextWindow；
-- `request/context`：与同一 requestId 关联、dispatch 前冻结的逻辑 request snapshot；
+- `request/system-prompt`：系统提示词各段、模型事实和提供方来源；内容 digest 与日志里最近一条不同时才写；
+- `request/tools`：工具定义；内容 digest 与日志里最近一条不同时才写；
+- `request/context`：与同一 requestId 关联、dispatch 前冻结的小快照（schemaVersion 3），不含对话、提示词、工具和估算；
 - `assistant/message`：请求终态与 provider usage；`step/end` 提供步骤终态及工具步骤的 usage 回退；
 - `llm/retry` / `llm/retry-started`：失败尝试与下一次重试；
 - `llm/auxiliary-start` / `llm/auxiliary-end`：工具内部真实辅助模型尝试及其父工具、实际模型、终态与 nullable usage；不创建助手消息；
@@ -41,37 +44,45 @@ sessions-v2/<sessionId>/journal.jsonl
 
 ## Request Snapshot
 
-每次真实模型 dispatch 前，Context 的 `snapshotContext` 从实际 `LlmInput` 与 LLM PreparedCall 元数据形成 JSON-safe、deep-frozen snapshot：
+每次真实模型 dispatch 前，`context-engine/src/request-snapshot.ts` 的 `requestRecords` 从实际 `LlmInput` 与 LLM PreparedCall 元数据产出三样东西：提示词记录、工具记录和 `request/context` 快照。一次请求的事件顺序固定：
 
 ```text
-sessionId
-turnId
-stepId
-messages
-systemSections
-facts
-modelFacts
-renderedSystemPrompt
-tools
-contributorProvenance
-requestOptions
-compositionDigest
-hostCapabilityDigest
-prepared.route / model / registrationId / adapterVersion
-prepared.defaults / retryPolicy / contextWindow
+request/header          每次写
+request/system-prompt   与日志里最近一条 digest 不同时才写
+request/tools           与日志里最近一条 digest 不同时才写
+request/context         每次写
 ```
 
-Snapshot 的作用是：
+`request/context.snapshot`（schemaVersion 3）只留小字段，每条约 1–2 KB：
 
-- 证明一次 request 使用了哪份 Session Surface；
-- 证明哪些 Prompt / Context contributor 参与组装；
+```text
+schemaVersion: 3
+sessionId / logicalAgentScopeId
+contextRevision / throughJournalSeq / surfaceGeneration
+turnId / stepId
+systemPromptDigest / toolsDigest
+prepared.route / model / registrationId / adapterVersion
+prepared.defaults / retryPolicy / contextWindow
+requestOptions
+contextModel
+compositionDigest / hostCapabilityDigest
+```
+
+快照不再存 `messages`、`tools`、`renderedSystemPrompt`、`systemSections`、`contextSections`、`modelFacts`、`contextModelFacts`、`facts`、`contributorProvenance` 和 `contextManifest`。对话由上下文引擎从对话事件、补充事件重新拼出；拼好的系统提示词文本由 `@actspace/shared` 的 `renderSystemPrompt(sections, modelFacts)` 推出。
+
+某次请求生效的提示词和工具，是 seq 不大于该请求 `request/context` 的最近一条 `request/system-prompt` / `request/tools`。所有读取方都用 `@actspace/shared` 的 `effectiveRequestRecord` / `indexRequestRecords` 取。
+
+这组记录的作用是：
+
+- 证明一次 request 使用了哪份 Session Surface（`throughJournalSeq`、`surfaceGeneration`）；
+- 证明哪些 Prompt / Context contributor 参与组装（提示词记录的 `contributorProvenance`）；
 - 关联 route、model、adapter 和 retry policy；
 - 为 Context、Trajectory 和故障恢复提供确定输入；
 - 在恢复时结合 request/terminal 关系识别未结束请求；dispatch 的外部效果边界仍由对应恢复契约解释，snapshot 自身不证明请求已发送。
 
-Snapshot 不得包含 API Key、Authorization、Cookie、proxy credential 或其他 secret-like 字段。`packages/context/context-engine/src/request-snapshot.ts` 会拒绝非 JSON 值、非有限数字、过深对象和敏感字段名。
+Snapshot 不得包含 API Key、Authorization、Cookie、proxy credential 或其他 secret-like 字段。`request-snapshot.ts` 会拒绝非 JSON 值、非有限数字、过深对象和敏感字段名。
 
-schema v2 中，`facts` 保留完整审计事实，`modelFacts` 只保存真正进入 system prompt 的稳定事实。动态 run/request/Host identity 可以出现在 `facts`，不得因此污染 `renderedSystemPrompt`。新请求的 Agent mode、日期与时区由 Context runtime 来源保存为 surface:null 的补充事件，转换时插入完整工具批次后的模型消息；Context 估算计入最终消息，UI 不伪造用户气泡，Compaction 不把这类导航/运行补充当作用户要求。旧消息中已有的 runtime-context 仍兼容转换。
+新请求的 Agent mode、日期与时区由 Context runtime 来源保存为 surface:null 的补充事件，转换时插入完整工具批次后的模型消息；Context 估算计入最终消息，UI 不伪造用户气泡，Compaction 不把这类导航/运行补充当作用户要求。旧消息中已有的 runtime-context 仍兼容转换。
 
 ## Request Model Facts
 
@@ -160,39 +171,43 @@ sessions-v2/<sessionId>/journal.jsonl
 
 ## Context Projection
 
-当前 Desktop Context 面板从最近一次 `request/context.snapshot` 派生只读 entries，并从该 snapshot 的 prepared metadata 或关联 `request/header` 读取容量：
+上下文估算只从 Journal 推算，日志里不存估算明细。会话投影 `contextEstimate` 用 `@actspace/shared` 的 `applyContextEstimate` 逐条折叠：
 
-| Snapshot 来源 | UI bucket |
+| 事件 | 处理 |
 | --- | --- |
-| `systemSections` 的核心段 | System Prompt |
-| rules contributor | Rules |
-| skills contributor | Skills |
-| `tools` | Tool Definitions |
-| `modelFacts` | System Prompt 中模型实际看见的 Runtime facts entry |
-| `facts` | 审计事实；不作为模型上下文 bucket 展示 |
-| `messages` | Conversation |
-| 最近 Compaction summary | Summarized Conversation |
+| `request/system-prompt` | 系统提示词、规则、技能、模型事实各项整体换新 |
+| `request/tools` | 工具各项整体换新 |
+| `request/header` / `request/context` | 更新最近请求、上下文窗口和 `contextModel` |
+| 补充上下文增删、`step/end`、`turn/end` | 按补充的生命周期增删对应项 |
+| 对话节点 surface `append` | 节点估算加进 `conversation` |
+| 压缩替换 `surface/replaced`（`kind: "replace"`） | 减去事件里记的 `replacedTokens`，再把摘要节点估算加进 `summarizedConversation` |
 
-Context Projection 的 token 数是 UI 估算，不是 provider usage。当前估算器会根据文本字符做近似计算，并展示：
+状态大小只取决于系统提示词、工具和补充项的项数，不随消息数增长；对话只存两个合计。对外的 view 是总数、六个分类（System Prompt、Rules、Skills、Tool Definitions、Conversation、Summarized Conversation）、上下文窗口、`percentUsed` 和非对话明细。
+
+估算算法全项目只有一套（`@actspace/shared` 的 `token-estimate.ts`，照 DSH `dsh-token-meter`）：文本一律 `Math.ceil(length / 4)`，非字符串先 `JSON.stringify`；每块内容加 4，每条消息再加 4，系统提示词整体、工具定义整体各加 4。面板、Composer 圆环、Web 百分比、Harness 统计、自动压缩触发和请求前容量检查都用它。纯中文文本会少算，这一点接受，自动压缩另有保险。
+
+Context Projection 的 token 数是 UI 估算，不是 provider usage。展示项：
 
 - `totalEstimatedTokens`；
-- `maxTokens`：优先取 `snapshot.prepared.contextWindow`，再取关联 `request/header.contextWindow`；只接受正安全整数，缺失或非法时为 `0`；
+- 容量：优先取 `request/context.snapshot.contextModel.contextWindow`，再取 `request/header.contextWindow`；只接受正安全整数，缺失或非法时 `percentUsed` 为 `0`；
 - `percentUsed`；
 - bucket tokens；
 - entry preview、included、pinned、removable。
 
-Composer 百分比与 ContextPopup 优先消费同一份完整请求分项估算，面板标题保持「上下文」。`projectContextSnapshot` 从 `projectContextState` 派生总量、容量和 buckets；工作台不能用整体序列化估算覆盖完整分项投影，也不能用 provider usage 代替上下文占用。顶部会话详情每次打开刷新累计 provider usage，仅显示一行「累计 Token：xxx」，不显示上下文占用、进度条、下拉明细或说明文字。
+Composer 圆环、ContextPopup 与 Context 面板「当前」的总数和分类都只读 `contextEstimate` 这一个来源，面板标题保持「上下文」。面板的对话逐条明细不进投影，打开面板或翻页时用 `describeConversationEntries` 对当前对话现算：引擎在线用引擎实例的内容，不在线用日志折叠出的当前 Surface。预览和全文仍按 key 向引擎实时实例读取。顶部会话详情每次打开刷新累计 provider usage，仅显示一行「累计 Token：xxx」，不显示上下文占用、进度条、下拉明细或说明文字。
 
 因此必须在 UI 和文档中区分：
 
 ```text
 Provider usage = 已完成请求的真实或 adapter 标注值
-Context estimate = 当前 snapshot 的前端可解释估算
+Context estimate = 由 Journal 折叠出的可解释估算
 ```
 
-Context estimate 只表示当前、最近一次或下次请求预计会携带的有效上下文；压缩后有效 Surface 变小，后续请求的 estimate 也应变小。分页浏览缓存只能截短 entry preview，必须保留完整的 bucket 与 total 计数。`Provider usage` 另行作为会话累计用量展示，它聚合每次真实 provider request 的输入、输出及缓存 Token，压缩不会清零，也不参与 Context 的容量百分比。
+Context estimate 只表示当前、最近一次或下次请求预计会携带的有效上下文；压缩后有效 Surface 变小，后续请求的 estimate 也应变小。压缩替换事件上记录的被替换估算是写入时算法的结果，以后换算法时压缩之后的合计会有偏差，用 `estimatorVersion` 识别。`Provider usage` 另行作为会话累计用量展示，它聚合每次真实 provider request 的输入、输出及缓存 Token，压缩不会清零，也不参与 Context 的容量百分比。
 
-不能用 Context estimate 回写或修正历史 provider usage。UI 消费完整 bucket，不再压缩成 provider usage 的两桶适配；未知 bucket 必须有稳定兜底。若新增 MCP/Subagent 专用类别，先扩展 snapshot 分类契约，再接 renderer。弹窗尺寸、数字格式与临时模型选择见 [Context 面板与 Composer](agent-context-model-facts-and-composer.md)。
+主进程 SQLite 上下文历史（`context-history-projection.ts`）和 Harness 统计（`harness-stats-projection.ts`）调用同一个折叠函数，在每个 `request/context` 时取当时的状态记趋势与明细，不读日志里的估算数。
+
+不能用 Context estimate 回写或修正历史 provider usage。UI 消费完整 bucket，不再压缩成 provider usage 的两桶适配；未知 bucket 必须有稳定兜底。若新增 MCP/Subagent 专用类别，先扩展 `@actspace/shared` 的估算明细定义，再接 renderer。弹窗尺寸、数字格式与临时模型选择见 [Context 面板与 Composer](agent-context-model-facts-and-composer.md)。
 
 ## Context assembly 所有权
 
@@ -218,7 +233,7 @@ Compaction 不删除 Journal 历史，而是为有效 Session Surface 追加 rep
 1. 选择可压缩的连续 Surface 区域；
 2. flush 当前 Journal；
 3. 生成 summary；
-4. 写入 compaction transaction；
+4. 写入 compaction transaction；替换事件 `surface/replaced` 带被替换范围的估算 `replacedTokens: { conversation, summarizedConversation }` 与 `estimatorVersion`，codec 强制要求；
 5. flush 后让新 Surface 对后续请求生效。
 
 当前默认 policy 使用 context limit、reserve token、trigger ratio 和最小区域长度决定是否压缩。自动触发和手动触发都必须拒绝在 active turn 中直接改写 Surface。
@@ -238,16 +253,18 @@ Compaction 不删除 Journal 历史，而是为有效 Session Surface 追加 rep
 ## 代码事实入口
 
 - `packages/context/prompt/src/assembler.ts`：contributor 排序、required / optional 语义；
-- `packages/context/context-engine/src/request-snapshot.ts`：snapshot 冻结与 secret-like 字段拒绝；
+- `packages/context/context-engine/src/request-snapshot.ts`：提示词记录、工具记录、`request/context` 快照的产出与 secret-like 字段拒绝；
+- `packages/util/shared/src/request-record.ts`：生效提示词与工具的读取规则；
+- `packages/util/shared/src/token-estimate.ts`、`context-entries.ts`、`context-estimate.ts`：唯一估算算法、估算明细定义与 `contextEstimate` 折叠；
 - `packages/core/runtime/src/projection/durable-session.ts`：durable usage 聚合；
-- `packages/core/runtime/src/projection/durable-session.ts`：Host Context 与 Usage facts；`packages/client/client/src/sessions/selectors.ts`：Client Context 与 Usage projection；
+- `packages/core/runtime/src/projection/durable-session.ts`：`contextEstimate` 投影与 Usage facts；`packages/client/client/src/sessions/selectors.ts`：Client Context 与 Usage projection；
 - `packages/context/context-compaction/src/plugin.ts`：Surface compaction transaction；
 - `packages/context/context-compaction/src/policy.ts`：默认 compaction policy。
 
 ## 验收
 
 - 持久 Session 只写 `sessions-v2/<id>/journal.jsonl`；
-- 每次 dispatch 前存在关联同一 requestId 的 `request/header` 与 `request/context`；
+- 每次 dispatch 前存在关联同一 requestId 的 `request/header` 与 `request/context`；提示词或工具变化时，两者之间有同一 requestId 的 `request/system-prompt` / `request/tools`；
 - 每次真实 provider request 的 usage 不被其他 request 覆盖；
 - Context 面板可以仅凭 Journal 重建；
 - 删除派生 UI 状态不会影响 Session 恢复；

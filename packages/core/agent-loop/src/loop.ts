@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { RuntimeV2AgentMode, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
-import { ContextEngine, surfaceMessage, snapshotContext, describeContextContent, estimateContextTokens, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context-engine";
+import { ContextEngine, surfaceMessage, requestRecords, describeContextContent, type RequestRecords, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context-engine";
 import { contextFromCandidate } from "@actspace/prompt";
+import { estimateRequestInput } from "@actspace/shared";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
 import type { LlmService } from "@actspace/llm-service";
 import type { LlmStreamEvent } from "@actspace/llm-service";
@@ -189,11 +190,11 @@ export class AgentLoop {
         const contextWindow = prepared.request.contextWindow ?? null;
         if (this.options.contextSources) converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${prepared.request.routeId}/${prepared.request.model}`, label: prepared.request.model, contextWindow, autoCompactAtTokens: compaction?.threshold?.(contextWindow) ?? null }) };
         const metadata: PreparedRequestMetadata = { route: prepared.request.routeId, model: prepared.request.model, registrationId: prepared.registration.registrationId, adapterVersion: prepared.registration.adapter.adapterVersion, defaults: prepared.request.options as RuntimeV2JsonValue, retryPolicy: retryPolicySnapshot(retryPolicy) as unknown as RuntimeV2JsonValue, contextWindow };
-        const snapshot = this.options.contextSources ? snapshotContext(converted.context, { ...llmInput, requestId, messages: prepared.request.messages, tools: prepared.request.tools, routeId: prepared.request.routeId, model: prepared.request.model }, metadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest, converted.input) : assembler!.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
+        const records = requestRecords(converted.context, { ...prepared.request, sessionId: this.options.session.header.sessionId }, metadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest);
         try {
           await converted.engine.bindRequest(converted.context);
           await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: prepared.request.routeId, model: prepared.request.model, contextWindow, attempt: 1, agentMode: mode, agentModeRevision: modeRevision }));
-          await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot }));
+          await this.appendRequestRecords(records, { requestId, turnId, stepId });
           await this.checkpoint("before-llm-dispatch");
         } catch (error) { prepared.release(); throw error; }
         let output: Awaited<ReturnType<typeof collectStream>> | undefined;
@@ -204,8 +205,8 @@ export class AgentLoop {
             this.emitLive({ kind: "run-state", agentRunId, turnId, stepId, requestId, message: "request-started", model: activePrepared.request.model });
             const stream = await this.waterfall("llm/stream", { requestId, turnId, stepId, request: activePrepared.request, signal: controller.signal }, () => activePrepared.dispatch() as unknown as Promise<Awaited<ReturnType<typeof activePrepared.dispatch>>>);
             output = await collectStream(stream as AsyncIterable<LlmStreamEvent>, controller.signal, async (event) => {
+              // Stream deltas are live-only: the settled assistant/message is the durable fact (agent-spec-live-assistant-stream.md).
               this.emitLive({ ...event.live, agentRunId, turnId, stepId, requestId, messageId: event.messageId });
-              await this.options.session.append(core("assistant/chunk", { messageId: event.messageId, chunkIndex: event.chunkIndex, requestId, turnId, stepId, kind: event.live.kind, content: event.live.kind === "tool-call-delta" ? event.live.argumentsDelta : event.live.message, ...(event.live.kind === "tool-call-delta" ? { callId: event.live.callId, name: event.live.name } : {}) }));
               this.#events.emit("llm/chunk", this.recordPayload(event.live));
             });
           } catch (error) {
@@ -220,7 +221,7 @@ export class AgentLoop {
             // Failed partial tool calls must never enter the model surface or execute.
             const partialContent = output.content.filter(block => block.type !== "tool-call");
             const content = partialContent as unknown as RuntimeV2JsonValue;
-            await this.options.session.append(core("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content, finishReason: output.aborted ? "aborted" : "failed", usage: output.usage }, partialContent.length > 0 ? { surface: { kind: "append", node: { kind: "assistant", messageId: output.messageId, content } } } : undefined));
+            await this.options.session.append(core("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content, finishReason: output.aborted ? "aborted" : "failed", usage: output.usage, ...firstToken(output) }, partialContent.length > 0 ? { surface: { kind: "append", node: { kind: "assistant", messageId: output.messageId, content } } } : undefined));
             await this.options.session.append(core("step/end", { turnId, stepId, reason: output.aborted ? "aborted" : "failed" }));
             throw new AgentRuntimeError(output.aborted ? "TURN_ABORTED" : "AGENT_SETUP_FAILED", output.failure.message, output.failure);
           }
@@ -260,16 +261,16 @@ export class AgentLoop {
           const retryContextWindow = activePrepared.request.contextWindow ?? null;
           if (this.options.contextSources) converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${activePrepared.request.routeId}/${activePrepared.request.model}`, label: activePrepared.request.model, contextWindow: retryContextWindow, autoCompactAtTokens: compaction?.threshold?.(retryContextWindow) ?? null }) };
           const retryMetadata = { ...metadata, route: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow: retryContextWindow };
-          const retrySnapshot = this.options.contextSources ? snapshotContext(converted.context, { ...converted.input, requestId, messages: activePrepared.request.messages, tools: activePrepared.request.tools, routeId: activePrepared.request.routeId, model: activePrepared.request.model }, retryMetadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest, converted.input) : assembler!.finalize({ ...candidate, messages: requestMessageList.filter((message) => message.role !== "system") as unknown as readonly RuntimeV2JsonValue[] }, metadata, this.options.compositionDigest, this.options.hostCapabilityDigest);
+          const retryRecords = requestRecords(converted.context, { ...activePrepared.request, sessionId: this.options.session.header.sessionId }, retryMetadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest);
           await converted.engine.bindRequest(converted.context);
           await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: activePrepared.request.routeId, model: activePrepared.request.model, contextWindow: retryContextWindow, attempt, agentMode: mode, agentModeRevision: modeRevision }));
-          await this.options.session.append(core("request/context", { requestId, turnId, stepId, snapshot: retrySnapshot }));
+          await this.appendRequestRecords(retryRecords, { requestId, turnId, stepId });
           await this.checkpoint("before-llm-dispatch");
           output = undefined;
         }
         // Empty content still settles the request before its Step can end.
         finalText = output.text || output.content.filter((block) => block.type === "text").map((block) => block.text).join("");
-        await this.options.session.append(core("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content: output.content as unknown as RuntimeV2JsonValue, finishReason: output.stopReason ?? (output.aborted ? "aborted" : "completed"), usage: output.usage }, { surface: { kind: "append", node: { kind: "assistant", messageId: output.messageId, content: output.content as unknown as RuntimeV2JsonValue } } }));
+        await this.options.session.append(core("assistant/message", { messageId: output.messageId, requestId, turnId, stepId, content: output.content as unknown as RuntimeV2JsonValue, finishReason: output.stopReason ?? (output.aborted ? "aborted" : "completed"), usage: output.usage, ...firstToken(output) }, { surface: { kind: "append", node: { kind: "assistant", messageId: output.messageId, content: output.content as unknown as RuntimeV2JsonValue } } }));
         if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames, requestModel);
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
         await this.checkpoint("before-next-step");
@@ -375,9 +376,18 @@ export class AgentLoop {
         && (this.options.allowedToolNames?.has(definition.name) ?? true))
       .map((definition) => ({ name: definition.name, definitionVersion: definition.definitionVersion, definitionDigest: definition.definitionDigest, description: definition.description, inputSchema: definition.inputSchema as RuntimeV2JsonValue }));
   }
+  /** 提示词、工具与日志里最近一条 digest 不同时才写；比较对象是日志，所以恢复会话后不会重写（agent-spec-request-record.md §3）。 */
+  private async appendRequestRecords(records: RequestRecords, ids: { requestId: string; turnId: string; stepId: string }): Promise<void> {
+    const journal = this.options.session.journal;
+    const latestDigest = (type: string) => { const data = journal.latestEvent(type)?.data; return isRecord(data) ? data.digest : undefined; };
+    if (latestDigest("request/system-prompt") !== records.systemPrompt.digest) await this.options.session.append(core("request/system-prompt", { ...ids, ...records.systemPrompt } as unknown as RuntimeV2JsonValue));
+    if (latestDigest("request/tools") !== records.tools.digest) await this.options.session.append(core("request/tools", { ...ids, ...records.tools } as unknown as RuntimeV2JsonValue));
+    await this.options.session.append(core("request/context", { ...ids, snapshot: records.snapshot }));
+  }
+
   private checkContextCapacity(input: import("@actspace/context-engine").LlmInput, capacity: number | null, release: () => void): void {
     if (capacity === null || !Number.isFinite(capacity) || capacity <= 0) return;
-    const estimate = input.messages.reduce((sum, message) => sum + estimateContextTokens(message.content), 0) + input.tools.reduce((sum, tool) => sum + estimateContextTokens(tool), 0);
+    const estimate = estimateRequestInput(input);
     const reserve = Math.max(0, input.options.maxTokens ?? 0);
     if (estimate >= capacity || estimate + reserve > capacity) {
       release();
@@ -497,15 +507,17 @@ export class AgentLoop {
 }
 
 type CollectedToolCall = { readonly callId: string; readonly name: string; readonly arguments: string };
-type StreamDelta = { readonly messageId: string; readonly chunkIndex: number; readonly live: StreamPayload };
-async function collectStream(stream: AsyncIterable<LlmStreamEvent>, signal: AbortSignal, emit: (event: StreamDelta) => void | Promise<void>): Promise<{ messageId: string; text: string; content: readonly LlmContentBlock[]; toolCalls: readonly CollectedToolCall[]; usage: RuntimeV2JsonValue; stopReason: string | null; failure: LlmFailure | null; aborted: boolean; sawObservableDelta: boolean }> {
+type StreamDelta = { readonly messageId: string; readonly live: StreamPayload };
+async function collectStream(stream: AsyncIterable<LlmStreamEvent>, signal: AbortSignal, emit: (event: StreamDelta) => void | Promise<void>): Promise<{ messageId: string; text: string; content: readonly LlmContentBlock[]; toolCalls: readonly CollectedToolCall[]; usage: RuntimeV2JsonValue; stopReason: string | null; failure: LlmFailure | null; aborted: boolean; sawObservableDelta: boolean; firstTokenAt: string | null }> {
   const messageId = randomUUID();
-  let chunkIndex = 0; let text = ""; let content: readonly LlmContentBlock[] = []; let usage: RuntimeV2JsonValue = {}; let stopReason: string | null = null; let failure: LlmFailure | null = null; let aborted = false; let sawObservableDelta = false; const calls = new Map<string, CollectedToolCall>();
+  let firstTokenAt: string | null = null;
+  const observed = (delta: string) => { if (delta.length > 0 && firstTokenAt === null) firstTokenAt = new Date().toISOString(); return delta.length > 0; };
+  let text = ""; let content: readonly LlmContentBlock[] = []; let usage: RuntimeV2JsonValue = {}; let stopReason: string | null = null; let failure: LlmFailure | null = null; let aborted = false; let sawObservableDelta = false; const calls = new Map<string, CollectedToolCall>();
   try {
     for await (const event of stream) {
-      if (event.type === "text-delta") { sawObservableDelta ||= event.text.length > 0; text += event.text; await emit({ messageId, chunkIndex: chunkIndex++, live: { kind: "assistant-delta", message: event.text } }); }
-      if (event.type === "reasoning-delta") { sawObservableDelta ||= event.text.length > 0; await emit({ messageId, chunkIndex: chunkIndex++, live: { kind: "reasoning-delta", message: event.text } }); }
-      if (event.type === "tool-call-delta") { sawObservableDelta ||= event.argumentsDelta.length > 0; const prior = calls.get(event.callId); calls.set(event.callId, { callId: event.callId, name: event.name || prior?.name || "", arguments: `${prior?.arguments ?? ""}${event.argumentsDelta}` }); await emit({ messageId, chunkIndex: chunkIndex++, live: { kind: "tool-call-delta", callId: event.callId, name: event.name || prior?.name || "", argumentsDelta: event.argumentsDelta } }); }
+      if (event.type === "text-delta") { sawObservableDelta = observed(event.text) || sawObservableDelta; text += event.text; await emit({ messageId, live: { kind: "assistant-delta", message: event.text } }); }
+      if (event.type === "reasoning-delta") { sawObservableDelta = observed(event.text) || sawObservableDelta; await emit({ messageId, live: { kind: "reasoning-delta", message: event.text } }); }
+      if (event.type === "tool-call-delta") { sawObservableDelta = observed(event.argumentsDelta) || sawObservableDelta; const prior = calls.get(event.callId); calls.set(event.callId, { callId: event.callId, name: event.name || prior?.name || "", arguments: `${prior?.arguments ?? ""}${event.argumentsDelta}` }); await emit({ messageId, live: { kind: "tool-call-delta", callId: event.callId, name: event.name || prior?.name || "", argumentsDelta: event.argumentsDelta } }); }
       if (event.type === "done") { usage = event.usage as unknown as RuntimeV2JsonValue; stopReason = event.stopReason; content = event.content; for (const block of event.content) if (block.type === "tool-call") calls.set(block.callId, { callId: block.callId, name: block.name, arguments: block.arguments }); }
       if ((event.type === "error" || event.type === "aborted") && event.usage) usage = event.usage as unknown as RuntimeV2JsonValue;
       if (event.type === "error") failure = event.failure;
@@ -518,7 +530,11 @@ async function collectStream(stream: AsyncIterable<LlmStreamEvent>, signal: Abor
   }
   if (signal.aborted) { failure = { kind: "abort", message: "Turn aborted.", retryable: false, attempt: 1 }; aborted = true; }
   if (content.length === 0 && text.length > 0) content = Object.freeze([{ type: "text", text }]);
-  return { messageId, text, content, toolCalls: Object.freeze([...calls.values()]), usage, stopReason, failure, aborted, sawObservableDelta };
+  return { messageId, text, content, toolCalls: Object.freeze([...calls.values()]), usage, stopReason, failure, aborted, sawObservableDelta, firstTokenAt };
+}
+/** First visible output of the request (text, reasoning or tool arguments); omitted when nothing streamed. */
+function firstToken(output: { readonly firstTokenAt: string | null }): { firstTokenAt?: string } {
+  return output.firstTokenAt === null ? {} : { firstTokenAt: output.firstTokenAt };
 }
 function cancellableDelay(delayMs: number, signal: AbortSignal): Promise<boolean> {
   if (signal.aborted) return Promise.resolve(false);
@@ -534,7 +550,7 @@ function normalizeLlmFailure(error: unknown, attempt: number): LlmFailure {
   return Object.freeze({ kind: "unknown", message, retryable: false, attempt });
 }
 function failedStreamOutput(failure: LlmFailure): Awaited<ReturnType<typeof collectStream>> {
-  return { messageId: randomUUID(), text: "", content: Object.freeze([]), toolCalls: Object.freeze([]), usage: {}, stopReason: null, failure, aborted: failure.kind === "abort", sawObservableDelta: false };
+  return { messageId: randomUUID(), text: "", content: Object.freeze([]), toolCalls: Object.freeze([]), usage: {}, stopReason: null, failure, aborted: failure.kind === "abort", sawObservableDelta: false, firstTokenAt: null };
 }
 function parseArgs(value: string): RuntimeV2JsonValue { try { const parsed = JSON.parse(value); return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}; } catch { return {}; } }
 function appendRuntimeContext(content: RuntimeV2JsonValue, mode: RuntimeV2AgentMode, revision: number): RuntimeV2JsonValue {

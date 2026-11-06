@@ -18,8 +18,12 @@ it.each(["error", "aborted", "throw"] as const)("preserves partial text and iden
     onJournal: events => { journal = events; },
   })).rejects.toThrow();
   const message = journal.find(event => event.type === "assistant/message")!;
-  const chunk = journal.find(event => event.type === "assistant/chunk")!;
-  expect(message.data).toMatchObject({ messageId: (chunk.data as { messageId: string }).messageId, content: [{ type: "text", text: "Keep this answer." }], finishReason: ending === "aborted" ? "aborted" : "failed" });
+  // Deltas are live-only; the settled message alone records the partial output and when it started.
+  expect(journal.some(event => event.type === "assistant/chunk")).toBe(false);
+  const header = journal.find(event => event.type === "request/header")!;
+  const firstTokenAt = (message.data as { firstTokenAt?: string }).firstTokenAt;
+  expect(Date.parse(firstTokenAt ?? "")).toBeGreaterThanOrEqual(Date.parse(header.time));
+  expect(message.data).toMatchObject({ messageId: expect.any(String), content: [{ type: "text", text: "Keep this answer." }], finishReason: ending === "aborted" ? "aborted" : "failed" });
   expect(message.surface).toMatchObject({ kind: "append", node: { kind: "assistant", content: [{ type: "text", text: "Keep this answer." }] } });
   expect(journal.filter(event => event.type === "assistant/message")).toHaveLength(1);
   expect(executed).toBe(0);
@@ -39,4 +43,22 @@ it("keeps partial text when an aborted iterator ends without another event", asy
   });
   expect(result.reason).toBe("aborted");
   expect(journal.find(event => event.type === "assistant/message")?.data).toMatchObject({ content: [{ type: "text", text: "Before stop." }], finishReason: "aborted" });
+});
+
+it("records firstTokenAt on completed messages and omits it when nothing streamed", async () => {
+  const streamed = await runToolStreamFixture({
+    stream: async function* (): AsyncGenerator<LlmStreamEvent> {
+      yield { type: "reasoning-delta", text: "" };
+      yield { type: "text-delta", text: "Done." };
+      yield { type: "done", content: [{ type: "text", text: "Done." }], usage: { inputTokens: 1, outputTokens: 1 }, stopReason: "completed" } as LlmStreamEvent;
+    },
+  });
+  expect(streamed.journal.some(event => event.type === "assistant/chunk")).toBe(false);
+  expect(typeof (streamed.journal.find(event => event.type === "assistant/message")!.data as { firstTokenAt?: unknown }).firstTokenAt).toBe("string");
+  const silent = await runToolStreamFixture({
+    stream: async function* (): AsyncGenerator<LlmStreamEvent> {
+      yield { type: "done", content: [], usage: { inputTokens: 1, outputTokens: 0 }, stopReason: "completed" } as LlmStreamEvent;
+    },
+  });
+  expect(silent.journal.find(event => event.type === "assistant/message")!.data).not.toHaveProperty("firstTokenAt");
 });

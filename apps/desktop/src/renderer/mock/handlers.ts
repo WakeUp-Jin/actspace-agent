@@ -20,7 +20,7 @@ import {
 } from "./mock-db";
 import { emitLiveMessage, type MockClock } from "./clock";
 import { MOCK_REPLY, MOCK_SIDE_CHAT_REPLY, playReply, type ReplyPlayback } from "./stream-player";
-import { MOCK_CONTEXT_PATHS, MOCK_CONTEXT_PATHS_REVISION, mockContextPanelView, mockContextState } from "./context-panel-fixture";
+import { MOCK_CONTEXT_PATHS, MOCK_CONTEXT_PATHS_REVISION, mockContextPanelView } from "./context-panel-fixture";
 import { mockContextPathsPage } from "./context-paths-fixture";
 import { createModelConnectionsMock } from "./model-connections-fixture";
 import { MOCK_HARNESS_STATS_SYNC, mockHarnessStats } from "./harness-stats-fixture";
@@ -168,6 +168,7 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       getObservation: async ({ sessionId }) => sessionObservation(requireSession(db, sessionId)),
       getPreview: async () => null,
       getSubagents: async () => [],
+      liveOutput: async () => ({ runId: null, revision: 0, segments: [] }),
       getSubAgentTranscript: async () => [],
       create: async (input) => sessionProjection(createMockSession(db, input)),
       fork: async ({ sessionId }) => sessionProjection(forkMockSession(db, sessionId)),
@@ -192,7 +193,6 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
         return { ok: true, archivedSessionIds: sessionIds, failedSessionIds: [] };
       },
       setObserved: () => undefined,
-      describeContext: async ({ sessionId }) => db.sessions.has(sessionId) ? mockContextState(mockContextPanelView(sessionId, db.sessions.get(sessionId))) : null,
       listContextPaths: async input => {
         if (input.revision !== MOCK_CONTEXT_PATHS_REVISION) throw new Error("Context revision stale; reload the panel.");
         return mockContextPathsPage(MOCK_CONTEXT_PATHS, input);

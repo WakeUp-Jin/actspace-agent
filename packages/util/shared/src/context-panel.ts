@@ -86,6 +86,8 @@ export type ContextPanelManifest = {
   comparisonUnavailableReason?: string;
   estimatorVersion?: string;
   requestId: string;
+  /** 这次请求的 `request/context` 所在 seq；对话项按它判断新增（agent-spec-request-record.md §6.4）。 */
+  seq?: number;
   turnIndex: number;
   stepIndex: number;
   sentAt: string;

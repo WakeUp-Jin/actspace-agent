@@ -36,16 +36,4 @@ export type RuntimeV2ApprovalDecisionInput =
 export type RuntimeV2DesktopLiveEnvelope = {
   readonly event: RuntimeV2LiveEvent;
   readonly emittedAt: string;
-  /**
-   * One IPC message may carry several consecutive stream chunk envelopes, oldest first. `event` is the last one.
-   * Receivers unroll it before dispatching, so every consumer still sees individual envelopes in order.
-   */
-  readonly batch?: readonly RuntimeV2DesktopLiveEnvelope[];
-};
-export type RuntimeV2LiveReplay = {
-  readonly runtimeInstanceId: string;
-  readonly afterCursor: number;
-  readonly currentCursor: number;
-  readonly gap: boolean;
-  readonly events: readonly RuntimeV2DesktopLiveEnvelope[];
 };

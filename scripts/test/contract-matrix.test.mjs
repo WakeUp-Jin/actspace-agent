@@ -6,7 +6,7 @@ test("contract matrix is deterministic and preserves declared event surfaces", a
   const first = await buildMatrix();
   const second = await buildMatrix();
   assert.deepEqual(first, second);
-  assert.equal(first.events.filter((item) => item.category === "core").length, 12);
+  assert.equal(first.events.filter((item) => item.category === "core").length, 14);
   assert.equal(first.services.find(item => item.id === "session.checkpoint")?.providerId, "session.checkpoint:default");
   assert.equal(first.events.some(item => item.eventType === "session/checkpoint"), false);
   assert.equal(first.events.find(item => item.eventType === "agent/tasks-updated")?.mode, "emit");

@@ -45,7 +45,7 @@ export function BashRow({ block, sessionId }: { readonly block: BashLike; readon
     const next = !open;
     setOpen(next);
     if (!next || inline || output !== null || !connection || !block.runId) return;
-    void connection.client.call("sessions.output", { sessionId, runId: block.runId, offset: 0 }).then(result => {
+    void connection.client.call("sessions.output", { sessionId, runId: block.runId, afterRevision: 0 }).then(result => {
       const chunks = (result as { chunks?: { text: string }[] }).chunks ?? [];
       setOutput(chunks.map(chunk => chunk.text).join(""));
     }).catch(error => { store.reportError(error); setOutput("无法加载输出"); });

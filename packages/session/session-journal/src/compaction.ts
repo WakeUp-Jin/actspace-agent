@@ -9,6 +9,9 @@ export function createCompactionReplacement(options: {
   readonly summary: SessionSurfaceNodeV1;
   readonly compactionId: string;
   readonly contributorIds: readonly string[];
+  /** 被替换范围的估算，按节点是否是之前的压缩摘要分开记；上下文估算投影据此扣减（agent-spec-request-record.md §6.3.1）。 */
+  readonly replacedTokens: { readonly conversation: number; readonly summarizedConversation: number };
+  readonly estimatorVersion: string;
 }): SessionEventCandidateV1 {
   if (options.start < 0 || options.end <= options.start || options.end > options.surface.entries.length) {
     throw new SessionError("INVALID_EVENT", "Compaction replacement span is invalid.");
@@ -18,7 +21,7 @@ export function createCompactionReplacement(options: {
     type: "surface/replaced",
     eventVersion: 1,
     source: { ownerPluginId: "@actspace/core" },
-    data: { compactionId: options.compactionId, sourceEventSeqs: sources },
+    data: { compactionId: options.compactionId, sourceEventSeqs: sources, replacedTokens: { conversation: options.replacedTokens.conversation, summarizedConversation: options.replacedTokens.summarizedConversation }, estimatorVersion: options.estimatorVersion },
     surface: { kind: "replace", start: options.start, end: options.end, node: options.summary, sourceEventSeqs: sources },
     provenance: { sourceEventSeqs: sources, contributorIds: options.contributorIds, runtimeSelectionSeq: null },
   };
@@ -33,6 +36,8 @@ export function createCompactionTransaction(options: {
   readonly compactionId: string;
   readonly contributorIds: readonly string[];
   readonly summaryDigest: string;
+  readonly replacedTokens: { readonly conversation: number; readonly summarizedConversation: number };
+  readonly estimatorVersion: string;
   /** Elapsed compaction work, including summarization before the transaction commits. */
   readonly durationMs?: number;
   /** Display facts recorded on `compaction/end`: tokens before (flagged when it includes estimates), estimated tokens after. */

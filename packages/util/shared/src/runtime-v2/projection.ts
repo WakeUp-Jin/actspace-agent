@@ -12,7 +12,7 @@ export type RuntimeV2ProjectionKey =
   | "delegations"
   | "pendingInbox"
   | "providerUsage"
-  | "requestContext"
+  | "contextEstimate"
   | (string & {});
 
 export type RuntimeV2ProjectionRevision = {
@@ -150,19 +150,15 @@ export type RuntimeV2ProviderUsageProjection = {
   readonly usage: RuntimeV2UsageSummary;
 };
 
+/** 客户端从 `contextEstimate` 投影派生的上下文估算；三种形状给不同界面用，数字同源。 */
 export type RuntimeV2RequestContextEstimateProjection = {
-  readonly contextState?: import("../session").ContextState;
-  readonly cumulativeTokens?: number;
-  readonly cumulativeUsage?: RuntimeV2UsageSummary;
   readonly kind: "request-context-estimate";
   readonly schemaVersion: 1;
   readonly sessionId: string;
   readonly throughJournalSeq: number;
-  readonly requestId: string | null;
-  readonly estimator: { readonly name: "runtime-v2-request-snapshot"; readonly version: string };
-  readonly totalEstimatedTokens: number;
-  readonly maxTokens: number;
-  readonly percentUsed: number;
+  readonly estimate: import("../context-estimate").ContextEstimateView;
+  readonly contextState: import("../session").ContextState;
+  readonly usage: import("../session").ContextUsageSnapshot;
 };
 
 export type RuntimeV2ComposerProjection = {

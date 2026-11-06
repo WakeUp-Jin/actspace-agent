@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { DatabaseSync } from "node:sqlite";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionQuerySource } from "@actspace/session-storage";
 import { createReadModelSchema } from "../runtime-v2/usage-read-model-schema";
@@ -9,10 +9,6 @@ import { queryContextHistory, type ContextHistoryResult } from "../runtime-v2/co
 import { CONTEXT_PROJECTOR_VERSION } from "../runtime-v2/context-history-version";
 import { ContextPanelService } from "../runtime-v2/context-panel-service";
 import type { UsageReadModelService } from "../runtime-v2/usage-read-model";
-
-vi.mock("../runtime-v2/runtime-loader", () => ({
-  loadRuntimeV2Module: async () => ({ readPersistedContextManifest: () => ({ schemaVersion: 1, estimatorVersion: "test", comparable: true, totalEstimatedTokens: 0, buckets: {}, entries: [] }) }),
-}));
 
 const SESSION = "session-bash";
 const BASE = Date.parse("2026-11-02T08:00:00.000Z");
@@ -195,7 +191,7 @@ describe("Bash 值得注意", () => {
 
 describe("ContextPanelService 的 bash 字段", () => {
   async function describeWith(indexed: { result: ContextHistoryResult; syncing?: boolean }, throughSeq: number) {
-    const runtime = { readContextProjection: async () => null, readContextEntryText: async () => null, sessionQuerySource: async () => source(throughSeq) };
+    const runtime = { readContextProjection: async () => null, readContextEntryText: async () => null, sessionQuerySource: async () => source(throughSeq), readSessionProjectionValue: async () => undefined };
     const history = { contextHistory: () => indexed, releaseContext: () => undefined } as unknown as UsageReadModelService;
     const service = new ContextPanelService(runtime as unknown as ConstructorParameters<typeof ContextPanelService>[0], history);
     return await service.describe({ sessionId: SESSION, consumerId: "test" });

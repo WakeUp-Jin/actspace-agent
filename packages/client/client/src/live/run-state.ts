@@ -13,12 +13,15 @@ export type ToolEntry = {
   approvalReason?: string;
   approvalSummary?: string;
   approvalScope?: "browser_session";
+  /** 正在流式生成参数时所属的模型请求（`tool_call_streaming.llmCallId`）。 */
+  llmCallId?: string;
   transcriptEvents?: SessionEvent[];
 };
 
 export type StreamingSegment =
-  | { type: "thinking"; text: string }
-  | { type: "text"; text: string }
+  /** `llmCallId` / `messageId`：产生这段输出的模型请求与消息（轨迹流式层按请求取正文）；旧帧可能没有。 */
+  | { type: "thinking"; text: string; llmCallId?: string; messageId?: string }
+  | { type: "text"; text: string; llmCallId?: string; messageId?: string }
   | { type: "tool"; toolCallId: string }
   | { type: "compaction"; agentRunId: string }
   | { type: "workspace_preparation"; agentRunId: string }
@@ -53,6 +56,12 @@ export type SessionRunState = {
   operationTaskId?: string;
   /** Reattached after renderer reload; completion comes from the host stream. */
   recovered?: boolean;
+  /**
+   * Recovered runs only: the live baseline's revision once applied. Until then text/thinking deltas wait in
+   * `liveBuffer`; afterwards frames whose `liveRevision` is not greater are already in the baseline and dropped.
+   */
+  liveCut?: number;
+  liveBuffer?: Extract<RuntimeStreamEvent, { type: "assistant_text_delta" | "assistant_thinking_delta" }>[];
   sessionId: string;
   agentRunId: string;
   state: StreamingState;

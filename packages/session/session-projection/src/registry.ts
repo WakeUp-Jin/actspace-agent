@@ -120,7 +120,7 @@ export class SessionProjectionRegistry {
       if (next !== previous) {
         nextStates.set(definition.key, next);
         changedKeys.push(definition.key);
-        changedValues[definition.key] = detached(definition.view(next));
+        changedValues[definition.key] = sharedView(definition.view(next));
       }
     }
 
@@ -178,7 +178,7 @@ export class SessionProjectionRegistry {
     this.#cells.set(sessionId, cell);
     const values: Record<string, RuntimeV2JsonValue> = {};
     for (const definition of this.#definitions.values()) {
-      values[definition.key] = detached(definition.view(cell.states.get(definition.key)));
+      values[definition.key] = sharedView(definition.view(cell.states.get(definition.key)));
     }
     return Object.freeze({
       kind: "session-projection",
@@ -206,7 +206,7 @@ export class SessionProjectionRegistry {
   value(sessionId: string, key: string): RuntimeV2JsonValue | undefined {
     const definition = this.#definitions.get(key);
     const cell = this.#cells.get(sessionId);
-    return definition && cell ? detached(definition.view(cell.states.get(key))) : undefined;
+    return definition && cell ? sharedView(definition.view(cell.states.get(key))) : undefined;
   }
 
   checkpoint(sessionId: string): ProjectionCheckpoint {
@@ -226,7 +226,7 @@ export class SessionProjectionRegistry {
       const row = checkpoint.rows[key];
       if (!row || row.stateVersion !== definition.stateVersion) throw new Error(`Projection checkpoint version mismatch: ${key}.`);
       const state = immutableState(detached(row.state));
-      detached(definition.view(state));
+      sharedView(definition.view(state));
       cell.states.set(key, state);
     }
     for (let index = 0; index < checkpoint.pending.length; index++) {
@@ -290,6 +290,17 @@ function validateEventSequence(events: readonly SessionEventEnvelopeV1[]): void 
   }
 }
 
+/**
+ * Views leave the registry deep-frozen and shared, never copied: a view can be large (surface grows with
+ * the conversation) and copying it per change dominated main-process allocation. Readers must not
+ * mutate; a write now throws instead of corrupting the next reader.
+ */
+function sharedView(value: RuntimeV2JsonValue): RuntimeV2JsonValue {
+  assertJson(value);
+  return immutableState(value);
+}
+
+/** Checkpoint rows leave and enter the registry as independent copies (they are persisted and restored). */
 function detached(value: RuntimeV2JsonValue): RuntimeV2JsonValue {
   assertJson(value);
   if (value === null || typeof value !== "object") return value;

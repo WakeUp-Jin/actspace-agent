@@ -144,7 +144,7 @@ describe("cold fork and compaction provenance", () => {
     await session.append(candidate("user/message", { messageId: "u1" }, { surface: { kind: "append", node: { kind: "user", messageId: "u1", content: "one" } } }));
     await session.append(candidate("assistant/message", { messageId: "a1" }, { surface: { kind: "append", node: { kind: "assistant", messageId: "a1", content: "two" } } }));
     const before = session.journal.events;
-    const transaction = createCompactionTransaction({ surface: session.journal.surface, start: 0, end: 2, summary: { kind: "user", messageId: "summary", content: "condensed" }, compactionId: "compact-1", contributorIds: ["summary-provider"], summaryDigest: "sha256-summary" });
+    const transaction = createCompactionTransaction({ surface: session.journal.surface, start: 0, end: 2, summary: { kind: "user", messageId: "summary", content: "condensed" }, compactionId: "compact-1", contributorIds: ["summary-provider"], summaryDigest: "sha256-summary", replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test" });
     await session.append(transaction[0] as SessionEventCandidateV1);
     await session.append(transaction[1] as SessionEventCandidateV1);
     await session.append(transaction[2] as SessionEventCandidateV1);

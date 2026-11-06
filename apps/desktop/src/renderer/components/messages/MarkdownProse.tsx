@@ -17,18 +17,22 @@ const EMPTY_NUMBERS: ReadonlyMap<string, number> = new Map();
  * 平滑输出 → 顶层分块（冻结块复用）→ 合并跨块的 `<details>` → 收集全局定义 → 每块一个 react-markdown，
  * 脚注区整条回复只在最后渲染一次。流式时只有最后一块重新渲染。
  * 宿主能力走 `MarkdownHostContext`；`onOpenWorkspaceFile` 提供 `openPath`，没有就不可点。
+ * `writing`：这条回复是否正在写（平滑输出、末尾渐显、光标）；不传时跟随所在轮是否在流式。
  */
-export const MarkdownProse = memo(function MarkdownProse({ content, onOpenWorkspaceFile }: { content: string; onOpenWorkspaceFile?: (path: string, line?: number) => void }) {
+export const MarkdownProse = memo(function MarkdownProse({ content, writing, onOpenWorkspaceFile }: { content: string; writing?: boolean; onOpenWorkspaceFile?: (path: string, line?: number) => void }) {
   const id = useId();
   const prefix = useMemo(() => `user-content-${id.replace(/:/g, "")}-`, [id]);
   const pipelines = useMemo(() => createPipelineCache(prefix), [prefix]);
   const outerHost = useContext(MarkdownHostContext);
   const host = useMemo<MarkdownHost>(() => (onOpenWorkspaceFile ? { ...outerHost, openPath: onOpenWorkspaceFile } : outerHost), [outerHost, onOpenWorkspaceFile]);
 
-  // 所在轮仍在流式，或平滑输出还有积压没放完，都算流式；放完之后才退出。
+  // 版面稳定（mermaid 保持代码块、表格固定列宽）按整轮算：所在轮仍在流式，或平滑输出还有积压没放完。
+  // 末尾渐显和光标只给正在写的回复：一轮里已经写完、后面接着工具的回复不带（规范 §7.1）。
   const turnStreaming = useContext(ReplyStreamingContext);
-  const smooth = useSmoothText(content, turnStreaming);
+  const replyWriting = turnStreaming && (writing ?? true);
+  const smooth = useSmoothText(content, replyWriting);
   const streaming = turnStreaming || smooth.backlog;
+  const tail = replyWriting || smooth.backlog;
 
   const split = useRef<MarkdownBlockSplit | undefined>(undefined);
   const merged = useRef<readonly MarkdownBlock[]>(NO_BLOCKS);
@@ -43,7 +47,7 @@ export const MarkdownProse = memo(function MarkdownProse({ content, onOpenWorksp
 
   // 末尾效果落在最后一个会显示的块上；最后一块是脚注定义时落在脚注区上。
   let liveIndex = -1;
-  if (streaming) {
+  if (tail) {
     for (let i = blocks.length - 1; i >= 0; i -= 1) {
       if (blocks[i].definition?.kind === "link") continue;
       liveIndex = i;

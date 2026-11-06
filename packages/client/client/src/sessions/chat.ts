@@ -3,7 +3,9 @@ import {
   type BackgroundNotice,
   createMessageBlocks,
   type ContextUsageSnapshot,
-  projectContextState,
+  contextEstimateState,
+  contextEstimateUsage,
+  type ContextEstimateView,
   type MessageBlock,
   type SessionEvent,
   type SessionRecord,
@@ -17,29 +19,21 @@ import {
   hasVisibleText,
 } from "@actspace/shared";
 import { foldSubagentTree, lastActivationModel, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView, type SubagentView } from "@actspace/shared/runtime-v2";
-import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import type { LiveOutputBaseline, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { inheritedThroughSeq } from "@actspace/shared/session-list-page";
 
 type EventRecord = Readonly<Record<string, RuntimeV2JsonValue>>;
 
-export type ChatProjectionOptions = { readonly includePendingChunks?: boolean };
-
-export function projectChatWindow(projection: import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection, workspaceRoot = "", options: ChatProjectionOptions = {}): SessionRecord {
-  const record = projectChatSession(projection.snapshot, projection.window.events, workspaceRoot, options);
+export function projectChatWindow(projection: import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection, workspaceRoot = ""): SessionRecord {
+  const record = projectChatSession(projection.snapshot, projection.window.events, workspaceRoot);
   const deferred = new Set(projection.deferredToolCalls);
   for (const block of record.messageBlocks ?? []) {
     const event = record.events.find(event => event.id === block.id);
     const callId = event?.type === "tool_result" ? (event.payload as { toolCallId?: string }).toolCallId : undefined;
     if (callId && deferred.has(callId)) block.deferredToolDetail = { sessionId: projection.sessionId, callId };
   }
-  const state = projection.values.requestContext as unknown as import("@actspace/shared").ContextState;
-  return { ...record, contextState: state, contextSnapshot: {
-    throughJournalSeq: projection.throughJournalSeq, basis: state.basis, requestId: state.requestId,
-    totalTokens: state.totalEstimatedTokens, maxTokens: state.maxTokens, percentUsed: state.percentUsed,
-    compressionCount: projection.snapshot.activity.compactionCount,
-    cumulativeTokens: projection.snapshot.usage.totalTokens, cumulativeUsage: projection.snapshot.usage,
-    estimator: state.estimator, buckets: state.buckets,
-  } };
+  const view = projection.values.contextEstimate as unknown as ContextEstimateView | undefined;
+  return view ? { ...record, contextState: contextEstimateState(view, projection.sessionId), contextSnapshot: contextEstimateUsage(view, projection.snapshot) } : record;
 }
 type RequestInfo = { readonly requestId: string; readonly agentRunId: string; readonly turnId: string; readonly stepId: string; readonly model: string; readonly provider: string; readonly time: string };
 type EventIndex = {
@@ -64,9 +58,8 @@ export function projectChatSession(
   snapshot: RuntimeV2SessionSnapshot,
   journal: readonly SessionEventEnvelopeV1[],
   fallbackWorkspaceRoot: string,
-  options: ChatProjectionOptions = {},
 ): SessionRecord {
-  const events = projectChatEvents(snapshot, journal, options);
+  const events = projectChatEvents(snapshot, journal);
   return {
     meta: {
       schemaVersion: 2,
@@ -85,26 +78,19 @@ export function projectChatSession(
     },
     events,
     messageBlocks: createMessageBlocks(events),
-    contextSnapshot: projectContextSnapshot(snapshot, journal),
-    contextState: projectContextState(snapshot, journal),
   };
 }
 
 export function projectChatEvents(
   snapshot: RuntimeV2SessionSnapshot,
   journal: readonly SessionEventEnvelopeV1[],
-  options: ChatProjectionOptions = {},
 ): SessionEvent[] {
   const index = buildIndex(snapshot, journal);
-  const pendingChunks = options.includePendingChunks ? projectPendingChunks(snapshot, journal, index) : null;
   const activeSurface = indexActiveSurface(snapshot, journal);
   const projected: SessionEvent[] = [];
   for (const event of journal) {
-    if (event.type === "assistant/chunk") {
-      const pending = pendingChunks?.get(eventId(event));
-      if (pending) projected.push(pending);
-      continue;
-    }
+    // Old Sessions only: streamed text is shown by the settled message (or, mid-run, by the live baseline).
+    if (event.type === "assistant/chunk") continue;
     const data = record(event.data);
     const identity = identityFor(event, data, index);
     const base = {
@@ -298,52 +284,24 @@ function compactionSummaryText(events: readonly SessionEventEnvelopeV1[], compac
   return text.trim() || undefined;
 }
 
-export function projectContextSnapshot(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[] = []): ContextUsageSnapshot {
-  const state = projectContextState(snapshot, journal);
-  return {
-    throughJournalSeq: state.throughJournalSeq,
-    basis: state.basis,
-    requestId: state.requestId,
-    totalTokens: state.totalEstimatedTokens,
-    maxTokens: state.maxTokens,
-    percentUsed: state.percentUsed,
-    compressionCount: snapshot.activity.compactionCount,
-    cumulativeTokens: snapshot.usage.totalTokens,
-    cumulativeUsage: snapshot.usage,
-    estimator: state.estimator,
-    buckets: state.buckets,
-  };
-}
 
-export { projectContextState } from "@actspace/shared";
-
-/** Pending text is Journal-derived during recovery; completed messages replace their chunks. */
-function projectPendingChunks(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[], index: EventIndex): Map<string, SessionEvent> {
-  const completedMessages = new Set(journal.filter((event) => event.type === "assistant/message").map((event) => string(record(event.data).messageId)));
-  const chunks = new Map<string, SessionEvent>();
-  for (const event of journal) {
-    const data = record(event.data);
-    if (event.type !== "assistant/chunk" || completedMessages.has(string(data.messageId))) continue;
-    if (data.kind !== "assistant-delta" && data.kind !== "reasoning-delta") continue;
-    const key = `${string(data.messageId)}:${string(data.kind)}`;
-    const previous = chunks.get(key);
-    const identity = identityFor(event, data, index);
-    chunks.set(key, { id: previous?.id ?? eventId(event), sessionId: snapshot.sessionId, agentRunId: identity.agentRunId,
-      ...(identity.turnId === null ? {} : { turnId: identity.turnId }),
-      ...(identity.requestId === null ? {} : { llmCallId: identity.requestId }),
-      timestamp: previous?.timestamp ?? event.time,
-      type: data.kind === "reasoning-delta" ? "thinking" : "assistant_message",
-      payload: { content: String((previous?.payload as { content?: string } | undefined)?.content ?? "") + String(data.content ?? "") } } as SessionEvent);
-  }
-  // A combined event spans multiple envelopes, so it has no single sourceSeq.
-  return new Map([...chunks.values()].map(event => [event.id, event]));
-}
-
-export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[]): SessionEvent[] {
+/**
+ * The subagent panel's transcript: the child's Journal projection plus, while it runs, the child's live
+ * baseline (text not yet settled into a message; agent-spec-live-assistant-stream §6).
+ */
+export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, journal: readonly SessionEventEnvelopeV1[], pending?: LiveOutputBaseline): SessionEvent[] {
   // A forked subagent's Journal starts with the parent's events; the panel shows only what it did after the fork.
   const inherited = inheritedThroughSeq(snapshot.lineage);
-  const events = projectChatEvents(snapshot, journal, { includePendingChunks: true })
+  const events = projectChatEvents(snapshot, journal)
     .filter(event => event.sourceSeq === undefined || event.sourceSeq > inherited);
+  const settled = new Set(journal.filter(event => event.type === "assistant/message").map(event => string(record(event.data).messageId)));
+  const now = new Date().toISOString();
+  for (const segment of pending?.segments ?? []) {
+    if (!segment.text || settled.has(segment.messageId)) continue;
+    events.push({ id: `live-${segment.kind}:${segment.messageId}`, sessionId: snapshot.sessionId, agentRunId: pending?.runId ?? "subagent-live", timestamp: now,
+      type: segment.kind === "thinking" ? "thinking" : "assistant_message",
+      payload: segment.kind === "thinking" ? { title: "Thinking", content: segment.text, collapsedByDefault: false } : { content: segment.text } } as SessionEvent);
+  }
   const index = buildIndex(snapshot, journal);
   for (const tool of snapshot.tools.filter((tool) => tool.state === "running")) {
     if (events.some(event => event.type === "tool_result" && (event.payload as { toolCallId?: string }).toolCallId === tool.callId)) continue;

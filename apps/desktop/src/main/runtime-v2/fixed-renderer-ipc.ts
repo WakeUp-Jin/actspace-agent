@@ -1,4 +1,3 @@
-import { LiveEnvelopeBatcher, isStreamChunkEnvelope } from "./live-envelope-batcher";
 import { ContextPanelService } from "./context-panel-service";
 import { validateRunReferences as validateSharedRunReferences } from "@actspace/shared/composer-reference-validation";
 import type { RemoteDesktopAdapter } from "../remote-hosts/desktop-adapter";
@@ -34,7 +33,8 @@ import {
   type SettingsV4Snapshot,
   type SettingsV4UpdateResult,
   type SettingsV4UpdateInput,
-  projectManagedContextState,
+  contextEstimateUsage,
+  type ContextEstimateView,
 } from "@actspace/shared";
 import {
   RUNTIME_V2_FIXED_RENDERER_CHANNELS,
@@ -71,8 +71,6 @@ import type { ProviderNetworkService } from "./provider-network-service";
 import { ChatAttachmentValidationError, type DesktopRuntimeV2Registry } from "./runtime-registry";
 import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRendererSkill } from "./fixed-renderer-skills";
 import {
-  projectContextSnapshot,
-  projectContextState,
   projectChatEvents,
   projectSubagentTranscript,
   projectSubagentItems,
@@ -153,11 +151,11 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   ipc.handle(contract.sessions.getPreview, async (input) => {
     try {
       const snapshot = await options.registry.inspectSession(input.sessionId);
-      const journal = await options.registry.inspectSessionEvents(input.sessionId);
+      const estimate = await options.registry.readSessionProjectionValue(input.sessionId, "contextEstimate") as ContextEstimateView | undefined;
       return {
         sessionId: snapshot.sessionId,
         workspaceRoot: snapshot.workspaceRoot ?? options.roots.workspaceRoot,
-        contextSnapshot: projectContextSnapshot(snapshot, journal),
+        contextSnapshot: estimate ? contextEstimateUsage(estimate, snapshot) : null,
       };
     } catch {
       return null;
@@ -312,24 +310,19 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return true;
   });
 
-  // Streaming sends one IPC message per token on two channels. Both coalesce within ~33ms; any other
-  // message flushes the pending items of BOTH channels first so order never changes across them.
-  const liveBatcher = new LiveEnvelopeBatcher((message) => {
-    const target = options.getMainWindow();
-    if (target === undefined || target.isDestroyed()) return;
-    target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.sessionLiveEvent, message);
-  });
+  // Text deltas travel only on the renderer stream, coalesced there within ~33ms. Session live envelopes are
+  // journal facts and run states (no per-token traffic since chunks left the Journal), so they go out at once.
   const unsubscribeLive = options.registry.subscribe((envelope) => {
     if (envelope.event.kind === "runtime-live" || envelope.event.kind === "journal-update") usageReadModels.get(options.registry)?.invalidate();
     // A finished message (or any other journal fact) must not overtake the text deltas streamed before it:
     // a delta arriving after its message was committed is drawn as a new live segment that stays until the run ends.
-    if (!isStreamChunkEnvelope(envelope)) options.registry.flushRendererStream();
-    liveBatcher.push(envelope);
+    options.registry.flushRendererStream();
+    const target = options.getMainWindow();
+    if (target === undefined || target.isDestroyed()) return;
+    target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.sessionLiveEvent, envelope);
   });
 
   const unsubscribeRendererStream = options.registry.subscribeRendererStream((event) => {
-    // A run boundary or tool event must not overtake the journal chunks that came before it.
-    if (event.type !== "assistant_text_delta" && event.type !== "assistant_thinking_delta") liveBatcher.flush();
     const target = options.getMainWindow();
     if (target !== undefined && !target.isDestroyed()) target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.agentStream, event);
   });
@@ -366,10 +359,9 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   });
 
   return {
-    flushLive: () => { options.registry.flushRendererStream(); liveBatcher.flush(); },
+    flushLive: () => { options.registry.flushRendererStream(); },
     dispose: () => {
       unsubscribeLive();
-      liveBatcher.dispose();
       void usageReadModels.get(options.registry)?.dispose();
       usageReadModels.delete(options.registry);
       unsubscribeRendererStream();
@@ -658,7 +650,6 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
   ipc.handle(contract.updates.start, () => options.localUpdate.start());
 
-  ipc.handle(contract.sessions.describeContext, input => contextPanel.describeComposer(input.sessionId));
   ipc.handle(contract.usage.getStatus, input => usageReadModels.get(options.registry)?.getStatus(input.requestId) ?? null);
   ipc.handle(contract.usage.cancel, input => usageReadModels.get(options.registry)?.cancel(input.requestId));
   ipc.handle(contract.harnessStats.query, input => usageReadModelFor(options.registry, options.roots.dataRoot).queryHarnessStats(input));
@@ -703,10 +694,12 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     shell.showItemInFolder(path);
     return { ok: true };
   });
+  ipc.handle(contract.sessions.liveOutput, (input) => options.registry.liveOutput(input.sessionId));
   ipc.handle(contract.sessions.getSubAgentTranscript, async (input) => {
     const snapshot = await options.registry.inspectSession(input.transcriptRef.runId);
     const journal = await options.registry.inspectSessionEvents(input.transcriptRef.runId);
-    return projectSubagentTranscript(snapshot, journal);
+    // The child's unsettled text lives only in the live baseline; settled messages come from its Journal.
+    return projectSubagentTranscript(snapshot, journal, options.registry.liveOutput(input.transcriptRef.runId));
   });
 
 }

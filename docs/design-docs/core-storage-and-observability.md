@@ -98,13 +98,12 @@ SessionRecord / Context / Usage
 
 ## Context、Usage 与 Trajectory
 
-当前 Context 面板没有独立持久化文件。实时内容来自 `context.engine` 内存实例的只读投影；历史请求与趋势来自派生查询读模型。没有实时实例时，可用最近一次请求信息回退展示并标记为 last-request / stale，不能冒充当前状态。具体读取与同步路径见[Context 决策记录](上下文管理引擎设计/上下文管理引擎V2/07-Step增量更新与披露面板决策记录.md)。历史 `request/context` Journal event 提供下列请求信息：
+当前 Context 面板没有独立持久化文件。实时内容来自 `context.engine` 内存实例的只读投影；历史请求与趋势来自派生查询读模型。总数与分类来自会话投影 `contextEstimate`，它只从 Journal 折叠（[请求记录规范](agent-plugin-runtime/agent-spec-request-record.md)）。具体读取与同步路径见[Context 决策记录](上下文管理引擎设计/上下文管理引擎V2/07-Step增量更新与披露面板决策记录.md)。各分类的来源：
 
-- `systemSections` -> System Prompt、Rules、Skills；
-- `tools` -> Tool Definitions；
-- `facts` -> Runtime / Host facts；
-- `messages` -> Conversation；
-- 最近 Compaction summary -> Summarized Conversation。
+- `request/system-prompt` 的 `sections`、`modelFacts` -> System Prompt、Rules、Skills；
+- `request/tools` -> Tool Definitions；
+- 对话事件（surface append） -> Conversation；
+- 压缩替换 `surface/replaced` -> Summarized Conversation，并减去事件里记的被替换估算。
 
 Usage 和成本来自 Session Journal 的 request / assistant terminal usage facts。Desktop fixed-renderer projection 额外从 `request/header`、`request/context`、`assistant/message`、`step/end`、`llm/retry`、`tool/call` 和 Tool terminal 事件重建 `UsageActivitySnapshot`，按真实 request / tool invocation 输出稳定 activity ID、状态、延迟、重试链和成本依据。`UsageStatisticsSnapshot` 继续作为旧 UI/调用方的兼容适配器，不能成为第二份事实账本。
 

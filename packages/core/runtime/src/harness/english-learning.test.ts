@@ -61,8 +61,10 @@ describe("English learning real AgentLoop integration", () => {
       expect(syntheses).toEqual(["A clear explanation."]);
       expect(JSON.stringify(observed.get("a"))).toContain("english-learning/v1");
       expect(JSON.stringify(observed.get("b"))).not.toContain("english-learning/v1");
-      const snapshot = a.session.journal.events.find((event) => event.type === "request/context");
-      expect(JSON.stringify(snapshot)).toContain("english-learning/v1");
+      // 提示词记在 request/system-prompt（agent-spec-request-record.md §3），request/context 只留小字段。
+      const prompt = a.session.journal.events.find((event) => event.type === "request/system-prompt");
+      expect(JSON.stringify(prompt)).toContain("english-learning/v1");
+      expect(JSON.stringify(a.session.journal.events.find((event) => event.type === "request/context"))).not.toContain("english-learning/v1");
       expect(JSON.stringify(a.session.journal.events)).not.toContain("speech-canary");
       // Replayed terminal events and closing the mode cannot speak old content.
       for (const event of a.session.journal.events.filter((event) => event.type === "turn/end")) await emitNotification(root.context, "session/event", event, { sessionId: "a" });

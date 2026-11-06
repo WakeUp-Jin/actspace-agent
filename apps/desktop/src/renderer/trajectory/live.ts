@@ -1,10 +1,12 @@
-import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode } from "@actspace/shared/runtime-v2";
+import type { RequestLiveOutput } from "@actspace/client/live";
 import type { TrajectoryCell, TrajectoryRecord, TrajectorySourceBlock } from "./contract";
 import { dataOf, pick, sourceBlocks, valueText } from "./node-data";
 
 /**
- * Streaming split (DSH `finalized` + `streamingCells`): the assistant that is still streaming keeps an
- * empty placeholder in the settled layout, and its content is accumulated chunk by chunk on the side.
+ * Streaming split (DSH `finalized` + `streamingCells`): the call still streaming keeps an empty placeholder
+ * in the settled layout (builder.ts, one per open request), and its content comes from the live run state
+ * (spec agent-spec-live-assistant-stream §6). Old Sessions' chunks are still folded by the builder.
  */
 
 /** Chunk group key, shared with the builder: the message id, then the request, then a per-session fallback. */
@@ -28,7 +30,7 @@ export function closedKey(node: RuntimeV2TrajectoryNode, open: ReadonlyMap<strin
   return undefined;
 }
 
-/** Content folded from chunks. Mutable so the accumulator can append in place. */
+/** Content folded from an old Session's chunks. */
 export type LiveContent = {
   text: string;
   thinking: string;
@@ -59,7 +61,7 @@ export function appendChunks(content: LiveContent, chunks: readonly RuntimeV2Tra
 
 type LiveFields = Pick<TrajectoryRecord, "summary" | "preview" | "raw" | "outputDetail" | "sourceBlocks" | "thinkingDetail" | "sourceSequences">;
 
-/** The assistant record fields that grow with each chunk. */
+/** The assistant record fields folded from an old Session's chunks. */
 export function liveFields(content: LiveContent): LiveFields {
   const toolCalls: TrajectorySourceBlock[] = [...content.calls].map(([callId, call]) => ({
     type: "tool-call", content: call.content, ...(callId ? { callId } : {}), ...(call.toolName ? { toolName: call.toolName } : {}),
@@ -75,144 +77,40 @@ export function liveFields(content: LiveContent): LiveFields {
   };
 }
 
-export type LiveGroup = {
-  readonly key: string;
-  readonly recordId: string;
-  readonly chunks: readonly RuntimeV2TrajectoryNode[];
-  readonly firstNonEmpty: RuntimeV2TrajectoryNode | null;
-};
-
-export type TrajectorySplit = {
-  /** Unchanged while only live chunks grow; Journal events are append-only. */
-  readonly settledKey: string;
-  /** Streaming chunk groups by group key. */
-  readonly live: ReadonlyMap<string, LiveGroup>;
-  /** Settled nodes plus each live group's first and first non-empty chunk, which fix the placeholder. */
-  settled(): RuntimeV2TrajectorySnapshot;
-};
-
-type OpenGroup = { chunks: RuntimeV2TrajectoryNode[]; firstNonEmpty: RuntimeV2TrajectoryNode | null; turn: string | null; callIds: Set<string> | null };
-
-/**
- * A chunk group is live while no `assistant/message` has closed it and its turn has not ended. A group
- * whose tool-call deltas name a settled `tool/call` stays settled, since that tool links to its content.
- */
-export function splitLiveChunks(snapshot: RuntimeV2TrajectorySnapshot): TrajectorySplit {
-  const sorted = snapshot.nodes.every((node, index) => index === 0 || snapshot.nodes[index - 1]!.eventSeq <= node.eventSeq);
-  const nodes = sorted ? snapshot.nodes : [...snapshot.nodes].sort((a, b) => a.eventSeq - b.eventSeq);
-  const open = new Map<string, OpenGroup>();
-  const lists = new Map<string, RuntimeV2TrajectoryNode[]>();
-  const ended = new Set<string>();
-  const toolCalls = new Set<string>();
-  let activeTurn: string | null = null;
-  let lastSettled = -1;
-  for (const node of nodes) {
-    const data = dataOf(node);
-    if (node.eventType === "assistant/chunk") {
-      const key = chunkKey(node);
-      let group = open.get(key);
-      if (group === undefined) {
-        group = { chunks: [], firstNonEmpty: null, turn: pick(data, ["turnId", "turn"]) ?? activeTurn, callIds: null };
-        open.set(key, group);
-        lists.set(key, group.chunks);
-      }
-      group.chunks.push(node);
-      if (group.firstNonEmpty === null && valueText(data.delta ?? data.content) !== "") group.firstNonEmpty = node;
-      if (data.kind === "tool-call-delta") (group.callIds ??= new Set()).add(pick(data, ["callId"]) ?? "");
-      continue;
-    }
-    lastSettled = node.eventSeq;
-    if (node.eventType === "assistant/message") {
-      const key = closedKey(node, lists);
-      if (key !== undefined) { open.delete(key); lists.delete(key); }
-      continue;
-    }
-    const turn = pick(data, ["turnId", "turn"]);
-    if (node.eventType === "turn/start" && turn !== null) activeTurn = turn;
-    if (node.eventType === "turn/end") {
-      if (turn !== null) ended.add(turn);
-      activeTurn = null;
-    }
-    if (node.eventType === "tool/call") {
-      const callId = node.callId ?? pick(data, ["callId", "toolCallId"]);
-      if (callId !== null) toolCalls.add(callId);
-    }
-  }
-
-  const live = new Map<string, LiveGroup>();
-  let dropped = 0;
-  const signature: string[] = [];
-  for (const [key, group] of open) {
-    const first = group.chunks[0]!;
-    const settled = (group.turn !== null && ended.has(group.turn)) || [...group.callIds ?? []].some(callId => toolCalls.has(callId));
-    if (settled) {
-      lastSettled = Math.max(lastSettled, group.chunks.at(-1)!.eventSeq);
-      continue;
-    }
-    live.set(key, { key, recordId: `${first.sessionId}:record:assistant:${key}`, chunks: group.chunks, firstNonEmpty: group.firstNonEmpty });
-    dropped += group.chunks.length - (group.firstNonEmpty === null || group.firstNonEmpty === first ? 1 : 2);
-    signature.push(`${key}@${first.eventSeq}/${group.firstNonEmpty?.eventSeq ?? "-"}`);
-  }
-  const history = snapshot.history;
-  const settledKey = [
-    snapshot.sessionId, history?.fromSeq ?? "", history?.turnOffset ?? "", history?.requestOffset ?? "",
-    nodes.length - dropped, nodes[0]?.eventSeq ?? "", lastSettled, ...signature,
-  ].join("\u0000");
-
-  return {
-    settledKey,
-    live,
-    settled: () => {
-      if (live.size === 0) return sorted ? snapshot : { ...snapshot, nodes };
-      const drop = new Set<RuntimeV2TrajectoryNode>();
-      for (const group of live.values()) {
-        for (const chunk of group.chunks) if (chunk !== group.chunks[0] && chunk !== group.firstNonEmpty) drop.add(chunk);
-      }
-      return { ...snapshot, nodes: nodes.filter(node => !drop.has(node)) };
-    },
-  };
+/** Request id → message id of every request the live run streams; the builder gives their placeholders that id. */
+export function liveMessageIds(outputs: ReadonlyMap<string, RequestLiveOutput>): ReadonlyMap<string, string> {
+  const ids = new Map<string, string>();
+  for (const [requestId, output] of outputs) if (output.messageId !== null) ids.set(requestId, output.messageId);
+  return ids;
 }
 
-/** Keeps each live group's content and folds in only the chunks that arrived since the last update. */
-export function createLiveAccumulator() {
-  const states = new Map<string, { first: number; count: number; content: LiveContent }>();
-  let processed = 0;
-  return {
-    /** Chunks folded so far, for tests: each chunk is folded once. */
-    get processed() { return processed; },
-    /** Live content by record id. */
-    update(live: ReadonlyMap<string, LiveGroup>): ReadonlyMap<string, LiveContent> {
-      const result = new Map<string, LiveContent>();
-      for (const group of live.values()) {
-        const first = group.chunks[0]!.eventSeq;
-        let state = states.get(group.recordId);
-        if (state === undefined || state.first !== first || state.count > group.chunks.length) {
-          state = { first, count: 0, content: emptyLiveContent() };
-          states.set(group.recordId, state);
-        }
-        appendChunks(state.content, group.chunks, state.count);
-        processed += group.chunks.length - state.count;
-        state.count = group.chunks.length;
-        result.set(group.recordId, state.content);
-      }
-      for (const recordId of states.keys()) if (!result.has(recordId)) states.delete(recordId);
-      return result;
-    },
-  };
-}
-export type LiveAccumulator = ReturnType<typeof createLiveAccumulator>;
-
-/** The placeholder cell with the live content merged in. */
-export function withLiveContent(cell: TrajectoryCell, content: LiveContent): TrajectoryCell {
-  return { ...cell, record: { ...cell.record, ...liveFields(content) } };
+/** Changes only when a request starts streaming or names its message, so the settled layer rebuilds that rarely. */
+export function liveMessageIdsKey(outputs: ReadonlyMap<string, RequestLiveOutput>): string {
+  return [...outputs].map(([requestId, output]) => `${requestId}=${output.messageId ?? ""}`).join("\n");
 }
 
-/** Streaming cells by record id, built from the settled layout's placeholder cells. */
-export function streamingCells(cells: ReadonlyMap<string, TrajectoryCell>, contents: ReadonlyMap<string, LiveContent>): ReadonlyMap<string, TrajectoryCell> {
+/** The placeholder cell with the live output merged in. */
+export function withLiveOutput(cell: TrajectoryCell, output: RequestLiveOutput): TrajectoryCell {
+  const toolCalls: TrajectorySourceBlock[] = [...output.calls].map(([callId, call]) => ({ type: "tool-call", content: "", callId, toolName: call.toolName }));
+  return { ...cell, record: {
+    ...cell.record,
+    summary: output.text || output.thinking,
+    preview: output.text || output.thinking,
+    raw: { requestId: cell.record.requestId, messageId: output.messageId, text: output.text, thinking: output.thinking, calls: [...output.calls].map(([callId, call]) => ({ callId, toolName: call.toolName })) },
+    outputDetail: output.text || null,
+    sourceBlocks: [...sourceBlocks(output.thinking, "reasoning"), ...sourceBlocks(output.text), ...toolCalls],
+    thinkingDetail: output.thinking || null,
+  } };
+}
+
+/** Streaming cells by record id: each placeholder whose request the live run is streaming. */
+export function streamingCells(cells: readonly TrajectoryCell[], outputs: ReadonlyMap<string, RequestLiveOutput>): ReadonlyMap<string, TrajectoryCell> {
   const result = new Map<string, TrajectoryCell>();
-  for (const [recordId, content] of contents) {
-    const cell = cells.get(recordId);
-    if (cell !== undefined) result.set(recordId, withLiveContent(cell, content));
+  if (outputs.size === 0) return result;
+  for (const cell of cells) {
+    if (cell.record.placeholder !== true || cell.record.requestId === null) continue;
+    const output = outputs.get(cell.record.requestId);
+    if (output !== undefined) result.set(cell.recordId, withLiveOutput(cell, output));
   }
   return result;
 }

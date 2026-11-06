@@ -198,7 +198,7 @@ Composer 是整页的操作中心，一套可复用的输入系统，有两种 s
 - context 圆环悬停提示「当前上下文窗口占用 ≈32.4K / 1M（估算）」，与「累计」胶囊是两个口径，文案上要能分开。
 - 计费输入 = 未缓存输入 + 缓存读 + 缓存写；缓存命中 = 缓存读 ÷（未缓存输入 + 缓存读 + 缓存写），不把「差一点全命中」舍成 100%；输出速度 = 总输出 token ÷ 总解码时长。
 - 胶囊是状态行里的纯文字入口（原生 `<button>`，和 context 圆环一致），hover 或展开给 hover 底色；面板是 `ui/Popover`，在胶囊上方右对齐，宽 300–440px。
-- 数据全部取自宿主投影，不读 renderer 事件窗口：轮次、步数、Token 来自 `activity` / `usage`；模型用时、TTFT、输出速度来自 `activity.timing`（`sessionStats` 投影扫全量 journal 含 `assistant/chunk`）；工具用时来自全量 `tools` 投影。模型用时按每次请求 request/header 到 assistant/message 或 llm/retry 累加，含失败尝试、不含重试等待。
+- 数据全部取自宿主投影，不读 renderer 事件窗口：轮次、步数、Token 来自 `activity` / `usage`；模型用时、TTFT、输出速度来自 `activity.timing`（`sessionStats` 投影扫全量 journal；首 token 时间读 `assistant/message.firstTokenAt`，旧会话没有这个字段时从 `assistant/chunk` 补算）；工具用时来自全量 `tools` 投影。模型用时按每次请求 request/header 到 assistant/message 或 llm/retry 累加，含失败尝试、不含重试等待。
 
 ## Context 弹窗
 

@@ -19,6 +19,8 @@ export class HarnessHmr {
   acquire(sessionId: string, signal?: AbortSignal) {
     return this.#exclusive(sessionId, async () => {
       signal?.throwIfAborted();
+      // 重启时旧 Host 可能还占着选择存储：先让 control 重试这种启动失败，再读 blocked，否则任务会被一直暂停。
+      await this.options.control.retryStartup();
       const binding = await this.#binding(sessionId);
       return this.options.control.acquire(binding.harnessId, signal);
     });

@@ -296,7 +296,7 @@ Desktop 与显式持久化的 CLI run 共享 Session root 时，持久 Session �
 - 成功持有 lease 的进程才可 append、repair、compact 或提交 fork source transaction；
 - lease identity 至少关联 Session、Host process identity 和本次 writer instance；
 - 第二个 writer 不能偷取仍健康的 lease，也不能降级为无锁 append；
-- stale lease recovery 必须先证明原 writer 已失效，并记录结构化诊断；
+- stale lease recovery 必须先证明原 writer 已失效，并记录结构化诊断；当前实现以持有进程已不存在（`kill(pid, 0)` 返回 ESRCH）为证明，进程退出后立即接管，不等心跳过期；旧 owner 记录移到 `recovery/stale-lock-<nonce>`；
 - lease 丢失后当前 writer 立即 fail closed，未确认 durable 的 batch 不得被报告为成功；
 - browse/export 始终可以并发只读，但必须只读取一个经过验证的完整前缀。
 

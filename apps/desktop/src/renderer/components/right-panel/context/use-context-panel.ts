@@ -51,10 +51,9 @@ export function useContextPanel({ sessionId, revision, fallbackState }: {
           const next: ContextPanelData = { view: panel, source: "backend" };
           dataRef.current = next; setData(next);
         } else {
-          const described = await sessionsApi.describeContext({ sessionId });
-          if (stopped) return;
+          // 后端没有面板视图时，用会话投影里的上下文估算（调用方传入）拼一个临时视图。
           const { snapshot, fallbackState: fallback } = latest.current;
-          const next = buildInterimPanelView({ sessionId, contextState: described ?? fallback, activity: snapshot?.activity ?? null, usage: snapshot?.usage ?? null });
+          const next = buildInterimPanelView({ sessionId, contextState: fallback, activity: snapshot?.activity ?? null, usage: snapshot?.usage ?? null });
           dataRef.current = next; setData(next);
         }
         failures = 0; setError(null);

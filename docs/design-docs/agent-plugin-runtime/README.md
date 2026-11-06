@@ -26,7 +26,7 @@ P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle
 | 主题 | 规范 |
 |---|---|
 | Plugin 与包边界 | [Plugin ABI](agent-spec-plugin-runtime-abi.md)、[Package layout 与包清单](agent-spec-package-layout-and-plugin-packaging.md)、[包地图](../../../packages/README.md) |
-| Session 与上下文 | [Session/Context](agent-spec-session-core-persistence-separation.md)、[Session Format v1](agent-spec-session-format-v1.md)、[DSH 事件模型](agent-spec-dsh-event-model.md)、[Prompt contributors](agent-spec-prompt-context-contributors.md) |
+| Session 与上下文 | [Session/Context](agent-spec-session-core-persistence-separation.md)、[Session Format v1](agent-spec-session-format-v1.md)、[DSH 事件模型](agent-spec-dsh-event-model.md)、[流式输出只走实时通道](agent-spec-live-assistant-stream.md)、[请求记录与上下文估算](agent-spec-request-record.md)、[Prompt contributors](agent-spec-prompt-context-contributors.md) |
 | Agent 与 Loop | [Core 所有权](agent-target-agent-core.md)、[Agent/Subagent](agent-spec-agent-and-subagent.md)、[Scope](agent-spec-agent-scope-model.md)、[Loop 插入面](agent-spec-cordis-event-abi-and-eventhub-retirement.md#agent-loop-插入面) |
 | Cordis Service 与事件 | [Service 所有权与契约](agent-spec-package-layout-and-plugin-packaging.md)、[Cordis 原生事件 ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md) |
 | LLM | [Adapter](agent-target-llm-adapter.md)、[Core Pi 收敛目标（已实施）](agent-llm-core-pi.md)、[多供应商](../model-context/agent-multi-provider-llm.md) |

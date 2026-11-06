@@ -16,9 +16,9 @@ function PendingProbe() {
   return <output data-testid="pending">{navigation?.pending ? JSON.stringify(navigation.pending.target) : ""}</output>;
 }
 
-function renderPanel(options: { navigation?: boolean } = {}) {
+function renderPanel(options: { navigation?: boolean; contextState?: ContextState } = {}) {
   const onShowTrajectory = vi.fn();
-  const panel = <ContextPanel sessionId={SESSION} contextRevision={1} />;
+  const panel = <ContextPanel sessionId={SESSION} contextRevision={1} contextState={options.contextState} />;
   const wrap = (children: ReactNode) => options.navigation
     ? <TrajectoryNavigationProvider onShowTrajectory={onShowTrajectory}>{children}<PendingProbe /></TrajectoryNavigationProvider>
     : children;
@@ -61,11 +61,8 @@ describe("ContextPanel", () => {
         { id: "managed-3-message-0", kind: "conversation", title: "你好", estimatedTokens: 1_000, included: true },
       ],
     } as ContextState;
-    setupBridge({
-      "sessions.describeContextPanel": async () => null,
-      "sessions.describeContext": async () => contextState,
-    });
-    renderPanel({ navigation: true });
+    setupBridge({ "sessions.describeContextPanel": async () => null });
+    renderPanel({ navigation: true, contextState });
 
     expect(await screen.findByText("趋势、事件、路径和 Bash 命令需要后端数据，暂未提供")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "上下文趋势" })).not.toBeInTheDocument();

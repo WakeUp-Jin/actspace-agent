@@ -1,3 +1,4 @@
+import { ESTIMATOR_VERSION, estimateConversationNode } from "@actspace/shared";
 import { describe, expect, it, vi } from "vitest";
 import { createCoreCodecRegistry, createSessionHeader } from "@actspace/session-journal";
 import { SessionHandle } from "@actspace/session-persistence";
@@ -90,6 +91,9 @@ describe("Compaction", () => {
     expect(started).toEqual([4]);
     expect(session.journal.events).toHaveLength(9);
     expect(session.journal.events[7]?.type).toBe("surface/replaced");
+    // 被替换的 4 条消息按统一算法估算，写在替换事件上。
+    const replaced = session.journal.events.slice(0, 4).reduce((sum, event) => sum + estimateConversationNode(event.surface!.node), 0);
+    expect(session.journal.events[7]?.data).toMatchObject({ replacedTokens: { conversation: replaced, summarizedConversation: 0 }, estimatorVersion: ESTIMATOR_VERSION });
     expect(session.journal.surface.entries).toHaveLength(2);
     await session.close();
   });
@@ -119,9 +123,9 @@ describe("Compaction", () => {
     const plugin = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, { summarize: async () => ({ content: "summary" }) });
     expect(await plugin.compact(session)).toBe(true);
     const { start, end } = compactionSpan(session);
-    // Each fixture message is "message-N" (9 chars → 3 tokens); "summary" is 7 chars → 2 tokens.
+    // Each fixture message is "message-N" (3 text + 4 block + 4 message = 11); the summary "summary" is 2 + 4 + 4 = 10.
     const data = session.journal.events.at(-1)!.data;
-    expect(data).toMatchObject({ trigger: "manual", beforeTokens: 150, afterTokens: 150 - 3 * (end - start) + 2 });
+    expect(data).toMatchObject({ trigger: "manual", beforeTokens: 150, afterTokens: 150 - 11 * (end - start) + 10 });
     expect(data).not.toHaveProperty("beforeEstimated");
     await session.close();
   });
@@ -133,8 +137,8 @@ describe("Compaction", () => {
     await assistant(session, "a-3", "reply-3", { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, cost: null, costCurrency: null, source: "unknown" });
     const plugin = new CompactionPlugin(DEFAULT_COMPACTION_POLICY, { summarize: async () => ({ content: "summary" }) });
     expect(await plugin.compact(session)).toBe(true);
-    // 135 measured + "reply-2" and "reply-3" (7 chars → 2 tokens each) appended after that request.
-    expect(session.journal.events.at(-1)!.data).toMatchObject({ trigger: "manual", beforeTokens: 139, beforeEstimated: true });
+    // 135 measured + "reply-2" and "reply-3" (2 text + 4 block + 4 message = 10 each) appended after that request.
+    expect(session.journal.events.at(-1)!.data).toMatchObject({ trigger: "manual", beforeTokens: 155, beforeEstimated: true });
     await session.close();
   });
 
@@ -147,8 +151,9 @@ describe("Compaction", () => {
     expect(await plugin.maybeCompact(session, { inputTokens: 90_000, outputTokens: 1_000, contextWindow: 100_000 }, { onFinished: finished })).toBe(true);
     const { start, end } = compactionSpan(session);
     const removed = session.journal.events.filter(event => event.seq < 7 && event.surface?.kind === "append").slice(start, end)
-      .reduce((sum, event) => sum + Math.ceil(String((event.surface as { node: { content: string } }).node.content).length / 4), 0);
-    const stats = { trigger: "auto", beforeTokens: 250, afterTokens: 250 - removed + 2, beforeEstimated: true };
+      .reduce((sum, event) => sum + estimateConversationNode((event.surface as { node: Parameters<typeof estimateConversationNode>[0] }).node), 0);
+    // 150 measured + the late 400-char message (100 + 4 + 4); the summary is 10.
+    const stats = { trigger: "auto", beforeTokens: 258, afterTokens: 258 - removed + 10, beforeEstimated: true };
     expect(session.journal.events.at(-1)).toMatchObject({ type: "compaction/end", data: stats });
     expect(finished).toHaveBeenCalledWith(expect.objectContaining({ ...stats, entryCount: end - start }));
     await session.close();

@@ -10,7 +10,7 @@ function compactedLayout(stats?: Parameters<typeof createCompactionTransaction>[
   for (const messageId of ['u1', 'u2', 'u3']) {
     journal.append({ type: 'user/message', eventVersion: 1, source: { ownerPluginId: '@actspace/core' }, data: { messageId, content: messageId }, surface: { kind: 'append', node: { messageId, kind: 'user', content: messageId } } });
   }
-  journal.appendMany(createCompactionTransaction({ surface: journal.surface, start: 0, end: 3, compactionId: 'k1', contributorIds: [], summaryDigest: 'digest', durationMs: 23_000, summary: { messageId: 'summary', kind: 'user', content: '目标：改游标分页' }, ...(stats ? { stats } : {}) }));
+  journal.appendMany(createCompactionTransaction({ surface: journal.surface, start: 0, end: 3, compactionId: 'k1', contributorIds: [], summaryDigest: 'digest', replacedTokens: { conversation: 24, summarizedConversation: 0 }, estimatorVersion: 'test', durationMs: 23_000, summary: { messageId: 'summary', kind: 'user', content: '目标：改游标分页' }, ...(stats ? { stats } : {}) }));
   const runtime = buildTrajectorySnapshot(projectTrajectoryWindow('session', { events: journal.events, fromSeq: 0, throughJournalSeq: journal.lastSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0 }));
   const layout = deriveLayout(runtime);
   return { layout, cell: layout.cells.find(cell => cell.kind === 'compacted')! };

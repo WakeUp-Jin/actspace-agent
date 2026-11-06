@@ -151,11 +151,14 @@ describe("task queue store", () => {
   it("attaches a recovered run from a snapshot and detaches it once the Host reports it finished", () => {
     const tasks = createTaskQueueStore();
     const runs = createLiveRunStore();
-    const effects = { tasks, runs, patchLocal: vi.fn(), notice: vi.fn(), refreshSession: vi.fn() };
+    const effects = { tasks, runs, patchLocal: vi.fn(), notice: vi.fn(), refreshSession: vi.fn(), attachLiveBaseline: vi.fn() };
     const running = { runId: "run-1", taskId: "t-1", state: "running", result: null, configuration: {}, harness: { harnessId: "main", generationId: "g", revision: 1 } } as TaskSnapshot["runs"][number];
     applyTaskSnapshot(snapshot("s1", 1, [running]), effects);
     expect(runs.view("s1")).toMatchObject({ isStreaming: true, runId: "run-1", recovered: true });
-    applyTaskSnapshot(snapshot("s1", 2, [{ ...running, state: "completed" } as TaskSnapshot["runs"][number]]), effects);
+    expect(effects.attachLiveBaseline).toHaveBeenCalledExactlyOnceWith("s1", "run-1");
+    applyTaskSnapshot(snapshot("s1", 2, [running]), { ...effects });
+    expect(effects.attachLiveBaseline).toHaveBeenCalledOnce();
+    applyTaskSnapshot(snapshot("s1", 3, [{ ...running, state: "completed" } as TaskSnapshot["runs"][number]]), effects);
     expect(runs.has("s1")).toBe(false);
     expect(runs.isTerminal("run-1")).toBe(true);
     expect(effects.patchLocal).toHaveBeenCalledWith("s1", expect.objectContaining({ messageQueue: expect.anything() }));

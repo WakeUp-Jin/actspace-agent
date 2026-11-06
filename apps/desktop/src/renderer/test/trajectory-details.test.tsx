@@ -6,11 +6,16 @@ import { DetailPanel, type DetailSelection } from '../components/trajectory/deta
 import { buildTrajectorySnapshot, deriveLayout, detailTabs, type DetailTab, type TrajectoryCell } from '../trajectory';
 
 const tool = (description: string) => ({ name: 'bash', description, parameters: { type: 'object', properties: { command: { type: 'string', description: 'The command to execute.' } } } });
+const prompt = (requestId: string, content: string): [string, Record<string, RuntimeV2JsonValue>] => ['request/system-prompt', { requestId, digest: content, sections: [{ id: 'model-prompt', owner: 'actspace.context-system', order: 0, content }], modelFacts: [], contributorProvenance: [] }];
+const context = (requestId: string): [string, Record<string, RuntimeV2JsonValue>] => ['request/context', { requestId, snapshot: { schemaVersion: 3 } }];
 const events: [string, Record<string, RuntimeV2JsonValue>][] = [
   ['turn/start', { turnId: 't' }],
   ['user/message', { content: '**Inspect** files', source: { kind: 'user' } }],
   ['step/start', { stepId: 's' }],
-  ['request/header', { requestId: 'r', routeId: 'deepseek', model: 'v4', prompt: { systemPrompt: '你是助手\n保持简短\n用中文', tools: [tool('Execute a shell command.')] } }],
+  ['request/header', { requestId: 'r', routeId: 'deepseek', model: 'v4' }],
+  prompt('r', '你是助手\n保持简短\n用中文'),
+  ['request/tools', { requestId: 'r', digest: 't', tools: [tool('Execute a shell command.')] }],
+  context('r'),
   ['assistant/message', { requestId: 'r', messageId: 'a', content: [
     { type: 'thinking', text: 'Check first.' }, { type: 'text', text: 'Inspect **both** files.' },
     { type: 'tool-call', callId: 'c1', name: 'bash', arguments: { command: 'first' } },
@@ -21,9 +26,12 @@ const events: [string, Record<string, RuntimeV2JsonValue>][] = [
   ['tool/result', { callId: 'c1', result: 'first output' }],
   ['step/end', {}],
   ['step/start', { stepId: 's2' }],
-  ['request/header', { requestId: 'r2a', prompt: { systemPrompt: '你是助手\n保持详细\n用中文', tools: [tool('Execute a shell command.')] } }],
+  ['request/header', { requestId: 'r2a' }],
+  prompt('r2a', '你是助手\n保持详细\n用中文'),
+  context('r2a'),
   ['llm/retry', { requestId: 'r2a', attempt: 1, delayMs: 200, failure: { message: '超时' } }],
-  ['request/header', { requestId: 'r2b', attempt: 2, routeId: 'deepseek', model: 'v4', prompt: { systemPrompt: '你是助手\n保持详细\n用中文', tools: [tool('Execute a shell command.')] } }],
+  ['request/header', { requestId: 'r2b', attempt: 2, routeId: 'deepseek', model: 'v4' }],
+  context('r2b'),
   ['assistant/message', { requestId: 'r2b', messageId: 'm2', content: '完成' }],
 ];
 let step = 's';

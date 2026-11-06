@@ -10,7 +10,9 @@ const events: [string, RuntimeV2JsonValue][] = [
   ['turn/start', { turnId: 't' }],
   ['user/message', { content: '**Inspect** files', source: { kind: 'user' } }],
   ['step/start', { stepId: 's' }],
-  ['request/header', { requestId: 'r', prompt: { tools: [{ name: 'bash', description: 'Execute a shell command.', parameters: { type: 'object', properties: { command: { type: 'string', description: 'The command to execute.' } }, required: ['command'] } }] } }],
+  ['request/header', { requestId: 'r' }],
+  ['request/tools', { requestId: 'r', digest: 't1', tools: [{ name: 'bash', description: 'Execute a shell command.', parameters: { type: 'object', properties: { command: { type: 'string', description: 'The command to execute.' } }, required: ['command'] } }] }],
+  ['request/context', { requestId: 'r', snapshot: { schemaVersion: 3 } }],
   ['assistant/message', { requestId: 'r', messageId: 'a', content: [
     { type: 'thinking', text: 'Check first.' }, { type: 'text', text: 'Inspect **both** files.' },
     { type: 'tool-call', callId: 'c1', name: 'bash', arguments: { command: 'first' } },
@@ -25,7 +27,9 @@ const events: [string, RuntimeV2JsonValue][] = [
   ['tool/call', { requestId: 'r', callId: 'c2', name: 'bash', arguments: { command: 'second' } }],
   ['tool/call', { callId: 'child', parentCallId: 'c2', name: 'bash', arguments: { command: 'nested' } }],
   ['tool/call', { callId: 'orphan', name: 'bash', arguments: {} }],
-  ['request/header', { requestId: 'later', prompt: { tools: [{ name: 'bash', description: 'New definition.', parameters: {} }] } }],
+  ['request/header', { requestId: 'later' }],
+  ['request/tools', { requestId: 'later', digest: 't2', tools: [{ name: 'bash', description: 'New definition.', parameters: {} }] }],
+  ['request/context', { requestId: 'later', snapshot: { schemaVersion: 3 } }],
 ];
 const snapshot: RuntimeV2TrajectorySnapshot = {
   kind: 'trajectory', schemaVersion: 1, sessionId: 'relations', throughJournalSeq: events.length - 1,

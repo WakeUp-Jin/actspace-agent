@@ -5,13 +5,36 @@ import type { SessionEventEnvelopeV1 } from "./event-envelope.js";
 import { SessionError } from "./errors.js";
 
 export type EventCodecRelationContext = {
+  /**
+   * Accepted history before the candidate. Materialized on first access and
+   * only for codecs that declare `readsHistory: true`; any other codec that
+   * touches it throws, so a rule cannot silently pay for a full history read.
+   */
   readonly previous: readonly SessionEventEnvelopeV1[];
   readonly candidate: SessionEventEnvelopeV1;
 };
 
 export type EventCodec = PluginEventCodec & {
   readonly validateRelations?: (context: EventCodecRelationContext) => void;
+  /** Declare when `validateRelations` reads `previous`; writers then load history for it. */
+  readonly readsHistory?: boolean;
 };
+
+/** Whether appending this codec's events needs the Session history loaded. */
+export function codecReadsHistory(codec: EventCodec | undefined): boolean {
+  return codec?.validateRelations !== undefined && codec.readsHistory === true;
+}
+
+export function relationContext(codec: EventCodec, candidate: SessionEventEnvelopeV1, previous: () => readonly SessionEventEnvelopeV1[]): EventCodecRelationContext {
+  let cached: readonly SessionEventEnvelopeV1[] | undefined;
+  return Object.freeze({
+    candidate,
+    get previous(): readonly SessionEventEnvelopeV1[] {
+      if (codec.readsHistory !== true) throw new SessionError("INVALID_EVENT", `Codec ${codec.type} reads Session history without declaring readsHistory.`);
+      return cached ??= Object.freeze(previous());
+    },
+  });
+}
 
 export type DecodedSessionEvent = {
   readonly event: SessionEventEnvelopeV1;

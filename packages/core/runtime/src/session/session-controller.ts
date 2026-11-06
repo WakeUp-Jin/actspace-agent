@@ -100,10 +100,12 @@ export class RuntimeSessionController {
     const source = await this.readModel(input.sessionId);
     const { model, snapshot, read } = source;
     const live = this.#open.get(input.sessionId);
-    const boundaries = live?.journal.project(HISTORY_BOUNDARIES, () => ({ floor: 0, starts: [] as number[], requests: [] as number[] }), (state, event) => {
+    const boundaries = live?.journal.project(HISTORY_BOUNDARIES, () => ({ floor: 0, starts: [] as number[], requests: [] as number[], prompts: [] as number[], toolSets: [] as number[] }), (state, event) => {
       if (event.type === "turn/start") return { ...state, starts: [...state.starts, state.floor] };
       if (event.type === "turn/end") return { ...state, floor: event.seq + 1 };
       if (event.type === "request/header" || event.type === "llm/auxiliary-start") return { ...state, requests: [...state.requests, event.seq] };
+      if (event.type === "request/system-prompt") return { ...state, prompts: [...state.prompts, event.seq] };
+      if (event.type === "request/tools") return { ...state, toolSets: [...state.toolSets, event.seq] };
       return state;
     });
     const end = snapshot.throughJournalSeq + 1;
@@ -136,6 +138,13 @@ export class RuntimeSessionController {
     }
     if (trimmed > 0) journal = journal.slice(trimmed);
     const windowFrom = journal[0]?.seq ?? until;
+    // 提示词与工具定义只在变化时记一次（agent-spec-request-record.md §4.3）。窗口不从头开始时，补上起点之前最近的一条，
+    // 让窗口内每次请求都能找到自己生效的提示词与工具；它们不计入窗口的事件数/字节预算。
+    const carried = [latestBefore(read?.prompts ?? boundaries?.prompts ?? [], windowFrom), latestBefore(read?.toolSets ?? boundaries?.toolSets ?? [], windowFrom)].filter((seq): seq is number => seq !== null).sort((a, b) => a - b);
+    if (carried.length > 0) {
+      const records = (await Promise.all(carried.map(seq => live ? live.journal.readEvents(seq, seq + 1) : this.#cache.events(read!, seq, seq + 1)))).flat();
+      journal = [...records, ...journal];
+    }
     const messageIds = new Set(journal.flatMap(event => event.surface ? [event.surface.node.messageId] : []));
     const callIds = new Set(journal.flatMap(event => {
       const data = eventData(event);
@@ -370,6 +379,8 @@ export class RuntimeSessionController {
   }
   snapshot(session: SessionHandle): RuntimeV2SessionSnapshot { return this.liveModel(session).snapshot(session.journal.validation.accessState); }
   async inspect(sessionId: string): Promise<RuntimeV2SessionSnapshot> { return (await this.readModel(sessionId)).snapshot; }
+  /** 只读一个投影值（例如 `contextEstimate`），不读日志窗口。 */
+  async projectionValue(sessionId: string, key: string): Promise<import("@actspace/shared/runtime-v2").RuntimeV2JsonValue | undefined> { return (await this.readModel(sessionId)).model.projections.value(sessionId, key); }
   async recoveryAccess(sessionId: string): Promise<SessionRecoveryAccess> { const open = this.#open.get(sessionId); if (open !== undefined) return open.durabilityState === "blocked" ? "read-only" : "read-write"; return classifySessionRecoveryAccess(await this.store.inspect(sessionId)); }
   async readEventBatch(sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput) {
     if (!this.store.storage.readEventBatch) throw new Error("Session provider does not support bounded query reads.");
@@ -431,16 +442,12 @@ const DEFERRED_DETAIL_BYTES = 24_000;
 
 /**
  * 历史窗口只服务展示，先剔除体积大但展示用不到的事件，再按事件数/字节上限裁剪：
- * - 已有 assistant/message 定稿的消息，其 assistant/chunk 流式增量客户端会直接跳过（约占 journal 事件的 97%）；
- * - request/context 每次请求都记录一份完整上下文，随对话增长累积；窗口内只保留最新一份给 Context 面板，
- *   其余大快照收敛为模型 / 路由 / 请求参数等身份字段，与大工具事件的 bounded 处理一致。
- *   系统提示词和工具定义是轨迹「系统」行与工具 Schema 的来源：窗口内第一次请求和它们变化的请求保留原文，
- *   其余标 `promptUnchanged`，由 renderer 沿用上一份。
+ * 已有 assistant/message 定稿的消息，其 assistant/chunk 流式增量客户端会直接跳过（约占 journal 事件的 97%）。
+ * `request/context` 已经只有小字段，提示词与工具定义各自只在变化时记一次，都原样保留。
  */
 export function slimHistoryWindow(journal: readonly SessionEventEnvelopeV1[]): SessionEventEnvelopeV1[] {
   const completedMessages = new Set<string>();
   const tokenTimes = new Map<string, { first: string; nonEmpty?: string }>();
-  let latestContextSeq = -1;
   for (const event of journal) {
     const data = eventData(event);
     if (event.type === "assistant/message" && typeof data?.messageId === "string") completedMessages.add(data.messageId);
@@ -449,18 +456,9 @@ export function slimHistoryWindow(journal: readonly SessionEventEnvelopeV1[]): S
       if (!timing.nonEmpty && hasChunkText(data.delta ?? data.content)) timing.nonEmpty = event.time;
       tokenTimes.set(data.messageId, timing);
     }
-    if (event.type === "request/context") latestContextSeq = event.seq;
   }
-  let previousPrompt: string | null = null;
   return journal.flatMap(event => {
     const data = eventData(event);
-    if (event.type === "request/context") {
-      const prompt = requestPrompt(data);
-      const changed = prompt.signature !== previousPrompt;
-      previousPrompt = prompt.signature;
-      if (event.seq !== latestContextSeq && JSON.stringify(event).length > DEFERRED_DETAIL_BYTES) return [boundRequestContextEvent(event, changed ? prompt.fields : null)];
-      return [event];
-    }
     if (event.type === "assistant/chunk" && typeof data?.messageId === "string" && completedMessages.has(data.messageId)) return [];
     if (event.type === "assistant/message" && typeof data?.messageId === "string" && data.firstTokenAt == null && data.firstTokenTime == null) {
       const timing = tokenTimes.get(data.messageId);
@@ -476,42 +474,6 @@ function hasChunkText(value: RuntimeV2JsonValue | undefined): boolean {
   if (Array.isArray(value)) return value.some(hasChunkText);
   const record = jsonRecord(value);
   return record ? hasChunkText(record.text ?? record.content ?? record.value) : false;
-}
-
-const REQUEST_PROMPT_KEYS = ["renderedSystemPrompt", "systemPrompt", "system", "tools", "contextSections", "contextModelFacts"] as const;
-
-function requestPrompt(data: Readonly<Record<string, RuntimeV2JsonValue>> | null): { signature: string; fields: Record<string, RuntimeV2JsonValue> } {
-  const snapshot = jsonRecord(data?.snapshot);
-  const fields: Record<string, RuntimeV2JsonValue> = {};
-  for (const key of REQUEST_PROMPT_KEYS) if (snapshot?.[key] !== undefined) fields[key] = snapshot[key];
-  return { signature: JSON.stringify(fields), fields };
-}
-
-/** `prompt` 为 null 表示与窗口内上一次请求相同，只留 `promptUnchanged` 标记。 */
-function boundRequestContextEvent(event: SessionEventEnvelopeV1, prompt: Record<string, RuntimeV2JsonValue> | null): SessionEventEnvelopeV1 {
-  const data = eventData(event);
-  if (!data) return event;
-  const bounded: Record<string, RuntimeV2JsonValue> = { deferredDetail: true };
-  for (const key of ["agentRunId", "turnId", "stepId", "requestId"] as const) {
-    const value = data[key];
-    if (value !== undefined) bounded[key] = value;
-  }
-  const snapshot = jsonRecord(data.snapshot);
-  const prepared = jsonRecord(snapshot?.prepared);
-  const boundedSnapshot: Record<string, RuntimeV2JsonValue> = {};
-  if (prepared) {
-    const boundedPrepared: Record<string, RuntimeV2JsonValue> = {};
-    for (const key of ["model", "route", "contextWindow"] as const) {
-      const value = prepared[key];
-      if (value !== undefined) boundedPrepared[key] = value;
-    }
-    boundedSnapshot.prepared = boundedPrepared;
-  }
-  if (snapshot?.requestOptions !== undefined) boundedSnapshot.requestOptions = snapshot.requestOptions;
-  if (prompt === null) boundedSnapshot.promptUnchanged = true;
-  else Object.assign(boundedSnapshot, prompt);
-  bounded.snapshot = boundedSnapshot;
-  return { ...event, data: bounded };
 }
 
 function publicValues(values: RuntimeV2ProjectionValues): RuntimeV2ProjectionValues {
@@ -537,6 +499,12 @@ function jsonRecord(value: RuntimeV2JsonValue | undefined): Readonly<Record<stri
 }
 function eventData(event: SessionEventEnvelopeV1): Readonly<Record<string, RuntimeV2JsonValue>> | null {
   return event.data !== null && typeof event.data === "object" && !Array.isArray(event.data) ? event.data as Readonly<Record<string, RuntimeV2JsonValue>> : null;
+}
+/** 有序 seq 列表里小于 `seq` 的最后一个。 */
+function latestBefore(seqs: readonly number[], seq: number): number | null {
+  let low = 0, high = seqs.length;
+  while (low < high) { const mid = (low + high) >> 1; if (seqs[mid]! < seq) low = mid + 1; else high = mid; }
+  return low > 0 ? seqs[low - 1]! : null;
 }
 function turnStarts(events: readonly SessionEventEnvelopeV1[]): number[] {
   const starts: number[] = []; let floor = 0;

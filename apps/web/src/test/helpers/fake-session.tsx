@@ -54,10 +54,10 @@ export function observationFixture(sessionId: string, options: { title?: string 
     metadata, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
     activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } }, lineage: null,
   };
-  const requestContext = { basis: "last-request", totalEstimatedTokens: 0, maxTokens: 1000, percentUsed: 0, buckets: [], entries: [], estimator: { name: "t", version: "1" }, throughJournalSeq: seq, sessionId, updatedAt: at };
+  const contextEstimate = { schemaVersion: 1, estimatorVersion: "t", totalEstimatedTokens: 0, buckets: { systemPrompt: 0, tools: 0, rules: 0, skills: 0, summarizedConversation: 0, conversation: 0 }, contextWindow: 1000, model: null, percentUsed: 0, entries: [], summaries: [], requestId: null, throughJournalSeq: seq, updatedAt: at };
   return {
     kind: "session-observation", schemaVersion: 1, sessionId, snapshot,
-    projection: { kind: "session-projection-snapshot", schemaVersion: 1, sessionId, throughJournalSeq: seq, values: { metadata, requestContext } },
+    projection: { kind: "session-projection-snapshot", schemaVersion: 1, sessionId, throughJournalSeq: seq, values: { metadata, contextEstimate } },
     window: { events: [], fromSeq: seq + 1, throughJournalSeq: seq, beforeSeq: null, turnOffset: 0, requestOffset: 0 }, activeMessageIds: [], deferredToolCalls: [], watermarks: {},
   };
 }

@@ -1,11 +1,10 @@
-import { projectContextState } from "@actspace/shared";
+import { applyContextEstimate, initialContextEstimate, viewContextEstimate, type ContextEstimateState } from "@actspace/shared";
 import { mainAgentFormFromPresetId, type RuntimeV2AgentMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView } from "@actspace/shared/runtime-v2";
 import { SessionSurface, type SessionSurfaceView, type EventCodecRegistry, type SessionEventEnvelopeV1, type SessionHeaderV1 } from "@actspace/session-journal";
 import { registerSessionFacts, sessionFacts, SessionProjectionRegistry, type SessionProjectionService } from "@actspace/session-projection";
 import { createRunningToolView, completeToolView, projectRendererHint, type RendererAllowlist } from "./tool-dto.js";
 import { redactProjectionText } from "./redaction.js";
 
-type ContextInput = { surface: SessionSurfaceView; events: SessionEventEnvelopeV1[]; activeTurnId: string | null; throughJournalSeq: number; updatedAt: string };
 export class SessionReadModel {
   readonly projections: SessionProjectionRegistry;
   constructor(readonly header: SessionHeaderV1, readonly codecs: EventCodecRegistry, readonly rendererAllowlist?: RendererAllowlist, readonly projectionService?: SessionProjectionService) {
@@ -50,37 +49,12 @@ export class SessionReadModel {
       key: "updatedAt", stateVersion: 1, init: () => header.createdAt, view: state => state,
       apply: (_, event) => event.time,
     });
-    let contextMemo: { input: ContextInput; value: ReturnType<typeof projectContextState>; fixedWatermark: boolean; fixedTime: boolean } | undefined;
-    this.projections.register<ContextInput>({
-      key: "requestContext", stateVersion: 1,
-      init: () => ({ surface: { entries: [], replaceGeneration: 0 }, events: [], activeTurnId: null, throughJournalSeq: -1, updatedAt: header.createdAt }),
-      apply: (state, event) => {
-        let surface = state.surface;
-        if (event.surface) { const next = SessionSurface.fromView(surface); next.apply(event); surface = next.view; }
-        let events = state.events;
-        if (["request/header", "request/context", "compaction/end"].includes(event.type)) events = [...events.filter(previous => previous.type !== event.type), event];
-        if (event.type === "surface/replaced") events = [...events, event];
-        const activeTurnId = event.type === "turn/start" && isRecord(event.data) ? stringValue(event.data.turnId) : event.type === "turn/end" ? null : state.activeTurnId;
-        return { surface, events, activeTurnId, throughJournalSeq: event.seq, updatedAt: event.time };
-      },
-      view: state => {
-        const prior = contextMemo;
-        if (prior && prior.input.surface === state.surface && prior.input.events === state.events && prior.input.activeTurnId === state.activeTurnId) {
-          return { ...prior.value,
-            throughJournalSeq: prior.fixedWatermark ? prior.value.throughJournalSeq : state.throughJournalSeq,
-            updatedAt: prior.fixedTime ? prior.value.updatedAt : state.updatedAt,
-          } as unknown as RuntimeV2JsonValue;
-        }
-        const value = projectContextState({
-          sessionId: header.sessionId, throughJournalSeq: state.throughJournalSeq, updatedAt: state.updatedAt,
-          activity: { activeTurnId: state.activeTurnId }, messages: state.surface.entries.map(entry => entry.node),
-        }, state.events);
-        const latest = [...state.events].reverse().find(event => event.type === "request/context");
-        const cached = latest && isRecord(latest.data) ? latest.data.browseContextState : null;
-        const fixedWatermark = isRecord(cached) && cached.sessionId === header.sessionId;
-        contextMemo = { input: state, value: JSON.parse(JSON.stringify(value)), fixedWatermark, fixedTime: fixedWatermark || latest !== undefined };
-        return JSON.parse(JSON.stringify(value));
-      },
+    // 上下文估算（agent-spec-request-record.md §6.3）：状态只含非对话项与两个对话合计，不随消息数增长；
+    // 与估算无关的事件返回同一引用，注册表不重建、不推送。
+    this.projections.register<ContextEstimateState>({
+      key: "contextEstimate", stateVersion: 1, init: initialContextEstimate,
+      apply: (state, event) => applyContextEstimate(state, event),
+      view: state => viewContextEstimate(state) as unknown as RuntimeV2JsonValue,
     });
     this.projections.seal();
     this.projections.ensureSession(header.sessionId);

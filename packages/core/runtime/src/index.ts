@@ -55,4 +55,3 @@ export type { BootDiagnostic } from "@actspace/diagnostics";
 
 export type { AgentLoopLiveEvent } from "@actspace/agent-loop";
 
-export { readPersistedContextManifest } from "@actspace/context-engine";

@@ -60,11 +60,21 @@ App 只负责把这些 store 装配起来、把事件接到对应的 store，以
 
 流式输出时每个 delta 都会来事件，每秒可达上百个。渲染成本 = 渲染次数 × 渲染范围 × 每次解析量，三项都要压住：
 
-- **主进程先合并**：正文 / 思考增量只走 `agentStream` 一条通道（`FixedRendererStreamAdapter` 在桌面端以 33ms 合并同一条消息的连续增量）；`sessionLiveEvent` 不再转发 `assistant-delta` / `reasoning-delta`，只转发 `run-state` 与 journal 事件。`assistant/chunk` 的 journal-update 由 `main/runtime-v2/live-envelope-batcher.ts` 以 33ms 合成一条 `{ ...最后一条, batch: [...] }`，`api/live-events.ts` 拆回单条，下游无感。任何非增量事件（工具、run 边界、审批）先冲掉两边积压再发送，顺序不变。
-- **按帧合并通知**：`R/session/frame-batch.ts` 的 `scheduleFrame` 是渲染进程共用的帧调度器。`LiveRunStore`（`createLiveRunStore(limit, { scheduleNotify })`）对 `assistant_text_delta`、`assistant_thinking_delta`、`tool_call_streaming` 只登记、下一帧统一通知；Session bridge（`scheduleStreamFlush`）把 `assistant/chunk` 的 journal-update 排队，下一帧在一次 `store.batch` 里应用。两个 store 的通知落在同一个帧回调里，React 只渲染一次。
-- **结构性事件立即生效**：run 开始 / 结束、工具结果、`assistant/message` 等不排队；bridge 收到它们时先冲掉已排队的增量再应用，顺序不变。新增高频事件类型时才往延迟集合里加，结构性事件不能加。
-- **普通流式投影复用**：`useChatSessionRecord` 仅在非 recovered 模式下，新 cell 相对上一个只追加了 `assistant/chunk`、投影值和快照（除 `throughJournalSeq`、`updatedAt`）都没变时，复用上一次的 record（`onlyStreamChunksSince`）。普通 Chat 投影默认忽略 chunk，正文由 LiveRunStore 按帧显示，历史块保持引用不变。
-- **重载恢复投影**：App 将既有 `isRecoveredRun` 传给 `useChatSessionRecord`；恢复模式显式启用 Client 的 `includePendingChunks`，从 cell 的 Journal 窗口聚合尚未完成的正文及思考片段，并继续消费后续 chunk，不走普通流式复用。片段按 messageId/类型聚合，保留 run/turn/request 身份与首片段顺序；同消息的完整 `assistant/message` 到来后替换合成片段，不重复追加。片段仍是 durable 事实的派生结果，不新增 React 正文状态或第二个事实源；子轨迹复用同一片段投影。
+- **流式文字不进日志**：新会话不写 `assistant/chunk`，正文 / 思考增量只走实时通道（[流式输出只走实时通道](../agent-plugin-runtime/agent-spec-live-assistant-stream.md)）。日志里只有每次调用一条 `assistant/message`，流式期间没有逐 token 的 journal-update。
+- **主进程先合并**：正文 / 思考增量只走 `agentStream` 一条通道，`FixedRendererStreamAdapter` 在桌面端以 `RENDERER_STREAM_INTERVAL_MS`（33ms，`main/runtime-v2/runtime-registry.ts`）合并同一条消息的连续增量。`sessionLiveEvent` 不转发 `assistant-delta` / `reasoning-delta`，只转发 `run-state` 与 journal 事件，逐条直接发送。任何 journal 事件（工具、`assistant/message`、run 边界、审批）发送前先冲掉积压的增量帧，定稿消息不会越过它之前的片段。
+- **实时底稿**：主进程的 `LiveOutputBuffer`（`@actspace/shared/runtime-v2` 的 `live-output.ts`）保存每个会话当前运行里还没定稿的正文与思考，按 `messageId` 分组，带请求的 `requestId`。
+  - 每接受一个增量，全局 `revision` 加一；合并后的增量帧带上它包含的最后一个 `liveRevision`。
+  - `assistant/message` 写入日志后删掉这条消息，运行结束时整份删除。
+  - `sessions.liveOutput({ sessionId })` 先冲掉积压帧再读底稿，所以之前发出的帧都不超过底稿的 `revision`，之后的帧都更大。远程会话返回 `null`，由远程适配器在 `agent_run_started(recoveredReset)` 之后自己推底稿。
+- **按帧合并通知**：`R/session/frame-batch.ts` 的 `scheduleFrame` 是渲染进程共用的帧调度器。`LiveRunStore`（`createLiveRunStore(limit, { scheduleNotify })`）对 `assistant_text_delta`、`assistant_thinking_delta`、`tool_call_streaming` 只登记、下一帧统一通知；Session bridge 收到的 journal 事件都是结构性的，直接应用。
+- **结构性事件立即生效**：run 开始 / 结束、工具结果、`assistant/message` 等不排队，顺序不变。新增高频事件类型时才往 LiveRunStore 的延迟集合里加，结构性事件不能加。
+- **Chat 投影不读 chunk**：Chat 投影忽略 `assistant/chunk`（旧会话里有，新会话没有），崩溃留下的孤儿 chunk 不显示为进行中。正文由 LiveRunStore 按帧显示，历史块保持引用不变。
+- **恢复运行**（渲染进程重载、窗口重开后重新挂上的 run，`isRecoveredRun`）：
+  - LiveRunStore 先缓存这个运行的正文 / 思考增量，任务队列（`task-queue.ts`）和审批恢复调用 `attachLiveBaseline`（`R/session/live-runs/live-baseline.ts`）读 `sessions.liveOutput`，以 `live_output_baseline` 事件灌入运行状态。
+  - 底稿作为起点；缓存的帧和之后的帧里 `liveRevision` 不大于底稿的丢掉，其余照常追加，不重复、不缺字。没带 `liveRevision` 的帧照常追加。只认第一份底稿；读取失败时给空底稿，缓存的增量照常显示。
+  - 底稿的 `runId` 与这个运行不同（读取时运行已换）时只用 revision 截断，不灌文字。
+  - 压缩操作恢复的 run 没有底稿，直接丢弃它的正文增量。
+  - 远程会话（Web 端、远程 Host）的适配器按 `afterRevision` 分页回放底稿，跳过投影里已经定稿的消息，再推 `live_output_baseline`，界面侧逻辑相同。
 - **订阅隔离**：每帧变的数据不进 App 状态和粗粒度 context。消息序列在 `R/session/transcript-context.tsx` 的 transcript store 里，消息区用 `useTranscriptMessages()`，外壳只用 `useTranscriptSelect(selector, isEqual)` 取派生小值；投影派生值用 `SessionProjectionContext.tsx` 的 `useProjectionSelect(selector, isEqual)`，只认当前会话自己的 cell / overlay，后台会话的事件不触发重渲染。App 只从 live run 取 `useLiveRunSelect` 给的小状态。侧栏、右栏外壳、输入框外壳、`WorkbenchLayout` 用 `memo`，流式时不随帧渲染；selector 和 isEqual 用模块级函数。`render-isolation.test.tsx` 守住这条：100 帧流式下侧栏、右栏、输入框外壳渲染 0 次。
 - **按引用跳过**：`TurnView` 逐条比较消息块引用，`AssistantReply`、`MarkdownProse` 用 `memo`。新增给这些组件的 props 必须是稳定引用（`useCallback` / 常量），否则整页历史每帧都会重渲染。
 - **Markdown 分块**：`MarkdownProse` 用 `components/messages/markdown-blocks.ts` 按顶层块切分，除最后两块外冻结复用，只重新解析尾部；每块单独交给 react-markdown，`MarkdownSourceContext` 给的是本块源码。引用式链接定义、脚注会跨块生效：全文收集后，追加到引用它们的块，脚注区整条回复只渲染一次，不再退回一块。代码块不做语言自动识别，没标语言的按纯文本显示。流式时 `MarkdownProse` 按帧平滑放出积压的文字，每帧只重渲染最后一块；`ReplyStreamingContext` 结束后，要等积压放完才退出流式显示。详见[聊天区 Markdown 渲染规范](front-聊天区Markdown渲染规范.md)的「流式输出」「分块与性能」。
@@ -76,13 +86,13 @@ App 只负责把这些 store 装配起来、把事件接到对应的 store，以
 | 字段 | 含义 | 谁写入 |
 | --- | --- | --- |
 | `runId` | 块所属的 agent run | durable：`createMessageBlocks` 的 `withIdentity` 从 `event.agentRunId` 写入，每个块都有；live：`streamingStateToBlocks(state, agentRunId)` 补写，`createCompactionBlock` 自己写，App 构造的 user / steer / workspace-preparation 块显式写 |
-| `sourceSeq` | 投影来源 Journal envelope 的 seq | 只由 client 的 `projectChatEvents` 写入（`base` 里的 `sourceSeq: event.seq`）。live 块、subagent 合成事件及多条 chunk 聚合的恢复片段没有这个键 |
+| `sourceSeq` | 投影来源 Journal envelope 的 seq | 只由 client 的 `projectChatEvents` 写入（`base` 里的 `sourceSeq: event.seq`）。live 块（含恢复运行从实时底稿开始的块）和 subagent 合成事件没有这个键 |
 
 规则：
 
 - 两个字段都用条件展开：没有值时连键都不出现，不写 `undefined`。
 - 同一条 envelope 可能投影出多个事件（如 user + thinking），它们共用一个 `sourceSeq`。**`sourceSeq` 标识来源，不是块的唯一键。**
-- `sourceSeq` 表示可指向单条 Journal envelope 的直接投影；没有它不等于底层事实未落盘，多条 chunk 合成的恢复片段也不伪造一个来源 seq。回复批注只允许批注带 `sourceSeq` 的块（`annotatableMessageIds`），合成片段须等完整消息接手。
+- `sourceSeq` 表示可指向单条 Journal envelope 的直接投影；没有它不等于底层事实未落盘。回复批注只允许批注带 `sourceSeq` 的块（`annotatableMessageIds`），未定稿的 live 块须等完整消息接手。
 - `renderKey` 保留，只用于 DOM 复用和 user 块去重，不用来判断归属。
 - renderer 里不允许解析 id / renderKey 字符串来判断归属或序号：不写 `startsWith("turn:…")`、`includes(":tool:")`、`/^v2-/`。新代码需要归属信息时读 `runId` / `sourceSeq`。
 
@@ -100,10 +110,10 @@ mergeTranscript(
 
 1. **durable 部分**（`durableTranscript`）：
    - 正在流式输出的 run（live 有块且不是恢复的 run）：durable 里 `runId` 相同的块隐藏，由 live 显示。run 结束、live 卸下后，durable 接手，相同 renderKey 复用 DOM。
-   - 恢复的 run（渲染进程重载后重新挂上）：live 不重建正文/思考增量，durable 启用待完成片段投影并全部保留，只隐藏 live 里已有的工具块（按 renderKey 比较）。`todo` 不算工具块，恢复时 durable 的 todo 不隐藏。
+   - 恢复的 run（渲染进程重载后重新挂上）：durable 显示全部已定稿内容并全部保留，只隐藏 live 里已有的工具块（按 renderKey 比较）。`todo` 不算工具块，恢复时 durable 的 todo 不隐藏。
    - record 没有块时，退回用 events 现算，同样过滤正在流式的 run。
 2. **user 去重**：durable 已有相同 renderKey 的 user 块时，丢掉 live 的占位 user 块，保留 durable 的。
-3. **追加 live 块**。没有 durable 对应物的块（steer 插入的 user、workspace-preparation）保持原样显示，不套用「run 完成后整组让位」。
+3. **追加 live 块**。没有 durable 对应物的块（steer 插入的 user、workspace-preparation）保持原样显示，不套用「run 完成后整组让位」。恢复的 run 里 live 的正文 / 思考从实时底稿开始：消息定稿后 durable 里出现同一 run、同样内容的块，live 的这一块不再显示；live 块的序号从底稿重新数，与 durable 同一 run 的 renderKey 撞上时加 `:live` 后缀。规则与 Web 端（`apps/web` 的 transcript-model）一致。
 4. **本地装饰**：不在流式时追加压缩失败块；后台 bash 状态（`bashUpdates`）覆写 durable bash 块的 `backgroundStatus` / `exitCode`。
 
 `mergeTranscript` 是纯函数。改动它时，`R/test/transcript.test.ts` 的场景必须全部通过；App 级用例经 `R/test/helpers/transcript-shadow.ts` 与基准实现（`apps/desktop/test-fixtures/legacy-transcript.ts`）逐次对照，有意改变行为时要同时更新对照基准。

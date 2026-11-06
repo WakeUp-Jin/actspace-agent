@@ -1,5 +1,6 @@
 /**
  * 上下文历史投影的口径版本，口径变化时加一：老会话第一次打开面板时整会话重建。
- * 1：初版；2：新增 Bash 命令统计；3：Bash「值得注意」（最慢 / 重复命令原文、后台调用数）。单独成文件，主进程只引这个常量，不加载投影代码。
+ * 1：初版；2：新增 Bash 命令统计；3：Bash「值得注意」（最慢 / 重复命令原文、后台调用数）；
+ * 4：估算改由日志折叠（agent-spec-request-record.md），不再读 `request/context` 里的明细。单独成文件，主进程只引这个常量，不加载投影代码。
  */
-export const CONTEXT_PROJECTOR_VERSION = 3;
+export const CONTEXT_PROJECTOR_VERSION = 4;

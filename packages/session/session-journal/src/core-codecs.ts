@@ -15,6 +15,8 @@ export const CORE_EVENT_TYPES = [
   "tool/call",
   "tool/result",
   "request/header",
+  "request/system-prompt",
+  "request/tools",
   "request/context",
   "session/end-seed",
 ] as const;
@@ -117,10 +119,22 @@ function createExtensionCodec(type: PersistedExtensionEventType): EventCodec {
       }
       if (type.startsWith("permission/")) validatePermissionData(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
       if (type === "background/task") validateBackgroundTaskData(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
+      if (type === "surface/replaced") validateSurfaceReplaced(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
       if (type === "subagent/spawned") validateSubagentSpawned(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
       if (type === "subagent/activation") validateSubagentActivation(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
     },
   });
+}
+
+/** 替换事件带被替换范围的估算，上下文估算投影据此扣减（agent-spec-request-record.md §6.3.1）。 */
+function validateSurfaceReplaced(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+  const replaced = data.replacedTokens;
+  if (replaced === null || typeof replaced !== "object" || Array.isArray(replaced)) throw invalid(type, "replacedTokens must be an object");
+  for (const field of ["conversation", "summarizedConversation"] as const) {
+    const value = (replaced as Readonly<Record<string, RuntimeV2JsonValue>>)[field];
+    if (!Number.isSafeInteger(value) || (value as number) < 0) throw invalid(type, `replacedTokens.${field} must be a non-negative integer`);
+  }
+  requireId(data.estimatorVersion, type, "estimatorVersion");
 }
 
 function validateBackgroundTaskData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
@@ -297,9 +311,14 @@ function validateCoreData(type: CoreSessionEventType, data: RuntimeV2JsonValue):
       requireId(data.stepId, type, "stepId");
       break;
     case "user/message":
-    case "assistant/message":
       requireId(data.messageId, type, "messageId");
       break;
+    case "assistant/message":
+      requireId(data.messageId, type, "messageId");
+      if (data.firstTokenAt !== undefined) requireTimestamp(data.firstTokenAt, type, "firstTokenAt");
+      break;
+    // Read-only compatibility: sessions written before 2026-11 journaled every stream delta.
+    // New sessions keep deltas live-only (agent-spec-live-assistant-stream.md).
     case "assistant/chunk":
       requireId(data.messageId, type, "messageId");
       if (!Number.isSafeInteger(data.chunkIndex) || (data.chunkIndex as number) < 0) {
@@ -320,9 +339,18 @@ function validateCoreData(type: CoreSessionEventType, data: RuntimeV2JsonValue):
     case "request/header":
     case "request/context":
       requireId(data.requestId, type, "requestId");
-      if (type === "request/header" || type === "request/context") {
-        requireId(data.turnId, type, "turnId");
-        requireId(data.stepId, type, "stepId");
+      requireId(data.turnId, type, "turnId");
+      requireId(data.stepId, type, "stepId");
+      break;
+    // 只在内容变化时写（agent-spec-request-record.md §3–§4）。
+    case "request/system-prompt":
+    case "request/tools":
+      requireId(data.requestId, type, "requestId");
+      requireId(data.turnId, type, "turnId");
+      requireId(data.stepId, type, "stepId");
+      requireId(data.digest, type, "digest");
+      for (const field of type === "request/tools" ? ["tools"] : ["sections", "modelFacts", "contributorProvenance"]) {
+        if (!Array.isArray(data[field])) throw invalid(type, `${field} must be an array`);
       }
       break;
     case "session/end-seed":

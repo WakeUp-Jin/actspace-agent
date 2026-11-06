@@ -11,9 +11,11 @@ import { getSessionTitle } from "./session/session-title";
 import { createSessionCellRetention } from "./session/session-store";
 import { useChatSessionRecord } from "./session/session-store";
 import { SessionTranscriptProvider } from "./session/transcript-context";
+import { LiveRunsProvider } from "./session/live-runs/live-runs-context";
 import { createLiveRunStore, TERMINAL_RUN_LIMIT, useBusySessionIds, useLiveRunSelect, type LiveRunView, type StreamEvent } from "./session/live-runs/live-run-store";
 import { scheduleFrame } from "./session/frame-batch";
 import { applyTaskSnapshot as applyHostTaskSnapshot, createTaskQueueStore } from "./session/task-queue";
+import { attachLiveBaseline } from "./session/live-runs/live-baseline";
 import { loadEarlier } from "./session/session-pages";
 import { createSessionLocalStore, useSessionLocalIds, useSessionLocalState, type ComposerSessionState, type SessionLocalState } from "./session/session-local-store";
 import type { SessionBrowseState } from "./session/SessionBrowseContext";
@@ -95,16 +97,14 @@ const EMPTY_EVENTS: SessionEvent[] = [];
 const QUEUE_REFRESH_FAILED = "队列状态读取失败，请稍后重试。";
 const QUEUE_COMMAND_FAILED = "队列操作没有完成，请重试。";
 /** App 只关心 live run 的运行状态；流式 blocks 每帧都变，不进 App 的订阅（见 SessionTranscriptProvider）。 */
-type LiveStatus = { readonly isStreaming: boolean; readonly isAborting: boolean; readonly recovered: boolean; readonly isCompacting: boolean; readonly hasStreamingBlocks: boolean };
+type LiveStatus = { readonly isStreaming: boolean; readonly isAborting: boolean; readonly isCompacting: boolean; readonly hasStreamingBlocks: boolean };
 const selectLiveStatus = (view: LiveRunView): LiveStatus => ({
   isStreaming: view.isStreaming,
   isAborting: view.isAborting,
-  recovered: view.recovered,
   isCompacting: view.blocks.some((block) => block.kind === "context_compaction" && block.status === "running"),
   hasStreamingBlocks: view.blocks.length > 0,
 });
-const sameLiveStatus = (left: LiveStatus, right: LiveStatus) => left.isStreaming === right.isStreaming && left.isAborting === right.isAborting
-  && left.recovered === right.recovered && left.isCompacting === right.isCompacting && left.hasStreamingBlocks === right.hasStreamingBlocks;
+const sameLiveStatus = (left: LiveStatus, right: LiveStatus) => left.isStreaming === right.isStreaming && left.isAborting === right.isAborting && left.isCompacting === right.isCompacting && left.hasStreamingBlocks === right.hasStreamingBlocks;
 const selectComposerState = (state: SessionLocalState) => state.composer;
 const selectApprovalPending = (state: SessionLocalState) => state.approvalPending;
 const selectFailed = (state: SessionLocalState) => state.failed;
@@ -276,7 +276,7 @@ export function App() {
   // live run 只订阅运行状态（流式每帧都变的 blocks 不进 App）；消息序列由 SessionTranscriptProvider 单独订阅。
   const liveStatus = useLiveRunSelect(liveRuns, selectedSessionId, selectLiveStatus, sameLiveStatus);
   const { isStreaming, isAborting, isCompacting, hasStreamingBlocks } = liveStatus;
-  const { sessionRecord, historyBefore } = useChatSessionRecord(sessionStore, selectedSessionId, bootstrapState?.workspaceRoot, liveStatus.recovered);
+  const { sessionRecord, historyBefore } = useChatSessionRecord(sessionStore, selectedSessionId, bootstrapState?.workspaceRoot);
   const runTarget = useRunTarget({
     sessionId: selectedSessionId,
     sessionWorkspacePath: sessionRecord?.meta.workspaceRoot,
@@ -335,6 +335,7 @@ export function App() {
     tasks: taskQueue, runs: liveRuns, patchLocal,
     notice: (sessionId, text) => setComposerNotice({ sessionId, text }),
     refreshSession: (sessionId) => { void refreshSessionRef.current(sessionId).catch(console.error); },
+    attachLiveBaseline: (sessionId, agentRunId) => { void attachLiveBaseline(liveRuns, sessionId, agentRunId); },
   }), [taskQueue, liveRuns, patchLocal]);
   // 14 S9：影响界面的后台请求失败时，在当前会话的输入框上方提示（3 秒后消失），同时打到控制台。
   // 只提示当前会话，避免后台会话的失败顶掉当前会话的提示。
@@ -435,6 +436,7 @@ export function App() {
           run = { sessionId: result.sessionId, agentRunId: recovery.agentRunId, recovered: true,
             state: createEmptyStreamingState(), userBlock: null, aborting: false };
           liveRuns.start(run);
+          void attachLiveBaseline(liveRuns, result.sessionId, recovery.agentRunId);
         }
         if (run.state.activeTools.get(recovery.toolCallId)?.terminalStatus) continue;
         upsertStreamingTool(run.state, recovery.toolCallId, pending.toolName, recovery.preview);
@@ -1571,6 +1573,7 @@ export function App() {
 
   return (
     <AppProviders sessionStore={sessionStore} browse={browse} localStore={localStore} activeSession={activeSession} composer={composer} sessionActions={sessionActions} runTarget={runTargetValue} sideChat={sideChat}>
+      <LiveRunsProvider store={liveRuns}>
       <SessionTranscriptProvider liveRuns={liveRuns} localStore={localStore} sessionId={selectedSessionId} sessionRecord={sessionRecord}>
         <WorkbenchLayout
           sessions={visibleSessions}
@@ -1584,6 +1587,7 @@ export function App() {
           onReviewChanged={handleReviewChanged}
         />
       </SessionTranscriptProvider>
+      </LiveRunsProvider>
       <ShutdownOverlay />
     </AppProviders>
   );

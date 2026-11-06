@@ -15,7 +15,7 @@ import type { DatabaseSync } from "node:sqlite";
 export function createReadModelSchema(db: DatabaseSync): void {
   db.exec(`
     PRAGMA application_id = 0x41555332;
-    PRAGMA user_version = 16;
+    PRAGMA user_version = 17;
     CREATE TABLE IF NOT EXISTS usage_write_mode(batching INTEGER NOT NULL) STRICT;
     INSERT INTO usage_write_mode SELECT 0 WHERE NOT EXISTS(SELECT 1 FROM usage_write_mode);
     CREATE TABLE IF NOT EXISTS session_catalog (

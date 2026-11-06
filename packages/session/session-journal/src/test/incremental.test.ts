@@ -57,7 +57,7 @@ it("keeps an unfinished compaction pending after its durable start leaves the re
   const history: import("../event-envelope.js").SessionEventEnvelopeV1[] = [];
   const journal = new SessionJournal({ registry: createCoreCodecRegistry(), retainedEvents: 1, history: { readEvents: (a, b) => history.slice(a, b) } });
   journal.append({ ...core("user/message", { messageId: "m" }), surface: { kind: "append", node: { kind: "user", messageId: "m", content: "old" } } });
-  const transaction = createCompactionTransaction({ surface: journal.surface, start: 0, end: 1, summary: { kind: "assistant", messageId: "summary", content: "summary" }, compactionId: "c", contributorIds: [], summaryDigest: "digest" });
+  const transaction = createCompactionTransaction({ surface: journal.surface, start: 0, end: 1, summary: { kind: "assistant", messageId: "summary", content: "summary" }, compactionId: "c", contributorIds: [], summaryDigest: "digest", replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test" });
   journal.appendMany(transaction.slice(0, -1));
   history.push(...journal.readEvents()); journal.releaseDurable(journal.lastSeq);
   expect(journal.retainedEventCount).toBe(1);

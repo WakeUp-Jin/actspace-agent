@@ -7,7 +7,7 @@ const excerpt = {
   selectedText: "先读配置，再启动服务。", startOffset: 0, endOffset: 11, prefixContext: "", suffixContext: "", comment: "顺序能反过来吗？",
 };
 
-it("renders file references once and excerpts as readable text, and counts them in the request context", async () => {
+it("renders file references once and excerpts as readable text, and records them once in the user message", async () => {
   const requests: (readonly LlmMessage[])[] = [];
   const run = await runToolStreamFixture({
     terminalOnly: true,
@@ -35,8 +35,9 @@ it("renders file references once and excerpts as readable text, and counts them 
   expect(serialized).not.toContain("ann_1");
   expect(serialized).not.toContain("\"file-reference\"");
 
+  // 对话只在对话事件里记一次，请求快照不再复制（agent-spec-request-record.md §5）。
   const contextEvent = run.journal.find((event) => event.type === "request/context");
-  expect(JSON.stringify(contextEvent)).toContain("先读配置，再启动服务。");
-  expect(JSON.stringify(contextEvent)).toContain("workspace_file_reference");
+  expect(JSON.stringify(contextEvent)).not.toContain("先读配置，再启动服务。");
+  expect(JSON.stringify(run.journal.find((event) => event.type === "user/message"))).toContain("先读配置，再启动服务。");
   expect(run.result.reason).toBe("completed");
 });

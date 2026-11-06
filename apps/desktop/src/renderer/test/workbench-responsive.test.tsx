@@ -77,10 +77,11 @@ describe("WorkbenchLayout narrow window behavior", () => {
     setViewportWidth(originalInnerWidth);
   });
 
-  it("keeps chrome, footer and popup on the complete estimate instead of the generic projection", async () => {
-    const contextSnapshot = { ...mockContextSnapshot, totalTokens: 49_000, maxTokens: 1_000_000, percentUsed: 4.9, cumulativeTokens: 549000 };
+  it("reads chrome, footer and popup from the contextEstimate projection", async () => {
+    const contextSnapshot = { ...mockContextSnapshot, totalTokens: 1_000, maxTokens: 1_000_000, percentUsed: 0.1, cumulativeTokens: 549000 };
     const getSessionProjectionSnapshot = vi.fn(async () => ({
       kind: "session-projection", schemaVersion: 1, sessionId: "session-responsive", throughJournalSeq: 3,
+      activeMessageIds: [], deferredToolCalls: [], window: { events: [], fromSeq: 0, throughJournalSeq: 3, beforeSeq: null, turnOffset: 0, requestOffset: 0 },
       snapshot: {
         kind: "session-snapshot", schemaVersion: 1, sessionId: "session-responsive",
         createdAt: "2026-09-15T00:00:00Z", updatedAt: "2026-09-15T00:00:03Z",
@@ -91,10 +92,10 @@ describe("WorkbenchLayout narrow window behavior", () => {
         activity: { turnCount: 1, completedTurnCount: 1, stepCount: 1, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } },
       },
       values: {
-        requestContextEstimate: {
-          kind: "request-context-estimate", schemaVersion: 1, sessionId: "session-responsive", throughJournalSeq: 3,
-          requestId: "request-1", estimator: { name: "runtime-v2-request-snapshot", version: "1" },
-          totalEstimatedTokens: 60_000, maxTokens: 1_000_000, percentUsed: 6,
+        contextEstimate: {
+          schemaVersion: 1, estimatorVersion: "chars4-block4-message4", totalEstimatedTokens: 49_000,
+          buckets: { systemPrompt: 9_000, tools: 0, rules: 0, skills: 0, summarizedConversation: 0, conversation: 40_000 },
+          contextWindow: 1_000_000, model: null, percentUsed: 4.9, entries: [], summaries: [], requestId: "request-1", throughJournalSeq: 3, updatedAt: "2026-09-15T00:00:03Z",
         },
       },
     }));

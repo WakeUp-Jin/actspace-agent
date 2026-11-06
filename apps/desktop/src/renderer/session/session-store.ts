@@ -32,66 +32,32 @@ const NO_CHAT_RECORD: ChatSessionRecordState = Object.freeze({ sessionRecord: nu
 
 /**
  * 当前会话的 durable 记录（从 cell 投影）与早期历史游标（14 T10）。
- * 返回值是稳定快照：cell 每次变更都会换引用（流式 chunk 每帧一次），但投影结果没变时快照对象也不变，
- * 调用方（App）不会因为 chunk 重渲染。
+ * 返回值是稳定快照：cell 每次变更都会换引用（例如 live 事件只推进 lastLiveSeq），但投影输入没变时快照对象也不变，
+ * 调用方（App）不会因此重渲染。流式正文只走实时通道，不经过这里。
  * cell 必须留在这个 hook 里，不能成为 App 的局部变量：同一函数里的闭包共用一个作用域，App 的 useCallback
  * 会让旧渲染的作用域一直存活，cell 在里面就会连同原始事件（系统提示词、技能列表）把已归档会话一起留住。
  */
-export function useChatSessionRecord(store: ClientSessionStore, sessionId: string | null, workspaceRoot: string | undefined, recovered = false): ChatSessionRecordState {
-  // 普通 live run 不投影片段，保留历史块引用；重载恢复的 run 从 Journal 重建已收正文，
-  // 因而必须消费后续 chunk，不能走普通流式输出的投影复用路径。
-  const cache = useRef<{ cell: ClientSessionCell; workspaceRoot: string | undefined; recovered: boolean; state: ChatSessionRecordState } | null>(null);
+export function useChatSessionRecord(store: ClientSessionStore, sessionId: string | null, workspaceRoot: string | undefined): ChatSessionRecordState {
+  const cache = useRef<{ cell: ClientSessionCell; workspaceRoot: string | undefined; state: ChatSessionRecordState } | null>(null);
   const subscribe = useCallback((onChange: () => void) => store.subscribe(onChange), [store]);
   const getSnapshot = useCallback((): ChatSessionRecordState => {
     const cell = sessionId === null ? null : store.peek(sessionId);
     if (!cell) { cache.current = null; return NO_CHAT_RECORD; }
     const previous = cache.current;
-    if (previous && previous.cell === cell && previous.workspaceRoot === workspaceRoot && previous.recovered === recovered) return previous.state;
+    if (previous && previous.cell === cell && previous.workspaceRoot === workspaceRoot) return previous.state;
     // 投影只读这几个字段：live 事件只推进 lastLiveSeq 时 cell 引用会变，但不必重新投影。
-    const sameInputs = previous !== null && previous.workspaceRoot === workspaceRoot && previous.recovered === recovered
+    const sameInputs = previous !== null && previous.workspaceRoot === workspaceRoot
       && previous.cell.sessionId === cell.sessionId && previous.cell.snapshot === cell.snapshot && previous.cell.window === cell.window
       && previous.cell.projectionValues === cell.projectionValues && previous.cell.deferredToolCalls === cell.deferredToolCalls;
-    const chunkOnly = previous !== null && !recovered && previous.recovered === recovered && previous.workspaceRoot === workspaceRoot && onlyStreamChunksSince(previous.cell, cell);
-    const sessionRecord = sameInputs || chunkOnly
-      ? previous!.state.sessionRecord
-      : selectChatSession(cell, workspaceRoot, { includePendingChunks: recovered });
+    const sessionRecord = sameInputs ? previous!.state.sessionRecord : selectChatSession(cell, workspaceRoot);
     const historyBefore = cell.window?.beforeSeq ?? null;
     const state = previous !== null && previous.state.sessionRecord === sessionRecord && previous.state.historyBefore === historyBefore
       ? previous.state
       : { sessionRecord, historyBefore };
-    cache.current = { cell, workspaceRoot, recovered, state };
+    cache.current = { cell, workspaceRoot, state };
     return state;
-  }, [store, sessionId, workspaceRoot, recovered]);
+  }, [store, sessionId, workspaceRoot]);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
-
-/** snapshot 里随每条 journal 事件变化、但不进聊天投影的字段。 */
-const CHUNK_VOLATILE_SNAPSHOT_KEYS: ReadonlySet<string> = new Set(["throughJournalSeq", "updatedAt"]);
-
-/**
- * `next` 相对 `previous` 是否只在窗口末尾多了 `assistant/chunk`（其余投影输入全是同一引用）。
- * 是的话聊天投影结果不变（只差 updatedAt 与 contextSnapshot 的 throughJournalSeq），可以沿用。
- */
-export function onlyStreamChunksSince(previous: ClientSessionCell, next: ClientSessionCell): boolean {
-  if (previous === next) return true;
-  if (previous.sessionId !== next.sessionId || previous.deferredToolCalls !== next.deferredToolCalls) return false;
-  const before = previous.window;
-  const after = next.window;
-  if (!before || !after || !previous.snapshot || !next.snapshot) return false;
-  if (after.fromSeq !== before.fromSeq || after.beforeSeq !== before.beforeSeq || after.turnOffset !== before.turnOffset || after.requestOffset !== before.requestOffset) return false;
-  const kept = before.events.length;
-  if (after.events.length < kept || (kept > 0 && after.events[kept - 1] !== before.events[kept - 1])) return false;
-  for (let index = kept; index < after.events.length; index++) if (after.events[index]!.type !== "assistant/chunk") return false;
-  if (!shallowEqual(previous.projectionValues, next.projectionValues)) return false;
-  return shallowEqual(previous.snapshot, next.snapshot, CHUNK_VOLATILE_SNAPSHOT_KEYS);
-}
-
-function shallowEqual(left: object, right: object, ignored?: ReadonlySet<string>): boolean {
-  const a = left as Record<string, unknown>;
-  const b = right as Record<string, unknown>;
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  for (const key of keys) if (!ignored?.has(key) && a[key] !== b[key]) return false;
-  return true;
 }
 
 export interface SessionCellRetention {

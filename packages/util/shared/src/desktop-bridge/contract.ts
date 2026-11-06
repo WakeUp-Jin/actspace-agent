@@ -100,6 +100,11 @@ export const desktopBridgeContract = {
     /** 右侧子 Agent 面板的列表：每个子智能体一行（跨所有激活），由父 Journal 折叠。 */
     getSubagents: invoke<{ sessionId: string }, S.SubagentListItem[]>(CH.getSubagents),
     getSubAgentTranscript: invoke<S.SubAgentTranscriptGetInput, S.SessionEvent[]>(CH.getSubAgentTranscript),
+    /**
+     * 恢复运行的起点：主进程实时底稿里还没定稿的正文与思考（先冲刷实时通道再读）。
+     * 远程会话返回 null：远程适配器在 `agent_run_started(recoveredReset)` 之后自己推 `live_output_baseline`。
+     */
+    liveOutput: invoke<{ sessionId: string }, RV2.LiveOutputBaseline | null>(CH.getSessionLiveOutput),
     /** 子 Agent 面板的「停止」：效果同主会话调用 `interrupt_agent`；message 是给模型看的同一句话。 */
     interruptSubagent: invoke<{ sessionId: string; agentId: string }, { ok: boolean; message: string }>(CH.interruptSubagent),
     /** 外部子智能体详情的「在 Finder 中显示」：路径由主进程从父 Journal 的 `subagent/spawned` 取，renderer 不传路径。 */
@@ -123,7 +128,6 @@ export const desktopBridgeContract = {
      * 不在其中且已空闲的会话按 LRU 最多保留 3 个，其余释放（重新打开时 resume）。
      */
     setObserved: send<readonly string[]>(CH.setObservedSessions),
-    describeContext: invoke<S.DescribeContextInput, S.ContextState | null>(CH.describeContext),
     /** 当前 Context 与异步历史摘要，支持条件读取和有界明细。 */
     describeContextPanel: invoke<S.DescribeContextPanelInput, S.ContextPanelResponse | null>(CH.describeContextPanel),
     listContextPaths: invoke<S.ContextPathsInput, S.ContextPathsPage>(CH.listContextPaths),

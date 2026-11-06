@@ -2,7 +2,7 @@ import { FixedRendererStreamAdapter, createEmptyStreamingState, createLiveRunSto
 import { ClientSessionStore, selectChatSession, type ClientSessionCell } from "@actspace/client/sessions";
 import type { MessageBlock, RuntimeStreamEvent, SessionRecord } from "@actspace/shared";
 import { isRecord } from "@actspace/shared/host-protocol";
-import type { AgentLiveEvent, ApprovalRequest, RuntimeV2DesktopSessionProjection, RuntimeV2SessionObservation, TaskSnapshot } from "@actspace/shared/runtime-v2";
+import { mergePieces, type AgentLiveEvent, type ApprovalRequest, type LiveOutputPage, type LiveOutputPiece, type RuntimeV2DesktopSessionProjection, type RuntimeV2SessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
 import type { HostConnection } from "../connection/connection-store";
 import { buildTranscript, type TranscriptItem } from "./transcript-model";
 
@@ -43,8 +43,7 @@ export type ObserverOptions = {
   readonly now?: () => number;
 };
 
-type ObserveResult = { subscriptionId: string; cursor: number; snapshot: { observation: RuntimeV2SessionObservation; tasks: TaskSnapshot; approvals: ApprovalRequest[]; output: { runId: string; chunks: number } | null } };
-type OutputPage = { next: number; chunks: { kind: string; messageId: string; text: string }[] };
+type ObserveResult = { subscriptionId: string; cursor: number; snapshot: { observation: RuntimeV2SessionObservation; tasks: TaskSnapshot; approvals: ApprovalRequest[]; output: { runId: string; revision: number } | null } };
 const noop = () => undefined;
 const TERMINAL: ReadonlySet<string> = new Set(["agent_run_finished", "agent_run_aborted", "agent_run_failed"]);
 
@@ -177,25 +176,26 @@ export class SessionObserver {
     this.#tasks = tasks; this.#approvals = approvals.filter(item => item.sessionId === this.sessionId);
     const running = tasks.runs.find(run => run.state === "running");
     if (!running) return;
-    this.#startRun(running.runId);
-    if (output?.runId !== running.runId) return;
-    // 只回放还没落盘的那条消息：已落盘的部分由投影显示，工具块没有回放来源。
-    const persisted = new Set(observation.snapshot.messages.map(message => message.messageId));
+    // 中途加入的 run：先缓存它的正文增量，拿到 Host 的实时底稿后从底稿接着显示（规范 agent-spec-live-assistant-stream §5）。
+    this.#startRun(running.runId, true);
+    const pieces: LiveOutputPiece[] = [];
     try {
-      for (let offset = 0; offset < output.chunks;) {
-        const page = await this.connection.client.call("sessions.output", { sessionId: this.sessionId, runId: output.runId, offset }) as OutputPage;
+      for (let after = 0; output?.runId === running.runId && after < output.revision;) {
+        const page = await this.connection.client.call("sessions.output", { sessionId: this.sessionId, runId: output.runId, afterRevision: after }) as LiveOutputPage;
         if (this.#disposed) return;
-        if (page.next <= offset) break;
-        for (const chunk of page.chunks.slice(0, output.chunks - offset)) {
-          if (persisted.has(chunk.messageId)) continue;
-          this.#live.applyStreamEvent({ type: chunk.kind === "assistant-delta" ? "assistant_text_delta" : "assistant_thinking_delta", sessionId: this.sessionId, agentRunId: running.runId, messageId: chunk.messageId, delta: chunk.text } as unknown as StreamEvent, () => undefined);
-        }
-        offset = page.next;
+        if (page.chunks.length === 0 || page.next <= after) break;
+        pieces.push(...page.chunks.filter(chunk => chunk.revision <= output.revision));
+        after = page.next;
       }
     } catch (error) {
-      // Run 在回放期间换了：回放放弃，后续靠 live 事件和投影。
+      // Run 在回放期间换了：底稿为空，后续靠 live 事件和投影。
       if (!(isRecord(error) && error.kind === "CONFLICT")) throw error;
+      pieces.length = 0;
     }
+    // 已落盘的消息由投影显示。
+    const persisted = new Set(observation.snapshot.messages.map(message => message.messageId));
+    const segments = mergePieces(pieces.filter(piece => !persisted.has(piece.messageId)));
+    this.#live.applyStreamEvent({ type: "live_output_baseline", sessionId: this.sessionId, agentRunId: running.runId, revision: output?.revision ?? 0, segments }, () => undefined);
   }
 
   #onHostEvent(value: unknown): void {
@@ -231,9 +231,9 @@ export class SessionObserver {
     try { await this.refresh(); } catch (error) { this.options.onError?.(error); } finally { this.#resyncing = false; }
   }
 
-  #startRun(runId: string): void {
+  #startRun(runId: string, recovered = false): void {
     if (this.#live.isTerminal(runId)) return;
-    this.#live.start({ sessionId: this.sessionId, agentRunId: runId, state: createEmptyStreamingState(), userBlock: null, aborting: false });
+    this.#live.start({ sessionId: this.sessionId, agentRunId: runId, ...(recovered ? { recovered } : {}), state: createEmptyStreamingState(), userBlock: null, aborting: false });
     this.#runStartedAt ??= this.#now();
   }
 
@@ -275,7 +275,7 @@ export class SessionObserver {
     const cell = this.store.peek(this.sessionId);
     if (cell && cell !== this.#cell) {
       this.#cell = cell;
-      if (cell.snapshot && cell.window && cell.projectionValues.requestContext) {
+      if (cell.snapshot && cell.window) {
         try { this.#session = selectChatSession(cell); } catch (error) { this.options.onError?.(error); }
       }
     }

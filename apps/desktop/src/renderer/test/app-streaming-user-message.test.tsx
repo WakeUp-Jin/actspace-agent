@@ -61,7 +61,6 @@ const settingsApiStub = {
   "settings.update": async () => defaultSettings,
   "providers.setKey": async () => ({ ok: true }),
   "providers.clearKey": async () => ({ ok: true }),
-  "sessions.describeContext": async () => null,
   "review.getSnapshot": async () => createReviewChanges(0, 0),
   "review.refreshSnapshot": async () => createReviewChanges(0, 0),
   "workspaces.listMarkdownFiles": async () => ({ ok: true as const, files: [], truncated: false, source: "walk" as const }),

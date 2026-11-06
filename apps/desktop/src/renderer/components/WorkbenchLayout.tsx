@@ -28,7 +28,6 @@ import { collectEditedFilePaths } from "./workbench/edited-files";
 import { PermissionModeControl } from "./workbench/PermissionModeControl";
 import { LEFT_MAX_WIDTH, LEFT_MIN_WIDTH, MAIN_MIN_WIDTH, RIGHT_MIN_WIDTH, usePanelLayout } from "./workbench/use-panel-layout";
 import { useSessionHistory } from "./workbench/use-session-history";
-import { useCurrentContext } from "./workbench/use-current-context";
 import { SPACE_DEMO_ENABLED } from "./space/space-demo-enabled";
 import { ExtensionsPage, NewSpaceDialog, SettingsPage, SpaceDemoHelpButton, SpaceObjectMenu, SpaceRightPanel, SpaceTabBar, SpaceWorkbench } from "./lazy-pages";
 import { useSpacePanelBinding } from "./space/use-space-panel-binding";
@@ -101,12 +100,9 @@ export const WorkbenchLayout = memo(function WorkbenchLayout({
   const projectionBridge = useOptionalProjectionTarget()?.bridge ?? null;
   const projectionView = useProjectionSelect<SessionProjectionView | null>(selectSessionView, sameSessionView);
   const projectedContextSnapshot = projectionView?.contextSnapshot ?? null;
-  // The fixed request-context projection shares the popup's complete bucket estimate.
-  const liveContextState = projectionView?.contextState;
-  const currentContextState = useCurrentContext(activeSessionId, projectionView?.contextRevision, view === "chat");
-  const useLiveContext = liveContextState && (!contextState || (liveContextState.throughJournalSeq ?? -1) > (contextState.throughJournalSeq ?? -1));
-  const effectiveContextState = currentContextState ?? (useLiveContext ? liveContextState : contextState);
-  const effectiveContextSnapshot = useLiveContext ? projectedContextSnapshot : contextSnapshot ?? projectedContextSnapshot;
+  // 上下文估算只有一个来源：会话投影 `contextEstimate`（圆环、弹窗、面板同一个数）。
+  const effectiveContextState = projectionView?.contextState ?? contextState;
+  const effectiveContextSnapshot = projectedContextSnapshot ?? contextSnapshot;
   const projectionSessionReady = projectionView !== null && projectionView.status !== "error";
   const permissionMode = projectionView?.permissionMode ?? "default";
   const effectiveIsSessionReady = (projectionView?.composerPhase != null && projectionView.composerPhase !== "blank") || isSessionReady || projectionSessionReady;

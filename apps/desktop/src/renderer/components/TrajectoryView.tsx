@@ -1,6 +1,8 @@
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
+import type { RequestLiveOutput } from '@actspace/client/live';
+import { useRequestOutputs } from '../session/live-runs/live-runs-context';
 import {
   T,
   TrajectorySearchIndex,
@@ -8,13 +10,13 @@ import {
   buildTrajectorySnapshot,
   collapseAssistants,
   collapseTurns,
-  createLiveAccumulator,
   deriveLayout,
   deriveTimeline,
   filterRows,
   findRevealRecord,
   flattenLayout,
-  splitLiveChunks,
+  liveMessageIds,
+  liveMessageIdsKey,
   streamingCells as liveCells,
   timelineFocusIds,
   type DetailTab,
@@ -56,32 +58,29 @@ export type TrajectoryViewProps = {
   readonly onOpenSubagent?: (childSessionId: string) => void;
   /** Fork 子智能体：只显示 seq 大于它的部分（见 `trajectoryAfterSeq`）。 */
   readonly afterSeq?: number;
+  /** 测试用：代替会话实时运行里按请求归组的未定稿输出。 */
+  readonly live?: ReadonlyMap<string, RequestLiveOutput>;
 };
 
 /** 轨迹视图：只做装配 —— 数据源、搜索、折叠、时间轴范围、选中与跳转。 */
-export function TrajectoryView({ snapshot, onAbort, isAborting, sessionId: watchedSessionId, variant = 'main', onOpenSubagent, afterSeq }: TrajectoryViewProps) {
+export function TrajectoryView({ snapshot, onAbort, isAborting, sessionId: watchedSessionId, variant = 'main', onOpenSubagent, afterSeq, live: liveOverride }: TrajectoryViewProps) {
   const source = useTrajectorySource(snapshot, watchedSessionId);
   const shown = useMemo(() => trajectoryAfterSeq(source.snapshot ?? null, afterSeq), [source.snapshot, afterSeq]);
   const bridge = source.projection?.bridge;
   const projectionCell = source.projection?.cell;
-  // 定稿层（DSH finalized）：正在输出的助手只留空占位。流式时只有 chunk 在长，定稿键不变，builder 和布局都不重算。
-  const split = useMemo(() => shown ? splitLiveChunks(shown) : null, [shown]);
-  const splitRef = useRef(split);
-  splitRef.current = split;
-  const runtime = useMemo(() => {
-    const current = splitRef.current;
-    return current ? buildTrajectorySnapshot(current.settled(), { placeholders: new Set(current.live.keys()) }) : null;
-  }, [split?.settledKey]);
+  // 流式层的数据：会话实时运行里按请求归组的未定稿正文、思考和工具调用（不再来自日志 chunk）。
+  const storeLive = useRequestOutputs(shown?.sessionId ?? null);
+  const live = liveOverride ?? source.fixtureLive ?? storeLive;
+  // 定稿层（DSH finalized）：没有结算的请求只留空占位。流式时日志不变，只在请求开始输出、报出消息 id 时重算一次。
+  const liveIdsKey = liveMessageIdsKey(live);
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  const runtime = useMemo(() => shown ? buildTrajectorySnapshot(shown, { liveMessageIds: liveMessageIds(liveRef.current) }) : null, [shown, liveIdsKey]);
   const layout = useMemo(() => runtime ? deriveLayout(runtime) : null, [runtime]);
   const delegations = useMemo(() => new Map(trajectoryDelegations(shown).map(item => [item.parentCallId, item])), [shown]);
   const subagentFor = useCallback((callId: string) => delegations.get(callId) ?? null, [delegations]);
-  const cellsById = useMemo(() => new Map((layout?.cells ?? []).map(cell => [cell.recordId, cell])), [layout]);
-  // 流式层（DSH streamingCells）：累加器只折叠新到的 chunk，表格和详情按 recordId 把占位换成流式 cell。
-  const accumulator = useRef(createLiveAccumulator()).current;
-  const streamingCells = useMemo(() => {
-    if (!split || split.live.size === 0) return NO_STREAMING;
-    return liveCells(cellsById, accumulator.update(split.live));
-  }, [split, cellsById, accumulator]);
+  // 流式层（DSH streamingCells）：表格和详情按 recordId 把占位换成带实时输出的 cell。
+  const streamingCells = useMemo(() => live.size === 0 || !layout ? NO_STREAMING : liveCells(layout.cells, live), [layout, live]);
   const remoteHistory = !source.isFixture ? shown?.history : undefined;
 
   const [actualDuration, setActualDuration] = useState(false);

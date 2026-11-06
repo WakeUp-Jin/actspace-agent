@@ -58,8 +58,9 @@ export function ContextPopup({
     estimator: contextState.estimator,
     buckets: contextState.buckets,
   } satisfies ContextUsageSnapshot : null;
+  // 会话投影是唯一来源；只有不在投影里的会话才用调用方给的状态或快照。
   const safeSnapshot =
-    stateSnapshot ?? snapshot ?? projectedSnapshot ?? {
+    projectedSnapshot ?? stateSnapshot ?? snapshot ?? {
       totalTokens: 0,
       maxTokens: 0,
       percentUsed: 0,

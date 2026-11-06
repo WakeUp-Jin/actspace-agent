@@ -4,23 +4,44 @@ import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { SessionReadModel } from "./durable-session.js";
 
 describe("durable usage summary", () => {
-  it("keeps memoized context identical to replay across chunks and final surfaces", () => {
+  it("keeps the live contextEstimate identical to a cold replay", () => {
     const codecs = createCoreCodecRegistry();
     const header = createSessionHeader({ sessionId: "context", createdAt: "2026-09-07T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: codecs.digest } });
     const journal = new SessionJournal({ registry: codecs });
     const append = (type: string, data: RuntimeV2JsonValue) => journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
     append("turn/start", { turnId: "t" });
     append("step/start", { turnId: "t", stepId: "s" });
-    append("request/header", { requestId: "r", turnId: "t", stepId: "s" });
-    append("request/context", { requestId: "r", turnId: "t", stepId: "s", snapshot: { messages: [{ role: "user", content: "hello" }] } });
+    journal.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "u" }, surface: { kind: "append", node: { kind: "user", messageId: "u", content: "hello" } } });
+    append("request/header", { requestId: "r", turnId: "t", stepId: "s", contextWindow: 1000 });
+    append("request/system-prompt", { requestId: "r", turnId: "t", stepId: "s", digest: "p", sections: [{ owner: "actspace.context-system", id: "core", order: 0, content: "be helpful" }], modelFacts: [], contributorProvenance: [] });
+    append("request/tools", { requestId: "r", turnId: "t", stepId: "s", digest: "t", tools: [{ name: "read", description: "read a file", inputSchema: {} }] });
+    append("request/context", { requestId: "r", turnId: "t", stepId: "s", snapshot: { schemaVersion: 3 } });
     for (let i = 0; i < 10; i++) append("assistant/chunk", { requestId: "r", messageId: "a", chunkIndex: i, chunk: { type: "text-delta", text: "hello" } });
     journal.append({ type: "assistant/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "a", requestId: "r", content: "final" }, surface: { kind: "append", node: { kind: "assistant", messageId: "a", content: "final" } } });
     const live = new SessionReadModel(header, codecs);
     for (const [index, event] of journal.events.entries()) {
       live.apply(event);
       const cold = new SessionReadModel(header, codecs).replay(journal.events.slice(0, index + 1));
-      expect(live.projections.value(header.sessionId, "requestContext")).toEqual(cold.projections.value(header.sessionId, "requestContext"));
+      expect(live.projections.value(header.sessionId, "contextEstimate")).toEqual(cold.projections.value(header.sessionId, "contextEstimate"));
     }
+    expect(live.projections.value(header.sessionId, "contextEstimate")).toMatchObject({ contextWindow: 1000, requestId: "r", buckets: { systemPrompt: expect.any(Number), tools: expect.any(Number), conversation: expect.any(Number) } });
+  });
+
+  it("pushes contextEstimate only when the estimate changes, frozen and shared instead of copied", () => {
+    const codecs = createCoreCodecRegistry();
+    const header = createSessionHeader({ sessionId: "context-changes", createdAt: "2026-09-07T00:00:00Z", lineage: null, createdWith: { profileId: "fixture", runtimeContractVersion: "1", manifestDigest: "fixture", plugins: [], codecSetDigest: codecs.digest } });
+    const journal = new SessionJournal({ registry: codecs });
+    const model = new SessionReadModel(header, codecs);
+    const append = (type: string, data: RuntimeV2JsonValue) => model.apply(journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null }));
+    expect(Object.keys(append("turn/start", { turnId: "t" })?.values ?? {})).not.toContain("contextEstimate");
+    expect(Object.keys(append("step/start", { turnId: "t", stepId: "s" })?.values ?? {})).not.toContain("contextEstimate");
+    const header1 = append("request/header", { requestId: "r", turnId: "t", stepId: "s", contextWindow: 1000 });
+    const pushed = header1?.values.contextEstimate as Record<string, unknown>;
+    expect(pushed).toMatchObject({ requestId: "r", contextWindow: 1000 });
+    expect(Object.isFrozen(pushed)).toBe(true);
+    expect(Object.keys(append("request/context", { requestId: "r", turnId: "t", stepId: "s", snapshot: { schemaVersion: 3 } })?.values ?? {})).not.toContain("contextEstimate");
+    for (let i = 0; i < 5; i++) expect(Object.keys(append("assistant/chunk", { requestId: "r", messageId: "a", chunkIndex: i, content: "x" })?.values ?? {})).not.toContain("contextEstimate");
+    expect((model.projections.value(header.sessionId, "contextEstimate") as Record<string, unknown>).throughJournalSeq).toBe(pushed.throughJournalSeq);
   });
 
   it("counts terminal copies once and distinguishes historical zero from a verified free request", () => {

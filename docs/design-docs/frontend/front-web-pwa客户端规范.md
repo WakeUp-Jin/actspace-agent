@@ -115,7 +115,7 @@ PWA 必须运行在安全上下文（HTTPS 或 `localhost`），否则 Service W
 
 ### 8.3 会话详情
 
-- 进入时 `sessions.observe { sessionId }` 拿 `{ observation, tasks, approvals, output }` 快照交给 `ClientSessionStore`；之后 `host.event` 按 `value.kind` 分发：`projection` 喂 store，`live` 喂流式折叠，`tasks` 更新运行和排队，`approvals` 更新审批卡。离开时 `sessions.unobserve`；向上滚到顶用 `sessions.page { beforeSeq }` 加载更早消息；重连后重新 `sessions.observe`，`epoch` 变化时整体替换快照不合并。
+- 进入时 `sessions.observe { sessionId }` 拿 `{ observation, tasks, approvals, output }` 快照交给 `ClientSessionStore`；`output` 是 Host 实时底稿的 `{ runId, revision }`，运行中时用 `sessions.output { sessionId, runId, afterRevision }` 按 revision 分页回放未定稿的正文，跳过投影里已定稿的消息，再以 `live_output_baseline` 灌入实时运行（[流式输出只走实时通道](../agent-plugin-runtime/agent-spec-live-assistant-stream.md) §5）；之后 `host.event` 按 `value.kind` 分发：`projection` 喂 store，`live` 喂流式折叠，`tasks` 更新运行和排队，`approvals` 更新审批卡。离开时 `sessions.unobserve`；向上滚到顶用 `sessions.page { beforeSeq }` 加载更早消息；重连后重新 `sessions.observe`，`epoch` 变化时整体替换快照不合并。
 - 渲染：时间线按轮次拆分（规则对齐桌面端 `turns.ts`）：用户消息开一轮；末尾连续的助手回复是「回复」，之前的思考、工具和中间旁白是「过程」；错误和状态提示在最后；上下文压缩单独一轮。进行中的一轮过程逐行展开，等模型首个输出时显示扫光「思考中」；已完成的一轮过程折叠成一行「Worked for 1m 12s」，回复在外面，其后是改动卡（成功写入的文件按路径合并，「已编辑 N 个文件 +A −D」，只来自真实 diff 块）和尾栏（复制、时间、用量胶囊「用量 88K tok」，仅回复带 `assistant.usage` 时显示，点开「本轮用量」弹层：提供方 / 模型、缓存命中、未缓存输入、缓存读取、缓存写入、输出（其中推理）、花费（预估 / 未知 / 部分未知），与桌面端一致）。
 - 过程行没有图标，动作 + 浅色目标，动作用英文，与桌面端一致：
 

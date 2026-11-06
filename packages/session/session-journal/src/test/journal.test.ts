@@ -1,5 +1,5 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import { EventCodecRegistry, type EventCodec } from "../codec-registry.js";
+import { codecReadsHistory, EventCodecRegistry, type EventCodec } from "../codec-registry.js";
 import { CORE_EVENT_TYPES, createCoreCodecRegistry } from "../core-codecs.js";
 import type { SessionEventCandidateV1, SessionEventEnvelopeV1 } from "../event-envelope.js";
 import { SessionJournal } from "../journal.js";
@@ -16,10 +16,10 @@ function candidate(type: string, data: RuntimeV2JsonValue, extra: Partial<Sessio
 
 describe("Session Journal", () => {
   it("keeps Todo outside the Agent Loop core event set", () => {
-    expect(CORE_EVENT_TYPES).toHaveLength(12);
+    expect(CORE_EVENT_TYPES).toHaveLength(14);
     expect(CORE_EVENT_TYPES).toEqual([
       "turn/start", "turn/end", "step/start", "step/end", "user/message", "assistant/chunk", "assistant/message",
-      "tool/call", "tool/result", "request/header", "request/context", "session/end-seed",
+      "tool/call", "tool/result", "request/header", "request/system-prompt", "request/tools", "request/context", "session/end-seed",
     ]);
   });
 
@@ -89,6 +89,34 @@ describe("Session Journal", () => {
     expect(journal.surface.entries.map((entry) => entry.node.kind)).toEqual(["user", "assistant"]);
     const reloaded = new SessionJournal({ registry: createCoreCodecRegistry(), seed: journal.events });
     expect(reloaded.surface).toEqual(journal.surface);
+  });
+
+  it("accepts firstTokenAt on assistant/message only as a valid timestamp", () => {
+    const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
+    journal.append(candidate("assistant/message", { messageId: "a-1", content: "ok", firstTokenAt: "2026-11-05T12:00:00.250Z" }));
+    expect(() => journal.append(candidate("assistant/message", { messageId: "a-2", content: "ok", firstTokenAt: "soon" }))).toThrow(/firstTokenAt must be a valid timestamp/);
+    expect(() => journal.append(candidate("assistant/message", { messageId: "a-3", content: "ok", firstTokenAt: 12 }))).toThrow(/firstTokenAt/);
+  });
+
+  it("accepts the prompt and tools records only between a request header and its context, once each", () => {
+    const ids = { requestId: "r", turnId: "t", stepId: "s" };
+    const prompt = candidate("request/system-prompt", { ...ids, digest: "p", sections: [], modelFacts: [], contributorProvenance: [] });
+    const tools = candidate("request/tools", { ...ids, digest: "d", tools: [] });
+    const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
+    journal.append(candidate("turn/start", { turnId: "t" }));
+    journal.append(candidate("step/start", ids));
+    expect(() => journal.append(prompt)).toThrow(/open request header/);
+    journal.append(candidate("request/header", ids));
+    expect(() => journal.append(candidate("request/system-prompt", { ...ids, digest: "p", sections: "x", modelFacts: [], contributorProvenance: [] }))).toThrow(/sections must be an array/);
+    expect(() => journal.append(candidate("request/tools", { ...ids, tools: [] }))).toThrow(/digest/);
+    journal.append(prompt);
+    expect(() => journal.append(prompt)).toThrow(/open request header/);
+    journal.append(tools);
+    expect(() => journal.append(tools)).toThrow(/open request header/);
+    journal.append(candidate("request/context", ids));
+    expect(() => journal.append(candidate("request/tools", { ...ids, digest: "e", tools: [] }))).toThrow(/open request header/);
+    const replay = new SessionJournal({ registry: createCoreCodecRegistry(), seed: journal.events });
+    expect(replay.events.map(event => event.type).slice(-3)).toEqual(["request/system-prompt", "request/tools", "request/context"]);
   });
 
   it("settles a failed request before retry wait and preserves that boundary on replay", () => {
@@ -182,12 +210,16 @@ describe("Session Journal", () => {
     journal.append(candidate("assistant/message", { messageId: "assistant-1", content: "two" }, { surface: { kind: "append", node: { kind: "assistant", messageId: "assistant-1", content: "two" } } }));
     journal.append(candidate("compaction/start", { compactionId: "compact-1", start: 0, end: 2 }));
     journal.append(candidate("compaction/summary", { compactionId: "compact-1", summaryDigest: "digest" }));
-    journal.append(candidate("surface/replaced", { compactionId: "compact-1", sourceEventSeqs: [0, 1] }, {
+    journal.append(candidate("surface/replaced", { compactionId: "compact-1", sourceEventSeqs: [0, 1], replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test" }, {
       provenance: { sourceEventSeqs: [0, 1], contributorIds: ["compactor"], runtimeSelectionSeq: null },
       surface: { kind: "replace", start: 0, end: 2, sourceEventSeqs: [0, 1], node: { kind: "user", messageId: "summary-1", content: "summary" } },
     }));
     journal.append(candidate("compaction/end", { compactionId: "compact-1", summaryDigest: "digest" }));
     expect(journal.events).toHaveLength(6);
+    const missing = new SessionJournal({ registry: createCoreCodecRegistry(), seed: journal.events.slice(0, 2) });
+    missing.append(candidate("compaction/start", { compactionId: "compact-2", start: 0, end: 2 }));
+    expect(() => missing.append(candidate("surface/replaced", { compactionId: "compact-2", sourceEventSeqs: [0, 1] }))).toThrow(/replacedTokens must be an object/);
+    expect(() => missing.append(candidate("surface/replaced", { compactionId: "compact-2", sourceEventSeqs: [0, 1], replacedTokens: { conversation: -1, summarizedConversation: 0 }, estimatorVersion: "v" }))).toThrow(/non-negative integer/);
     expect(journal.surface.entries).toHaveLength(1);
     expect(journal.surface.entries[0]?.node).toMatchObject({ messageId: "summary-1" });
     expect(journal.surface.replaceGeneration).toBe(1);
@@ -230,4 +262,37 @@ it("validates process grant combinations and records grant use without a request
   expect(() => journal.append(candidate("permission/grant-used", use))).not.toThrow();
   expect(() => journal.append(candidate("permission/grant-used", { ...use, usedAt: "invalid" }))).toThrow();
   expect(() => journal.append(candidate("permission/grant-used", { ...use, grantId: "" }))).toThrow();
+});
+
+describe("relation rules read history only when they declare it", () => {
+  const plugin = { ownerPluginId: "@test/relations" } as const;
+  const seen: number[] = [];
+  const codecs: EventCodec[] = [
+    { type: "plugin/@test/relations/local", ownerPluginId: plugin.ownerPluginId, currentVersion: 1, criticality: "required", validate: () => undefined, validateRelations: ({ candidate }) => { if (candidate.surface !== null) throw new Error("no surface"); } },
+    { type: "plugin/@test/relations/history", ownerPluginId: plugin.ownerPluginId, currentVersion: 1, criticality: "required", readsHistory: true, validate: () => undefined, validateRelations: ({ previous }) => { seen.push(previous.length); } },
+    { type: "plugin/@test/relations/sneaky", ownerPluginId: plugin.ownerPluginId, currentVersion: 1, criticality: "required", validate: () => undefined, validateRelations: ({ previous }) => { seen.push(previous.length); } },
+  ];
+  const event = (type: string) => ({ type, eventVersion: 1, source: plugin, data: {}, surface: null }) as SessionEventCandidateV1;
+
+  it("never loads history for a rule that only checks the candidate", () => {
+    const journal = new SessionJournal({ registry: createCoreCodecRegistry(codecs), now: () => "2026-11-05T12:00:00.000Z" });
+    let reads = 0;
+    const original = journal.readEvents.bind(journal);
+    journal.readEvents = () => { reads++; return original(); };
+    for (let index = 0; index < 5; index++) journal.append(event("plugin/@test/relations/local"));
+    expect(reads).toBe(0);
+    expect(codecReadsHistory(createCoreCodecRegistry(codecs).get("plugin/@test/relations/local"))).toBe(false);
+  });
+
+  it("gives a declared rule the full history, and rejects an undeclared one that reaches for it", () => {
+    seen.length = 0;
+    const registry = createCoreCodecRegistry(codecs);
+    const journal = new SessionJournal({ registry, now: () => "2026-11-05T12:00:00.000Z" });
+    journal.append(event("plugin/@test/relations/local")); journal.append(event("plugin/@test/relations/local"));
+    journal.append(event("plugin/@test/relations/history"));
+    expect(seen).toEqual([2]);
+    expect(codecReadsHistory(registry.get("plugin/@test/relations/history"))).toBe(true);
+    expect(() => journal.append(event("plugin/@test/relations/sneaky"))).toThrow(/without declaring readsHistory/);
+    expect(journal.events).toHaveLength(3);
+  });
 });

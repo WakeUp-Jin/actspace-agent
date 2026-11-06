@@ -6,15 +6,15 @@ import type { ComposerExecutionContext, ComposerWorkspaceOption } from "./compos
 import type { RunTargetRowProps } from "./RunTargetRow";
 
 /**
- * 09 T30：context 用量的来源，按优先级：会话的 ContextState → 调用方给的快照 → 会话投影里的请求估算。
- * 投影只在它属于当前会话时才用（没传 sessionId 时视为当前会话）。
+ * context 用量的来源：会话投影里的上下文估算（与面板「当前」同源）；投影不属于当前会话时，
+ * 才用调用方给的快照或 ContextState（没传 sessionId 时视为当前会话）。
  */
 export function useComposerContextSnapshot(sessionId: string | null | undefined, contextState: ContextState | null | undefined, contextSnapshot: ContextUsageSnapshot | null): ContextUsageSnapshot | null {
   const target = useOptionalProjectionTarget();
   const belongs = target !== null && target.sessionId !== null && target.sessionId === (sessionId ?? target.sessionId);
   // 只订阅派生出的用量快照：流式时 cell 每帧换一次，快照几乎不变，输入框外壳不随帧重渲染。
   const projectedSnapshot = useProjectionSelect<ContextUsageSnapshot | null>(selectProjectedContextSnapshot, jsonEqual, belongs ? undefined : null);
-  return (contextState ? {
+  return projectedSnapshot ?? (contextState ? {
     basis: contextState.basis,
     totalTokens: contextState.totalEstimatedTokens,
     maxTokens: contextState.maxTokens,
@@ -22,8 +22,7 @@ export function useComposerContextSnapshot(sessionId: string | null | undefined,
     estimator: contextState.estimator,
     buckets: contextState.buckets,
   } : null)
-    ?? contextSnapshot
-    ?? projectedSnapshot;
+    ?? contextSnapshot;
 }
 
 function selectProjectedContextSnapshot(cell: ClientSessionCell | null): ContextUsageSnapshot | null {

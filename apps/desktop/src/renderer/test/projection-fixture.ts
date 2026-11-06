@@ -1,4 +1,4 @@
-import type { SessionEvent, SessionRecord } from "@actspace/shared";
+import { initialContextEstimate, viewContextEstimate, type SessionEvent, type SessionRecord } from "@actspace/shared";
 import type { RuntimeV2DesktopSessionProjection, RuntimeV2JsonValue, RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 
 export function projectionFixture(sessionId = "s", throughJournalSeq = -1, events: readonly SessionEventEnvelopeV1[] = []): RuntimeV2DesktopSessionProjection {
@@ -6,7 +6,7 @@ export function projectionFixture(sessionId = "s", throughJournalSeq = -1, event
     usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: null },
     activity: { turnCount: 0, completedTurnCount: 0, stepCount: 0, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } } };
   return { kind: "session-projection", schemaVersion: 1, sessionId, throughJournalSeq, snapshot, activeMessageIds: [], deferredToolCalls: [],
-    values: { metadata: snapshot.metadata, providerUsage: snapshot.usage, sessionStats: snapshot.activity, requestContext: { sessionId, throughJournalSeq, updatedAt: snapshot.updatedAt, basis: "last-request", estimator: { name: "runtime-v2-request-snapshot", version: "2" }, totalEstimatedTokens: 0, maxTokens: 0, percentUsed: 0, entries: [], buckets: [] } },
+    values: { metadata: snapshot.metadata, providerUsage: snapshot.usage, sessionStats: snapshot.activity, contextEstimate: viewContextEstimate(initialContextEstimate()) as unknown as RuntimeV2JsonValue },
     window: { events, fromSeq: events[0]?.seq ?? 0, throughJournalSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0 } };
 }
 

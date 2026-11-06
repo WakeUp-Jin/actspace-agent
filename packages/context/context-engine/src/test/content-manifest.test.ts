@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { BLOCK_OVERHEAD, MESSAGE_OVERHEAD } from "@actspace/shared";
 import { ContextEngine } from "../engine.js";
-import { describeContextContent, requestContentManifest } from "../content-manifest.js";
-import { snapshotContext } from "../request-snapshot.js";
+import { describeContextContent } from "../content-manifest.js";
+import { requestRecords } from "../request-snapshot.js";
 import type { Context } from "../types.js";
 const context: Context = { request: { sessionId: "s", requestId: "r", routeId: "p", model: "m", options: {} }, content: { system: { sections: [{ id: "rules", owner: "rules", order: 1, content: "x".repeat(4000) }], modelFacts: [] }, tools: [], supplements: [], conversation: { replaceGeneration: 0, entries: [{ node: { kind: "user", messageId: "u", content: "hello" }, sourceEventSeqs: [1] }, { node: { kind: "assistant", messageId: "a", content: [{ type: "reasoning", text: "thought" }, { type: "tool-call", callId: "c", name: "read", arguments: {} }] }, sourceEventSeqs: [2] }] } }, status: { throughJournalSeq: 2, cycle: 0, paths: [], facts: [], plugins: {} } };
 describe("Context content manifest", () => {
@@ -9,7 +10,11 @@ describe("Context content manifest", () => {
     const first = describeContextContent(context).manifest;
     const next = describeContextContent({ ...context, status: { ...context.status, contextRevision: 20 } }).manifest;
     expect(first.entries.map(row => row.key)).toEqual(next.entries.map(row => row.key));
-    expect(first.entries[0]).toMatchObject({ estimatedTokens: 1000 });
+    // 一项非对话内容：4000 字 / 4 + 每块 4。
+    expect(first.entries[0]).toMatchObject({ estimatedTokens: 1000 + BLOCK_OVERHEAD });
+    // 助手消息只有思考和工具调用：消息开销记一次，落在思考项上。
+    expect(first.entries.find(row => row.kind === "thinking")?.estimatedTokens).toBe(Math.ceil("thought".length / 4) + BLOCK_OVERHEAD + MESSAGE_OVERHEAD);
+    expect(first.entries.find(row => row.kind === "tool-call")?.estimatedTokens).toBe(Math.ceil("read".length / 4) + Math.ceil("{}".length / 4) + BLOCK_OVERHEAD);
     expect(first.entries[0]!.preview).toHaveLength(600);
     expect(first.entries.filter(row => row.bucket === "conversation").every(row => !row.preview)).toBe(true);
     expect(first.entries.find(row => row.kind === "thinking")?.trajectoryRef).toEqual({ messageId: "a" });
@@ -33,7 +38,7 @@ describe("Context content manifest", () => {
     const summary = described.manifest.entries.find(entry => entry.key === key)!;
     expect(summary).toMatchObject({
       bucket: "summarizedConversation", title: "压缩摘要", preview: summaryText.slice(0, 600),
-      estimatedTokens: Math.ceil(summaryText.length / 4), trajectoryRef: { messageId: "summary-message" },
+      estimatedTokens: Math.ceil(summaryText.length / 4) + BLOCK_OVERHEAD + MESSAGE_OVERHEAD, trajectoryRef: { messageId: "summary-message" },
     });
     expect(summary.fullTextAvailable).toBeUndefined();
     expect(described.text.has(key)).toBe(false);
@@ -44,27 +49,21 @@ describe("Context content manifest", () => {
     const view = await engine.getContext(withSummary.request);
     expect(engine.getProjection(view.request)!.manifest.entries.find(entry => entry.key === key)?.preview).toBe(summaryText.slice(0, 600));
     const input = await engine.toLlmInput(view);
-    const persisted = requestContentManifest(view, input, input);
-    expect(persisted.entries.find(entry => entry.key === key)).toMatchObject({ bucket: "summarizedConversation" });
-    expect(persisted.entries.every(entry => entry.preview === undefined && entry.fullTextAvailable === undefined)).toBe(true);
-    const snapshot = snapshotContext(view, input, {}, "composition", "host", input) as Record<string, unknown>;
-    expect(JSON.stringify(snapshot.contextManifest)).not.toContain("Summary preview boundary.");
+    // 请求记录不带估算明细，也不带对话。
+    const records = requestRecords(view, input, {}, "composition", "host");
+    expect(JSON.stringify(records)).not.toContain("Summary preview boundary.");
   });
-  it("records actual repaired input and rejects provenance after an adapter rewrite", async () => {
+  it("splits the request into a prompt record, a tools record and a small snapshot", async () => {
     const engine = new ContextEngine({ resolve: () => context });
     const input = await engine.toLlmInput(context);
-    const manifest = requestContentManifest(context, input, input);
-    expect(manifest.comparable).toBe(true);
-    expect(manifest.entries.some(row => row.kind === "tool-result" && row.trajectoryRef?.callId === "c")).toBe(true);
-    expect(manifest.entries.every(row => !row.preview)).toBe(true);
-    const changed = requestContentManifest(context, { ...input, messages: [{ role: "user", content: "rewritten" }] }, input);
-    expect(changed.comparable).toBe(false); expect(changed.entries).toEqual([]);
-    const snapshot = snapshotContext(context, input, {}, "composition", "host", input) as Record<string, unknown>;
-    expect(Object.isFrozen(snapshot.contextManifest)).toBe(true);
-    expect(snapshot.contextSections).toEqual(context.content.system.sections);
-    const rewritten = snapshotContext(context, { ...input, messages: [{ role: "system", content: "rewritten" }] }, {}, "c", "h", input) as Record<string, unknown>;
-    expect(rewritten.contextSections).toBeNull();
-    expect(JSON.stringify(snapshot.contextManifest)).not.toContain("thought");
+    const records = requestRecords(context, input, {}, "composition", "host");
+    expect(records.systemPrompt.sections).toEqual([{ owner: "rules", id: "rules", order: 1, content: "x".repeat(4000) }]);
+    expect(records.tools.tools).toEqual([]);
+    expect(records.snapshot).toMatchObject({ schemaVersion: 3, systemPromptDigest: records.systemPrompt.digest, toolsDigest: records.tools.digest });
+    expect(JSON.stringify(records.snapshot)).not.toContain("thought");
+    expect(Object.isFrozen(records.snapshot)).toBe(true);
+    // 内容相同，digest 相同。
+    expect(requestRecords(context, input, { other: true }, "c", "h").systemPrompt.digest).toBe(records.systemPrompt.digest);
   });
   it("keeps individual skill identities and excludes unrelated model facts from skills", () => {
     const withSkills: Context = { ...context, content: { ...context.content, system: { sections: [], modelFacts: [[{ id: "alpha", name: "Alpha" }, { id: "beta", name: "Beta" }], { model: "m" }], modelFactSources: [{ owner: "actspace.context-skills", id: "core/skills-catalog" }, { owner: "system", id: "model" }] } } };

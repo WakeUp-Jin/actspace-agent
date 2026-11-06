@@ -30,7 +30,7 @@ function envelope(seq,type,data,surface=null) {
 function requestEvents(index,startSeq) {
   const ids={turnId:`t${index}`,stepId:`step${index}`,requestId:`r${index}`,agentRunId:`run${index}`};
   const usage={inputTokens:100,outputTokens:20,cacheReadTokens:10,cacheWriteTokens:0,totalTokens:120,cost:0.001,costCurrency:'USD',source:'provider-reported'};
-  return [['turn/start',ids],['step/start',ids],['request/header',{...ids,model:`model-${index%8}`,routeId:`provider-${index%3}`}],['request/context',{...ids,snapshot:{renderedSystemPrompt:'Synthetic benchmark',tools:[],requestOptions:{}}}],['assistant/message',{...ids,messageId:`a${index}`,content:[],finishReason:'stop',usage}],['step/end',{...ids,reason:'completed',usage}],['turn/end',{...ids,reason:'completed'}]].map(([type,data],offset)=>envelope(startSeq+offset,type,data));
+  return [['turn/start',ids],['step/start',ids],['request/header',{...ids,model:`model-${index%8}`,routeId:`provider-${index%3}`}],['request/context',{...ids,snapshot:{schemaVersion:3,requestOptions:{}}}],['assistant/message',{...ids,messageId:`a${index}`,content:[],finishReason:'stop',usage}],['step/end',{...ids,reason:'completed',usage}],['turn/end',{...ids,reason:'completed'}]].map(([type,data],offset)=>envelope(startSeq+offset,type,data));
 }
 const generated=performance.now();
 if (!option('reuse')) {

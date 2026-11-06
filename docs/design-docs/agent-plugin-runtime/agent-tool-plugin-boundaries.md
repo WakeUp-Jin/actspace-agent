@@ -43,7 +43,7 @@ Agent Loop 将可见工具集合传入 `ToolPreparedEnvironment.allowedToolNames
 - eventVersion：1；criticality：required。
 - TodoService、工具 schema、Codec、`todos` projection 全部由 `todo-tools` 拥有。
 - Todo item 按 `todoId + revision` 合并；替换列表对遗漏项写 cancellation delta。
-- Core Journal 只有 12 个核心 Codec。旧 `todo/write` 没有兼容 Codec，也不做转换或数据迁移。
+- Core Journal 只有 14 个核心 Codec。旧 `todo/write` 没有兼容 Codec，也不做转换或数据迁移。
 - 旧 required Todo 事件产生 `UNKNOWN_REQUIRED_CODEC`，Session accessState 为 browse-only；新 Todo 插件不会解释旧事件。
 
 Projection Contributor 必须在 Session 读取前注册。注册重复 Contributor id 或重复 projection key 会失败；首次应用后禁止追加 Contributor。Contributor 不拥有事件订阅、第二套快照服务或独立 projection cache。

@@ -38,6 +38,7 @@ export type ApplicationSessionService = {
   resume(sessionId: string): Promise<SessionHandle>;
   snapshot(session: SessionHandle): RuntimeV2SessionSnapshot;
   inspect(sessionId: string): Promise<RuntimeV2SessionSnapshot>;
+  projectionValue(sessionId: string, key: string): Promise<RuntimeV2JsonValue | undefined>;
   inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]>;
   list(): Promise<readonly RuntimeV2SessionListItem[]>;
   browseSessions(): Promise<import("@actspace/shared/runtime-v2").RuntimeV2BrowseList>;
@@ -100,6 +101,7 @@ export type AgentApplicationContract = {
   readonly inspectSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly readSessionEventBatch: (sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput) => Promise<import("@actspace/session-storage").SessionEventBatch>;
   readonly inspectSessionEvents: (sessionId: string) => Promise<readonly SessionEventEnvelopeV1[]>;
+  readonly readSessionProjectionValue: (sessionId: string, key: string) => Promise<RuntimeV2JsonValue | undefined>;
   readonly readContextEntryText: (sessionId: string, scope: string, key: string, revision: number, generation: string) => Promise<string | null>;
   readonly readContextProjection: (sessionId: string, logicalAgentScopeId?: string) => Promise<ManagedContextProjection | null>;
   readonly exportSession: (sessionId: string) => Promise<string>;
@@ -220,6 +222,7 @@ export class AgentApplication implements AgentApplicationContract {
     return this.#sessions.readEventBatch(sessionId, input);
   }
   inspectSessionEvents(sessionId: string) { return this.#sessions.inspectEvents(sessionId); }
+  readSessionProjectionValue(sessionId: string, key: string) { return this.#sessions.projectionValue(sessionId, key); }
   async readContextProjection(sessionId: string, logicalAgentScopeId = `main:${sessionId}`): Promise<ManagedContextProjection | null> {
     const projection = await this.#runs.inspectCapability<{ readonly getProjection?: (id: string, scope?: string, basis?: "current-context" | "request") => ManagedContextProjection | undefined }, ManagedContextProjection | undefined>("context.engine", service => service?.getProjection?.(sessionId, logicalAgentScopeId, "current-context"), sessionId);
     return projection ?? null;
