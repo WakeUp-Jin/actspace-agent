@@ -84,3 +84,22 @@ it("keeps rendered transcript rows when a running agent's poll returns the same 
   // same DOM node: the row was not replaced
   expect(screen.getByText("go")).toBe(row);
 });
+
+it("polls the subagent list every second while one runs and every five seconds when none does", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  let status: SubagentListItem["status"] = "running";
+  const list = vi.fn(async () => [agent("scan", status)]);
+  overrideBridge({ "sessions.getSubagents": list });
+  render(<TooltipProvider><SubagentsPanel sessionId="parent" /></TooltipProvider>);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  const start = list.mock.calls.length;
+  await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+  expect(list.mock.calls.length - start).toBeGreaterThanOrEqual(3);
+  status = "idle";
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  const idle = list.mock.calls.length;
+  await act(async () => { await vi.advanceTimersByTimeAsync(4500); });
+  expect(list.mock.calls.length - idle).toBeLessThanOrEqual(1);
+  await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+  expect(list.mock.calls.length - idle).toBeLessThanOrEqual(3);
+});

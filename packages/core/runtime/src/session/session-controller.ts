@@ -42,12 +42,21 @@ export class RuntimeSessionController {
 
   subscribeProjection(listener: (update: RuntimeV2SessionUpdate) => void): () => void { this.#projectionListeners.add(listener); return () => { this.#projectionListeners.delete(listener); }; }
 
+  /**
+   * 内存里正在写的会话：主会话（`#open`）或外部登记的子 Agent 会话（`#external`）。
+   * 读它们直接用内存里的日志和读模型，不整份重读文件；不刷新空闲计时（与 `getOpen` 不同）。
+   */
+  private liveSession(sessionId: string): SessionHandle | undefined { return this.#open.get(sessionId) ?? this.#external.get(sessionId); }
+
   private liveModel(session: SessionHandle): SessionReadModel {
     let model = this.#models.get(session.header.sessionId);
     if (!model) { model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService).replay(session.journal.readEvents()); this.#models.set(session.header.sessionId, model); return model; }
     const seq = model.projections.throughSeq(session.header.sessionId);
+    // `#changes` 留给 onEvent 推送时取用；子 Agent 会话的事件不经过这里的 onEvent，记下来只会越攒越多。
+    const pushes = this.#open.get(session.header.sessionId) === session;
     for (const event of session.journal.eventsAfter(seq)) {
       const values = model.apply(event)?.values ?? {};
+      if (!pushes) continue;
       const changes = this.#changes.get(session.header.sessionId) ?? new Map();
       changes.set(event.seq, values); this.#changes.set(session.header.sessionId, changes);
     }
@@ -55,7 +64,7 @@ export class RuntimeSessionController {
   }
 
   private async readModel(sessionId: string): Promise<{ model: SessionReadModel; snapshot: RuntimeV2SessionSnapshot; read?: ProjectionCacheRead }> {
-    const live = this.#open.get(sessionId);
+    const live = this.liveSession(sessionId);
     if (live) { const model = this.liveModel(live); return { model, snapshot: model.snapshot(live.journal.validation.accessState) }; }
     const read = await this.#cache.read(sessionId);
     // The cache returns the same read object until the journal grows, so an unchanged Session keeps its restored model.
@@ -99,7 +108,7 @@ export class RuntimeSessionController {
   async readProjection(input: RuntimeV2SessionProjectionInput): Promise<RuntimeV2DesktopSessionProjection> {
     const source = await this.readModel(input.sessionId);
     const { model, snapshot, read } = source;
-    const live = this.#open.get(input.sessionId);
+    const live = this.liveSession(input.sessionId);
     const boundaries = live?.journal.project(HISTORY_BOUNDARIES, () => ({ floor: 0, starts: [] as number[], requests: [] as number[], prompts: [] as number[], toolSets: [] as number[] }), (state, event) => {
       if (event.type === "turn/start") return { ...state, starts: [...state.starts, state.floor] };
       if (event.type === "turn/end") return { ...state, floor: event.seq + 1 };
@@ -171,7 +180,7 @@ export class RuntimeSessionController {
     for (const callId of callIds) support.push({ kind: "tool-call", callId, eventSeqs: journal.filter(event => eventData(event)?.callId === callId).map(event => event.seq) });
     return { kind: "session-projection", schemaVersion: 1, sessionId: input.sessionId, throughJournalSeq: snapshot.throughJournalSeq,
       snapshot: windowSnapshot, values, activeMessageIds: snapshot.messages.map(message => message.messageId), deferredToolCalls,
-      watermarks: watermarksFor(this.#open.get(input.sessionId), snapshot.throughJournalSeq, until - 1),
+      watermarks: watermarksFor(live, snapshot.throughJournalSeq, until - 1),
       window: { events: boundedJournal, fromSeq: windowFrom, throughJournalSeq: until - 1, beforeSeq: windowFrom > 0 ? windowFrom : null, turnOffset: starts.filter(seq => seq < windowFrom).length, requestOffset: requestSeqs.filter(seq => seq < windowFrom).length, support, deferredDetails: deferredToolCalls.map(callId => ({ sessionId: input.sessionId, callId, kind: "tool" as const })) } };
   }
 
@@ -186,7 +195,7 @@ export class RuntimeSessionController {
     const tool = source.snapshot.tools.find(item => item.callId === callId);
     if (!tool) throw new Error("Tool detail is unavailable.");
     const sequences = source.read?.calls[callId];
-    const journal = sequences ? (await Promise.all(sequences.map(seq => this.#cache.events(source.read!, seq, seq + 1)))).flat() : (this.#open.get(sessionId)?.journal.readEvents() ?? []).filter(event => event.data && typeof event.data === "object" && !Array.isArray(event.data) && (event.data as Record<string, unknown>).callId === callId);
+    const journal = sequences ? (await Promise.all(sequences.map(seq => this.#cache.events(source.read!, seq, seq + 1)))).flat() : (this.liveSession(sessionId)?.journal.readEvents() ?? []).filter(event => event.data && typeof event.data === "object" && !Array.isArray(event.data) && (event.data as Record<string, unknown>).callId === callId);
     return { snapshot: { ...source.snapshot, tools: [tool] }, journal, history: { before: null, throughJournalSeq: source.snapshot.throughJournalSeq } };
   }
 
@@ -295,7 +304,8 @@ export class RuntimeSessionController {
     const id = session.header.sessionId;
     if (this.getOpen(id) !== undefined) throw new Error(`Session ${id} is already live.`);
     this.#external.set(id, session);
-    return () => { if (this.#external.get(id) === session) this.#external.delete(id); };
+    // 子 Agent 会话结束后，它在内存里的读模型一起释放，之后再读走冷缓存。
+    return () => { if (this.#external.get(id) !== session) return; this.#external.delete(id); if (!this.#open.has(id)) { this.#models.delete(id); this.#changes.delete(id); } };
   }
   isEphemeral(sessionId: string): boolean { return this.#ephemeral.has(sessionId); }
   getOpen(sessionId: string): SessionHandle | undefined { const open = this.#open.get(sessionId); if (open !== undefined) { this.touch(sessionId); return open; } return this.#external.get(sessionId); }
@@ -393,7 +403,15 @@ export class RuntimeSessionController {
     });
     return { ...batch, events };
   }
-  async inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]> { const open = this.#open.get(sessionId); if (open !== undefined) return open.journal.readEvents(); const inspection = await this.store.inspect(sessionId); if (inspection.header === null || inspection.validation === null) throw new Error(`Session ${sessionId} is corrupt.`); return inspection.events; }
+  async inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]> { const open = this.liveSession(sessionId); if (open !== undefined) return open.journal.readEvents(); const inspection = await this.store.inspect(sessionId); if (inspection.header === null || inspection.validation === null) throw new Error(`Session ${sessionId} is corrupt.`); return inspection.events; }
+  /** 某类事件的最新一条。内存里的会话查日志自带的类型索引，不读历史；冷会话才整份读取。 */
+  async latestEvent(sessionId: string, type: string): Promise<SessionEventEnvelopeV1 | undefined> {
+    const live = this.liveSession(sessionId);
+    if (live !== undefined) return live.journal.latestEvent(type);
+    const events = await this.inspectEvents(sessionId);
+    for (let index = events.length - 1; index >= 0; index -= 1) if (events[index]!.type === type) return events[index];
+    return undefined;
+  }
   async list(): Promise<readonly RuntimeV2SessionListItem[]> { return (await this.browseSessions()).items; }
   async export(sessionId: string): Promise<string> { const open = this.#open.get(sessionId); if (open !== undefined && this.#ephemeral.has(sessionId)) return [open.header, ...open.journal.readEvents()].map((record) => JSON.stringify(record)).join("\n") + "\n"; const inspection = await this.store.inspect(sessionId); if (inspection.header === null) throw new Error(`Session ${sessionId} has no header.`); return [inspection.header, ...inspection.events].map((record) => JSON.stringify(record)).join("\n") + "\n"; }
   openSessions(): readonly SessionHandle[] { return Object.freeze([...this.#open.values()]); }

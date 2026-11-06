@@ -664,11 +664,12 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   ipc.handle(contract.sessions.getSubagents, async (input) => {
     const journal = await options.registry.inspectSessionEvents(input.sessionId);
     // The parent records a child's model only when it finishes; until then use the child's own request facts.
-    // The panel polls every second, so a finished child's answer is remembered instead of re-reading its Journal.
+    // The panel polls every second: only the child's latest `request/header` is read (a live child answers from
+    // its in-memory type index), and a finished child's answer is remembered.
     const childModels = new Map<string, string>();
     await Promise.all(subagentChildrenWithoutModel(journal).map(async ({ childSessionId, finished }) => {
       const cached = finishedChildModels.get(childSessionId);
-      const model = cached !== undefined ? cached : latestRequestModel(await options.registry.inspectSessionEvents(childSessionId).catch(() => [])) ?? null;
+      const model = cached !== undefined ? cached : latestRequestModel(await options.registry.latestSessionEvent(childSessionId, "request/header").then(event => event ? [event] : [], () => [])) ?? null;
       if (finished) rememberFinished(finishedChildModels, childSessionId, model);
       if (model) childModels.set(childSessionId, model);
     }));

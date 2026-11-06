@@ -16,7 +16,12 @@ type PluginList = NonNullable<Options["remarkPlugins"]>;
  * 只按标注的语言高亮，不再自动识别（规范 §5.2）：识别经常猜错（报错日志被认成 dart），
  * 没标语言的按纯文本显示。`text` / `txt` 明确不高亮。
  */
-const HIGHLIGHT_PLUGIN = [rehypeHighlight, { detect: false, ignoreMissing: true, languages: LANGUAGE_MODULES, plainText: ["text", "txt", "plain", "plaintext"] }];
+const highlightTransform = rehypeHighlight({ detect: false, languages: LANGUAGE_MODULES, plainText: ["text", "txt", "plain", "plaintext"] });
+/**
+ * react-markdown 每次渲染都重建处理器、重新初始化全部插件；rehype-highlight 每次初始化都会新建 lowlight
+ * 并把全部语言注册一遍（run6 合计 1.8 GB 分配）。所以只初始化一次，插件直接交出这个转换函数，所有回复共用。
+ */
+function rehypeSharedHighlight() { return highlightTransform; }
 
 export type BlockPipeline = {
   remarkPlugins: PluginList;
@@ -51,7 +56,7 @@ export function createPipelineCache(prefix: string) {
             ...(html?.htmlRehypePlugins(prefix) ?? []),
             rehypeInlinePaths,
             ...(math?.MATH_REHYPE_PLUGINS ?? []),
-            HIGHLIGHT_PLUGIN,
+            rehypeSharedHighlight,
             ...(tail ? [rehypeStreamTail] : []),
           ] as PluginList,
           remarkRehypeOptions,

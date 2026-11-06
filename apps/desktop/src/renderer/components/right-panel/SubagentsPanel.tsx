@@ -13,8 +13,10 @@ import { TrajectoryView } from "../TrajectoryView";
 import type { SubagentFocus } from "./RightPanelContext";
 import { reconcileSubagents, reconcileTranscript, type TranscriptState } from "./subagent-transcript";
 
-// 列表每秒轮询；结束后记录可能拉取失败（父会话还在输出时主进程繁忙），拿到非空结果前继续重试，最多这么多次。
+// 有子智能体在跑时列表每秒轮询（耗时、状态要跟上），都没在跑时 5 秒一次，只为接住新派出的子智能体。
+// 结束后记录可能拉取失败（父会话还在输出时主进程繁忙），拿到非空结果前继续重试，最多这么多次。
 const POLL_MS = 1000;
+const IDLE_POLL_MS = 5000;
 const COMPLETED_TRANSCRIPT_RETRIES = 20;
 // 列表行：设置页分组卡里的一行，规范见 docs/design-docs/frontend/front-子Agent与后台任务规范.md。
 const rowClass = "flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring";
@@ -50,6 +52,7 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
     if (!sessionId) return;
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
+    let delay = POLL_MS;
     async function refresh() {
       try {
         const items = await sessionsApi.getSubagents({ sessionId: sessionId! });
@@ -57,9 +60,11 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
         // 数据没变就不 setState（保持引用），只在有运行中的子智能体时推进耗时。
         setAgents((previous) => reconcileSubagents(previous, items));
         setLoaded(true); setError(undefined);
-        if (items.some((item) => item.status === "running")) setTick((value) => value + 1);
+        const running = items.some((item) => item.status === "running");
+        if (running) setTick((value) => value + 1);
+        delay = running ? POLL_MS : IDLE_POLL_MS;
       } catch { if (!disposed) setError("无法加载子智能体，请稍后重试。"); }
-      finally { if (!disposed) timer = setTimeout(refresh, POLL_MS); }
+      finally { if (!disposed) timer = setTimeout(refresh, delay); }
     }
     void refresh();
     return () => { disposed = true; clearTimeout(timer); };
