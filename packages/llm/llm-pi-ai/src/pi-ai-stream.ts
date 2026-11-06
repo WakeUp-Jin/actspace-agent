@@ -9,6 +9,7 @@ import { LlmRuntimeError, providerCodeFromUnknown, retryAfterMsFromUnknown, type
 import type { LlmContentBlock, LlmMessage, LlmReplayEnvelope } from "@actspace/llm-service";
 import { redactLlmText } from "@actspace/llm-service";
 import { describeTransportFailure, transportCauseOf, transportKind } from "./transport-failure.js";
+import { withOpencodeSessionHeader } from "./opencode-session.js";
 import type { LlmStreamEvent, LlmStreamSource } from "@actspace/llm-service";
 import type { LlmUsage } from "@actspace/llm-service";
 import type { DeepSeekFileUploader } from "./deepseek-files.js";
@@ -72,7 +73,7 @@ export async function streamPiAi(options: PiAiConnectionOptions, input: LlmAdapt
         { api: options.route, provider: options.providerId, model: modelId },
         { provider: options.providerId, protocol: options.route, model: modelId },
       );
-      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), sessionId: input.request.sessionId, cacheRetention: options.cacheRetention, onPayload: (payload: Record<string, unknown>) => { const body = withReasoningPayload(payload, options.route, options.providerId, input.request.options); if (deepseek) validateDeepSeekPayload(body); return body; }, headers: input.credential.headers } as never);
+      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), sessionId: input.request.sessionId, cacheRetention: options.cacheRetention, onPayload: (payload: Record<string, unknown>) => { const body = withReasoningPayload(payload, options.route, options.providerId, input.request.options); if (deepseek) validateDeepSeekPayload(body); return body; }, headers: withOpencodeSessionHeader(input.credential.headers, baseUrl, input.request.sessionId) } as never);
       return fromPiAiEvents(events, input.request.requestId, options.pricing ?? null, { providerId: options.providerId, protocol: options.route, modelId, endpoint: baseUrl });
     } catch (error) {
       if (error instanceof LlmRuntimeError) throw error;

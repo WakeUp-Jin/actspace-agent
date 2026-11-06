@@ -11,6 +11,7 @@ import type { PiAiArtifactReader, PiAiWireRoute } from "./pi-ai-stream.js";
 import { ProviderProxyError, ProviderProxyPool } from "@actspace/llm-service";
 import { redactLlmText } from "@actspace/llm-service";
 import { describeTransportFailure, transportCauseOf, transportKind } from "./transport-failure.js";
+import { withOpencodeSessionHeader } from "./opencode-session.js";
 import type { LlmStreamEvent, LlmStreamSource } from "@actspace/llm-service";
 import type { LlmUsage } from "@actspace/llm-service";
 import { DeepSeekFileUploader } from "./deepseek-files.js";
@@ -65,7 +66,7 @@ export class LegacyProxyWireEngine {
     const auth = headerAuth
       ? { apiKey: null, authToken: null }
       : { apiKey: input.credential.apiKey ?? "placeholder", ...(anthropic ? { authToken: null } : {}) };
-    const client = new Constructor({ ...auth, baseURL, maxRetries: 0, fetch, defaultHeaders: input.credential.headers });
+    const client = new Constructor({ ...auth, baseURL, maxRetries: 0, fetch, defaultHeaders: withOpencodeSessionHeader(input.credential.headers, baseURL, input.request.sessionId) });
     if (this.options.route === "anthropic-messages") return anthropicStream(client, input, this.options);
     if (this.options.route === "openai-responses") return responsesStream(client, input, this.options);
     return completionsStream(client, input, this.options);
