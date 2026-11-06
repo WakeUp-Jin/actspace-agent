@@ -8,7 +8,7 @@ export function catalogProviderForEndpoint(baseUrl: string): string | null {
   try {
     const host = /^https:\/\/([^/:?#]+)(?::443)?(?:\/|$)/i.exec(baseUrl)?.[1]?.toLowerCase();
     if (!host) return null;
-    const providers: Record<string, string> = { "api.deepseek.com": "deepseek", "api.moonshot.cn": "moonshotai-cn", "api.moonshot.ai": "moonshotai", "openrouter.ai": "openrouter", "api.openai.com": "openai", "api.anthropic.com": "anthropic", "api.x.ai": "xai", "api.minimax.io": "minimax", "api.minimaxi.com": "minimax-cn", "open.bigmodel.cn": "zhipuai" };
+    const providers: Record<string, string> = { "api.deepseek.com": "deepseek", "api.moonshot.cn": "moonshotai-cn", "api.moonshot.ai": "moonshotai", "openrouter.ai": "openrouter", "opencode.ai": "opencode-go", "api.openai.com": "openai", "api.anthropic.com": "anthropic", "api.x.ai": "xai", "api.minimax.io": "minimax", "api.minimaxi.com": "minimax-cn", "open.bigmodel.cn": "zhipuai" };
     return providers[host] ?? null;
   } catch { return null; }
 }

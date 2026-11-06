@@ -39,6 +39,15 @@ async function openConnection(name: RegExp) {
 }
 
 describe("设置 › 模型", () => {
+  it("lists OpenCode Go under 聚合平台, described by its site", async () => {
+    await renderModels();
+    await userEvent.click(screen.getByRole("button", { name: /添加连接/ }));
+    const row = await screen.findByRole("button", { name: /OpenCode Go/ });
+    expect(row).toHaveTextContent("opencode.ai");
+    // 一个 Key 接多厂模型：和 OpenRouter 同组，不进「官方」。
+    expect(within(screen.getByRole("heading", { name: "聚合平台" }).closest("section")!).getByRole("button", { name: /OpenCode Go/ })).toBe(row);
+  });
+
   it("returns focus to the stable fetch button after an automatically opened picker closes", async () => {
     await renderModels();
     await userEvent.click(screen.getByRole("button", { name: /添加连接/ }));

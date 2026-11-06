@@ -12,6 +12,7 @@ import minimax from "../../assets/provider-marks/minimax.svg";
 import anthropic from "../../assets/provider-marks/anthropic.svg";
 import xiaomi from "../../assets/provider-marks/xiaomi.svg";
 import volcengine from "../../assets/provider-marks/volcengine.svg";
+import opencode from "../../assets/provider-marks/opencode.svg";
 
 // Exact upstream marks and license provenance live next to the SVG assets.
 // Monochrome marks use masks so the same geometry follows the active theme.
@@ -29,6 +30,7 @@ const MARKS: Partial<Record<ProviderLogoKey, { src: string; monochrome?: boolean
   anthropic: { src: anthropic },
   xiaomi: { src: xiaomi, monochrome: true },
   volcengine: { src: volcengine, monochrome: true },
+  opencode: { src: opencode, monochrome: true },
 };
 
 /** size：md 36px（默认）、sm 32px、xs 24px（模型行的家族 mark）。 */

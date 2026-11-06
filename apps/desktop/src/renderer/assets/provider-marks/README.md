@@ -7,6 +7,7 @@ These assets identify third-party providers; trademarks remain with their owners
 - DeepSeek, Moonshot and OpenAI paths: extracted without geometric changes from `tmp/maka/apps/desktop/src/renderer/settings/provider-brand-marks.tsx`, which vendors Lobe Icons (MIT).
 - OpenRouter, xAI (`grok.svg`), Mistral, Groq, Alibaba Cloud and Z.AI: copied from Maka's `assets/provider-brands/` Lobe Icons assets. OpenRouter is from `@lobehub/icons-static-svg@1.92.0`; the others are from 1.91.0.
 - MiniMax: https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/minimax.svg, retrieved 2026-09-06, Simple Icons (CC0-1.0, https://github.com/simple-icons/simple-icons/blob/develop/LICENSE.md).
+- OpenCode: https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/opencode.svg, retrieved 2026-11-06, same Simple Icons CC0-1.0 provenance as MiniMax.
 - Monochrome marks render with a theme-aware CSS mask; colored marks retain their upstream fills. Unregistered brands use a neutral generic symbol, never an approximate drawing or another provider's mark.
 
 ## Lobe Icons MIT license

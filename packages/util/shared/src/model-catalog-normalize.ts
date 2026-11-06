@@ -1,7 +1,7 @@
 import type { CatalogSource, ModelCatalogEntry } from "./model-catalog";
 
 // Endpoint owners supported by current connection presets; never enables an adapter.
-export const CATALOG_PROVIDERS = ["deepseek", "moonshotai", "moonshotai-cn", "openai", "anthropic", "xai", "minimax", "minimax-cn", "zhipuai", "zhipuai-coding-plan"];
+export const CATALOG_PROVIDERS = ["deepseek", "moonshotai", "moonshotai-cn", "openai", "anthropic", "xai", "minimax", "minimax-cn", "zhipuai", "zhipuai-coding-plan", "opencode-go"];
 const object = (v: unknown): Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
 export function catalogRate(value: unknown, factor = 1): number | null {
   if (typeof value !== "number" && (typeof value !== "string" || !value.trim())) return null;
