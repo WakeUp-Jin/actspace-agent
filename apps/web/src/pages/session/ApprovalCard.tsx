@@ -30,7 +30,7 @@ export function describeApproval(request: ApprovalRequest, command?: string): Ap
 const ICONS = { command: TerminalSquare, write: FilePen, delete: FileX, read: FilePen, tool: Wrench } as const;
 
 /**
- * 审批卡（桌面端样式）：上方「等待确认」，卡头动作 + 目标，命令块，底栏环境信息与 [拒绝][本会话允许 前缀][运行]。
+ * 审批卡（桌面端样式）：只有一个框，卡头动作 + 目标，命令块，底栏环境信息与 [拒绝][本会话允许 前缀][运行]；框外不加文字行，等待状态只写在容器的 aria-label 上。
  * 提交中转圈；成功后选中项打勾、其余变淡；失败恢复并在卡下显示原因。
  */
 export function ApprovalCard({ request, command, sandboxed, onDecided, onStale }: { readonly request: ApprovalRequest; readonly command?: string; readonly sandboxed?: boolean; readonly onDecided?: (kind: DecisionKind) => void; readonly onStale?: () => Promise<void> }) {
@@ -49,9 +49,6 @@ export function ApprovalCard({ request, command, sandboxed, onDecided, onStale }
   const meta = [sandboxed === true ? "沙盒" : sandboxed === false ? "真实环境" : "", view.cwd ? baseName(view.cwd) : ""].filter(Boolean).join(" · ");
   return (
     <section aria-label="等待审批" className="anim-rise">
-      <div className="mb-1.5 flex items-center gap-1.5 text-act-sm font-medium text-warning">
-        <span aria-hidden className={cx("size-1.5 rounded-full bg-warning", state.status === "idle" && "pulse-dot")} />{state.status === "done" ? "已提交" : "等待确认"}
-      </div>
       <div className="approval">
         <div className="approval-head">
           <Icon size={15} aria-hidden />

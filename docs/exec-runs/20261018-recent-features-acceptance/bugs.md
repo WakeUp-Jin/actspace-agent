@@ -46,7 +46,7 @@
 - `packages/agent-service/src/task-projection.ts:68` 在非 completed 的结束状态保持队列暂停。
 - Host 协议已有 `tasks.command op=resume`。这说明不能简单删除后端暂停语义；修复方案应校准 Web 的状态呈现和继续执行入口。上述是只读定位，没有通过修改源码验证根因修复。
 
-证据：同目录 `screenshots/web-after-stop-queued-idle.png`、`web-after-stop-reload.png`、`web-after-failure-queued.png`（本地截图，不随仓库分发）；`tmp/codex-acceptance/20261018-web-site/engineering-results.json` 中 W13、WA01、W14 记录与脱敏 Provider 请求计数。完整操作结果见 [Web/官网验收](web-site-acceptance.md)。
+证据：同目录 `screenshots/web-after-stop-queued-idle.png`、`web-after-stop-reload.png`、`web-after-failure-queued.png`（本地截图，不随仓库分发）；`tmp/codex-acceptance/20261018-web-site/engineering-results.json` 中 W13、WA01、W14 记录与脱敏 Provider 请求计数。完整操作结果见 `Web/官网验收`（原始记录已清理，见 git 历史）。
 
 修复后定向复验：停止/立即失败/流式后失败三种状态；已有排队项与停止后新发项；刷新及重连；继续操作只执行一次；旧队列不得在用户尚未决定时自动逃逸。至少补跨真实 Host 的恢复验证，不能只 mock `tasks.submit` 成功。
 
@@ -118,7 +118,7 @@
 - `apps/desktop/src/renderer/components/turn-tail/turn-tail-data.ts:107` 无相对路径就跳过改动项。present 返回相对路径，因此仍生成交付卡。
 - 使用本次专用事件调用当前已构建 `toolPreview`，原 root 产生缺少相对路径的 preview；仅工程比较改用 `realpath(root)` 后产生 `acceptance-one.txt`。这支持路径口径不一致的定位，没有修改代码或声称修复已经验证。
 
-证据：本地 `screenshots/real-changes-setting-on.png`、`real-alias-refresh-no-changes-card.png`、`real-alias-round2-no-changes-card.png`；对照 `real-canonical-single-turn-review.png`、`real-canonical-multi-turn-review.png`；脱敏 `tmp/codex-acceptance/20261018-recent/engineering/real-turn-path-audit.json`。逐项结果见 [真实连接补充验收](real-provider-acceptance.md)。
+证据：本地 `screenshots/real-changes-setting-on.png`、`real-alias-refresh-no-changes-card.png`、`real-alias-round2-no-changes-card.png`；对照 `real-canonical-single-turn-review.png`、`real-canonical-multi-turn-review.png`；脱敏 `tmp/codex-acceptance/20261018-recent/engineering/real-turn-path-audit.json`。逐项结果见 真实连接补充验收（原始记录已清理，见 git 历史）。
 
 修复后定向复验：`/tmp`/`/private/tmp`、合法符号链接与普通真实路径；相对/绝对工具入参；单文件、多文件、新建后删除；流式到完成、刷新后回读；第N轮 Review、present 和系统打开。不可直接移除工作区边界检查来让卡片出现。
 
@@ -141,7 +141,7 @@
 - 只对本次白名单验收会话调用当前已构建的 `slimHistoryWindow`，再经当前源码的轨迹 builder 比较：完整事件计算前两轮 TTFT 为924/527ms、生成583/465ms；精简历史两轮均为 null，Token 与总时长仍在。
 - 此比较不修改产品输入或代码，也不等同修复验证。宿主会话统计使用全量投影，其数值正确不抵消轨迹详情缺失；无需为此恢复传输全部历史 chunk，具体方案留待修复阶段。
 
-证据：本地 `screenshots/real-thinking-trajectory-detail.png`；脱敏 `tmp/codex-acceptance/20261018-recent/engineering/real-trajectory-timing-audit.json`。逐项结果见 [真实连接补充验收](real-provider-acceptance.md)。
+证据：本地 `screenshots/real-thinking-trajectory-detail.png`；脱敏 `tmp/codex-acceptance/20261018-recent/engineering/real-trajectory-timing-audit.json`。逐项结果见 真实连接补充验收（原始记录已清理，见 git 历史）。
 
 修复后定向复验：普通/Thinking、重试/失败/停止、打开历史/刷新/重新启动、较长会话的分页；轨迹详情和时间轴与全量日志有据一致。缺少 chunk 的旧历史仍应如实显示不可用；不得假造首 Token、重复累计 usage 或引入全量事件传输退化。
 
@@ -169,7 +169,7 @@
 ## 非产品 Bug：验收限制
 
 - CU-B01：浏览器 tab API 创建调用返回 `unsupported Codex auth method: apikey`。初轮 Web/官网原生 Computer Use 未覆盖；工程浏览器证据单独列出。真实连接补验中 native `getApp` 可读取 Chrome 的既有页面，但没有本轮已配置真实 Host 的 Web 路线，未继续操作旧页面；不能扩大称全部原生 Chrome 或 Computer Use 不可用。
-- 真实 Provider 的部分路径已在 [补验](real-provider-acceptance.md) 实测；首次停止时点不明未签收，后续带时间戳的定向补验已确认真实取消、部分保留、显式继续和刷新无重复，未新增停止 Bug。iPhone Safari / Tailscale、系统安装和其他缺现场数据的点仍按分报告保留未覆盖，不能当作通过，也不能自动当作产品 Bug。
+- 真实 Provider 的部分路径已在 补验（原始记录已清理，见 git 历史） 实测；首次停止时点不明未签收，后续带时间戳的定向补验已确认真实取消、部分保留、显式继续和刷新无重复，未新增停止 Bug。iPhone Safari / Tailscale、系统安装和其他缺现场数据的点仍按分报告保留未覆盖，不能当作通过，也不能自动当作产品 Bug。
 - 旧验收中的 MN01–MN04 等只在当前版本复现后结论成立；旧“已修复”文字不作为本轮实测通过。
 
 每个问题均保留复现、证据和定向复验条件，后续修复另行安排。

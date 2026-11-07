@@ -6,6 +6,8 @@ import { InlineCode } from "./InlineCode";
 import { MarkdownImage } from "./MarkdownImage";
 import { MarkdownLink } from "./MarkdownLink";
 import { MarkdownTable } from "./MarkdownTable";
+import { STREAM_FADE_TAG, STREAM_TAIL_TAG } from "./rehype-stream-tail";
+import { StreamFade, StreamTailSlot } from "./StreamTail";
 
 type WithNode<T> = T & { node?: unknown };
 
@@ -28,6 +30,8 @@ const SHARED: Components = {
   img: MarkdownImage as Components["img"],
   table: MarkdownTable as Components["table"],
   h2: FootnoteHeading as Components["h2"],
+  // rehype-stream-tail 的占位元素（不是 HTML 标签，hast-util-to-jsx-runtime 按名字查这里）。
+  ...({ [STREAM_TAIL_TAG]: StreamTailSlot, [STREAM_FADE_TAG]: StreamFade } as Components),
 };
 
 export const BLOCK_COMPONENTS: Components = { ...SHARED, section: HiddenFootnotes as Components["section"] };

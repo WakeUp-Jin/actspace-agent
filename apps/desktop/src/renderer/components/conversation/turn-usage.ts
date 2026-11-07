@@ -20,8 +20,6 @@ export type TurnUsageModel = {
   readonly cacheRead: string;
   readonly cacheWrite: string;
   readonly output: string;
-  /** 输出里的推理部分；为 0 时为 null。 */
-  readonly reasoning: string | null;
   readonly cost: TurnCost;
 };
 
@@ -44,7 +42,6 @@ export function turnUsageModel(usage: TurnUsageSummary | undefined): TurnUsageMo
     cacheRead: tok(formatExactTokens(usage.cacheReadTokens)),
     cacheWrite: tok(formatExactTokens(usage.cacheWriteTokens)),
     output: tok(formatExactTokens(usage.outputTokens)),
-    reasoning: usage.reasoningTokens > 0 ? tok(formatExactTokens(usage.reasoningTokens)) : null,
     cost: turnCost(usage),
   };
 }

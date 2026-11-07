@@ -72,7 +72,7 @@ export function ModelsPage({ onChanged }: { onChanged?: () => void }) {
   if (!controller.view) {
     page = (
       <>
-        <PageHeader title="模型" description="模型连接、各用途的默认模型与思考档位。" />
+        <PageHeader title="模型" />
         {controller.error ? <ModelsError /> : <p className="text-act-sm text-text-muted">正在读取…</p>}
       </>
     );
@@ -85,7 +85,7 @@ export function ModelsPage({ onChanged }: { onChanged?: () => void }) {
   } else {
     page = (
       <>
-        <PageHeader title="模型" description="模型连接、各用途的默认模型与思考档位。" />
+        <PageHeader title="模型" />
         <ModelsError />
         <PurposesSection view={controller.view} />
         <ConnectionListSection connections={controller.view.connections} />

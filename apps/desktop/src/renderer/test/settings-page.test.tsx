@@ -457,7 +457,7 @@ describe("SettingsPage", () => {
     expect(progressMessage.parentElement).toHaveClass("flex-wrap");
     expect(progressMessage.parentElement?.querySelector("h3")).toHaveTextContent("本地更新");
     expect(progressMessage.parentElement?.previousElementSibling).not.toHaveClass("bg-operational-soft");
-    expect(screen.getByText("构建阶段不会退出应用；构建完成后才会关闭窗口并执行替换。")).toBeInTheDocument();
+    expect(screen.getByText("构建完成后将退出并重启。")).toBeInTheDocument();
   });
 
   it("本地更新弹窗可显示失败状态并关闭", async () => {
@@ -512,7 +512,7 @@ describe("SettingsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "通用" }));
     expect(await screen.findByRole("heading", { name: "媒体", level: 3 })).toBeInTheDocument();
     expect(within(screen.getByRole("button", { name: "配置图片生成服务" })).getByText("未配置")).toBeInTheDocument();
-    expect(screen.getByText("配置 API Key 后，主 Agent 才能使用图片生成工具。")).toBeInTheDocument();
+    expect(screen.queryByText(/才能使用图片生成工具/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("图片生成服务 API Key")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "配置图片生成服务" }));
@@ -586,17 +586,17 @@ describe("SettingsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "工具" }));
     expect(screen.getByRole("switch", { name: "浏览器" })).toHaveAttribute("aria-checked", "true");
-    expect(screen.queryByRole("switch", { name: "浏览器 CUA" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "截图与鼠标键盘操作" })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "浏览器高级设置" }));
-    expect(screen.getByRole("switch", { name: "浏览器 CUA" })).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "浏览器文件上传" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "截图与鼠标键盘操作" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "允许上传本地文件" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("switch", { name: "浏览器" }));
     await waitFor(() => {
       expect(updateSettingsV4).toHaveBeenCalledWith(expect.objectContaining({ namespace: "tools", patch: { disabledTools: ["browser"] } }));
     });
-    expect(screen.getByRole("switch", { name: "浏览器 CUA" })).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "截图与鼠标键盘操作" })).toBeDisabled();
   });
 
   it("editing 主 Agent 系统提示词 saves it through the prompt file", async () => {

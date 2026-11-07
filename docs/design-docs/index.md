@@ -1,128 +1,74 @@
 # 设计文档索引
 
-[Host/Harness/Run 总览](agent-plugin-runtime/agent-target-overall-architecture.md)：Host 稳定基底、Harness 独立组合与 Run 固定租约；P5 实机验收单独跟踪。
+`docs/design-docs/` 是设计文档的唯一索引：回答“为什么这么设计、边界在哪里、哪些方案被排除”。实施步骤在 `docs/exec-plans/`，外部资料与调研在 `docs/references/`，决策时间线在 `docs/histories/`。
 
-- [Tool 插件边界与 Todo 领域事件](agent-plugin-runtime/agent-tool-plugin-boundaries.md)：独立工具包、Host port、Projection Contributor、scope 和不兼容旧 Todo 的事件断点。
+## 目录规则
 
+- `docs/design-docs/` 下最多一层专题目录；只有至少两份长期强关联、放在一起能降低查找成本的文档才建专题目录。
+- 跨专题入口、基础原则和无法形成稳定专题的独立设计放在根层。
+- 专题目录内保留 `agent-`、`front-` 文件名前缀。
+- HTML 原型随所属专题放置，入口需说明用途；选定方向后结论写进规范，原型删除，需要时查 git 历史。
+- 当前实现变化要同步设计文档，但不把实现流水账堆进设计入口；设计文档开头最多一行说明它管什么。
 
-- [沙箱设计](execution-safety/agent-沙箱设计.md)：2026-10-25 确认，第一期工具沙箱、第二期评估沙箱已实施；工具沙箱 / 评估沙箱，可替换的 Harness 插件（管理器 + 后端），macOS / Linux 用打包的 nono，Windows 第三期原生；第一期计划见 [20261025-sandbox-v1-tool-sandbox](../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md)；第二期评估沙箱已实施，计划见 [20261025-sandbox-v2-evaluation-sandbox](../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md)；工具沙箱的出沙箱与回退已实施，计划见 [20261025-sandbox-escape-fallback](../exec-plans/completed/20261025-sandbox-escape-fallback.md)。
+## 专题目录
 
-- [Agent 工具权限模型](execution-safety/agent-tool-permission-model.md)：当前权限事实源；定义已实施的 `default/full-access`、结构化资源、once 与 Desktop 文件 Session Grant。
-
-- [LLM Core Pi 收敛设计](agent-plugin-runtime/agent-llm-core-pi.md)：已实施 Host prepare、重试 generation、pi-ai 直接调用、backend parity 与 replay；外部验收边界见执行摘要。
-
-- [Session 事件持久化重构](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)：核心行为已实施；Session 增量接纳、持久化协调器、背压、历史回读与 accepted/durable 边界。
-
-- [Session 三类读模型设计规范](agent-plugin-runtime/agent-spec-runtime-projection.md)：已落地；定义 Global Aggregate、Session Projection、Window Presentation 及其水位、缓存和 Client 边界。
-
-- [工具输出、文件引用与图片输入](tool-system/agent-tool-output-references.md)：Bash 大输出回读、历史引用、Provider 图片转换和失败反馈。
-
-- [设置 › 模型页面](frontend/front-模型设置页面-Maka重做规范.md)：2026-10-21 按四层数据模型（协议 / 服务商模板 / 连接 / 模型）重做，已实施，Electron 验收待做；用途表 + 连接列表，模型行就地展开，有效值 = 用户修改 > 服务商 > 目录 > 未知；Demo 见 [model-provider-demo](frontend/model-provider-demo/index.html)，价格规则见[本地模型目录及使用费用](model-context/agent-model-catalog-and-usage-cost.md)。
-
-- [Web / PWA 客户端规范](frontend/front-web-pwa客户端规范.md)：已实施（2026-10-17）；手机与浏览器共用的响应式客户端 `apps/web`，支持 PWA，直连 agent-host（Host 同源托管，手机经 Tailscale HTTPS）；2026-10-18 视觉改为 B · 轻玻璃；真机验收待做。
-
-- [聊天 Mermaid 图表渲染](frontend/front-chat-mermaid-diagrams.md)：已实施；助手回复中闭合的 Mermaid 代码块渲染为固定 Codex 浅色图表，源码按不可信输入处理，Electron 验收边界见执行摘要。
-
-- [日常桌面界面中文文案](frontend/front-desktop-chinese-ui.md)：日常操作中文化，保留模式、思考档位与工具执行名称；验收边界见执行摘要。
-
-- [外观强调色](frontend/front-accent-palette.md)：已实施，Electron 验收待做；5 个调色板只驱动发送按钮、开关、焦点、链接与文字选中，默认零变化。
-- [使用统计页面更新](frontend/front-usage-statistics-refresh.md)与[本地模型目录及使用费用](model-context/agent-model-catalog-and-usage-cost.md)：已实施，实机门禁见执行摘要；统一设置视觉，修正费用来源，定义随包目录、缓存和按需刷新。
-- [存储改版 V2：增加 SQLite 查询读模型](筛选存储改版V2-增加SQLite/README.md)：Session JSONL 继续作为唯一事实源，SQLite 负责使用统计、历史搜索和过去会话查询；Worker 边界见[单独说明](筛选存储改版V2-增加SQLite/worker.md)。
-- [Context 面板与 SQLite 联合设计](上下文管理引擎设计/上下文管理引擎V2/05-Context面板与SQLite联合设计.md)：当前 Context、历史索引、同步生命周期与联合修复已实现；性能与实机覆盖边界见联合执行摘要。
-- [SQLite 原会话与联合方案校验](上下文管理引擎设计/上下文管理引擎V2/06-原会话决策与联合方案校验.md)：核对按需查询、失败恢复、迁移成本与已有验收边界，登记早期导出/诊断的范围缺口。
-- [英语辅助学习插件设计](agent-plugin-runtime/agent-english-learning.md)：提示词与朗读功能保留；当前 live Agent 绑定存在接线限制，详见正文。
-- [Agent 工具流式渲染修复设计](frontend/front-agent-tool-stream-rendering.md)：已实施的跨 Core、Tools、Desktop 事件链修复设计。
-
-`docs/design-docs/` 集中管理当前 v2 架构设计、产品设计和重要设计决策。
-
-## 目录硬约束
-
-- `docs/design-docs/` 下面最多只允许一层专题目录。
-- 专题文档直接放在一级专题目录；原型复用图片可置于资产目录，不把资产目录发展为第二层文档专题。
-- 只有强关联、需要一起阅读和维护的文档才进入同一专题目录。
-- 跨专题入口、基础原则和无法形成稳定专题的独立设计继续放在根层。
-- 专题目录已经表达归属，现阶段仍保留 `agent-`、`front-` 文件名前缀，避免目录迁移与全面重命名同时发生。
-- HTML prototype 放在所属专题目录；PNG 可与原型相邻或按原型资源组织，入口需说明用途与状态。
-
-新增专题目录前应先确认：至少有两份长期强关联文档，并且把它们放在一起能明显降低查找成本。否则不要为了分类而创建空目录或单文件目录。
-
-## 根层入口
-
-- `core-beliefs.md`：Agent-first 的工作原则和模板设计出发点。
-- [架构优化](架构优化/README.md)：2026-11-01 立项，2026-11-02 两步都已实施（分支 `架构优化`，未合入 main，Electron 实机检查待执行）。第一步「功能减法」，见 [01 功能减法设计](架构优化/01-功能减法设计.md)（删除 HTML / 代码 / CSV 渲染、可视化回复、终端、文件树和 Review 的操作与监听；浏览器能力与英语学习默认不加载），计划见 [20261101-feature-subtraction](../exec-plans/completed/20261101-feature-subtraction/README.md)；第二步「插件结构」见 [02 插件结构设计](架构优化/02-插件结构设计.md)（`packages/<能力>/<包>` 两级目录、全局 / 会话两类插件、manifest 的 `display`、唯一插件清单、扩展 › 插件页、README 规范与检查），计划见 [20261101-plugin-structure](../exec-plans/completed/20261101-plugin-structure/README.md)，插件页 demo 见 [plugins-page-demo](frontend/plugins-page-demo.html)。
-- [子智能体和后台任务设计规范](子智能体和后台任务设计规范/README.md)：2026-11-04 后端（S1–S5：留痕、后台 Bash、子智能体核心、fork、外部 Codex / Claude Code）已实施，界面、设置与文档（S6）已实施，Electron 实机验收 17 通过、0 失败、6 部分覆盖，见[执行计划](../exec-plans/completed/20261103-subagent-background-redesign/README.md)（分支 `feat/subagent-background-redesign`）；子智能体参考 DSH 改为默认异步、可续聊、可写、预设与模型可选，外加「留痕」：子会话 transcript 与 Bash 日志路径全程交给主智能体并进入活跃 / 睡眠路径；决策记录见 [01-设计决策](子智能体和后台任务设计规范/01-设计决策.md)。
-- [文档面板规范](frontend/front-文档面板规范.md)：2026-11-01 确认并实施（功能减法 P4）；只含 Markdown 的目录树取代工作区文件树，聊天 → 正文 → 文件树，绿点标出本会话改过的文档；demo 见 [md-file-tree-demo](frontend/md-file-tree-demo.html)（方案 A）。
-- [ActSpace 产品概念思路（初稿）](ActSpace产品概念思路初稿.md)：产品形象：定位、信念“唯变所适，每一个问题都有它的空间”、故事线、Agent / 场景 / Actor / Actor 名册 / 空间、意象与气质；视觉方向待定。
-- `core-storage-and-observability.md`：本地存储、workspace root 和可观测性边界。
-- [ActSpace 数据存储结构与职责](core-data-storage-design.md)：当前四块存储结构、接纳与落盘写入图、按用途读取图；区分完整事实、当前内存、SQLite 查询缓存和全局配置，明确冷读与检查点限制。
-- `core-review-change-sources.md`：Git-first Review Workbench 单一事实源，覆盖五种只读 scope、upstream Branch、结构化 diff、Review Options、刷新时机与验收边界。
-- `core-review-large-diff-loading.md`：Review Standard/capped 双模式、批量 patch、完整文件正文、虚拟渲染和性能验收规范。
-- `agent-index.md`：Agent Runtime 和全部 Agent 专题的总入口。
-- `website-introduction-site-design.md`：`apps/site` 官网、公开文档、博客、更新页、内容归属和静态部署边界；视觉规范见 `apps/site/DESIGN.md`。
-
-## 一级专题目录
-
-- [自进化的方案设计](自进化的方案设计/README.md)：V1 用户显式修改、下一条消息使用新版本，新增官方 Skill 内容集合；V2 失败触发与沙箱评估。V1 已实施，实际 API、限制和验收证据以专题 README 与执行摘要为准。
-- [Harness 统计设计](自进化的方案设计/11-Harness统计设计.md)：设置「Harness 统计」页与数据层，统计插件、工具、上下文、Skills、渐进式披露、压缩等的成本与使用，为自进化提供依据；2026-11-01 已实现（未提交），待 Electron 真实 Host 验收。
-- [会话内自进化与 Actor 扩展边界](自进化的方案设计/04-会话内自进化与Actor扩展边界.md)：早期可行性分析；自动续跑已移出当前计划，最新决策见专题导航；只预留 Actor 能力版本接口，不实施 Actor。
-
-| 目录 | 内容边界 | 入口或代表文档 |
+| 目录 | 内容边界 | 入口 |
 |---|---|---|
-| `agent-plugin-runtime/` | v2 后端插件化重构的总体架构、研究证据、已确认决策、目标边界、包结构与公共契约 | `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`、`docs/design-docs/agent-plugin-runtime/README.md` |
-| `agent-runtime/` | Agent 形态、工作模式、Journal 观测数据契约与会话记录 Markdown | `docs/design-docs/agent-runtime/agent-forms-and-modes.md`、`docs/design-docs/agent-runtime/agent-observability-trace-model.md`、[会话记录 Markdown](agent-runtime/agent-session-transcript.md) |
-| `model-context/` | 当前模型供应商、模型能力、request snapshot、token usage 和 Context Projection | `docs/design-docs/model-context/agent-multi-provider-llm.md`、`docs/design-docs/model-context/agent-context-model-facts-and-composer.md` |
-| `上下文管理引擎设计/` | V2 生命周期与物理拆包已有实现；Context 面板与 SQLite 联合实现已完成，联合验收保留未覆盖及性能限制 | [V2 设计](上下文管理引擎设计/上下文管理引擎V2/README.md)、[第一版数据结构规范](上下文管理引擎设计/Context数据结构和模型输入数据结构的设计规范.md)、[第一版插件拆分](上下文管理引擎设计/上下文管理引擎的插件拆分和上下文的插件拆分.md)、[渐进式披露](上下文管理引擎设计/agent-progressive-disclosure.md)、[压缩提示词](上下文管理引擎设计/agent-compaction-prompt.md)、[第一版执行计划](../exec-plans/completed/20261006-context-management-engine/README.md) |
-| `tool-system/` | 当前 Skill、Web/图片工具、工具预览和受控子进程 | `docs/design-docs/tool-system/agent-skill-loading.md`、`docs/design-docs/tool-system/agent-image-inspection-tool.md` |
-| `execution-safety/` | v2 Tool Runtime、Host policy、权限模式、审批、Grant、Bash hard guard 和副作用恢复边界 | `docs/design-docs/execution-safety/README.md`、`docs/design-docs/execution-safety/agent-tool-permission-model.md` |
-| `browser/` | Browser Bridge、ActSpace 集成和 canonical command | `docs/design-docs/browser/agent-browser-use-index.md` |
-| `collaboration/` | 子智能体（默认后台、可续聊、fork、外部 Codex / Claude Code，已实施）与后台 Bash 任务；侧边对话（右侧面板里从主会话分出的长期副线，`@actspace/side-chat`） | `docs/design-docs/collaboration/agent-subagent-runtime.md`、[后台任务](collaboration/agent-background-tasks.md)、[侧边对话设计](collaboration/side-chat-design.md)、[前端 demo](frontend/side-chat-demo.html) |
-| `多智能体协作/` | Space 工作台、Actor 名册与一对一对话：多个 Actor 协作解决一个问题的产品与前端设计、demo 和头像素材 | [README](多智能体协作/README.md)、[Space 工作台设计](多智能体协作/front-space-工作台设计.md) |
-| `frontend/` | 桌面端视觉、主题、组件、工作台、页面和前端原型 | `README.md` |
+| `agent-plugin-runtime/` | v2 插件化 Runtime：总体架构、Profile / Bundle / Patch、Cordis 事件 ABI、包结构、Session 与 Tool 公共契约、Host 部署 | [README](agent-plugin-runtime/README.md)、[总体架构](agent-plugin-runtime/agent-target-overall-architecture.md) |
+| `agent-runtime/` | Agent 形态与工作模式、Journal 观测数据契约、会话记录 Markdown、渐进式会话加载 | [形态与模式](agent-runtime/agent-forms-and-modes.md)、[观测模型](agent-runtime/agent-observability-trace-model.md) |
+| `model-context/` | 多供应商、模型目录与费用、request snapshot、token usage、Context Projection | [多供应商](model-context/agent-multi-provider-llm.md)、[Context 模型事实](model-context/agent-context-model-facts-and-composer.md) |
+| `上下文管理引擎设计/` | 上下文管理引擎 V2：生命周期、物理拆包、Step 增量更新、渐进式披露、压缩、Context 面板与 SQLite 联合设计 | [专题 README](上下文管理引擎设计/README.md)、[V2 设计](上下文管理引擎设计/上下文管理引擎V2/README.md) |
+| `tool-system/` | Skill、Web / 图片工具、工具输出引用、工具预览契约、受控子进程 | [Skill 加载](tool-system/agent-skill-loading.md)、[工具预览契约](tool-system/agent-tool-preview-design-guidelines.md) |
+| `execution-safety/` | Tool Runtime、权限模式、审批、Grant、Bash 硬防线、沙箱 | [README](execution-safety/README.md) |
+| `browser/` | Browser Bridge、ActSpace 集成与 canonical command | [入口](browser/agent-browser-use-index.md) |
+| `collaboration/` | 子智能体、后台 Bash 任务、侧边对话 | [子智能体](collaboration/agent-subagent-runtime.md)、[后台任务](collaboration/agent-background-tasks.md)、[侧边对话](collaboration/side-chat-design.md) |
+| `子智能体和后台任务设计规范/` | 子智能体与后台任务改造的设计决策与分项规范（模型可见文本、界面与设置） | [README](子智能体和后台任务设计规范/README.md) |
+| `自进化的方案设计/` | Harness 自进化：V1 用户显式修改、下一条消息使用新版本；V2 失败触发与沙箱评估；Harness 统计 | [README](自进化的方案设计/README.md)、[V1 使用说明](自进化的方案设计/10-V1实现与使用说明.md)、[Harness 统计](自进化的方案设计/11-Harness统计设计.md) |
+| `架构优化/` | 功能减法（什么属于 ActSpace）与插件结构（`packages/<能力>/<包>`、全局 / 会话插件、插件清单） | [README](架构优化/README.md) |
+| `多智能体协作/` | Space 工作台、Actor 名册与一对一对话的产品与前端设计（只做前端演示，不是 v2 Runtime 事实） | [README](多智能体协作/README.md) |
+| `frontend/` | 桌面端与 Web 客户端的视觉、组件、区域与页面规范 | 前端相关一律从 [frontend/README.md](frontend/README.md) 进入 |
 
-## 推荐阅读路线
+## 根层文档
 
-- [Agent 形态与三种工作模式](agent-runtime/agent-forms-and-modes.md)：当前 Chat/Plan/Agent 模式、工具白名单与持久化边界；未接通项在专题中单独说明。
+- [ActSpace 产品概念思路初稿](ActSpace产品概念思路初稿.md)：定位、信念“唯变所适，每一个问题都有它的空间”、Agent / 场景 / Actor / 名册 / 空间、意象与气质。
+- [存储与可观测性边界](core-storage-and-observability.md)：本地存储、workspace root 和可观测性边界。
+- [数据存储结构与职责](core-data-storage-design.md)：Session 数据包为唯一事实源；接纳与落盘写入、按用途读取、Q1–Q14 决策记录、运行态实现落点、SQLite 查询读模型与查询 Worker。
+- [Review 设计规范](core-review-change-sources.md)：Git-first 只读 Review，覆盖五种 scope、结构化 diff、Review Options、刷新时机、Standard / capped 大 Diff 加载与虚拟渲染。
+- 官网：内容归属与静态部署边界见 [apps/site/CONTENT_SOURCES.md](../../apps/site/CONTENT_SOURCES.md)，视觉规范见 [apps/site/DESIGN.md](../../apps/site/DESIGN.md)。
 
-### Agent Runtime
+## v2 插件化 Runtime（agent-plugin-runtime）
 
-1. `agent-index.md`
-2. `agent-plugin-runtime/README.md`
-3. 涉及 v2 Desktop / CLI 多宿主时读 `agent-plugin-runtime/agent-target-runtime-architecture.md`
-4. `agent-plugin-runtime/agent-task-run-lifecycle.md`
-5. 涉及 Journal 观测时读 `agent-runtime/agent-observability-trace-model.md`
-6. 根据任务进入 `model-context/`、`tool-system/`、`execution-safety/`、`browser/` 或 `collaboration/`
+- [Runtime 文档导航](agent-plugin-runtime/README.md)：研究证据、已确认目标、公共契约、条件采用门禁的总入口。
+- [总体架构](agent-plugin-runtime/agent-target-overall-architecture.md)：v2 分层、启动流、单次任务流、Session 真相模型。
+- [Runtime 与 Composition](agent-plugin-runtime/agent-target-runtime-architecture.md)：Profile / Bundle / Patch、生产启动类型、Host 与 shutdown 边界。
+- [Agent Core](agent-plugin-runtime/agent-target-agent-core.md)：Host / Harness / Run 边界和核心不变量。
+- [已确认决策总账](agent-plugin-runtime/agent-harness-host-refactor-decisions.md)：含 Cordis 采用范围、门禁与回退条件。
+- [Profile / Bundle / Patch 分层](agent-plugin-runtime/agent-spec-profile-bundle-patch-layering.md)、[插件运行时 ABI](agent-plugin-runtime/agent-spec-plugin-runtime-abi.md)、[Cordis 事件 ABI 与 Agent Loop 插入面](agent-plugin-runtime/agent-spec-cordis-event-abi-and-eventhub-retirement.md)、[插件组装与 Agent 启动](agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md)。
+- [包结构与插件打包](agent-plugin-runtime/agent-spec-package-layout-and-plugin-packaging.md)：包身份、服务接口与消费者、Plugin Entry。
+- Session：[Session Core 与持久化分离](agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)、[Session 格式 v1](agent-plugin-runtime/agent-spec-session-format-v1.md)、[三类读模型](agent-plugin-runtime/agent-spec-runtime-projection.md)、[流式输出只走实时通道](agent-plugin-runtime/agent-spec-live-assistant-stream.md)（`assistant/chunk` 不持久化、实时底稿、每事件投影 / 校验 / IPC 开销约束）、[请求记录与上下文估算](agent-plugin-runtime/agent-spec-request-record.md)（提示词与工具变化才写、`request/context` 小快照、`contextEstimate` 投影与统一估算）、[上下文引擎不再每次请求复制对话](agent-plugin-runtime/agent-spec-context-trusted-surface.md)（日志交出的对话视图已信任、按版本号判断变化、`toLlmInput` 浅冻结）。
+- Tool / Prompt：[Tool Runtime ABI](agent-plugin-runtime/agent-spec-tool-runtime-abi.md)、[Tool 插件边界与 Todo 领域事件](agent-plugin-runtime/agent-tool-plugin-boundaries.md)、[Prompt / Context 贡献者](agent-plugin-runtime/agent-spec-prompt-context-contributors.md)。
+- [main Agent 与 Subagent 契约](agent-plugin-runtime/agent-spec-agent-and-subagent.md)、[Task / Run 生命周期](agent-plugin-runtime/agent-task-run-lifecycle.md)、[LLM Core Pi 收敛](agent-plugin-runtime/agent-llm-core-pi.md)、[契约矩阵生成](agent-plugin-runtime/agent-spec-contract-matrix-generation.md)、[测试分层](agent-plugin-runtime/agent-testing.md)。
+- 其余契约：[Agent scope 模型](agent-plugin-runtime/agent-spec-agent-scope-model.md)、[DSH 事件模型](agent-plugin-runtime/agent-spec-dsh-event-model.md)、[工具名契约](agent-plugin-runtime/agent-spec-tool-name-contract.md)、[Tool Runtime 边界](agent-plugin-runtime/agent-spec-tool-runtime-boundary.md)、[LLM Adapter](agent-plugin-runtime/agent-target-llm-adapter.md)；[契约矩阵](agent-plugin-runtime/agent-contract-matrix.generated.md)由脚本生成，不手改。
+- [Host 部署指南](agent-plugin-runtime/agent-host-guide.md)（含 `apps/web` 所连接的 Host）、[英语辅助学习插件](agent-plugin-runtime/agent-english-learning.md)（默认不加载）。
 
-### v2 插件化 Runtime
+## 模型、上下文与工具
 
-1. [总体架构](agent-plugin-runtime/agent-target-overall-architecture.md)
-2. [Runtime 与 Composition](agent-plugin-runtime/agent-target-runtime-architecture.md)
-3. [插件组装与 Agent 启动](agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md)
-4. [专题契约与实施状态](agent-plugin-runtime/README.md)
+- [多供应商与 Host prepare](model-context/agent-multi-provider-llm.md)、[模型目录与使用费用](model-context/agent-model-catalog-and-usage-cost.md)、[token usage 与 Context 状态](model-context/agent-token-usage-and-context-state.md)。
+- [渐进式会话加载](agent-runtime/agent-progressive-session-loading.md)：会话浏览按需加载。
+- [会话记录 Markdown](agent-runtime/agent-session-transcript.md)：每个会话派生一份精简 `transcript.md`，Agent 据此读取历史会话，读取不弹审批。
+- [Skill 加载](tool-system/agent-skill-loading.md)、[Web 工具](tool-system/agent-web-tools.md)、[工具输出、文件引用与图片输入](tool-system/agent-tool-output-references.md)、[受控子进程](tool-system/agent-subprocess-runner-guidelines.md)、[图片检查工具](tool-system/agent-image-inspection-tool.md)、[图片生成工具](tool-system/agent-image-generation-tool.md)、[工具预览契约](tool-system/agent-tool-preview-design-guidelines.md)。
 
-当前实现与部分实施目标按文档状态区分。Profile-first 等决策保留在原目录供追溯；DSH-native 早期提案不再作为首读规范。
+## Browser Use
 
-### 前端
+- [入口](browser/agent-browser-use-index.md)（含 Bridge、协议与安装）→ [集成设计](browser/agent-browser-use-integration-design.md) → [命令面](browser/agent-browser-use-command-surface.md) → [命令实现](browser/agent-browser-use-command-implementation.md)。
 
-1. `frontend/README.md`
-2. `frontend/front-新功能开发清单.md`：新增或改动前端功能前必读
-3. `frontend/front-全局视觉语言规范.md`
-4. `frontend/front-主题与配色规范.md`
-5. 再进入具体工作台区域、组件或页面规范
+## 执行安全
 
-### 官网与公开内容
+- [Agent 工具权限模型](execution-safety/agent-tool-permission-model.md)：权限事实源；`default/auto-review/full-access`、结构化资源、once 与 Desktop 文件 Session Grant。
+- [沙箱设计](execution-safety/agent-沙箱设计.md)：工具沙箱与评估沙箱，可替换的 Harness 插件（管理器 + 后端），macOS / Linux 用打包的 nono；含出沙箱与回退。
+- [权限设计规则和原则](execution-safety/agent-权限设计规则和原则.md)：长期风险分层与审核原则。
 
-1. `website-introduction-site-design.md`
-2. `docs/releases/README.md`
-3. `docs/releases/feature-release-notes.md`
+## 阅读路线
 
-## 设计文档与其他资料的边界
-
-- 设计文档回答为什么做、做成什么样和边界是什么。
-- 实施步骤放在 `docs/exec-plans/`。
-- 外部资料、调研底稿和历史快照放在 `docs/references/`。
-- 当前实现变化需要同步设计文档，但不要把逐次实现流水账堆进长期设计入口。
-- `docs/references/llm-agent-dev-skill-fixes/README.md` 是 Skill 修复分析归档，不作为主线架构事实来源。
-
-- [ActSpace 官网专属设计规范](../../apps/site/DESIGN.md)：产品参考取舍、双主题、排版与官网各页面设计方向。
-
-- [Session 存储职责与实现边界](core-data-storage-responsibilities.md)：Session 文件权威事实、运行态增量投影、近期正文预算与 SQLite 展示查询职责；含本轮实现和验收入口。
+- Agent Runtime：[总体架构](agent-plugin-runtime/agent-target-overall-architecture.md) → [Runtime 文档导航](agent-plugin-runtime/README.md) → [Task / Run 生命周期](agent-plugin-runtime/agent-task-run-lifecycle.md)；涉及 Journal 观测读[观测模型](agent-runtime/agent-observability-trace-model.md)；再按任务进入模型、工具、执行安全、Browser 或协作专题。
+- 官网与公开内容：[CONTENT_SOURCES](../../apps/site/CONTENT_SOURCES.md) → `docs/releases/README.md`。

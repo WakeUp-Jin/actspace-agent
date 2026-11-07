@@ -1,4 +1,5 @@
 import { validateFileReferences, validateResponseAnnotations, type FileReference, type ResponseAnnotationReference, type ComposerReferenceIssue } from "./composer-content";
+import { surfaceNode } from "./runtime-v2/session-events";
 import type { RuntimeV2SessionSnapshot, RuntimeV2SessionProjectionInput, RuntimeV2DesktopSessionProjection } from "./runtime-v2";
 
 export type RunReferenceValidation = { ok: true; fileReferences: FileReference[]; responseAnnotations: ResponseAnnotationReference[] } | { ok: false; issue: ComposerReferenceIssue };
@@ -29,7 +30,7 @@ export async function validateRunReferences(ports: ReferenceValidationPorts, inp
     if (!Number.isSafeInteger(seq) || seq < 0 || seq > snapshot.throughJournalSeq) return { ok: false, issue: { code: "annotation_source_missing", kind: "annotation", index } };
     const projection = await ports.readSessionProjection({ sessionId: input.sessionId, beforeSeq: seq + 1, maxWindowEvents: 1 });
     const event = projection.window.events.find(candidate => candidate.seq === seq);
-    if (!event || event.surface?.node.kind !== "assistant" || !((event.type === "assistant/message" && event.surface.kind === "append") || (event.type === "surface/replaced" && event.surface.kind === "replace"))) return { ok: false, issue: { code: "annotation_source_missing", kind: "annotation", index } };
+    if (!event || event.surface == null || surfaceNode(event)?.kind !== "assistant" || !((event.type === "assistant/message" && event.surface.kind === "append") || (event.type === "surface/replaced" && event.surface.kind === "replace"))) return { ok: false, issue: { code: "annotation_source_missing", kind: "annotation", index } };
   }
   return { ok: true, fileReferences: files.value, responseAnnotations: annotations.value };
 }

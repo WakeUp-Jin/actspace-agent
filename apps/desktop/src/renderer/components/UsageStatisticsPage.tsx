@@ -6,6 +6,7 @@ import { PageShell, SettingsSelect, StatusDot, Toggle } from "./settings/Setting
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
 import { UsageHoverCard } from "./usage/UsageHoverCard";
 import { formatUsageAmount } from "../usage-format";
+import { billedInputTokens, formatCacheHitPercent } from "./composer/composer-stats";
 
 type Tab = "requests" | "providers" | "models" | "tools";
 type Status = "all" | "success" | "error" | "aborted" | "unknown";
@@ -62,15 +63,14 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
   const cost = data?.costSummary;
   const unknownTokens = summary?.unknownTokenRequestCounts;
   const requestCount = summary?.requestCount ?? 0;
-  const totalInput = (summary?.inputTokens ?? 0) + (summary?.cacheReadTokens ?? 0) + (summary?.cacheWriteTokens ?? 0);
   // 没有任何用量的请求（失败或未完成）单独成「请求失败或未完成」；缓存字段缺口只看已上报用量的请求。
   const failedRequests = unknownTokens?.total ?? 0;
   const unpricedRequests = cost?.unknownCostRequestCount ?? 0;
-  const partialInput = Math.max(0, (unknownTokens?.input ?? 0) - failedRequests);
   const partialCache = Math.max(0, (unknownTokens?.cacheRead ?? 0) - failedRequests);
-  // cacheWrite 未上报（OpenAI 兼容协议如 DeepSeek）按 0 计入分母，与 usage-cost / indexed-usage 一致。
-  const cacheRateIncomplete = partialInput > 0 || partialCache > 0;
-  const hitRate = !cacheRateIncomplete && totalInput ? `${((summary?.cacheReadTokens ?? 0) / totalInput * 100).toFixed(1)}%` : "—";
+  // 命中率与会话胶囊同一算法：缓存读 ÷（未缓存输入 + 缓存读 + 缓存写），按已知部分的合计计算；
+  // 缺失用量的请求和未上报缓存字段的请求不参与（cacheWrite 未上报按 0）。只有没有任何已知输入依据时才显示「—」。
+  const hit = formatCacheHitPercent(summary?.cacheReadTokens ?? 0, summary ? billedInputTokens(summary) : 0, 1);
+  const hitRate = hit === null ? "—" : `${hit}%`;
   const totalDetail = [
     tokenPart("输入", summary?.inputTokens, unknownTokens?.input ?? 0, requestCount),
     tokenPart("输出", summary?.outputTokens, unknownTokens?.output ?? 0, requestCount),
@@ -87,7 +87,7 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
   const page = data?.rowsPage;
   const updatePage = (next: number) => onRequestPageChange?.(next, range, queryStatus, search, kind);
   return <main className="h-full min-w-0 overflow-auto bg-app-bg text-text-main">
-    <PageShell width="wide" title="使用统计" description="模型调用、Token 用量与估算费用。">
+    <PageShell width="wide" title="使用统计">
       <div className="flex items-center justify-between gap-3">
         <div className="inline-flex rounded-act-md border border-line/60 bg-surface-subtle p-0.5" role="tablist" aria-label="统计时间范围">{ranges.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={range === value} className={`h-6 rounded-act-sm px-3 text-act-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30 ${range === value ? "bg-surface font-medium text-text-main shadow-act-xs" : "text-text-muted hover:text-text-main"}`} onClick={() => setRange(value)}>{label}</button>)}</div>
         <Tooltip><TooltipTrigger asChild><button type="button" className={button} aria-label="刷新使用统计" disabled={isLoading} onClick={() => onRefresh?.(range, page?.page ?? 1, queryStatus, search, kind)}><RefreshCw size={15} className={isLoading ? "animate-spin motion-reduce:animate-none" : ""} /></button></TooltipTrigger><TooltipContent>刷新使用统计</TooltipContent></Tooltip>
@@ -106,9 +106,9 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
         <button className={`${button} shrink-0 whitespace-nowrap`} onClick={() => onRefresh?.(range, 1, queryStatus, search, kind)}>重试</button>
       </div> : null}
       {isLoading && !data ? <div role="status" className="rounded-act-md bg-surface-subtle p-5 text-act-sm text-text-faint">正在读取使用记录…</div> : <section aria-label="使用概览" className="-mt-5 grid grid-cols-4 gap-2.5 max-[800px]:grid-cols-2 max-[400px]:grid-cols-1">
-        <Metric label="请求数" value={number(summary?.requestCount)} detail="模型调用" />
+        <Metric label="请求数" value={number(summary?.requestCount)} />
         <Metric label="Token 用量" value={aggregateTokenValue(summary?.totalTokens, failedRequests, requestCount)} detail={totalDetail} />
-        <Metric label="费用" value={summary?.requestCount === 0 ? "—" : money(cost)} detail={cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : "按请求记录 · USD 汇总"} />
+        <Metric label="费用" value={summary?.requestCount === 0 ? "—" : money(cost)} detail={cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : undefined} />
         <Metric label="缓存命中率" value={hitRate} detail={tokenPart("缓存", summary?.cacheReadTokens, unknownTokens?.cacheRead ?? 0, requestCount)} />
       </section>}
       {gapNote && !(isLoading && !data) ? <Tooltip><TooltipTrigger asChild><span tabIndex={0} className="-mt-3 w-fit max-w-full rounded-sm text-left text-act-xxs text-text-faint hover:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">{gapNote}</span></TooltipTrigger><TooltipContent className="max-w-[340px]"><ul className="m-0 list-none p-0">{gapReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></TooltipContent></Tooltip> : null}
@@ -122,7 +122,7 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
           {search || queryStatus !== "all" ? <button className={button} onClick={() => { setSearch(""); setStatus("all"); }}>清除筛选</button> : null}
           {tab === "requests" ? <label className="ml-auto flex h-[30px] shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-act-xs text-text-muted">显示明细<Toggle ariaLabel="显示明细" checked={details} onChange={setDetails} /></label> : null}
         </div>
-        {tab === "providers" || tab === "models" || tab === "tools" ? <AggregateTable rows={data?.aggregates?.[tab] ?? []} tools={tab === "tools"} search={search} pending={Boolean(isLoading || error)} /> : !details ? <div className="flex items-center justify-between gap-3 rounded-act-md border border-line px-4 py-4 text-act-sm text-text-muted"><span>当前仅显示汇总，开启详细记录查看模型和工具调用。</span><button className={button} onClick={() => setDetails(true)}>显示记录</button></div> : <>
+        {tab === "providers" || tab === "models" || tab === "tools" ? <AggregateTable rows={data?.aggregates?.[tab] ?? []} tools={tab === "tools"} search={search} pending={Boolean(isLoading || error)} /> : !details ? <div className="flex items-center justify-between gap-3 rounded-act-md border border-line px-4 py-4 text-act-sm text-text-muted"><span>明细已隐藏</span><button className={button} onClick={() => setDetails(true)}>显示记录</button></div> : <>
           <div className={tableFrame} onFocusCapture={(event) => {
             // Native focus scrolling may leave a partially visible trigger
             // clipped when Shift+Tab moves back across a narrow table.
@@ -152,8 +152,8 @@ export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, 
   </main>;
 }
 
-function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return <div className="min-w-0 rounded-act-group border border-line bg-surface px-3.5 py-3"><div className="text-act-xs text-text-muted">{label}</div><div className="mb-0.5 mt-1 break-words text-act-xl font-semibold leading-tight tracking-tight tabular-nums">{value}</div><div className="text-act-xxs leading-relaxed text-text-faint">{detail}</div></div>;
+function Metric({ label, value, detail }: { label: string; value: string; detail?: string }) {
+  return <div className="min-w-0 rounded-act-group border border-line bg-surface px-3.5 py-3"><div className="text-act-xs text-text-muted">{label}</div><div className="mb-0.5 mt-1 break-words text-act-xl font-semibold leading-tight tracking-tight tabular-nums">{value}</div>{detail ? <div className="text-act-xxs leading-relaxed text-text-faint">{detail}</div> : null}</div>;
 }
 function aggregateTokenValue(value: number | undefined, unknownCount: number, requestCount: number) {
   return unknownCount > 0 && requestCount > 0 && unknownCount >= requestCount ? "—" : number(value);

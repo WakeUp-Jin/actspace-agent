@@ -1,6 +1,6 @@
 # 执行摘要
 
-状态：统一计划已完成，Computer Use 已启动并完成首批真实 Electron 检查；全矩阵尚未完成。统一测试计划见 [test-plan.md](test-plan.md)。
+状态：统一计划已完成，Computer Use 已启动并完成首批真实 Electron 检查；全矩阵尚未完成。统一测试计划见 `test-plan.md`（原始记录已清理，见 git 历史）。
 
 ## 继续测试结果（2026-09-16）
 

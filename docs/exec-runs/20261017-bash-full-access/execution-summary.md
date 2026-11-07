@@ -31,9 +31,9 @@
 
 ## 界面验收
 
-按[计划](../../exec-plans/completed/20261017-bash-full-access.md) A1–A7，由 gpt-6.1-sol 操作真实 Electron，使用隔离数据和确定性 HTTP Provider。它验证真实 UI/IPC/工具链路，不证明真实模型服务。逐项结果见[验收记录](acceptance.md)。真实交互已覆盖自动允许/拒绝、完全权限连续运行、等待中切换恢复、硬拒绝、后台输出/终止、停止待审批、刷新保持与会话权限隔离。原始 A3 曾因 Desktop expireAll 失败，修复并重启后复验通过。
+按[计划](../../exec-plans/completed/20261017-bash-full-access.md) A1–A7，由 gpt-6.1-sol 操作真实 Electron，使用隔离数据和确定性 HTTP Provider。它验证真实 UI/IPC/工具链路，不证明真实模型服务。逐项结果见验收记录（原始记录已清理，见 git 历史）。真实交互已覆盖自动允许/拒绝、完全权限连续运行、等待中切换恢复、硬拒绝、后台输出/终止、停止待审批、刷新保持与会话权限隔离。原始 A3 曾因 Desktop expireAll 失败，修复并重启后复验通过。
 
-验收使用的隔离 Electron、Provider 与 Agent Host 已关闭，测试数据保留。摘录的工具/权限事实见 [Journal 证据](journal-evidence.json)，不包含请求上下文或凭据。
+验收使用的隔离 Electron、Provider 与 Agent Host 已关闭，测试数据保留。摘录的工具/权限事实见 Journal 证据（原始记录已清理，见 git 历史），不包含请求上下文或凭据。
 
 ## PR 交付检查
 

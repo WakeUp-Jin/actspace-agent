@@ -35,8 +35,9 @@ it("runs large Bash output through storage, the next request, and paginated read
     expect(nextInput).toContain(file.path);
     expect(nextInput).not.toContain('"type":"image"');
     expect(nextInput).not.toContain("line-3000");
-    const snapshot = run.journal.filter((event) => event.type === "request/context").at(-1)!;
-    expect(JSON.stringify(snapshot.data)).toContain(file.path);
+    // request/context 只留小字段（agent-spec-request-record.md）；日志里的工具结果存 artifact 引用，路径在发请求时才解析。
+    expect(JSON.stringify(run.journal.filter((event) => event.type === "request/context").at(-1)!.data)).not.toContain(file.path);
+    expect(JSON.stringify(run.journal.filter((event) => event.type === "tool/result").map((event) => event.data))).toContain(body.artifacts![0].artifactId);
     const page = await ports.read_file!({ path: file.path, offset: 2999, limit: 2 }, context);
     expect(page.status).toBe("completed");
     expect(JSON.stringify(page)).toContain("3000|line-3000 needle");

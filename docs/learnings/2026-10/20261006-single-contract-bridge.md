@@ -1,4 +1,6 @@
-# 进程边界的接口只写一份：从契约生成各端
+# 进程边界的接口只写一份：从契约生成各端，生产者也受契约约束
+
+合并自：进程边界的接口只写一份、IPC 的类型断言为什么拦不住字段拼错。
 
 Electron 应用的 renderer 和 main 之间隔着一层 preload。最常见的写法是三处各自手写：
 
@@ -49,6 +51,12 @@ export const desktopBridgeContract = {
 - **类型断言要放在会被 tsc 检查的地方**。`expectTypeOf` 写在一个被 tsconfig `exclude` 掉的测试目录里，vitest 照常跑完，但断言从来没被类型检查过。写完类型测试之后，故意改错一个类型，确认 typecheck 会失败。
 - **只禁 `window.actspace` 不够**。业务代码可以 `import { getBridge } from "api/bridge"` 绕开按域划分的 `api/<域>`。规则要同时限制「谁能导入入口模块」。
 - **契约会暴露旧代码的类型谎言**。出参类型一收紧，main 里冒出 16 处不一致，比如共享类型写的是 `{ requestId }`，main 实际返回 `{ requestedAt }`。这些原本被 preload 里的 `as Promise<…>` 掩盖，迁移时要逐个核对线上负载，再决定改类型还是改实现。
+
+## 生产者也要受契约约束：`as Promise<Result>` 拦不住字段拼错
+
+preload 里常写 `invoke(...) as Promise<Result>`，这个断言只告诉 TypeScript“相信返回值符合 Result”，既不检查 Main handler，也不会在运行时重命名字段。Main 返回 `{ path }` 而 renderer 读 `{ workspaceRoot }`，两侧各自编译通过，前端 `if (!result.workspaceRoot) return`，用户看到的是点击后无反应。小范围修复的关键是让**生产者**也受共享契约约束：Main handler 标注 `Promise<SelectWorkspaceDirectoryResult>`，让返回字段直接接受编译器检查，消费端类型断言代替不了这一层。
+
+测试同样要覆盖边界：只 mock 一个“正确的前端响应”只证明消费者会处理正确数据；应调用实际注册的 IPC handler、只 mock 系统目录对话框，再检查返回对象，并分别验证成功、取消、空选择，避免把无效返回值混入正常取消流程。自检：测试里的“正确对象”是生产代码构造的，还是测试自己构造的？后者可能绕开了真正需要保护的契约。
 
 ## 自检
 

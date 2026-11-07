@@ -16,7 +16,7 @@
 
 ## 必读
 
-- `AGENTS.md`、`docs/SECURITY.md`、`docs/CODING_BEHAVIOR.md`。
+- `AGENTS.md`、`docs/SECURITY.md`、`docs/REPO_COLLAB_GUIDE.md`。
 - 代码：`packages/util/shared/src/ipc.ts`（`RunAgentInput`，约 134 行）、`packages/util/shared/src/session.ts`（`UserMessagePayload` 约 185 行、`MessageBlock` user 约 696 行）、`packages/util/shared/src/chat-attachments.ts`（`RunAgentPreparationFailure`）、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`（`agent:run` handler 约 222 行、`toRunContent` 约 759 行）、`packages/core/agent-loop/src/loop.ts`（`toLlmContent` 约 393 行）、`packages/client/client/src/sessions/chat.ts`（`projectSurfaceNode` 约 185 行、`contentText` / `attachmentViews`）、`packages/util/shared/src/session-selectors.ts`（`createMessageBlocks` 约 371 行）、`packages/util/shared/src/session-transcript.ts`、`apps/desktop/src/main/artifact-context-menu-service.ts`（realpath 双重校验的参考写法）。
 
 ## 契约（以 `packages/util/shared/src/composer-content.ts` 为唯一真源）

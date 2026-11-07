@@ -12,7 +12,7 @@ export function PerformanceSection({ settingsV4, onUpdateNamespace }: SectionPro
     finally { setSaving(false); }
   };
   return <SettingGroup title="性能监控" headingLevel={3}>
-    <SettingRow title="显示性能面板" description="在左侧栏底部显示 CPU 和内存。每 2 秒采样，关闭后停止采集。"
+    <SettingRow title="显示性能面板"
       control={<Toggle checked={settingsV4?.settings.general.performanceMonitoring === true} disabled={!settingsV4 || saving}
         onChange={change} ariaLabel="显示性能面板" />} />
     {error ? <p role="alert" className="text-act-xs text-on-danger">{error}</p> : null}

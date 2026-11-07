@@ -2,7 +2,6 @@ import { useMemo, useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { PlainButton } from "../ui/PlainButton";
 import { cn } from "../ui/cn";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { DASH } from "./harness-stats-format";
 
 /* 页面里反复用到的小块：指标卡、卡片、键值列表、小节标题、计量条、标签、可排序表格。 */
@@ -35,24 +34,39 @@ export function Card({ title, hint, children, className }: { title?: ReactNode; 
   );
 }
 
+/** 卡片网格：按容器宽度自动换列（每张卡至少 15rem / 18.75rem 宽），不依赖窗口宽度——设置页有侧栏，窗口宽度不等于内容宽度。 */
 export function Grid({ cols, children }: { cols: 2 | 3; children: ReactNode }) {
-  return <div className={cn("grid gap-2.5", cols === 2 ? "grid-cols-2 max-[800px]:grid-cols-1" : "grid-cols-3 max-[800px]:grid-cols-1")}>{children}</div>;
+  return <div className={cn("grid gap-2.5", cols === 2 ? "grid-cols-[repeat(auto-fit,minmax(min(100%,18.75rem),1fr))]" : "grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))]")}>{children}</div>;
 }
 
 export type KvRow = { label: ReactNode; value: ReactNode; tone?: "warn" | "bad" };
 
+/**
+ * 「标签 — 值」键值列表。每行是一个 flex 行：标签列不被值挤压（保持自然宽度，最多占 60%，更长的标识符才换行），
+ * 值列右对齐；这一行放不下时值整体换到第二行，仍放不下才在值内换行；需要截断的值（如模型名）由调用方用 {@link TruncateValue} 包好。
+ */
 export function KvList({ rows }: { rows: readonly KvRow[] }) {
   return (
-    <dl className="m-0 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 text-act-sm">
+    <dl className="m-0 flex flex-col gap-y-1.5 text-act-sm">
       {rows.map((row, index) => (
-        <div key={index} className="contents">
-          <dt className="min-w-0 text-text-muted">{row.label}</dt>
-          <dd className={cn("m-0 text-right tabular-nums text-text-main", row.tone && "font-medium")}>
+        <div key={index} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <dt className="max-w-[60%] flex-none text-text-muted [overflow-wrap:anywhere]">{row.label}</dt>
+          <dd className={cn("m-0 ml-auto min-w-0 max-w-full text-right tabular-nums text-text-main [overflow-wrap:anywhere]", row.tone && "font-medium")}>
             {row.tone ? <ToneText tone={row.tone}>{row.value}</ToneText> : row.value}
           </dd>
         </div>
       ))}
     </dl>
+  );
+}
+
+/** 值里「名称（可截断）+ 后缀（始终可见）」，如「模型名 (+38.4%)」；名称被截断时悬停显示全文。 */
+export function TruncateValue({ text, suffix }: { text: string; suffix: ReactNode }) {
+  return (
+    <span className="flex min-w-0 items-baseline justify-end gap-x-1">
+      <span className="min-w-0 truncate" title={text}>{text}</span>
+      <span className="flex-none">{suffix}</span>
+    </span>
   );
 }
 
@@ -129,8 +143,6 @@ export type Column<T> = {
   readonly width?: string;
   /** 排序用的值；不给就不可排序。null 永远排在最后。 */
   readonly sortValue?: (row: T) => number | string | null;
-  /** 表头悬停说明。 */
-  readonly tip?: string;
   readonly render: (row: T) => ReactNode;
 };
 
@@ -210,9 +222,9 @@ export function DataTable<T>({
                       onClick={() => setSort(active ? { key: column.key, dir: sort.dir === 1 ? -1 : 1 } : { key: column.key, dir: column.numeric ? -1 : 1 })}
                       className="rounded-act-xs text-act-xs font-medium text-text-muted hover:text-text-main"
                     >
-                      {column.tip ? <HeadTip tip={column.tip}>{head}</HeadTip> : head}
+                      {head}
                     </PlainButton>
-                  ) : column.tip ? <HeadTip tip={column.tip}>{head}</HeadTip> : head}
+                  ) : head}
                 </th>
               );
             })}
@@ -249,15 +261,6 @@ export function DataTable<T>({
         </PlainButton>
       ) : null}
     </div>
-  );
-}
-
-function HeadTip({ tip, children }: { tip: string; children: ReactNode }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild><span>{children}</span></TooltipTrigger>
-      <TooltipContent>{tip}</TooltipContent>
-    </Tooltip>
   );
 }
 

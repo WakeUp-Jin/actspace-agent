@@ -13,7 +13,11 @@ const workerPath = new URL('../dist-electron/main/runtime-v2/usage-read-model-wo
 const time = '2026-10-11T00:00:00Z';
 const descriptor = (seq, stamp = 'one') => ({ header: { sessionId: 's', createdAt: time }, throughSeq: seq, stamp, codecSetDigest: 'codec' });
 const manifest = (n=12) => ({ schemaVersion:1,estimatorVersion:'context-content-1',comparable:true,totalEstimatedTokens:n,buckets:{systemPrompt:n},entries:[{key:'["section","system","base"]',bucket:'systemPrompt',title:'System',estimatedTokens:n,preview:'NEVER_INDEX_THIS'}] });
-const snapshot = (n=12) => ({ contextManifest:manifest(n),contextModel:{modelKey:'p/m',label:'m',contextWindow:1000,autoCompactAtTokens:800},logicalAgentScopeId:'main:s',renderedSystemPrompt:'NEVER_INDEX_THIS',messages:[{content:'NEVER_INDEX_THIS'}] });
+// request/context 只留小字段；估算由 request/system-prompt 等事件折叠（agent-spec-request-record.md）。
+const snapshot = () => ({ schemaVersion:3,contextModel:{modelKey:'p/m',label:'m',contextWindow:1000,autoCompactAtTokens:800},logicalAgentScopeId:'main:s' });
+// 一段 41 字符的提示词：ceil(41/4)=11 + 每段 4 → 估算 15。正文不应出现在任何索引表里。
+const PROMPT = 'NEVER_INDEX_THIS '+'x'.repeat(24);
+const prompt = (requestId='r') => ['request/system-prompt',{requestId,turnId:'t',stepId:'step',digest:'d',contributorProvenance:[],sections:[{owner:'system',id:'base',order:0,content:PROMPT}],modelFacts:[]}];
 function events(rows, start=0) { return rows.map(([type,data],i)=>({ seq:start+i,type,time,eventVersion:1,data,surface:null })); }
 async function fixture(t) {
   const root=await mkdtemp(join(tmpdir(),'context-read-model-'));
@@ -27,38 +31,38 @@ async function fixture(t) {
 }
 test('Context canonical usage crosses batches, survives restart, ignores global reset and excludes body text',async t=>{
   const f=await fixture(t);
-  const first=events([['turn/start',{turnId:'t',agentRunId:'run'}],['step/start',{turnId:'t',stepId:'step',stepIndex:1}],['request/header',{requestId:'r',turnId:'t',stepId:'step',model:'m'}],['request/context',{requestId:'r',turnId:'t',stepId:'step',snapshot:snapshot()}]]);
-  const source=descriptor(5);
+  const first=events([['turn/start',{turnId:'t',agentRunId:'run'}],['step/start',{turnId:'t',stepId:'step',stepIndex:1}],['request/header',{requestId:'r',turnId:'t',stepId:'step',model:'m'}],prompt(),['request/context',{requestId:'r',turnId:'t',stepId:'step',snapshot:snapshot()}]]);
+  const source=descriptor(6);
   await f.send({type:'context-journal',source,events:first,cursor:'a',first:true,final:false,reset:true});
   assert.equal(await f.send({type:'context-query',sessionId:'s'}),null,'unpublished build must remain private');
   await f.restart();
   const state=await f.send({type:'context-source-state',source});assert.equal(state.cursor,'a');assert.equal(state.building,true);
-  await f.send({type:'context-journal',source,events:events([['assistant/message',{requestId:'r',finishReason:'stop',usage:{inputTokens:7,outputTokens:3,cacheReadTokens:2},content:'NEVER_INDEX_THIS'}],['turn/end',{turnId:'t'}]],4),cursor:'b',first:false,final:true,reset:true});
+  await f.send({type:'context-journal',source,events:events([['assistant/message',{requestId:'r',finishReason:'stop',usage:{inputTokens:7,outputTokens:3,cacheReadTokens:2},content:'NEVER_INDEX_THIS'}],['turn/end',{turnId:'t'}]],5),cursor:'b',first:false,final:true,reset:true});
   const result=await f.send({type:'context-query',sessionId:'s'});
   assert.equal(result.stats.turnCount,1);assert.equal(result.stats.stepCount,1);
   assert.deepEqual(result.stats.cumulativeUsage,{inputTokens:7,outputTokens:3,cacheReadTokens:2,cacheWriteTokens:0});
-  assert.equal(result.previous.requestId,'r');assert.equal(result.previous.stepIndex,1);assert.equal(result.previous.entries[0].estimatedTokens,12);
+  assert.equal(result.previous.requestId,'r');assert.equal(result.previous.stepIndex,1);assert.equal(result.previous.entries[0].estimatedTokens,15);
   assert.equal(result.trend[0].actual.inputTokens,7);
   // Global Usage may be empty/reset; Context owns independent canonical totals.
   await f.send({type:'sync',sources:[],replaceSessionIds:[]});
   assert.deepEqual((await f.send({type:'context-query',sessionId:'s'})).stats,result.stats);
   const db=new DatabaseSync(join(f.root,'runtime-v2/usage-read-model.sqlite'),{readOnly:true});
-  try { for(const table of ['context_request','context_manifest_entry','context_usage_projection_events','context_usage_row']) assert(!JSON.stringify(db.prepare(`SELECT * FROM ${table}`).all()).includes('NEVER_INDEX_THIS'),table); } finally { db.close(); }
+  try { for(const table of ['context_request','context_manifest_entry','context_estimate_state','context_usage_projection_events','context_usage_row']) assert(!JSON.stringify(db.prepare(`SELECT * FROM ${table}`).all()).includes('NEVER_INDEX_THIS'),table); } finally { db.close(); }
 });
-test('Context rebuild retains published data; legacy inputs explicitly disable comparisons',async t=>{
-  const f=await fixture(t);const source=descriptor(0);
-  await f.send({type:'context-journal',source,events:events([['request/context',{requestId:'r',snapshot:snapshot()}]]),cursor:'old',first:true,final:true,reset:true});
-  const next=descriptor(1,'replacement');
-  await f.send({type:'context-journal',source:next,events:events([['request/context',{requestId:'legacy',snapshot:{renderedSystemPrompt:'12345678',messages:[]}}]]),cursor:'partial',first:true,final:false,reset:true});
+test('Context rebuild retains published data until the replacement build is final',async t=>{
+  const f=await fixture(t);const source=descriptor(1);
+  await f.send({type:'context-journal',source,events:events([prompt(),['request/context',{requestId:'r',snapshot:snapshot()}]]),cursor:'old',first:true,final:true,reset:true});
+  const next=descriptor(2,'replacement');
+  await f.send({type:'context-journal',source:next,events:events([prompt('next'),['request/context',{requestId:'next',snapshot:snapshot()}]]),cursor:'partial',first:true,final:false,reset:true});
   assert.equal((await f.send({type:'context-query',sessionId:'s'})).previous.requestId,'r');
   await f.restart();
-  await f.send({type:'context-journal',source:next,events:events([['compaction/end',{compactionId:'c'}]],1),cursor:'done',first:false,final:true,reset:true});
+  await f.send({type:'context-journal',source:next,events:events([['compaction/end',{compactionId:'c'}]],2),cursor:'done',first:false,final:true,reset:true});
   const result=await f.send({type:'context-query',sessionId:'s'});
-  assert.equal(result.previous.requestId,'legacy');assert.equal(result.previous.comparable,false);assert.equal(result.previous.totalEstimatedTokens,2);
+  assert.equal(result.previous.requestId,'next');assert.equal(result.previous.comparable,true);assert.equal(result.previous.totalEstimatedTokens,15);
   assert.equal(result.stats.compactionCount,1);assert.equal(result.events[0].tokenDelta,null);
 });
 test('history windows are bounded while counts cover all history and recent manifest retention stays bounded',async t=>{
-  const f=await fixture(t);const all=events(Array.from({length:510},(_,i)=>[['request/context',{requestId:`r${i}`,snapshot:snapshot(i)}],['agent/mode-set',{mode:i%2?'chat':'agent'}]]).flat());
+  const f=await fixture(t);const all=events([prompt('r0'),...Array.from({length:510},(_,i)=>[['request/context',{requestId:`r${i}`,snapshot:snapshot()}],['agent/mode-set',{mode:i%2?'chat':'agent'}]]).flat()]);
   const source=descriptor(all.length-1);
   for(let i=0;i<all.length;i+=128)await f.send({type:'context-journal',source,events:all.slice(i,i+128),cursor:String(i+128),first:i===0,final:i+128>=all.length,reset:true});
   const result=await f.send({type:'context-query',sessionId:'s'});
@@ -68,8 +72,9 @@ test('history windows are bounded while counts cover all history and recent mani
 });
 test('panel conditional reads, generation guards, pagination and UTF8 text pages stay independent of history',async()=>{
   let generation='g1';const entries=Array.from({length:602},(_,i)=>({key:`k${i}`,bucket:'tools',title:`Tool ${i}`,estimatedTokens:10,fullTextAvailable:true,preview:'p'.repeat(600)}));
-  const projection=()=>({identity:{sessionId:'s',logicalAgentScopeId:'main:s'},instanceGeneration:generation,contextRevision:1,throughJournalSeq:4,model:{modelKey:'p/m',label:'m',contextWindow:1000,autoCompactAtTokens:null},manifest:{...manifest(),entries,totalEstimatedTokens:6020,buckets:{tools:6020}}});
-  const service=new ContextPanelService({readContextProjection:async()=>projection(),sessionQuerySource:async()=>descriptor(4),readContextEntryText:async()=> '汉'.repeat(30000)}, {contextHistory:()=>({result:null,syncing:true}),releaseContext:()=>{}});
+  const projection=()=>({identity:{sessionId:'s',logicalAgentScopeId:'main:s'},instanceGeneration:generation,contextRevision:1,throughJournalSeq:4,model:{modelKey:'p/m',label:'m',contextWindow:1000,autoCompactAtTokens:null},manifest:{...manifest(),entries,totalEstimatedTokens:6020,buckets:{tools:6020}},status:{throughJournalSeq:4,cycle:0,paths:[],facts:[],plugins:{}}});
+  const estimate={schemaVersion:1,estimatorVersion:'x',totalEstimatedTokens:6020,buckets:{systemPrompt:0,tools:6020,rules:0,skills:0,summarizedConversation:0,conversation:0},contextWindow:1000,model:null,percentUsed:100,entries:entries.map(({preview,fullTextAvailable,...entry})=>entry),summaries:[],requestId:'r',throughJournalSeq:4,updatedAt:null};
+  const service=new ContextPanelService({readContextProjection:async()=>projection(),sessionQuerySource:async()=>descriptor(4),readContextEntryText:async()=> '汉'.repeat(30000),readSessionProjectionValue:async(_id,key)=>key==='contextEstimate'?estimate:undefined}, {contextHistory:()=>({result:null,syncing:true}),releaseContext:()=>{}});
   const view=await service.describe({sessionId:'s'});assert.equal(view.current.totalEstimatedTokens,6020);assert.equal(view.stats,null);assert.equal(view.entriesPage.total,602);assert(Buffer.byteLength(JSON.stringify(view))<=200*1024);
   assert.equal((await service.describe({sessionId:'s',versionToken:view.versionToken})).notModified,true);
   const keys=view.current.entries.map(e=>e.key);let cursor=view.entriesPage.nextCursor;
@@ -127,25 +132,24 @@ test('Worker scheduler lets current Context progress while background work is qu
   release();await Promise.all([first,...jobs]);assert.equal(order.indexOf('background'),4);assert.equal(order.length,10);
 });
 
-test('historical manifest preserves safe trajectory identities and never exposes stored body text',async t=>{
-  const f=await fixture(t);const value=snapshot();
-  value.contextManifest.entries=[{key:'message:a',bucket:'conversation',title:'Assistant',kind:'assistant',estimatedTokens:12,trajectoryRef:{messageId:'a'},preview:'NEVER_INDEX_THIS',fullTextAvailable:true}];
-  await f.send({type:'context-journal',source:descriptor(0),events:events([['request/context',{requestId:'r',snapshot:value}]]),cursor:'1',first:true,final:true,reset:true});
+test('history stores only non-conversation entries and never exposes stored body text',async t=>{
+  const f=await fixture(t);
+  const appended=events([prompt(),['user/message',{messageId:'a'}],['request/context',{requestId:'r',snapshot:snapshot()}]]);
+  appended[1].surface={kind:'append',node:{kind:'user',messageId:'a',content:'NEVER_INDEX_THIS body'}};
+  await f.send({type:'context-journal',source:descriptor(2),events:appended,cursor:'1',first:true,final:true,reset:true});
   const result=await f.send({type:'context-query',sessionId:'s'});
-  assert.deepEqual(result.previous.entries[0].trajectoryRef,{messageId:'a'});assert.equal(result.previous.entries[0].kind,'assistant');assert(!JSON.stringify(result).includes('NEVER_INDEX_THIS'));
-  const service=new ContextPanelService({readContextProjection:async()=>null,sessionQuerySource:async()=>descriptor(0)}, {contextHistory:()=>({result,syncing:false}),releaseContext:()=>{}});
-  const view=await service.describe({sessionId:'s'});assert.equal(view.current.basis,'last-request');assert.equal(view.current.entries[0].title,'Assistant');assert.deepEqual(view.current.entries[0].trajectoryRef,{messageId:'a'});
-  assert.equal((await service.describeComposer('s')).basis,'last-request');
+  assert.deepEqual(result.previous.entries.map(e=>e.bucket),['systemPrompt']);assert(result.previous.buckets.conversation>0);assert(!JSON.stringify(result).includes('NEVER_INDEX_THIS'));
+  const service=new ContextPanelService({readContextProjection:async()=>null,sessionQuerySource:async()=>descriptor(2),readSessionProjectionValue:async()=>undefined}, {contextHistory:()=>({result,syncing:false}),releaseContext:()=>{}});
+  const view=await service.describe({sessionId:'s'});assert.equal(view.current.basis,'last-request');assert.equal(view.current.entries[0].title,'base');
 });
 
 
-test('unavailable live Harness does not block historical Context or Composer reads',async t=>{
-  const f=await fixture(t);const value=snapshot();
-  await f.send({type:'context-journal',source:descriptor(0),events:events([['request/context',{requestId:'r',snapshot:value}]]),cursor:'1',first:true,final:true,reset:true});
+test('unavailable live Harness does not block historical Context reads',async t=>{
+  const f=await fixture(t);
+  await f.send({type:'context-journal',source:descriptor(1),events:events([prompt(),['request/context',{requestId:'r',snapshot:snapshot()}]]),cursor:'1',first:true,final:true,reset:true});
   const result=await f.send({type:'context-query',sessionId:'s'});
-  const service=new ContextPanelService({readContextProjection:async()=>{throw new Error('Harness recovery blocked');},sessionQuerySource:async()=>descriptor(0)}, {contextHistory:()=>({result,syncing:false}),releaseContext:()=>{}});
+  const service=new ContextPanelService({readContextProjection:async()=>{throw new Error('Harness recovery blocked');},sessionQuerySource:async()=>descriptor(1),readSessionProjectionValue:async()=>undefined}, {contextHistory:()=>({result,syncing:false}),releaseContext:()=>{}});
   const view=await service.describe({sessionId:'s'});
   assert.equal(view.current.basis,'last-request');assert.equal(view.current.status,'stale');assert.equal(view.history.status,'ready');
-  assert.equal((await service.describeComposer('s')).basis,'last-request');
   const page=await service.listEntries({sessionId:'s',revision:view.entriesPage.revision});assert.equal(page.total,view.entriesPage.total);
 });

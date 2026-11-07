@@ -11,18 +11,14 @@ export type StatRow = readonly [label: string, value: ReactNode];
 export type StatDialog = {
   readonly title: string;
   readonly titleValue?: string;
-  /** 分隔线下、明细上的口径说明。 */
-  readonly description?: string;
   readonly rows: readonly StatRow[];
-  /** 明细下的补充口径，例如缓存命中的算法。 */
-  readonly footnote?: string;
 };
 
 /** 交给 PopoverContent 的 className：宽度随最长一行，夹在 300–440px 之间。 */
 export const STAT_DIALOG_CONTENT_CLASS =
   "w-max min-w-[min(300px,calc(100vw-24px))] max-w-[min(440px,calc(100vw-24px))] p-4 text-act-xs leading-[18px]";
 
-/** 明细值后面跟的次要说明，例如「（其中推理 …）」「预估」。 */
+/** 明细值后面跟的次要标记，例如「预估」。 */
 export const STAT_NOTE_CLASS = "whitespace-nowrap text-text-faint";
 
 export function StatDialogBody({ icon: Icon, dialog }: { icon: LucideIcon; dialog: StatDialog }): ReactNode {
@@ -36,7 +32,6 @@ export function StatDialogBody({ icon: Icon, dialog }: { icon: LucideIcon; dialo
         {dialog.titleValue ? <span className="font-semibold text-text-main tabular-nums">{dialog.titleValue}</span> : null}
       </div>
       <div className="mt-2 mb-2.5 h-px bg-line" aria-hidden="true" />
-      {dialog.description ? <p className="m-0 mb-2.5 text-text-faint">{dialog.description}</p> : null}
       <dl className="m-0 grid grid-cols-[minmax(76px,auto)_minmax(0,1fr)] gap-x-4 gap-y-1.5">
         {dialog.rows.map(([label, value]) => (
           <Fragment key={label}>
@@ -45,7 +40,6 @@ export function StatDialogBody({ icon: Icon, dialog }: { icon: LucideIcon; dialo
           </Fragment>
         ))}
       </dl>
-      {dialog.footnote ? <p className="m-0 mt-2.5 text-text-faint">{dialog.footnote}</p> : null}
     </>
   );
 }

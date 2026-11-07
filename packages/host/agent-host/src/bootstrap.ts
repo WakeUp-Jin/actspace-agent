@@ -80,7 +80,11 @@ export async function bootstrapHost(config: HostConfig, options: {
     const observations = new HostObservations(gateway.epoch);
     own(() => observations.dispose());
     const runtime = await options.bootRuntime({ artifacts, approvals, readArtifact, resolveArtifact,
-      onLiveEvent: event => { output.accept(event); observations.publish(event.sessionId, { kind: "live", event }); },
+      onLiveEvent: event => {
+        // Text deltas carry their live revision so an observer that replayed the output pages drops the frames those pages already held.
+        const liveRevision = output.accept(event);
+        observations.publish(event.sessionId, { kind: "live", event: liveRevision === null ? event : { ...event, liveRevision } });
+      },
     });
     const shutdown = own(() => runtime.shutdown());
     let stopMaintenance = async () => {};
@@ -104,6 +108,10 @@ export async function bootstrapHost(config: HostConfig, options: {
       observations.publish("host", { kind: "sessions-changed" });
     })));
     own(application.subscribeSessionProjection(update => {
+      if (update.event.type === "assistant/message") {
+        const messageId = (update.event.data as { messageId?: unknown } | null)?.messageId;
+        if (typeof messageId === "string") output.settle(update.sessionId, messageId);
+      }
       observations.publish(update.sessionId, { kind: "projection", update });
       observations.publish("host", { kind: "sessions-changed" });
     }));

@@ -323,6 +323,29 @@ describe("writer lease and checkpoints", () => {
     await second.dispose();
   });
 
+  it("takes over at once when the owner process has exited, even inside the heartbeat window", async () => {
+    const dataRoot = await temporaryRoot();
+    const layout = sessionFileLayout(dataRoot, "session-dead-owner");
+    const now = () => new Date("2026-08-22T11:00:00.000Z");
+    const first = await SessionWriterLease.acquire({ sessionDir: layout.sessionDir, sessionId: "session-dead-owner", runtimeId: "exited-runtime", pid: 999_998, now });
+    const nonce = first.owner.nonce;
+    // 重启 dev 时旧进程刚退出、心跳还没过期：进程已不在就接管，不等 30 秒。
+    const second = await SessionWriterLease.acquire({ sessionDir: layout.sessionDir, sessionId: "session-dead-owner", runtimeId: "new-runtime", now: () => new Date("2026-08-22T11:00:12.000Z"), isProcessAlive: () => false });
+    expect(second.owner.runtimeId).toBe("new-runtime");
+    expect(await readFile(join(layout.recoveryDir, `stale-lock-${nonce}`, "owner.json"), "utf8")).toContain("exited-runtime");
+    await first.dispose();
+    await second.dispose();
+  });
+
+  it("still refuses a live owner inside the heartbeat window", async () => {
+    const dataRoot = await temporaryRoot();
+    const layout = sessionFileLayout(dataRoot, "session-live-owner");
+    const now = () => new Date("2026-08-22T11:00:00.000Z");
+    const first = await SessionWriterLease.acquire({ sessionDir: layout.sessionDir, sessionId: "session-live-owner", runtimeId: "live-runtime", now });
+    await expect(SessionWriterLease.acquire({ sessionDir: layout.sessionDir, sessionId: "session-live-owner", runtimeId: "new-runtime", now, isProcessAlive: () => true })).rejects.toMatchObject({ code: "SESSION_WRITER_LOCKED" });
+    await first.dispose();
+  });
+
   it("wraps failed durability barriers and never invokes the side effect", async () => {
     let sideEffects = 0;
     const policy = new CheckpointPolicy();

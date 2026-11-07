@@ -2,7 +2,7 @@
 
 状态：已完成（Phase 1–5 已落地；另有仓库已有 active plan 的文档登记门禁待处理）。本文记录已批准的执行范围与阶段门禁。
 
-设计真源：[核心 Cordis Service 化与能力 seam 规范](../../../design-docs/agent-plugin-runtime/agent-spec-service-definition-provider-consumer.md)。本计划承接已落地的 DSH-native Boot、Session 13 事件、Agent Loop 9 个干预点、5 个通知和 CLI 单次 run，不重新设计这些公共语义。
+设计真源：[核心 Cordis Service 化与能力 seam 规范](../../../design-docs/agent-plugin-runtime/agent-spec-package-layout-and-plugin-packaging.md)。本计划承接已落地的 DSH-native Boot、Session 13 事件、Agent Loop 9 个干预点、5 个通知和 CLI 单次 run，不重新设计这些公共语义。
 
 ## 1. 目标
 

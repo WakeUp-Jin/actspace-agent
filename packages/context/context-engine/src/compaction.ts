@@ -3,7 +3,7 @@ import { createCompactionTransaction, type SessionEventCandidateV1, type Session
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { Context } from "./types.js";
 import { contextEvents, latestContextEvent, type ContextSession } from "./supplements.js";
-import { estimateContextTokens } from "./content-manifest.js";
+import { ESTIMATOR_VERSION, contextSummaryKeys, estimateConversationNode } from "@actspace/shared";
 
 export interface CompactionSession extends ContextSession {
   appendMany(events: readonly SessionEventCandidateV1[]): Promise<readonly SessionEventEnvelopeV1[]>;
@@ -100,9 +100,11 @@ export class ContextCompactionCoordinator implements ContextCompactor {
       if (surface.replaceGeneration !== session.journal.surface.replaceGeneration || JSON.stringify(surface.entries) !== JSON.stringify(session.journal.surface.entries)) return false;
       const durationMs = Math.max(0, Date.now() - started);
       // The trigger's pressure value mixes estimates, so both manual and auto runs recount from the journal.
-      const stats = { trigger, ...compactionTokens(session, surface.entries, region, content) };
-      const transaction = createCompactionTransaction({ surface, ...region, summary: { kind: "user", messageId: `compaction-${randomUUID()}`, content }, compactionId,
-        contributorIds: ["core/compaction"], summaryDigest: createHash("sha256").update(JSON.stringify(content)).digest("hex"), durationMs, stats });
+      const summary = { kind: "user" as const, messageId: `compaction-${randomUUID()}`, content };
+      const replacedTokens = replacedEstimate(surface.entries.slice(region.start, region.end), contextSummaryKeys(context.status.plugins["actspace.context.compaction"]));
+      const stats = { trigger, ...compactionTokens(session, surface.entries, replacedTokens, summary) };
+      const transaction = createCompactionTransaction({ surface, ...region, summary, compactionId,
+        contributorIds: ["core/compaction"], summaryDigest: createHash("sha256").update(JSON.stringify(content)).digest("hex"), durationMs, stats, replacedTokens, estimatorVersion: ESTIMATOR_VERSION });
       await session.appendMany(transaction);
       await session.flush();
       await this.disclosure?.applied(session, compactionId);
@@ -143,15 +145,25 @@ function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }
 
+/** 被替换范围的估算，按节点是否是之前的压缩摘要分开记（agent-spec-request-record.md §6.3.1）。 */
+function replacedEstimate(entries: ContextSession["journal"]["surface"]["entries"], summaries: ReadonlyMap<string, string>): { conversation: number; summarizedConversation: number } {
+  const replaced = { conversation: 0, summarizedConversation: 0 };
+  for (const { node } of entries) {
+    const summary = summaries.get(node.messageId);
+    replaced[summary === undefined ? "conversation" : "summarizedConversation"] += estimateConversationNode(node, summary);
+  }
+  return replaced;
+}
+
 /**
  * Before = baseline + estimate of entries appended after it (tool results the model has not seen yet), flagged when
- * any estimate is included. After swaps the replaced entries' estimate for the summary's, so it is available at commit time.
+ * any estimate is included. After swaps the replaced estimate for the summary's, so it is available at commit time.
  */
-function compactionTokens(session: ContextSession, entries: ContextSession["journal"]["surface"]["entries"], region: CompactionRegion, summary: unknown): { beforeTokens?: number; afterTokens?: number; beforeEstimated?: true } {
+function compactionTokens(session: ContextSession, entries: ContextSession["journal"]["surface"]["entries"], replaced: { conversation: number; summarizedConversation: number }, summary: { kind: "user"; messageId: string; content: RuntimeV2JsonValue }): { beforeTokens?: number; afterTokens?: number; beforeEstimated?: true } {
   const baseline = tokenBaseline(session);
   if (baseline === null) return {};
-  const appended = entries.filter(entry => entry.sourceEventSeqs.some(seq => seq > baseline.seq)).reduce((sum, entry) => sum + estimateContextTokens(entry.node.content), 0);
+  const appended = entries.filter(entry => entry.sourceEventSeqs.some(seq => seq > baseline.seq)).reduce((sum, entry) => sum + estimateConversationNode(entry.node), 0);
   const beforeTokens = baseline.tokens + appended;
-  const removed = entries.slice(region.start, region.end).reduce((sum, entry) => sum + estimateContextTokens(entry.node.content), 0);
-  return { beforeTokens, afterTokens: Math.max(0, beforeTokens - removed + estimateContextTokens(summary)), ...(baseline.estimated || appended > 0 ? { beforeEstimated: true as const } : {}) };
+  const removed = replaced.conversation + replaced.summarizedConversation;
+  return { beforeTokens, afterTokens: Math.max(0, beforeTokens - removed + estimateConversationNode(summary, summary.messageId)), ...(baseline.estimated || appended > 0 ? { beforeEstimated: true as const } : {}) };
 }

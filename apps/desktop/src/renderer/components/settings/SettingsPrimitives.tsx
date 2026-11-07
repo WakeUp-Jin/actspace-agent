@@ -21,7 +21,7 @@ import { SELECT_TRIGGER_CLASS, Select, type SelectOption } from "../ui/Select";
 /**
  * 设置页通用展示原子组件。样式所有权：这些组件只负责"长什么样"，
  * 业务状态由调用方（各分区）持有，遵循 frontend-style-scope-conventions。
- * 视觉契约见 docs/exec-plans/active/20260925-settings-visual-redesign.md「设计契约」。
+ * 视觉规则见 docs/design-docs/frontend/front-设置页规范.md。
  */
 
 function cx(...parts: Array<string | false | null | undefined>): string {
@@ -36,18 +36,16 @@ function cx(...parts: Array<string | false | null | undefined>): string {
  */
 export function PageShell({
   title,
-  description,
   width = "default",
   children,
 }: {
   title?: string;
-  description?: string;
   width?: "default" | "wide";
   children: ReactNode;
 }) {
   return (
     <div className={cx("mx-auto w-full px-12 pb-24 pt-9 max-[600px]:px-4 max-[600px]:pb-16 max-[600px]:pt-6", width === "wide" ? "max-w-[928px]" : "max-w-[736px]")}>
-      {title ? <PageHeader title={title} description={description} /> : null}
+      {title ? <PageHeader title={title} /> : null}
       <div className={cx("flex min-w-0 flex-col gap-9 max-[600px]:gap-7", title && "mt-9 max-[600px]:mt-6")}>{children}</div>
     </div>
   );
@@ -105,20 +103,18 @@ function GroupHeading({ level, children }: { level: 3 | 4; children: ReactNode }
 /** 无容器的分组标题 + 内容，用于内容不是设置行的区域（如主题缩略图、表格）。 */
 export function SectionShell({
   title,
-  description,
   action,
   headingLevel = 3,
   children,
 }: {
   title?: string;
-  description?: ReactNode;
   action?: ReactNode;
   headingLevel?: 3 | 4;
   children: ReactNode;
 }) {
   return (
     <section className="flex min-w-0 w-full flex-col gap-2.5">
-      <GroupHeader title={title} description={description} right={action} headingLevel={headingLevel} />
+      <GroupHeader title={title} right={action} headingLevel={headingLevel} />
       {children}
     </section>
   );
@@ -185,10 +181,9 @@ export function SettingGroup({
 
 /* ---------------------------------------------------------------- 行 */
 
-function rowPadding({ tight, indent }: { tight?: boolean; indent?: boolean }) {
+function rowPadding({ tight }: { tight?: boolean }) {
   return cx(
-    "pr-4",
-    indent ? "pl-9" : "pl-4",
+    "px-4",
     tight ? "min-h-[44px] py-2" : "min-h-[52px] py-2.5",
   );
 }
@@ -219,7 +214,6 @@ export function SettingRow({
   description,
   control,
   align = "center",
-  indent = false,
   tight = false,
   disabled = false,
   monoDescription = false,
@@ -229,8 +223,6 @@ export function SettingRow({
   description?: ReactNode;
   control?: ReactNode;
   align?: "center" | "start";
-  /** 从属于上一行开关的设置，左侧缩进。 */
-  indent?: boolean;
   tight?: boolean;
   /** 只负责变灰；控件本身的 disabled 由调用方传入。 */
   disabled?: boolean;
@@ -242,7 +234,7 @@ export function SettingRow({
       aria-disabled={disabled || undefined}
       className={cx(
         "flex justify-between gap-6 max-[600px]:flex-col max-[600px]:items-start max-[600px]:gap-2.5",
-        rowPadding({ tight, indent }),
+        rowPadding({ tight }),
         align === "start" ? "items-start" : "items-center",
       )}
     >
@@ -268,7 +260,6 @@ export function SettingLinkRow({
   expanded,
   ariaLabel,
   controlsId,
-  indent = false,
   tight = false,
   disabled = false,
   monoDescription = false,
@@ -283,7 +274,6 @@ export function SettingLinkRow({
   expanded?: boolean;
   ariaLabel?: string;
   controlsId?: string;
-  indent?: boolean;
   tight?: boolean;
   disabled?: boolean;
   monoDescription?: boolean;
@@ -298,7 +288,7 @@ export function SettingLinkRow({
       aria-controls={controlsId}
       className={cx(
         "flex w-full items-center gap-4 text-left transition-colors duration-(--motion-fast) hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:outline-none disabled:cursor-not-allowed disabled:hover:bg-transparent",
-        rowPadding({ tight, indent }),
+        rowPadding({ tight }),
       )}
     >
       {leading ? <span className={cx("shrink-0", disabled && "opacity-45")}>{leading}</span> : null}
@@ -321,9 +311,9 @@ export function SettingLinkRow({
   );
 }
 
-export function SettingSubhead({ children, indent = false }: { children: ReactNode; indent?: boolean }) {
+export function SettingSubhead({ children }: { children: ReactNode }) {
   return (
-    <div className={cx("bg-surface-subtle pb-1.5 pr-4 pt-2.5 text-act-xxs font-medium text-text-faint", indent ? "pl-9" : "pl-4")}>
+    <div className="bg-surface-subtle px-4 pb-1.5 pt-2.5 text-act-xxs font-medium text-text-faint">
       {children}
     </div>
   );

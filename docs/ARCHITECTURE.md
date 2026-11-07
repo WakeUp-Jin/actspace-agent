@@ -1,6 +1,6 @@
 # 架构总览
 
-这份文档是 `actspace` 的架构入口，只保留顶层结构、依赖边界和阅读路线。更细的设计规范放在 `docs/design-docs/`，当前实现清单放在对应专题文档里。
+这份文档是 `actspace` 的架构入口，只保留顶层结构和依赖边界。设计专题的入口见 [设计文档索引](design-docs/index.md)。
 
 如果架构、数据流、存储模型或模块边界发生变化，优先更新对应专题文档，再回到这里确认导航是否仍然准确。
 
@@ -70,31 +70,6 @@ runtime --(Host capability)--> browser-bridge
 - `@actspace/runtime` 及各领域 package exports
 
 对应地，`shared`、领域 packages 和 `runtime` 需要先构建出各自的 `dist/` 产物，再作为 `desktop` 的运行时依赖。
-
-## 架构阅读路线
-
-- [LLM Core Pi 收敛目标](design-docs/agent-plugin-runtime/agent-llm-core-pi.md)：已实施的 LLM prepare、Host 配置绑定、pi-ai 调用、backend policy 和重试生命周期边界；验收边界见执行摘要。
-
-- `docs/design-docs/agent-plugin-runtime/agent-target-runtime-architecture.md`：v2 Runtime、Profile / Bundle / Patch、基础与生产启动类型、Host 和固定前端边界。
-- `docs/design-docs/agent-runtime/agent-observability-trace-model.md`：Journal 观测的数据契约，解释 Session V2、真实 Turn、LLM Call、重试、Trace 安全边界及投影边界。
-- `docs/design-docs/agent-plugin-runtime/agent-target-overall-architecture.md`：v2 当前架构总图，解释启动、单次任务、Session、Host、Cordis 和 Agent Core 的关系。
-- `docs/design-docs/agent-plugin-runtime/README.md`：v2 后端插件化架构入口，汇总设计证据、决策、公共契约和执行记录。
-- `docs/design-docs/model-context/agent-multi-provider-llm.md`：已落地的多供应商 LLM 架构，统一 DeepSeek / Kimi / OpenRouter 的服务商连接、模型目录、服务商级代理、协议服务和任务模型选择；历史 DuckCoding 设计文档仅用于变更追溯。图片生成仍可独立使用 DuckCoding 的 OpenAI-compatible Images API。
-- `docs/design-docs/core-storage-and-observability.md`：`sessions-v2/<id>/journal.jsonl`、Session-owned artifact、Runtime Projection、Electron `userData`、workspace root 和本地排障日志边界；也记录 Desktop main 侧 settings / secrets 的模块划分（`apps/desktop/src/main/settings/`）。
-- `docs/design-docs/core-review-change-sources.md`：Git-first Review Workbench 总规范，定义五种只读 scope、upstream Branch、结构化 diff、Review Options、刷新时机和右侧 Tab 边界。
-- `docs/design-docs/多智能体协作/README.md`：多智能体协作（Space、Actor 名册）产品与前端设计；当前只有前端演示计划，不代表已实现对应 Runtime。
-- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：v2 Journal usage、request snapshot、Context Projection 与成本统计边界。
-- `docs/design-docs/agent-plugin-runtime/agent-testing.md`：v2 package lifecycle、Session golden、Runtime、Host 与外部人工门禁的测试分层。
-- `docs/design-docs/tool-system/agent-skill-loading.md`：Agent Skill 设计与加载规范，约束 `.actspace/skills`、`.agents/skills`、`.claude/skills` 的发现优先级、catalog 注入和 `read_file` 读取边界。
-- `docs/design-docs/browser/agent-browser-use-index.md`：Browser Use 专题入口，统一 Agent Core、Go Command Engine、Injected Locator runtime 与 Chrome Extension 的职责边界。
-- `docs/design-docs/browser/agent-browser-use-command-surface.md`：Browser Use 62 条命令面分类详解。
-- `docs/design-docs/browser/agent-browser-use-integration-design.md`：Browser Use 集成方案设计。
-- `docs/design-docs/browser/agent-browser-use-command-implementation.md`：Browser Use 62 条命令的核心实现设计——CDP 调用链、Go/Extension/Injected runtime 职责，以及 Plan 5 前历史基线与当前 62/62 实现矩阵。
-- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`：新增工具时必须遵守的前端预览契约。
-- `docs/design-docs/tool-system/agent-image-generation-tool.md`：图片生成工具的 provider/key 边界、`generate_image` 参数、会话产物、上下文控制和多图预览规范。
-- `docs/design-docs/tool-system/agent-image-inspection-tool.md`：文本主模型按需委托 Kimi 或 OpenRouter Luna 分析图片的配置、路径安全、固定视觉提示词、稳定输出和验收边界。
-- `docs/design-docs/frontend/README.md`：前端工作台设计文档入口。
-- `docs/references/llm-agent-dev-skill-fixes/README.md`：`llm-agent-dev` Skill 修复分析归档，不作为主线架构事实来源。
 
 ## 当前已确认的实现方向
 

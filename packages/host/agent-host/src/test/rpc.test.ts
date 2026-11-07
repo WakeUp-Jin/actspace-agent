@@ -25,7 +25,7 @@ it("validates response ownership before accepting a reference and reuses accepte
   const annotation = { annotationId: "a", assistantMessageId: "v2-2", selectedText: "reply", startOffset: 0, endOffset: 5, prefixContext: "", suffixContext: "" };
   let tasks: unknown[] = [], valid = false;
   const submitTask = vi.fn(async (_session, submissionId, content) => { tasks = [{ submissionId, content }]; return { accepted: true }; });
-  const readSessionProjection = vi.fn(async () => ({ window: { events: valid ? [{ seq: 2, type: "assistant/message", surface: { kind: "append", node: { kind: "assistant" } } }] : [] } }));
+  const readSessionProjection = vi.fn(async () => ({ window: { events: valid ? [{ seq: 2, type: "assistant/message", data: { messageId: "a", content: "reply" }, surface: { kind: "append" } }] : [] } }));
   const rpc = new HostRpc({ state: () => "ready", application: { submitTask, taskCommand: async () => ({ snapshot: { tasks } }), inspectSession: async () => ({ throughJournalSeq: 2 }), readSessionProjection } } as unknown as HostRpcOptions);
   const input = { sessionId: "s", submissionId: "id", content: "", responseAnnotations: [annotation] };
   await expect(rpc.dispatch("tasks.submit", input, context)).rejects.toThrow("annotation_source_missing");

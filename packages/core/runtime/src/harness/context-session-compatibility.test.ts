@@ -15,8 +15,8 @@ it("converts an existing persisted Session without changing bytes, seq or Surfac
   const session = await store.create({ sessionId: "old-session", createdAt: "2026-01-01T00:00:00Z", lineage: null,
     createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } });
   try {
-    await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "old" },
-      surface: { kind: "append", node: { kind: "user", messageId: "old", content: "Old conversation" } } });
+    await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "old", content: "Old conversation" },
+      surface: { kind: "append" } });
     await session.flush();
     const path = sessionFileLayout(dataRoot, session.header.sessionId).journalPath;
     const bytes = await readFile(path); const seq = session.lastSeq; const surface = session.journal.surface;

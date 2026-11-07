@@ -5,31 +5,26 @@ export type DesktopSessionTransport = {
   readonly inspectSession: (input: RuntimeV2SessionProjectionInput) => Promise<RuntimeV2DesktopSessionProjection>;
   readonly observeSession?: (input: RuntimeV2SessionProjectionInput) => Promise<RuntimeV2SessionObservation>;
   readonly subscribeLive: (listener: (event: RuntimeV2LiveEvent) => void) => () => void;
+  readonly reportObserved?: (sessionIds: readonly string[]) => void;
 };
 export type DesktopSessionApi = {
   readonly getSessionProjectionSnapshot: DesktopSessionTransport["inspectSession"];
   readonly onSessionLiveEvent: (listener: (envelope: { readonly event: RuntimeV2LiveEvent }) => void) => () => void;
   readonly getSessionObservation?: (input: RuntimeV2SessionProjectionInput) => Promise<RuntimeV2SessionObservation>;
+  /**
+   * 告诉主进程当前选中和订阅的会话全集（变化时整体替换），主进程据此不回收它们。
+   * 不传则不上报，主进程只按 LRU 回收。
+   */
+  readonly setObservedSessions?: (sessionIds: readonly string[]) => void;
 };
 export type DesktopSessionBridgeOptions = {
   /** refresh 失败后的重试间隔；用完仍失败就停下，错误留在 cell 的 `status/error` 上。 */
   readonly retryDelaysMs?: readonly number[];
-  /**
-   * 流式增量（`assistant/chunk` 的 journal-update、assistant / reasoning delta）先排队，交给它延后统一应用
-   * （例如按帧），一批只通知一次。其他事件到达时先按顺序应用排队的增量。不传时每个事件立即应用。
-   */
-  readonly scheduleStreamFlush?: (flush: () => void) => void;
 };
-
-/** 流式输出期间每个 delta 都会来的 live 事件；只改正文，不改会话结构。 */
-function isStreamIncrement(event: RuntimeV2LiveEvent): boolean {
-  return event.kind === "assistant-delta" || event.kind === "reasoning-delta"
-    || (event.kind === "journal-update" && event.update?.event.type === "assistant/chunk");
-}
 const REFRESH_RETRY_DELAYS_MS = [1000, 2000, 4000] as const;
 
 export function createDesktopSessionBridge(api: DesktopSessionApi, store = new ClientSessionStore(), options: DesktopSessionBridgeOptions = {}): DesktopSessionBridge {
-  return new DesktopSessionBridge({ inspectSession: async input => {
+  return new DesktopSessionBridge({ ...(api.setObservedSessions ? { reportObserved: api.setObservedSessions } : {}), inspectSession: async input => {
     if (!api.getSessionObservation) return api.getSessionProjectionSnapshot(input);
     const observation = await api.getSessionObservation(input);
     return { kind: "session-projection", schemaVersion: 1, sessionId: observation.sessionId, throughJournalSeq: observation.projection.throughJournalSeq, snapshot: observation.snapshot, values: observation.projection.values, window: observation.window ?? { events: [], fromSeq: observation.projection.throughJournalSeq + 1, throughJournalSeq: observation.projection.throughJournalSeq, beforeSeq: null, turnOffset: 0, requestOffset: 0 }, activeMessageIds: observation.activeMessageIds, deferredToolCalls: observation.deferredToolCalls, watermarks: observation.watermarks };
@@ -46,30 +41,29 @@ export class DesktopSessionBridge {
   readonly #historyLoads = new Map<string, Promise<void>>();
   readonly #retryTimers = new Map<ReturnType<typeof setTimeout>, () => void>();
   readonly #retryDelaysMs: readonly number[];
-  readonly #scheduleStreamFlush: ((flush: () => void) => void) | undefined;
-  #queuedIncrements: RuntimeV2LiveEvent[] = [];
+  #unsubscribeStore: (() => void) | undefined;
+  #reportedObserved: string | null = null;
   constructor(private readonly transport: DesktopSessionTransport, readonly store = new ClientSessionStore(), options: DesktopSessionBridgeOptions = {}) {
     this.#retryDelaysMs = options.retryDelaysMs ?? REFRESH_RETRY_DELAYS_MS;
-    this.#scheduleStreamFlush = options.scheduleStreamFlush;
+  }
+  /** 选中 + 订阅的会话集合变化时上报一次；dispose 不上报，避免重建 bridge 时短暂清空。 */
+  #reportObserved(): void {
+    const report = this.transport.reportObserved;
+    if (report === undefined || this.#disposed) return;
+    const ids = new Set(this.#watched.keys());
+    if (this.store.selectedSessionId !== null) ids.add(this.store.selectedSessionId);
+    const sorted = [...ids].sort();
+    const key = sorted.join("\n");
+    if (key === this.#reportedObserved) return;
+    this.#reportedObserved = key;
+    try { report(sorted); } catch (error) { console.error("Reporting observed Sessions failed", error); }
   }
   start(): void {
     this.#disposed = false;
-    this.#unsubscribeLive ??= this.transport.subscribeLive(event => {
-      if (this.#scheduleStreamFlush && isStreamIncrement(event)) {
-        this.#queuedIncrements.push(event);
-        if (this.#queuedIncrements.length === 1) this.#scheduleStreamFlush(() => this.#flushIncrements());
-        return;
-      }
-      this.#flushIncrements();
-      this.#applyLive(event);
-    });
-  }
-  #flushIncrements(): void {
-    if (this.#queuedIncrements.length === 0) return;
-    const queued = this.#queuedIncrements;
-    this.#queuedIncrements = [];
-    if (this.#disposed) return;
-    this.store.batch(() => { for (const event of queued) this.#applyLive(event); });
+    this.#reportedObserved = null;
+    this.#unsubscribeStore ??= this.store.subscribe(() => this.#reportObserved());
+    this.#reportObserved();
+    this.#unsubscribeLive ??= this.transport.subscribeLive(event => this.#applyLive(event));
   }
   #applyLive(event: RuntimeV2LiveEvent): void {
     const applied = this.store.applyLiveEvent(event);
@@ -89,13 +83,14 @@ export class DesktopSessionBridge {
   watch(sessionId: string): () => void {
     this.#watched.set(sessionId, (this.#watched.get(sessionId) ?? 0) + 1);
     if (this.#watched.get(sessionId) === 1) {
+      this.#reportObserved();
       this.#pendingRefresh.add(sessionId);
       this.#refresh(sessionId);
     }
     return () => {
       const count = (this.#watched.get(sessionId) ?? 1) - 1;
       if (count > 0) this.#watched.set(sessionId, count);
-      else { this.#watched.delete(sessionId); this.#pendingRefresh.delete(sessionId); }
+      else { this.#watched.delete(sessionId); this.#pendingRefresh.delete(sessionId); this.#reportObserved(); }
     };
   }
   refreshRelated(sessionId: string): Promise<void> {
@@ -147,7 +142,7 @@ export class DesktopSessionBridge {
   }
   dispose(): void {
     this.#watched.clear();
-    this.#disposed = true; this.#unsubscribeLive?.(); this.#unsubscribeLive = undefined; this.#pendingRefresh.clear(); this.#queuedIncrements = [];
+    this.#disposed = true; this.#unsubscribeLive?.(); this.#unsubscribeLive = undefined; this.#unsubscribeStore?.(); this.#unsubscribeStore = undefined; this.#pendingRefresh.clear();
     // 等待中的重试立即结束，循环看到 disposed 后退出。
     for (const [timer, resolve] of this.#retryTimers) { clearTimeout(timer); resolve(); }
     this.#retryTimers.clear();

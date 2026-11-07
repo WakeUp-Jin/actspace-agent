@@ -9,7 +9,7 @@ storageContract("JSONL", async () => {
   return { storage: new JsonlSessionStorage({ dataRoot, runtimeId: "test", registry: createCoreCodecRegistry() }), cleanup: () => rm(dataRoot, { recursive: true, force: true }) };
 });
 
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { access } from "node:fs/promises";
 import { createSessionHeader, SessionJournal } from "@actspace/session-journal";
 it("joins provisional writer acquisition before provider close returns", async () => {
@@ -68,7 +68,7 @@ it("query descriptors wait for the real writer fsync while old durable cursors r
     const before = await storage.querySource("durable");
     const cursor = (await storage.readEventBatch("durable", { throughSeq: before.throughSeq })).cursor;
     const event = new SessionJournal({ registry }).append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" },
-      data: { messageId: "pending", content: "pending durability" }, surface: { kind: "append", node: { kind: "user", messageId: "pending", content: "pending durability" } } });
+      data: { messageId: "pending", content: "pending durability" }, surface: { kind: "append" } });
     armed = true;
     const append = writer.append([event]);
     await atSync;
@@ -131,5 +131,30 @@ it("inspection carries a content digest instead of the raw Journal bytes, and re
     const torn = await inspectJsonlSession(path, registry, "digest");
     await writeFile(path, `${await readFile(path, "utf8")}x`);
     await expect(repairTornJsonlSession({ inspection: torn, registry, runtimeId: "repair" })).rejects.toThrow("changed after inspection");
+  } finally { await storage.close(); await rm(dataRoot, { recursive: true, force: true }); }
+});
+
+it("loads the Session history before a write only for codecs that declare readsHistory", async () => {
+  const dataRoot = await mkdtemp(join(tmpdir(), "storage-reads-history-"));
+  const owner = "@test/relations";
+  const seen: number[] = [];
+  const registry = createCoreCodecRegistry([
+    { type: `plugin/${owner}/local`, ownerPluginId: owner, currentVersion: 1, criticality: "required", validate: () => undefined, validateRelations: ({ candidate }) => { if (candidate.surface !== null) throw new Error("no surface"); } },
+    { type: `plugin/${owner}/history`, ownerPluginId: owner, currentVersion: 1, criticality: "required", readsHistory: true, validate: () => undefined, validateRelations: ({ previous }) => { seen.push(previous.length); } },
+  ]);
+  const storage = new JsonlSessionStorage({ dataRoot, runtimeId: "test", registry });
+  try {
+    const writer = await storage.create(createSessionHeader({ sessionId: "relations", createdAt: "2026-11-05T00:00:00.000Z", lineage: null,
+      createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }));
+    const journal = new SessionJournal({ registry });
+    const next = (kind: string) => journal.append({ type: `plugin/${owner}/${kind}`, eventVersion: 1, source: { ownerPluginId: owner }, data: {}, surface: null });
+    const inspect = vi.spyOn(storage, "inspect");
+    for (let index = 0; index < 3; index++) await writer.append([next("local")]);
+    expect(inspect).not.toHaveBeenCalled();
+    await writer.append([next("history")]);
+    expect(inspect).toHaveBeenCalledTimes(1);
+    // Once in the in-memory journal that built the event, once in the storage writer: both see the full history.
+    expect(seen).toEqual([3, 3]);
+    await writer.close();
   } finally { await storage.close(); await rm(dataRoot, { recursive: true, force: true }); }
 });

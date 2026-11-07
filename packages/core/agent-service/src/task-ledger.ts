@@ -158,8 +158,9 @@ export class TaskLedger {
     // A wake task has no user input; the Run opens with the claimed Inbox notifications.
     if (isBackgroundWake(task.content)) return [claim];
     return [claim, {
-      type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: task.taskId, agentRunId: runId },
-      surface: { kind: "append", node: { kind: "user", messageId: task.taskId, content: task.content && typeof task.content === "object" && !Array.isArray(task.content) && "kind" in task.content && task.content.kind === "composer-task" ? task.content.prepared : task.content } },
+      type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, // 模型看到的内容只存在 data.content，节点由 surfaceNode 推出（agent-spec-surface-derived.md §4.2）。
+      data: { messageId: task.taskId, agentRunId: runId, content: task.content && typeof task.content === "object" && !Array.isArray(task.content) && "kind" in task.content && task.content.kind === "composer-task" ? task.content.prepared : task.content },
+      surface: { kind: "append" },
       provenance: { sourceEventSeqs: [task.acceptedSeq], contributorIds: [TASK_OWNER_ID], runtimeSelectionSeq: null },
     }];
   }

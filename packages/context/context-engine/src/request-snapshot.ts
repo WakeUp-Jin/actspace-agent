@@ -1,28 +1,36 @@
-import { requestContentManifest } from "./content-manifest.js";
+import { createHash } from "node:crypto";
+import { sortSystemSections } from "@actspace/shared";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { Context, LlmInput } from "./types.js";
 
-/** Existing request/context schema, projected from the actual prepared input. */
-export function snapshotContext(context: Context, input: LlmInput, prepared: RuntimeV2JsonValue, compositionDigest: string, hostCapabilityDigest: string, original?: LlmInput): RuntimeV2JsonValue {
-  const contextManifest = requestContentManifest(context, input, original);
-  const snapshot = { schemaVersion: 2, sessionId: input.sessionId, logicalAgentScopeId: context.request.logicalAgentScopeId ?? "main", contextRevision: context.status.contextRevision ?? null, throughJournalSeq: context.status.throughJournalSeq, surfaceGeneration: context.content.conversation.replaceGeneration, turnId: context.request.turnId ?? null, stepId: context.request.stepId ?? null,
-    contextSections: contextManifest.comparable ? [...context.content.system.sections].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)) : null,
-    contextModelFacts: contextManifest.comparable ? context.content.system.modelFacts.map((content, index) => ({ id: context.content.system.modelFactSources?.[index]?.id ?? `model-facts:${index}`, owner: context.content.system.modelFactSources?.[index]?.owner ?? "runtime", order: index, content })) : null,
-    systemSections: [...context.content.system.sections].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)).map(section => section.content),
-    modelFacts: context.content.system.modelFacts, facts: context.status.facts,
-    renderedSystemPrompt: input.messages.filter(message => message.role === "system").map(message => message.content).join("\n\n"),
-    messages: input.messages.filter(message => message.role !== "system"), tools: input.tools,
-    contributorProvenance: context.status.plugins["actspace.context.sources"] ?? [], requestOptions: { routeId: input.routeId, model: input.model },
-    contextManifest, contextModel: context.status.requestModel ?? null,
-    prepared, compositionDigest, hostCapabilityDigest,
+/** 一次请求要写进日志的三样东西（agent-spec-request-record.md §3–§5）。提示词、工具只在 digest 与日志里最近一条不同时才写。 */
+export type RequestRecords = {
+  readonly systemPrompt: { readonly digest: string; readonly sections: RuntimeV2JsonValue; readonly modelFacts: RuntimeV2JsonValue; readonly contributorProvenance: RuntimeV2JsonValue };
+  readonly tools: { readonly digest: string; readonly tools: RuntimeV2JsonValue };
+  readonly snapshot: RuntimeV2JsonValue;
+};
+
+function digestOf(value: unknown): string { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
+
+/** 从引擎上下文和实际发出的请求（工具、路由、模型）生成请求记录。对话不进记录：它已经在对话事件里。 */
+export function requestRecords(context: Context, input: Pick<LlmInput, "sessionId" | "routeId" | "model" | "tools">, prepared: RuntimeV2JsonValue, compositionDigest: string, hostCapabilityDigest: string): RequestRecords {
+  const system = context.content.system;
+  const prompt = {
+    sections: sortSystemSections(system.sections).map(section => ({ owner: section.owner, id: section.id, order: section.order, content: section.content, ...(section.provenance === undefined ? {} : { provenance: section.provenance }) })),
+    modelFacts: system.modelFacts.map((content, index) => ({ owner: system.modelFactSources?.[index]?.owner ?? "runtime", id: system.modelFactSources?.[index]?.id ?? `model-facts:${index}`, order: index, content })),
+    contributorProvenance: context.status.plugins["actspace.context.sources"] ?? [],
   };
-  if (Buffer.byteLength(JSON.stringify(snapshot)) > 960 * 1024) { snapshot.contextSections = null; snapshot.contextModelFacts = null; }
-  // Metadata must not push an otherwise legal Journal record over the Provider
-  // budget. Totals survive; a missing identity list is explicitly uncomparable.
-  if (contextManifest.entries.length > 5000 || Buffer.byteLength(JSON.stringify(contextManifest)) > 256 * 1024 || Buffer.byteLength(JSON.stringify(snapshot)) > 960 * 1024) {
-    contextManifest.entries = []; contextManifest.comparable = false; contextManifest.comparisonUnavailableReason = "manifest-budget";
-  }
-  return freezeRequest(snapshot as unknown as RuntimeV2JsonValue);
+  const systemPrompt = freezeRequest({ digest: digestOf(prompt), ...prompt } as unknown as RuntimeV2JsonValue) as unknown as RequestRecords["systemPrompt"];
+  const tools = freezeRequest({ digest: digestOf(input.tools), tools: input.tools } as unknown as RuntimeV2JsonValue) as unknown as RequestRecords["tools"];
+  const snapshot = freezeRequest({
+    schemaVersion: 3, sessionId: input.sessionId, logicalAgentScopeId: context.request.logicalAgentScopeId ?? "main",
+    contextRevision: context.status.contextRevision ?? null, throughJournalSeq: context.status.throughJournalSeq, surfaceGeneration: context.content.conversation.replaceGeneration,
+    turnId: context.request.turnId ?? null, stepId: context.request.stepId ?? null,
+    systemPromptDigest: systemPrompt.digest, toolsDigest: tools.digest,
+    prepared, requestOptions: { routeId: input.routeId, model: input.model }, contextModel: context.status.requestModel ?? null,
+    compositionDigest, hostCapabilityDigest,
+  } as unknown as RuntimeV2JsonValue);
+  return { systemPrompt, tools, snapshot };
 }
 
 export function freezeRequest<T extends RuntimeV2JsonValue>(value: T): Readonly<T> {

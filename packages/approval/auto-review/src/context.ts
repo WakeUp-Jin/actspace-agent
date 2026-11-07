@@ -1,3 +1,4 @@
+import { surfaceNode } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 /** Use original messages even after compaction. Never send raw ordinary tool output or reasoning. */
 export function reviewConversation(events: Iterable<SessionEventEnvelopeV1>): unknown[] {
@@ -5,7 +6,7 @@ export function reviewConversation(events: Iterable<SessionEventEnvelopeV1>): un
   const approvals = new Map<string, unknown>();
   let size = 0, users = 0;
   for (const event of events) {
-    const node = event.surface?.kind === "append" ? event.surface.node : undefined;
+    const node = event.surface?.kind === "append" ? surfaceNode(event) ?? undefined : undefined;
     if (node && (event.type === "user/message" || event.type === "assistant/message")) {
       const content = typeof node.content === "string" ? node.content : Array.isArray(node.content) ? node.content.filter(b => b && typeof b === "object" && !Array.isArray(b) && b.type === "text") : node.content;
       const message = { seq: event.seq, role: event.type === "user/message" ? "user" : "assistant", content };

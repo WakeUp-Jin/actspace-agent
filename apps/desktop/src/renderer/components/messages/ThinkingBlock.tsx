@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { hasVisibleText, type MessageBlock } from "@actspace/shared";
+import { ToolLogShimmer } from "./ToolLogShimmer";
 import {
   getToolLogRunningTextAttrs,
   TOOL_LOG_LINE_TEXT_RUNNING_CLASS,
@@ -37,6 +38,7 @@ export function ThinkingBlock({ message, className, replyCompleted = false }: {
           {...(running ? getToolLogRunningTextAttrs(message.title) : {})}
         >
           {message.title}
+          {running ? <ToolLogShimmer text={message.title} /> : null}
         </span>
         {expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />}
       </button>

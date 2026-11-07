@@ -79,9 +79,12 @@ export function SidebarSessions({
     return options.archived === "all" ? [...live, ...archived] : live;
   }, [archivedPool, options.archived, sessions, workspaces]);
 
-  const pinned = orderSessions(pool.filter((session) => session.pinned && !session.archived), savedOrder(PINNED_ORDER_ACCOUNT));
+  // 排序和分组结果按输入缓存：别的状态变化（搜索框、折叠……）不重新排序整个列表。
+  const pinnedOrder = savedOrder(PINNED_ORDER_ACCOUNT);
+  const flatOrder = savedOrder(FLAT_ORDER_ACCOUNT);
+  const pinned = useMemo(() => orderSessions(pool.filter((session) => session.pinned && !session.archived), pinnedOrder), [pool, pinnedOrder]);
   const unpinned = useMemo(() => pool.filter((session) => !session.pinned || session.archived), [pool]);
-  const flat = orderSessions(unpinned, savedOrder(FLAT_ORDER_ACCOUNT));
+  const flat = useMemo(() => orderSessions(unpinned, flatOrder), [unpinned, flatOrder]);
   const workspaceGroups = useMemo(() => {
     const groups = groupSessionsByWorkspace(unpinned, workspaces, hostNameOf);
     if (options.archived === "only") return groups.filter((group) => group.sessions.length > 0);
@@ -92,8 +95,8 @@ export function SidebarSessions({
     }
     return groups;
   }, [browse?.groups, hostNameOf, options.archived, unpinned, workspaces]);
-  const orderedGroups: WorkspaceGroup[] = orderGroups(workspaceGroups, savedOrder(GROUPS_ORDER_ACCOUNT))
-    .map((group) => ({ ...group, sessions: orderSessions(group.sessions, savedOrder(group.key)) }));
+  const orderedGroups: WorkspaceGroup[] = useMemo(() => orderGroups(workspaceGroups, manual ? view.orders[GROUPS_ORDER_ACCOUNT] : undefined)
+    .map((group) => ({ ...group, sessions: orderSessions(group.sessions, manual ? view.orders[group.key] : undefined) })), [workspaceGroups, manual, view.orders]);
   // 「归档全部」会连置顶的会话一起归档，所以判断是否可用时看全部会话。
   const allByGroup = useMemo(() => sessionsByGroupKey(sessions, workspaces), [sessions, workspaces]);
 

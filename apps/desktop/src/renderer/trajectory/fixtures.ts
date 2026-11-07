@@ -1,5 +1,6 @@
 import completeFixture from "../fixtures/trajectory-complete.json";
 import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
+import type { RequestLiveOutput } from "@actspace/client/live";
 
 export type TrajectoryFixtureName = "complete" | "running" | "errors" | "long" | "empty" | "streaming" | "streaming-long";
 
@@ -50,9 +51,6 @@ function runningFixture(): RuntimeV2TrajectorySnapshot {
 function errorsFixture(): RuntimeV2TrajectorySnapshot {
   const nodes: RuntimeV2TrajectoryNode[] = COMPLETE.nodes.map(node => {
     const data = node.data as Record<string, RuntimeV2JsonValue>;
-    if (node.eventType === "request/header" && data.requestId === "request-2-2") {
-      return cloneNode(node, { data: { ...data, prompt: { ...(data.prompt as Record<string, RuntimeV2JsonValue>), systemPrompt: "你是 ActSpace 的代码助手。\n本轮只检查文件，不修改。" } } });
-    }
     if (node.eventType === "tool/call" && node.callId === "call-1-1-2") {
       return cloneNode(node, { data: { ...data, parentCallId: "call-1-1-1" } });
     }
@@ -76,11 +74,16 @@ function errorsFixture(): RuntimeV2TrajectorySnapshot {
     const anchor = nodes[index]!;
     nodes.splice(index + 1, 0, { ...anchor, eventType, kind: "other", state: "observed", callId: null, data, ...(surface === undefined ? {} : { surface }) });
   };
+  // 第 2 轮第 2 次请求换了提示词：提示词只在变化时记一条 request/system-prompt（agent-spec-request-record.md §3）。
+  const initialPrompt = nodes.find(node => node.eventType === "request/system-prompt")!.data as Record<string, RuntimeV2JsonValue>;
+  const changedSections = [{ id: "model-prompt", owner: "actspace.context-system", order: 0, content: "你是 ActSpace 的代码助手。\n本轮只检查文件，不修改。" }];
+  extra(node => node.eventType === "request/header" && (node.data as Record<string, RuntimeV2JsonValue>).requestId === "request-2-2", "request/system-prompt",
+    { ...initialPrompt, requestId: "request-2-2", turnId: "turn-2", stepId: "step-2-2", digest: "fixture-prompt-2", sections: changedSections });
   const content = "后台任务「pnpm build」已完成，退出码 0。";
   extra(node => node.eventType === "user/message" && (node.data as Record<string, RuntimeV2JsonValue>).messageId === "user-1", "plugin/actspace.context/supplement",
     { turnId: "turn-1", op: "add", owner: "actspace.context-runtime", id: "runtime-state", lifetime: "turn", content: "运行环境：macOS · 工作目录 actspace-agent · 本轮执行预算剩余 18 步" });
   extra(node => node.eventType === "turn/end" && (node.data as Record<string, RuntimeV2JsonValue>).turnId === "turn-1", "agent/inbox/spliced",
-    { operation: "claim", target: "next-turn", source: "task_notification", taskId: "task-build", content }, { node: { kind: "user", content } });
+    { operation: "claim", messageId: "notice-task-build", target: "next-turn", source: "task_notification", taskId: "task-build", content }, { kind: "append" });
   // 插入后重排 eventSeq，保持 Journal 序号严格递增。
   return snapshot(nodes.map((node, eventSeq) => cloneNode(node, { eventSeq, key: `${node.sessionId}:${eventSeq}` })));
 }
@@ -118,57 +121,54 @@ const STREAMING_CHUNK = 6;
 /** Number of frames the streaming replay emits before it stops growing. */
 export const STREAMING_FRAMES = Math.ceil(STREAMING_TEXT.length / STREAMING_CHUNK);
 
+/** A streaming fixture frame: the Journal (the running request still open) and the live run's output. */
+export type TrajectoryFixtureFrame = { readonly snapshot: RuntimeV2TrajectorySnapshot; readonly live: ReadonlyMap<string, RequestLiveOutput> };
+
+const isRunningChunk = (node: RuntimeV2TrajectoryNode) => node.eventType === "assistant/chunk" && String((node.data as Record<string, RuntimeV2JsonValue>).messageId).endsWith("assistant-running");
+const liveOf = (node: RuntimeV2TrajectoryNode, text: string): ReadonlyMap<string, RequestLiveOutput> => {
+  const data = node.data as Record<string, string>;
+  return text === "" ? new Map() : new Map([[data.requestId!, { messageId: data.messageId!, text, thinking: "", calls: new Map() }]]);
+};
+
 /**
- * The complete fixture's running turn, with its assistant text cut into `frame` chunks.
- * The renderer replays frames 0…STREAMING_FRAMES to review in-place streaming without IPC.
+ * The complete fixture's running turn as a new Session streams it: the Journal ends at the open request and
+ * the reply grows in the live run by `frame` chunks. Frames 0…STREAMING_FRAMES review in-place streaming without IPC.
  */
-export function streamingFixture(frame: number): RuntimeV2TrajectorySnapshot {
-  const template = COMPLETE.nodes.find(node => node.eventType === "assistant/chunk" && (node.data as Record<string, RuntimeV2JsonValue>).messageId === "assistant-running")!;
+export function streamingFixture(frame: number): TrajectoryFixtureFrame {
+  const template = COMPLETE.nodes.find(isRunningChunk)!;
   const base = COMPLETE.nodes.filter(node => node.eventSeq < template.eventSeq);
-  const start = Date.parse(template.time ?? "2026-10-14T00:00:00.000Z");
-  const chunks = Array.from({ length: Math.min(frame, STREAMING_FRAMES) }, (_, index) => {
-    const eventSeq = template.eventSeq + index;
-    return cloneNode(template, {
-      key: `${template.sessionId}:${eventSeq}`, eventSeq,
-      time: new Date(start + index * 120).toISOString(),
-      data: { ...(template.data as Record<string, RuntimeV2JsonValue>), delta: STREAMING_TEXT.slice(index * STREAMING_CHUNK, (index + 1) * STREAMING_CHUNK) },
-    });
-  });
-  return snapshot([...base, ...chunks], template.sessionId);
+  return { snapshot: snapshot(base, template.sessionId), live: liveOf(template, STREAMING_TEXT.slice(0, Math.min(frame, STREAMING_FRAMES) * STREAMING_CHUNK)) };
 }
 
 /** Chunks in the `streaming-long` reply once its replay finishes. */
 export const STREAMING_LONG_CHUNKS = 2000;
 
 /**
- * The long fixture with one reply still streaming in its last turn, cut into `chunks` chunks.
- * Earlier batches drop their unfinished reply, so exactly one assistant is streaming.
+ * The long fixture with one reply still streaming in its last turn, grown by `chunks` chunks.
+ * Earlier batches drop their unfinished reply and its request, so exactly one call is streaming.
  */
-let streamingLongBase: { readonly template: RuntimeV2TrajectoryNode; readonly base: readonly RuntimeV2TrajectoryNode[] } | null = null;
+let streamingLongBase: { readonly template: RuntimeV2TrajectoryNode; readonly base: RuntimeV2TrajectorySnapshot } | null = null;
 
-export function streamingLongFixture(chunks: number): RuntimeV2TrajectorySnapshot {
+export function streamingLongFixture(chunks: number): TrajectoryFixtureFrame {
   if (streamingLongBase === null) {
-    const running = (node: RuntimeV2TrajectoryNode) => node.eventType === "assistant/chunk" && String((node.data as Record<string, RuntimeV2JsonValue>).messageId).endsWith(":assistant-running");
     const nodes = longFixture().nodes;
-    streamingLongBase = { template: nodes.filter(running).at(-1)!, base: nodes.filter(node => !running(node)) };
+    const template = nodes.filter(isRunningChunk).at(-1)!;
+    const open = new Set(nodes.filter(isRunningChunk).map(node => (node.data as Record<string, string>).requestId));
+    open.delete((template.data as Record<string, string>).requestId);
+    const base = nodes.filter(node => !isRunningChunk(node) && !(node.eventType.startsWith("request/") && open.has((node.data as Record<string, string>).requestId)));
+    streamingLongBase = { template, base: snapshot(base, template.sessionId) };
   }
   const { template, base } = streamingLongBase;
-  const start = Date.parse(template.time ?? "2026-10-14T00:00:00.000Z");
-  const firstSeq = (base.at(-1)?.eventSeq ?? 0) + 1;
-  const added = Array.from({ length: Math.min(chunks, STREAMING_LONG_CHUNKS) }, (_, index) => {
-    const eventSeq = firstSeq + index;
+  let text = "";
+  for (let index = 0; index < Math.min(chunks, STREAMING_LONG_CHUNKS); index += 1) {
     const offset = (index * STREAMING_CHUNK) % STREAMING_TEXT.length;
-    return cloneNode(template, {
-      key: `${template.sessionId}:${eventSeq}`, eventSeq,
-      time: new Date(start + index * 20).toISOString(),
-      data: { ...(template.data as Record<string, RuntimeV2JsonValue>), delta: STREAMING_TEXT.slice(offset, offset + STREAMING_CHUNK) },
-    });
-  });
-  return snapshot([...base, ...added], template.sessionId);
+    text += STREAMING_TEXT.slice(offset, offset + STREAMING_CHUNK);
+  }
+  return { snapshot: base, live: liveOf(template, text) };
 }
 
-/** Dev replay for the streaming fixtures: frame count and the snapshot at each frame. */
-export function streamingReplay(name: TrajectoryFixtureName | null): { readonly frames: number; readonly frame: (index: number) => RuntimeV2TrajectorySnapshot } | null {
+/** Dev replay for the streaming fixtures: frame count and the Journal plus live output at each frame. */
+export function streamingReplay(name: TrajectoryFixtureName | null): { readonly frames: number; readonly frame: (index: number) => TrajectoryFixtureFrame } | null {
   if (name === "streaming") return { frames: STREAMING_FRAMES, frame: streamingFixture };
   if (name === "streaming-long") return { frames: STREAMING_LONG_CHUNKS / 20, frame: index => streamingLongFixture(index * 20) };
   return null;
@@ -182,8 +182,8 @@ export function loadTrajectoryFixture(name: TrajectoryFixtureName): RuntimeV2Tra
     case "errors": return errorsFixture();
     case "long": return longFixture();
     case "empty": return emptyFixture();
-    case "streaming": return streamingFixture(0);
-    case "streaming-long": return streamingLongFixture(0);
+    case "streaming": return streamingFixture(0).snapshot;
+    case "streaming-long": return streamingLongFixture(0).snapshot;
   }
 }
 

@@ -1,7 +1,7 @@
 # 执行摘要：获取可用模型与连接详情 V3
 
 - 计划：[20261021-model-acquisition-picker](../../exec-plans/completed/20261021-model-acquisition-picker.md)
-- 规范：[设置 › 模型重做规范](../../design-docs/frontend/front-模型设置页面-Maka重做规范.md)（§4.1、§4.3–§4.5、§5.2、§5.3、§6.1、§10）
+- 规范：[设置 › 模型重做规范](../../exec-plans/completed/design-archive/frontend/front-模型设置页面-Maka重做规范.md)（§4.1、§4.3–§4.5、§5.2、§5.3、§6.1、§10）
 - Demo：`docs/design-docs/frontend/model-provider-demo/connection-detail-v3.html`
 - 分支：`fix/settings-model-select`（未提交）
 - 日期：2026-10-21
@@ -38,13 +38,13 @@
 
 ## 截图（浏览器 mock）
 
-- [浅色 · 中转连接，卡片展开](screenshots/1-light-relay.png)
-- [浅色 · 显示更多、撤销条、变体草稿](screenshots/2-light-more-undo-draft.png)
-- [深色 · 获取可用模型弹窗](screenshots/3-dark-picker.png)
-- [浅色 · 480px](screenshots/4-light-480.png)
+- 浅色 · 中转连接，卡片展开（截图 `screenshots/1-light-relay.png`，原图未入库）
+- 浅色 · 显示更多、撤销条、变体草稿（截图 `screenshots/2-light-more-undo-draft.png`，原图未入库）
+- 深色 · 获取可用模型弹窗（截图 `screenshots/3-dark-picker.png`，原图未入库）
+- 浅色 · 480px（截图 `screenshots/4-light-480.png`，原图未入库）
 
 ## 未覆盖与已知限制
 
-- Electron 实机和真实 Key 未验证，清单见[验收交接](acceptance-handoff.md)。
+- Electron 实机和真实 Key 未验证，清单见验收交接（原始记录已清理，见 git 历史）。
 - 撤销的倒计时只在页面内存里；应用在 8 秒内退出时，这次移除不会提交（模型保留）。
 - 未提交，等用户确认。

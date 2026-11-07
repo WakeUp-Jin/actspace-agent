@@ -23,7 +23,9 @@ const context={request:{sessionId:'context-0',requestId:'live',routeId:'fixture'
 const engine=new ContextEngine({resolve:()=>context});
 const live=await engine.getContext(context.request);await engine.recordPrepared(live,{modelKey:'fixture/fixture',label:'fixture',contextWindow:32768,autoCompactAtTokens:26000});
 const projection=engine.getProjection(context.request);
-const manifest={...projection.manifest,entries:projection.manifest.entries.map(({preview,fullTextAvailable,source,...entry})=>entry)};
+// 提示词、工具只在变化时写一次（agent-spec-request-record.md）；估算由日志折叠。
+const promptRecord=ids=>({...ids,digest:'benchmark-prompt',contributorProvenance:[],sections:content.system.sections,modelFacts:[]});
+const toolsRecord=ids=>({...ids,digest:'benchmark-tools',tools:content.tools});
 await mkdir(root,{recursive:true});await writeFile(join(root,'global-usage-reset.json'),JSON.stringify({version:1,resetAt:'2000-01-01T00:00:00Z'}));
 let journalBytes=0;
 for(let s=0;s<sessions;s++){
@@ -35,7 +37,8 @@ for(let s=0;s<sessions;s++){
  const ids={turnId:`t${i}`,stepId:`step${i}`,requestId:`r${i}`,agentRunId:`run${i}`};
  await append('turn/start',ids);await append('step/start',{...ids,stepIndex:1});
  await append('request/header',{...ids,model:'fixture',routeId:'fixture'});
- await append('request/context',{...ids,snapshot:{contextManifest:manifest,contextModel:projection.model,logicalAgentScopeId:`main:${id}`,renderedSystemPrompt:'Context benchmark',messages:[]}});
+ if(i===0){await append('request/system-prompt',promptRecord(ids));await append('request/tools',toolsRecord(ids));}
+ await append('request/context',{...ids,snapshot:{schemaVersion:3,contextModel:projection.model,logicalAgentScopeId:`main:${id}`}});
  const body=[{type:'text',text:`Visible synthetic response ${i}`}],usage={inputTokens:100,outputTokens:20,cacheReadTokens:10,totalTokens:120};
  await append('assistant/message',{...ids,messageId:`a${i}`,content:body,finishReason:'stop',usage},{kind:'append',node:{kind:'assistant',messageId:`a${i}`,content:body}});
  await append('step/end',{...ids,reason:'completed',usage});await append('turn/end',{...ids,reason:'completed'});
@@ -46,7 +49,7 @@ const storage=new JsonlSessionStorage({dataRoot:root,runtimeId:'context-benchmar
 const controller=new RuntimeSessionController({dataRoot:root,runtimeId:'context-benchmark',registry,profileId:'base',manifestDigest:'benchmark',plugins:[]},new SessionStore({registry},storage));
 let enumerations=0,readEvents=0,sourceCalls=0;const readSessions=new Set();
 const service=new UsageReadModelService({sessionQuerySources:()=>{enumerations++;return controller.querySources();},readSessionEventBatch:async(id,input)=>{const batch=await controller.readEventBatch(id,input);readEvents+=batch.events.length;readSessions.add(id);return batch;}},root);
-const panel=new ContextPanelService({readContextProjection:async()=>projection,readContextEntryText:async()=>null,sessionQuerySource:async id=>{sourceCalls++;return controller.querySource(id);}},service);
+const panel=new ContextPanelService({readContextProjection:async()=>projection,readContextEntryText:async()=>null,sessionQuerySource:async id=>{sourceCalls++;return controller.querySource(id);},readSessionProjectionValue:async(id,key)=>controller.projectionValue(id,key)},service);
 const loop=monitorEventLoopDelay({resolution:10});loop.enable();let heap=0;const timer=setInterval(()=>{heap=Math.max(heap,process.memoryUsage().heapUsed);},20);
 const dist=values=>Object.fromEntries([50,95,99].map(p=>[`p${p}`,[...values].sort((a,b)=>a-b)[Math.ceil(values.length*p/100)-1]]));
 try{

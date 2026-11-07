@@ -3,7 +3,7 @@ import type { RuntimeV2SessionActivity, RuntimeV2UsageSummary } from "@actspace/
 
 /**
  * Context 面板的纯数据逻辑（见 `front-右侧面板与文件渲染规范.md`「Context 面板」）。
- * `source: "interim"` 表示后端 `describeContextPanel` 还没实现，视图由 describeContext + 会话 projection 拼成：
+ * `source: "interim"` 表示后端 `describeContextPanel` 还没实现，视图由 contextEstimate 投影 + 会话 projection 拼成：
  * 没有对比基准、趋势和事件，会话条目也没有子类型和轨迹身份。
  */
 export type ContextPanelData = { view: ContextPanelView; source: "backend" | "interim" };

@@ -15,8 +15,9 @@ type LiveIdentity = {
   readonly workspaceRoot?: string;
 };
 type StreamPayload =
-  | { readonly kind: "assistant-delta"; readonly message: string }
-  | { readonly kind: "reasoning-delta"; readonly message: string }
+  /** `liveRevision`：实时底稿给这段增量的编号（见 live-output.ts），宿主在转发前加上。 */
+  | { readonly kind: "assistant-delta"; readonly message: string; readonly liveRevision?: number }
+  | { readonly kind: "reasoning-delta"; readonly message: string; readonly liveRevision?: number }
   | { readonly kind: "tool-call-delta"; readonly callId: string; readonly name: string; readonly argumentsDelta: string };
 export type AgentLiveToolResult = { readonly status: "completed" | "failed" | "denied" | "aborted" | "outcome-unknown"; readonly [field: string]: unknown };
 export type AgentLiveFailure = { readonly kind: string; readonly message: string; readonly retryable: boolean; readonly [field: string]: unknown };

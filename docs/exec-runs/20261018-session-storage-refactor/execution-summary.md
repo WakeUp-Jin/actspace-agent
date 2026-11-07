@@ -55,4 +55,4 @@ pnpm -r --filter @actspace/session-journal --filter @actspace/session-jsonl --fi
 
 ## 后续联合 Computer Use 验收
 
-2026-10-18 已补充真实 Electron 联合验收：工具Step刷新、压缩后下一请求、移除隔离SQLite后的恢复与继续执行已有证据；发现压缩中取消入口禁用、自动失败终态无持续提示两项前端问题。部分恢复/路径边界仍未覆盖，不能据此声明全部通过。详见 [联合验收摘要](../20261018-context-storage-cu/execution-summary.md) 与 [问题记录](../20261018-context-storage-cu/issues.md)。本段是后续验收结果，不改写上文实施时点的自动化证据。
+2026-10-18 已补充真实 Electron 联合验收：工具Step刷新、压缩后下一请求、移除隔离SQLite后的恢复与继续执行已有证据；发现压缩中取消入口禁用、自动失败终态无持续提示两项前端问题。部分恢复/路径边界仍未覆盖，不能据此声明全部通过。详见 [联合验收摘要](../20261018-context-storage-cu/execution-summary.md) 与 问题记录（原始记录已清理，见 git 历史）。本段是后续验收结果，不改写上文实施时点的自动化证据。

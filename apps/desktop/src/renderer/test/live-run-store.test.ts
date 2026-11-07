@@ -84,6 +84,26 @@ describe("live run store", () => {
     ]);
   });
 
+  it("does not project a sibling bash call as Running while the batch waits on another call's approval", () => {
+    const store = createLiveRunStore();
+    store.start(run("s1", "run-b"));
+    const ids = { sessionId: "s1", agentRunId: "run-b", turnId: "t1", llmCallId: "l1" };
+    const bashPreview = (command: string) => ({ kind: "bash", status: "running", title: "Bash command", command, commandPreview: command });
+    const apply = (event: Record<string, unknown>) => store.applyStreamEvent({ ...ids, ...event } as never, () => undefined);
+    // runtime 对一批调用先全部 prepared；`ls ~/Desktop` 在 stage 里等审批，`ls ~` 还没轮到。
+    apply({ type: "tool_call_streaming", toolCallId: "call-a", toolName: "bash", preview: bashPreview("ls ~/Desktop") });
+    apply({ type: "tool_call_streaming", toolCallId: "call-b", toolName: "bash", preview: bashPreview("ls ~") });
+    apply({ type: "tool_approval_required", toolCallId: "call-a", toolName: "bash", requestId: "approval-a", summary: "List Desktop contents", reason: "Bash command requires approval", command: "ls ~/Desktop" });
+    const toolBlocks = () => store.view("s1").blocks.filter((block) => block.kind === "bash");
+    expect(toolBlocks().map((block) => [block.id, "status" in block ? block.status : null])).toEqual([["turn:run-b:tool:call-a", "pending"]]);
+
+    // 审批通过、两个调用各自开始执行后，后面的调用才作为运行中出现。
+    apply({ type: "tool_approval_resolved", toolCallId: "call-a", decision: "once" });
+    apply({ type: "tool_started", toolCallId: "call-a", toolName: "bash", argsPreview: "", preview: bashPreview("ls ~/Desktop") });
+    apply({ type: "tool_started", toolCallId: "call-b", toolName: "bash", argsPreview: "", preview: bashPreview("ls ~") });
+    expect(toolBlocks().map((block) => "status" in block ? block.status : null)).toEqual(["running", "running"]);
+  });
+
   it("puts the background notice divider first in a wake run and keys it like the durable block", () => {
     const store = createLiveRunStore();
     store.start(run("s1", "run-w"));
@@ -131,11 +151,14 @@ describe("task queue store", () => {
   it("attaches a recovered run from a snapshot and detaches it once the Host reports it finished", () => {
     const tasks = createTaskQueueStore();
     const runs = createLiveRunStore();
-    const effects = { tasks, runs, patchLocal: vi.fn(), notice: vi.fn(), refreshSession: vi.fn() };
+    const effects = { tasks, runs, patchLocal: vi.fn(), notice: vi.fn(), refreshSession: vi.fn(), attachLiveBaseline: vi.fn() };
     const running = { runId: "run-1", taskId: "t-1", state: "running", result: null, configuration: {}, harness: { harnessId: "main", generationId: "g", revision: 1 } } as TaskSnapshot["runs"][number];
     applyTaskSnapshot(snapshot("s1", 1, [running]), effects);
     expect(runs.view("s1")).toMatchObject({ isStreaming: true, runId: "run-1", recovered: true });
-    applyTaskSnapshot(snapshot("s1", 2, [{ ...running, state: "completed" } as TaskSnapshot["runs"][number]]), effects);
+    expect(effects.attachLiveBaseline).toHaveBeenCalledExactlyOnceWith("s1", "run-1");
+    applyTaskSnapshot(snapshot("s1", 2, [running]), { ...effects });
+    expect(effects.attachLiveBaseline).toHaveBeenCalledOnce();
+    applyTaskSnapshot(snapshot("s1", 3, [{ ...running, state: "completed" } as TaskSnapshot["runs"][number]]), effects);
     expect(runs.has("s1")).toBe(false);
     expect(runs.isTerminal("run-1")).toBe(true);
     expect(effects.patchLocal).toHaveBeenCalledWith("s1", expect.objectContaining({ messageQueue: expect.anything() }));

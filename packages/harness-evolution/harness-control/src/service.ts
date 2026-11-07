@@ -187,14 +187,25 @@ export class HarnessControl {
       }
     }
   }
+  /**
+   * Startup that only failed because the previous Host still owned the selection store is retried; anything
+   * else (artifact, contract, durability recovery) stays blocked. Callers that read `inspect().blocked` before
+   * acquiring (session HMR binding) call this first, so a restart does not leave the queue paused.
+   */
+  retryStartup(): Promise<void> {
+    return this.#exclusive(() => this.#retryLockedStartup());
+  }
+  async #retryLockedStartup(): Promise<void> {
+    // A failed initial lease owns no records or generation. Retry through the
+    // same gate; never bypass artifact, contract, or durability recovery errors.
+    const startupFailure = this.#blocked.get("*");
+    if (startupFailure instanceof HarnessControlError && startupFailure.code === "STORE_LOCKED") await this.initialize();
+  }
   async acquire(harnessId: string, signal?: AbortSignal, generationId?: string): Promise<HarnessLease> {
     signal?.throwIfAborted();
     const pending = this.#exclusive(async () => {
       signal?.throwIfAborted();
-      // A failed initial lease owns no records or generation. Retry through the
-      // same gate; never bypass artifact, contract, or durability recovery errors.
-      const startupFailure = this.#blocked.get("*");
-      if (startupFailure instanceof HarnessControlError && startupFailure.code === "STORE_LOCKED") await this.initialize();
+      await this.#retryLockedStartup();
       const blocked = this.#blocked.get("*") ?? this.#blocked.get(harnessId);
       if (blocked) throw new HarnessControlError("RECOVERY_BLOCKED", "Harness execution is blocked", { cause: blocked });
       await this.#store.assertOwned();

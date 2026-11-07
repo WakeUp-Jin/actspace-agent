@@ -32,7 +32,8 @@ describe("incremental Journal", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
     journal.appendMany([core("turn/start", { turnId: "t" }), core("step/start", { turnId: "t", stepId: "s" }), core("tool/call", { callId: "c", name: "read_file" })]);
     const result = core("tool/result", { callId: "c", name: "read_file", status: "completed" });
-    expect(() => journal.append({ ...result, surface: { kind: "append", node: { kind: "user", messageId: "wrong", content: "bad" } } })).toThrow();
+    // 没有 modelOutput 的工具结果推不出节点，进入对话时被拒。
+    expect(() => journal.append({ ...result, surface: { kind: "append" } })).toThrow(/cannot derive a node/);
     expect(journal.validation.relations.openToolCallIds).toEqual(["c"]);
     journal.append(result);
     expect(journal.validation.relations.openToolCallIds).toEqual([]);
@@ -56,8 +57,8 @@ it("keeps an unfinished compaction pending after its durable start leaves the re
   const { createCompactionTransaction } = await import("../compaction.js");
   const history: import("../event-envelope.js").SessionEventEnvelopeV1[] = [];
   const journal = new SessionJournal({ registry: createCoreCodecRegistry(), retainedEvents: 1, history: { readEvents: (a, b) => history.slice(a, b) } });
-  journal.append({ ...core("user/message", { messageId: "m" }), surface: { kind: "append", node: { kind: "user", messageId: "m", content: "old" } } });
-  const transaction = createCompactionTransaction({ surface: journal.surface, start: 0, end: 1, summary: { kind: "assistant", messageId: "summary", content: "summary" }, compactionId: "c", contributorIds: [], summaryDigest: "digest" });
+  journal.append({ ...core("user/message", { messageId: "m", content: "old" }), surface: { kind: "append" } });
+  const transaction = createCompactionTransaction({ surface: journal.surface, start: 0, end: 1, summary: { kind: "assistant", messageId: "summary", content: "summary" }, compactionId: "c", contributorIds: [], summaryDigest: "digest", replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test" });
   journal.appendMany(transaction.slice(0, -1));
   history.push(...journal.readEvents()); journal.releaseDurable(journal.lastSeq);
   expect(journal.retainedEventCount).toBe(1);

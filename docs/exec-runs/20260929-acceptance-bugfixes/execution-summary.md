@@ -30,7 +30,7 @@
 | C01 旧产物不能跳过本轮构建 | 通过：真实 dev orchestrator 进程测试先失败退出91，修复后按 build-start → build-done → launch 通过；真实 dev 日志中 build:electron 成功先于 dev-runtime。 |
 | C02 构建失败阻断启动 | 通过（自动化）：注入构建退出23，启动器传播23，未启动后续阶段；修复前错误启动。 |
 | C03 首次窗口与模式切换 | 通过（CU）：真实 pnpm dev:log 首次打开；Plan 创建并调用成功，已有会话移除 Plan → Chat → 移除 Chat 恢复 Agent。工作区/权限入口随模式隐藏恢复，日志无缺 handler 错误。 |
-| C04 跨会话首读与缓存语义 | 通过：CU 两个独立会话分别首次读取同一文件，force=false，各仅1次调用，界面均显示正文；[工具证据](cache-session-verification.json)。同会话缓存命中与 force=true 由自动化验证。 |
+| C04 跨会话首读与缓存语义 | 通过：CU 两个独立会话分别首次读取同一文件，force=false，各仅1次调用，界面均显示正文；工具证据（原始记录已清理，见 git 历史）。同会话缓存命中与 force=true 由自动化验证。 |
 
 验证：dev runner 7通过/1跳过（环境未提供 npm_execpath，既有 pnpm 外层进程测试跳过）；filesystem-read 5通过；filesystem-read 与 desktop typecheck、dev 依赖及 Electron 构建、renderer build 通过。三个新增回归检查均观察过修改前失败。
 

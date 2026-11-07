@@ -1,6 +1,6 @@
 import { BackgroundTasksPanel } from "./right-panel/BackgroundTasksPanel";
-import { SubagentsPanel } from "./right-panel/SubagentsPanel";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { SubagentsPanel } from "./lazy-pages";
+import { Suspense, memo, useContext, useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
   Eye,
@@ -38,7 +38,7 @@ const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-col overflow-hidden 
 // 右面板纵向两段：① tab 条（全宽）→ ② 内容。文件标签（本机图片）在内容上方多一条操作栏；
 // 「文档」标签的操作栏和目录树都在它自己的面板里（`right-panel/docs`）。
 const RIGHT_PANEL_CONTENT_CLASS = "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden";
-export function RightPanel({
+export const RightPanel = memo(function RightPanel({
   developmentEnabled = true,
   contextState,
   contextRevision,
@@ -93,7 +93,7 @@ export function RightPanel({
       <DocsLeaveDialog workspaceRoot={workspaceRoot} />
     </aside>
   );
-}
+});
 
 function isVisibleTab(tab: RightPanelTab, sessionId: string | null): boolean {
   return tab.kind !== "sideChat" || tab.parentSessionId === sessionId;
@@ -167,7 +167,7 @@ function RightPanelBody({
 
   if (tab.kind === "sideChat") return <SideChatView tab={tab} />;
 
-  if (tab.kind === "subagents") return <SubagentsPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
+  if (tab.kind === "subagents") return <Suspense fallback={null}><SubagentsPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} focus={tab.sessionId === sessionId ? tab.focus : undefined} /></Suspense>;
 
   if (tab.kind === "backgroundTasks") return <BackgroundTasksPanel key={sessionId ?? "none"} sessionId={sessionId ?? null} focus={tab.sessionId === sessionId ? tab.focus : undefined} />;
 

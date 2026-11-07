@@ -13,9 +13,10 @@ import { archiveHarnessSession, ingestHarnessArchive } from "../runtime-v2/harne
 import { ingestHarnessRuntimeFiles } from "../runtime-v2/harness-stats-runtime-ingest";
 import { projectUsageJournalBatch } from "../runtime-v2/usage-journal-projection";
 import { UsageSessionFallback } from "../runtime-v2/usage-session-fallback";
-import type { UsageActivityRow } from "@actspace/shared";
+import { estimateItem, foldContextEstimate, viewContextEstimate, type UsageActivityRow } from "@actspace/shared";
 
 const BASE = Date.parse("2026-10-30T08:00:00.000Z");
+const TOOLS = [{ name: "read_file", pluginId: "x", description: "Read a file from the workspace.", inputSchema: { type: "object", properties: { path: { type: "string" } } } }, { name: "bash", pluginId: "x", description: "Run a shell command.", inputSchema: {} }];
 const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 
@@ -40,16 +41,11 @@ function journal(): SessionEventEnvelopeV1[] {
   e("turn/start", { turnId: "t1", agentRunId: "run1", mode: "agent" });
   e("step/start", {});
   e("request/header", { requestId: "q1", turnId: "t1", model: "m1" });
-  e("request/context", { requestId: "q1", snapshot: {
-    tools: [{ name: "read_file" }, { name: "bash" }],
-    contextModel: { contextWindow: 1000 },
-    contextModelFacts: [{ id: "core/skills-catalog", content: [{ id: "writer", location: "/skills/writer/SKILL.md", source: "user" }] }],
-    contextManifest: { comparable: true, totalEstimatedTokens: 500, buckets: { systemPrompt: 100, tools: 200, skills: 30, conversation: 170 }, entries: [
-      { key: JSON.stringify(["tool", "x", "read_file"]), estimatedTokens: 120, bucket: "tools" },
-      { key: JSON.stringify(["tool", "x", "bash"]), estimatedTokens: 80, bucket: "tools" },
-      { key: JSON.stringify(["skill", "core", "catalog", "writer"]), estimatedTokens: 30, bucket: "skills" },
-    ] },
-  } });
+  // 提示词、工具各一条，只在变化时写；request/context 只留小字段（agent-spec-request-record.md）。
+  e("request/system-prompt", { requestId: "q1", turnId: "t1", stepId: "s1", digest: "p1", contributorProvenance: [], sections: [{ owner: "actspace.context-system", id: "core", order: 0, content: "core prompt" }],
+    modelFacts: [{ owner: "actspace.context-skills", id: "core/skills-catalog", order: 0, content: [{ id: "writer", location: "/skills/writer/SKILL.md", source: "user" }] }] });
+  e("request/tools", { requestId: "q1", turnId: "t1", stepId: "s1", digest: "t1", tools: TOOLS });
+  e("request/context", { requestId: "q1", snapshot: { schemaVersion: 3, contextModel: { contextWindow: 1000 } } });
   e("assistant/message", { requestId: "q1", usage: { inputTokens: 100, cacheReadTokens: 300 } });
   e("plugin/actspace.context/state", { op: "fact", paths: [{ path: "/w/a.ts", read: true }] });
   e("tool/call", { callId: "c1", name: "read_file", requestId: "q1", turnId: "t1", args: { path: "/skills/writer/SKILL.md" } });
@@ -80,7 +76,7 @@ describe("Harness 统计投影", () => {
     projectHarnessJournalBatch(db, "s1", journal());
     const tools = query(db, "tools");
     const read = tools.rows.find(row => row.name === "read_file")!;
-    expect(read).toMatchObject({ calls: 2, completed: 1, failed: 1, exposures: 1, schemaTokens: 120, repeatedSameArgs: 1, foldedOutputs: 1, foldedTokens: 100 });
+    expect(read).toMatchObject({ calls: 2, completed: 1, failed: 1, exposures: 1, schemaTokens: estimateItem(TOOLS[0]), repeatedSameArgs: 1, foldedOutputs: 1, foldedTokens: 100 });
     expect(read.failureCodes).toEqual([{ code: "io", count: 1 }]);
     expect(tools.approvals).toMatchObject({ asked: 1, userApproved: 1, avgWaitMs: 2000 });
     expect(tools.bash).toMatchObject({ unsandboxed: 1, escalations: 1, background: 1, foreground: 0 });
@@ -100,7 +96,10 @@ describe("Harness 统计投影", () => {
     const context = query(db, "context");
     expect(context.skills.find(skill => skill.id === "writer")).toMatchObject({ listed: 1, selected: 1, skillReads: 1 });
     expect(context.cache.hitRate).toBeCloseTo(0.75);
-    expect(context.window.p50).toBeCloseTo(0.5);
+    // 占用率 = 请求时折叠出的估算 / 上下文窗口（提示词 + 两个工具 + 技能目录，还没有对话）。
+    const view = viewContextEstimate(foldContextEstimate(journal().filter(event => event.seq <= 6)));
+    expect(view.totalEstimatedTokens).toBeGreaterThan(0);
+    expect(context.window.p50).toBeCloseTo(view.totalEstimatedTokens / 1000);
 
     const options = query(db, "options");
     expect(options.revisions.map(info => info.key)).toContain("main@3");

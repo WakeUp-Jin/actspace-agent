@@ -36,7 +36,6 @@ export interface DesktopRuntimeV2ApprovalPort {
   onApprovalRequired(request: DesktopRuntimeV2ApprovalRequest): void;
   abortRequest?(requestId: string): void;
   abortAgentRun?(sessionId: string, agentRunId: string): number;
-  expireAll?(sessionId?: string): number;
 }
 
 export interface DesktopRuntimeV2BrowserPort {

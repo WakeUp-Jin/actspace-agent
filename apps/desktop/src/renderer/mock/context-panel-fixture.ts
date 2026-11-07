@@ -1,4 +1,4 @@
-import { getContextBucketDisplay, type ContextState, type ContextPanelBucketKey, type ContextPanelBashStats, type ContextPanelBucketTokens, type ContextPanelConversationKind, type ContextPanelEntry, type ContextPanelView } from "@actspace/shared";
+import { type ContextPanelBucketKey, type ContextPanelBashStats, type ContextPanelBucketTokens, type ContextPanelConversationKind, type ContextPanelEntry, type ContextPanelView } from "@actspace/shared";
 import { mockContextPaths, mockDisclosureSummary } from "./context-paths-fixture";
 import type { MockSession } from "./mock-db";
 
@@ -105,29 +105,11 @@ export const MOCK_CONTEXT_BASH: ContextPanelBashStats = {
     ...([["cat", 6], ["grep", 5], ["rg", 4], ["tail", 4], ["ls", 3], ["sed", 2], ["node", 2, 1], ["find", 1], ["sleep", 1], ["python3", 1]] as const)
       .map(([name, count, failed]) => ({ ...bashCount(name, count, failed), subcommands: [] })),
   ],
+  slowest: { command: "pnpm --filter @actspace/desktop test -- --run context-bash", durationMs: 74_300 },
+  mostFailedProgram: { program: "pnpm", count: 2 },
+  mostRepeated: { command: "git status --short", count: 4 },
+  backgroundCount: 2,
 };
-
-/** Composer and panel share the same complete mock totals, independent of entry paging. */
-export function mockContextState(view: ContextPanelView): ContextState {
-  const maxTokens = view.model.contextWindow ?? 0;
-  return {
-    sessionId: view.sessionId,
-    throughJournalSeq: view.throughJournalSeq,
-    basis: "current-request",
-    updatedAt: "2026-10-11T10:58:00.000Z",
-    estimator: { name: "mock", version: "1" },
-    totalEstimatedTokens: view.current.totalEstimatedTokens,
-    maxTokens,
-    percentUsed: maxTokens > 0 ? Math.min(100, view.current.totalEstimatedTokens / maxTokens * 100) : 0,
-    buckets: Object.entries(view.current.buckets).map(([key, tokens]) => ({
-      key: key as ContextPanelBucketKey,
-      name: key as ContextPanelBucketKey,
-      label: getContextBucketDisplay(key).label,
-      tokens: tokens ?? 0,
-    })),
-    entries: [],
-  };
-}
 
 export function mockContextPanelView(sessionId: string, session?: MockSession): ContextPanelView {
   const base: ContextPanelEntry[] = [

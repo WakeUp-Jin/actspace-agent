@@ -58,10 +58,10 @@ export function HarnessStatsPage({ initialTab = "overview" }: { initialTab?: Har
   const refreshing = summary.refreshing || stats.tab.refreshing || sync?.phase === "syncing";
 
   return (
-    <PageShell width="wide" title="Harness 统计" description="插件、工具、上下文和压缩的使用情况，为优化 harness 和自进化提供依据。不含 Token 与费用（见「使用统计」）。">
+    <PageShell width="wide" title="Harness 统计">
       <HarnessStatsFilters filter={filter} options={options.data} onChange={setFilter} onRefresh={stats.refresh} refreshing={refreshing} />
       {sync?.phase === "syncing" ? (
-        <Notice tone="info">正在补齐历史 · 已读 {fmtInt(sync.completedSessions)} / {fmtInt(sync.totalSessions)} 个会话，数据会随进度更新。</Notice>
+        <Notice tone="info">正在补齐历史 · 已读 {fmtInt(sync.completedSessions)} / {fmtInt(sync.totalSessions)} 个会话</Notice>
       ) : null}
       {sync?.phase === "failed" ? (
         <Notice tone="error" role="alert">

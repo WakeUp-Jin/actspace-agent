@@ -26,14 +26,6 @@ export const PURPOSES: readonly PurposeMeta[] = [
 ];
 
 export const LEVEL_LABELS: Record<ThinkingLevel, string> = { off: "关", low: "低", medium: "中", high: "高", xhigh: "超高", max: "最高" };
-export const LEVEL_DESCRIPTIONS: Record<ThinkingLevel, string> = {
-  off: "不思考，直接回答",
-  low: "少量推理，较快",
-  medium: "均衡",
-  high: "复杂任务",
-  xhigh: "更深入，更慢更贵",
-  max: "最多推理，最慢",
-};
 
 export type ThinkingKind = "unknown" | "none" | "toggle" | "always" | "levels" | "mandatory";
 

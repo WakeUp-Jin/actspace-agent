@@ -12,7 +12,7 @@ describe("SessionStore backend independence", () => {
     const createdWith = { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest };
     try {
       const session = await store.create({ sessionId: "parent", createdAt: "2026-10-04T00:00:00.000Z", lineage: null, createdWith });
-      await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "m", content: "hello" }, surface: { kind: "append", node: { kind: "user", messageId: "m", content: "hello" } } });
+      await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "m", content: "hello" }, surface: { kind: "append" } });
       await session.append({ type: "turn/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: "t" }, surface: null });
       await session.flush(); await session.close();
       expect((await store.inspect("parent")).events).toHaveLength(2);

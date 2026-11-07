@@ -7,11 +7,11 @@ const at = "2026-10-28T13:58:00.000Z";
 function event(type: string, data: Record<string, unknown>, surface: unknown = null): SessionEventEnvelopeV1 {
   return { recordKind: "event", seq: seq++, type, eventVersion: 1, criticality: "required", time: at, source: { ownerPluginId: "@actspace/core" }, data, surface, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } } as unknown as SessionEventEnvelopeV1;
 }
-const user = (content: unknown) => event("user/message", { messageId: `m${seq}` }, { kind: "append", node: { kind: "user", messageId: `m${seq}`, content } });
-const assistant = (content: unknown[]) => event("assistant/message", { messageId: `a${seq}`, content }, { kind: "append", node: { kind: "assistant", messageId: `a${seq}`, content } });
+const user = (content: unknown) => event("user/message", { messageId: `m${seq}`, content: content }, { kind: "append" });
+const assistant = (content: unknown[]) => event("assistant/message", { messageId: `a${seq}`, content }, { kind: "append" });
 const call = (callId: string, name: string, args: Record<string, unknown>) => event("tool/call", { callId, name, args });
 const result = (callId: string, name: string, status: string, text: string, extra: Record<string, unknown> = {}) =>
-  event("tool/result", { callId, name, status, summary: `${name} ${status}`, modelOutput: [{ type: "text", text }], detail: [], failure: null, ...extra }, { kind: "append", node: { kind: "tool-result", messageId: `tool-${callId}`, callId, content: [{ type: "text", text }], isError: status !== "completed" } });
+  event("tool/result", { callId, name, status, summary: `${name} ${status}`, modelOutput: [{ type: "text", text }], detail: [], failure: null, ...extra }, { kind: "append" });
 
 function header(overrides: Partial<SessionHeaderV1> = {}): SessionHeaderV1 {
   return { recordKind: "header", format: "actspace-session", formatVersion: 1, backend: "raw-jsonl", backendSchemaVersion: 1, sessionId: "s-main", createdAt: at, cwd: "/work/repo", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "2", manifestDigest: "d", plugins: [], codecSetDigest: "c" }, ...overrides } as SessionHeaderV1;
@@ -55,7 +55,7 @@ describe("session transcript rendering", () => {
       result("c1", "agent", "completed", "## Findings\nmore", { detail: [{ label: "delegation", value: { childSessionId: "child-1", status: "completed" } }] }),
       call("c2", "bash", { command: "rm -rf /" }),
       result("c2", "bash", "denied", "", { failure: { code: "BASH_COMMAND_DENIED", message: "Command is not allowed." } }),
-      event("surface/replaced", { compactionId: "k1" }, { kind: "replace", start: 0, end: 3, node: { kind: "user", messageId: "compaction-1", content: { text: "## Summary\nUser asked for research.", metadata: {} } }, sourceEventSeqs: [0, 1] }),
+      event("surface/replaced", { compactionId: "k1", node: { kind: "user", messageId: "compaction-1", content: { text: "## Summary\nUser asked for research.", metadata: {} } } }, { kind: "replace", start: 0, end: 3, sourceEventSeqs: [0, 1] }),
       call("c3", "read_file", { path: "/work/repo/a.ts" }),
       event("turn/end", { turnId: "t1", reason: "aborted" }),
     ];
@@ -114,7 +114,7 @@ describe("session transcript rendering", () => {
   it("renders agent messages, subagent notifications and send_message lines", () => {
     seq = 0;
     const spliced = (messageId: string, source: string, content: string, extra: Record<string, unknown> = {}) =>
-      event("agent/inbox/spliced", { operation: "claim", messageId, target: "next-step", source, ...extra }, { kind: "append", node: { kind: "user", messageId, content } });
+      event("agent/inbox/spliced", { operation: "claim", messageId, target: "next-step", source, ...extra, content: content }, { kind: "append" });
     const events = [
       user("start"),
       call("c1", "send_message", { agent_id: "child-7", message: "Also check the tests.\nThanks" }),

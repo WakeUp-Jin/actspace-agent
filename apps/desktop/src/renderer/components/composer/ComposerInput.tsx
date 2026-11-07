@@ -128,12 +128,12 @@ export function useComposerLayout({ surface, mode, message, inputRef, hasExtras,
   };
 }
 
-/** 定稿文案（09 决策 3）：Plan / Chat 不分新建页和对话中；运行中且开了队列时提示会进队列。 */
+/** 定稿文案（09 决策 3）：Plan / Chat 不分新建页和对话中；运行中且开了队列时提示会进队列。@ 引用文件（Composer PB）上线后再把「@ 引用文件」加回 initial 文案。 */
 export function composerPlaceholder(mode: ComposerMode, surface: "followup" | "initial", queueing: boolean): string {
   if (queueing) return "继续追问，运行中发送会进入队列…";
   if (mode === "chat") return "问点什么…";
   if (mode === "plan") return "描述要规划的改动…";
-  return surface === "initial" ? "描述你要做的事，@ 引用文件，/ 调用命令" : "继续追问…";
+  return surface === "initial" ? "描述你要做的事，/ 调用命令" : "继续追问…";
 }
 
 export type ComposerInputProps = {

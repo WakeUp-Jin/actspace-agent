@@ -1,6 +1,6 @@
 # 子智能体运行规范
 
-> 状态：已实施（2026-11-04，分支 `feat/subagent-background-redesign`，S1–S6；界面见 [05 界面与设置](../子智能体和后台任务设计规范/05-界面与设置设计规范.md)）。设计依据与逐字的模型可见文字见 [子智能体和后台任务设计规范](../子智能体和后台任务设计规范/README.md)（[01 决策](../子智能体和后台任务设计规范/01-设计决策.md)、[02 子智能体](../子智能体和后台任务设计规范/02-子智能体设计规范.md)、[04 外部子智能体](../子智能体和后台任务设计规范/04-外部子智能体设计规范.md)）；实际做了什么、与设计不同的地方见[执行过程](../../exec-runs/20261103-subagent-background-redesign/execution-process.md)。本文只写现状的结构与边界，不重复每一句工具描述。
+> 设计依据与逐字的模型可见文字见 [子智能体和后台任务设计规范](../子智能体和后台任务设计规范/README.md)（[01 决策](../子智能体和后台任务设计规范/01-设计决策.md)、[02 子智能体](../子智能体和后台任务设计规范/02-子智能体设计规范.md)、[04 外部子智能体](../子智能体和后台任务设计规范/04-外部子智能体设计规范.md)、[05 界面与设置](../子智能体和后台任务设计规范/05-界面与设置设计规范.md)）；实现与设计的差异见[执行过程](../../exec-runs/20261103-subagent-background-redesign/execution-process.md)。本文只写现状的结构与边界，不重复每一句工具描述。
 
 公共契约见 [`agent-spec-agent-and-subagent.md`](../agent-plugin-runtime/agent-spec-agent-and-subagent.md)，实现位于 `packages/subagent/`（包表见 [`packages/subagent/README.md`](../../../packages/subagent/README.md)）。
 
@@ -8,7 +8,7 @@
 
 子智能体是主会话派出的、在自己子会话里工作的 Agent。`agent_id` 就是子会话 ID。参考 DeepSeek Harness 的运行模型（默认后台、可续聊、可写、预设与模型可选），再加 ActSpace 自己的「留痕」：子会话 transcript 路径全程交给主智能体，并进入上下文的活跃 / 睡眠路径。
 
-旧的一次性、只读、不能续聊的实现和 `explore` 工具已删除；原 `agent-explore-subagent.md` 随之退役，由设计 02 取代。
+子智能体默认后台、可续聊、可写；没有单独的 `explore` 工具，它是 `agent` 的只读预设。
 
 ## 工具
 

@@ -15,7 +15,7 @@
 
 ## 必读
 
-- `AGENTS.md`、`docs/FRONTEND.md`、`docs/FRONTEND_VERIFICATION.md`、`docs/SECURITY.md`、`docs/design-docs/frontend/front-主题与配色规范.md`、`docs/design-docs/frontend/front-聊天输入框规范.md`、`docs/design-docs/frontend/front-composer-slash-command.md`。
+- `AGENTS.md`、`docs/design-docs/frontend/README.md`、`docs/FRONTEND_VERIFICATION.md`、`docs/SECURITY.md`、`docs/design-docs/frontend/front-视觉token规范.md`、`docs/design-docs/frontend/front-聊天输入框规范.md`、`docs/design-docs/frontend/front-聊天输入框规范.md`。
 - 设计文档第 6、7 节，以及顶部「实施决策修订」。
 - 执行过程里的「M0.2 编辑器 PoC」结论（jsdom 限制与测试写法）。
 - 代码：`Composer.tsx`（`renderComposerInput`、输入高度测量的 `useLayoutEffect`、`navigateInputHistory`、`finishSlashSelection`、`handlePasteImages`、`switchAgentForm`）、`composer-slash-commands.ts`、`apps/desktop/src/main/workspace-fs-service.ts`（忽略目录列表 `IGNORED_DIR_NAMES`）、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`（`handle` + `assertTrustedSender`、`registeredWorkspaceRoot`）、`packages/util/shared/src/runtime-v2/fixed-renderer.ts`（通道常量）、`apps/desktop/src/preload/index.ts`（`FIXED_RENDERER_INVOKE_CHANNELS`、`exposeInMainWorld`）、`apps/desktop/src/global.d.ts`。

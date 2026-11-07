@@ -1,6 +1,6 @@
 # Chrome 扩展连接体验 — 执行摘要
 
-- 计划：`docs/exec-plans/active/20260928-chrome-connect-experience.md`
+- 计划：`docs/exec-plans/completed/20260928-chrome-connect-experience.md`
 - 状态：源码实施与自动化验证进行中；首次连接、双 Chrome 资料和真实 Agent 浏览器对话已做界面验证，其余验收未完成，计划保持 active。
 
 ## 变更

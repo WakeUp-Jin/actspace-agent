@@ -19,7 +19,7 @@ export interface LiveEventHub {
 export function createLiveEventHub(source: LiveSource): LiveEventHub {
   const listeners = new Set<LiveListener>();
   let release: (() => void) | null = null;
-  const dispatch: LiveListener = (envelope) => {
+  const deliver: LiveListener = (envelope) => {
     for (const listener of [...listeners]) {
       try { listener(envelope); } catch (error) { console.error("Live event listener failed", error); }
     }
@@ -28,7 +28,7 @@ export function createLiveEventHub(source: LiveSource): LiveEventHub {
     // 同一个函数挂两次也各算一个消费者。
     const entry: LiveListener = (envelope) => listener(envelope);
     listeners.add(entry);
-    if (!release) release = source(dispatch);
+    if (!release) release = source(deliver);
     let active = true;
     return () => {
       if (!active) return;

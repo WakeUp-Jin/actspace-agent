@@ -1,4 +1,6 @@
 import { contextCategory, contextSectionRecords, fixedSystemText } from "./context-sections";
+import { indexRequestRecords, isRequestRecordEvent, renderSystemPrompt, sortSystemSections, type EffectiveRequestRecord } from "@actspace/shared";
+import { surfaceNode as deriveSurfaceNode, type SessionSurfaceOperationV1 } from "@actspace/shared/runtime-v2";
 import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import type {
   TrajectoryAssistantMetrics,
@@ -125,96 +127,42 @@ function usage(data: Data): TrajectoryUsage | null {
   return Object.values(result).some(item => item !== null) ? result : null;
 }
 
-function promptDetail(data: Data): TrajectoryPromptDetail | null {
-  const header = asRecord(data.header);
-  const direct = data.promptSnapshot ?? data.prompt ?? data.requestPrompt ?? data.snapshot ?? data.header;
-  const directRecord = asRecord(direct);
-  const directText = typeof direct === "string" ? direct : null;
-  const systemPrompt = text(data.systemPrompt)
-    ?? text(data.system)
-    ?? directText
-    ?? text(directRecord.systemPrompt)
-    ?? text(directRecord.system)
-    ?? text(directRecord.renderedSystemPrompt);
-  const systemPromptParts = data.systemPromptParts ?? directRecord.systemPromptParts ?? directRecord.systemParts ?? directRecord.systemSections;
-  const tools = data.tools ?? directRecord.tools ?? header.tools;
-  const config = data.config ?? directRecord.config ?? directRecord.requestOptions ?? header.config;
-  const hasRaw = direct !== undefined
-    || data.systemPrompt !== undefined
-    || data.system !== undefined
-    || data.systemPromptParts !== undefined
-    || data.tools !== undefined
-    || data.config !== undefined
-    || header.system !== undefined
-    || header.tools !== undefined;
-  if (!hasRaw || (systemPrompt === null && systemPromptParts === undefined && tools === undefined && config === undefined)) return null;
+/**
+ * 某次请求生效的提示词与工具（agent-spec-request-record.md §4.3）：seq 不晚于它的最近一条
+ * `request/system-prompt` / `request/tools`，拼成详情面板用的形状。
+ */
+function requestPromptDetail(record: EffectiveRequestRecord): TrajectoryPromptDetail | null {
+  const prompt = record.systemPrompt?.data;
+  const tools = record.tools?.data;
+  if (!prompt && !tools) return null;
+  const sections = prompt ? sortSystemSections(prompt.sections) : [];
   return {
-    ...(systemPrompt === null ? {} : { systemPrompt }),
-    ...(directRecord.contextSections === undefined ? {} : { contextSections: directRecord.contextSections }),
-    ...(directRecord.contextModelFacts === undefined ? {} : { contextModelFacts: directRecord.contextModelFacts }),
-    ...(systemPromptParts === undefined ? {} : { systemPromptParts }),
-    ...(tools === undefined ? {} : { tools }),
-    ...(config === undefined ? {} : { config }),
-    raw: direct ?? data,
+    ...(prompt ? {
+      systemPrompt: renderSystemPrompt(sections.map(section => section.content), prompt.modelFacts.map(fact => fact.content)),
+      contextSections: sections as unknown as RuntimeV2JsonValue,
+      contextModelFacts: prompt.modelFacts as unknown as RuntimeV2JsonValue,
+    } : {}),
+    ...(tools ? { tools: tools.tools as unknown as RuntimeV2JsonValue } : {}),
+    raw: { ...(prompt ? { systemPrompt: prompt } : {}), ...(tools ? { tools } : {}) } as unknown as RuntimeV2JsonValue,
   };
 }
 
-/** 系统行只看系统提示词和工具：模型、请求选项变化不算提示词变化（对齐 DSH）。 */
-const systemSignature = (prompt: TrajectoryPromptDetail): string => JSON.stringify(fixedSystemText(prompt));
-const toolsSignature = (prompt: TrajectoryPromptDetail): string => JSON.stringify(prompt.tools ?? null);
-const hasPromptBody = (prompt: TrajectoryPromptDetail | null): boolean =>
-  prompt !== null && (typeof prompt.systemPrompt === "string" || prompt.systemPromptParts !== undefined || prompt.tools !== undefined);
-
-function promptSignature(prompt: TrajectoryPromptDetail): string {
-  try { return `${systemSignature(prompt)}\u0000${toolsSignature(prompt)}`; } catch { return ""; }
+/**
+ * 系统行只看固定系统提示词和工具（对齐 DSH）：规则、技能等可变段落由上下文行展示，
+ * 模型、请求选项变化也不算提示词变化。
+ */
+type SystemSignature = { readonly system: string; readonly tools: string };
+function systemSignature(record: EffectiveRequestRecord, prompt: TrajectoryPromptDetail): SystemSignature {
+  return { system: fixedSystemText(prompt), tools: record.tools?.data.digest ?? "" };
 }
 
-/** 历史窗口里与上一次请求相同的提示词只带 `promptUnchanged`（session-controller slimHistoryWindow），沿用上一份正文。 */
-function inheritPrompt(data: Data, prompt: TrajectoryPromptDetail | null, last: TrajectoryPromptDetail | null): TrajectoryPromptDetail | null {
-  if (hasPromptBody(prompt) || last === null || asRecord(data.snapshot).promptUnchanged !== true) return prompt;
-  const { systemPrompt, systemPromptParts, tools, contextSections, contextModelFacts } = last;
-  return {
-    ...(systemPrompt === undefined ? {} : { systemPrompt }),
-    ...(contextSections === undefined ? {} : { contextSections }),
-    ...(contextModelFacts === undefined ? {} : { contextModelFacts }),
-    ...(systemPromptParts === undefined ? {} : { systemPromptParts }),
-    ...(tools === undefined ? {} : { tools }),
-    ...(prompt?.config === undefined ? {} : { config: prompt.config }),
-    raw: prompt?.raw ?? data,
-  };
-}
-
-function isPromptChange(node: RuntimeV2TrajectoryNode, prompt: TrajectoryPromptDetail | null): boolean {
-  const type = node.eventType.toLocaleLowerCase();
-  const data = dataOf(node);
-  return prompt !== null && (
-    data.promptChange !== undefined
-    || data.systemPromptChanged === true
-    || type === "system/prompt"
-    || type.includes("prompt/change")
-    || type.includes("prompt/update")
-    || type.includes("tools/change")
-    || type.includes("tools/update")
-    || type.includes("system/update")
-  );
-}
-
-function changeKind(node: RuntimeV2TrajectoryNode, previous: TrajectoryPromptDetail | null, prompt: TrajectoryPromptDetail): TrajectorySystemChangeKind {
-  const data = dataOf(node);
-  const change = asRecord(data.promptChange);
-  const explicit = pick(data, ["changeKind", "promptChangeKind"])
-    ?? pick(change, ["kind", "changeKind"]);
-  if (explicit === "initial") return "initial";
-  if (explicit === "tools" || explicit === "tools-updated") return "tools-updated";
-  if (explicit === "prompt" || explicit === "prompt-updated" || explicit === "system") return "prompt-updated";
-  if (explicit === "system-and-tools" || explicit === "prompt-and-tools") return "updated";
+function changeKind(previous: SystemSignature | null, current: SystemSignature): TrajectorySystemChangeKind | null {
   if (previous === null) return "initial";
-  const systemChanged = systemSignature(previous) !== systemSignature(prompt);
-  const toolsChanged = toolsSignature(previous) !== toolsSignature(prompt);
+  const systemChanged = previous.system !== current.system;
+  const toolsChanged = previous.tools !== current.tools;
   if (systemChanged && toolsChanged) return "updated";
   if (toolsChanged) return "tools-updated";
-  if (systemChanged) return "prompt-updated";
-  return node.eventType.toLocaleLowerCase().includes("tool") ? "tools-updated" : "prompt-updated";
+  return systemChanged ? "prompt-updated" : null;
 }
 
 function eventRecordId(node: RuntimeV2TrajectoryNode, index: number): string {
@@ -341,7 +289,7 @@ function buildEventContexts(nodes: readonly RuntimeV2TrajectoryNode[]): Map<numb
   return contexts;
 }
 
-function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: ReadonlySet<string>): {
+function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], effective: (atSeq?: number) => EffectiveRequestRecord, liveMessageIds?: ReadonlyMap<string, string>): {
   records: TrajectoryRecord[];
   rawRecords: TrajectoryRecord[];
   partial: TrajectoryRecord | null;
@@ -358,13 +306,14 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: Re
   const records: TrajectoryRecord[] = [];
   const calls = new Map<string, { index: number; record: TrajectoryRecord }>();
   const chunks = new Map<string, RuntimeV2TrajectoryNode[]>();
+  /** Requests a reply, a retry or (old Sessions) a chunk already accounts for; the rest still stream. */
+  const answered = new Set<string>();
   const pendingApprovals = new Map<string, RuntimeV2TrajectoryNode[]>();
   const requests = new Map<string, RequestFact>();
   const requestByStep = new Map<string, RequestFact>();
   const stepBoundaries = new Map<string, Boundary>();
   const turnBoundaries = new Map<string, TurnBoundary>();
   const contexts = buildEventContexts(ordered);
-  let lastPrompt: TrajectoryPromptDetail | null = null;
 
   for (const node of ordered) {
     const data = dataOf(node);
@@ -392,9 +341,8 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: Re
         fact.provider = pick(data, ["provider", "routeId"]) ?? pick(prepared, ["route"]) ?? fact.provider;
         fact.model = pick(data, ["model"]) ?? pick(prepared, ["model"]) ?? fact.model;
         fact.options = data.options ?? data.requestOptions ?? asRecord(data.snapshot).requestOptions ?? fact.options;
-        const prompt = inheritPrompt(data, promptDetail(data), lastPrompt);
-        if (hasPromptBody(prompt)) lastPrompt = prompt;
-        fact.prompt = prompt ?? fact.prompt;
+        // request/context 紧跟在本次请求的提示词与工具记录之后，按它的 seq 取生效的那一条。
+        fact.prompt = requestPromptDetail(effective(node.eventSeq)) ?? fact.prompt;
         fact.sequences.push(node.eventSeq);
         if (node.eventType === "request/header") fact.header = node;
         else fact.context = node;
@@ -406,9 +354,11 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: Re
       continue;
     }
     if (node.eventType === "llm/retry" && requestId !== null) {
+      answered.add(requestId);
       requests.get(requestId)?.sequences.push(node.eventSeq);
       continue;
     }
+    if ((node.eventType === "assistant/chunk" || node.eventType === "assistant/message") && requestId !== null) answered.add(requestId);
     if (node.eventType === "assistant/chunk") {
       const key = chunkKey(node);
       const list = chunks.get(key);
@@ -541,8 +491,8 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: Re
       continue;
     }
     const kind = recordKind(node);
-    const surface = asRecord(node.surface);
-    const surfaceNode = asRecord(surface.node);
+    // 轨迹节点带着原事件的 type/data/surface，按同一规则推出对话节点（agent-spec-surface-derived.md §4.2）。
+    const surfaceNode = asRecord((deriveSurfaceNode({ type: node.eventType, data: node.data, surface: (node.surface ?? null) as SessionSurfaceOperationV1 | null }) ?? undefined) as RuntimeV2JsonValue | undefined);
     if (node.eventType === "agent/inbox/spliced" && (data.operation !== "claim" || surfaceNode.kind !== "user")) continue;
     // Background task notifications and Context supplements reach the model as user content but are CONTEXT rows.
     const notice = node.eventType === "agent/inbox/spliced" && data.source === "task_notification";
@@ -604,12 +554,27 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], placeholders?: Re
       ?? first.time;
     const firstNonEmpty = chunkList.find(item => valueText(dataOf(item).delta ?? dataOf(item).content) !== "");
     const ended = context.turnId ? turnBoundaries.get(context.turnId) : undefined;
-    // A live group is an empty placeholder here; its content streams in through live.ts.
-    const fields = placeholders?.has(messageId)
-      ? { ...liveFields(emptyLiveContent()), sourceSequences: [first.eventSeq] }
-      : liveFields(appendChunks(emptyLiveContent(), chunkList));
+    // Old Sessions only: chunks no reply closed (the run stopped mid-stream). New Sessions keep no chunks.
+    const fields = liveFields(appendChunks(emptyLiveContent(), chunkList));
     const raw = baseRecord(first, first.eventSeq, fields.sourceSequences, { id: `${first.sessionId}:record:assistant:${messageId}`, kind: "assistant", visible: true, state: ended?.end ? ended.state : "running", partial: !ended?.end, ...fields, turnId: firstData.turnId ? pick(firstData, ["turnId", "turn"]) : context.turnId, stepId: firstData.stepId ? pick(firstData, ["stepId", "step"]) : context.stepId, startedAt: stepStartAt, completedAt: null, durationMs: null, usage: usage(firstData) });
     partial = { ...raw, assistantMetrics: { ...assistantMetrics(raw, stepStartAt, firstNonEmpty?.time ?? first.time, null), completedAt: null, completedTime: null, generationMs: null, throughputTokensPerSecond: null } };
+    records.push(partial);
+  }
+
+  // The call still streaming (spec agent-spec-live-assistant-stream §6): a request no reply or retry has
+  // settled, in a turn that has not ended, keeps an empty placeholder. Its content comes from the live run
+  // (live.ts); once the live run names the message, the placeholder takes that message's record id.
+  for (const fact of requests.values()) {
+    const header = fact.header;
+    if (header === null || answered.has(fact.id)) continue;
+    if (fact.turnId !== null && turnBoundaries.get(fact.turnId)?.end) continue;
+    const messageId = liveMessageIds?.get(fact.id) ?? null;
+    const raw = baseRecord(header, header.eventSeq, [header.eventSeq], {
+      ...liveFields(emptyLiveContent()), sourceSequences: [header.eventSeq],
+      id: placeholderRecordId(header.sessionId, fact.id, messageId), kind: "assistant", eventType: "assistant/message", visible: true, state: "running", partial: true, placeholder: true,
+      requestId: fact.id, messageId, turnId: fact.turnId, stepId: fact.stepId, startedAt: header.time, completedAt: null, durationMs: null, usage: null,
+    });
+    partial = { ...raw, assistantMetrics: { ...assistantMetrics(raw, header.time, null, null), completedAt: null, completedTime: null, generationMs: null, throughputTokensPerSecond: null } };
     records.push(partial);
   }
 
@@ -725,18 +690,25 @@ function assignGroups(
   return { records: assigned, turns };
 }
 
-function systemRecords(nodes: readonly RuntimeV2TrajectoryNode[]): TrajectoryRecord[] {
+/**
+ * 系统行：相邻两次请求生效的提示词或工具记录换了一条，就出一行（agent-spec-request-record.md §4.3）。
+ * 行挂在该请求的 `request/context` 上，所以随请求归到对应的轮次与步骤。
+ */
+function systemRecords(nodes: readonly RuntimeV2TrajectoryNode[], effective: (atSeq?: number) => EffectiveRequestRecord, fromSeq: number): TrajectoryRecord[] {
   const output: TrajectoryRecord[] = [];
-  let previous: TrajectoryPromptDetail | null = null;
-  let previousSignature = "";
-  for (const [index, node] of [...nodes].sort((a, b) => a.eventSeq - b.eventSeq).entries()) {
-    // 只带请求选项或 promptUnchanged 标记的请求没有提示词正文，不产生系统行。
-    const prompt = promptDetail(dataOf(node));
-    if (prompt === null || !hasPromptBody(prompt)) continue;
-    if (!isPromptChange(node, prompt) && promptSignature(prompt) === previousSignature) continue;
-    const kind = changeKind(node, previous, prompt);
+  let previous: { record: EffectiveRequestRecord; signature: SystemSignature; detail: TrajectoryPromptDetail } | null = null;
+  for (const [index, node] of nodes.entries()) {
+    if (node.eventType !== "request/context") continue;
+    const current = effective(node.eventSeq);
+    if (previous !== null && previous.record.systemPrompt?.seq === current.systemPrompt?.seq && previous.record.tools?.seq === current.tools?.seq) continue;
+    const prompt = requestPromptDetail(current);
+    if (prompt === null) continue;
+    const signature = systemSignature(current, prompt);
+    const kind = changeKind(previous?.signature ?? null, signature);
+    if (kind === null) { previous = { record: current, signature, detail: prompt }; continue; }
     const label = kind === "initial" ? "初始系统提示词" : kind === "tools-updated" ? "工具已更新" : kind === "updated" ? "系统提示词和工具已更新" : "系统提示词已更新";
-    output.push(baseRecord(node, index, [node.eventSeq], {
+    const changed = [current.systemPrompt?.seq, current.tools?.seq].filter((seq): seq is number => seq !== undefined && seq >= fromSeq && seq !== previous?.record.systemPrompt?.seq && seq !== previous?.record.tools?.seq);
+    output.push(baseRecord(node, index, [...changed, node.eventSeq].sort((a, b) => a - b), {
       id: `${node.sessionId}:system:${node.eventSeq}`,
       kind: "system",
       visible: true,
@@ -745,22 +717,32 @@ function systemRecords(nodes: readonly RuntimeV2TrajectoryNode[]): TrajectoryRec
       preview: label,
       systemChange: kind,
       promptDetail: prompt,
-      previousPromptDetail: previous,
+      previousPromptDetail: previous?.detail ?? null,
       startedAt: node.time,
       completedAt: node.time,
       durationMs: 0,
     }));
-    previous = prompt;
-    previousSignature = promptSignature(prompt);
+    previous = { record: current, signature, detail: prompt };
   }
   return output;
 }
 
-/** `placeholders`: live chunk group keys (live.ts) that get an empty placeholder record. */
-export function buildTrajectorySnapshot(snapshot: RuntimeV2TrajectorySnapshot, options: { readonly placeholders?: ReadonlySet<string> } = {}): TrajectoryRuntimeSnapshot {
-  const merged = mergeNodes(snapshot.nodes, options.placeholders);
-  const system = systemRecords(snapshot.nodes);
-  const sections = contextSectionRecords(snapshot.nodes, (node, overrides) => baseRecord(node, node.eventSeq, [node.eventSeq], overrides));
+/** Record id of a streaming placeholder: the message's own id once the live run names it, else the request's. */
+export function placeholderRecordId(sessionId: string, requestId: string, messageId: string | null): string {
+  return `${sessionId}:record:assistant:${messageId ?? `request:${requestId}`}`;
+}
+
+/** `liveMessageIds`: request id → message id the live run streams for it, so the placeholder keeps its row when it settles. */
+export function buildTrajectorySnapshot(snapshot: RuntimeV2TrajectorySnapshot, options: { readonly liveMessageIds?: ReadonlyMap<string, string> } = {}): TrajectoryRuntimeSnapshot {
+  const ordered = [...snapshot.nodes].sort((a, b) => a.eventSeq - b.eventSeq);
+  const effective = indexRequestRecords(ordered.map(node => ({ seq: node.eventSeq, type: node.eventType, data: node.data })));
+  // 窗口起点之前补进来的提示词 / 工具记录（session-controller 历史窗口）只供按 seq 查找，不进轮次与原始记录。
+  const fromSeq = snapshot.history?.fromSeq ?? 0;
+  const windowed = ordered.filter(node => node.eventSeq >= fromSeq || !isRequestRecordEvent(node.eventType));
+  const merged = mergeNodes(windowed, effective, options.liveMessageIds);
+  const system = systemRecords(windowed, effective, fromSeq);
+  // 历史窗口起点之前补进来的提示词记录只作比较基线，不产生「已加载」行。
+  const sections = contextSectionRecords(ordered, fromSeq, (node, overrides) => baseRecord(node, node.eventSeq, [node.eventSeq], overrides));
   const combined = [...merged.records, ...system, ...sections].sort((a, b) => a.systemChange === "initial" ? -1 : b.systemChange === "initial" ? 1 : (a.sourceSequences[0] ?? 0) - (b.sourceSequences[0] ?? 0));
   const assigned = assignGroups(combined, merged.rawRecords, merged.turnBoundaries, merged.stepBoundaries, snapshot.history?.turnOffset);
   return {

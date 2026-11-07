@@ -99,7 +99,7 @@
 
 - **问题**：常量守卫已经加好，Space 演示代码仍然在生产包里。
   - **原因**：`WorkbenchLayout` 无条件调用了 store 的 hook；另外，store 单例和 `memo()` 都是顶层调用，打包器默认它们有副作用，不敢删。
-  - **应对**：在模块层面二选一，选出 hook 的实现；对没有副作用的顶层调用加 `/* @__PURE__ */`。写成了学习文档 [20261007-pure-annotation-tree-shaking](../../learnings/2026-10/20261007-pure-annotation-tree-shaking.md)。
+  - **应对**：在模块层面二选一，选出 hook 的实现；对没有副作用的顶层调用加 `/* @__PURE__ */`。写成了学习文档 [20261007-pure-annotation-tree-shaking](../../learnings/2026-10/20261006-dev-only-code-out-of-bundle.md)。
 
 ## 跳过或推迟的事项
 

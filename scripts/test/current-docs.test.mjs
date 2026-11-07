@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkCurrentDocs, checkDocumentationLinks, checkMarkdownFiles } from "../check-current-docs.mjs";
+import { checkCurrentDocs, checkDocumentationLinks, checkMarkdownFiles, maskCode } from "../check-current-docs.mjs";
 
 test("current documentation truth zone is v2-first and link-complete", async () => {
   const failures = await checkCurrentDocs(process.cwd());
@@ -20,9 +20,10 @@ test("current documentation check rejects stale v1 claims and broken links", asy
     );
 
     const failures = await checkMarkdownFiles(root, ["docs/current.md"]);
-    assert.equal(failures.length, 2);
+    assert.equal(failures.length, 3);
     assert.match(failures[0], /packages\/agent-runtime/);
-    assert.match(failures[1], /broken Markdown link/);
+    assert.match(failures[1], /code path does not exist: packages\/agent-runtime\/src\/index\.ts/);
+    assert.match(failures[2], /broken Markdown link/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -110,4 +111,36 @@ test("retired Host and Task APIs require explicit historical labels on their own
     await writeFile(join(root, "current.md"), examples.map(api => `历史：已退役 \`${api}\`。`).join("\n") + "\nUse bootProfileRuntime().");
     assert.deepEqual(await checkMarkdownFiles(root, ["current.md"]), []);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("link syntax shown inside code is not checked, real links next to it still are", async () => {
+  const source = "Example `[文字](url)` here.\n\n```md\n[demo](./nowhere.md)\n```\n\nSee [missing](./missing.md).\n";
+  assert.equal(maskCode(source).length, source.length);
+  assert.equal(maskCode(source).split("\n").length, source.split("\n").length);
+  const root = await mkdtemp(join(tmpdir(), "actspace-current-docs-"));
+  try {
+    await mkdir(join(root, "docs"), { recursive: true });
+    await writeFile(join(root, "docs", "current.md"), source);
+    const failures = await checkMarkdownFiles(root, ["docs/current.md"], { checkClaims: false });
+    assert.deepEqual(failures, ["docs/current.md:7: broken Markdown link: ./missing.md"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("current docs must name code paths that exist, unless the line marks them as removed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "actspace-current-docs-"));
+  try {
+    await mkdir(join(root, "docs"), { recursive: true });
+    await mkdir(join(root, "packages", "real", "src"), { recursive: true });
+    await writeFile(join(root, "packages", "real", "src", "index.ts"), "");
+    await writeFile(
+      join(root, "docs", "current.md"),
+      "Entry: `packages/real/src/index.ts:12`.\nMissing: `packages/gone/src/index.ts`.\n不再使用 `packages/legacy/`。\nPattern `packages/*/README.md`.\n",
+    );
+    const failures = await checkMarkdownFiles(root, ["docs/current.md"]);
+    assert.deepEqual(failures, ["docs/current.md:2: code path does not exist: packages/gone/src/index.ts"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

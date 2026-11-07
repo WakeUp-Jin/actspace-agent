@@ -1,5 +1,5 @@
 import { contextEvents } from "./supplements.js";
-import { contextEntryKey, rememberInputManifest } from "./content-manifest.js";
+import { renderContextSupplement, sortSystemSections } from "@actspace/shared";
 import type { CompactionSession } from "./compaction.js";
 import { ContextSupplements, type ContextSession } from "./supplements.js";
 import type { ContextSourceRegistry, ContextSource } from "./registry.js";
@@ -11,7 +11,8 @@ import { projectContext } from "./projection.js";
 import type { ContextProjection } from "./types.js";
 import { convertMessages, surfaceMessage } from "./conversion.js";
 import { freezeRequest } from "./request-snapshot.js";
-import { freezeContextView } from "./context-snapshot.js";
+import { contextValue, freezeContextView, isCheckedContextValue } from "./context-snapshot.js";
+import type { LlmMessage } from "@actspace/llm-service";
 import { renderSystemPrompt } from "./system.js";
 
 export type ContextEngineOptions = {
@@ -115,8 +116,7 @@ export class ContextEngine {
 
   /** Conversion never writes Session or derives model-visible content from management state. */
   async toLlmInput(context: Context): Promise<LlmInput> {
-    const sections = [...context.content.system.sections].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
-    const system = renderSystemPrompt(sections.map(section => section.content), context.content.system.modelFacts);
+    const system = renderSystemPrompt(sortSystemSections(context.content.system.sections).map(section => section.content), context.content.system.modelFacts);
     const entries = context.content.conversation.entries;
     const insertions = new Map<number, typeof context.content.supplements[number][]>();
     for (const supplement of context.content.supplements) {
@@ -126,19 +126,29 @@ export class ContextEngine {
       const group = insertions.get(index) ?? []; group.push(supplement); insertions.set(index, group);
     }
     const values: RuntimeV2JsonValue[] = [];
-    const origins: { messageId?: string; supplementKey?: string }[] = [];
     const appendSupplements = (index: number) => {
-      for (const supplement of (insertions.get(index) ?? []).sort((a, b) => a.sourceEventSeq - b.sourceEventSeq || a.id.localeCompare(b.id))) {
-        origins.push({ supplementKey: contextEntryKey("supplement", supplement.owner, supplement.id) });
-        values.push({ role: "user", content: `<runtime_context owner=${JSON.stringify(supplement.owner)} id=${JSON.stringify(supplement.id)}>\n${supplement.text}\n</runtime_context>` });
-      }
+      for (const supplement of (insertions.get(index) ?? []).sort((a, b) => a.sourceEventSeq - b.sourceEventSeq || a.id.localeCompare(b.id))) values.push({ role: "user", content: renderContextSupplement(supplement) });
     };
     appendSupplements(-1);
-    entries.forEach((entry, index) => { origins.push({ messageId: entry.node.messageId }); values.push(surfaceMessage(entry.node)); appendSupplements(index); });
-    const converted: { message: import("@actspace/llm-service").LlmMessage; origin: typeof origins[number] | null }[] = [];
-    const messages = await convertMessages(values, context.request.sessionId, this.options.resolveArtifact, (message, index) => converted.push({ message, origin: index === null ? null : origins[index]! }));
-    const input = freezeRequest({ requestId: context.request.requestId, sessionId: context.request.sessionId, routeId: context.request.routeId, model: context.request.model, options: context.request.options, messages: [...(system ? [{ role: "system", content: system }] : []), ...messages], tools: context.content.tools } as unknown as RuntimeV2JsonValue) as unknown as LlmInput;
-    rememberInputManifest(context, input, converted);
-    return input;
+    entries.forEach((entry, index) => { values.push(surfaceMessage(entry.node)); appendSupplements(index); });
+    const converted = await convertMessages(values, context.request.sessionId, this.options.resolveArtifact);
+    const messages = [...(system ? [{ role: "system", content: system } as LlmMessage] : []), ...converted];
+    // 不再整份序列化复制（agent-spec-context-trusted-surface.md §3.5）：消息由引擎新建，字段引用的是已检查、已冻结的
+    // 对话节点、补充文字和系统提示词，外壳浅冻结即可。对话没经过日志或引擎检查（调用方直接传入的 Context）时，照旧整份检查、复制、冻结。
+    const checked = isCheckedContextValue(context.content.conversation)
+      ? Object.freeze(messages.map(freezeMessage))
+      : freezeRequest(messages as unknown as RuntimeV2JsonValue) as unknown as readonly LlmMessage[];
+    return Object.freeze({
+      requestId: context.request.requestId, sessionId: context.request.sessionId, routeId: context.request.routeId, model: context.request.model,
+      options: contextValue(context.request.options),
+      messages: checked,
+      tools: contextValue(context.content.tools),
+    });
   }
+}
+
+/** 引擎新建的消息外壳、content 数组和块冻结；块里引用的对话数据已由日志冻结。 */
+function freezeMessage(message: LlmMessage): LlmMessage {
+  if (Array.isArray(message.content)) { for (const block of message.content) Object.freeze(block); Object.freeze(message.content); }
+  return Object.freeze(message);
 }

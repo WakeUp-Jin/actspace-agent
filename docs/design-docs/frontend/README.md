@@ -1,102 +1,61 @@
 # 前端设计文档
 
-- [Web / PWA 客户端规范](front-web-pwa客户端规范.md)：已实施（2026-10-17）；`apps/web` 响应式浏览器客户端（手机 V1 单栏、宽屏两栏），PWA 安装，直连 agent-host；2026-10-18 视觉更新为 B · 轻玻璃（已实施），早期原型已迁出；验收截图见 `docs/exec-runs/20261017-web-pwa-client/`，真机验收待做。
+桌面端 renderer（`apps/desktop`）与 web 客户端（`apps/web`）的设计规范。品牌总纲见根目录 [DESIGN.md](../../../DESIGN.md)。规则只写现行做法；决策过程与历史在 `docs/exec-plans/completed/` 和 `docs/histories/`。
 
-- [聊天 Mermaid 图表渲染](front-chat-mermaid-diagrams.md)：已实施：闭合的 ` ```mermaid ` 渲染为固定 Codex 浅色图表，支持查看/复制源码、PNG 导出与缩放预览；Electron 验收边界见执行摘要。
+## 做什么事，读哪几份
 
-- [消息流排版与工具摘要规范](front-tool-stream-typography.md)：已实施：统一过程行、相邻间距与摘要层级；自动验证和真实桌面验收边界见执行摘要。
+每次都先读「必读 4 份」，再按任务读区域规范。
 
-- [日常桌面界面中文文案](front-desktop-chinese-ui.md)：日常操作中文化，保留模式、思考档位与工具执行名称；验收边界见执行摘要。
+| 要做什么 | 先读 | 再读 |
+|---|---|---|
+| 任何前端改动 | [新功能开发清单](front-新功能开发清单.md)（含 UI 自检）、[视觉 token](front-视觉token规范.md)、[文案与状态表达](front-文案与状态表达规范.md)、[组件与交互模式](front-组件与交互模式规范.md) | 下面对应区域 |
+| 改颜色、字号、圆角、主题、强调色 | 视觉 token | 外观设置见设置页规范 |
+| 改任何界面上的文字、状态、空态、错误 | 文案与状态表达 | 对应区域 |
+| 新增或改按钮、弹层、菜单、Tooltip、表格、设置行 | 组件与交互模式 | 对应区域 |
+| 消息流、工具行、Thinking、审批 | 中间消息区 | 聊天区 Markdown 渲染；轮尾与导航 |
+| 回复尾部操作、用量胶囊、轮次导航、压缩显示、交付卡片 | 轮尾与导航 | 中间消息区 |
+| 轨迹页 | 轨迹视图 | 中间消息区 |
+| 输入框、`@` 引用、`/` 菜单、批注 | 聊天输入框 | 文件引用与回复批注；工作区、Git 与运行目标 |
+| 侧栏会话列表、置顶、工作区分组 | 左侧会话栏 | 工作台布局 |
+| 窗口布局、分栏、折叠、右侧面板外壳与文件打开 | 工作台布局与面板交互；右侧面板与文件渲染 | 文档面板 |
+| Context 面板 | Context 面板 | 会话状态与数据流 |
+| 子 Agent、后台任务、侧边对话 | 子 Agent 与后台任务 | 右侧面板与文件渲染 |
+| 设置页、模型连接、使用统计、Harness 统计 | 设置页 | 组件与交互模式 §6 |
+| 会话数据、store、live 事件 | 会话状态与数据流 | Preload bridge 与 Mock |
+| 新增 IPC、写 mock、写测试 | Preload bridge 与 Mock | 前端验证约定 |
+| web / 手机端 | Web / PWA 客户端 | 视觉 token |
+| 验收 | [前端验证约定](../../FRONTEND_VERIFICATION.md) | 新功能开发清单 §9 |
 
-- [外观强调色](front-accent-palette.md)：已实施，Electron 验收待做；强调色覆盖范围、调色板色值、对比度门槛与 `data-accent` 机制。
-- [设置内使用统计页面更新](front-usage-statistics-refresh.md)：已实施，实机门禁见执行摘要；借鉴 Maka 信息结构，统一 ActSpace 视觉和中文，连接可靠费用投影及本地价目。
-- [英语辅助学习插件设计](../agent-plugin-runtime/agent-english-learning.md)：提示词与 MiniMax 朗读设计；当前 live Agent 绑定存在接线限制，详见正文。
-- [Agent 工具流式渲染修复设计](front-agent-tool-stream-rendering.md)：已实施，定义工具事件链与实时/历史预览对齐；体验调整见后续计划。
+## 必读 4 份
 
-本目录汇总 `actspace` 桌面端 renderer 的视觉语言、主题、工程样式、基础组件、工作台区域、页面规范和设计原型。Markdown 规范与主要 HTML 原型位于本层；Space（多智能体协作）的设计、demo 与素材已移到 [`../多智能体协作/`](../多智能体协作/README.md)。
+- [新功能开发清单](front-新功能开发清单.md)：工程规则（文件放哪、状态放哪、IPC、安全、测试）加 11 条 UI 自检。
+- [视觉 token 规范](front-视觉token规范.md)：颜色职责与唯一色板、字号（含 8–10px 白名单）、间距、圆角、阴影、层级、动效、强调色、主题硬约束、样式归属。
+- [文案与状态表达规范](front-文案与状态表达规范.md)：中文取舍、说明文字默认不写、同一信息只出现一次、状态表达、空 / 零 / 未知 / 错误 / 加载的固定写法。
+- [组件与交互模式规范](front-组件与交互模式规范.md)：Button / IconButton 变体、Tooltip、弹层怎么选、确认与撤销、设置行与对齐、表格与长值、对标与 demo。
 
-当前产品级设计系统名称为 **ActSpace Editor Design System**，内部视觉方向为 **Ink & Emerald / 墨色与翡翠绿**。总纲见仓库根目录 `DESIGN.md`。
+## 区域规范
 
-## 当前阶段
+- [工作台布局与面板交互](front-工作台布局与面板交互规范.md)：SplitView、resize、折叠与恢复。
+- [左侧会话栏](front-左侧会话栏规范.md)：会话、已置顶、工作区分区与视图选项。
+- [中间消息区](front-中间消息区规范.md)：消息语法、工具流、执行状态。
+- [轮尾与导航](front-轮尾与导航规范.md)：轮尾操作、用量胶囊、轮次导航、压缩显示、交付卡片。
+- [聊天区 Markdown 渲染](front-聊天区Markdown渲染规范.md)：`MarkdownProse` 排版、公式、Mermaid、流式稳定性。
+- [流式 Markdown 解析降频](front-流式Markdown解析降频规范.md)：尾部最多每 100ms 解析一次、原样尾巴、处理器常驻。
+- [聊天输入框](front-聊天输入框规范.md)：Composer、模式、模型、附件、`/` 菜单、发送。
+- [文件引用与回复批注](front-composer-file-mentions-and-response-annotations.md)：`@` 工作区文件、选区批注、引用托盘。
+- [工作区、Git 与运行目标](front-workspace-git-worktree-context.md)：初始 Composer 的工作区、分支、本机 / 远端、工作树。
+- [Environment 与 Git 操作](front-environment-and-git-actions.md)：顶部 Environment、编辑器选择、分支、Commit、Push。
+- [右侧面板与文件渲染](front-右侧面板与文件渲染规范.md)：面板外壳、标签、文件打开、diff。
+- [文档面板](front-文档面板规范.md)、[Markdown 编辑与渲染](front-Markdown编辑与渲染规范.md)：只含 Markdown 的目录树与 CodeMirror 6 编辑器。
+- [Context 面板](front-Context面板规范.md)：当前上下文、会话统计、Bash 统计、路径卡片、契约字段。
+- [子 Agent 与后台任务](front-子Agent与后台任务规范.md)：子 Agent 列表与详情顶栏、后台任务、侧边对话。
+- [轨迹视图](front-轨迹视图规范.md)：轨迹页的结构、小字号白名单与交互。
+- [设置页](front-设置页规范.md)：设置信息架构、模型连接、使用统计、外观。
+- [会话状态与数据流](front-会话状态与数据流规范.md)：cell / live run / 本地状态、合并规则、evict。
+- [Preload bridge 与 Mock](front-preload-bridge与mock规范.md)：`window.actspace` 契约、`api/<域>`、新增 IPC 步骤、mock 与测试打桩。
+- [Web / PWA 客户端](front-web-pwa客户端规范.md)：`apps/web` 响应式客户端与视觉。
+- 相关：[Review 变更来源](../core-review-change-sources.md)（右侧 Review 标签与六种 scope）、[Space 工作台](../多智能体协作/front-space-工作台设计.md)。
 
-- `Ink & Emerald` renderer token 与组件迁移已完成，旧 `brand` / `warm` 消费者已清零。
-- 工程验证与防回流检查已落地；真实 Electron / Retina 与完整页面状态保留人工验收。
-- [四态主题样板归档与恢复](../retired-html-demos.md)。
+## 资产与 demo
 
-## 总目标
-
-- 让 ActSpace 呈现为真实的桌面编辑与 Agent 工作工具，而不是普通网页聊天页。
-- 中间消息与工作区始终是视觉和交互主轴，左右面板服务于上下文、导航和对象浏览。
-- 复杂能力必须可见、可控、可收起，并保持执行顺序和状态可追踪。
-- 先稳定全局视觉语言、主题 token 和布局底座，再逐个打磨业务组件。
-- 颜色、字体、间距、圆角和动效不在入口文档重复定义，分别以视觉语言与主题规范为事实来源。
-- 中性灰阶承担主要信息层级，主操作使用主题反色的墨色 action，翡翠绿只承担运行、连接、开启和成功等 operational 语义。
-
-## 页面与布局原则
-
-- 聊天态使用左侧会话栏、中间主工作区和可展开右侧对象面板。
-- 初始状态可以折叠右侧面板，但必须保留明确入口。
-- 左右面板争抢空间时优先保护中间区域的可读、可输入和可滚动性。
-- 设置态是独立页面布局，不作为聊天态右侧面板叠加。
-- Composer、消息流、Context 和文件预览分别由专题规范维护，避免入口文档重复描述组件细节。
-
-## 必读顺序
-
-1. `docs/design-docs/frontend/front-新功能开发清单.md`：新增或改动功能前先读，一页列出全部规则和对应的检查命令
-2. `docs/design-docs/frontend/front-全局视觉语言规范.md`
-3. `docs/design-docs/frontend/front-主题与配色规范.md`
-4. `docs/design-docs/frontend/front-tailwind-style-architecture.md`
-5. `docs/design-docs/frontend/front-基础组件封装规范.md`
-6. 涉及会话数据时读 `front-会话状态与数据流规范.md`；涉及调用 main / IPC / mock 时读 `front-preload-bridge与mock规范.md`
-7. 根据任务进入具体区域或页面规范
-
-## 文档列表
-
-- `docs/design-docs/frontend/front-新功能开发清单.md`：新功能开发清单。样式、组件与弹层、文件拆分（单文件超过 500 行要拆）、状态归属、IPC、安全、测试、验收和提交前命令，每条一行并链到详细规范。
-- `docs/design-docs/frontend/front-全局视觉语言规范.md`：字体、颜色、间距、圆角、阴影和动效 token。
-- `docs/design-docs/frontend/front-主题与配色规范.md`：浅色、深色、跟随系统三态主题和颜色硬约束。
-- `docs/design-docs/frontend/front-tailwind-style-architecture.md`：Tailwind v4 样式架构和迁移策略。
-- `docs/design-docs/frontend/front-基础组件封装规范.md`：基础 UI wrapper 分层和组件抽象边界。
-- `docs/design-docs/frontend/front-preload-bridge与mock规范.md`：`window.actspace` 契约、renderer `api/<域>` 访问约定、新增 IPC 的步骤、guard 约定、mock bridge 与场景、测试打桩。
-- `docs/design-docs/frontend/front-会话状态与数据流规范.md`：renderer 会话数据的三类归属（durable cell / live run / 本地状态）、cell LRU、`runId` / `sourceSeq` 与正文合并规则、SessionLocalStore、evict 时机、live 事件分发、三个 Context、错误可见、未确认提交。
-- `docs/design-docs/frontend/front-icon-button-tooltip-guidelines.md`：图标按钮 Tooltip 和可访问性规范。
-- `docs/design-docs/frontend/front-工作台布局与面板交互规范.md`：SplitView、resize、collapse 和 restore。
-- `docs/design-docs/frontend/front-environment-and-git-actions.md`：顶部 Environment、编辑器选择、本地分支创建、Commit 和 Push 工作流。
-- `docs/design-docs/core-review-change-sources.md`：Git-first Review Workbench 总规范；右侧 Review Tab、六种 scope、upstream Branch、Review Options 与 Git actions 都以此为准。
-- `docs/design-docs/frontend/front-左侧会话栏规范.md`：会话、Pinned 和 Workspaces 分区。
-- `docs/design-docs/多智能体协作/front-space-工作台设计.md`：Space 工作台（Actor 模型）前端设计定稿；协调 Agent + Actor 标签页、右栏 Actor / 库 / 记忆、胶囊与三层审批、Actor 名册。
-- `docs/design-docs/frontend/front-中间消息区规范.md`：消息语法、工具流和执行状态。
-- `docs/design-docs/frontend/front-聊天输入框规范.md`：Composer、模型、附件、Context 和发送。
-- `docs/design-docs/frontend/front-composer-slash-command.md`：Composer 内 `/` 快捷菜单的 Functions / Skills 分组、命令语义、键盘交互和验证边界。
-- `docs/design-docs/frontend/front-composer-file-mentions-and-response-annotations.md`：Composer `@` 工作区文件引用、助手回复选区批注、引用托盘与历史 marker（含 2026-09-28 实施决策修订）。
-- `docs/design-docs/frontend/front-workspace-git-worktree-context.md`：初始 Composer 的 Workspace、Git branch、This Mac 与 New Worktree 执行上下文。
-- `docs/design-docs/frontend/front-右侧面板与文件渲染规范.md`：对象启动页、文件预览、Workspace 文件树和 diff。
-- `docs/design-docs/frontend/front-文档面板规范.md`：「文档」面板（只含 Markdown 的目录树 + 正文），2026-11-01 确认、待实施；实施后取代上一条中的 Workspace 文件树。
-- `docs/design-docs/frontend/front-Markdown编辑与渲染规范.md`：「文档」正文的 CodeMirror 6 实时预览编辑器（预览 / 源码都可编辑），D1–D12 预览规则、Codex 排版、文中路径与链接、安全与性能；2026-11-03 已实施，demo 在 `md-render-demo/`。
-- `docs/design-docs/frontend/front-聊天区Markdown渲染规范.md`：聊天区（`MarkdownProse`）的 Markdown 渲染。内容有：改进 1–10（路径可点、提示框、公式、原始 HTML 白名单、远程图片不加载、脚注全局化…）、「A 书页」排版、流式效果和稳定性约束。2026-11-03 已实施，demo 在 `chat-md-demo/`。
-- `docs/design-docs/frontend/plugins-page-demo.html`：扩展 › 插件页 demo，2026-11-01 用户选定方案 B（可关的在上，内置的折叠）；规则见 [02 插件结构设计](../架构优化/02-插件结构设计.md) §7.3。
-- `docs/design-docs/frontend/front-Context面板后端数据需求.md`：右侧栏 Context 面板（当前上下文、会话统计、明细对比上次请求、趋势、事件）需要后端提供的数据形状与缺口；2026-10-11 需求稿，前端先用 mock 实现。
-- `docs/design-docs/frontend/front-设置中心重构规范.md`：当前设置中心的产品信息架构、页面职责、模型连接流程、身份设置、Usage 活动分析和实施边界。后续设置中心实现以本文为准。
-- `docs/design-docs/frontend/front-模型设置页面-Maka重做规范.md`：模型页面的 Maka 风格重做规范，冻结连接列表、目录、配置、详情和模型目录的页面语法与验收标准。
-
-
-## HTML 原型
-
-已实现的设计 Demo 已本地备份后迁出当前仓库，原路径与恢复方式见 [迁出清单](../retired-html-demos.md)。后续实现以本目录 Markdown 规范和正式应用为准。
-
-- [Space 工作台演示](../多智能体协作/space-demo.html) 仍保留，当前是 mock 前端；Runtime 协作不在该演示的交付范围。
-- PA2 批注验收 Demo 仍保留，PB 尚未实施。
-
-## 资产约定
-
-- 未实施原型可暂存本目录；实现落地后按迁出清单流程备份到本机，当前导航转为 Markdown 规范。配套素材引用必须能从保留的原型或规范追踪。
-- 每个资产尽量只表达一个明确状态，并使用可识别的功能名。
-- 新增资产时同步更新本入口或对应组件规范，写清它验证的状态。
-
-- [会话浏览按需加载](front-progressive-session-loading.md)：摘要与消息真实分页、轨迹按需、浏览索引与验证边界。
-
-## 工具流交互演示
-
-- [消息流排版原型归档与恢复](../retired-html-demos.md)：静态排版与工具摘要视觉参考。
-
-- [Context 面板 Step 刷新与路径展示交接](front-Context面板Step刷新与路径展示交接.md)：后端与刷新已实现，CloudOps 待补活跃/睡眠路径 UI 和交互验收。
+- 规范和 token 为准；demo 只用于选方向，选定后结论写进区域规范、demo 删除。保留的 demo（待 Electron 复验）：`context-bash-demo.html`、`subagent-style-demo.html`、`md-render-demo/`。

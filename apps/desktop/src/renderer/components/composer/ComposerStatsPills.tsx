@@ -1,8 +1,10 @@
 import { Database, Gauge, type LucideIcon } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useState } from "react";
 import { STAT_DIALOG_CONTENT_CLASS, StatDialogBody, type StatDialog, type StatRow } from "../stats/StatDialog";
 import type { RuntimeV2UsageSummary } from "@actspace/shared/runtime-v2/projection";
-import { useOptionalSessionProjection } from "../../session";
+import { useProjectionSelect } from "../../session";
+import { jsonEqual } from "../../json-equal";
+import type { ClientSessionCell } from "@actspace/client/sessions";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/Popover";
 import {
   billedInputTokens,
@@ -39,9 +41,6 @@ export type ComposerStatsOverlay = {
 type PillModel =
   | { readonly kind: "plain"; readonly label: readonly string[] }
   | { readonly kind: "dialog"; readonly label: readonly string[]; readonly ariaLabel: string; readonly dialog: StatDialog };
-
-const USAGE_DESCRIPTION = "每次模型请求的输入（含缓存）加输出之和；每一步都会重发上下文，所以远大于当前窗口占用。";
-const CACHE_HIT_FOOTNOTE = "缓存命中 = 缓存读 ÷（未缓存输入 + 缓存读 + 缓存写），按累计计算。";
 
 const tokenCount = (value: string) => `${value} tok`;
 
@@ -95,11 +94,16 @@ export function usagePillModel(usage: RuntimeV2UsageSummary | null | undefined):
     dialog: {
       title: "会话累计消耗",
       titleValue: tokenCount(formatExactTokens(total)),
-      description: USAGE_DESCRIPTION,
       rows,
-      ...(hit !== null ? { footnote: CACHE_HIT_FOOTNOTE } : {}),
     },
   };
+}
+
+type StatsModels = { readonly activity: PillModel | null; readonly usage: PillModel | null };
+
+function selectStatsModels(cell: ClientSessionCell | null): StatsModels {
+  const snapshot = cell?.snapshot ?? null;
+  return { activity: activityPillModel(sessionStats(snapshot)), usage: usagePillModel(snapshot?.usage) };
 }
 
 /**
@@ -111,10 +115,8 @@ export function ComposerStatsPills({ overlay }: { overlay?: ComposerStatsOverlay
   const openStat = overlay ? overlay.openStat : localOpen;
   const onOpenChange = overlay?.onOpenChange
     ?? ((stat: ComposerStat, open: boolean) => setLocalOpen((current) => (open ? stat : current === stat ? null : current)));
-  const projection = useOptionalSessionProjection();
-  const snapshot = projection?.cell.snapshot ?? null;
-  const activity = useMemo(() => activityPillModel(sessionStats(snapshot)), [snapshot]);
-  const usage = useMemo(() => usagePillModel(snapshot?.usage), [snapshot?.usage]);
+  // 只订阅两个胶囊的模型：流式时 cell 每帧换一次，模型几乎不变，状态行不随帧重渲染。
+  const { activity, usage } = useProjectionSelect<StatsModels>(selectStatsModels, jsonEqual);
   if (activity === null && usage === null) return null;
   return (
     <span className="flex min-w-0 shrink flex-wrap items-center gap-1" data-composer-stats="">

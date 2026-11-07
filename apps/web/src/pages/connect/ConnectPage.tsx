@@ -10,7 +10,7 @@ function FieldError({ id, message }: { readonly id: string; readonly message: st
   return message ? <p id={id} role="alert" className="m-0 -mt-2 mb-3.5 ml-0.5 text-act-sm text-danger">{message}</p> : null;
 }
 
-/** 首次连接 / 吊销后重新配对（front-web-pwa客户端规范 §5）。 */
+/** 首次连接 / 吊销后重新配对（front-web-pwa客户端规范 §4）。 */
 export function ConnectPage() {
   const store = useConnectionStore();
   const state = useConnection();

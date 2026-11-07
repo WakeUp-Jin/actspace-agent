@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { mkdir, open, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createCoreCodecRegistry, createSessionHeader } from '@actspace/session-journal';
-import { ContextEngine } from '../../../packages/context/context-engine/dist/index.js';
 
 const option = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
 const root = resolve(option('root') ?? '.');
@@ -13,24 +12,11 @@ assert(root.startsWith('/tmp/actspace-context-') && workspace.startsWith('/tmp/a
 const template = JSON.parse((await readFile(option('header-from'), 'utf8')).split('\n')[0]);
 const id = 'context-large-legal-fixture';
 const registry = createCoreCodecRegistry();
-async function project(toolCount) {
-  const context = {
-    request: { sessionId: id, requestId: 'fixture', routeId: 'fixture', model: 'fixture', options: {} },
-    content: {
-      system: { sections: [{ id: 'base', owner: 'system', order: 0, content: 'Synthetic historical Context acceptance fixture' }], modelFacts: [] },
-      tools: Array.from({ length: toolCount }, (_, i) => ({ name: `fixture_tool_${String(i).padStart(3, '0')}`, description: 'Synthetic bounded tool metadata', inputSchema: { type: 'object', properties: {} } })),
-      supplements: [], conversation: { entries: [], replaceGeneration: 0 },
-    },
-    status: { throughJournalSeq: 0, cycle: 0, paths: [], facts: [], plugins: {} },
-  };
-  const engine = new ContextEngine({ resolve: () => context });
-  const live = await engine.getContext(context.request);
-  await engine.recordPrepared(live, { modelKey: 'fixture/fixture', label: 'fixture', contextWindow: 32768, autoCompactAtTokens: 26000 });
-  const projection = engine.getProjection(context.request);
-  return { ...projection, manifest: { ...projection.manifest, entries: projection.manifest.entries.map(({ preview, fullTextAvailable, source, ...entry }) => entry) } };
-}
-const small = await project(0), large = await project(620);
-assert.equal(large.manifest.entries.length, 621);
+// 提示词、工具只在变化时写（agent-spec-request-record.md）：第 0 次写 1 个工具，第 598 次换成 620 个。
+const sections = [{ id: 'base', owner: 'system', order: 0, content: 'Synthetic historical Context acceptance fixture' }];
+const tool = name => ({ name, description: 'Synthetic bounded tool metadata', inputSchema: { type: 'object', properties: {} } });
+const tools = count => count ? Array.from({ length: count }, (_, i) => tool(`fixture_tool_${String(i).padStart(3, '0')}`)) : [tool('fixture_tool_base')];
+const contextModel = { contextWindow: 32768, autoCompactAtTokens: 26000 };
 const directory = join(root, 'sessions-v2', id);
 await mkdir(directory, { recursive: true });
 const path = join(directory, 'journal.jsonl');
@@ -48,12 +34,13 @@ try {
   await append('session/workspace-set', { workspaceRoot: workspace });
   for (let i = 0; i < 600; i++) {
     const ids = { turnId: `t${i}`, stepId: `step${i}`, requestId: `r${i}`, agentRunId: `run${i}` };
-    const projection = i >= 598 ? large : small;
     const model = `fixture-${i % 2}`;
     await append('turn/start', ids);
     await append('step/start', { ...ids, stepIndex: 1 });
-    await append('request/header', { ...ids, model, routeId: 'fixture' });
-    await append('request/context', { ...ids, snapshot: { contextManifest: projection.manifest, contextModel: { ...projection.model, modelKey: `fixture/${model}`, label: model }, logicalAgentScopeId: `main:${id}`, renderedSystemPrompt: 'Synthetic historical Context acceptance fixture', messages: [] } });
+    await append('request/header', { ...ids, model, routeId: 'fixture', contextWindow: contextModel.contextWindow });
+    if (i === 0) await append('request/system-prompt', { ...ids, digest: 'fixture-prompt', contributorProvenance: [], sections, modelFacts: [] });
+    if (i === 0 || i === 598) await append('request/tools', { ...ids, digest: `fixture-tools-${i}`, tools: tools(i === 0 ? 0 : 620) });
+    await append('request/context', { ...ids, snapshot: { schemaVersion: 3, contextModel: { ...contextModel, modelKey: `fixture/${model}`, label: model }, logicalAgentScopeId: `main:${id}` } });
     const body = [{ type: 'text', text: `Synthetic historical fixture response ${i}; not a provider request.` }];
     const usage = { inputTokens: 100, outputTokens: 20, cacheReadTokens: 10, totalTokens: 120 };
     await append('assistant/message', { ...ids, messageId: `a${i}`, content: body, finishReason: 'stop', usage }, { kind: 'append', node: { kind: 'assistant', messageId: `a${i}`, content: body } });

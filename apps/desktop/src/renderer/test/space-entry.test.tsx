@@ -66,7 +66,7 @@ describe("Space 演示入口（T4）", () => {
     const section = screen.getByRole("region", { name: "Space" });
     await user.click(within(section).getByRole("button", { name: /支付链路提速/ }));
 
-    expect(screen.getByRole("main", { name: "Space（开发中演示）" })).toBeInTheDocument();
+    expect(await screen.findByRole("main", { name: "Space（开发中演示）" })).toBeInTheDocument();
     expect(screen.getByText("开发中演示")).toBeInTheDocument();
     expect(within(section).getByRole("button", { name: /支付链路提速/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByPlaceholderText("接下来做什么？")).toBeInTheDocument();
@@ -81,7 +81,7 @@ describe("Space 演示入口（T4）", () => {
     renderWorkbench();
     await user.click(within(sidebar()).getByRole("button", { name: /Actor 名册/ }));
 
-    expect(screen.getByRole("heading", { name: /Actor 名册/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Actor 名册/ })).toBeInTheDocument();
     expect(within(sidebar()).getByRole("button", { name: /Actor 名册/ })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("tab", { name: "Actor" })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("接下来做什么？")).not.toBeInTheDocument();
@@ -93,7 +93,7 @@ describe("Space 演示入口（T4）", () => {
     act(() => spaceDemoStore.actions.openSoloChat("be"));
     await user.click(within(sidebar()).getByRole("button", { name: /^后端/ }));
 
-    expect(screen.getByPlaceholderText("和后端说…")).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("和后端说…")).toBeInTheDocument();
     expect(within(sidebar()).getByRole("button", { name: /^后端/ })).toHaveAttribute("aria-current", "page");
 
     await user.click(within(sidebar()).getByRole("button", { name: /^新建会话/ }));
@@ -108,7 +108,7 @@ describe("Space 演示入口（T4）", () => {
     await user.type(within(dialog).getByRole("textbox", { name: /名字/ }), "发布清单");
     await user.click(within(dialog).getByRole("button", { name: /^创建/ }));
 
-    expect(screen.getByRole("main", { name: "Space（开发中演示）" })).toBeInTheDocument();
+    expect(await screen.findByRole("main", { name: "Space（开发中演示）" })).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Space" })).getByRole("button", { name: /发布清单/ })).toHaveAttribute("aria-current", "page");
   });
 });

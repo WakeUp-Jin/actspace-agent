@@ -4,6 +4,7 @@ import { formatChatAttachmentIssue, type ChatAttachmentIssue, type EnglishLearni
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "../workspace-registry-service";
 import { FixedRendererStreamAdapter } from "./fixed-renderer-stream-adapter";
 import { randomUUID } from "node:crypto";
+import { LiveOutputBuffer, surfaceNode, type LiveOutputBaseline } from "@actspace/shared/runtime-v2";
 import { readFile, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import type {
@@ -12,7 +13,6 @@ import type {
   RuntimeV2DesktopSnapshot,
   RuntimeV2ForkSessionInput,
   RuntimeV2LiveEvent,
-  RuntimeV2LiveReplay,
   RuntimeV2RequestRestartInput,
   RuntimeV2UpdateSessionMetadataInput,
   RuntimeV2ReadArtifactResult,
@@ -27,6 +27,9 @@ import { bootDesktopRuntimeV2 } from "./desktop-host-adapter";
 import type { DesktopRuntimeV2ModelPort } from "./model-port";
 import type { DesktopRuntimeV2ApprovalPort, DesktopRuntimeV2BrowserPort, DesktopRuntimeV2Roots } from "./host-ports";
 import { loadRuntimeV2Module, type RuntimeV2Module } from "./runtime-loader";
+
+/** Window in which consecutive text / thinking deltas share one renderer stream message. */
+export const RENDERER_STREAM_INTERVAL_MS = 33;
 
 export type DesktopRuntimeV2RegistryOptions = {
   readonly speech?: SpeechHostPort;
@@ -46,10 +49,18 @@ export type DesktopRuntimeV2RegistryOptions = {
   readonly log?: (message: string, details?: Record<string, unknown>) => void;
 };
 
+/** The slice of the Session controller the Host drives to keep idle Sessions from piling up in memory. */
+type SessionReleaseControl = {
+  setObserved(sessionIds: readonly string[]): void;
+  addPin(pin: (sessionId: string) => boolean): () => void;
+};
+
 export class DesktopRuntimeV2Registry {
   readonly #streamWorkspaces = new Map<string, string>();
-  readonly #rendererStream = new FixedRendererStreamAdapter((sessionId) => this.#streamWorkspaces.get(sessionId));
+  readonly #rendererStream = new FixedRendererStreamAdapter((sessionId) => this.#streamWorkspaces.get(sessionId), RENDERER_STREAM_INTERVAL_MS);
   readonly #listeners = new Set<(event: RuntimeV2DesktopLiveEnvelope) => void>();
+  /** Unsettled text of each running Session, for renderers that reattach mid-run (agent-spec-live-assistant-stream §5). */
+  readonly #liveOutput = new LiveOutputBuffer();
   #profile: BootedRuntimeProfile | undefined;
   #workspaceDiscovery?: { controller: AbortController; task: Promise<void> };
   #bootPromise: Promise<void> | undefined;
@@ -60,7 +71,6 @@ export class DesktopRuntimeV2Registry {
   #browserSocketPath: string | undefined;
   #bootError: string | null = null;
   #cursor = 0;
-  readonly #eventBuffer: RuntimeV2DesktopLiveEnvelope[] = [];
   #artifacts: {
     create(input: { readonly bytes: Uint8Array; readonly mediaType: string; readonly owner: { readonly sessionId: string; readonly callId: string; readonly pluginId: string; readonly name: string } }): Promise<{ readonly artifactId: string; readonly mediaType: string; readonly size: number }>;
     readForSession(sessionId: string, artifactId: string): Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }>;
@@ -161,6 +171,8 @@ export class DesktopRuntimeV2Registry {
   inspectSession(sessionId: string) { return this.requireApp().inspectSession(sessionId); }
   readSessionEventBatch(sessionId: string, input: Parameters<DesktopAppServiceContract["readSessionEventBatch"]>[1]): ReturnType<DesktopAppServiceContract["readSessionEventBatch"]> { return this.requireApp().readSessionEventBatch(sessionId, input); }
   inspectSessionEvents(sessionId: string) { return this.requireApp().inspectSessionEvents(sessionId); }
+  latestSessionEvent(sessionId: string, type: string) { return this.requireApp().latestSessionEvent(sessionId, type); }
+  readSessionProjectionValue(sessionId: string, key: string) { return this.requireApp().readSessionProjectionValue(sessionId, key); }
   readContextEntryText(sessionId: string, scope: string, key: string, revision: number, generation: string) { return this.requireApp().readContextEntryText(sessionId, scope, key, revision, generation); }
   readContextProjection(sessionId: string, logicalAgentScopeId?: string) { return this.requireApp().readContextProjection(sessionId, logicalAgentScopeId); }
   completeText(input: Parameters<DesktopAppServiceContract["completeText"]>[0]) { return this.requireApp().completeText(input); }
@@ -304,17 +316,6 @@ export class DesktopRuntimeV2Registry {
     return snapshot;
   }
 
-  async revokeSessionGrant(sessionId: string, grantId: string) {
-    this.assertAdmission();
-    this.#admittedWork++;
-    try {
-      this.options.approvals.expireAll?.(sessionId);
-      const snapshot = await this.requireApp().revokeSessionGrant(sessionId, grantId);
-      this.#emitDurableChanged(sessionId, snapshot.throughJournalSeq, "session-grant-revoked");
-      return snapshot;
-    } finally { this.#admittedWork--; }
-  }
-
   async readArtifact(sessionId: string, artifactId: string): Promise<RuntimeV2ReadArtifactResult> {
     const artifact = await this.resolveArtifact(sessionId, artifactId);
     return Object.freeze({ artifactId, mimeType: artifact.mediaType, bytesBase64: Buffer.from(artifact.bytes).toString("base64") });
@@ -398,24 +399,43 @@ export class DesktopRuntimeV2Registry {
     } finally { this.#admittedWork--; }
   }
 
+  /**
+   * The Sessions the renderer shows or subscribes to (the whole set, replaced on every change). They are
+   * never released as idle; every other idle Session beyond the LRU limit is closed and resumed on demand.
+   */
+  setObservedSessions(sessionIds: readonly string[]): void {
+    this.#observedSessions = sessionIds.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, 256);
+    this.#sessionRelease()?.setObserved(this.#observedSessions);
+  }
+  #observedSessions: readonly string[] = [];
+  #sessionRelease(): SessionReleaseControl | undefined { return this.#profile?.context.get?.("session.runtime") as SessionReleaseControl | undefined; }
+  /** A fresh boot starts without viewers: replay the renderer's set and pin what Host features hold open. */
+  #installSessionRelease(profile: BootedRuntimeProfile): void {
+    const control = profile.context.get?.("session.runtime") as SessionReleaseControl | undefined;
+    if (control === undefined) return;
+    control.setObserved(this.#observedSessions);
+    // English learning keeps the target Session's handle to read each finished turn.
+    control.addPin((sessionId) => {
+      const learning = profile.context.get?.("english-learning") as EnglishLearningService | undefined;
+      const state = learning?.getState();
+      return state?.enabled === true && state.targetSessionId === sessionId;
+    });
+  }
+  /** Emit a buffered text/reasoning delta now (before a message that must not overtake it). */
+  flushRendererStream(): void { this.#rendererStream.flush(); }
+  /**
+   * The unsettled text of a Session's current Run. Pending frames go out first, so every frame sent
+   * before this call has a revision ≤ the returned one and every later frame a greater one.
+   */
+  liveOutput(sessionId: string): LiveOutputBaseline {
+    this.#rendererStream.flush();
+    return this.#liveOutput.baseline(sessionId);
+  }
   subscribeRendererStream(listener: (event: import("@actspace/shared").RuntimeStreamEvent) => void): () => void { return this.#rendererStream.subscribe(listener); }
 
   subscribe(listener: (event: RuntimeV2DesktopLiveEnvelope) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
-  }
-
-  replayLiveEvents(afterCursor: number): RuntimeV2LiveReplay {
-    const profile = this.requireProfile();
-    const first = this.#eventBuffer[0]?.event.liveSeq ?? this.#cursor + 1;
-    const gap = afterCursor < first - 1;
-    return Object.freeze({
-      runtimeInstanceId: profile.getState().runtimeInstanceId,
-      afterCursor,
-      currentCursor: this.#cursor,
-      gap,
-      events: Object.freeze(gap ? [] : this.#eventBuffer.filter((envelope) => envelope.event.liveSeq > afterCursor)),
-    });
   }
 
   private learningControl: Promise<unknown> = Promise.resolve();
@@ -514,8 +534,6 @@ export class DesktopRuntimeV2Registry {
       }),
       emittedAt: new Date().toISOString(),
     });
-    this.#eventBuffer.push(envelope);
-    if (this.#eventBuffer.length > 512) this.#eventBuffer.shift();
     for (const listener of this.#listeners) listener(envelope);
   }
 
@@ -558,11 +576,15 @@ export class DesktopRuntimeV2Registry {
       void this.options.browser?.endTurn?.(update.sessionId, update.turnId).catch((error: unknown) => this.options.log?.("browser turn cleanup failed", { error: String(error) }));
     }
     if (update.workspaceRoot) this.#streamWorkspaces.set(update.sessionId, update.workspaceRoot);
-    this.#rendererStream.accept(update);
-    if (update.kind === "run-state" && ["completed", "failed", "aborted", "step-limit"].includes(update.message)) this.#streamWorkspaces.delete(update.sessionId);
-    if (update.kind === "assistant-delta" || update.kind === "reasoning-delta" || update.kind === "run-state") {
-      this.#emit({ ...update, throughJournalSeq: 0 });
+    const liveRevision = this.#liveOutput.accept(update);
+    // 正文 / 思考增量带上 revision，界面恢复运行时据此丢掉底稿里已有的帧。
+    this.#rendererStream.accept(liveRevision !== null && (update.kind === "assistant-delta" || update.kind === "reasoning-delta") ? { ...update, liveRevision } : update);
+    if (update.kind === "run-state" && ["completed", "failed", "aborted", "step-limit"].includes(update.message)) {
+      this.#streamWorkspaces.delete(update.sessionId);
+      this.#liveOutput.clear(update.sessionId, update.agentRunId);
     }
+    // Delta text travels only on the renderer stream (the Journal records the settled message); a live envelope copy has no reader.
+    if (update.kind === "run-state") this.#emit({ ...update, throughJournalSeq: 0 });
   }
 
   async #boot(): Promise<void> {
@@ -585,6 +607,7 @@ export class DesktopRuntimeV2Registry {
         onRuntimeLive: (update) => this.#emitRuntimeLive(update),
       });
       this.#profile = booted.profile;
+      this.#installSessionRelease(booted.profile);
       const learningTarget = this.#learningTargetToRestore;
       if (learningTarget?.enabled && learningTarget.sessionId) {
         await this.requireApp().resumeMainSession(learningTarget.sessionId);
@@ -616,6 +639,10 @@ export class DesktopRuntimeV2Registry {
       }).catch(error => { if (!controller.signal.aborted) this.options.log?.("Workspace discovery failed", { error: String(error) }); });
       this.#workspaceDiscovery = { controller, task };
       this.#stopSessionRevisions = this.requireApp().subscribeSessionProjection(update => {
+        if (update.event.type === "assistant/message") {
+          const messageId = (update.event.data as { messageId?: unknown } | null)?.messageId;
+          if (typeof messageId === "string") this.#liveOutput.settle(update.sessionId, messageId);
+        }
         this.#emit({ kind: "journal-update", sessionId: update.sessionId, throughJournalSeq: update.throughJournalSeq, update, ...(update.event.type === "session/title-set" ? { message: "session-title-updated" } : {}) });
       });
       this.#stopTaskRevisions = booted.profile.context.on?.("agent/tasks-updated", (snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot) => {
@@ -671,7 +698,7 @@ function findArtifactRef(value: unknown, artifactId: string): { readonly mimeTyp
 function findHistoricalArtifactRef(events: readonly SessionEventEnvelopeV1[], artifactId: string): { readonly mimeType: string } | null {
   for (const event of events) {
     if (event.surface?.kind !== "append") continue;
-    const match = findArtifactRef(event.surface.node.content, artifactId);
+    const match = findArtifactRef(surfaceNode(event)?.content, artifactId);
     if (match !== null) return match;
   }
   return null;

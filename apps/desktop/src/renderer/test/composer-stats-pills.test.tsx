@@ -24,7 +24,8 @@ let projection: SessionProjectionContextValue | null = null;
 
 vi.mock("../session", async (importOriginal) => ({
   ...await importOriginal<typeof import("../session")>(),
-  useOptionalSessionProjection: () => projection,
+  // 胶囊只订阅 cell 派生出的模型：这里直接用夹具里的 cell 跑 selector。
+  useProjectionSelect: (selector: (cell: unknown, overlay: unknown) => unknown) => selector(projection?.cell ?? null, null),
 }));
 
 const NO_STATS: ComposerSessionStats = { turns: 0, steps: 0, llmMs: 0, toolMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 };
@@ -112,8 +113,6 @@ describe("pill models", () => {
       dialog: {
         title: "会话累计消耗",
         titleValue: "12,240 tok",
-        description: "每次模型请求的输入（含缓存）加输出之和；每一步都会重发上下文，所以远大于当前窗口占用。",
-        footnote: "缓存命中 = 缓存读 ÷（未缓存输入 + 缓存读 + 缓存写），按累计计算。",
         rows: [["缓存命中", "80%"], ["未缓存输入", "1,967 tok"], ["缓存读取", "8,033 tok"], ["输出", "2,240 tok"]],
       },
     });
@@ -149,8 +148,8 @@ describe("ComposerStatsPills", () => {
     await userEvent.click(pill);
     const dialog = await screen.findByRole("dialog", { name: "会话累计消耗" });
     expect(dialog).toHaveTextContent("12,240 tok");
-    expect(dialog).toHaveTextContent("所以远大于当前窗口占用");
-    expect(dialog).toHaveTextContent("缓存读 ÷（未缓存输入 + 缓存读 + 缓存写），按累计计算");
+    expect(dialog).not.toHaveTextContent("所以远大于当前窗口占用");
+    expect(dialog).not.toHaveTextContent("按累计计算");
     expect(dialog).toHaveTextContent("未缓存输入1,967 tok");
     expect(pill).toHaveAttribute("aria-expanded", "true");
 

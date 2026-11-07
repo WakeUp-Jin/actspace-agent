@@ -1,4 +1,5 @@
-import { useState, type ComponentProps, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import type { MessageBlock } from "@actspace/shared";
 import { ConversationView } from "../../components/ConversationView";
 import { Sidebar } from "../../components/Sidebar";
 import { WorkbenchLayout } from "../../components/WorkbenchLayout";
@@ -6,6 +7,7 @@ import { ComposerContext, useSessionDrafts, type ComposerContextValue } from "..
 import { ActiveSessionContext, type ActiveSessionValue } from "../../session/active-session-context";
 import { SessionActionsContext, type SessionActionsValue } from "../../session/session-actions-context";
 import { createSessionLocalStore } from "../../session/session-local-store";
+import { createTranscriptStore, TranscriptStoreProvider, type MutableTranscriptStore } from "../../session/transcript-context";
 import type { ComposerExecutionContext, ComposerWorkspaceOption } from "../../components/Composer";
 import type { RunTargetReadiness } from "../../target/readiness";
 import { capabilitiesOf, type RunTarget } from "../../target/run-target";
@@ -17,8 +19,11 @@ import { RunTargetContext, type RunTargetValue } from "../../target/run-target-c
  * 15 T6：运行目标和工作区选择改从 RunTargetContext 读，同样由这里把旧 prop 拆进去。
  */
 
+/** 消息序列不在 ActiveSessionValue 里（流式每帧都变，见 transcript-context.tsx）；测试仍按旧写法在这里传 `messages`。 */
+export type TestActiveSession = ActiveSessionValue & { readonly messages: MessageBlock[] };
+
 const DEFAULT_ACTIVE_SESSION: ActiveSessionValue = {
-  sessionId: null, title: "", messages: [], contextSnapshot: null, isStreaming: false, isAborting: false, isCompacting: false,
+  sessionId: null, title: "", contextSnapshot: null, isStreaming: false, isAborting: false, isCompacting: false,
   isSessionReady: true, sendScrollRequestId: 0, composerFocusRequestId: 0,
 };
 
@@ -27,7 +32,9 @@ const ACTIVE_SESSION_KEYS = {
   sessionId: true, title: true, messages: true, contextSnapshot: true, contextState: true, isStreaming: true, isAborting: true,
   isCompacting: true, isSessionReady: true, sendScrollRequestId: true, composerFocusRequestId: true, onSend: true, onAbort: true,
   onRetryCompaction: true,
-} satisfies Record<keyof ActiveSessionValue, true>;
+} satisfies Record<keyof TestActiveSession, true>;
+
+const EMPTY_MESSAGES: MessageBlock[] = [];
 
 const COMPOSER_KEYS = {
   draftKey: true, readDraft: true, writeDraft: true, readAttachmentDraft: true, writeAttachmentDraft: true, readAnnotationDraft: true, writeAnnotationDraft: true, messageQueue: true,
@@ -80,31 +87,44 @@ function split<T extends object>(props: Record<string, unknown>, keys: Record<st
   return { picked: picked as Picked<T>, rest };
 }
 
+/** 把 `messages` 写进一个静态的消息 store，rerender 传入新数组时通知订阅者。 */
+function StaticTranscript({ messages, children }: { readonly messages: MessageBlock[]; readonly children: ReactNode }) {
+  const ref = useRef<MutableTranscriptStore | null>(null);
+  if (ref.current === null) ref.current = createTranscriptStore(messages);
+  const store = ref.current;
+  store.setSilently(messages);
+  useLayoutEffect(() => { store.notify(); });
+  return <TranscriptStoreProvider store={store}>{children}</TranscriptStoreProvider>;
+}
+
 export function TestWorkbenchProviders({ activeSession, composer, sessionActions, runTarget, children }: {
-  readonly activeSession?: Partial<ActiveSessionValue>;
+  readonly activeSession?: Partial<TestActiveSession>;
   readonly composer?: Partial<ComposerContextValue>;
   readonly sessionActions?: SessionActionsValue;
   readonly runTarget?: LegacyRunTargetProps;
   readonly children: ReactNode;
 }) {
+  const { messages, ...active } = activeSession ?? {};
   return (
-    <ActiveSessionContext.Provider value={{ ...DEFAULT_ACTIVE_SESSION, ...activeSession }}>
-      <RunTargetContext.Provider value={legacyRunTarget(runTarget ?? {})}>
-        <ComposerContext.Provider value={{ composerNotice: null, ...composer }}>
-          <SessionActionsContext.Provider value={sessionActions ?? {}}>{children}</SessionActionsContext.Provider>
-        </ComposerContext.Provider>
-      </RunTargetContext.Provider>
+    <ActiveSessionContext.Provider value={{ ...DEFAULT_ACTIVE_SESSION, ...active }}>
+      <StaticTranscript messages={messages ?? EMPTY_MESSAGES}>
+        <RunTargetContext.Provider value={legacyRunTarget(runTarget ?? {})}>
+          <ComposerContext.Provider value={{ composerNotice: null, ...composer }}>
+            <SessionActionsContext.Provider value={sessionActions ?? {}}>{children}</SessionActionsContext.Provider>
+          </ComposerContext.Provider>
+        </RunTargetContext.Provider>
+      </StaticTranscript>
     </ActiveSessionContext.Provider>
   );
 }
 
 type ConversationViewProps = ComponentProps<typeof ConversationView>;
-export type TestConversationViewProps = Partial<ConversationViewProps> & Partial<ActiveSessionValue> & Partial<ComposerContextValue> & SessionActionsValue & LegacyRunTargetProps;
+export type TestConversationViewProps = Partial<ConversationViewProps> & Partial<TestActiveSession> & Partial<ComposerContextValue> & SessionActionsValue & LegacyRunTargetProps;
 
 /** ConversationView 自己的 contextSnapshot / contextState / isSessionReady 是合并后的值，仍作为 prop 传入。 */
 export function TestConversationView(props: TestConversationViewProps) {
   const own = ["contextSnapshot", "contextState", "isSessionReady"];
-  const active = split<ActiveSessionValue>(props, ACTIVE_SESSION_KEYS, own);
+  const active = split<TestActiveSession>(props, ACTIVE_SESSION_KEYS, own);
   const composer = split<ComposerContextValue>(active.rest, COMPOSER_KEYS);
   const actions = split<SessionActionsValue>(composer.rest, SESSION_ACTION_KEYS);
   const runTarget = split<LegacyRunTargetProps>(actions.rest, RUN_TARGET_KEYS);
@@ -134,7 +154,7 @@ export function TestSidebar({ onRename, onFork, onArchive, ...props }: SidebarPr
 }
 
 type WorkbenchLayoutProps = ComponentProps<typeof WorkbenchLayout>;
-export type TestWorkbenchLayoutProps = WorkbenchLayoutProps & Partial<Omit<ActiveSessionValue, "sessionId">> & Partial<ComposerContextValue> & SessionActionsValue & LegacyRunTargetProps & {
+export type TestWorkbenchLayoutProps = WorkbenchLayoutProps & Partial<Omit<TestActiveSession, "sessionId">> & Partial<ComposerContextValue> & SessionActionsValue & LegacyRunTargetProps & {
   readonly activeSessionId?: string | null;
 };
 
@@ -142,7 +162,7 @@ export type TestWorkbenchLayoutProps = WorkbenchLayoutProps & Partial<Omit<Activ
 export function TestWorkbenchLayout({ activeSessionId = null, ...props }: TestWorkbenchLayoutProps) {
   const [localStore] = useState(createSessionLocalStore);
   const drafts = useSessionDrafts(localStore, activeSessionId);
-  const active = split<ActiveSessionValue>(props, ACTIVE_SESSION_KEYS);
+  const active = split<TestActiveSession>(props, ACTIVE_SESSION_KEYS);
   const composer = split<ComposerContextValue>(active.rest, COMPOSER_KEYS);
   const actions = split<SessionActionsValue>(composer.rest, SESSION_ACTION_KEYS);
   const runTarget = split<LegacyRunTargetProps>(actions.rest, RUN_TARGET_KEYS);

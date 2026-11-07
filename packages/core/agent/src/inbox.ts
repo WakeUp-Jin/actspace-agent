@@ -45,8 +45,9 @@ export class MainAgentInbox {
   async claim(options: { readonly opensTurn?: boolean } = {}): Promise<readonly InboxItem[]> {
     const items = this.pending().filter((item) => item.target === "next-step" && item.source !== "steer");
     for (const item of items) {
-      await this.session.append(core("agent/inbox/spliced", { operation: "claim", messageId: item.messageId, target: item.target, ...(item.source === undefined ? {} : { source: item.source }), ...(item.senderId === undefined ? {} : { senderId: item.senderId }), ...(item.notice === undefined ? {} : { notice: item.notice }), ...(options.opensTurn ? { opensTurn: true } : {}) }, {
-        surface: { kind: "append", node: { kind: "user", messageId: item.messageId, content: item.content } },
+      await this.session.append(core("agent/inbox/spliced", { operation: "claim", messageId: item.messageId, target: item.target, ...(item.source === undefined ? {} : { source: item.source }), ...(item.senderId === undefined ? {} : { senderId: item.senderId }), ...(item.notice === undefined ? {} : { notice: item.notice }), ...(options.opensTurn ? { opensTurn: true } : {}), content: item.content }, {
+        // claim 自带内容，只加载后半段日志时也能独立推出节点（agent-spec-surface-derived.md §8 第 2 条）。
+        surface: { kind: "append" },
         provenance: { sourceEventSeqs: [item.enqueuedSeq], contributorIds: ["core/inbox"], runtimeSelectionSeq: null },
       }));
     }

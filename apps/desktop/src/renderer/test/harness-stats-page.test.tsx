@@ -115,6 +115,19 @@ describe("Harness 统计页", () => {
     expect(await screen.findByText(/还没有运行时统计/)).toBeInTheDocument();
   });
 
+  it("估算准确度：长模型名可截断并带全文提示，偏差百分比单独保留；标签列不被压缩", async () => {
+    install();
+    render(<HarnessStatsPage initialTab="context" />);
+    const card = (await screen.findByRole("heading", { name: /估算准确度/ })).parentElement!;
+    const model = within(card).getByTitle("anthropic/claude-haiku-5.5");
+    expect(model).toHaveClass("truncate");
+    expect(model.nextElementSibling).toHaveTextContent("（+38.4%）");
+    expect(model.nextElementSibling).toHaveClass("flex-none");
+    const label = within(card).getByText("偏差最大的模型");
+    expect(label).toHaveClass("flex-none");
+    expect(label.parentElement).toHaveClass("flex-wrap");
+  });
+
   it("工具列表可排序", async () => {
     install();
     render(<HarnessStatsPage initialTab="tools" />);

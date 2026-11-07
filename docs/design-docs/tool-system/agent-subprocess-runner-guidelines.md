@@ -15,7 +15,7 @@
 
 - 使用显式 `ripgrepPath`；未提供时通过 PATH 启动 `rg`。
 - 当前没有 `ACTSPACE_RG_PATH` 自动解析、版本探测或 bundled `@vscode/ripgrep` fallback。
-- 默认 timeout 为 15 秒；stdout/stderr 各保留最多 128,000 字符；timeout / abort 发送 SIGTERM。
+- 默认 timeout 为 15 秒；stdout/stderr 各保留最多 64,000 字符，截断时结果末尾提示模型用更具体的 pattern、path 或 glob 缩小范围；timeout / abort 发送 SIGTERM。
 - exit 1 表示无匹配；其他非零退出按失败处理。ENOENT 返回缺少 ripgrep 的清晰提示。
 - Grep 的 pattern 在 `--` 后作为单独参数传入；`glob` 仅是过滤条件。
 - Glob 使用 `rg --files`；简单文件名 pattern 补成递归匹配，结果按 mtime 降序、路径次序排序，最多展示 200 项。

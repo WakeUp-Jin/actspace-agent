@@ -36,15 +36,15 @@ export function PluginsTab({ data, focusKey }: { data: HarnessStatsPlugins; focu
     { key: "plugin", label: "插件", width: "230px", sortValue: (row) => row.pluginId, render: (row) => <NameCell name={row.pluginId} tags={sourceTag(row.source)} sub={row.lastLoadError ? <span className="text-on-danger">加载失败：{row.lastLoadError}</span> : undefined} /> },
     { key: "tools", label: "工具", numeric: true, sortValue: (row) => row.tools, render: (row) => (row.tools ? fmtInt(row.tools) : <Dash />) },
     { key: "calls", label: "工具调用", numeric: true, sortValue: (row) => row.toolCalls, render: (row) => (row.tools ? fmtInt(row.toolCalls) : <Dash />) },
-    { key: "context", label: "上下文 / 请求", numeric: true, tip: "这个插件的工具定义平均每次请求占多少 token", sortValue: (row) => row.contextTokens, render: (row) => (row.contextTokens ? fmtInt(row.contextTokens) : <Dash />) },
+    { key: "context", label: "上下文 / 请求", numeric: true, sortValue: (row) => row.contextTokens, render: (row) => (row.contextTokens ? fmtInt(row.contextTokens) : <Dash />) },
     { key: "services", label: "服务调用", numeric: true, sortValue: (row) => row.serviceCalls, render: (row) => (row.services ? fmtInt(row.serviceCalls) : <Dash />) },
     {
       key: "listeners", label: "监听", numeric: true, sortValue: (row) => row.listeners,
       render: (row) => (row.listeners ? <>{fmtInt(row.listeners)}{row.listenerErrors ? <span className="ml-1"><ToneText tone="bad">{fmtInt(row.listenerErrors)} 报错</ToneText></span> : null}</> : <Dash />),
     },
-    { key: "events", label: "写入事件", numeric: true, tip: "这个插件写入会话日志的事件数", sortValue: (row) => row.journalEvents, render: (row) => (row.journalEvents ? fmtInt(row.journalEvents) : <Dash />) },
+    { key: "events", label: "写入事件", numeric: true, sortValue: (row) => row.journalEvents, render: (row) => (row.journalEvents ? fmtInt(row.journalEvents) : <Dash />) },
     {
-      key: "load", label: "加载", numeric: true, tip: "加载耗时的中位数（约）；括号里是失败次数", sortValue: (row) => row.loadP50Ms,
+      key: "load", label: "加载", numeric: true, sortValue: (row) => row.loadP50Ms,
       render: (row) => (row.loads === 0 ? <Dash /> : <span>{fmtApproxDuration(row.loadP50Ms)}{row.loadFailures ? <span className="ml-1"><ToneText tone="bad">{row.loadFailures} 次失败</ToneText></span> : null}</span>),
     },
   ];
@@ -64,7 +64,6 @@ export function PluginsTab({ data, focusKey }: { data: HarnessStatsPlugins; focu
           />
         </span>
         <SettingsSelect size="sm" ariaLabel="筛选插件来源" value={source} options={SOURCE_OPTIONS} onChange={setSource} />
-        <span className="ml-auto text-act-xs text-text-faint">点击行查看服务、监听与依赖</span>
       </div>
       {data.runtimeFilterLimited ? <Notice tone="info">服务、监听、加载只支持按时间和版本筛选，其余筛选条件对这几列不生效。</Notice> : null}
       <DataTable
@@ -79,8 +78,8 @@ export function PluginsTab({ data, focusKey }: { data: HarnessStatsPlugins; focu
         renderExpanded={(row) => <PluginDetail row={row} data={data} runtimeEmpty={data.runtimeEmpty} />}
         empty={<EmptyNote>没有符合条件的插件</EmptyNote>}
       />
-      <SecHead title="服务调用" hint="按插件、服务统计次数与耗时" />
-      {data.runtimeEmpty ? <EmptyNote>还没有运行时统计：服务、监听和加载耗时从统计开启后才开始记录。</EmptyNote> : (
+      <SecHead title="服务调用" />
+      {data.runtimeEmpty ? <EmptyNote>还没有运行时统计。</EmptyNote> : (
         <DataTable
           ariaLabel="服务调用"
           columns={serviceColumns}
@@ -93,7 +92,7 @@ export function PluginsTab({ data, focusKey }: { data: HarnessStatsPlugins; focu
       )}
       {showRuntime ? (
         <Grid cols={2}>
-          <Card title="依赖关系" hint="调用方 → 被调用方，仅次数">
+          <Card title="依赖关系">
             {data.dependencies.length === 0 ? <p className="m-0 text-act-sm text-text-faint">没有插件之间的服务调用</p> : (
               <div className="flex flex-col gap-1.5">
                 {[...data.dependencies].sort((a, b) => b.calls - a.calls).map((dep) => (
@@ -131,7 +130,7 @@ const serviceColumns: Column<HarnessStatsPlugins["services"][number]>[] = [
   { key: "service", label: "服务", sortValue: (row) => row.service, render: (row) => <NameCell name={row.method ? `${row.service}.${row.method}` : row.service} sub={row.providerPluginId ?? undefined} /> },
   { key: "calls", label: "调用", numeric: true, sortValue: (row) => row.calls, render: (row) => (row.calls ? fmtInt(row.calls) : <ToneText tone="warn">0</ToneText>) },
   { key: "avg", label: "平均耗时", numeric: true, sortValue: (row) => row.avgMs, render: (row) => (row.calls && row.avgMs != null ? fmtDuration(row.avgMs) : <Dash />) },
-  { key: "p95", label: "P95", numeric: true, tip: "取直方图所在档的上界，所以写「约」", sortValue: (row) => row.p95Ms, render: (row) => (row.calls && row.p95Ms != null ? fmtApproxDuration(row.p95Ms) : <Dash />) },
+  { key: "p95", label: "P95", numeric: true, sortValue: (row) => row.p95Ms, render: (row) => (row.calls && row.p95Ms != null ? fmtApproxDuration(row.p95Ms) : <Dash />) },
   { key: "errors", label: "报错", numeric: true, sortValue: (row) => row.errors, render: (row) => (row.errors ? <ToneText tone="bad">{fmtInt(row.errors)}</ToneText> : "0") },
 ];
 
@@ -140,7 +139,7 @@ function PluginDetail({ row, data, runtimeEmpty }: { row: HarnessPluginRow; data
   const listeners = data.listeners.filter((item) => item.pluginId === row.pluginId);
   const calledBy = data.dependencies.filter((item) => item.callee === row.pluginId);
   const calls = data.dependencies.filter((item) => item.caller === row.pluginId);
-  if (runtimeEmpty) return <p className="m-0 mt-2 text-act-sm text-text-faint">还没有运行时统计，暂时没有这个插件的服务、监听和依赖。</p>;
+  if (runtimeEmpty) return <p className="m-0 mt-2 text-act-sm text-text-faint">还没有运行时统计。</p>;
   return (
     <div className="mt-2 grid grid-cols-3 gap-3 max-[800px]:grid-cols-1">
       <Card title="服务" hint={`${services.length} 个`}>
@@ -153,7 +152,7 @@ function PluginDetail({ row, data, runtimeEmpty }: { row: HarnessPluginRow; data
           <KvList rows={listeners.map((item) => ({ label: <span className="font-mono text-act-xs">{item.event}</span>, value: `${fmtInt(item.calls)} 次${item.errors ? ` · ${item.errors} 报错` : ""}`, tone: item.errors ? "bad" as const : undefined }))} />
         )}
       </Card>
-      <Card title="依赖" hint="谁调用了它 / 它调用了谁">
+      <Card title="依赖">
         {calledBy.length + calls.length === 0 ? <p className="m-0 text-act-xs text-text-faint">没有与其他插件的服务调用</p> : (
           <KvList rows={[
             ...calledBy.map((item) => ({ label: <span className="font-mono text-act-xs">{item.caller} →（本插件）</span>, value: `${fmtInt(item.calls)} 次` })),

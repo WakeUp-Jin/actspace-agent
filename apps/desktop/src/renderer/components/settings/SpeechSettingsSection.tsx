@@ -87,16 +87,10 @@ export function SpeechSettingsSection() {
   const disabled = busy || !snapshot;
 
   return (
-    <SettingGroup
-      id="speech-settings"
-      title="语音播放"
-      headingLevel={3}
-      description="英语辅助学习的朗读服务（MiniMax 中国站），朗读的英文会发送至 MiniMax。"
-    >
+    <SettingGroup id="speech-settings" title="语音播放" headingLevel={3} description="朗读的英文会发送至 MiniMax">
       <>
         <SettingRow
           title="MiniMax API Key"
-          description={state?.hasApiKey ? "已保存，Key 不会回显。" : "未配置时仍可使用双语对照输出。"}
           control={state?.hasApiKey ? (
             <>
               <StatusDot tone="ok">已配置</StatusDot>
@@ -122,7 +116,7 @@ export function SpeechSettingsSection() {
           <SettingEditor
             id="speech-key-editor"
             returnFocusId="speech-key-trigger"
-            hint="使用 MiniMax 中国站 Key，只保存在本机。"
+            hint="只保存在本机"
             saving={busy}
             saveDisabled={!key.trim()}
             saveAriaLabel="保存 Key"

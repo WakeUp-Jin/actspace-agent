@@ -327,7 +327,7 @@ describe("ConversationView tooltips", () => {
       ["未缓存输入", "4,000 tok"],
       ["缓存读取", "28,000 tok"],
       ["缓存写入", "0 tok"],
-      ["输出", "1,361 tok（其中推理 300 tok）"],
+      ["输出", "1,361 tok"],
       ["花费", "$0.2321预估"],
     ]);
   });
@@ -439,7 +439,7 @@ it("hides the trajectory composer without losing the draft and keeps Stop availa
   fireEvent.change(input, { target: { value: "keep this draft" } });
   rendered.rerender(view("trajectory"));
   expect(rendered.container.querySelector(".composer-zone")).toHaveStyle({ display: "none" });
-  fireEvent.click(screen.getByRole("button", { name: "停止" }));
+  fireEvent.click(await screen.findByRole("button", { name: "停止" }));
   expect(abort).toHaveBeenCalledTimes(1);
   rendered.rerender(view("chat"));
   expect(rendered.container.querySelector("textarea")).toBe(input);

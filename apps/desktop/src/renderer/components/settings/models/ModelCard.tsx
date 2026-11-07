@@ -63,7 +63,7 @@ export function ModelCard({ model, level, flash, onLevel, onSave, onRemove }: {
         <div id={panelId} className="px-1.5 pb-0.5 pt-2.5">
           {tag ? (
             <div className="mb-3 flex flex-wrap items-center gap-2 rounded-act-md bg-warning-soft px-2.5 py-2 text-act-xs text-on-warning">
-              <span className="min-w-0 flex-1">没认出这个模型。填上上下文和价格，用量和费用才算得准；不填也能用。</span>
+              <span className="min-w-0 flex-1">没认出来：填上上下文和价格，用量和费用才算得准</span>
               {suggestion ? <Button size="xs" onClick={() => change("canonical", suggestion.apiModel)}>按 {suggestion.name} 填</Button> : null}
             </div>
           ) : null}

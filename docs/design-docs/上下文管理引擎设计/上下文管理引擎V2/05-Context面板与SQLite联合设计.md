@@ -1,12 +1,12 @@
 # Context 面板与 SQLite 联合设计
 
-状态：2026-10-18，联合实现与本轮验收已收束；schema 9 与 Context 面板契约 2 已接入。性能及 Computer Use 仍按原记录保留限制，未全量通过。
+schema 9、Context manifest、分批发布和刷新协议已在后续联合实施落地；它们不属于早期 SQLite 分支基线。
 
-已对照用户提供的 SQLite 分支完整会话复核，见[06：原会话决策与联合方案校验](06-原会话决策与联合方案校验.md)。schema 9、Context manifest、分批发布和刷新协议已在后续联合实施落地；它们不属于早期 SQLite 分支基线。
+> 2026-11-06 起，请求清单不再写进日志：`request/context` 只留小字段，提示词与工具改成变化才写的 `request/system-prompt` / `request/tools`，估算统一成 `ceil(字数/4)` 加结构开销，并由同一个折叠函数 `applyContextEstimate` 从日志推算。本文 §5 的「manifest 随 `request/context` 持久化」与 §10 的 `context-content-1` 估算器已被取代，以[请求记录规范](../../agent-plugin-runtime/agent-spec-request-record.md)为准。
 
 执行入口：[联合执行计划](../../../exec-plans/completed/20261011-context-sqlite-integration/README.md)。测试入口：[联合测试验收计划](../../../exec-plans/completed/20261011-context-sqlite-integration/acceptance.md)。本文是 Context V2 在面板查询与 SQLite 集成方面的增补；01–03 的 Session 权威、实例生命周期和插件边界继续有效。
 
-## 1. 原实施基线与范围（2026-10-11 历史记录）
+## 1. 原实施基线与范围
 
 在 `fix/context_manager_v1` 上完成两件关联工作：补齐右侧 Context 五区块的真实数据，修复 SQLite 查询已知问题并统一验收。基线包含 `2cbb634f` 和当前未提交的 Context、前端及其他改动；HEAD 不能独自代表待验版本，执行时记录受影响工作树内容指纹。不得为整合任务覆盖其他未提交工作。
 
@@ -98,7 +98,7 @@ Runtime 增加 `sessionQuerySource(sessionId)`，只读取指定会话并执行�
 
 ## 5. 请求清单与统计口径
 
-在 Context → LlmInput 转换时保留来源映射，并在 prepare 完成后生成精简 manifest，随既有 `request/context` 持久化。manifest 包括 schema/estimator 版本、稳定 key、bucket、estimatedTokens、来源身份和必要 trajectoryRef，不含全文。分类计算以实际转换/prepare 后输入为依据；适配器改变内容却无法映射时标记不可精确比较，不伪造来源。估算值不等同供应商计费 token。
+请求清单不进日志。面板「当前」的总数、分类、非对话明细来自会话投影 `contextEstimate`；对话逐条明细在打开面板时按需现算。SQLite 历史投影维护同一份折叠状态，在每个 `request/context` 时写下当时的总数、分类和非对话明细（只保留最近 2 次请求）；对比上一次请求时，seq 在上一次 `request/context` 之后的对话项算新增，被压缩掉的部分由压缩事件标记。「工具清单已变化」事件来自第一条之后的每条 `request/tools`。估算明细的分类与 key 只在 `@actspace/shared` 定义一份，引擎与日志折叠共用。估算值不等同供应商计费 token。
 
 系统条目用 owner + section id；规则用规范化来源路径/id；skill catalog 与 invoke 分开；工具用 owner + name；消息用 messageId；工具调用/结果用 callId 加类型；摘要用 compactionId。模型 facts 使用语义 key。不得包含数组下标、revision 或 request seq。
 
@@ -180,9 +180,9 @@ Context 历史失败沿用有界 fallback：最多 1,000 Sessions、合计 5,000
 
 schema 9 的内部模块为 `read-model-sync`（批次发布）、`read-model-scheduler`（公平调度）、`context-history-projection/query`（历史）、`context-panel-service`（当前/历史门面）。历史消费者租约 20 秒，最多缓存 16 个 Session；隐藏显式释放，租约兜底应用异常退出。Context 回退进一步限制当前一个 Session、5,000 events/8MiB；超时不触发全扫描。
 
-请求 manifest 使用 `context-content-1` 字符估算器。prepare 改写输入且无法保留来源时明确不可比较；manifest 超过 5,000 条/256KiB 或请求接近记录预算时省略身份清单，保留总量与不可比较原因。skill catalog 与调用分别按插件、来源 id、skill id 标识；无可靠来源的模型事实保留为系统信息。历史清单保留安全 title/kind/trajectoryRef，移除正文预览及全文读取标记。
+请求明细使用 `@actspace/shared` 的统一估算器（`ESTIMATOR_VERSION`），由日志折叠得出，不随 `request/context` 落盘。skill catalog 与调用分别按插件、来源 id、skill id 标识；无可靠来源的模型事实保留为系统信息。历史清单保留安全 title/kind/trajectoryRef，移除正文预览及全文读取标记。
 
-主面板与后续分页都检查响应字节数，目标 200KiB、硬限 1MiB；必要时减少页条数并返回后续 cursor，趋势/事件体积收缩有明确截断元数据。Composer 读取当前轻量投影，已有面板历史缓存时可复用历史基准，不启动新的全局索引。
+主面板与后续分页都检查响应字节数，目标 200KiB、硬限 1MiB；必要时减少页条数并返回后续 cursor，趋势/事件体积收缩有明确截断元数据。Composer 圆环只读 `contextEstimate` 投影，与面板「当前」是同一个数；`describeContext` 轮询已删除，不启动新的全局索引。
 
 SQLite 写入支持按新增 rowid 分组汇总，显式避免 GROUP BY 选择覆盖索引扫描全历史；少量行使用原逐行触发器。页缓存固定 32MiB，WAL 每约 16MiB 自动 checkpoint；这只是有界资源配置，不代表 250ms 增量同步目标已通过。证据及剩余性能问题见联合执行记录。
 

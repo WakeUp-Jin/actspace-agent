@@ -3,7 +3,7 @@ import type { ContextUsageBucketName } from "./context-buckets";
 /**
  * 右侧栏 Context 面板的读取形状（`sessions.describeContextPanel`）。
  *
- * 字段含义、key 规则和估算口径以 `docs/design-docs/frontend/front-Context面板后端数据需求.md` 为准；
+ * 字段含义、key 规则和估算口径以 `docs/design-docs/frontend/front-Context面板规范.md` §6 为准（字段推导细节见归档 `docs/exec-plans/completed/design-archive/frontend/front-Context面板后端数据需求.md`）；
  * 当前与历史拥有独立版本；相同令牌的条件读取不重复发送条目。
  */
 export type DescribeContextPanelInput = {
@@ -86,6 +86,8 @@ export type ContextPanelManifest = {
   comparisonUnavailableReason?: string;
   estimatorVersion?: string;
   requestId: string;
+  /** 这次请求的 `request/context` 所在 seq；对话项按它判断新增（agent-spec-request-record.md §6.4）。 */
+  seq?: number;
   turnIndex: number;
   stepIndex: number;
   sentAt: string;
@@ -111,7 +113,7 @@ export type ContextPanelStats = {
 };
 
 /**
- * Bash 命令统计（`docs/design-docs/frontend/front-Context面板Bash命令统计.md`）。
+ * Bash 命令统计（`docs/design-docs/frontend/front-Context面板规范.md` §5）。
  * `name` 为 `""` 表示「其他」：程序名不合法或超出每会话 500 个组合；子命令为 `""` 表示没有子命令。
  */
 export type ContextPanelBashCount = { name: string; count: number; failed: number };
@@ -119,6 +121,10 @@ export type ContextPanelBashProgram = ContextPanelBashCount & {
   /** 只有 git / pnpm / npm / yarn / cargo / go / gh / docker 有内容；排序同 `programs`。 */
   subcommands: ContextPanelBashCount[];
 };
+/** 「值得注意」：没有数据的项为 `null`（不显示）；命令原文最多 1000 个字符。 */
+export type ContextPanelBashSlowest = { command: string; durationMs: number };
+export type ContextPanelBashMostFailed = { program: string; count: number };
+export type ContextPanelBashMostRepeated = { command: string; count: number };
 export type ContextPanelBashStats = {
   /** 已有结果、且没有被拒绝的 Bash 调用数。 */
   calls: number;
@@ -128,6 +134,14 @@ export type ContextPanelBashStats = {
   durationMs: number;
   /** 按 count 降序、同数按名字；`""` 固定排最后。 */
   programs: ContextPanelBashProgram[];
+  /** 耗时最长的单条命令（口径同 `durationMs`）；没有耗时记录时为 null。缺省表示旧后端。 */
+  slowest?: ContextPanelBashSlowest | null;
+  /** 失败调用次数最多的程序（不含「其他」）；没有失败时为 null。 */
+  mostFailedProgram?: ContextPanelBashMostFailed | null;
+  /** 命令原文完全相同、重复次数最多的一条；最多只出现 1 次时为 null。 */
+  mostRepeated?: ContextPanelBashMostRepeated | null;
+  /** 转入（或本来就在）后台运行的 Bash 调用数。 */
+  backgroundCount?: number;
 };
 
 export type ContextPanelTrendPoint = {

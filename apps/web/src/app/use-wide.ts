@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-/** ≥1024px 走两栏（front-web-pwa客户端规范 §7）。 */
+/** ≥1024px 走两栏（front-web-pwa客户端规范 §6）。 */
 export const WIDE_QUERY = "(min-width: 1024px)";
 
 function media(): MediaQueryList | null {

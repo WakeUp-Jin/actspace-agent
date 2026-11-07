@@ -11,9 +11,7 @@ export type TrajectoryPromptDetail = {
   readonly systemPrompt?: string | null;
   readonly contextSections?: RuntimeV2JsonValue;
   readonly contextModelFacts?: RuntimeV2JsonValue;
-  readonly systemPromptParts?: RuntimeV2JsonValue;
   readonly tools?: RuntimeV2JsonValue;
-  readonly config?: RuntimeV2JsonValue;
   readonly raw?: RuntimeV2JsonValue;
 };
 
@@ -95,6 +93,8 @@ export type TrajectoryRecord = {
   readonly result: string | null;
   readonly isError: boolean;
   readonly partial: boolean;
+  /** The empty row of a call still streaming; the streaming layer fills it from the live run (live.ts). */
+  readonly placeholder?: boolean;
   /** True when this record is eligible for the main semantic ledger. */
   readonly visible?: boolean;
   /** DSH request-only separator; retained for raw/detail navigation, never a normal content row. */

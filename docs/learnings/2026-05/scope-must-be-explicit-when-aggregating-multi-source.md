@@ -1,87 +1,61 @@
-# 多事实源聚合页：scope 必须是显式契约字段，不能藏在参数里
+# 聚合页的契约：scope 显式、分页只切明细、累计指标不靠采样集
 
-> 关联 history：[`20260528-2000-usage-page-global-scope.md`](../../histories/2026-05/20260528-2000-usage-page-global-scope.md)
+合并自：多事实源聚合页 scope 必须是显式契约字段、Paginated Detail Views Preserve Aggregate Truth、运行时累计指标 ring buffer 不是账本。
 
-## 是什么
+关联：[`20260528-2000-usage-page-global-scope.md`](../../histories/2026-05/20260528-2000-usage-page-global-scope.md)、[`20260604-1954-usage-request-details.md`](../../histories/2026-06/20260604-1954-usage-request-details.md)、[`20260528-1735-kairos-usage-accumulator-persistent.md`](../../histories/2026-05/20260528-1735-kairos-usage-accumulator-persistent.md)
 
-任何"看似汇总全部数据"的页面（usage / billing / activity feed / 全局 dashboard），如果它的数据可能来自**多个事实源**（不同 session、不同 agent、不同租户、不同数据库），那它的取数范围 `scope` 应该是一个**契约里显式存在的字段**，而不是"靠某个参数不传 = 默认取全部"。
+> 历史说明：文中 `usage-statistics:get`、`createUsageStatisticsSnapshot`、`aggregateKairosUsage`、`usage-accumulator.json` 来自 v1 的 Kairos 与旧 Usage IPC，当前代码已不存在；当前使用统计的入口见 `packages/client/client/src/sessions/indexed-usage.ts` 与 [派生读模型](20261011-derived-read-model-worker.md)。下列契约原则仍然适用。
 
-具体到本仓库的 Usage 页面，旧实现长这样：
+三条规则回答同一个问题：**页面上的数字到底统计了哪些事实**。
 
-```ts
-ipcMain.handle("usage-statistics:get", async (_event, input) => {
-  const record = await readSessionRecord(join(sessionRoot, input.sessionId));
-  return createUsageStatisticsSnapshot(record, input.range ?? "month");
-});
-```
+## 1. scope 是契约里的显式字段，不是参数缺省
 
-前端按下"总计 / total" tab，看到的并不是"全部数据"，而是"当前那一条 session 的所有事件"。问题不在代码——代码很诚实，问题在 **"sessionId 必填 + range='total'"组合的产品语义**：UI 提示"全部"，参数空间里没法描述"跨所有 session"。
+“看似汇总全部”的页面（usage、billing、activity feed、全局 dashboard）若数据来自多个事实源（不同 session、agent、租户、数据库），取数范围必须显式。旧实现：`sessionId` 必填 + `range="total"`，用户按“总计”看到的其实是当前那条 session 的全部事件——切换对话数字就变，用户的心智是“账户总账单”，代码层面没人写错，是 UI 词汇与实现语义错位；Kairos 事件还没进账本。
 
-## 为什么需要
-
-一个最小反例：
-
-| 用户操作 | UI 显示 |
-|---|---|
-| 进入 Usage 页面，选了"总计" tab | 看到 12K tokens |
-| 在侧栏切换到另一条对话，再回 Usage | 看到 45K tokens（同一个"总计"） |
-| 启用 Kairos，监控页头部胶囊涨到 60K | Usage "总计"还是 45K（Kairos 没进账本） |
-
-用户的心智模型一直是"一个账户的总账单"，但实现里这其实是"当前那条 session 的总账单"。每次切对话数字都变，体验上像 bug——但代码层面没人写错。这是**典型的 UI 词汇与实现语义错位**。
-
-## 怎么用
-
-### 反面写法：靠"参数缺省"区分
-
-```ts
-// 调用方约定：不传 sessionId = 全部数据
-type GetUsageInput = { sessionId?: string; range?: Range };
-```
-
-问题：
-
-1. 类型层面看不出来"不传 sessionId"意味着什么；
-2. 主进程要靠隐含约定分流，老调用方代码一旦从"必传 sessionId"被人误改成"传 null"，会**沉默地**切换到完全不同的取数路径；
-3. 文档不写清"哪个字段缺省时走哪条分支"就完全没人能猜到。
-
-### 正面写法：显式 scope 字段
+反面：`{ sessionId?: string }`，“不传 = 全部”——类型看不出含义，调用方误传 null 会沉默切换取数路径。正面：
 
 ```ts
 type UsageScope = "session" | "global";
-
-type GetUsageInput = {
-  scope?: UsageScope;          // 默认按 "global"（无 sessionId）或 "session"（有 sessionId）兼容老调用方
-  sessionId?: string;           // 仅 scope==="session" 时必填
-  range?: Range;
-};
-
-type UsageSnapshot = {
-  scope: UsageScope;            // 出参也带回 scope
-  sessionId: string | null;     // global 时显式为 null
-  title: string;
-  sourceCount: number;          // 参与聚合的事实源数量
-  // ...
-};
+type GetUsageInput  = { scope?: UsageScope; sessionId?: string /* 仅 session 必填 */; range?: Range };
+type UsageSnapshot  = { scope: UsageScope; sessionId: string | null; title: string; sourceCount: number /* 参与聚合的事实源数 */ };
 ```
 
-前端拿到 snapshot 后通过 `snapshot.scope` 决定标题、来源数提示、是否启用"按会话钻取"按钮。后端通过 `input.scope` 走分流逻辑，缺省值的兼容性放在一个地方（handler 入口），不会扩散。
+- scope 与时间窗 range 正交（day/week/month/total 是时间切片，session/global 是来源切片）。
+- 入参、出参都带 scope：renderer 拿到 snapshot 就能决定标题、来源数提示、钻取按钮，不依赖自己上次的 input；`sourceCount` 给“数据可信度”提示。
+- 缺省值指向“信息更全的一档”（global），兼容逻辑只放在 handler 入口。
+- 事件级合流优于 snapshot 级合流：N 个来源先摊平原始事件再算占比/命中率/成本舍入，不要先算 N 个小 snapshot 再合并（重复舍入、语义模糊）。
+- 单个事实源读失败（某 session 文件损坏）不炸整张账单：`try/catch return null` + `.filter(Boolean)`。
+- 修契约的同一个 PR 必须刷新所有 fixture/mock（`as` 强转会让缺字段在运行时变成 `undefined` 被当 `"session"`）。时间窗语义也要写死并测试：本仓库 day/week/month 是“往回数 N 天”，与 controller 的“日历今天”刻意分开。
 
-## 核心要点
+## 2. 分页只作用于明细，不改变聚合依据
 
-1. **scope 是一个独立维度**。它和"时间窗 range"是正交的——day/week/month/total 是时间切片，session/global 是来源切片。不要把它压进 sessionId 的存在与否。
-2. **入参和出参都要带 scope**。出参带回去的好处是：renderer 可以做"不信任前端缓存"的兜底渲染——拿到 snapshot 就能完整决定页面文案，不用再读自己上一次发送的 input。
-3. **事件级合流 > snapshot 级合流**。当一个全局 snapshot 来自 N 个事实源时，正确做法是把 N 个来源的原始事件摊平再算一次派生指标（占比 / 缓存命中率 / 成本舍入），**不要**先算 N 个小 snapshot 再合并。后者会让百分比/命中率重复舍入、合并语义模糊。
-4. **不要用增量累加器代替全量重算**。Kairos 在本仓库有一个 `usage-accumulator.json`，它是"自上次 reset_today 起"的运行时累计；用它做 Usage 账本会复刻和 ring buffer 一样的问题（reset 时数字变小，用户失去信任）。事实账永远基于 jsonl 重建。
-5. **失败兜底要单点容忍**。global scope 下任何单个事实源（某条 session 文件损坏 / Kairos 目录不存在）读失败都不能炸掉整张账单——`try { ... } catch { return null }`，再 `.filter(Boolean)` 是最简洁的写法。
+页面常同时有聚合卡片与分页明细表。`page=2` 若在聚合前应用，总计、模型分布、缓存命中、每日行会悄悄变成“第 2 页总计”。查询仍扫描整个时间窗，用全部匹配事实算总计和分布，再只切片表格行：
 
-## 常见陷阱
+```ts
+const rows = buildRequestRows(requestRows).sort(newestFirst);
+const summary = buildSummary(allEvents), dailyRows = buildDailyRows(allEvents);
+const pageInfo = normalizePage(input.page, rows.length);
+return { summary, dailyRows, requestRows: rows.slice(start, start + pageInfo.pageSize), requestRowsPage: pageInfo };
+```
 
-- **缺省值的方向反了**：如果默认 `scope === "session"` 但 `sessionId === undefined`，主进程拿不到 sessionId 就只能返回 null，前端看到"暂无数据"——一切看上去像没数据，其实是契约 mismatch。**默认值应当指向"信息更全的那一档"**，本案是 global。
-- **fixture 没跟上契约升级**：前端 storybook / 单测的 mock snapshot 没补 `scope` / `sourceCount`，类型上还能 cast 过去（如果用了 `as` 强转），运行时就会出现 UI 渲染分支用了 `undefined` 当 `"session"`。修契约的同一个 PR 里必须把 fixture 全部刷一遍。
-- **时间窗语义随便选**：`day = "今天 0:00 起"` 还是 `"近 24 小时"`？`week = "近 7 天"` 还是 `"本周一起"`？这次本仓库选了"往回数 N 天"——产品 dashboard 常见心智，与 controller 里 `todayTickCount` 这种"日历今天"刻意分开。在 doc 和测试里把语义写死，否则后人重构会随便改一下断言。
+别用 `requestRows.length` 推总页数（那只是当前页长度）；页大小固定，除非产品要求可选；总行数已知后再 clamp 非法页，空数据集返回稳定的 `page=1,totalPages=1`。检查：翻页时主 token 总数不应变化；响应同时有当前行与总行数。
 
-## 自检问题
+## 3. 累计指标不能依赖采样集（ring buffer 不是账本）
 
-1. 如果你在一个新页面要展示"全部 X"，先问自己：X 的来源有几个？这几个来源是不是有独立的存储路径？如果是，你的 IPC 入参里有没有一个字段告诉后端"我要的是哪一档"？
-2. 当用户从 A 路径进入这个页面、再切换到 B 路径回到这个页面，数字会不会无声地变？如果会，那是不是 scope 漏了一个维度？
-3. 你的 snapshot 出参告诉调用方"我聚合了多少来源"了吗？没有 `sourceCount` 之类字段时，前端用什么方式做"数据可信度"提示？
+第一版用量胶囊在 renderer 对 ring buffer（默认 200 条）实时 `aggregate(events)`：跑几小时后老事件滚出去，数字越跑越小；进程重启 buffer 清零而 jsonl 里事件还在，胶囊归零。本质：ring buffer 为“最近事件浏览”设计，丢弃策略与累计指标的留存策略不重合。
+
+| 数据类型 | 寿命 | 存储 |
+|---|---|---|
+| 样本流 | 短期，容量滚动 | ring buffer/缓存/最近 N 条 |
+| 累计指标 | 长期，显式 reset 或时间窗切换 | 独立 accumulator + 持久化 |
+
+两者不共用数据源。累加器骨架：内存累加 + debounce(~300ms) atomic rename 写小 JSON（带 `schemaVersion`）；启动先读文件，缺失/损坏再扫最近事件流重建（`load()` 只读引导，不立刻落盘）；`reset()` 先等 pendingWrite 再 unlink，避免迟到的写把快照写回；账本进运行时状态机、累加后同步 emit state，UI 直接展示不自己聚合；字段命名表达 reset 边界（`*Today`），需要生命周期总量就新增 `usageLifetime`，不改 today 语义；币种“是否混合”这类跨调用状态外推到 observer，累加函数保持无副作用；兜底扫盘用 UTC 键、展示用本地时间，两条线分别明示。
+
+注意区别：Usage 页的事实账永远基于 jsonl（可重建的全量事实）重算；增量累加器只服务“自上次 reset 起”的运行时胶囊，用它做账本会复刻 ring buffer 问题。
+
+## 自检
+
+1. 新页面“全部 X”的来源有几个、是否各有独立存储，入参有没有字段说明要哪一档？
+2. 从路径 A 进入再从 B 回来，数字会无声变化吗（scope 漏维度）？
+3. 点“下一页”主总量会变吗？
+4. UI 数字会因采样集滚动而变小吗？崩溃重启 5 秒后累计与之前差多少？reset 后所有 `*Today` 都清空了吗？

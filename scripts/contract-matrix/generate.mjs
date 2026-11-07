@@ -14,6 +14,8 @@ import {
   VERIFICATION_SOURCES,
 } from "./source-registry.mjs";
 
+// Codec kept only to read sessions written before 2026-11; nothing appends it any more (agent-spec-live-assistant-stream.md).
+const READ_ONLY_CORE_EVENTS = new Set(["assistant/chunk"]);
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(scriptPath), "../..");
 const jsonOutput = "artifacts/agent-contract-matrix.json";
@@ -40,6 +42,8 @@ const SESSION_SURFACES = Object.freeze({
   "tool/call": "internal",
   "tool/result": "tool-result",
   "request/header": "internal",
+  "request/system-prompt": "internal",
+  "request/tools": "internal",
   "request/context": "internal",
   "session/end-seed": "internal",
 });
@@ -120,13 +124,13 @@ async function parseEvents() {
   const extensions = extractArray(journalSource, "export const PERSISTED_EXTENSION_EVENT_TYPES");
   const interventions = extractUnion(eventSource, "AgentLoopIntervention");
   const notifications = extractUnion(eventSource, "AgentNotification");
-  if (core.length !== 12) throw new Error(`Expected 12 Session core events, found ${core.length}.`);
+  if (core.length !== 14) throw new Error(`Expected 14 Session core events, found ${core.length}.`);
   for (const [ids, metadata] of [[interventions, LOOP_META], [notifications, NOTIFICATION_META]]) {
     if (ids.slice().sort().join() !== Object.keys(metadata).sort().join()) throw new Error("Event declarations and matrix metadata differ.");
   }
 
   const rows = [];
-  for (const id of core) rows.push(row("event", `session:${id}`, "@actspace/session-journal", "active", [sourceRef(EVENT_SOURCES.sessionCore.path, EVENT_SOURCES.sessionCore.symbol)], { plane: "session", category: "core", eventType: id, scope: "session", surface: SESSION_SURFACES[id] ?? "internal", codecStatus: "present", producerStatus: "present", required: true }));
+  for (const id of core) rows.push(row("event", `session:${id}`, "@actspace/session-journal", "active", [sourceRef(EVENT_SOURCES.sessionCore.path, EVENT_SOURCES.sessionCore.symbol)], { plane: "session", category: "core", eventType: id, scope: "session", surface: SESSION_SURFACES[id] ?? "internal", codecStatus: "present", producerStatus: READ_ONLY_CORE_EVENTS.has(id) ? "none" : "present", required: true }));
   for (const id of extensions) {
     const future = id === "goal/change" || id === "schedule/change";
     const auxiliary = id === "llm/auxiliary-start" || id === "llm/auxiliary-end";
@@ -321,7 +325,7 @@ export function validateRows(matrix) {
   const core = matrix.events.filter((item) => item.category === "core");
   const interventions = matrix.events.filter((item) => item.category === "agent-loop");
   const notifications = matrix.events.filter((item) => item.category === "notification");
-  if (core.length !== 12 || interventions.map(item => item.eventType).sort().join() !== Object.keys(LOOP_META).sort().join() || notifications.map(item => item.eventType).sort().join() !== Object.keys(NOTIFICATION_META).sort().join()) diagnostics.push({ severity: "error", code: "EVENT_COUNT_DRIFT", message: "Event surfaces differ from declared metadata." });
+  if (core.length !== 14 || interventions.map(item => item.eventType).sort().join() !== Object.keys(LOOP_META).sort().join() || notifications.map(item => item.eventType).sort().join() !== Object.keys(NOTIFICATION_META).sort().join()) diagnostics.push({ severity: "error", code: "EVENT_COUNT_DRIFT", message: "Event surfaces differ from declared metadata." });
   for (const item of matrix.events.filter((event) => event.category === "notification")) if (item.mode === "waterfall") diagnostics.push({ severity: "error", code: "NOTIFICATION_VETO", message: `${item.eventType} cannot be a waterfall/veto event.` });
   if (requiredServices.size === 0) diagnostics.push({ severity: "warning", code: "NO_REQUIRED_SERVICES", message: "No required Service Definitions were found." });
   return diagnostics;

@@ -1,6 +1,6 @@
 # Task、Run 与 Harness 的生产接线
 
-更新：2026-10-05。当前契约包含 P2 统一任务、P3 Harness 控制和 P4 独立 Host/远端传输；阶段背景见 [P2 记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)，最终清理与验收状态见[收尾摘要](../../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。
+当前契约包含 P2 统一任务、P3 Harness 控制和 P4 独立 Host/远端传输；阶段背景见 [P2 记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)，最终清理与验收状态见[收尾摘要](../../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。
 
 ## 所有权
 

@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import type { WorkspaceFileApplication, WorkspaceFileApplicationsResult } from "@actspace/shared";
 import { workspacesApi } from "../../api/workspaces";
+import { LruCache } from "../../lru-cache";
 
 /**
  * 文件的关联应用列表（macOS 由 main 用 JXA 查询，带图标，约几百毫秒）。
- * 按工作区 + 路径缓存，同一文件的多张卡和重新挂载不重复查询；查询失败不进缓存，下次挂载会重试。
+ * 按工作区 + 路径缓存（最多 200 个文件，LRU；每条带若干图标 data URL），同一文件的多张卡和重新挂载不重复查询；查询失败不进缓存，下次挂载会重试。
  * 下拉菜单打开时调用 `refresh` 重新查询，结果回来之前继续显示旧列表。
  */
-const cache = new Map<string, Promise<WorkspaceFileApplicationsResult>>();
+export const FILE_APPLICATIONS_CACHE_MAX_ENTRIES = 200;
+const cache = new LruCache<Promise<WorkspaceFileApplicationsResult>>(FILE_APPLICATIONS_CACHE_MAX_ENTRIES);
 
 function query(key: string, workspaceRoot: string, relativePath: string): Promise<WorkspaceFileApplicationsResult> {
   const pending = workspacesApi.listFileApplications({ workspaceRoot, relativePath })
     .catch((): WorkspaceFileApplicationsResult => ({ applications: [], error: "query_failed" }));
   cache.set(key, pending);
-  void pending.then((result) => { if (result.error && cache.get(key) === pending) cache.delete(key); });
+  void pending.then((result) => { if (result.error && cache.peek(key) === pending) cache.delete(key); });
   return pending;
 }
 

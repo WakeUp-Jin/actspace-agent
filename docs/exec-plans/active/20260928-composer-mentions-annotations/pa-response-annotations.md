@@ -15,7 +15,7 @@
 
 ## 必读
 
-- `AGENTS.md`、`docs/FRONTEND.md`、`docs/FRONTEND_VERIFICATION.md`、`docs/design-docs/frontend/front-主题与配色规范.md`、`docs/design-docs/frontend/front-中间消息区规范.md`、`docs/design-docs/frontend/front-聊天输入框规范.md`、`docs/design-docs/frontend/front-icon-button-tooltip-guidelines.md`。
+- `AGENTS.md`、`docs/design-docs/frontend/README.md`、`docs/FRONTEND_VERIFICATION.md`、`docs/design-docs/frontend/front-视觉token规范.md`、`docs/design-docs/frontend/front-中间消息区规范.md`、`docs/design-docs/frontend/front-聊天输入框规范.md`、`docs/design-docs/frontend/front-组件与交互模式规范.md`。
 - 设计文档第 8、9 节（交互细节），以及顶部「实施决策修订」。
 - 代码：`messages/MarkdownProse.tsx`、`messages/AssistantReply.tsx`、`messages/UserMessage.tsx`、`ConversationView.tsx`（`renderMessage` 约 170 行）、`Composer.tsx`（附件条 `renderAttachmentStrip`、`resolvedLayout`、`canSendMessage`、`sendCurrentMessage`）、`App.tsx`（`draftsRef` 约 844 行、`handleSend` 约 1635 行、两处 `setComposerDraftRestore`）、`components/ui/HoverCard.tsx`。
 

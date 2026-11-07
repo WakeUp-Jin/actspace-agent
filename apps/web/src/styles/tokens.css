@@ -1,6 +1,6 @@
 /*
  * 来源：apps/desktop/src/renderer/styles/tokens.css 第 1–745 行（不含强调色调色板），2026-10-17 复制。
- * 改桌面 token 时同步这里；变量名保持 --act-* 不变（front-web-pwa客户端规范 §10）。
+ * 改桌面 token 时同步这里；变量名保持 --act-* 不变（front-web-pwa客户端规范 §1）。
  * web 专用：--web-glass / --web-glass-strong / --web-glass-border / --web-glass-edge / --web-glass-shadow（玻璃材质），每个主题块末尾各一组。
  */
 :root {
@@ -95,7 +95,7 @@
   --act-color-overlay: rgba(17, 24, 39, 0.32);
 
   /*
-   * 强调色（外观 → 强调色，front-accent-palette.md）：只驱动发送按钮、开关开启态、焦点、普通链接与文字选中。
+   * 强调色（外观 → 强调色，front-视觉token规范.md §4）：只驱动发送按钮、开关开启态、焦点、普通链接与文字选中。
    * 调色板源值 --act-palette-light-* 只由文件末尾的 :root[data-accent="…"] 定义；
    * 默认调色板不定义，这里全部回落到原有 action / operational / info / 中性值。
    */
@@ -265,7 +265,7 @@
   --shadow-popover: var(--act-shadow-popover);
 
   /*
-   * z-index 分层（front-全局视觉语言规范「层级」）。组件用 z-(--act-z-*) 消费；
+   * z-index 分层（front-视觉token规范 §9）。组件用 z-(--act-z-*) 消费；
    * 组件内部的局部叠放用 Tailwind 内置 z-1 / z-2，不进分层。
    * pane: SplitView 拖拽柄；drawer: 窄窗口侧栏 / 右面板抽屉（低于 chrome，保证标题栏按钮可点）；
    * chrome: 窗口标题栏；dropdown: 组件内 absolute / fixed 菜单；overlay: 工作区内的全屏遮罩层；

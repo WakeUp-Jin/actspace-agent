@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCordisRoot } from "@actspace/cordis-adapter";
+import { surfaceNode } from "@actspace/shared/runtime-v2";
 import { runToolStreamFixture } from "../testing.js";
 
 describe("AgentLoop tool live events", () => {
@@ -9,7 +10,8 @@ describe("AgentLoop tool live events", () => {
     expect(journal.find((event) => event.type === "request/context")?.data).toMatchObject({
       snapshot: { prepared: { defaults: { cacheRetention: mode === "chat" ? "long" : "short" } } },
     });
-    const user = journal.find((event) => event.type === "user/message")?.surface?.node;
+    const userEvent = journal.find((event) => event.type === "user/message");
+    const user = userEvent ? surfaceNode(userEvent) : null;
     expect(user?.content).toEqual([
       { type: "text", text: "Read fixture" },
       { type: "runtime-context", context: { agentMode: mode, agentModeRevision: 0 } },
@@ -150,7 +152,7 @@ it("passes reasoning settings to every request in a tool turn", async () => {
       seedSession: async session => {
         await session.append({ type: "assistant/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" },
           data: { messageId: "old", content: [{ type: "tool-call", callId: "orphan", name: "read_file", arguments: "{}" }] },
-          surface: { kind: "append", node: { kind: "assistant", messageId: "old", content: [{ type: "tool-call", callId: "orphan", name: "read_file", arguments: "{}" }] } } });
+          surface: { kind: "append" } });
       }, onMessages: messages => { request = messages; },
     });
     const feedback = request.findIndex(message => message.role === "tool" && message.callId === "orphan");

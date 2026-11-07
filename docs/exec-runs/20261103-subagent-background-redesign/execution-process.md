@@ -369,7 +369,7 @@
 
 ### 步骤 7：验收修复（BUG-01 / 02 / 03）
 
-- **背景**：Electron 验收（[acceptance-results.md](acceptance-results.md)）23 点中 12 通过、5 失败、6 部分覆盖，确认三个缺陷。用户决定：BUG-01「都显示，插在轮内」；BUG-02「两头都堵」；BUG-03 按设计 02 §5.2 只读父会话授权。
+- **背景**：Electron 验收（`acceptance-results.md`（原始记录已清理，见 git 历史））23 点中 12 通过、5 失败、6 部分覆盖，确认三个缺陷。用户决定：BUG-01「都显示，插在轮内」；BUG-02「两头都堵」；BUG-03 按设计 02 §5.2 只读父会话授权。
 - **BUG-02（P1，X4）空闲子智能体续聊被写锁拒绝**：
   - 原因：子智能体 Run 结束时渲染层收到子会话的 `agent_run_finished`，照主会话的做法调 `continueQueue`，AgentService `#manager(子会话)` 经 `sessions.resume` 打开子会话并一直持有写锁；之后 `send_message` 冷恢复时 `store.open` 拿不到锁。
   - Runtime 侧：AgentService 新增端口 `providerOwnedEvents`（`managed-runs.ts` 实现：子会话 `lineage.origin === "delegation"` 时返回 Journal 事件）。`snapshot` 对子会话只用 `projectTasks` 读投影，不打开；`#manager` 遇到子会话直接抛 `SESSION_BUSY`，并清掉缓存项。

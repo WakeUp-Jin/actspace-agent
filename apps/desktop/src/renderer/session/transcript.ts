@@ -13,7 +13,10 @@ export type LiveTranscript = {
   readonly blocks: readonly MessageBlock[];
   /** 当前会话正在显示的 run。 */
   readonly runId: string | null;
-  /** 渲染进程重载后重新挂上的 run：live 只有重新收到的部分，durable 里已有的内容要保留。 */
+  /**
+   * 渲染进程重载后重新挂上的 run：durable 里已有的内容要保留，live 只有实时底稿起的未定稿正文
+   * 和重新收到的工具块（见 mergeTranscript 的去重）。
+   */
   readonly recovered: boolean;
 };
 
@@ -50,7 +53,27 @@ export function mergeTranscript(durable: DurableTranscript, live: LiveTranscript
   const persisted = durableTranscript(durable, live);
   // 恢复时 durable 的 user 消息和任务快照生成的占位 user 块可能同时存在：按身份去重，保留 durable 的（带元数据）。
   const durableUserKeys = new Set(persisted.filter((block) => block.kind === "user").map((block) => block.renderKey ?? block.id));
-  const visibleLive = live.blocks.filter((block) => block.kind !== "user" || !durableUserKeys.has(block.renderKey ?? block.id));
+  let visibleLive = live.blocks.filter((block) => block.kind !== "user" || !durableUserKeys.has(block.renderKey ?? block.id));
+  if (live.recovered && visibleLive.length > 0) visibleLive = recoveredLiveBlocks(persisted, visibleLive, live.runId);
   const withLive = visibleLive.length === 0 ? persisted : [...persisted, ...visibleLive];
   return local.compactionFailure && !local.isStreaming ? [...withLive, local.compactionFailure] : withLive;
+}
+
+const isText = (block: MessageBlock): block is Extract<MessageBlock, { kind: "assistant" | "thinking" }> => block.kind === "assistant" || block.kind === "thinking";
+
+/**
+ * 恢复的 run 里 durable 显示全部已定稿内容，live 的正文从实时底稿开始。规则与 Web 端一致（apps/web 的 transcript-model）：
+ * - 正文 / 思考：消息定稿后 durable 里出现同一 run、同样内容的块，live 的这一块不再显示；
+ * - live 块的序号从底稿重新数，会与 durable 同一 run 的 renderKey 撞上，撞上的换一个 key。
+ */
+function recoveredLiveBlocks(persisted: readonly MessageBlock[], live: readonly MessageBlock[], runId: string | null): MessageBlock[] {
+  const settled = new Set(persisted.filter((block) => isText(block) && (!runId || block.runId === runId)).map((block) => `${block.kind}:${(block as { content: string }).content.trim()}`));
+  const keys = new Set(persisted.map((block) => block.renderKey ?? block.id));
+  const visible: MessageBlock[] = [];
+  for (const block of live) {
+    if (isText(block) && settled.has(`${block.kind}:${block.content.trim()}`)) continue;
+    const key = block.renderKey ?? block.id;
+    visible.push(isText(block) && keys.has(key) ? { ...block, id: `${block.id}:live`, ...(block.renderKey ? { renderKey: `${block.renderKey}:live` } : {}) } : block);
+  }
+  return visible;
 }

@@ -18,7 +18,7 @@ function useElapsed(active: boolean, since: string): string {
   return formatElapsed(Number.isFinite(start) ? now - start : 0);
 }
 
-/** 执行环境徽标：没进入执行的标「未执行」，否则按 sandboxed 标沙盒 / 真实环境；历史数据没有这个字段时不标。 */
+/** 执行环境徽标（详情里的 where 用）：没进入执行的标「未执行」，否则按 sandboxed 标沙盒 / 真实环境；历史数据没有这个字段时不标。 */
 function badge(block: BashLike): { text: string; warn: boolean } | null {
   if (block.notExecuted || block.status === "denied") return { text: "未执行", warn: false };
   if (block.sandboxed === true) return { text: "沙盒", warn: false };
@@ -26,7 +26,7 @@ function badge(block: BashLike): { text: string; warn: boolean } | null {
   return null;
 }
 
-/** Bash：Running / Ran / Failed / Denied + 命令 + 环境徽标；点开看意图、命令、目录和输出。 */
+/** Bash：Running / Ran / Failed / Denied + 命令 + 环境徽标（「沙盒」「真实环境」只在运行前/运行中显示，结束后收掉，避免整列铺满；「未执行」保留）；点开看意图、命令、目录和输出。 */
 export function BashRow({ block, sessionId }: { readonly block: BashLike; readonly sessionId: string }) {
   const connection = useHostConnection();
   const store = useConnectionStore();
@@ -37,13 +37,15 @@ export function BashRow({ block, sessionId }: { readonly block: BashLike; readon
   const failed = block.status === "failed" || (typeof block.exitCode === "number" && block.exitCode !== 0);
   const inline = [block.stdout, block.stderr].filter(Boolean).join("\n");
   const env = badge(block);
+  // 环境徽标只在运行前/运行中显示，结束后收掉；「未执行」保留。环境仍写在展开详情里。
+  const showEnv = env !== null && (running || env.text === "未执行");
   const verb = VERBS[block.status] ?? (failed ? "Failed" : "Ran");
 
   const toggle = () => {
     const next = !open;
     setOpen(next);
     if (!next || inline || output !== null || !connection || !block.runId) return;
-    void connection.client.call("sessions.output", { sessionId, runId: block.runId, offset: 0 }).then(result => {
+    void connection.client.call("sessions.output", { sessionId, runId: block.runId, afterRevision: 0 }).then(result => {
       const chunks = (result as { chunks?: { text: string }[] }).chunks ?? [];
       setOutput(chunks.map(chunk => chunk.text).join(""));
     }).catch(error => { store.reportError(error); setOutput("无法加载输出"); });
@@ -58,7 +60,7 @@ export function BashRow({ block, sessionId }: { readonly block: BashLike; readon
       grow
       running={running}
       error={failed && block.status !== "denied"}
-      extra={<>{block.status === "running" ? <span className="tl-meta">{elapsed}</span> : null}{env ? <span className="tool-badge" data-tone={env.warn ? "warn" : undefined}>{env.text}</span> : null}</>}
+      extra={<>{block.status === "running" ? <span className="tl-meta">{elapsed}</span> : null}{showEnv && env ? <span className="tool-badge" data-tone={env.warn ? "warn" : undefined}>{env.text}</span> : null}</>}
       open={open}
       onToggle={toggle}
     >

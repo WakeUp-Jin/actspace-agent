@@ -31,6 +31,7 @@ export class AgentRuntimeService {
   harnesses!: HarnessControl;
   hmr!: HarnessHmr;
   evolution!: PluginManager;
+  #unregisterRelease: (() => void)[] = [];
   readonly registry: AgentRegistry;
   constructor(ctx: CordisContext) {
     const host = get<AgentRuntimeHostPort>(ctx, "actspace.host.agent");
@@ -39,10 +40,15 @@ export class AgentRuntimeService {
     this.backgroundTasks = new BackgroundTaskRegistry({ openSession: async id => sessions.getOpen(id) ?? await sessions.resume(id), wake: id => this.runs.service.wake(id), onError: error => host.onHarnessDiagnostic?.(error) });
     // Opening a main Session settles what an exit cut off: background Bash first, then subagent activations.
     const recover = { reconcile: async (session: import("@actspace/session-persistence").SessionHandle) => { await this.backgroundTasks.reconcile(session); await this.subagents.recoverLost(session); } };
-    this.runs = new ManagedRuns(sessions, { acquire: (id, signal) => this.harnesses.acquire(id, signal), acquireSession: (id, signal) => this.hmr.acquire(id, signal), acquireVersion: (id, generationId) => this.harnesses.acquire(id, undefined, generationId) }, snapshot => { emitNotification(ctx, "agent/tasks-updated", snapshot); }, recover);
+    this.runs = new ManagedRuns(sessions, { acquire: (id, signal) => this.harnesses.acquire(id, signal), acquireSession: (id, signal) => this.hmr.acquire(id, signal), acquireVersion: (id, generationId) => this.harnesses.acquire(id, undefined, generationId) }, snapshot => { emitNotification(ctx, "agent/tasks-updated", snapshot); if (!snapshot.runs.some(run => run.state === "running")) sessions.requestSweep(); }, recover);
     // Read when a subagent is created: the session Host is required by `initialize`, not by construction.
     const dataRoot = () => get<RuntimeSessionHostPort>(ctx, "actspace.host.session").dataRoot;
     const transcripts = () => ctx.get?.("session.transcript") as SessionTranscriptService | undefined;
+    // Idle Session release: work that must keep a Session resident, and the scheduler state that holds its handle.
+    this.#unregisterRelease = [
+      sessions.addPin(id => this.runs.isActive(id) || this.runs.hasQueuedTask(id) || this.subagents.runningCount(id) > 0 || this.backgroundTasks.hasRunning(id)),
+      sessions.addReleaseGate({ canRelease: id => this.runs.canRelease(id), release: id => this.runs.release(id) }),
+    ];
     this.subagents = new SubagentManager({
       store: sessions.store, manifestDigest: host.compositionDigest, plugins: host.plugins,
       openSession: async id => sessions.getOpen(id) ?? await sessions.resume(id),
@@ -138,6 +144,7 @@ export class AgentRuntimeService {
     finally { await lease.release().catch(() => undefined); }
   }
   async dispose(): Promise<void> {
+    for (const unregister of this.#unregisterRelease.splice(0)) unregister();
     this.runs.quiesce();
     await this.subagents.dispose();
     await this.backgroundTasks.dispose();

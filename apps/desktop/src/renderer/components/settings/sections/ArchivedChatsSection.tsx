@@ -70,7 +70,7 @@ export function ArchivedChatsSection({
   };
 
   return (
-      <SettingGroup title="已归档" headingLevel={3} description="恢复后会重新出现在左侧会话栏。">
+      <SettingGroup title="已归档" headingLevel={3}>
         {loading ? (
           <div className="px-3.5 py-4 text-act-sm text-text-faint">正在加载归档会话…</div>
         ) : error ? (

@@ -1,6 +1,29 @@
-import type { RuntimeV2DesktopSessionProjection, RuntimeV2JsonValue, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot, RuntimeV2SessionUpdate } from "@actspace/shared/runtime-v2";
+import { surfaceNode } from "@actspace/shared/runtime-v2";
+import type { RuntimeV2DesktopSessionProjection, RuntimeV2EventWindow, RuntimeV2JsonValue, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot, RuntimeV2SessionUpdate } from "@actspace/shared/runtime-v2";
 import { liveOverlayFromEvent, type ClientLiveOverlay } from "./live-overlay.js";
 import { emptyClientSessionCell, type ClientSessionCell } from "./session-snapshot.js";
+
+const TRANSACTION_BOUNDARIES: ReadonlySet<string> = new Set(["compaction/start", "compaction/end", "recovery/start", "recovery/committed"]);
+
+/**
+ * Whether the journal currently sits inside a compaction/recovery transaction (the last boundary event is a `/start`).
+ * Windows are immutable, so the answer is memoized per window object: `applyJournalUpdate` seeds the next window from the
+ * previous answer plus the one appended event (O(1)); only a window that came from elsewhere (a snapshot/page merge) is
+ * scanned once, backwards, without copying.
+ */
+const pendingTransactionByWindow = new WeakMap<RuntimeV2EventWindow, boolean>();
+
+function hasPendingTransaction(window: RuntimeV2EventWindow): boolean {
+  const known = pendingTransactionByWindow.get(window);
+  if (known !== undefined) return known;
+  let pending = false;
+  for (let index = window.events.length - 1; index >= 0; index--) {
+    const type = window.events[index]!.type;
+    if (TRANSACTION_BOUNDARIES.has(type)) { pending = type.endsWith("/start"); break; }
+  }
+  pendingTransactionByWindow.set(window, pending);
+  return pending;
+}
 
 export type ClientSessionListener = (cell: ClientSessionCell, overlay: ClientLiveOverlay | null) => void;
 
@@ -148,12 +171,11 @@ export class ClientSessionStore {
     if (event.seq <= cell.window.throughJournalSeq) return true;
     if (event.seq !== cell.window.throughJournalSeq + 1 || update.throughJournalSeq !== event.seq) return false;
     const snapshot = cell.snapshot;
-    const transactionBoundary = [...cell.window.events].reverse().find(item => ["compaction/start", "compaction/end", "recovery/start", "recovery/committed"].includes(item.type));
-    const pendingTransaction = transactionBoundary?.type.endsWith("/start") === true;
-    const node = !pendingTransaction && event.surface?.kind === "append" ? event.surface.node : null;
-    const messages = node ? [...snapshot.messages, { kind: node.kind, messageId: node.messageId, content: node.content, ...(node.kind === "tool-result" ? { callId: node.callId } : {}) }] : snapshot.messages;
+    const pendingTransaction = hasPendingTransaction(cell.window);
+    const node = !pendingTransaction && event.surface?.kind === "append" ? surfaceNode(event) : null;
+    const messages = node ? snapshot.messages.concat([{ kind: node.kind, messageId: node.messageId, content: node.content, ...(node.kind === "tool-result" ? { callId: node.callId } : {}) }]) : snapshot.messages;
     const values: Record<string, RuntimeV2JsonValue | undefined> = { ...cell.projectionValues, ...update.values };
-    const tools = update.tool ? [...snapshot.tools.filter(tool => tool.callId !== update.tool!.callId), update.tool] : snapshot.tools;
+    const tools = update.tool ? withToolUpdated(snapshot.tools, update.tool) : snapshot.tools;
     const nextSnapshot = { ...snapshot, throughJournalSeq: event.seq, updatedAt: event.time, messages, tools,
       metadata: (values.metadata ?? snapshot.metadata) as RuntimeV2SessionSnapshot["metadata"],
       todos: (values.todos ?? snapshot.todos) as RuntimeV2SessionSnapshot["todos"],
@@ -167,8 +189,11 @@ export class ClientSessionStore {
     };
     const revisions = { ...cell.projectionRevisions };
     for (const key of Object.keys(update.values)) revisions[key] = event.seq;
+    // Published arrays are never mutated (consumers compare array identity/length across renders), so appending is one native copy.
+    const nextWindow: RuntimeV2EventWindow = { ...cell.window, events: cell.window.events.concat([event]), throughJournalSeq: event.seq };
+    pendingTransactionByWindow.set(nextWindow, TRANSACTION_BOUNDARIES.has(event.type) ? event.type.endsWith("/start") : pendingTransaction);
     this.#cells.set(update.sessionId, Object.freeze({ ...cell, snapshot: nextSnapshot, projectionValues: values as Record<string, RuntimeV2JsonValue>, projectionRevisions: revisions,
-      window: { ...cell.window, events: [...cell.window.events, event], throughJournalSeq: event.seq },
+      window: nextWindow,
       liveGap: false, status: "ready" }));
     this.#emit(update.sessionId);
     return true;
@@ -246,4 +271,14 @@ export class ClientSessionStore {
     const overlay = this.#overlays.get(sessionId) ?? null;
     for (const listener of [...this.#listeners]) listener(cell, overlay);
   }
+}
+
+/** The updated tool moves to the end of the list (its latest activity); other tools keep their order. */
+function withToolUpdated(tools: RuntimeV2SessionSnapshot["tools"], tool: RuntimeV2SessionSnapshot["tools"][number]): RuntimeV2SessionSnapshot["tools"] {
+  let at = -1;
+  for (let index = tools.length - 1; index >= 0; index--) if (tools[index]!.callId === tool.callId) { at = index; break; }
+  if (at === -1) return tools.concat([tool]);
+  const next = tools.slice(0, at).concat(tools.slice(at + 1));
+  next.push(tool);
+  return next;
 }

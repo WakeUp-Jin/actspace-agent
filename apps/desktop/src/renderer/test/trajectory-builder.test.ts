@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeV2JsonValue, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import { buildTrajectoryDetail, buildTrajectorySnapshot, deriveLayout, TrajectorySearchIndex } from "../trajectory";
 import { loadTrajectoryFixture } from "../trajectory/fixtures";
 
@@ -49,7 +49,7 @@ describe("trajectory runtime builder", () => {
       "assistant/chunk",
     ]);
     expect(result.records.some(record => record.eventType === "request/header" && record.kind !== "system")).toBe(false);
-    expect(result.records.some(record => record.eventType === "request/context")).toBe(false);
+    expect(result.records.some(record => record.eventType === "request/context" && record.kind !== "system")).toBe(false);
     expect(result.records.some(record => record.eventType === "turn/start")).toBe(false);
     expect(result.rawRecords).toHaveLength(snapshot.nodes.length);
     expect(result.rawRecords?.find(record => record.eventType === "turn/start")?.visible).toBe(false);
@@ -69,25 +69,50 @@ describe("trajectory runtime builder", () => {
     });
   });
 
-  it("projects explicit prompt changes as SYSTEM records only", () => {
+  it("projects prompt and tool record changes as SYSTEM records only", () => {
+    const at = (seq: number, eventType: string, data: Record<string, RuntimeV2JsonValue>) => ({ ...snapshot.nodes[1]!, key: `s:${seq}`, eventSeq: seq, eventType, kind: "request" as const, data });
+    const prompt = (requestId: string, content: string) => ({ turnId: "t1", stepId: "st1", requestId, digest: content, sections: [{ id: "model-prompt", owner: "actspace.context-system", order: 0, content }], modelFacts: [], contributorProvenance: [] });
+    const context = (requestId: string) => ({ turnId: "t1", stepId: "st1", requestId, snapshot: { schemaVersion: 3, requestOptions: { model: "same" } } });
     const nodes = [
       snapshot.nodes[0]!,
       snapshot.nodes[1]!,
-      { ...snapshot.nodes[1]!, key: "s:10", eventSeq: 10, eventType: "request/header", data: { turnId: "t1", stepId: "st1", requestId: "r1", prompt: { systemPrompt: "initial", tools: [] } } },
-      { ...snapshot.nodes[1]!, key: "s:11", eventSeq: 11, eventType: "request/header", data: { turnId: "t1", stepId: "st1", requestId: "r2", prompt: { systemPrompt: "updated", tools: [] } } },
-      { ...snapshot.nodes[1]!, key: "s:12", eventSeq: 12, eventType: "request/header", data: { turnId: "t1", stepId: "st1", requestId: "r3", model: "same" } },
+      at(10, "request/system-prompt", prompt("r1", "initial")),
+      at(11, "request/tools", { turnId: "t1", stepId: "st1", requestId: "r1", digest: "t", tools: [{ name: "read_file", description: "Read" }] }),
+      at(12, "request/context", context("r1")),
+      at(13, "request/system-prompt", prompt("r2", "updated")),
+      at(14, "request/context", context("r2")),
+      at(15, "request/context", context("r3")),
     ];
     const result = buildTrajectorySnapshot({ ...snapshot, nodes });
     const systems = result.records.filter(record => record.kind === "system");
-    expect(systems).toHaveLength(2);
     expect(systems.map(record => record.summary)).toEqual(["初始系统提示词", "系统提示词已更新"]);
+    expect(systems[1]).toMatchObject({ promptDetail: { systemPrompt: "updated", tools: [{ name: "read_file" }] }, previousPromptDetail: { systemPrompt: "initial" }, sourceSequences: [13, 14] });
     expect(result.records.filter(record => record.kind === "request")).toHaveLength(0);
+  });
+
+  it("keeps the system row and tool schema when the history window starts after the prompt records", () => {
+    const at = (seq: number, eventType: string, data: Record<string, RuntimeV2JsonValue>) => ({ ...snapshot.nodes[1]!, key: `s:${seq}`, eventSeq: seq, eventType, kind: "other" as const, callId: typeof data.callId === "string" ? data.callId : null, data });
+    const ids = { turnId: "t9", stepId: "st9", requestId: "r9" };
+    const nodes = [
+      // session-controller 把窗口起点（seq 40）之前最近的提示词与工具记录补进窗口。
+      at(2, "request/system-prompt", { turnId: "t1", stepId: "st1", requestId: "r1", digest: "p", sections: [{ id: "model-prompt", owner: "actspace.context-system", order: 0, content: "fixed" }, { id: "host/workspace-instructions", owner: "actspace.context-rules", order: 20, content: "rule" }], modelFacts: [], contributorProvenance: [] }),
+      at(3, "request/tools", { turnId: "t1", stepId: "st1", requestId: "r1", digest: "t", tools: [{ name: "read_file", description: "Read", inputSchema: { type: "object" } }] }),
+      at(40, "turn/start", { turnId: "t9" }),
+      at(41, "request/context", { ...ids, snapshot: { schemaVersion: 3 } }),
+      at(42, "tool/call", { ...ids, callId: "c9", name: "read_file", args: { path: "a" } }),
+      at(43, "tool/result", { ...ids, callId: "c9", status: "completed", result: "ok" }),
+    ];
+    const result = buildTrajectorySnapshot({ ...snapshot, nodes, history: { fromSeq: 40, previousFromSeq: 40, turnOffset: 8 } });
+    expect(result.records.filter(record => record.kind === "system")).toMatchObject([{ systemChange: "initial", promptDetail: { systemPrompt: "fixed\n\nrule" }, sourceSequences: [41] }]);
+    expect(result.records.filter(record => record.kind === "context")).toHaveLength(0);
+    expect(result.records.find(record => record.callId === "c9")).toMatchObject({ schemaDetail: { name: "read_file" }, turnNumber: 9 });
+    expect(result.rawRecords?.some(record => record.eventType === "request/system-prompt")).toBe(false);
   });
 
   it("keeps request and lifecycle facts out of the semantic ledger", () => {
     const result = buildTrajectorySnapshot(loadTrajectoryFixture("complete"));
     expect(result.records.some(record => record.eventType === "request/header" && record.kind !== "system")).toBe(false);
-    expect(result.records.some(record => record.eventType === "request/context")).toBe(false);
+    expect(result.records.some(record => record.eventType === "request/context" && record.kind !== "system")).toBe(false);
     expect(result.records.filter(record => record.kind === "system")).toHaveLength(1);
     expect(result.records[0]).toMatchObject({ kind: "system", turnId: null });
     expect(result.records.find(record => record.messageId === "assistant-2-2")).toMatchObject({ turnNumber: 2, stepNumber: 2, requestId: "request-2-2" });
@@ -102,7 +127,7 @@ describe("trajectory runtime builder", () => {
   it("projects task notifications and context supplements as CONTEXT records with their source", () => {
     const nodes = [
       snapshot.nodes[0]!,
-      { ...snapshot.nodes[1]!, key: "s:20", eventSeq: 20, eventType: "agent/inbox/spliced", kind: "user" as const, data: { operation: "claim", messageId: "n1", target: "current-turn", source: "task_notification" }, surface: { kind: "append", node: { kind: "user", messageId: "n1", content: [{ type: "text", text: "后台任务完成" }, { type: "runtime-context", context: { agentMode: "agent" } }] } } },
+      { ...snapshot.nodes[1]!, key: "s:20", eventSeq: 20, eventType: "agent/inbox/spliced", kind: "user" as const, data: { operation: "claim", messageId: "n1", target: "current-turn", source: "task_notification", content: [{ type: "text", text: "后台任务完成" }, { type: "runtime-context", context: { agentMode: "agent" } }] }, surface: { kind: "append" } },
       { ...snapshot.nodes[1]!, key: "s:21", eventSeq: 21, eventType: "plugin/actspace.context/supplement", kind: "other" as const, data: { op: "add", id: "runtime-state", owner: "actspace.context-runtime", text: "当前目录 /tmp", afterEventSeq: 20, lifetime: "turn", turnId: "t1" } },
       { ...snapshot.nodes[1]!, key: "s:22", eventSeq: 22, eventType: "plugin/actspace.context/supplement", kind: "other" as const, data: { op: "remove", id: "runtime-state", owner: "actspace.context-runtime" } },
     ] as RuntimeV2TrajectorySnapshot["nodes"];

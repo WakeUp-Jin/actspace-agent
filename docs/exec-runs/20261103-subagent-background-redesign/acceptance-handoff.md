@@ -4,7 +4,7 @@
 - **计划**：`docs/exec-plans/completed/20261103-subagent-background-redesign/README.md`
 - **设计**：`docs/design-docs/子智能体和后台任务设计规范/`（02 §10、03 §4、04 §6、05 §5 的验收表合在下面）
 - **执行过程**：`execution-process.md`（同目录），与设计不同的地方都写在各步骤的「决定」里。
-- **状态**：已完成（2026-11-04）。首轮 12 通过、5 失败、6 部分覆盖；三个缺陷修复后复验 X1/X4/X6/X8/X21 全部通过，合计 17 通过、0 失败、6 部分覆盖。逐点结果见 [acceptance-results.md](acceptance-results.md) 和文末「修复后复验结果」；下文原始清单保留为覆盖依据。
+- **状态**：已完成（2026-11-04）。首轮 12 通过、5 失败、6 部分覆盖；三个缺陷修复后复验 X1/X4/X6/X8/X21 全部通过，合计 17 通过、0 失败、6 部分覆盖。逐点结果见 `acceptance-results.md`（原始记录已清理，见 git 历史） 和文末「修复后复验结果」；下文原始清单保留为覆盖依据。
 
 ## 约束
 
@@ -117,7 +117,7 @@ B-A6（日志超 50MB 删最早的）、B-A7（第 6 个后台任务）、B-A8�
 
 用户要求继续后，原生 CU 的空数据、Finder 对照和 accessibility 启动诊断仍未解除主窗口连接超时。按用户明确允许的组合方式，由 `gpt-6.1-sol` 使用 Playwright/CDP 操作真实 Electron 完成部分功能验收；这不属于原生 CU 通过。
 
-**最新逐点状态及缺陷以 [acceptance-results.md](acceptance-results.md) 为准**，上节全未覆盖是首次受阻轮次的历史记录。最新 23 点共 12 项通过、5 项失败、6 项部分覆盖（部分点内部仍有未验子项）：X1/X8/X21 通知行缺失（BUG-01，P2，通知已消费但展示只接受空闲唤醒）；X4 空闲子智能体续聊失败（BUG-02，P1，与当前 Runtime 已持有的会话写锁冲突）；X6 父会话已授予 Bash 前缀权限仍不被子智能体消费（BUG-03，P2）。Codex 成功链路因本机 Homebrew vendor ENOENT 阻塞；Claude Code、Fork 缓存及多项本地/后台交互已有真实证据。报告包含复现、源码位置、Journal 序号、证据文件及尚未定位的原因边界。
+**最新逐点状态及缺陷以 `acceptance-results.md`（原始记录已清理，见 git 历史） 为准**，上节全未覆盖是首次受阻轮次的历史记录。最新 23 点共 12 项通过、5 项失败、6 项部分覆盖（部分点内部仍有未验子项）：X1/X8/X21 通知行缺失（BUG-01，P2，通知已消费但展示只接受空闲唤醒）；X4 空闲子智能体续聊失败（BUG-02，P1，与当前 Runtime 已持有的会话写锁冲突）；X6 父会话已授予 Bash 前缀权限仍不被子智能体消费（BUG-03，P2）。Codex 成功链路因本机 Homebrew vendor ENOENT 阻塞；Claude Code、Fork 缓存及多项本地/后台交互已有真实证据。报告包含复现、源码位置、Journal 序号、证据文件及尚未定位的原因边界。
 
 没有修复或改动源码、测试，没有提交或推送；仅补充验收记录。最终重启已确认恢复浅色主题、跟随主智能体、两外部插件关闭且无待重启提示；本轮应用及开发服务已退出，保留验收会话和仅该会话的测试授权供另一个修复会话接手。文档检查通过。
 
@@ -147,6 +147,6 @@ B-A6（日志超 50MB 删最早的）、B-A7（第 6 个后台任务）、B-A8�
 | X8 | 通过 | CDP + 标准退出重启：退出前 child 运行，重开卡片「已停止 · 中断（应用退出）」；新消息后 Worked for 内出现中断通知，展开英文摘要。`X8-restored-card-list-before-message.png`、`X8-recovery-child-notice-expanded.png`。 |
 | X21 | 通过 | CDP + 同次重启：新消息轮内有 Bash 已失联通知，原日志无审批读取成功，保留退出前标记。`X8-X21-recovery-notices-expanded.png`、`X21-preserved-log-read.png`、`x8-x21-restart-findings.json`。 |
 
-本轮证据位于本地忽略目录 `tmp/codex-acceptance/20261103-subagent-background-redesign/postfix-d5dffac4/`。父会话 `3e5cf08e-21eb-4d70-8bf6-5bfa915c13b4`。完整步骤、子 id、Journal 序号、构建与观察边界见 [acceptance-results.md](acceptance-results.md) 末尾「修复后 Electron 复验」。五点修复范围全部通过，未发现新的相关缺陷；其余部分覆盖项目保持原缺口，未将 Web / Codex 成功链路写成通过。
+本轮证据位于本地忽略目录 `tmp/codex-acceptance/20261103-subagent-background-redesign/postfix-d5dffac4/`。父会话 `3e5cf08e-21eb-4d70-8bf6-5bfa915c13b4`。完整步骤、子 id、Journal 序号、构建与观察边界见 `acceptance-results.md`（原始记录已清理，见 git 历史） 末尾「修复后 Electron 复验」。五点修复范围全部通过，未发现新的相关缺陷；其余部分覆盖项目保持原缺口，未将 Web / Codex 成功链路写成通过。
 
 最终确认浅色、跟随主智能体、两外部插件关闭；仅新验收父会话保留 ls 工作区前缀授权，无全局授权，无工作区测试文件。应用标准退出 0，renderer 主动停止；5173 / 9227 无监听，测试 sleep 无残留。本轮仅补充验收记录，没有修源码、测试或配置，没有提交或推送。

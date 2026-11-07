@@ -12,7 +12,7 @@ export function queryContextHistory(db: DatabaseSync, id: string): ContextHistor
   const latest = rows[0];
   const entries = latest ? (prepare(db, "SELECT entry_json FROM context_manifest_entry WHERE session_id=? AND request_id=? ORDER BY rowid LIMIT 5000").all(id, latest.request_id) as { entry_json: string }[]).map(row => JSON.parse(row.entry_json)) : [];
   const summary = latest ? JSON.parse(latest.manifest_json) as ContextContentManifest : null;
-  const previous = latest && summary ? { requestId: latest.request_id, turnIndex: latest.turn_index, stepIndex: latest.step_index, sentAt: latest.time, totalEstimatedTokens: summary.totalEstimatedTokens, buckets: summary.buckets, entries, comparable: summary.comparable, estimatorVersion: summary.estimatorVersion, ...(summary.comparisonUnavailableReason ? { comparisonUnavailableReason: summary.comparisonUnavailableReason } : {}) } : null;
+  const previous = latest && summary ? { requestId: latest.request_id, seq: latest.seq, turnIndex: latest.turn_index, stepIndex: latest.step_index, sentAt: latest.time, totalEstimatedTokens: summary.totalEstimatedTokens, buckets: summary.buckets, entries, comparable: summary.comparable, estimatorVersion: summary.estimatorVersion, ...(summary.comparisonUnavailableReason ? { comparisonUnavailableReason: summary.comparisonUnavailableReason } : {}) } : null;
   const stat = prepare(db, "SELECT * FROM context_session_stats WHERE session_id=?").get(id) as Record<string, number>;
   const stats: ContextPanelStats = { turnCount: stat.turn_count!, stepCount: stat.step_count!, compactionCount: stat.compaction_count!, cumulativeUsage: stat.usage_count! > 0 ? { inputTokens: stat.input_tokens!, outputTokens: stat.output_tokens!, cacheReadTokens: stat.cache_read_tokens!, cacheWriteTokens: stat.cache_write_tokens! } : null, costUsd: stat.known_cost_count! > 0 && stat.unknown_cost_count === 0 ? stat.cost_usd! : null };
   const trend = rows.map(row => {
@@ -45,5 +45,15 @@ function queryBashStats(db: DatabaseSync, id: string): ContextPanelBashStats {
     if (BASH_SUBCOMMAND_PROGRAMS.has(row.program)) program.subcommands.push({ name: row.subcommand, count: Number(row.count), failed: Number(row.failed) });
   }
   for (const program of programs.values()) program.subcommands.sort(compareBashCounts);
-  return { calls: Number(total?.calls ?? 0), failed: Number(total?.failed ?? 0), durationMs: Number(total?.duration_ms ?? 0), programs: [...programs.values()].sort(compareBashCounts) };
+  const sorted = [...programs.values()].sort(compareBashCounts);
+  const notable = prepare(db, "SELECT slowest_command,slowest_ms,background_count FROM context_bash_notable WHERE session_id=?").get(id) as { slowest_command: string; slowest_ms: number; background_count: number } | undefined;
+  const repeated = prepare(db, "SELECT command,count FROM context_bash_command WHERE session_id=? AND count>=2 ORDER BY count DESC,command ASC LIMIT 1").get(id) as { command: string; count: number } | undefined;
+  const failedProgram = sorted.filter(program => program.name !== "" && program.failed > 0).sort((a, b) => b.failed - a.failed || a.name.localeCompare(b.name))[0];
+  return {
+    calls: Number(total?.calls ?? 0), failed: Number(total?.failed ?? 0), durationMs: Number(total?.duration_ms ?? 0), programs: sorted,
+    slowest: notable && Number(notable.slowest_ms) > 0 && notable.slowest_command ? { command: notable.slowest_command, durationMs: Number(notable.slowest_ms) } : null,
+    mostFailedProgram: failedProgram ? { program: failedProgram.name, count: failedProgram.failed } : null,
+    mostRepeated: repeated ? { command: repeated.command, count: Number(repeated.count) } : null,
+    backgroundCount: Number(notable?.background_count ?? 0),
+  };
 }

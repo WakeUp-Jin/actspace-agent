@@ -18,36 +18,31 @@ function envelope(seq: number, type: string, data: SessionEventEnvelopeV1["data"
 }
 
 describe("chat projection identity", () => {
-  it("recovers pending text and reasoning in Journal order without changing ordinary live projections", () => {
+  it("never shows journaled chunks of old Sessions, including orphans a crash left behind", () => {
     const journal = [
       envelope(1, "turn/start", { agentRunId: "run-1", turnId: "turn-1" }),
       envelope(2, "request/context", { requestId: "request-1", turnId: "turn-1", stepId: "step-1", snapshot: { prepared: {} } }),
       envelope(3, "assistant/chunk", { messageId: "a-1", requestId: "request-1", kind: "reasoning-delta", content: "think " }),
       envelope(4, "assistant/chunk", { messageId: "a-1", requestId: "request-1", kind: "assistant-delta", content: "line 1\n" }),
-      envelope(5, "assistant/chunk", { messageId: "a-1", requestId: "request-1", kind: "assistant-delta", content: "line 2\n" }),
-      envelope(6, "assistant/chunk", { messageId: "a-1", requestId: "request-1", kind: "reasoning-delta", content: "more" }),
     ];
     expect(projectChatSession(snapshot([]), journal, "/w").events).toEqual([]);
-    const recovered = projectChatSession(snapshot([]), journal, "/w", { includePendingChunks: true });
-    expect(recovered.events).toMatchObject([
-      { type: "thinking", agentRunId: "run-1", turnId: "turn-1", llmCallId: "request-1", payload: { content: "think more" } },
-      { type: "assistant_message", agentRunId: "run-1", payload: { content: "line 1\nline 2\n" } },
-    ]);
-    expect(recovered.events.every(event => event.sourceSeq === undefined)).toBe(true);
-    expect(recovered.messageBlocks).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "assistant", content: "line 1\nline 2\n" })]));
+    expect(projectSubagentTranscript(snapshot([]), journal)).toEqual([]);
   });
 
-  it("replaces recovered chunks with the completed message exactly once", () => {
+  it("adds the child's live baseline to the subagent transcript until the message settles", () => {
     const journal = [
-      envelope(1, "assistant/chunk", { agentRunId: "run-1", messageId: "a-1", kind: "assistant-delta", content: "partial" }),
-      envelope(2, "assistant/message", { agentRunId: "run-1", messageId: "a-1" }, { kind: "append", node: { kind: "assistant", messageId: "a-1", content: "complete" } }),
-      envelope(3, "assistant/chunk", { agentRunId: "run-2", messageId: "a-2", kind: "assistant-delta", content: "next" }),
+      envelope(1, "assistant/message", { agentRunId: "run-1", messageId: "a-1", content: "complete" }, { kind: "append" }),
     ];
-    const events = projectChatSession(snapshot(["a-1"]), journal, "/w", { includePendingChunks: true }).events;
+    const pending = { runId: "run-1", revision: 9, segments: [
+      { kind: "text" as const, messageId: "a-1", text: "complete" },
+      { kind: "thinking" as const, messageId: "a-2", text: "pondering" },
+      { kind: "text" as const, messageId: "a-2", text: "next" },
+    ] };
+    const events = projectSubagentTranscript(snapshot(["a-1"]), journal, pending);
     expect(events.map(event => [event.type, (event.payload as { content?: string }).content])).toEqual([
-      ["assistant_message", "complete"], ["assistant_message", "next"],
+      ["assistant_message", "complete"], ["thinking", "pondering"], ["assistant_message", "next"],
     ]);
-    expect(projectSubagentTranscript(snapshot(["a-1"]), journal)).toEqual(events);
+    expect(projectSubagentTranscript(snapshot(["a-1"]), journal)).toEqual(projectChatSession(snapshot(["a-1"]), journal, "/w").events);
   });
 
   it("restores the complete pending command from durable call facts for a new observer", () => {
@@ -60,17 +55,17 @@ describe("chat projection identity", () => {
   });
   it("drops a reasoning block that only holds a zero-width space", () => {
     const journal = [
-      envelope(7, "assistant/message", { agentRunId: "run-1", messageId: "a-1", content: "answer" },
-        { kind: "append", node: { kind: "assistant", messageId: "a-1", content: [{ type: "reasoning", text: "\u200B" }, { type: "text", text: "answer" }] } }),
+      envelope(7, "assistant/message", { agentRunId: "run-1", messageId: "a-1", content: [{ type: "reasoning", text: "\u200B" }, { type: "text", text: "answer" }] },
+        { kind: "append" }),
     ];
     const events = projectChatEvents(snapshot(["a-1"]), journal);
     expect(events.map((event) => event.type)).toEqual(["assistant_message"]);
   });
   it("stamps each projected event with the seq of the envelope it came from", () => {
     const journal = [
-      envelope(4, "user/message", { agentRunId: "run-1", messageId: "u-1", content: "question" }, { kind: "append", node: { kind: "user", messageId: "u-1", content: "question" } }),
-      envelope(7, "assistant/message", { agentRunId: "run-1", messageId: "a-1", content: "answer" },
-        { kind: "append", node: { kind: "assistant", messageId: "a-1", content: [{ type: "reasoning", text: "thinking it over" }, { type: "text", text: "answer" }] } }),
+      envelope(4, "user/message", { agentRunId: "run-1", messageId: "u-1", content: "question" }, { kind: "append" }),
+      envelope(7, "assistant/message", { agentRunId: "run-1", messageId: "a-1", content: [{ type: "reasoning", text: "thinking it over" }, { type: "text", text: "answer" }] },
+        { kind: "append" }),
     ];
     const events = projectChatEvents(snapshot(["u-1", "a-1"]), journal);
     expect(events.map((event) => [event.type, event.agentRunId, event.sourceSeq])).toEqual([

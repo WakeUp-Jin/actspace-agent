@@ -97,11 +97,12 @@
   --act-color-success-soft: #e5f2ea;
   --act-color-on-success: #087a4b;
 
-  /* 浮层（卡片/模态/popover 高一层背景）与模态遮罩 */
+  /* 浮层（卡片/模态/popover 高一层背景）与模态遮罩；scrim 是普通弹窗用的轻一档遮罩 */
   --act-color-overlay: rgba(17, 24, 39, 0.32);
+  --act-color-scrim: rgba(17, 24, 39, 0.16);
 
   /*
-   * 强调色（外观 → 强调色，front-accent-palette.md）：只驱动发送按钮、开关开启态、焦点、普通链接与文字选中。
+   * 强调色（外观 → 强调色，front-视觉token规范.md §4）：只驱动发送按钮、开关开启态、焦点、普通链接与文字选中。
    * 调色板源值 --act-palette-light-* 只由文件末尾的 :root[data-accent="…"] 定义；
    * 默认调色板不定义，这里全部回落到原有 action / operational / info / 中性值。
    */
@@ -271,7 +272,7 @@
   --shadow-popover: var(--act-shadow-popover);
 
   /*
-   * z-index 分层（front-全局视觉语言规范「层级」）。组件用 z-(--act-z-*) 消费；
+   * z-index 分层（front-视觉token规范 §9）。组件用 z-(--act-z-*) 消费；
    * 组件内部的局部叠放用 Tailwind 内置 z-1 / z-2，不进分层。
    * pane: SplitView 拖拽柄；drawer: 窄窗口侧栏 / 右面板抽屉（低于 chrome，保证标题栏按钮可点）；
    * chrome: 窗口标题栏；dropdown: 组件内 absolute / fixed 菜单；overlay: 工作区内的全屏遮罩层；
@@ -432,6 +433,7 @@
   --act-color-on-success: #55d99a;
 
   --act-color-overlay: rgba(0, 0, 0, 0.55);
+  --act-color-scrim: rgba(0, 0, 0, 0.4);
 
   --act-color-accent: var(--act-palette-dark-accent, var(--act-color-action));
 
@@ -621,6 +623,7 @@
     --act-color-on-success: #55d99a;
 
     --act-color-overlay: rgba(0, 0, 0, 0.55);
+    --act-color-scrim: rgba(0, 0, 0, 0.4);
 
     --act-color-accent: var(--act-palette-dark-accent, var(--act-color-action));
 
@@ -756,7 +759,7 @@
 }
 
 /*
- * 强调色调色板（外观 → 强调色，<html data-accent>，front-accent-palette.md）。
+ * 强调色调色板（外观 → 强调色，<html data-accent>，front-视觉token规范.md §4）。
  * 每块只写与明暗无关的源值：light / dark 各一个，同时作填充色与文字色；
  * 由 :root 与两个深色块挑选。默认调色板（data-accent="default"）不定义任何源值。
  * 对比度门槛：浅色 白字在强调色上、强调色在 surface / bg / surface-subtle 上 ≥ 4.5:1；

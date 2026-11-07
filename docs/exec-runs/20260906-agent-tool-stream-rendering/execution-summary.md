@@ -40,4 +40,4 @@
 
 未提交、未推送；保留先前设置分析观测删除和工作区其他改动。无 Journal 迁移、权限策略或 Provider 协议变更。回滚只能撤销本修复补丁并一起重建 Core/Runtime/Desktop，不得整文件回退到 HEAD。
 
-关联：[已归档计划](../../exec-plans/completed/20260906-agent-tool-stream-rendering/README.md)、[设计](../../design-docs/frontend/front-agent-tool-stream-rendering.md)、[执行过程](execution-process.md)。
+关联：[已归档计划](../../exec-plans/completed/20260906-agent-tool-stream-rendering/README.md)、[设计](../../exec-plans/completed/design-archive/frontend/front-agent-tool-stream-rendering.md)、[执行过程](execution-process.md)。

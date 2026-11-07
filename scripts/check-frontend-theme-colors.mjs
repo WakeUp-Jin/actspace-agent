@@ -153,7 +153,7 @@ for (const target of TARGETS) {
   }
 
   if (target.accents) {
-    // 强调色调色板（front-accent-palette.md）：accents.ts 每个 ID 都要有色样 token；
+    // 强调色调色板（front-视觉token规范.md §4）：accents.ts 每个 ID 都要有色样 token；
     // 非默认 ID 要有带浅深源值的 data-accent 块，且源值满足对比度门槛；默认 ID 不得定义源值。
     const DEFAULT_ACCENT_PALETTE = "default";
     const ACCENT_MIN_CONTRAST = 4.5;

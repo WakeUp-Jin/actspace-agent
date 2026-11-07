@@ -26,12 +26,12 @@ export function MediaDefaultsSection({
 
   return (
     <>
-      <SettingGroup title="媒体" headingLevel={3} description="图片生成与图片分析使用的服务。">
+      <SettingGroup title="媒体" headingLevel={3}>
         <SettingLinkRow
           title="图片生成"
           description={current.hasApiKey
             ? `${current.model} · ${endpointLabel}`
-            : "配置 API Key 后，主 Agent 才能使用图片生成工具。"}
+            : undefined}
           trailing={<StatusDot tone={current.hasApiKey ? "ok" : "off"}>{current.hasApiKey ? "已配置" : "未配置"}</StatusDot>}
           ariaLabel={current.hasApiKey ? "编辑图片生成服务配置" : "配置图片生成服务"}
           onClick={() => {
@@ -41,7 +41,6 @@ export function MediaDefaultsSection({
         />
         <SettingLinkRow
           title="看图模型"
-          description="图片分析用的模型，在「模型 › 用途 › 看图」中设置；未设置时用会话默认模型。"
           ariaLabel="前往模型设置看图模型"
           disabled={!onNavigate}
           onClick={() => onNavigate?.("model")}

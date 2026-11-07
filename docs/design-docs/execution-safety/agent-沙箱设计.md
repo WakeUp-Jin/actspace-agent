@@ -1,6 +1,6 @@
 # 沙箱设计
 
-> 状态：2026-10-25 用户确认的设计；第一期（地基 + 工具沙箱）已实施，见 [20261025-sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)。第二期（评估沙箱）已实施，见 [20261025-sandbox-v2-evaluation-sandbox](../../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md) 与[执行摘要](../../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)。工具沙箱的出沙箱与回退（第 9 节）已实施，见 [20261025-sandbox-escape-fallback](../../exec-plans/completed/20261025-sandbox-escape-fallback.md) 与[执行摘要](../../exec-runs/20261025-sandbox-escape-fallback/execution-summary.md)。第三期未开始。调研原稿与 Mac 性能实验见 [沙箱实现的思路](../../references/sandbox-research-20261022/README.md)。
+> 工具沙箱（含地基）、评估沙箱、工具沙箱的出沙箱与回退（第 9 节）均已实现。计划与执行摘要：[sandbox-v1-tool-sandbox](../../exec-plans/completed/20261025-sandbox-v1-tool-sandbox.md)（[摘要](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-summary.md)）、[sandbox-v2-evaluation-sandbox](../../exec-plans/completed/20261025-sandbox-v2-evaluation-sandbox.md)（[摘要](../../exec-runs/20261025-sandbox-v2-evaluation-sandbox/execution-summary.md)）、[sandbox-escape-fallback](../../exec-plans/completed/20261025-sandbox-escape-fallback.md)。Windows 原生后端尚未实现。
 
 ## 1. 结论
 
@@ -192,7 +192,7 @@ flowchart LR
 - **没有 nono 时转审批、在真实环境里评估**：评估跑的是整个 Harness，直接拒绝。
 - **让 Agent 每次自己选进不进沙箱**、**沙箱内失败后自动弹窗重试**、**出沙箱的批准记住（会话内同一条命令、前缀规则）**：原因见第 9 节。
 
-## 8. 实测结论（2026-10-25，nono 0.80.0）
+## 8. 实测结论（nono 0.80.0）
 
 详见[执行过程](../../exec-runs/20261025-sandbox-v1-tool-sandbox/execution-process.md)步骤 1。
 
@@ -222,7 +222,7 @@ flowchart LR
 - npm 被拦时 `EPERM` 出现在较前面，最后几行是误导性的 “sudo chown” 建议，所以要看输出末尾 8KB，不能只看最后几行。
 - 钥匙串没有稳定特征：`gh` 在两个后端都只报 “token 无效”；nono 下 `security`、`git credential-osxkeychain` 报 `-50` 参数错误，Seatbelt 下与沙箱外相同。所以钥匙串不做匹配，只在工具描述与参数描述里点名 `git push`（HTTPS）和 `gh`。
 
-## 9. 工具沙箱的出沙箱与回退（2026-10-25 确认）
+## 9. 工具沙箱的出沙箱与回退
 
 调研了 Codex（CLI 与 App 共用 `codex-rs`）、Cursor、DSH、OpenCode 的做法后确认（调研结论见[计划](../../exec-plans/completed/20261025-sandbox-escape-fallback.md)背景一节）。
 

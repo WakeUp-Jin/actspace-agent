@@ -77,10 +77,11 @@ describe("WorkbenchLayout narrow window behavior", () => {
     setViewportWidth(originalInnerWidth);
   });
 
-  it("keeps chrome, footer and popup on the complete estimate instead of the generic projection", async () => {
-    const contextSnapshot = { ...mockContextSnapshot, totalTokens: 49_000, maxTokens: 1_000_000, percentUsed: 4.9, cumulativeTokens: 549000 };
+  it("reads chrome, footer and popup from the contextEstimate projection", async () => {
+    const contextSnapshot = { ...mockContextSnapshot, totalTokens: 1_000, maxTokens: 1_000_000, percentUsed: 0.1, cumulativeTokens: 549000 };
     const getSessionProjectionSnapshot = vi.fn(async () => ({
       kind: "session-projection", schemaVersion: 1, sessionId: "session-responsive", throughJournalSeq: 3,
+      activeMessageIds: [], deferredToolCalls: [], window: { events: [], fromSeq: 0, throughJournalSeq: 3, beforeSeq: null, turnOffset: 0, requestOffset: 0 },
       snapshot: {
         kind: "session-snapshot", schemaVersion: 1, sessionId: "session-responsive",
         createdAt: "2026-09-15T00:00:00Z", updatedAt: "2026-09-15T00:00:03Z",
@@ -91,10 +92,10 @@ describe("WorkbenchLayout narrow window behavior", () => {
         activity: { turnCount: 1, completedTurnCount: 1, stepCount: 1, activeTurnId: null, activeStepId: null, compactionCount: 0, activeCompactionId: null, lastCompactionSummary: null, timing: { llmMs: 0, ttftMs: 0, ttftSteps: 0, decodeMs: 0, decodeTokens: 0 } },
       },
       values: {
-        requestContextEstimate: {
-          kind: "request-context-estimate", schemaVersion: 1, sessionId: "session-responsive", throughJournalSeq: 3,
-          requestId: "request-1", estimator: { name: "runtime-v2-request-snapshot", version: "1" },
-          totalEstimatedTokens: 60_000, maxTokens: 1_000_000, percentUsed: 6,
+        contextEstimate: {
+          schemaVersion: 1, estimatorVersion: "chars4-block4-message4", totalEstimatedTokens: 49_000,
+          buckets: { systemPrompt: 9_000, tools: 0, rules: 0, skills: 0, summarizedConversation: 0, conversation: 40_000 },
+          contextWindow: 1_000_000, model: null, percentUsed: 4.9, entries: [], summaries: [], requestId: "request-1", throughJournalSeq: 3, updatedAt: "2026-09-15T00:00:03Z",
         },
       },
     }));
@@ -238,7 +239,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
 
     await user.type(screen.getByLabelText("消息输入框"), "keep this draft");
     await user.click(screen.getByRole("button", { name: "设置" }));
-    await user.click(screen.getByRole("button", { name: "返回应用" }));
+    await user.click(await screen.findByRole("button", { name: "返回应用" }));
 
     expect(screen.getByLabelText("消息输入框")).toHaveValue("keep this draft");
   });
@@ -250,7 +251,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
     await user.type(screen.getByLabelText("消息输入框"), "extension draft");
     await user.click(screen.getByRole("button", { name: "打开面板" }));
     await user.click(screen.getByRole("button", { name: "扩展" }));
-    expect(screen.getByRole("main", { name: "扩展内容" })).toBeVisible();
+    expect(await screen.findByRole("main", { name: "扩展内容" })).toBeVisible();
     expect(screen.getByRole("main", { name: "扩展内容" }).parentElement).toHaveClass("pt-[var(--window-chrome-strip-height)]");
     expect(screen.getByRole("navigation", { name: "会话" })).toBeVisible();
     expect(screen.queryByRole("separator", { name: "调整预览面板宽度" })).not.toBeInTheDocument();
@@ -266,7 +267,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
     await user.click(screen.getByRole("button", { name: "展开会话侧栏" }));
     await user.click(screen.getByRole("button", { name: "扩展" }));
     expect(screen.queryByTestId("compact-sidebar-overlay")).not.toBeInTheDocument();
-    expect(screen.getByRole("main", { name: "扩展内容" })).toBeVisible();
+    expect(await screen.findByRole("main", { name: "扩展内容" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "展开会话侧栏" }));
     await user.click(screen.getByRole("button", { name: "新建会话" }));
     expect(screen.getByLabelText("消息输入框")).toBeVisible();
@@ -386,7 +387,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
     await user.type(input, "keep this while inspecting the run");
     await user.click(screen.getByRole("button", { name: "查看执行轨迹" }));
 
-    expect(screen.getByTestId("trajectory-view")).toBeInTheDocument();
+    expect(await screen.findByTestId("trajectory-view")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "会话消息" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("消息输入框")).toHaveValue("keep this while inspecting the run");
 
@@ -421,14 +422,14 @@ describe("WorkbenchLayout narrow window behavior", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "查看执行轨迹" }));
-    expect(screen.getByTestId("trajectory-view")).toBeInTheDocument();
+    expect(await screen.findByTestId("trajectory-view")).toBeInTheDocument();
 
     rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-view-b" title="Session View B" messages={[{ kind: "assistant", id: "assistant-view-b", content: "B", createdAt: "2026-08-05T09:00:01.000Z" }]} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "查看执行轨迹" })).toBeInTheDocument());
 
     rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-view-a" title="Session View A" messages={[{ kind: "assistant", id: "assistant-view-a", content: "A", createdAt: "2026-08-05T10:00:01.000Z" }]} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "返回对话" })).toBeInTheDocument());
-    expect(screen.getByTestId("trajectory-view")).toBeInTheDocument();
+    expect(await screen.findByTestId("trajectory-view")).toBeInTheDocument();
   });
 
   it("lets the right panel use the wide-screen space left after protecting the conversation", async () => {
@@ -469,7 +470,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(screen.queryByRole("button", { name: "分析观测" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "使用统计" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "归档会话" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "返回应用" }));
+    await user.click(await screen.findByRole("button", { name: "返回应用" }));
     expect(screen.getByLabelText("消息输入框")).toBeInTheDocument();
   });
 });

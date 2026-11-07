@@ -94,6 +94,14 @@ export class ManagedRuns {
     return { sessionId, taskId: receipt.task.taskId, agentRunId: run?.runId ?? null,
       outcome: run?.state ?? task.state, value: run?.result ?? null, snapshot: this.sessions.snapshot(session) };
   }
+  /** Session release gate: true when the scheduler holds nothing that a closed handle would lose. */
+  canRelease(sessionId: string): boolean { return this.service.canRelease(sessionId); }
+  /** Drop scheduler state for an idle Session; the caller closes the handle afterwards. */
+  async release(sessionId: string): Promise<boolean> {
+    const released = await this.service.release(sessionId);
+    if (released) this.#states.delete(sessionId);
+    return released;
+  }
   /** A message the user queued is waiting for this Session. */
   hasQueuedTask(sessionId: string): boolean { return (this.#states.get(sessionId)?.queue.length ?? 0) > 0; }
   isActive(sessionId: string): boolean { return this.#states.get(sessionId)?.runs.some(run => run.state === "running") ?? false; }

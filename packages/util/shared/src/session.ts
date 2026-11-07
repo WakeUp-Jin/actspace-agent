@@ -70,8 +70,11 @@ export type RuntimeStreamEvent =
   | { type: "user_message_steered"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; messageId: string }
   /** 唤醒回合领取了后台任务通知，回合以分隔行开头。 */
   | { type: "background_notice_claimed"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; messageId: string; notice: BackgroundNotice; content: string }
-  | { type: "assistant_text_delta"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; messageId: EventId; delta: string }
-  | { type: "assistant_thinking_delta"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; messageId: EventId; delta: string }
+  /** `liveRevision`：合并进这一帧的最后一段增量在实时底稿里的编号；恢复运行据此丢掉底稿已包含的帧。 */
+  | { type: "assistant_text_delta"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; messageId: EventId; delta: string; liveRevision?: number }
+  | { type: "assistant_thinking_delta"; sessionId: SessionId; agentRunId: AgentRunId; turnId: TurnId; llmCallId: LlmCallId; messageId: EventId; delta: string; liveRevision?: number }
+  /** 恢复运行（重载、重新观察）的起点：主进程或远程 Host 里还没定稿的正文与思考。 */
+  | { type: "live_output_baseline"; sessionId: SessionId; agentRunId: AgentRunId; revision: number; segments: readonly { kind: "text" | "thinking"; messageId: string; requestId?: string; text: string }[] }
   | {
       type: "tool_call_streaming";
       sessionId: SessionId;

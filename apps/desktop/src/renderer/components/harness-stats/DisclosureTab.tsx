@@ -1,4 +1,4 @@
-import { HARNESS_ACTIVE_PATH_LIMIT, HARNESS_INDEX_CONVERSION_STEPS, HARNESS_REREAD_WINDOW_STEPS, type HarnessStatsDisclosure } from "@actspace/shared";
+import { HARNESS_ACTIVE_PATH_LIMIT, type HarnessStatsDisclosure } from "@actspace/shared";
 import { Histogram } from "./harness-stats-charts";
 import { ACTIVE_HISTOGRAM_LABELS, DASH, SLEEP_HISTOGRAM_LABELS, STEPS_BETWEEN_LABELS, fmtDuration, fmtInt, fmtPct, fmtTokens } from "./harness-stats-format";
 import { Card, EmptyNote, Grid, KvList, Metric, MetricGrid, SecHead, Stack } from "./harness-stats-ui";
@@ -10,11 +10,11 @@ export function DisclosureTab({ data }: { data: HarnessStatsDisclosure }) {
   const lastActive = data.activeHistogram.length - 1;
   return (
     <Stack>
-      <SecHead title="活跃 / 睡眠路径" hint={`每次压缩算一个周期 · ${fmtInt(data.cycles)} 个周期`} />
+      <SecHead title="活跃 / 睡眠路径" hint={`${fmtInt(data.cycles)} 个周期`} />
       <MetricGrid label="披露指标">
-        <Metric label="活跃命中率" value={fmtPct(data.activeHitRate)} detail="进入活跃集合后，下个周期真的被读了" />
+        <Metric label="活跃命中率" value={fmtPct(data.activeHitRate)} />
         <Metric label="睡眠唤醒" value={`${fmtInt(data.sleepingReads)} 次`} detail={`占睡眠路径 ${fmtPct(data.wakeShare)} · 平均睡 ${data.avgSleepCycles == null ? DASH : data.avgSleepCycles.toFixed(1)} 个周期`} />
-        <Metric label="误睡" value={fmtPct(data.misSleepRate)} detail="刚睡下，下个周期就被唤醒" />
+        <Metric label="误睡" value={fmtPct(data.misSleepRate)} />
         <Metric
           label="索引占用"
           value={data.indexTokensAvg == null ? DASH : `${fmtInt(data.indexTokensAvg)} token`}
@@ -42,7 +42,7 @@ export function DisclosureTab({ data }: { data: HarnessStatsDisclosure }) {
         </Card>
       </Grid>
       {data.topPaths.length > 0 ? (
-        <Card title="读取最多的睡眠路径" hint={`睡着之后又被读了几次 · 前 ${data.topPaths.length} 个`}>
+        <Card title="读取最多的睡眠路径" hint={`前 ${data.topPaths.length} 个`}>
           <KvList rows={data.topPaths.map((item) => ({ label: <span className="break-all font-mono text-act-xs">{item.path}</span>, value: `${fmtInt(item.reads)} 次` }))} />
         </Card>
       ) : null}
@@ -52,7 +52,7 @@ export function DisclosureTab({ data }: { data: HarnessStatsDisclosure }) {
         <Metric label="压缩次数" value={fmtInt(c.count)} detail={`自动 ${fmtInt(c.auto)} · 手动 ${fmtInt(c.manual)} · 失败 ${fmtInt(c.failed)}`} />
         <Metric label="压缩比" value={fmtPct(ratio)} detail={c.avgBeforeTokens != null && c.avgAfterTokens != null ? `平均 ${fmtTokens(c.avgBeforeTokens)} → ${fmtTokens(c.avgAfterTokens)} token` : undefined} />
         <Metric label="平均耗时" value={c.avgDurationMs == null ? DASH : fmtDuration(c.avgDurationMs)} detail={c.avgAfterTokens != null ? `压缩后平均 ${fmtTokens(c.avgAfterTokens)} token` : undefined} />
-        <Metric label="压缩后重读" value={fmtPct(c.rereadRate)} detail={`${HARNESS_REREAD_WINDOW_STEPS} 步内重读压缩前读过的文件`} />
+        <Metric label="压缩后重读" value={fmtPct(c.rereadRate)} />
       </MetricGrid>
       <Grid cols={2}>
         <Card title="两次压缩之间隔了几步">
@@ -71,7 +71,6 @@ export function DisclosureTab({ data }: { data: HarnessStatsDisclosure }) {
           ]} />
         </Card>
       </Grid>
-      <p className="m-0 text-act-xxs text-text-faint">「查索引之后读了索引里的文件」按查索引后 {HARNESS_INDEX_CONVERSION_STEPS} 步内计算。</p>
     </Stack>
   );
 }

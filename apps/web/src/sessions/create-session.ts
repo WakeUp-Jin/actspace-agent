@@ -1,6 +1,6 @@
 import type { HostClient } from "@actspace/client/host";
 
-// 新建会话流程（front-web-pwa客户端规范 §9.2）：create → 模式 → 模型 → submit。
+// 新建会话流程（front-web-pwa客户端规范 §8.2）：create → 模式 → 模型 → submit。
 export type NewSessionMode = "agent" | "plan" | "chat";
 export type CreateStep = "create" | "mode" | "configure" | "submit";
 export type CreateInput = {

@@ -31,7 +31,9 @@ describe("DeleteFileBlock", () => {
 
     const row = screen.getByRole("article");
     expect(row).toHaveClass("approval");
-    expect(screen.getByText("等待确认")).toBeInTheDocument();
+    // 审批卡只有一个框：上方不再有「等待确认」文字行，语义只留在容器的可访问名称上。
+    expect(screen.queryByText("等待确认")).toBeNull();
+    expect(row).toHaveAccessibleName("等待确认");
     expect(screen.getByRole("button", { name: "删除" })).toHaveClass("bg-danger");
     expect(screen.getByText("notes.md")).toBeInTheDocument();
     // 通用删除提示不重复展示，也不提供会话级授权。

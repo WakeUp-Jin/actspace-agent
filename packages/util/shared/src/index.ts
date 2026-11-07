@@ -57,5 +57,9 @@ export * from "./custom-model-reasoning";
 export * from "./custom-connection-address";
 
 export * from "./context-projection";
+export * from "./context-entries";
+export * from "./request-record";
+export * from "./context-estimate";
+export * from "./token-estimate";
 
 export * from "./performance";

@@ -170,7 +170,7 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
         plain
         title="模型"
         headingLevel={3}
-        description={models.length > 0 ? `${models.length} 个，都会出现在对话框和「用途」里` : "加进来的模型会出现在对话框和「用途」里"}
+        description={models.length > 0 ? `${models.length} 个` : undefined}
         action={(
           <Button ref={fetchTriggerRef} busy={fetching} disabled={fetching} onClick={() => void fetchModels()}>
             {fetching ? null : <Download size={13} aria-hidden="true" />}
@@ -181,14 +181,14 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
         <div className="flex flex-col gap-2">
           {fail ? (
             <div role="alert" className="flex items-start gap-2 rounded-act-md bg-warning-soft py-2.5 pl-3 pr-1.5 text-act-xs leading-relaxed text-on-warning">
-              <span className="min-w-0 flex-1">没拿到模型列表：{fail}<br />可以按模型 ID 手动添加，下面已经帮你打开了。</span>
+              <span className="min-w-0 flex-1">没拿到模型列表：{fail}</span>
               <IconButton label="关闭提示" tooltip={false} variant="inherit" size="xs" onClick={() => setFail(null)}><X size={13} aria-hidden="true" /></IconButton>
             </div>
           ) : null}
           {cards}
           {empty ? (
             <div className="rounded-act-lg border border-dashed border-line-strong px-4 py-6 text-center text-act-xs leading-relaxed text-text-faint">
-              还没有模型。<br />点「获取可用模型」勾选要用的，或者手动添加。
+              还没有模型。
             </div>
           ) : null}
           {drafting ? (
@@ -224,7 +224,7 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
                 }}
               />
             </UnitBox>
-            <span className="min-w-0 text-act-xs text-text-faint">中转站打几折就填几，手填的价格不乘倍率。</span>
+            <span className="min-w-0 text-act-xs text-text-faint">手填的价格不乘倍率</span>
             {saved.field === "multiplier" ? <SavedMark key={saved.tick} /> : null}
           </FieldRow>
         ) : null}
@@ -238,7 +238,6 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
         <FetchModelsDialog
           returnFocus={fetchTriggerRef}
           label={connection.label}
-          fresh={models.length === 0}
           probe={pick}
           onClose={() => setPick(null)}
           onAdd={addPicked}
@@ -408,7 +407,7 @@ function DeleteRow({ onDelete }: { onDelete: () => Promise<void> }) {
   useEffect(() => () => window.clearTimeout(timer.current), []);
   return (
     <FieldRow label="删除连接">
-      <span className="min-w-0 flex-1 text-act-xs text-text-faint">{armed ? "再点一次确认。历史会话和用量记录会保留。" : "这个连接和它的模型都会移除，历史会话不受影响。"}</span>
+      <span className="min-w-0 flex-1 text-act-xs text-text-faint">{armed ? "再点一次确认，历史会话保留" : "连接及其模型都会移除"}</span>
       <Button
         variant={armed ? "danger-solid" : "danger"}
         onClick={() => {

@@ -4,7 +4,7 @@
 
 本次真实 Provider 验收再次出现两次 `TOOL_EXECUTION_FAILED / DURABILITY_BLOCKED / phase=body`。两个子会话各有一次 completed 的 read_file，父工具却失败。父轨迹能够正确关联并显示这些子工具及各自 Schema，因此“子工具缺失”修复与“委派整体成功”必须分开判断。
 
-主机检查确认这不是“没有执行工具”的情况。TaskLedger 会将提交/投影/flush 阶段的失败统一包装为 DURABILITY_BLOCKED，现有持久化 failure 没有保留底层 cause，当前证据不足以认定具体根因。此问题此前已在[原验收问题 OBS-01](../20261018-trajectory-system-prompt/acceptance-issues-20261018.md)出现，本次没有修改存储模块来猜测修复。
+主机检查确认这不是“没有执行工具”的情况。TaskLedger 会将提交/投影/flush 阶段的失败统一包装为 DURABILITY_BLOCKED，现有持久化 failure 没有保留底层 cause，当前证据不足以认定具体根因。此问题此前已在原验收问题 OBS-01（原始记录已清理，见 git 历史）出现，本次没有修改存储模块来猜测修复。
 
 本地脱敏结构证据：`tmp/codex-acceptance/20261018-trajectory-context/runtime-evidence.json`。后续应在 TaskLedger 失败点保留底层 cause 的脱敏诊断，用独立的委派持久化测试复现。
 

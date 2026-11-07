@@ -22,7 +22,7 @@ AgentService 增加 provider-owned Ledger 的显式登记：snapshot 返回该 L
 - Runtime 定向 5 项通过；实际 Harness 子执行期间读取 Host tasks，验证仍 running、事件数量不变并最终完成。
 - Subagent 全量 12 项通过，包含失败、取消与资源释放路径。
 - Desktop 依赖闭包构建通过。
-- 真实 Electron 定向复验见[验收记录](acceptance.md)。
+- 真实 Electron 定向复验见验收记录（原始记录已清理，见 git 历史）。
 
 ## 同类路径排查
 

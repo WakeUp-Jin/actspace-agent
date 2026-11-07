@@ -24,10 +24,7 @@ export function TurnUsagePill({ usage }: { usage: TurnUsageSummary | undefined }
   rows.push(["未缓存输入", model.input]);
   rows.push(["缓存读取", model.cacheRead]);
   rows.push(["缓存写入", model.cacheWrite]);
-  rows.push([
-    "输出",
-    model.reasoning ? <>{model.output}<span className={STAT_NOTE_CLASS}>（其中推理 {model.reasoning}）</span></> : model.output,
-  ]);
+  rows.push(["输出", model.output]);
   rows.push([
     "花费",
     model.cost.kind === "known" && model.cost.estimated

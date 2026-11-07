@@ -4,7 +4,7 @@
 
 ## 必读与范围
 
-先读 `AGENTS.md`、[总计划](README.md)、[页面设计](../../../design-docs/frontend/front-usage-statistics-refresh.md)、`docs/FRONTEND.md`、`docs/FRONTEND_VERIFICATION.md`、主题与全局视觉规范。Maka 只用于结构参考；颜色/字号/控件以 ActSpace 为准。
+先读 `AGENTS.md`、[总计划](README.md)、[页面设计](../design-archive/frontend/front-usage-statistics-refresh.md)、`docs/FRONTEND.md`、`docs/FRONTEND_VERIFICATION.md`、主题与全局视觉规范。Maka 只用于结构参考；颜色/字号/控件以 ActSpace 为准。
 
 ## 文件与实施任务
 

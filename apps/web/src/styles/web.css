@@ -1,4 +1,4 @@
-/* V1 专用的材质与动效（front-web-pwa客户端规范 §10）。颜色只引用 --act-* / --web-*。 */
+/* V1 专用的材质与动效（front-web-pwa客户端规范 §9）。颜色只引用 --act-* / --web-*。 */
 
 .glass {
   background: var(--act-color-surface);

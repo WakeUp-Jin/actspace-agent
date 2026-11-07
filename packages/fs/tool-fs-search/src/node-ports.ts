@@ -4,7 +4,9 @@ import { basename, isAbsolute, relative, resolve } from "node:path";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
-const MAX_SEARCH_OUTPUT_CHARS = 128_000;
+// 单次输出上限：一次宽泛的 grep 很容易命中几百行，全部进模型上下文和会话日志。截断时提示模型缩小范围。
+const MAX_SEARCH_OUTPUT_CHARS = 64_000;
+const TRUNCATED_NOTE = "\n\n[Output truncated at 64,000 characters. Narrow the search with a more specific pattern, a path, or a glob.]";
 const MAX_GREP_RESULTS = 100;
 const MAX_GLOB_RESULTS = 200;
 const RG_TIMEOUT_MS = 15_000;
@@ -29,7 +31,7 @@ async function grepTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, cont
     if (result.exitCode !== 0) return failure("SEARCH_FAILED", result.error || `ripgrep exited with code ${result.exitCode}`);
     const lines = result.stdout.trim().split("\n").filter(Boolean);
     const normalized = lines.map((line) => normalizeSearchLine(line, workspaceRoot)).join("\n");
-    const suffix = result.truncated ? "\n\n[Output truncated by ripgrep runner]" : "";
+    const suffix = result.truncated ? TRUNCATED_NOTE : "";
     return completed(`Found ${lines.length} match${lines.length === 1 ? "" : "es"}:\n\n${normalized}${suffix}`, `Found ${lines.length} matches`);
   } catch (error) {
     return ioFailure("search", pathArg, error);
@@ -59,7 +61,7 @@ async function globTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, cont
     entries.sort((left, right) => right.mtimeMs - left.mtimeMs || left.path.localeCompare(right.path));
     const limited = entries.slice(0, MAX_GLOB_RESULTS);
     const text = limited.map((entry) => `${entry.path} | size: ${entry.size < 0 ? "unknown" : formatBytes(entry.size)} | modified: ${entry.mtimeMs > 0 ? new Date(entry.mtimeMs).toISOString() : "unknown"}`).join("\n");
-    const suffix = entries.length > MAX_GLOB_RESULTS ? `\n\n[Showing first ${MAX_GLOB_RESULTS} of ${entries.length} files.]` : result.truncated ? "\n\n[Output truncated by ripgrep runner]" : "";
+    const suffix = entries.length > MAX_GLOB_RESULTS ? `\n\n[Showing first ${MAX_GLOB_RESULTS} of ${entries.length} files.]` : result.truncated ? TRUNCATED_NOTE : "";
     return completed(`Found ${entries.length} file${entries.length === 1 ? "" : "s"} matching "${pattern}":\n\n${text}${suffix}`, `Found ${entries.length} files`);
   } catch (error) {
     return ioFailure("glob", pathArg, error);

@@ -1,8 +1,8 @@
 import { disclosurePaths, disclosureSummary, contextPathsPage } from "./context-paths";
 import type { ContextPathsInput, ContextPathsPage } from "@actspace/shared";
 import { createHash } from "node:crypto";
-import type { ContextEntriesInput, ContextEntriesPage, ContextEntryInput, ContextEntryText, ContextPanelEntry, ContextPanelHistory, ContextPanelResponse, ContextPanelView, DescribeContextPanelInput, ManagedContextProjection, ContextState } from "@actspace/shared";
-import { getContextBucketDisplay } from "@actspace/shared";
+import type { ContextEntriesInput, ContextEntriesPage, ContextEntryInput, ContextEntryText, ContextEstimateView, ContextPanelEntry, ContextPanelHistory, ContextPanelResponse, ContextPanelView, ContextSurfaceNodeInput, DescribeContextPanelInput, ManagedContextProjection } from "@actspace/shared";
+import { contextEstimateSummaryKeys, describeConversationNode } from "@actspace/shared";
 import type { UsageReadModelService } from "./usage-read-model";
 import type { DesktopRuntimeV2Registry } from "./runtime-registry";
 
@@ -12,11 +12,12 @@ const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(va
  * wait for global indexing, recover a Session or initiate Context assembly. */
 export class ContextPanelService {
   #views = new Map<string, Current>();
-  constructor(private readonly runtime: Pick<DesktopRuntimeV2Registry, "readContextProjection" | "readContextEntryText" | "sessionQuerySource">, private readonly history: UsageReadModelService) {}
+  constructor(private readonly runtime: Pick<DesktopRuntimeV2Registry, "readContextProjection" | "readContextEntryText" | "sessionQuerySource" | "readSessionProjectionValue">, private readonly history: UsageReadModelService) {}
   async describe(input: DescribeContextPanelInput): Promise<ContextPanelResponse | null> {
     const { sessionId } = input;
     if (input.release) { if (input.consumerId) this.history.releaseContext(sessionId, input.consumerId); return null; }
     const projection = await this.#projection(sessionId);
+    const estimate = await this.#estimate(sessionId);
     let source: Awaited<ReturnType<DesktopRuntimeV2Registry["sessionQuerySource"]>> = null;
     let sourceError = false;
     try { source = await this.runtime.sessionQuerySource(sessionId); } catch { sourceError = true; }
@@ -28,7 +29,9 @@ export class ContextPanelService {
       indexedThroughSeq: indexed?.indexedThroughSeq ?? result?.revision ?? -1, targetThroughSeq: source?.throughSeq ?? -1, indexGeneration: result?.generation ?? "uninitialized",
       ...(sourceError || indexed?.error ? { error: "历史索引暂不可用，请重试。" } : {}),
     };
-    const currentVersion = projection ? digest([projection.instanceGeneration ?? "legacy", projection.contextRevision, projection.throughJournalSeq, projection.model, projection.manifest?.estimatorVersion]) : `last-request:${result?.generation ?? "none"}:${result?.revision ?? -1}`;
+    const currentVersion = estimate || projection
+      ? digest([estimate?.throughJournalSeq ?? null, estimate?.estimatorVersion ?? null, projection?.instanceGeneration ?? null, projection?.contextRevision ?? null, projection?.throughJournalSeq ?? null, projection?.model ?? null])
+      : `last-request:${result?.generation ?? "none"}:${result?.revision ?? -1}`;
     const versionToken = digest([currentVersion, history, result?.previous?.requestId ?? null]);
     const historyVersion = digest([result?.generation, result?.revision, result?.previous?.requestId]);
     const cached = this.#views.get(sessionId);
@@ -36,23 +39,27 @@ export class ContextPanelService {
       cached.view.versionToken = versionToken; cached.view.history = history;
       return { notModified: true, versionToken, history };
     }
-    const manifest = projection?.manifest;
     const prior = result?.previous ?? null;
-    const entries = manifest?.entries ?? (prior?.entries ?? []).map(entry => ({ ...entry, title: entry.title ?? "最近请求输入" }));
+    // 总数、分类、非对话明细来自 contextEstimate 投影；对话明细按需现算（agent-spec-request-record.md §6.3.2）。
+    const described = estimate ? await this.#currentEntries(sessionId, estimate, projection) : null;
+    const entries = described?.entries ?? (prior?.entries ?? []).map(entry => ({ ...entry, title: entry.title ?? "最近请求输入" }));
+    // 对比上一次请求：非对话项来自历史投影；对话项不逐条存，当前对话里在那次请求之前已有的项就是当时的项，之后的算新增。
+    const priorSeq = prior?.seq;
+    const previousEntries = prior ? [...prior.entries, ...(described && priorSeq !== undefined ? entries.filter(entry => (described.conversationSeqs.get(entry.key) ?? Infinity) <= priorSeq).map(({ key, bucket, estimatedTokens, title, kind, trajectoryRef }) => ({ key, bucket, estimatedTokens, title, ...(kind ? { kind } : {}), ...(trajectoryRef ? { trajectoryRef } : {}) })) : [])] : [];
     // 累计数字只在索引追上日志时给出，避免显示半截的统计。
     const caughtUp = !!result && (history.status === "ready" || history.status === "fallback") && result.revision >= history.targetThroughSeq;
     const view: ContextPanelView = {
       schemaVersion: 2, sessionId, logicalAgentScopeId: projection?.identity.logicalAgentScopeId ?? result?.logicalAgentScopeId ?? `main:${sessionId}`,
-      contextRevision: projection?.contextRevision ?? 0, throughJournalSeq: projection?.throughJournalSeq ?? result?.revision ?? -1,
-      currentVersion, versionToken, history, disclosure: disclosureSummary(projection, currentVersion), model: projection?.model ?? result?.model ?? null,
-      current: { basis: projection ? "current-context" : prior ? "last-request" : "unavailable", status: manifest ? "ready" : prior ? "stale" : "unavailable", totalEstimatedTokens: manifest?.totalEstimatedTokens ?? prior?.totalEstimatedTokens ?? 0, buckets: manifest?.buckets ?? prior?.buckets ?? {}, entries: [] },
+      contextRevision: projection?.contextRevision ?? 0, throughJournalSeq: Math.max(estimate?.throughJournalSeq ?? -1, projection?.throughJournalSeq ?? -1, estimate || projection ? -1 : result?.revision ?? -1),
+      currentVersion, versionToken, history, disclosure: disclosureSummary(projection, currentVersion), model: estimate?.model ?? projection?.model ?? result?.model ?? null,
+      current: { basis: estimate ? "current-context" : prior ? "last-request" : "unavailable", status: estimate ? "ready" : prior ? "stale" : "unavailable", totalEstimatedTokens: estimate?.totalEstimatedTokens ?? prior?.totalEstimatedTokens ?? 0, buckets: estimate ? { ...estimate.buckets } : prior?.buckets ?? {}, entries: [] },
       previous: prior ? { ...prior, entries: [] } : null,
       stats: caughtUp ? result.stats : null,
       bash: caughtUp ? result.bash : null,
       trend: result?.trend ?? [], events: result?.events ?? [], ...(result ? { limits: result.limits } : {}),
     };
     const entriesVersion = digest([currentVersion, result?.generation ?? null, prior?.requestId ?? null]);
-    const current: Current = { historyVersion, projection, version: entriesVersion, entries, previous: prior?.entries ?? [], view };
+    const current: Current = { historyVersion, projection, version: entriesVersion, entries, previous: previousEntries, view };
     this.#views.delete(sessionId); this.#views.set(sessionId, current);
     while (this.#views.size > 16) this.#views.delete(this.#views.keys().next().value!);
     // Default page keeps the latest messages; totals were computed before paging.
@@ -68,6 +75,33 @@ export class ContextPanelService {
     }
     if (Buffer.byteLength(JSON.stringify(view)) > 1024 * 1024) throw new Error("Context response exceeds 1 MiB.");
     return view;
+  }
+  async #estimate(sessionId: string): Promise<ContextEstimateView | null> {
+    try { return (await this.runtime.readSessionProjectionValue(sessionId, "contextEstimate") as ContextEstimateView | undefined) ?? null; }
+    catch { return null; }
+  }
+  /**
+   * 非对话项用投影的估算，预览、全文向在线引擎按 key 取；对话项引擎在线时用引擎实例，
+   * 否则用日志折叠出的当前对话现算。只在打开面板、翻页时算。
+   */
+  async #currentEntries(sessionId: string, estimate: ContextEstimateView, projection: ManagedContextProjection | null): Promise<{ entries: ContextPanelEntry[]; conversationSeqs: Map<string, number> }> {
+    const engine = new Map((projection?.manifest?.entries ?? []).map(entry => [entry.key, entry]));
+    const staticEntries = estimate.entries.map(entry => {
+      const live = engine.get(entry.key);
+      return { ...entry, ...(live?.preview ? { preview: live.preview } : {}), ...(live?.fullTextAvailable ? { fullTextAvailable: true } : {}) };
+    });
+    let surface: { readonly entries?: readonly { readonly node: ContextSurfaceNodeInput; readonly sourceEventSeqs?: readonly number[] }[] } | undefined;
+    try { surface = await this.runtime.readSessionProjectionValue(sessionId, "surface") as typeof surface; } catch { surface = undefined; }
+    // 每个对话项最晚的来源 seq，用来和上一次请求对比。
+    const summaryKeys = contextEstimateSummaryKeys(estimate);
+    const conversationSeqs = new Map<string, number>();
+    const journal: ContextPanelEntry[] = [];
+    for (const item of surface?.entries ?? []) {
+      const seq = Math.max(-1, ...(item.sourceEventSeqs ?? []));
+      for (const { entry } of describeConversationNode(item.node, summaryKeys.get(item.node.messageId))) { conversationSeqs.set(entry.key, seq); journal.push(entry); }
+    }
+    const live = projection?.manifest?.entries.filter(entry => entry.bucket === "conversation" || entry.bucket === "summarizedConversation");
+    return { entries: [...staticEntries, ...(live ?? journal)], conversationSeqs };
   }
   async #projection(sessionId: string): Promise<ManagedContextProjection | null> {
     // A retired or incompatible live Harness must not hide durable request
@@ -124,14 +158,5 @@ export class ContextPanelService {
     while (Buffer.byteLength(JSON.stringify(page)) > 200 * 1024 && selected.length > 1) { selected = selected.slice(Math.ceil(selected.length / 2)); page = materialize(); }
     if (Buffer.byteLength(JSON.stringify(page)) > 1024 * 1024) throw new Error("Context page exceeds 1 MiB.");
     return page;
-  }
-  /** Composer reuses the same light projection and never reads the full Journal. */
-  async describeComposer(sessionId: string): Promise<ContextState | null> {
-    const projection = await this.#projection(sessionId);
-    const cached = this.#views.get(sessionId)?.view;
-    const manifest = projection?.manifest ?? (cached?.previous ? { ...cached.previous, estimatorVersion: cached.previous.estimatorVersion ?? "legacy" } : null);
-    if (!manifest) return null;
-    const maxTokens = projection?.model?.contextWindow ?? cached?.model?.contextWindow ?? 0;
-    return { sessionId, throughJournalSeq: projection?.throughJournalSeq ?? cached?.throughJournalSeq, updatedAt: new Date().toISOString(), basis: projection ? "current-request" : "last-request", estimator: { name: "context-engine", version: manifest.estimatorVersion }, totalEstimatedTokens: manifest.totalEstimatedTokens, maxTokens, percentUsed: maxTokens > 0 ? Math.min(100, manifest.totalEstimatedTokens / maxTokens * 100) : 0, buckets: Object.entries(manifest.buckets).map(([name, tokens]) => ({ key: name as import("@actspace/shared").ContextUsageBucketName, name: name as import("@actspace/shared").ContextUsageBucketName, label: getContextBucketDisplay(name).label, tokens })), entries: [] };
   }
 }

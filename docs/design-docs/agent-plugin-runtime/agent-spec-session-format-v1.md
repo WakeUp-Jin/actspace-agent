@@ -1,10 +1,8 @@
 # ActSpace Session Format v1 规范
 
-> 状态：v2 Session 逻辑契约已固定，可作为 execution plan 和 golden fixtures 的输入。
+> v2 Session 逻辑契约，可作为 execution plan 和 golden fixtures 的输入。
 >
 > 本文固定 Session 的领域语义、规范存储形态、兼容性状态和持久化保证。文件锁实现、`fsync` 调用序列、原子发布算法等平台细节留给 execution plan，但实现不得削弱本文定义的可观察语义。
->
-> 规范日期：2026-08-22。
 >
 > 本文维护 Header、Envelope、JSONL Provider 格式与兼容性边界；事件词汇见[事件模型](agent-spec-dsh-event-model.md)，Session/存储所有权见[存储规范](agent-spec-session-core-persistence-separation.md)，用户队列见[Task/Run](agent-task-run-lifecycle.md)。
 
@@ -136,7 +134,7 @@ Header 后的每条记录使用统一 envelope：
 | `time` | Session 接纳事件时冻结的 RFC3339 时间；不作为排序依据 |
 | `source` | 事件所有者以及可选 Agent、Turn、Step identity |
 | `data` | 通过 codec 校验后冻结的 lossless JSON value |
-| `surface` | 无 Surface 变化时为 `null`，否则是核心定义的 append 或 replace operation |
+| `surface` | 无 Surface 变化时为 `null`，否则是核心定义的 append 或 replace 标记；标记不带节点，节点由 `surfaceNode(event)` 从 `data` 推出（[对话内容只存一份](agent-spec-surface-derived.md)），带 `node` 的旧格式按不可读拒绝 |
 | `provenance` | 形成本事实或 Surface node 的源事件、contributor 和 runtime selection 引用 |
 
 接纳边界必须先完成 codec、关系、Surface operation、大小限制和 secret policy 校验，再把整个不可变 event 分配给下一个 `seq`。验证失败不能消耗 `seq`，也不能留下半条逻辑事实。
@@ -298,7 +296,7 @@ Desktop 与显式持久化的 CLI run 共享 Session root 时，持久 Session �
 - 成功持有 lease 的进程才可 append、repair、compact 或提交 fork source transaction；
 - lease identity 至少关联 Session、Host process identity 和本次 writer instance；
 - 第二个 writer 不能偷取仍健康的 lease，也不能降级为无锁 append；
-- stale lease recovery 必须先证明原 writer 已失效，并记录结构化诊断；
+- stale lease recovery 必须先证明原 writer 已失效，并记录结构化诊断；当前实现以持有进程已不存在（`kill(pid, 0)` 返回 ESRCH）为证明，进程退出后立即接管，不等心跳过期；旧 owner 记录移到 `recovery/stale-lock-<nonce>`；
 - lease 丢失后当前 writer 立即 fail closed，未确认 durable 的 batch 不得被报告为成功；
 - browse/export 始终可以并发只读，但必须只读取一个经过验证的完整前缀。
 
@@ -379,7 +377,7 @@ Header 只承担创建时 provenance。所有会影响后续模型输入或副�
 - 超过记录大小、递归深度或字符串限制的事件应在分配 `seq` 前拒绝，不能静默截断；
 - cwd、用户文本、tool output 和 attachment ref 可能含敏感信息，export 必须显式区分 lossless canonical export 与经过脱敏的分享 export。
 
-v2 插件按受信任同进程代码处理；EventCodecRegistry 不是不可信代码沙箱。信任边界见 [Cordis 运行时采用决策](./agent-decision-cordis-adoption.md)。
+v2 插件按受信任同进程代码处理；EventCodecRegistry 不是不可信代码沙箱。信任边界见 [Cordis 运行时采用决策](./agent-harness-host-refactor-decisions.md)。
 
 ## 18. 版本轴与升级
 

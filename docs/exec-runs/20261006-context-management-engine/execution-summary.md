@@ -44,7 +44,7 @@ flowchart LR
 | 旧 Session 兼容 | JSONL 原文件 bytes、seq、Surface 在只读转换前后相同 |
 | 恢复与规模 | 0/1/100/101/10000 引用，候选分批与缺批，core 事务持久前缀，候选 flush/索引/applied 故障，重启/fork、去重与索引稳定均有 fixture |
 | 真实 Electron | 原无 Provider 空态检查保留；本轮独立目录复用授权配置，真实Electron验证普通请求、模式、附件、模型切换、停止、手动/自动压缩、重读、权限、重启和fork |
-| 真实 Provider、U1–U8 全链路 | 本轮完成35次真实请求和53份输入快照核对，确认路径采集、历史引用、索引、fork热度、英语开启、任务投影累计容量、自动压缩比例问题；逐项状态见 [真实桌面报告](real-desktop-acceptance-20261006.md) 和 [实际数据证据](real-desktop-data-evidence-20261006.md)。不能用转换一致代替功能全部通过 |
+| 真实 Provider、U1–U8 全链路 | 本轮完成35次真实请求和53份输入快照核对，确认路径采集、历史引用、索引、fork热度、英语开启、任务投影累计容量、自动压缩比例问题；逐项状态见 [真实桌面报告](real-desktop-acceptance-20261006.md) 和 实际数据证据（原始记录已清理，见 git 历史）。不能用转换一致代替功能全部通过 |
 
 故障注入验证 Journal 编码/投影和模拟持久边界；不等同于在每个指令位置实际杀进程或掉电。消息前缀与补充去重有自动化证据，未测 provider cache 命中率或真实摘要质量。
 
@@ -58,7 +58,7 @@ flowchart LR
 
 ## 后续修复与复验
 
-首轮确认B2–B6、B8、B9共7项问题，见[真实桌面报告](real-desktop-acceptance-20261006.md)、[数据证据](real-desktop-data-evidence-20261006.md)及[值核对JSON](real-desktop-value-checks-20261006.json)。用户随后批准修复：上述7项及新发现的两层启动锁问题B10已完成修复与定向复验，最新状态以[修复摘要](../20261006-context-acceptance-bugfix/execution-summary.md)为准；B1/B7仍保留未确认。以下保留首轮验收边界。
+首轮确认B2–B6、B8、B9共7项问题，见[真实桌面报告](real-desktop-acceptance-20261006.md)、数据证据（原始记录已清理，见 git 历史）及值核对JSON（原始记录已清理，见 git 历史）。用户随后批准修复：上述7项及新发现的两层启动锁问题B10已完成修复与定向复验，最新状态以[修复摘要](../20261006-context-acceptance-bugfix/execution-summary.md)为准；B1/B7仍保留未确认。以下保留首轮验收边界。
 
 尚未覆盖真正Provider自动重试、压缩失败/取消、英语启用后的作用域/关闭/语音；空压缩数据no-op正确，但未看到明确UI反馈。首轮暂停候选在后续正常重启未复现。输入转换一致和自动提交成功不能代替上述失败或缺口。没有测Provider缓存命中率。
 

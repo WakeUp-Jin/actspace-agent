@@ -1,21 +1,280 @@
-# 学习文档
+# 学习文档索引
 
-`docs/learnings/` 用来沉淀开发过程中值得深入理解的技术知识——把精华知识从代码变更中提炼出来，变成面向开发者自己的教程。
+`docs/learnings/` 沉淀开发中反复出现、且读代码读不出来的技术教训：为什么这样设计、哪里容易错、怎么自检。读者是开发者本人。
 
-## 目录与命名
+- 格式：只用 Markdown。新增前先在本页按主题找同类文章，能扩写就不要新建，规则见 [WRITING_GUIDE.md](WRITING_GUIDE.md)。
+- 目录：`docs/learnings/YYYY-MM/`，月份目录表示文章首次写入的时间。
+- 命名：新文章用 `topic-slug.md`（英文 kebab-case，不带日期前缀）；历史文章保留原有的 `YYYYMMDD-topic-slug.md`，不批量改名，避免大量外部引用失效。
+- 本页按主题分组，每篇一行，日期为文章首次写入的月份或日期；合并过的文章在正文开头注明合并来源。
+- 2026-11-04 文档整理把 323 篇合并去重为 225 篇（含 HTML 全部转为 Markdown），详见[整理计划](../exec-plans/completed/20261104-docs-reorg.md)。
 
-- 目录：`docs/learnings/YYYY-MM/`
-- 文件名：`YYYYMMDD-topic-slug.html` 或 `YYYYMMDD-topic-slug.md`
+## Agent 运行时、插件与架构分层（34）
 
-```text
-docs/learnings/
-  2026-05/
-    20260520-strategy-pattern.html
-    20260520-closure-traps.html
-    20260520-event-driven-arch.md
-```
+Harness / Runtime / Host 的边界，Cordis 插件所有权与生命周期，设置与配置的所有权。
 
-## 触发与编写
+- 2026-05 [Agent Runtime 模块化架构模式](2026-05/agent-runtime-modular-architecture.md)
+- 2026-05 [用一次性 Snapshot 让 Agent 可观测：按需拉取 + Sheet 临时展示模式](2026-05/agent-transparent-inspection-via-sheet.md)
+- 2026-05 [附加诊断信息不应成为主架构](2026-05/auxiliary-info-must-not-drive-architecture.md)
+- 2026-05 [Provider 原生能力与 Agent 工具不要混在一起](2026-05/provider-native-vs-agent-tools.md)
+- 2026-05 [Runtime 空态和测试 Fixture 要分边界](2026-05/runtime-empty-state-vs-test-fixture.md)
+- 2026-05 [设置真来源要和运行时适配层分开](2026-05/settings-source-of-truth-vs-runtime-adapters.md)
+- 2026-06 [运行时检查视图要复用真实 Loader](2026-06/runtime-inspection-reuses-runtime-loaders.md)
+- 2026-07 [Agent Harness、Application Runtime 与 Host Adapter 为什么必须分层](2026-07/agent-harness-runtime-host-adapter-layering.md)
+- 2026-07 [Agent 模式必须是能力边界，而不是 Prompt 标签](2026-07/agent-mode-is-a-capability-boundary.md)
+- 2026-07 [控制面不能依赖运行时已就绪](2026-07/control-plane-must-not-depend-on-runtime-readiness.md)
+- 2026-07 [用输出目录作为专用 Agent 的 Workspace](2026-07/specialized-agent-output-root.md)
+- 2026-07-06 [反模式：用 LLM 中间层包装确定性能力](2026-07/20260706-llm-middleman-tool-antipattern.md)
+- 2026-07-09 [模型能力路由：不要用隐藏工具补齐主模型](2026-07/20260709-model-capability-routing.md)
+- 2026-07-09 [插件能力接入要同时完成运行时可用与 Agent 可见](2026-07/20260709-plugin-capability-needs-agent-visibility.md)
+- 2026-08 [应用与可复用包的 Workspace 边界](2026-08/application-and-library-workspace-boundaries.md)
+- 2026-08 [Cordis Service seam 与 durable checkpoint 的分层](2026-08/cordis-service-seams-and-durable-checkpoints.md)
+- 2026-08 [Durable Retry 与发布插件准入的两个边界](2026-08/durable-retry-and-published-plugin-admission.md)
+- 2026-08 [功能可用性不等于运行状态](2026-08/feature-availability-is-not-runtime-state.md)
+- 2026-08 [扁平 Tool Name 与 Plugin Provenance 必须分离](2026-08/flat-tool-name-and-plugin-provenance.md)
+- 2026-08 [平台数据根不是单个 Host 的实现细节](2026-08/platform-data-root-is-a-cross-host-contract.md)
+- 2026-08 [插件加载有两道不同的信任边界](2026-08/plugin-loading-has-data-and-code-trust-boundaries.md)
+- 2026-08 [用 Profile Context 边界替代 Universal Runtime Facade](2026-08/profile-context-boundary-replaces-universal-runtime-facade.md)
+- 2026-08 [从 ESM 模块到真实插件包：边界、生命周期与可诊断性](2026-08/real-plugin-package-boundary.md)
+- 2026-08-29 [DSH Runtime 的插件所有权迁移模式](2026-08/20260829-dsh-runtime-plugin-ownership.md)
+- 2026-08-29 [Opaque ScopeKey 与可等待静止的资源清理](2026-08/20260829-scope-key-and-quiescent-disposal.md)
+- 2026-08-30 [设置持久化的所有权分层与派生读模型](2026-08/20260830-settings-persistence-ownership-and-read-model.md)
+- 2026-09 [Cordis dispatch 返回 callback 后为什么必须复用同一个参数数组](2026-09/cordis-dispatch-callback-arguments.md)
+- 2026-09 [服务包装层需要独立契约测试](2026-09/service-wrapper-contract-tests.md)
+- 2026-09-25 [把输入校验失败当作结果](2026-09/20260925-ipc-validation-result.md)
+- 2026-09-26 [增量构建的两个边界](2026-09/20260926-typescript-build-graph-and-dev-watch.md)
+- 2026-09-28 [Agent 形态要有实例边界，模式要有执行边界](2026-09/20260928-agent-form-scope-and-mode-gate.md)
+- 2026-10-03 [插件/Harness 热更新：版本租约、选择与清理三件事分开](2026-10/20261003-harness-durable-selection.md)
+- 2026-10-04 [插件副作用的释放权：Effect 所有权、通知观察者生命周期、依赖顺序关闭](2026-10/20261004-notification-lifetime.md)
+- 2026-10-06 [进程边界的接口只写一份：从契约生成各端，生产者也受契约约束](2026-10/20261006-single-contract-bridge.md)
 
-- 什么时候该触发学习记录：见 `AGENTS.md`"阶段完成后的学习沉淀"。
-- 触发后如何编写：见 `docs/learnings/WRITING_GUIDE.md`。
+## 会话、事件、投影与读模型（50）
+
+Session Journal 的事实与视图、事件平面、投影一致性、派生索引与分页。
+
+- 2026-05 [会话历史的所有权回到 ConversationContext](2026-05/conversation-context-owns-history-recovery.md)
+- 2026-05 [SessionEvent 多 producer 共用 schema 的设计](2026-05/kairos-session-event-multi-producer.md)
+- 2026-05 [监控页 UI：事实列表负责定位，详情区负责解释](2026-05/monitoring-ui-fact-list-detail-split.md)
+- 2026-05 [聚合页的契约：scope 显式、分页只切明细、累计指标不靠采样集](2026-05/scope-must-be-explicit-when-aggregating-multi-source.md)
+- 2026-05 [Stream Log Aggregation](2026-05/stream-log-aggregation.md)
+- 2026-06 [事件回放重建上下文必须保真块顺序：tool_use 要收尾](2026-06/event-replay-must-preserve-block-order.md)
+- 2026-06 [增量观测的游标：计算与提交分离（at-least-once）](2026-06/observation-cursor-compute-commit-split.md)
+- 2026-06 [Sidecar Transcript：子智能体可观测但不污染主上下文，详情页再适配回主消息语法](2026-06/sidecar-transcript-for-subagents.md)
+- 2026-06 [Slash command 作为系统事件，而不是用户消息](2026-06/slash-command-as-system-event.md)
+- 2026-06 [系统事件不要混进普通消息 turn](2026-06/system-events-outside-message-turns.md)
+- 2026-06-02 [Agent inbox：把跨 Agent 通信建模成观察信号](2026-06/20260602-agent-inbox-observation-signal.md)
+- 2026-07 [原子 rename 不等于并发安全：唯一 tmp 名 + read-modify-write 串行化](2026-07/atomic-json-registry-write-transactions.md)
+- 2026-07 [观测 ID 必须跟随真实生命周期](2026-07/observability-identities-must-follow-lifecycles.md)
+- 2026-07 [计量按最细粒度的模型调用记录：不按渲染消息，也不依赖业务解析成功](2026-07/rendered-message-is-not-a-billing-boundary.md)
+- 2026-07 [会话 Fork 是结构化快照：复制事实、重建身份、同步资源所有权](2026-07/session-fork-is-a-structured-snapshot.md)
+- 2026-08 [诊断界面需要按决策顺序渐进披露](2026-08/diagnostic-interfaces-need-progressive-disclosure.md)
+- 2026-08 [派生索引字段变义时，必须显式迁移](2026-08/trace-summary-semantic-migration.md)
+- 2026-08 [Turn 产物应该是终态投影](2026-08/turn-artifacts-are-terminal-state-projections.md)
+- 2026-08-29 [Agent Runtime 的三条事件平面：事实、干预与通知](2026-08/20260829-dsh-event-planes-and-post-commit-replay.md)
+- 2026-08-30 [会话导航的临时历史与异步回滚](2026-08/20260830-session-history-rollback.md)
+- 2026-08-30 [Session Projection 的一致性水位、原子刷新与会话隔离](2026-08/20260830-session-projection-revision-and-client-store.md)
+- 2026-08-31 [从 Session Journal 重建事件级活动视图](2026-08/20260831-journal-activity-projection.md)
+- 2026-09 [客户端队列 × 服务端收件箱：交接失败时问服务端，而不是猜](2026-09/client-queue-server-inbox-handoff.md)
+- 2026-09 [Inbox Claim 也是 Durable Surface：不要只按事件类型投影消息](2026-09/inbox-claim-surface-projection.md)
+- 2026-09 [Projection Contributor 要先于恢复注册](2026-09/projection-contributor-must-precede-restore.md)
+- 2026-09 [工作耗时不能从提交时间推算](2026-09/work-duration-versus-commit-time.md)
+- 2026-09-07 [费用是带单位和依据的事实：0 不是未知，币种不跟随 UI 偏好](2026-09/20260907-cost-provenance.md)
+- 2026-09-07 [一个可执行文件存在，不代表应用缓存可用](2026-09/20260907-derived-app-cache-integrity.md)
+- 2026-09-07 [事件身份与组装结果要分开读取](2026-09/20260907-event-subject-and-prompt-candidate.md)
+- 2026-09-13 [Explored 归组与子 Agent 入口的消息建模](2026-09/20260913-explored-agent-stream-boundaries.md)
+- 2026-09-15 [相同单位不代表相同指标](2026-09/20260915-context-metric-semantics.md)
+- 2026-09-15 [生成进度不等于执行结果](2026-09/20260915-generation-progress-semantics.md)
+- 2026-09-15 [分页的边界：限制哪一层的工作量，以及“整轮统计”只属于完整轮](2026-09/20260915-real-pagination.md)
+- 2026-09-16 [执行活动不是任务结论](2026-09/20260916-subagent-activity-vs-outcome.md)
+- 2026-09-17 [延迟加载详情时，保留可操作的摘要](2026-09/20260917-deferred-detail-and-summary.md)
+- 2026-09-21 [Session 事实与视图：共享事实，不共享视图](2026-09/20260921-session-facts-and-views.md)
+- 2026-10-04 [断线后重试，为什么要保留同一个提交标识？](2026-10/20261004-remote-submission-identity.md)
+- 2026-10-06 [单条记录的限制，为什么不能直接套在整个会话上](2026-10/20261006-record-limits-and-projections.md)
+- 2026-10-06 [为什么摘要成功后，不该因为索引失败再压缩一次](2026-10/20261006-recoverable-derived-state.md)
+- 2026-10-11 [事实源与派生读模型：性能边界、水位失效与降级口径](2026-10/20261011-derived-read-model-worker.md)
+- 2026-10-11 [索引进度持久化，不等于把半成品展示给用户](2026-10/20261011-durable-progress-and-published-results.md)
+- 2026-10-11 [长期 Context 与调用快照要分成两层](2026-10/20261011-long-lived-context-projection.md)
+- 2026-10-18 [为什么文件写成功，界面却找不到它](2026-10/20261018-canonical-path-display.md)
+- 2026-10-18 [为什么上下文展示应保留来源，而不是解析提示词](2026-10/20261018-context-provenance.md)
+- 2026-10-18 [增量计算首先要说清楚依赖](2026-10/20261018-context-source-invalidation.md)
+- 2026-11-07 [高频路径上的工作量，不能跟着会话长度涨](2026-11/hot-path-cost-grows-with-session.md)
+- 2026-10-18 [运行结束不等于提示结束](2026-10/20261018-live-run-notice-lifetime.md)
+- 2026-10-18 [读取状态不等于接管恢复](2026-10/20261018-read-does-not-own-recovery.md)
+- 2026-10-18 [多个搜索引擎的分数为什么不能直接排序](2026-10/20261018-reciprocal-rank-fusion.md)
+- 2026-10-24 [当前上下文不能决定历史附件的可访问性](2026-10/20261024-context-compaction-and-artifact-authority.md)
+
+## 工具、权限、沙箱与进程（27）
+
+工具契约与输出预算、权限分级与授权、沙箱、后台进程、浏览器桥接。
+
+- 2026-05 [Kimi $web_search 两轮调用协议：tool_result 的正确用法](2026-05/kimi-builtin-tool-result-protocol.md)
+- 2026-05 [rg 工具封装：runner 和 adapter 要分层](2026-05/rg-subprocess-runner-and-glob-semantics.md)
+- 2026-06 [Prompt 承诺必须匹配工具权限](2026-06/prompt-promises-must-match-tool-permissions.md)
+- 2026-06 [读类工具缓存要有失效和逃生口](2026-06/read-tools-need-range-cache-escape-hatches.md)
+- 2026-06 [Skill Catalog 优先于专用读取工具](2026-06/skill-catalog-over-dedicated-tool.md)
+- 2026-06-02 [Text deletion APIs need line-boundary semantics](2026-06/20260602-text-delete-and-diff-hunks.md)
+- 2026-07 [Agent 长命令的「超时转后台 + turn 边界事件注入」模式](2026-07/agent-bash-timeout-to-background-pattern.md)
+- 2026-07 [后台自治 Agent 的读写授权非对称设计](2026-07/autonomous-agent-asymmetric-read-write-authorization.md)
+- 2026-07 [后台进程需要有界生命周期与稳定身份](2026-07/background-process-lifecycle-needs-bounded-ownership.md)
+- 2026-07 [Browser Locator Runtime 需要三层分离](2026-07/browser-locator-runtime-needs-three-layer-separation.md)
+- 2026-07 [Electron 交互式 PTY：会话、背压与进程树](2026-07/electron-pty-session-backpressure-and-process-trees.md)
+- 2026-07 [用 Go Command Engine 把浏览器插件变成薄执行后端](2026-07/go-command-engine-thin-browser-extension.md)
+- 2026-07 [运行中的 Native Host 升级必须切换 inode](2026-07/native-host-binary-upgrade-must-swap-inode.md)
+- 2026-07 [工具输出的预算与压缩：按语义分类，契约型输出不被通用压缩改写](2026-07/structured-tool-results-need-semantic-output-budgets.md)
+- 2026-07 [Subprocess timeout must resolve](2026-07/subprocess-timeout-must-resolve.md)
+- 2026-07 [Tool failure output must stay diagnostic](2026-07/tool-failure-output-must-stay-diagnostic.md)
+- 2026-07 [工具权限分级：deny / ask / allow 的语义、环境契约与调度分层](2026-07/tool-permission-tiers-deny-ask-allow.md)
+- 2026-07 [Unpacked Chrome Extension 也需要稳定身份](2026-07/unpacked-chrome-extension-needs-stable-id.md)
+- 2026-07 [不可信生成媒体应该先跨过 Artifact 边界](2026-07/untrusted-generated-media-should-cross-an-artifact-boundary.md)
+- 2026-07-25 [渐进式工具披露：注册、可见与授权必须分层](2026-07/20260725-progressive-tool-disclosure.md)
+- 2026-08 [工具委托式多模态：从图片到可信上下文](2026-08/tool-mediated-multimodal-context-boundaries.md)
+- 2026-09 [浏览器连接不能只凭一个 socket 文件认定可用](2026-09/browser-bridge-identity-and-reconfiguration.md)
+- 2026-09 [权限准入、审批生命周期与“审批后放行”](2026-09/permission-admission-and-approval-lifecycle.md)
+- 2026-09 [权限授权（Grant）：生命周期、可撤销事实与命令前缀边界](2026-09/permission-grants-and-prefix-scope.md)
+- 2026-09 [工具展示契约：previewKind、UI 事实分层、完成态与可操作目标](2026-09/typed-tool-provenance-and-targets.md)
+- 2026-10 [工具 Schema 合法，不代表供应商会接受](2026-10/provider-tool-schema-validation.md)
+- 2026-10-25 [沙箱后端：Seatbelt 接入、只能授权的模型与默认值悄悄放宽边界](2026-10/20261025-sandbox-defaults-widen-silently.md)
+
+## 模型、供应商、凭据与提示词缓存（30）
+
+模型身份与能力事实、供应商边界、凭据存储、请求配置、重试、Prompt Cache、提示词资产。
+
+- 2026-05 [LLM Tool Call Streaming：后端转发颗粒度等于前端可消费颗粒度](2026-05/llm-tool-call-streaming.md)
+- 2026-05 [运行时配置生效：用 process.env 覆盖 + 重载冻结 env，并守住 env baseline](2026-05/runtime-config-overlay-and-env-baseline.md)
+- 2026-06 [Prompt 是运行时资产：按“给谁用”分模块，长文本做文件资产而非 Settings](2026-06/prompt-assets-outside-settings.md)
+- 2026-06 [压缩这类「自我改写」操作的执行权应该归数据所有者（贫血 → 充血）](2026-06/rich-model-compression-ownership.md)
+- 2026-06 [LLM 前缀缓存：静态前缀 + 持久化的动态尾部](2026-06/static-prefix-dynamic-suffix-for-prompt-cache.md)
+- 2026-06 [阈值判定必须用「未截断的全量」，不能复用「已截断的加载结果」](2026-06/threshold-check-must-use-untruncated-totals.md)
+- 2026-06-04 [打包应用不能把开发态 `.env` 当运行默认值](2026-06/20260604-packaged-env-defaults.md)
+- 2026-07 [Direct LLM Consumers Must Share Runtime Config](2026-07/direct-llm-consumers-must-use-runtime-config.md)
+- 2026-07 [凭据的作用域与路由：秘密、引用、计费与用途分离](2026-07/multi-credential-routing-needs-three-layer-separation.md)
+- 2026-07-04 [插槽式系统提示词设计：让用户改人格而不弄坏 Agent](2026-07/20260704-slot-based-prompt-design.md)
+- 2026-07-05 [LLM 重试与错误契约：重试放哪一层、尝试的终态、错误码即调度协议](2026-07/20260705-streaming-llm-retry-layer-choice.md)
+- 2026-07-24 [供应商级代理：把差异放在 fetch 边界，不要污染全局网络环境](2026-07/20260724-provider-scoped-proxy-fetch-boundary.md)
+- 2026-07-28 [Prompt Cache 诊断：归因、审计证据与最终 Wire](2026-07/20260728-prompt-cache-diagnosis-controlled-variable-matrix.md)
+- 2026-07-28 [Responses 无状态工具循环仍需回放推理项](2026-07/20260728-responses-stateless-replay-needs-reasoning-items.md)
+- 2026-08 [缓存失效应该是领域事件](2026-08/cache-invalidation-is-a-domain-event.md)
+- 2026-08 [凭据存储安全：先读后写、三态编辑与靠近出站的脱敏](2026-08/credential-migrations-must-fail-closed-before-write.md)
+- 2026-08 [Electron 图片附件有三种身份，不能混成一个 URL](2026-08/electron-image-attachments-have-three-identities.md)
+- 2026-08 [Provider seam 与契约矩阵：让可替换性变成可审计事实](2026-08/provider-seam-and-contract-matrix.md)
+- 2026-09 [文件引用不等于图片：把存储与模型输入分开](2026-09/artifact-reference-and-wire-content.md)
+- 2026-09 [推理能力和推理参数是两个契约](2026-09/reasoning-capabilities-vs-wire.md)
+- 2026-09-06 [模型身份与 Provider 分层：ModelKey、连接 ID、品牌与协议](2026-09/20260906-connection-scoped-model-identity.md)
+- 2026-09-09 [翻译界面时，为什么要区分文案和数据](2026-09/20260909-display-language-and-data-identity.md)
+- 2026-09-11 [模型事实与控制项：发现目录、能力、费用快照、请求事实](2026-09/20260911-model-discovery-facts-snapshots.md)
+- 2026-09-13 [Provider wire payload 与 Session Artifact 的分层](2026-09/20260913-provider-artifact-wire-boundaries.md)
+- 2026-09-22 [LLM 请求配置冻结与 Retry Lease](2026-09/20260922-request-bound-llm-preparation.md)
+- 2026-09-26 [Anthropic SDK 的两种认证头，以及它会悄悄读的环境变量](2026-09/20260926-anthropic-sdk-auth-headers.md)
+- 2026-09-29 [省略内容的缓存必须考虑谁读过](2026-09/20260929-cache-consumer-scope.md)
+- 2026-10-01 [有思考用量，为什么没有思考文字？](2026-10/20261001-thinking-text-signature-usage.md)
+- 2026-10-06 [命令行工具的输出随系统语言变化：判断结果不要匹配给人看的文字](2026-10/20261006-cli-output-locale.md)
+- 2026-10-23 [长寿命端口读可变配置：在调用入口取值，并区分失败阶段](2026-10/20261023-live-config-at-call-boundary.md)
+
+## Turn 生命周期与流式协议（8）
+
+取消、终态、流式事件作用域、流式 UI 状态与渲染性能。
+
+- 2026-05 [Promise resolve 分离：异步暂停恢复模式](2026-05/promise-resolve-separation-for-async-pause.md)
+- 2026-06 [流式工具流：折叠不靠结构推导，完成状态不等动画](2026-06/streaming-tool-collapse-flicker.md)
+- 2026-07 [Turn 终态协议：取消、空结果、拒绝调用都要完成结算](2026-07/agent-turn-cancellation-is-a-lifecycle-protocol.md)
+- 2026-07 [流式事件协议：类型要早分、作用域要显式、排序要稳定](2026-07/stream-events-need-explicit-turn-scope.md)
+- 2026-07 [流式内容变高要监听尺寸，而不是只监听数据](2026-07/streaming-content-resize-needs-scroll-follow.md)
+- 2026-07 [流式 UI 状态模型与交接：顺序建模、数据源互斥、身份稳定、终态持久](2026-07/streaming-ui-handoff-needs-source-exclusivity.md)
+- 2026-09-14 [为什么没有附件也能让 React 页面卡死](2026-09/20260914-react-empty-effect-loop.md)
+- 2026-10 [流式渲染的三个乘数：次数 × 范围 × 解析量](2026-10/streaming-render-three-multipliers.md)
+
+## 文件、Git、工作区与文档（17）
+
+文件监听与新鲜度、Git 语义、工作区接纳、文档治理、静态站。
+
+- 2026-07 [文档目录重组必须是一次原子迁移（含扁平前缀方案的演进）](2026-07/document-taxonomy-migration-must-be-atomic.md)
+- 2026-07 [做「内容是否过期」时，先挑信号，别急着上监听器](2026-07/file-freshness-pick-signals-not-watchers.md)
+- 2026-07 [Git Review 中 local branch、upstream 与 remote-tracking ref 的区别](2026-07/git-review-branch-upstream-semantics.md)
+- 2026-07 [Git Worktree 准备为什么要成为首轮 Turn 的事务前置阶段](2026-07/git-worktree-preparation-transaction.md)
+- 2026-07 [本地 Git 组合动作应该建模为两阶段状态机](2026-07/local-git-actions-are-a-two-phase-state-machine.md)
+- 2026-07 [macOS FSEvents 的事件类型不可信：created/modified/renamed 歧义与校正策略](2026-07/macos-fsevents-event-kind-ambiguity.md)
+- 2026-07 [公开 Changelog 的内容模型应该匹配阅读顺序](2026-07/public-changelog-content-model-should-match-reading-order.md)
+- 2026-07 [Review 写操作需要 generation 与 patch fingerprint 双重绑定](2026-07/review-mutations-need-generation-and-fingerprint.md)
+- 2026-07 [静态内容站的构建契约：数据、路径、资源、主题](2026-07/static-content-sites-need-build-contracts.md)
+- 2026-08 [文档的分层与版本：当前事实、历史、版本号是三个不同的维度](2026-08/design-doc-taxonomy-separates-current-facts-from-history.md)
+- 2026-08 [Git Unborn Branch 应按能力建模](2026-08/git-unborn-workspace-capabilities.md)
+- 2026-08 [索引页需要自己的摘要契约](2026-08/index-pages-need-summary-contracts.md)
+- 2026-09-19 [搬运 Markdown 时，原文和渲染结果要分别检查](2026-09/20260919-markdown-content-migration.md)
+- 2026-09-19 [选中路径、接纳工作区与初始化 Git 是三件事](2026-09/20260919-workspace-admission.md)
+- 2026-09-20 [静态站图片优化：把下载成本放在正确的位置](2026-09/20260920-static-responsive-images.md)
+- 2026-10-08 [文件监听降噪：在事件源头按 Git 语义过滤，拿不准就放行](2026-10/20261008-fail-open-watch-filter.md)
+- 2026-10-23 [多条 Markdown 回复如何共享一个页面](2026-10/20261023-markdown-fragment-scope.md)
+
+## React 与前端状态管理（21）
+
+状态归属与生命周期、请求身份、异步时序、测试可信度。
+
+- 2026-05 [Component State Matrix and Ready Gates](2026-05/component-state-matrix-and-ready-gates.md)
+- 2026-06 [组件本地状态可能太本地](2026-06/component-local-state-can-be-too-local.md)
+- 2026-06 [UI 选择态与提交态要分离](2026-06/deferred-ui-selection-commit.md)
+- 2026-06 [用 request id guard 防止旧请求覆盖新 UI 状态](2026-06/request-id-guard-for-ui-refresh.md)
+- 2026-07 [断言类名不等于断言行为：单测全绿也能全坏](2026-07/green-unit-tests-do-not-prove-rendered-behavior.md)
+- 2026-07 [可恢复隐藏必须是持久状态，而不是列表过滤](2026-07/recoverable-visibility-needs-persistent-state.md)
+- 2026-07 [让验证能失败：回显假阳性、故障注入未生效、搬家式重构的变异检查](2026-07/testing-assertion-poisoned-by-command-echo.md)
+- 2026-07 [UI 展开状态不是后台请求计划](2026-07/ui-state-is-not-a-data-request-plan.md)
+- 2026-07 [可视反馈必须与真实输入共享顺序契约](2026-07/visual-feedback-must-share-the-input-ordering-contract.md)
+- 2026-07-05 [用 grid-template-areas 切换布局，避免 React remount 丢焦点](2026-07/20260705-grid-areas-layout-switch-no-remount.md)
+- 2026-08 [Composer 草稿应该属于导航生命周期](2026-08/composer-drafts-belong-to-navigation-lifecycle.md)
+- 2026-08 [全局快捷键更新是一笔跨系统事务](2026-08/global-shortcut-registration-is-a-transaction.md)
+- 2026-08 [React Hooks 要求所有渲染路径保持同一调用序列](2026-08/react-hooks-require-render-path-invariance.md)
+- 2026-09 [后台生成结果不能抢走用户的修改权](2026-09/background-title-ownership.md)
+- 2026-09-01 [会话主视图切换为什么要保持 Shell 稳定](2026-09/20260901-session-view-toggle-stable-shell.md)
+- 2026-09-06 [夹具必须表达它要证明的东西：关系、时间、可区分性](2026-09/20260906-trajectory-fixture-identity.md)
+- 2026-09-14 [隐藏视图不等于销毁组件：折叠、切换视图时的局部状态生命周期](2026-09/20260914-disclosure-state-lifetime.md)
+- 2026-09-20 [为什么头像不能按列表位置分配](2026-09/20260920-stable-avatar-identity.md)
+- 2026-10-06 [同一个函数里的闭包共用一个作用域：大组件为什么会留住旧数据](2026-10/20261006-closure-scope-retention.md)
+- 2026-10-06 [什么会让代码留在生产包：静态 import、顶层调用、引入即注册](2026-10/20261006-dev-only-code-out-of-bundle.md)
+- 2026-10-23 [类型收窄不会删除运行时字段](2026-10/20261023-structural-types-and-object-spread.md)
+
+## 布局、滚动、浮层与样式（34）
+
+CSS 与 Tailwind 陷阱、滚动容器所有权、浮层与 iframe 几何、颜色与设计 token。
+
+- 2026-05 [色彩作为身份徽章，而非容器底色](2026-05/color-as-identity-badge-not-container.md)
+- 2026-05 [组件自身样式和渲染关系样式要分开归属](2026-05/component-style-vs-render-relation-boundary.md)
+- 2026-05 [Conversation Text Rail Alignment](2026-05/conversation-text-rail-alignment.md)
+- 2026-05 [CSS Grid 隐式 track：sidebar 折叠后看起来"没生效"的真凶](2026-05/css-grid-implicit-tracks-trap.md)
+- 2026-05 [Design Tokens Before Component Polish](2026-05/design-tokens-before-component-polish.md)
+- 2026-05 [全局 CSS reset 会覆盖 Tailwind utility](2026-05/global-css-reset-vs-tailwind.md)
+- 2026-05 [Hover 操作入口需要稳定 hit target](2026-05/hover-actions-need-stable-hit-targets.md)
+- 2026-05 [`overflow: auto` 会吃掉子代 `position: absolute`——而且与你想的不是同一种"吃"](2026-05/overflow-auto-clips-absolute-children.md)
+- 2026-05 [Tailwind 页面切片迁移：让样式所有权跟着组件走](2026-05/tailwind-page-slice-migration.md)
+- 2026-05 [Tailwind v4 三态主题：data-theme + 一组语义 token 整体翻转](2026-05/tailwind-v4-three-state-theme.md)
+- 2026-05 [Tailwind v4 + Vite 插件需要 ESM 配置](2026-05/tailwind-v4-vite-esm-config.md)
+- 2026-06 [受控浮层：open 状态归业务组件，并守住三个时序坑](2026-06/controlled-tooltip-async-preview.md)
+- 2026-06 [CSS Text Shimmer：动画层不要吞掉真实文本](2026-06/css-text-shimmer-overlay.md)
+- 2026-06 [图标按钮 Tooltip 的可访问性边界](2026-06/icon-button-tooltip-accessibility.md)
+- 2026-06-12 [从 SVG 生成 macOS 应用图标的本地管线（含工具选型陷阱）](2026-06/20260612-svg-to-macos-icon-pipeline.md)
+- 2026-07 [Electron 的 minWidth 不是响应式布局](2026-07/electron-min-width-is-not-responsive-layout.md)
+- 2026-07 [Electron 自定义标题栏：命中测试、拖动区与 Chrome 几何](2026-07/frameless-window-chrome-must-follow-pane-geometry.md)
+- 2026-07 [界面颜色应按职责分层，不应按品牌色扩散](2026-07/interface-color-needs-role-separation.md)
+- 2026-07 [布局测量不能依赖自己的判定结果：稳定基准 + 隔离的测量节点](2026-07/layout-state-needs-a-stable-measurement-baseline.md)
+- 2026-07 [长会话导航必须共享一个滚动事实源](2026-07/scroll-navigation-needs-one-scroll-source-of-truth.md)
+- 2026-08 [CSS Grid 的自动最小尺寸会让响应式子项看起来无法缩小](2026-08/css-grid-auto-minimum-needs-zero.md)
+- 2026-08 [滚动所有权：视口边界、单轴与一轴一个滚动容器](2026-08/one-axis-one-scroll-owner.md)
+- 2026-08 [缩放 iframe 时要同时管理布局尺寸和视觉尺寸](2026-08/scaled-iframes-need-two-coordinate-systems.md)
+- 2026-09 [用 CSS 变量回落链做「可切换、默认零变化」的调色板](2026-09/css-var-fallback-accent-palette.md)
+- 2026-09 [设置页的开放式分组与语义颜色](2026-09/settings-page-open-groups-and-semantic-color.md)
+- 2026-09-16 [消息流的间距为什么应该由父容器决定](2026-09/20260916-message-flow-spacing.md)
+- 2026-09-19 [滚动展示应建立在可读文档上](2026-09/20260919-progressive-scroll-layout.md)
+- 2026-09-25 [路径截断：flex-shrink 不是优先级](2026-09/20260925-flex-shrink-priority-for-paths.md)
+- 2026-09-26 [给白底 Logo 去背景：为什么不能“按亮度算透明度”](2026-09/20260926-logo-white-background-matting.md)
+- 2026-09-26 [Tailwind 同属性冲突：谁生效不看 className 的书写顺序](2026-09/20260926-tailwind-utility-conflict-order.md)
+- 2026-10-06 [Electron 主文档 CSP：先查 srcdoc 继承，再谈策略](2026-10/20261006-electron-csp-srcdoc-inheritance.md)
+- 2026-10-23 [iframe坐标是布局在某一时刻的快照](2026-10/20261023-frame-coordinate-measurement.md)
+- 2026-10-23 [虚拟滚动画布：内容宽度与可视宽度要分开](2026-10/20261023-virtual-canvas-viewport-width.md)
+- 2026-10-24 [浮层自动翻转为什么仍会越出屏幕](2026-10/20261024-popover-available-height.md)
+
+## Electron 打包、发布与工程（5）
+
+打包、签名、更新、单实例与脚本。
+
+- 2026-05 [pnpm workspace 里的 Electron portable release](2026-05/pnpm-workspace-electron-portable-release.md)
+- 2026-05 [Shell 脚本里的“脚本目录”不一定是真实目录](2026-05/symlink-script-root.md)
+- 2026-06 [Electron macOS ad-hoc signing: avoid `codesign --deep`](2026-06/electron-ad-hoc-codesign-without-deep.md)
+- 2026-06 [Self-Replacing Updaters Need a Two-Phase Boundary](2026-06/self-replacing-updaters-need-a-two-phase-boundary.md)
+- 2026-07 [单实例锁 vs 遗言心跳：一个文件同时承载两种语义时的自锁陷阱](2026-07/single-instance-lock-vs-farewell-heartbeat.md)

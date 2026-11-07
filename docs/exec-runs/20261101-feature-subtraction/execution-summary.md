@@ -4,7 +4,7 @@
 
 - **关联计划**：[功能减法](../../exec-plans/completed/20261101-feature-subtraction/README.md)（P1–P5，P6 并入 S3）、[插件结构](../../exec-plans/completed/20261101-plugin-structure/README.md)（S1–S4）
 - **设计**：[架构优化](../../design-docs/架构优化/README.md)：[01 功能减法设计](../../design-docs/架构优化/01-功能减法设计.md)、[02 插件结构设计](../../design-docs/架构优化/02-插件结构设计.md)
-- **执行过程**：[execution-process.md](execution-process.md)
+- **执行过程**：`execution-process.md`（原始记录已清理，见 git 历史）
 - **执行模式**：交互，连续执行。子智能体按子计划实施，主智能体逐个读 diff、复跑测试、补修后在本地提交
 - **执行结果**：完成。分支 `架构优化`，共 10 个本地提交（`18155df5` 文档，`281aa868`…`15ceb558` 九个子计划，另加本收尾提交），未推送、未合入 main
 
@@ -110,4 +110,4 @@
 
 - 用户做完上面的 Electron 检查后，决定是否推送 `架构优化` 并提 PR。
 - 清理 `docs/exec-runs/` 的 363 条断链，让根 `pnpm test` 能完整跑完。
-- [Chrome 扩展连接体验](../../exec-plans/active/20260928-chrome-connect-experience.md)计划已暂停，是否删除由用户决定。
+- [Chrome 扩展连接体验](../../exec-plans/completed/20260928-chrome-connect-experience.md)计划已暂停，是否删除由用户决定。

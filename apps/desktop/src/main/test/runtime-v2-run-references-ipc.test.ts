@@ -35,7 +35,7 @@ function setup(overrides: { agentForm?: "agent" | "chat"; journal?: Record<numbe
     return { snapshot: { sessionId: "s" }, reason: "completed", finalText: "" };
   });
   const importAttachment = vi.fn(async () => ({ artifactId: "art-1", mimeType: "image/png", name: "shot.png" }));
-  const journal = overrides.journal ?? { 5: { seq: 5, type: "assistant/message", surface: { kind: "append", node: { kind: "assistant", messageId: "m", content: "关键句。" } } } };
+  const journal = overrides.journal ?? { 5: { seq: 5, type: "assistant/message", data: { messageId: "m", content: "关键句。" }, surface: { kind: "append" } } };
   const readSessionProjection = vi.fn(async ({ beforeSeq }: { beforeSeq: number }) => ({
     window: { events: journal[beforeSeq - 1] ? [journal[beforeSeq - 1]] : [] },
   }));
@@ -106,7 +106,7 @@ it.each([
 });
 
 it("rejects a user message id used as a reply source", async () => {
-  const { registration, submitTask, run } = setup({ journal: { 5: { seq: 5, type: "agent/inbox/spliced", surface: { kind: "append", node: { kind: "user", messageId: "u", content: "hi" } } } } });
+  const { registration, submitTask, run } = setup({ journal: { 5: { seq: 5, type: "agent/inbox/spliced", data: { operation: "claim", messageId: "u", content: "hi" }, surface: { kind: "append" } } } });
   try {
     expect(await run({ responseAnnotations: [annotation] })).toMatchObject({ status: "submission-failed", referenceIssue: { code: "annotation_source_missing" } });
     expect(submitTask).not.toHaveBeenCalled();
@@ -114,7 +114,7 @@ it("rejects a user message id used as a reply source", async () => {
 });
 
 it("accepts a compacted assistant reply but rejects a compacted user message", async () => {
-  const replaced = (kind: "assistant" | "user") => ({ 5: { seq: 5, type: "surface/replaced", surface: { kind: "replace", sourceEventSeqs: [2], node: { kind, messageId: "m", content: "关键句。" } } } });
+  const replaced = (kind: "assistant" | "user") => ({ 5: { seq: 5, type: "surface/replaced", data: { node: { kind, messageId: "m", content: "关键句。" } }, surface: { kind: "replace", start: 0, end: 1, sourceEventSeqs: [2] } } });
   const accepted = setup({ journal: replaced("assistant") });
   try {
     await accepted.run({ responseAnnotations: [annotation] });

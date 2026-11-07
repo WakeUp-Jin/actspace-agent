@@ -96,7 +96,7 @@ function errorOf(error: unknown, closeCode: number | undefined, url: string | un
 }
 
 /**
- * 连接状态机（front-web-pwa客户端规范 §5）：host.hello → auth.pair / auth.resume → host.describe → host.observe。
+ * 连接状态机（front-web-pwa客户端规范 §4）：host.hello → auth.pair / auth.resume → host.describe → host.observe。
  * HostClient 不重连、不重试写操作，这两件事在这里和调用方处理。
  */
 export class ConnectionStore {

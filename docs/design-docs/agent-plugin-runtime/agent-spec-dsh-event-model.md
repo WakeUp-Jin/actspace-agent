@@ -1,24 +1,22 @@
 # DSH 风格 Session 事件模型
 
-> 2026-09-20 更新：[Session 事件持久化重构](agent-spec-session-core-persistence-separation.md)的核心行为已实施。Journal 接纳后先交给 persistence coordinator，再发布 observer 通知；`flush` 是独立 durability barrier。
+> [Session 事件持久化重构](agent-spec-session-core-persistence-separation.md)的核心行为已实现。Journal 接纳后先交给 persistence coordinator，再发布 observer 通知；`flush` 是独立 durability barrier。
 
 
-> 状态：12 个核心事件与默认 Loop 已实现；最终 CLI retry/error 已有真实 HTTP fixture 定向证据，完整收尾状态见本轮执行记录。2026-09-09 按 ActSpace 当前 codec / Session Format v1 校准 seq 描述。
->
-> 日期：2026-08-29
+> 14 个核心事件与默认 Loop 已实现（2026-11-06 新增 `request/system-prompt`、`request/tools`，见[请求记录规范](agent-spec-request-record.md)）；最终 CLI retry/error 已有真实 HTTP fixture 定向证据。seq 描述以当前 codec / Session Format v1 为准。
 
 本文定义 ActSpace 重构后的 Session 事实流。目标是把 DeepSeek Harness（DSH）已经验证的事件分层、顺序和可重放语义作为新的核心模型；不保留旧 ActSpace 事件名称或兼容分支。当前 CLI 只实现一次无头 `run`，`chat` 不在本轮范围内。
 
 ## 1. 依据与边界
 
-当前事件词汇与 envelope 以 ActSpace `packages/session/session-journal/src/core-codecs.ts`、默认 Agent Loop 和 [Session Format v1](agent-spec-session-format-v1.md)为准。以下保留 2026-08-29 设计时的参考资料顺序，不覆盖当前实现：
+当前事件词汇与 envelope 以 ActSpace `packages/session/session-journal/src/core-codecs.ts`、默认 Agent Loop 和 [Session Format v1](agent-spec-session-format-v1.md)为准。以下保留设计时的参考资料顺序，不覆盖当前实现：
 
-1. `tmp/deepseek-harness/packages/core/session/src/types.ts` 与 `tmp/deepseek-harness/packages/core/agent-loop/src/agent.ts` 的源码行为；
+1. DSH 外部参考快照的 `packages/core/session/src/types.ts` 与 `packages/core/agent-loop/src/agent.ts` 的源码行为；
 2. `tmp/deepseek-harness/docs/persistence-catalog.md` 的持久化目录；
 3. `/Users/wakeup-jin/Downloads/session/干预主链和相关通知.md` 的三平面整理；
 4. 当前 ActSpace 工具执行器的行为测试和实现。
 
-本文只规定 Session 事件、重放和事件到 UI/通知的投影。Cordis 插入点见 [Agent Loop Cordis Surface](./agent-spec-agent-loop-cordis-surface.md)，工具内核与可替换外壳见 [Tool Runtime Boundary](./agent-spec-tool-runtime-boundary.md)。
+本文只规定 Session 事件、重放和事件到 UI/通知的投影。Cordis 插入点见 [Agent Loop 插入面](./agent-spec-cordis-event-abi-and-eventhub-retirement.md)，工具内核与可替换外壳见 [Tool Runtime Boundary](./agent-spec-tool-runtime-boundary.md)。
 
 ## 2. 三个事件平面
 
@@ -30,11 +28,11 @@
 
 `[I]` 事件不能悄悄改变已提交事实；任何改变都必须在后续持久化事件中可见。`[N]` 事件丢失不影响 Session 恢复，通知消费者必须能从 `[S]` 重建状态。
 
-## 3. 12 种核心持久化事件
+## 3. 14 种核心持久化事件
 
 Todo 新事件为 `plugin/actspace.todo/todo-write`，owner 为 `actspace.todo`，required / version 1。旧 required `todo/write` 没有兼容 Codec，会产生 `UNKNOWN_REQUIRED_CODEC` 并进入 browse-only；详见 [工具边界](agent-tool-plugin-boundaries.md)。
 
-以下 12 种为当前 ActSpace Core Journal 的持久化核心。Todo 已移入插件领域事件。表中数据列说明用途，不是完整 wire schema；Surface 列描述展示语义，实际 envelope 使用下面定义的 operation/null：
+以下 14 种为当前 ActSpace Core Journal 的持久化核心。Todo 已移入插件领域事件。表中数据列说明用途，不是完整 wire schema；Surface 列描述展示语义，实际 envelope 使用下面定义的 operation/null：
 
 | 事件 | 写入时机 | 关键数据 | Surface |
 |---|---|---|---|
@@ -43,12 +41,14 @@ Todo 新事件为 `plugin/actspace.todo/todo-write`，owner 为 `actspace.todo`�
 | `step/start` | 每个模型/工具步骤开始 | `turnId`, `stepId`, `attempt` | internal |
 | `step/end` | 步骤完成或失败 | `stepId`, `status`, `reason`, `usage` | internal |
 | `user/message` | 用户输入或 Agent 注入的用户消息 | `messageId`, `content`, `source` | user |
-| `assistant/chunk` | LLM 流式增量到达 | `messageId`, `chunkIndex`, `delta`, `finishReason?`, `usage?` | assistant |
-| `assistant/message` | 一条 Assistant 消息收束 | `messageId`, `content`, `sourceEventSeqs`, `usage`, `finishReason` | assistant |
+| `assistant/chunk` | 仅旧会话：LLM 流式增量（2026-11 起不再写入，只读兼容，见[流式输出规范](agent-spec-live-assistant-stream.md)） | `messageId`, `chunkIndex`, `delta`, `finishReason?`, `usage?` | assistant |
+| `assistant/message` | 一次模型调用结算（完成 / 失败 / 中断） | `messageId`, `content`, `sourceEventSeqs`, `usage`, `finishReason`, `firstTokenAt?` | assistant |
 | `tool/call` | 模型请求执行工具 | `toolCallId`, `name`, `arguments`, `stepId` | internal |
 | `tool/result` | 工具执行完成 | `toolCallId`, `status`, `output`, `artifacts`, `error?` | tool-result |
 | `request/header` | 请求头部快照 | `requestId`, `model`, `provider`, `headers`（已脱敏） | internal |
-| `request/context` | 发送给模型的上下文 | `requestId`, `messages`, `system`, `tools`, `sourceRefs` | internal |
+| `request/system-prompt` | 本次系统提示词与日志里最近一条不同时才写，位于 header 与 context 之间 | `requestId`, `digest`, `sections`, `modelFacts`, `contributorProvenance` | internal |
+| `request/tools` | 本次工具与日志里最近一条不同时才写，位于 header 与 context 之间 | `requestId`, `digest`, `tools` | internal |
+| `request/context` | 每次请求的小快照（schemaVersion 3）；不含对话、提示词、工具和估算 | `requestId`, `snapshot.{systemPromptDigest, toolsDigest, prepared, requestOptions, contextModel}` | internal |
 | `session/end-seed` | Session 关闭前的确定性收尾种子 | `sessionId`, `lastSeq`, `reason` | internal |
 
 正常响应即使没有任何content block，也必须在step/end之前写入唯一assistant/message，保留requestId、空content、finishReason和真实usage。正文为空不能省略请求终态，否则请求仍开放并违反Session收尾不变量；不得填造占位正文来替代该事实。
@@ -60,12 +60,15 @@ sequenceDiagram
     participant A as Agent Loop
     participant J as Session Journal
     participant N as Notification Bus
+    participant L as 实时通道
     A->>J: turn/start
     A->>J: step/start
     A->>J: user/message
     A->>J: request/header
+    A->>J: request/system-prompt（变化才写）
+    A->>J: request/tools（变化才写）
     A->>J: request/context
-    A->>J: assistant/chunk × N
+    A-->>L: 流式片段 × N（不进 Journal）
     A->>J: assistant/message
     A->>J: step/end
     A->>N: session/event (accepted, queued)
@@ -83,8 +86,7 @@ flowchart TD
     S0 --> U[user/message]
     U --> H[request/header]
     H --> C[request/context]
-    C --> Ch[assistant/chunk*]
-    Ch --> M[assistant/message]
+    C --> M[assistant/message]
     M --> Call[tool/call]
     Call --> Result[tool/result]
     Result --> S1[step/end]
@@ -110,7 +112,7 @@ criticality  = "required" | "ignorable"，由 codec 固定
 time         = RFC3339 UTC 时间
 source       = { ownerPluginId, agentId?, turnId?, stepId? }
 data         = 事件 payload，禁止把 UI 临时字段塞入此处
-surface      = null | { kind: "append", node } | { kind: "replace", start, end, node, sourceEventSeqs }
+surface      = null | { kind: "append" } | { kind: "replace", start, end, sourceEventSeqs }   // 只做标记，节点由 surfaceNode(event) 从 data 推出
 provenance   = { sourceEventSeqs: number[], contributorIds: string[], runtimeSelectionSeq: number | null }
 ```
 
@@ -135,7 +137,7 @@ Journal 的 append 是唯一逻辑提交点：先校验 codec 和序号并接纳
 | Session 与用户反馈 | `session/title`, `session/title-llm-request`, `feedback/record` |
 | 外部请求 | `web/deepseek-search-llm-request` |
 
-`goal/change` 和 `schedule/change` 本轮只建立 codec、replay 和未知事件治理；当前没有 Goal/Schedule producer，不因提前建模而虚构运行时能力。扩展事件不能改变 12 种核心事件的含义。完整目录（含模式、委派、恢复及 Task 插件事件）以 codec 和[生成矩阵](agent-contract-matrix.generated.md)为准。
+`goal/change` 和 `schedule/change` 本轮只建立 codec、replay 和未知事件治理；当前没有 Goal/Schedule producer，不因提前建模而虚构运行时能力。扩展事件不能改变 14 种核心事件的含义。完整目录（含模式、委派、恢复及 Task 插件事件）以 codec 和[生成矩阵](agent-contract-matrix.generated.md)为准。
 
 ### 5.1 明确删除的旧事件
 
@@ -146,7 +148,7 @@ Journal 的 append 是唯一逻辑提交点：先校验 codec 和序号并接纳
 - 旧的持久化 `llm/chunk`、`llm/usage`、`llm/error`、`llm/aborted`；当前同名 `llm/chunk` 仅是非持久化增量通知；
 - 任何把工具权限、审批或 UI 临时状态冒充核心事件的旧名称。
 
-主循环请求的 usage、finish、error、abort 都分别归入 `assistant/chunk`、`assistant/message`、`step/end`/`turn/end` 的结构化字段；重试用 `llm/retry*` 扩展事件表达。辅助请求使用下述独立事实，不污染主请求用量。
+主循环请求的 usage、finish、error、abort 都归入 `assistant/message`（含首 token 时间 `firstTokenAt`）、`step/end`/`turn/end` 的结构化字段；重试用 `llm/retry*` 扩展事件表达。辅助请求使用下述独立事实，不污染主请求用量。
 
 失败回合在 `turn/end(reason=failed)` 的可选 `failure` 中保存脱敏、有界原因；live 与恢复后的 UI 使用同一失败信息。旧记录缺少该字段时展示明确的通用失败提示，`agent/error` 仍是通知，不要求成为独立 Journal 事件。
 
@@ -168,7 +170,7 @@ Usage、轨迹和窗口分页分别消费辅助事实：每次尝试计一次请
 
 ## 7. 表面投影
 
-Surface node 是最小的模型可见历史节点；envelope 的 `surface` 是 append/replace operation 或 null，不是 UI 分类字符串：
+Surface node 是最小的模型可见历史节点；envelope 的 `surface` 是 append/replace 标记或 null，不是 UI 分类字符串。节点不在 `surface` 里再存一份，而是由 `@actspace/shared/runtime-v2` 的 `surfaceNode(event)` 从事件 `data` 推出（`user/message`、`assistant/message`、Inbox claim 取 `data.content`；`tool/result` 取 `modelOutput`，`isError = status !== "completed"`；`tool/recovery-outcome` 取 `data.content`；`surface/replaced` 取 `data.node`），详见 [对话内容只存一份](agent-spec-surface-derived.md)：
 
 - `user`：用户可见输入消息；
 - `assistant`：收束后的 Assistant 消息；chunk 保留为 Journal 事实，不单独创建完整历史消息；
@@ -183,9 +185,9 @@ CLI `run` 默认输出最终文本，`--jsonl` 才输出结构化流；显式持
 
 设计完成的验收条件：
 
-1. 12 种核心事件有唯一 codec、schema、golden JSONL 和 replay 测试；
+1. 14 种核心事件有唯一 codec、schema、golden JSONL 和 replay 测试；
 2. 无工具、含工具、重试、错误、取消五种顺序都能由 `seq` 重放；
 3. 扩展目录中的 codec 不影响核心事件，未知扩展按策略记录诊断或 fail closed；
 4. `session/event` 只能在 Journal 接纳且 coordinator 入队后触发，通知丢失不会破坏恢复；
-5. 任意 projection 只依赖 `surface` 和已提交事件，不读取 Agent Loop 私有状态；
+5. 任意 projection 只依赖 `surface` 标记、`surfaceNode(event)` 推出的节点和已提交事件，不读取 Agent Loop 私有状态；
 6. 新格式从空 Session 开始，旧 Session 文件明确视为不可读。

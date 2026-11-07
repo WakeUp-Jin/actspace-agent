@@ -33,7 +33,8 @@ import {
   type SettingsV4Snapshot,
   type SettingsV4UpdateResult,
   type SettingsV4UpdateInput,
-  projectManagedContextState,
+  contextEstimateUsage,
+  type ContextEstimateView,
 } from "@actspace/shared";
 import {
   RUNTIME_V2_FIXED_RENDERER_CHANNELS,
@@ -70,8 +71,6 @@ import type { ProviderNetworkService } from "./provider-network-service";
 import { ChatAttachmentValidationError, type DesktopRuntimeV2Registry } from "./runtime-registry";
 import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRendererSkill } from "./fixed-renderer-skills";
 import {
-  projectContextSnapshot,
-  projectContextState,
   projectChatEvents,
   projectSubagentTranscript,
   projectSubagentItems,
@@ -99,6 +98,8 @@ export type FixedRendererIpcOptions = {
 };
 
 export type FixedRendererIpcRegistration = {
+  /** Send buffered stream deltas now; call before pushing a related message through another path. */
+  readonly flushLive: () => void;
   readonly dispose: () => void;
   readonly requestQuickOpen: () => void;
 };
@@ -150,11 +151,11 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   ipc.handle(contract.sessions.getPreview, async (input) => {
     try {
       const snapshot = await options.registry.inspectSession(input.sessionId);
-      const journal = await options.registry.inspectSessionEvents(input.sessionId);
+      const estimate = await options.registry.readSessionProjectionValue(input.sessionId, "contextEstimate") as ContextEstimateView | undefined;
       return {
         sessionId: snapshot.sessionId,
         workspaceRoot: snapshot.workspaceRoot ?? options.roots.workspaceRoot,
-        contextSnapshot: projectContextSnapshot(snapshot, journal),
+        contextSnapshot: estimate ? contextEstimateUsage(estimate, snapshot) : null,
       };
     } catch {
       return null;
@@ -175,6 +176,11 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     }
     if (input.title?.trim()) {
       snapshot = await options.registry.updateSessionMetadata({ sessionId: snapshot.sessionId, title: input.title.trim() });
+    }
+    // 设置 → 通用 →「新会话默认权限」：写进新会话，第一轮就按它跑。Chat 形态没有工具，不需要。
+    const permissionMode = input.agentForm === "chat" ? "default" : options.settings.getV4().settings.general.defaultPermissionMode ?? "default";
+    if (permissionMode !== "default" && snapshot.permissionMode !== permissionMode) {
+      snapshot = await options.registry.updateSessionPermissionMode(snapshot.sessionId, permissionMode);
     }
     return options.registry.readSessionProjection({ sessionId: snapshot.sessionId });
   });
@@ -230,15 +236,6 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     try {
       const snapshot = await options.registry.updateSessionAgentMode(input.sessionId, input.mode, input.expectedRevision);
       return { ok: true, mode: snapshot.agentMode, revision: snapshot.agentModeRevision };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-  ipc.handle(contract.sessions.revokeGrant, async (input) => {
-    if (!input.sessionId || !input.grantId) return { ok: false, error: "invalid_grant_revoke" };
-    try {
-      await options.registry.revokeSessionGrant(input.sessionId, input.grantId);
-      return { ok: true };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
@@ -313,12 +310,16 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return true;
   });
 
+  // Text deltas travel only on the renderer stream, coalesced there within ~33ms. Session live envelopes are
+  // journal facts and run states (no per-token traffic since chunks left the Journal), so they go out at once.
   const unsubscribeLive = options.registry.subscribe((envelope) => {
     if (envelope.event.kind === "runtime-live" || envelope.event.kind === "journal-update") usageReadModels.get(options.registry)?.invalidate();
+    // A finished message (or any other journal fact) must not overtake the text deltas streamed before it:
+    // a delta arriving after its message was committed is drawn as a new live segment that stays until the run ends.
+    options.registry.flushRendererStream();
     const target = options.getMainWindow();
     if (target === undefined || target.isDestroyed()) return;
     target.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.sessionLiveEvent, envelope);
-
   });
 
   const unsubscribeRendererStream = options.registry.subscribeRendererStream((event) => {
@@ -349,11 +350,16 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
     return result.ok ? result : { ...result, settings: options.settings.get() };
   });
 
+  ipc.on(contract.sessions.setObserved, (sessionIds) => {
+    options.registry.setObservedSessions(Array.isArray(sessionIds) ? sessionIds : []);
+  });
+
   ipc.on(contract.appearance.setNativeTheme, (mode) => {
     if (mode === "light" || mode === "dark" || mode === "system") nativeTheme.themeSource = mode;
   });
 
   return {
+    flushLive: () => { options.registry.flushRendererStream(); },
     dispose: () => {
       unsubscribeLive();
       void usageReadModels.get(options.registry)?.dispose();
@@ -644,7 +650,6 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
   ipc.handle(contract.updates.start, () => options.localUpdate.start());
 
-  ipc.handle(contract.sessions.describeContext, input => contextPanel.describeComposer(input.sessionId));
   ipc.handle(contract.usage.getStatus, input => usageReadModels.get(options.registry)?.getStatus(input.requestId) ?? null);
   ipc.handle(contract.usage.cancel, input => usageReadModels.get(options.registry)?.cancel(input.requestId));
   ipc.handle(contract.harnessStats.query, input => usageReadModelFor(options.registry, options.roots.dataRoot).queryHarnessStats(input));
@@ -659,11 +664,12 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   ipc.handle(contract.sessions.getSubagents, async (input) => {
     const journal = await options.registry.inspectSessionEvents(input.sessionId);
     // The parent records a child's model only when it finishes; until then use the child's own request facts.
-    // The panel polls every second, so a finished child's answer is remembered instead of re-reading its Journal.
+    // The panel polls every second: only the child's latest `request/header` is read (a live child answers from
+    // its in-memory type index), and a finished child's answer is remembered.
     const childModels = new Map<string, string>();
     await Promise.all(subagentChildrenWithoutModel(journal).map(async ({ childSessionId, finished }) => {
       const cached = finishedChildModels.get(childSessionId);
-      const model = cached !== undefined ? cached : latestRequestModel(await options.registry.inspectSessionEvents(childSessionId).catch(() => [])) ?? null;
+      const model = cached !== undefined ? cached : latestRequestModel(await options.registry.latestSessionEvent(childSessionId, "request/header").then(event => event ? [event] : [], () => [])) ?? null;
       if (finished) rememberFinished(finishedChildModels, childSessionId, model);
       if (model) childModels.set(childSessionId, model);
     }));
@@ -689,10 +695,12 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     shell.showItemInFolder(path);
     return { ok: true };
   });
+  ipc.handle(contract.sessions.liveOutput, (input) => options.registry.liveOutput(input.sessionId));
   ipc.handle(contract.sessions.getSubAgentTranscript, async (input) => {
     const snapshot = await options.registry.inspectSession(input.transcriptRef.runId);
     const journal = await options.registry.inspectSessionEvents(input.transcriptRef.runId);
-    return projectSubagentTranscript(snapshot, journal);
+    // The child's unsettled text lives only in the live baseline; settled messages come from its Journal.
+    return projectSubagentTranscript(snapshot, journal, options.registry.liveOutput(input.transcriptRef.runId));
   });
 
 }

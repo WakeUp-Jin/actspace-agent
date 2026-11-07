@@ -78,6 +78,17 @@ it("blocks restoration when Host contracts change without silently using builtin
   expect(restored.inspect().blocked).toContain("fingerprint");
   await expect(restored.acquire("main")).rejects.toMatchObject({ code: "RECOVERY_BLOCKED" });
 });
+it("clears a startup store lock through retryStartup once the previous Host releases it", async () => {
+  const { control, options } = await setup();
+  const restored = new HarnessControl({ ...options, runtimeId: "next-host" }); controls.push(restored);
+  await restored.initialize();
+  await restored.retryStartup();
+  expect(restored.inspect().blocked).toContain("owned by another Host");
+  await control.close();
+  await restored.retryStartup();
+  expect(restored.inspect().blocked).toBe("");
+  expect(restored.inspect().current?.revision).toBe(1);
+});
 it("retries initial store ownership after the previous Host releases it", async () => {
   const { control, options } = await setup();
   const restored = new HarnessControl({ ...options, runtimeId: "next-host" }); controls.push(restored);

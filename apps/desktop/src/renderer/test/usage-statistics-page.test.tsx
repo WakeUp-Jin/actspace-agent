@@ -86,14 +86,25 @@ describe("使用统计", () => {
     expect(totalMetric).not.toHaveTextContent("未知");
     expect(screen.getByText(/有 2 次请求缺少用量或定价/)).toBeInTheDocument();
   });
-  it("ignores failed requests without usage when judging the cache rate, but hides it when a provider omits cache read", () => {
-    const base = { ...data.summary, requestCount: 3, totalTokens: 1100, inputTokens: 100, outputTokens: 0, cacheReadTokens: 900, cacheWriteTokens: 0 };
-    const failedOnly = { ...data, summary: { ...base, unknownTokenRequestCounts: { input: 1, output: 1, cacheRead: 1, cacheWrite: 3, reasoning: 1, total: 1 } } } as unknown as UsageActivitySnapshot;
+  it("computes the cache rate from the known part when some requests lack usage or omit the cache-read field", () => {
+    // 复现 24 小时范围的真实形状：192 次请求，4 次缺用量/定价，另有请求只上报 input/output 而缺缓存读取字段。
+    const base = { ...data.summary, requestCount: 192, totalTokens: 2_892_225, inputTokens: 247_519, outputTokens: 137_826, cacheReadTokens: 2_506_880, cacheWriteTokens: 0 };
+    const failedOnly = { ...data, summary: { ...base, unknownTokenRequestCounts: { input: 4, output: 4, cacheRead: 4, cacheWrite: 192, reasoning: 4, total: 4 } } } as unknown as UsageActivitySnapshot;
     const view = render(<UsageStatisticsPage snapshot={null} activitySnapshot={failedOnly} />);
-    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("90.0%");
-    const partial = { ...failedOnly, summary: { ...base, unknownTokenRequestCounts: { input: 1, output: 1, cacheRead: 2, cacheWrite: 3, reasoning: 1, total: 1 } } } as unknown as UsageActivitySnapshot;
-    view.rerender(<UsageStatisticsPage snapshot={null} activitySnapshot={partial} />);
-    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("—");
+    // 2,506,880 ÷ (247,519 + 2,506,880) = 91.0%
+    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("91%");
+    const omitsCacheRead = { ...failedOnly, summary: { ...base, unknownTokenRequestCounts: { input: 4, output: 4, cacheRead: 9, cacheWrite: 192, reasoning: 4, total: 4 } } } as unknown as UsageActivitySnapshot;
+    view.rerender(<UsageStatisticsPage snapshot={null} activitySnapshot={omitsCacheRead} />);
+    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("91%");
+    const partialInput = { ...failedOnly, summary: { ...base, unknownTokenRequestCounts: { input: 9, output: 4, cacheRead: 4, cacheWrite: 192, reasoning: 4, total: 4 } } } as unknown as UsageActivitySnapshot;
+    view.rerender(<UsageStatisticsPage snapshot={null} activitySnapshot={partialInput} />);
+    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("91%");
+  });
+  it("keeps the cache rate in line with the session pill algorithm", () => {
+    const summary = { ...data.summary, requestCount: 2, totalTokens: 1_100, inputTokens: 100, outputTokens: 0, cacheReadTokens: 800, cacheWriteTokens: 100, unknownTokenRequestCounts: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, total: 0 } };
+    render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, summary } as unknown as UsageActivitySnapshot} />);
+    // 缓存读 ÷（未缓存输入 + 缓存读 + 缓存写）= 800 / 1000
+    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("80%");
   });
   it("shows no footnote when every request has usage and a price", () => {
     const complete = { ...data, costSummary: { ...data.costSummary!, unknownCostRequestCount: 0 }, summary: { ...data.summary, unknownTokenRequestCounts: { input: 0, output: 0, cacheRead: 0, cacheWrite: 2, reasoning: 0, total: 0 } } } as unknown as UsageActivitySnapshot;
@@ -107,7 +118,7 @@ describe("使用统计", () => {
     } as unknown as UsageActivitySnapshot;
     render(<UsageStatisticsPage snapshot={null} activitySnapshot={openAiCompatible} />);
     const cacheMetric = screen.getByText("缓存命中率").parentElement;
-    expect(cacheMetric).toHaveTextContent("90.0%");
+    expect(cacheMetric).toHaveTextContent("90%");
   });
   it("sends search to the full query and preserves status and search on pagination", async () => {
     const refresh = vi.fn(); const next = vi.fn();

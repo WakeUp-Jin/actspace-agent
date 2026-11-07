@@ -1,10 +1,8 @@
 import type { ReactNode } from "react";
-import { CircleHelp } from "lucide-react";
 import { cn } from "../../ui/cn";
 import { Button } from "../../ui/Button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/Tooltip";
 
-/** Context 面板各区块共用的外观；视觉对照 `docs/design-docs/frontend/context-panel-demo.html`。 */
+/** Context 面板各区块共用的外观；规则见 `docs/design-docs/frontend/front-Context面板规范.md`。 */
 
 export const CARD_CLASS = "rounded-act-group border border-line bg-surface";
 export const CARD_HEAD_CLASS = "flex items-center gap-2 px-3 pt-2.5";
@@ -56,21 +54,6 @@ export function Gauge({ share, colorVar, label }: { share: number; colorVar: str
     <span className={cn("h-[3px] w-9 shrink-0 overflow-hidden rounded-full", TRACK_CLASS)} title={label}>
       <i className="block h-full rounded-full" style={{ width: `${Math.max(4, Math.min(100, share * 100))}%`, background: colorOf(colorVar) }} />
     </span>
-  );
-}
-
-/** 指标旁的 `?`：悬停或聚焦时说明口径。 */
-export function HelpHint({ text }: { text: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span tabIndex={0} aria-label={text}
-          className="inline-grid cursor-help place-items-center rounded-full text-text-faint outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">
-          <CircleHelp size={12} strokeWidth={2} aria-hidden="true" />
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{text}</TooltipContent>
-    </Tooltip>
   );
 }
 

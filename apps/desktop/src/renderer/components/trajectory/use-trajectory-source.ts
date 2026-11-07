@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { selectTrajectory } from '@actspace/client/sessions';
 import type { RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
+import type { RequestLiveOutput } from '@actspace/client/live';
 import { useOptionalSessionProjection } from '../../session';
 
 const STREAMING_INTERVAL_MS = 120;
 
 /**
- * Hold `value` until the next animation frame. Projection updates arrive once per Journal event
- * (every assistant chunk), so the builder runs at most once per frame. A first value, or a switch to
+ * Hold `value` until the next animation frame. Projection updates arrive once per Journal event, so the
+ * builder runs at most once per frame. A first value, or a switch to
  * another session, commits immediately.
  */
 export function useFrameCoalesced<T>(value: T, immediate: (committed: T, next: T) => boolean): T {
@@ -45,6 +46,7 @@ export function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | 
   const cell = useFrameCoalesced(target, (committed, next) => committed === null || next === null || committed.sessionId !== next.sessionId);
   const projected = cell ? selectTrajectory(cell) : null;
   const [fixture, setFixture] = useState<RuntimeV2TrajectorySnapshot | null>(null);
+  const [fixtureLive, setFixtureLive] = useState<ReadonlyMap<string, RequestLiveOutput> | null>(null);
   useEffect(() => {
     if (sessionId !== undefined) return;
     if (!import.meta.env.DEV && import.meta.env.MODE !== 'test') return;
@@ -58,11 +60,13 @@ export function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | 
       setFixture(loaded);
       const replay = streamingReplay(trajectoryFixtureName());
       if (replay) {
-        // Replays the running turn chunk by chunk to review in-place streaming.
+        // Replays the running reply chunk by chunk (live run output, the Journal stays put) to review in-place streaming.
         let frame = 0;
         timer = setInterval(() => {
           frame += 1;
-          setFixture(replay.frame(frame));
+          const next = replay.frame(frame);
+          setFixture(next.snapshot);
+          setFixtureLive(next.live);
           if (frame >= replay.frames && timer !== null) clearInterval(timer);
         }, STREAMING_INTERVAL_MS);
       }
@@ -75,5 +79,5 @@ export function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | 
     });
     return () => { cancelled = true; if (timer !== null) clearInterval(timer); restoreTheme?.(); };
   }, [sessionId]);
-  return { snapshot: fixture ?? (input !== undefined ? input : projected), isFixture: fixture !== null, projection, cell };
+  return { snapshot: fixture ?? (input !== undefined ? input : projected), isFixture: fixture !== null, fixtureLive, projection, cell };
 }

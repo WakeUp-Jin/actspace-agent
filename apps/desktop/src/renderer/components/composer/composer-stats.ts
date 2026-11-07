@@ -2,7 +2,7 @@ import type { RuntimeV2SessionSnapshot, RuntimeV2UsageSummary } from "@actspace/
 
 /**
  * 输入区用量胶囊的数字口径，逐条对应 DeepSeek Harness 的 `StatsPills.tsx` +
- * `token-format.ts`（参考实现见 docs/design-docs/frontend/composer-usage-dock-demo.html）。
+ * `token-format.ts`（规则见 docs/design-docs/frontend/front-聊天输入框规范.md）。
  * 这里只做投影，不碰 DOM；两个胶囊的显示/隐藏分支在 ComposerStatsPills 里。
  */
 
@@ -56,7 +56,7 @@ export function sessionStats(snapshot: RuntimeV2SessionSnapshot | null | undefin
 }
 
 /** 计费输入 = 未缓存输入 + 缓存读取 + 缓存写入（三个互不重叠的提示侧桶）。 */
-export function billedInputTokens(usage: RuntimeV2UsageSummary): number {
+export function billedInputTokens(usage: Pick<RuntimeV2UsageSummary, "inputTokens" | "cacheReadTokens" | "cacheWriteTokens">): number {
   return usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
 }
 

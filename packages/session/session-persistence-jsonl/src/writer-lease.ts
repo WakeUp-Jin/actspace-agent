@@ -18,7 +18,6 @@ export type AcquireWriterLeaseOptions = {
   readonly runtimeId: string;
   readonly pid?: number;
   readonly heartbeatMs?: number;
-  readonly staleMs?: number;
   readonly now?: () => Date;
   readonly isProcessAlive?: (pid: number) => boolean;
 };
@@ -65,9 +64,9 @@ export class SessionWriterLease {
           throw error;
         }
         const existing = await readOwner(ownerPath);
-        const age = now().getTime() - Date.parse(existing.heartbeatAt);
-        const isAlive = (options.isProcessAlive ?? defaultProcessAlive)(existing.pid);
-        if (age <= (options.staleMs ?? 30_000) || isAlive) {
+        // 只看持有进程是否还在：进程退出后立即接管，不等心跳过期。重启 dev / 应用时新进程常在旧进程退出后
+        // 几秒内启动，等 30 秒会让选择存储和会话一直锁着，排队任务被暂停。
+        if ((options.isProcessAlive ?? defaultProcessAlive)(existing.pid)) {
           throw new SessionError("SESSION_WRITER_LOCKED", `Session ${options.sessionId} is owned by runtime ${existing.runtimeId} pid ${existing.pid}.`);
         }
         const stalePath = join(recoveryDir, `stale-lock-${existing.nonce}`);

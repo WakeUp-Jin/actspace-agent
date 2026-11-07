@@ -7,7 +7,6 @@ export const currentTruthFiles = [
   "packages/README.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-package-layout-and-plugin-packaging.md",
   "docs/design-docs/frontend/front-composer-file-mentions-and-response-annotations.md",
-  "docs/design-docs/frontend/front-composer-slash-command.md",
   "docs/design-docs/frontend/front-中间消息区规范.md",
   "docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md",
   "README.md",
@@ -17,10 +16,8 @@ export const currentTruthFiles = [
   "docs/RELIABILITY.md",
   "docs/FRONTEND_VERIFICATION.md",
   "docs/roadmap.md",
-  "docs/TODOLIST.md",
   "docs/exec-plans/README.md",
   "docs/design-docs/index.md",
-  "docs/design-docs/agent-index.md",
   "docs/design-docs/core-storage-and-observability.md",
   "docs/design-docs/model-context/agent-token-usage-and-context-state.md",
   "docs/design-docs/model-context/agent-multi-provider-llm.md",
@@ -40,7 +37,6 @@ export const currentTruthFiles = [
   "docs/design-docs/agent-plugin-runtime/agent-spec-dsh-plugin-assembly-and-agent-startup.md",
   "docs/design-docs/agent-plugin-runtime/agent-target-agent-core.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-agent-and-subagent.md",
-  "docs/design-docs/agent-plugin-runtime/agent-spec-service-definition-provider-consumer.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-profile-bundle-patch-layering.md",
   "docs/design-docs/agent-plugin-runtime/agent-spec-prompt-context-contributors.md",
   "docs/design-docs/frontend/README.md",
@@ -50,7 +46,24 @@ export const currentTruthFiles = [
   "docs/design-docs/frontend/front-聊天输入框规范.md",
   "docs/design-docs/frontend/front-preload-bridge与mock规范.md",
   "docs/design-docs/frontend/front-会话状态与数据流规范.md",
+  "docs/design-docs/frontend/front-视觉token规范.md",
+  "docs/design-docs/frontend/front-文案与状态表达规范.md",
+  "docs/design-docs/frontend/front-组件与交互模式规范.md",
+  "docs/design-docs/frontend/front-设置页规范.md",
+  "docs/design-docs/frontend/front-Context面板规范.md",
+  "docs/design-docs/frontend/front-子Agent与后台任务规范.md",
+  "docs/design-docs/frontend/front-轮尾与导航规范.md",
+  "docs/design-docs/frontend/front-工作台布局与面板交互规范.md",
+  "docs/design-docs/frontend/front-左侧会话栏规范.md",
+  "docs/design-docs/frontend/front-聊天区Markdown渲染规范.md",
+  "docs/design-docs/frontend/front-web-pwa客户端规范.md",
+  "DESIGN.md",
 ];
+
+/** Gitignored outputs that a demo builds locally (see its README); a fresh clone legitimately lacks them. */
+const BUILD_ARTIFACTS = new Set([
+  "docs/design-docs/frontend/md-render-demo/editor.bundle.js",
+]);
 
 const forbiddenCurrentClaims = [
   { pattern: /\b(?:bootProfile\b\s*\(|BootedProfile\b|RunAgentInput\b)|context:compact|engine\/streaming-preview-extractors\.ts/g, message: "仍把退役的启动或任务 API 当作当前契约", allowHistoricalLine: true },
@@ -69,6 +82,14 @@ const forbiddenCurrentClaims = [
   { pattern: /@actspace\/(?:tools-|core-agent|core-scope|session-jsonl)/g, message: "仍使用插件结构调整前的旧包名", allowHistoricalLine: true },
   { pattern: /packages\/(?:tools-[a-z-]+|core-(?:agent|scope)[a-z-]*|session-jsonl)(?:\/|\b)/g, message: "仍使用插件结构调整前的一级包路径", allowHistoricalLine: true },
 ];
+
+/** Replace fenced and inline code with same-length blanks, keeping offsets and line numbers. */
+export function maskCode(source) {
+  const blank = (text) => text.replace(/[^\n]/gu, " ");
+  return source
+    .replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[^\n]*$/gmu, blank)
+    .replace(/(`+)[^`\n][\s\S]*?\1/gu, (match) => (match.includes("\n\n") ? match : blank(match)));
+}
 
 function lineNumber(source, index) {
   return source.slice(0, index).split("\n").length;
@@ -113,8 +134,22 @@ export async function checkMarkdownFiles(repoRoot, files, { checkClaims = true }
       }
     }
 
+    if (checkClaims) {
+      // Code paths named in current docs must exist; lines that explicitly describe a removed or rejected path are exempt.
+      const lines = source.split("\n");
+      for (const [index, line] of lines.entries()) {
+        if (/不|旧|迁移前|历史|已删除|已退役|retired|historical/iu.test(line)) continue;
+        for (const match of line.matchAll(/`((?:packages|apps)\/[^`\s]+)`/gu)) {
+          const path = match[1].replace(/[:#].*$/u, "").replace(/\/$/u, "");
+          if (/[*{}<>…]|\.\.\./u.test(path)) continue;
+          if (!(await exists(resolve(repoRoot, path)))) failures.push(`${relativePath}:${index + 1}: code path does not exist: ${path}`);
+        }
+      }
+    }
+
     const linkPattern = /\[[^\]]*\]\((<[^>]+>(?:\s+["'][^\n]*["'])?|[^)]+)\)/g;
-    for (const match of source.matchAll(linkPattern)) {
+    // Link syntax shown as an example inside code is not a link.
+    for (const match of maskCode(source).matchAll(linkPattern)) {
       const target = normalizeLinkTarget(match[1]);
       if (!target || target.startsWith("#") || target.startsWith("/") || /^[a-z][a-z0-9+.-]*:/iu.test(target)) continue;
       if (target.includes("*") || target.includes("{") || target.includes("<")) continue;
@@ -164,7 +199,9 @@ export async function checkDocumentationLinks(repoRoot, directories) {
         const target = normalizeLinkTarget(match[1]);
         if (!target || target.startsWith("/") || /^[a-z][a-z0-9+.-]*:/iu.test(target) || /[{}<>]/u.test(target)) continue;
         try {
-          if (!(await exists(resolve(dirname(resolve(repoRoot, path)), decodeURIComponent(target))))) {
+          const resolvedAsset = resolve(dirname(resolve(repoRoot, path)), decodeURIComponent(target));
+          if (BUILD_ARTIFACTS.has(relative(repoRoot, resolvedAsset).replaceAll("\\", "/"))) continue;
+          if (!(await exists(resolvedAsset))) {
             failures.push(`${path}:${lineNumber(source, match.index)}: broken HTML asset/link: ${target}`);
           }
         } catch {

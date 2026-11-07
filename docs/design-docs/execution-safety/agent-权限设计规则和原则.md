@@ -1,6 +1,6 @@
 # Agent 权限设计规则和原则
 
-> 文档等级：current-v2-design
+> 当前 v2 设计原则。
 >
 > 权限目标合同：[`agent-tool-permission-model.md`](./agent-tool-permission-model.md)。
 >

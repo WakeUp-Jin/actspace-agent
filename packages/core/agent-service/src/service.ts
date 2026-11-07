@@ -40,6 +40,8 @@ export interface AgentServicePorts {
 export class AgentService {
   readonly #sessions = new Map<string, Promise<SessionRunManager>>();
   readonly #externalLedgers = new Map<string, TaskLedger>();
+  /** Managers whose open already settled; release decides on these only, never on a pending open. */
+  readonly #settled = new Map<string, SessionRunManager>();
   #closed = false;
   #draining = false;
   #closing: Promise<void> | undefined;
@@ -127,6 +129,26 @@ export class AgentService {
     });
   }
   async waitForIdle(sessionId: string): Promise<void> { await (await this.#manager(sessionId)).waitForIdle(); }
+  /** True when this service holds nothing a release would lose: no manager, or an idle settled one. */
+  canRelease(sessionId: string): boolean {
+    if (this.#closed || this.#externalLedgers.has(sessionId)) return false;
+    if (!this.#sessions.has(sessionId)) return true;
+    return this.#settled.get(sessionId)?.releasable === true;
+  }
+  /**
+   * Drop the Session's manager (ledger and queue state) so the owner can close the Session handle.
+   * Check and removal share one synchronous step, so nothing can submit to a manager that is about
+   * to lose its Session. Returns false and keeps everything when work is present.
+   */
+  async release(sessionId: string): Promise<boolean> {
+    if (!this.canRelease(sessionId)) return false;
+    const manager = this.#settled.get(sessionId);
+    if (manager === undefined) return true;
+    this.#settled.delete(sessionId);
+    this.#sessions.delete(sessionId);
+    await manager.dispose().catch(() => undefined);
+    return true;
+  }
   dispose(): Promise<void> {
     if (this.#closing) return this.#closing;
     this.#closed = true;
@@ -155,6 +177,7 @@ export class AgentService {
     // Only an unacquired writer lease may be retried by the next request.
     // Recovery and durability failures remain cached to protect accepted writes.
     this.#sessions.set(sessionId, opening);
+    void opening.then(manager => { if (this.#sessions.get(sessionId) === opening) this.#settled.set(sessionId, manager); }, () => undefined);
     void opening.catch(error => {
       const retryable = (error instanceof SessionError && error.code === "SESSION_WRITER_LOCKED") || (error instanceof TaskError && error.code === "SESSION_BUSY");
       if (!acquired && retryable && this.#sessions.get(sessionId) === opening) this.#sessions.delete(sessionId);

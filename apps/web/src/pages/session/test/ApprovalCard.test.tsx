@@ -43,6 +43,17 @@ it("re-enables the buttons and shows the reason when the decision fails", async 
   expect(store.errors).toHaveLength(1);
 });
 
+it("is a single box: no 「等待确认」/「已提交」 text row above the card, the waiting state lives on the container label", async () => {
+  setup(() => ({ ok: true }));
+  const section = screen.getByRole("region", { name: "等待审批" });
+  expect(screen.queryByText("等待确认")).toBeNull();
+  expect(section.firstElementChild).toHaveClass("approval");
+  await userEvent.click(screen.getByRole("button", { name: "运行" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "运行" })).toBeDisabled());
+  expect(screen.queryByText("已提交")).toBeNull();
+  expect(section.firstElementChild).toHaveClass("approval");
+});
+
 it("recovers the full pending command through the session-owned tool detail before enabling allow", async () => {
   let resolve!: (value: unknown) => void;
   const client = fakeClient(() => new Promise(done => { resolve = done; }));

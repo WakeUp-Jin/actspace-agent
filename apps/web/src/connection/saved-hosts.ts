@@ -1,4 +1,4 @@
-// 已配对的 Host（front-web-pwa客户端规范 §5）。v1 只保存一台，结构按列表设计。
+// 已配对的 Host（front-web-pwa客户端规范 §4）。v1 只保存一台，结构按列表设计。
 export type SavedHost = { readonly hostId: string; readonly deviceId: string; readonly url: string; readonly token: string; readonly name: string; readonly pairedAt: string };
 export type SavedHosts = { readonly version: 1; readonly activeHostId: string; readonly hosts: readonly SavedHost[] };
 

@@ -11,7 +11,7 @@ it("preserves historical summaries, signed reasoning, attachments and runtime bl
   const run = await runToolStreamFixture({ terminalOnly: true, thinkingEnabled: true,
     seedSession: async session => {
       await session.append({ type: "assistant/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" },
-        data: { messageId: "summary", content: historical }, surface: { kind: "append", node: { kind: "assistant", messageId: "summary", content: historical } } });
+        data: { messageId: "summary", content: historical }, surface: { kind: "append" } });
     },
     content: [
       { type: "text", text: "Continue" },
@@ -30,8 +30,8 @@ it("preserves historical summaries, signed reasoning, attachments and runtime bl
     { type: "text", text: '<runtime_context>{"agentMode":"agent","agentModeRevision":0}</runtime_context>' },
   ] });
   const snapshot = (run.journal.find(event => event.type === "request/context")!.data as any).snapshot;
-  expect(snapshot.schemaVersion).toBe(2);
-  expect(snapshot.messages).toEqual(messages);
+  expect(snapshot.schemaVersion).toBe(3);
+  expect(snapshot.messages).toBeUndefined();
   expect(snapshot.prepared).toMatchObject({ model: "test", route: "test", adapterVersion: "test", contextWindow: null });
 });
 
@@ -55,9 +55,10 @@ it("reselects the model prompt when a request intervention changes the model", a
   } });
   expect(messages[0]).toEqual({ role: "system", content: "Prompt for selected-model" });
   const snapshot = (run.journal.find(event => event.type === "request/context")!.data as any).snapshot;
-  expect(snapshot.renderedSystemPrompt).toBe("Prompt for selected-model");
+  const prompt = run.journal.find(event => event.type === "request/system-prompt")!.data as any;
+  expect(prompt.sections.map((section: any) => section.content)).toEqual(["Prompt for selected-model"]);
+  expect(snapshot.systemPromptDigest).toBe(prompt.digest);
   expect(snapshot.prepared.model).toBe("selected-model");
   expect(snapshot.contextModel.label).toBe("selected-model");
-  expect(snapshot.contextManifest.comparable).toBe(true);
-  expect(snapshot.contextManifest.entries.every((entry: any) => !entry.preview)).toBe(true);
+  expect(snapshot.contextManifest).toBeUndefined();
 });

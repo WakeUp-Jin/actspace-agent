@@ -24,7 +24,7 @@
 | 包边界 / v2 legacy / Harness事件 / 文档 | 通过；package-cutover非strict仍列出3个既存site /eval路径，未宣称strict通过 |
 | Desktop全套 | 原工作区首次1008断言通过但悬空HoverCard定时器报错；复验一项批注卡关闭时序失败；隔离完整构建后串行全套1008项通过（139文件，1文件/2用例跳过）；未掩盖原工作区时序不稳定 |
 | CLI分发产物 | 隔离副本生成tar.gz，解包后help/version、持久会话与resume冒烟通过；非签名Desktop发布验收 |
-| Computer Use | gpt-6.1-sol完成[逐项验收](computer-use-acceptance.md)：A1/A3/A4/A5/A6通过；A2运行中手动命名与终态保持通过，标题请求30秒内竞争未实际覆盖，仅单测补证。没有确认新产品Bug |
+| Computer Use | gpt-6.1-sol完成逐项验收（原始记录已清理，见 git 历史）：A1/A3/A4/A5/A6通过；A2运行中手动命名与终态保持通过，标题请求30秒内竞争未实际覆盖，仅单测补证。没有确认新产品Bug |
 | 历史保护 | 原有813个histories/learnings文件hash一致；原有产品/前端WIP保留 |
 
 ## 统计与未覆盖

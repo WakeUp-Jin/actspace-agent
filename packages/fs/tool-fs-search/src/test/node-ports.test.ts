@@ -22,6 +22,19 @@ describe("filesystem-search ports", () => {
     const glob = await invoke(ports.glob, { pattern: "*.ts", path: "src" }); const text = JSON.stringify(glob); expect(text.indexOf("src/new.ts")).toBeLessThan(text.indexOf("src/old.ts"));
   });
 });
+describe("filesystem-search output cap", () => {
+  it("caps grep output at 64,000 characters and tells the model to narrow the search", async () => {
+    const root = await workspace();
+    // 2,000 个文件各 1 行命中，每行约 100 字符：总输出约 200K，超过上限。
+    await Promise.all(Array.from({ length: 2_000 }, (_, i) => writeFile(join(root, `f${String(i).padStart(4, "0")}.ts`), `export const needle_${i} = "${"x".repeat(60)}";\n`)));
+    const ports = createNodeToolPorts({ workspaceRoot: root });
+    const result = await invoke(ports.grep, { pattern: "needle" });
+    const text = (result.modelOutput as { text: string }[])[0]!.text;
+    expect(text.length).toBeLessThan(66_000);
+    expect(text).toContain("Output truncated");
+    expect(text).toMatch(/narrow/i);
+  });
+});
 async function waitFor(predicate: () => boolean, timeoutMs = 1_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!predicate()) {

@@ -2,7 +2,7 @@
 
 状态：实现完成，未提交；真实桌面与部分视觉矩阵仍保留验收门禁。
 关联计划：[已完成计划](../../exec-plans/completed/20260916-tool-stream-typography.md)。
-执行过程：[过程记录](execution-process.md)。
+执行过程：过程记录（原始记录已清理，见 git 历史）。
 
 ## 交付内容
 

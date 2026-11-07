@@ -55,7 +55,7 @@ export function ProviderKeyModal({
       <DialogContent size="sm" surface="raised" backdrop="overlay" withDescription className="p-5">
         <DialogTitle asChild><h3 className="text-act-lg font-bold text-text-main">连接 {label}</h3></DialogTitle>
         <DialogDescription className="mt-1.5 text-act-xs leading-relaxed text-text-faint">
-          输入你的 {label} API Key，将经系统密钥串加密后保存在本机，不会以明文形式落盘或上传。
+          Key 只保存在本机
         </DialogDescription>
         <input
           type="password"

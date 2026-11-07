@@ -14,10 +14,10 @@
 
 - 根 `AGENTS.md`、`docs/REPO_COLLAB_GUIDE.md`、`docs/ARCHITECTURE.md`、`docs/CODING_BEHAVIOR.md`。
 - [联合设计](../../../design-docs/上下文管理引擎设计/上下文管理引擎V2/05-Context面板与SQLite联合设计.md)；[V2 总入口](../../../design-docs/上下文管理引擎设计/上下文管理引擎V2/README.md)。
-- [面板数据需求](../../../design-docs/frontend/front-Context面板后端数据需求.md)、[前端开发清单](../../../design-docs/frontend/front-新功能开发清单.md)、[前端验证](../../../FRONTEND_VERIFICATION.md)。
-- [SQLite 设计](../../../design-docs/筛选存储改版V2-增加SQLite/README.md)、[Worker 规范](../../../design-docs/筛选存储改版V2-增加SQLite/worker.md)、原执行摘要与上述 Bug 清单。
+- [面板数据需求](../design-archive/frontend/front-Context面板后端数据需求.md)、[前端开发清单](../../../design-docs/frontend/front-新功能开发清单.md)、[前端验证](../../../FRONTEND_VERIFICATION.md)。
+- [SQLite 设计](../../../design-docs/core-data-storage-design.md)、[Worker 规范](../../../design-docs/core-data-storage-design.md)、原执行摘要与上述 Bug 清单。
 - [Agent 测试规范](../../../design-docs/agent-plugin-runtime/agent-testing.md)、[本计划验收矩阵](acceptance.md)。
-- [原 SQLite 会话决策校验](../../../design-docs/上下文管理引擎设计/上下文管理引擎V2/06-原会话决策与联合方案校验.md)：区分已确认约束、新增提案和未交付的历史讨论项；不得把导出/doctor 自动视为已完成或擅自扩展本任务。
+- 原 SQLite 会话决策校验（原文已删除，见 git 历史）：区分已确认约束、新增提案和未交付的历史讨论项；不得把导出/doctor 自动视为已完成或擅自扩展本任务。
 
 ## 输入、输出与依赖
 

@@ -36,7 +36,7 @@ export function RuntimeTab({ data }: { data: HarnessStatsRuntime }) {
     { label: "碰到步数上限", value: fmtPct(ratio(ends.stepLimit, endTotal)), tone: ends.stepLimit > 0 ? "warn" : undefined },
     ...(ends.other ? [{ label: "其他", value: fmtPct(ratio(ends.other, endTotal)) }] : []),
   ];
-  if (data.turns === 0) return <EmptyNote>所选范围内没有运行记录。</EmptyNote>;
+  if (data.turns === 0) return <EmptyNote>没有运行记录。</EmptyNote>;
   return (
     <Stack>
       <SecHead title="Agent 循环" />
@@ -88,7 +88,7 @@ export function RuntimeTab({ data }: { data: HarnessStatsRuntime }) {
         </Card>
       </Grid>
       {data.auxiliary.length > 0 ? (
-        <Card title="辅助模型调用" hint="标题生成、压缩摘要等不属于主循环的调用">
+        <Card title="辅助模型调用">
           <KvList rows={[...data.auxiliary].sort((a, b) => b.calls - a.calls).map((item) => ({
             label: <span className="font-mono text-act-xs">{item.purpose}</span>,
             value: `${fmtInt(item.calls)} 次${item.failed ? ` · ${fmtInt(item.failed)} 失败` : ""} · 平均 ${fmtDuration(item.avgMs)}`,

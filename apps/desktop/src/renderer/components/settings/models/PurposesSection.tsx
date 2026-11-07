@@ -15,7 +15,7 @@ export function PurposesSection({ view }: { view: ModelConnectionsView }) {
     if (connection) go({ name: "detail", connectionId: connection.connectionId, expand: key });
   };
   return (
-    <SettingGroup title="用途" description="每类任务用哪个模型，以及默认的思考档位。" headingLevel={3}>
+    <SettingGroup title="用途" headingLevel={3}>
       {PURPOSES.map((purpose) => (
         <SettingRow
           key={purpose.id}

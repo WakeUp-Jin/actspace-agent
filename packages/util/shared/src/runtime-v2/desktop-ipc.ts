@@ -37,10 +37,3 @@ export type RuntimeV2DesktopLiveEnvelope = {
   readonly event: RuntimeV2LiveEvent;
   readonly emittedAt: string;
 };
-export type RuntimeV2LiveReplay = {
-  readonly runtimeInstanceId: string;
-  readonly afterCursor: number;
-  readonly currentCursor: number;
-  readonly gap: boolean;
-  readonly events: readonly RuntimeV2DesktopLiveEnvelope[];
-};

@@ -60,10 +60,12 @@ export type TaskSnapshotEffects = {
   readonly notice: (sessionId: string, text: string) => void;
   /** 有任务结算时重读 durable 页。 */
   readonly refreshSession: (sessionId: string) => void;
+  /** 重新挂上运行中的 run 后，取它的实时底稿（见 live-runs/live-baseline.ts）。 */
+  readonly attachLiveBaseline?: (sessionId: string, agentRunId: string) => void;
 };
 
 /** 应用 Host 的任务快照：更新队列、结算本地选项，并按运行中的 run / 压缩任务挂上或卸下 live run。 */
-export function applyTaskSnapshot(snapshot: TaskSnapshot, { tasks, runs, patchLocal, notice, refreshSession }: TaskSnapshotEffects): void {
+export function applyTaskSnapshot(snapshot: TaskSnapshot, { tasks, runs, patchLocal, notice, refreshSession, attachLiveBaseline }: TaskSnapshotEffects): void {
   const accepted = tasks.accept(snapshot);
   if (!accepted) return;
   const { previous } = accepted;
@@ -104,6 +106,7 @@ export function applyTaskSnapshot(snapshot: TaskSnapshot, { tasks, runs, patchLo
       sessionId: snapshot.sessionId, agentRunId: running.runId, recovered: true,
       state, userBlock: null, aborting: false,
     });
+    attachLiveBaseline?.(snapshot.sessionId, running.runId);
   }
   const currentRun = runs.get(snapshot.sessionId);
   const initial = running && snapshot.tasks.find(task => task.taskId === running.taskId);

@@ -8,37 +8,42 @@ function snapshot(events: [string, Record<string, RuntimeV2JsonValue>][], sessio
 }
 const base = { id: 'model-prompt', owner: 'actspace.context-system', order: 0, content: 'fixed' };
 const rule = { id: 'host/workspace-instructions', owner: 'actspace.context-rules', order: 20, content: 'rule-one' };
-const request = (id: string, sections: RuntimeV2JsonValue[], facts: RuntimeV2JsonValue[] = []) => ({ turnId: 't', stepId: id, requestId: id, snapshot: { renderedSystemPrompt: sections.map(value => (value as Record<string, unknown>).content).join('\n\n'), contextSections: sections, contextModelFacts: facts, tools: [] } });
+const prompt = (id: string, sections: RuntimeV2JsonValue[], facts: RuntimeV2JsonValue[] = []): [string, Record<string, RuntimeV2JsonValue>] => ['request/system-prompt', { turnId: 't', stepId: id, requestId: id, digest: JSON.stringify([sections, facts]), sections, modelFacts: facts, contributorProvenance: [] }];
+const context = (id: string): [string, Record<string, RuntimeV2JsonValue>] => ['request/context', { turnId: 't', stepId: id, requestId: id, snapshot: { schemaVersion: 3 } }];
 
-it('projects initial, changed and removed context without fake system updates or repeated unchanged rows', () => {
+it('projects initial, changed and removed context from adjacent prompt records without repeated unchanged rows', () => {
   const view = buildTrajectorySnapshot(snapshot([
     ['turn/start', { turnId: 't' }],
-    ['request/context', request('r1', [base, rule])],
-    ['request/context', request('r2', [base, rule])],
-    ['request/context', { requestId: 'r3', snapshot: { promptUnchanged: true } }],
-    ['request/context', request('r4', [base, { ...rule, content: 'rule-two' }])],
-    ['request/context', request('r5', [base])],
+    prompt('r1', [base, rule]), context('r1'),
+    context('r2'),
+    context('r3'),
+    prompt('r4', [base, { ...rule, content: 'rule-two' }]), context('r4'),
+    prompt('r5', [base]), context('r5'),
   ]));
-  expect(view.records.filter(row => row.kind === 'system')).toHaveLength(1);
+  expect(view.records.filter(row => row.kind === 'system').map(row => row.summary)).toEqual(['初始系统提示词']);
   const rows = view.records.filter(row => row.kind === 'context');
   expect(rows.map(row => row.contextPresentation?.action)).toEqual(['已加载', '已更新', '已移除']);
   expect(rows[1]).toMatchObject({ inputDetail: 'rule-two', contextPresentation: { category: '规则', previousText: 'rule-one', placement: 'system' }, messageSource: { projection: 'request-composition', requestId: 'r4' } });
   expect(rows[2]?.inputDetail).toBe('');
 });
 
-it('keeps skill catalog distinct from loaded skills and does not infer sources for old logs', () => {
+it('keeps skill catalog distinct from loaded skills', () => {
   const skill = { id: 'core/selected-skills', owner: 'actspace.context-skills', order: 30, content: 'loaded' };
   const catalog = { id: 'core/skills-catalog', owner: 'actspace.context-skills', order: 0, content: [{ id: 'test', name: 'Test', description: 'catalog only' }] };
-  const view = buildTrajectorySnapshot(snapshot([['request/context', request('r', [base, skill], [catalog])]]));
+  const view = buildTrajectorySnapshot(snapshot([prompt('r', [base, skill], [catalog]), context('r')]));
   expect(view.records.filter(row => row.kind === 'context').map(row => row.contextPresentation?.category)).toEqual(['已加载技能', '技能目录']);
-  const old = buildTrajectorySnapshot(snapshot([['request/context', { snapshot: { renderedSystemPrompt: '<rules>unknown</rules>', systemSections: ['unknown'], tools: [] } }]]));
-  expect(old.records.map(row => row.kind)).toEqual(['system']);
+});
+
+it('uses a prompt record carried from before the history window only as the baseline', () => {
+  const events = snapshot([prompt('r1', [base, rule]), ['turn/start', { turnId: 't' }], prompt('r2', [base, { ...rule, content: 'rule-two' }]), context('r2')]);
+  const view = buildTrajectorySnapshot({ ...events, history: { fromSeq: 1, previousFromSeq: 1, turnOffset: 3 } });
+  expect(view.records.filter(row => row.kind === 'context').map(row => row.contextPresentation?.action)).toEqual(['已更新']);
 });
 
 it('keeps the delegated agent call as one parent row and exposes its child session link', () => {
   const parentSnapshot = snapshot([
     ['turn/start', { turnId: 't' }], ['step/start', { turnId: 't', stepId: 'p' }],
-    ['request/context', { turnId: 't', stepId: 'p', requestId: 'r', snapshot: { renderedSystemPrompt: 'parent', tools: [] } }],
+    ['request/context', { turnId: 't', stepId: 'p', requestId: 'r', snapshot: { schemaVersion: 3 } }],
     ['tool/call', { turnId: 't', stepId: 'p', callId: 'same', name: 'agent', args: { description: 'Read storage' } }],
     ['delegation/requested', { invocationId: 'i1', parentCallId: 'same', childSessionId: 'child', presetId: 'actspace.explore' }],
     ['delegation/requested', { invocationId: 'i2', parentCallId: 'self', childSessionId: 's' }],

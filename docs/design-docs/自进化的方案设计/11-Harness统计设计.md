@@ -1,6 +1,6 @@
 # Harness 统计设计
 
-更新：2026-11-01。状态：已实现（未提交，待 Electron 真实 Host 验收）。用户已确认方向和全部核心决策（含 D13–D15），执行计划见 [20261101-harness-stats](../../exec-plans/active/20261101-harness-stats.md)；视觉方向 A 的 demo 见 [harness-stats-demo.html](../frontend/harness-stats-demo.html)。
+本文定义 Harness 统计的方向与决策（D1–D15）；执行计划见 [20261101-harness-stats](../../exec-plans/completed/20261101-harness-stats.md)。
 
 ## 1. 为什么做
 
@@ -23,14 +23,14 @@
 | D4 | 全部指标一期实现；只有 Agent 查询工具放第二期 | 第二期依赖第一期的数据打磨好 |
 | D5 | 筛选：时间、模式、模型、工作区、会话类型、Harness 版本；子 Agent 会话默认分开 | 用户要求按模式判断“哪些工具在哪种模式下没用” |
 | D6 | 所有数据带 Harness 版本，支持两个版本对比 | 自进化改完要能验证效果 |
-| D7 | 设置「活动」分组新增「Harness 统计」页，视觉方向 A（与「使用统计」同构） | 用户 2026-11-01 选定 |
+| D7 | 设置「活动」分组新增「Harness 统计」页，视觉方向 A（与「使用统计」同构） | 已选定 |
 | D8 | 会话日志里没有的运行时数据，另存到 `<dataRoot>/harness-stats/YYYY-MM.jsonl`（方案 C），不写进会话日志，也不直接写 SQLite | 会话日志只放会话事实；原始文件保证新指标能补算历史 |
 | D9 | 会话删除后统计数据保留 | 统计只存名字、次数和耗时，不存参数和对话内容 |
 | D10 | 服务调用记“插件 × 服务 × 方法”的次数、耗时、报错，加“调用方 → 被调用方”次数汇总；不逐次记录 | 一切以不消耗资源为前提 |
 | D11 | 增量读取 + 只读一遍（并入使用统计的 Worker）+ 按小时预汇总 + 按 tab 按需查询 + 缓存 | 打开页面的开销只和新增数据量有关 |
-| D12 | 首次补历史时先显示已算好的部分并显示进度；页面打开时会话日志有新内容，2 秒后只刷新当前 tab | 用户 2026-11-01 确认 |
+| D12 | 首次补历史时先显示已算好的部分并显示进度；页面打开时会话日志有新内容，2 秒后只刷新当前 tab | 已确认 |
 | D13 | 运行时统计做成独立的 Host 插件包 `@actspace/harness-stats`，不做成 Harness 插件；挂载层只加通用观察口 | Harness 插件无法包装兄弟插件、没有数据目录，且会被自进化删改（见 3.2） |
-| D14 | 「压缩拿掉的工具输出」与「查睡眠索引 / 索引转化」从现有日志算出 | 用户 2026-11-01 要求保留这两项 |
+| D14 | 「压缩拿掉的工具输出」与「查睡眠索引 / 索引转化」从现有日志算出 | 保留这两项 |
 | D15 | 会话删除时把该会话的汇总追加到归档文件，统计永久保留 | 统计库重建后已删除会话的日志不在了，只能靠归档 |
 
 ## 3. 数据从哪来
@@ -41,19 +41,19 @@
 
 | 指标 | 来源事件与字段 |
 |---|---|
-| 工具可用次数 | `request/context.snapshot.tools[].name` 与 manifest 中 `["tool", pluginId, name]` 条目 |
-| 工具定义 token | manifest 条目 `estimatedTokens`（key `["tool", pluginId, name]`） |
+| 工具可用次数 | 每次请求时最近一条 `request/tools` 的 `tools[].name` |
+| 工具定义 token | `contextEstimate` 折叠出的工具项 `estimatedTokens`（key `["tool", pluginId, name]`） |
 | 调用、结果、失败原因 | `tool/call`（`callId, pluginId, name, args`）、`tool/result`（`status, failure.code, failure.phase`） |
 | 纯执行耗时 | `tool-workflow/run-start` 到 `tool/result` 的信封时间差（run-start 在审批之后、执行体之前写入） |
-| 输出 token | `tool/result.modelOutput` 文本长度 ÷ 4（与 manifest 同一估算口径） |
+| 输出 token | `tool/result.modelOutput` 按统一估算（`ceil(字数/4)`，与上下文估算同一口径） |
 | 输出被截断 | `modelOutput` 文本中的截断标记：Bash `[Output truncated;`、read_file `[Showing lines`、grep/glob 方括号后缀、web_fetch `[Content truncated]`。调用参数里带 `offset` / `limit` 的读取是主动分段，不算截断 |
 | 审批 | `tool/result.approvalMode`（`auto / manual / session`）与 `approvalReason`；`permission/asked`（`requestedAt`）、`permission/decided`（`kind, decidedAt, code`）、`permission/grant-used`、`permission/scope-denied` |
 | bash 沙盒 | `tool/result.detail[label="environment"].value.sandboxed`；出沙箱申请 = `tool/call.args.sandbox_permissions === "require_escalated"` |
 | 同参数重复 / 失败后重试 | 同一 turn 内 `tool/call` 的 `name + args` 摘要相同；失败结果之后下一次调用同名工具 |
 | 模式、模型 | `request/header.agentMode`、`request/header.model`（每一步） |
-| 上下文 6 类、来源、条目 | `request/context.snapshot.contextManifest`（`buckets, entries[{key, bucket, estimatedTokens}], comparable`） |
-| 窗口占用、估算准确度、缓存命中 | `request/header.contextWindow`、manifest `totalEstimatedTokens`、`assistant/message.usage`（`inputTokens, cacheReadTokens, cacheWriteTokens`） |
-| Skills | 列表：`snapshot.modelFacts` 里 `core/skills-catalog` 的 `{id, location, source}`；选中：manifest key 的 section 为 `core/selected-skills`；读取：`read_file` 结果 `detail[label="actspace.context.file"].value.path` 等于某个 skill 的 `location`，或位于其目录下（附属文件） |
+| 上下文 6 类、来源、条目 | 每个 `request/context` 时 `applyContextEstimate` 折叠状态的分类与非对话明细（2026-11-06 起日志里不再存估算明细） |
+| 窗口占用、估算准确度、缓存命中 | `request/header.contextWindow`、折叠状态的 `totalEstimatedTokens`、`assistant/message.usage`（`inputTokens, cacheReadTokens, cacheWriteTokens`） |
+| Skills | 列表：`request/system-prompt.modelFacts` 里 `core/skills-catalog` 的 `{id, location, source}`；选中：明细 key 的 section 为 `core/selected-skills`；读取：`read_file` 结果 `detail[label="actspace.context.file"].value.path` 等于某个 skill 的 `location`，或位于其目录下（附属文件） |
 | 活跃 / 睡眠路径 | `plugin/actspace.context/state`（`fact / candidate / applied / index / fork`）。按 `applyStateEvent` 重放，读取发生时路径是活跃还是睡眠由重放状态判断（按 `fact.sourceSeq` 排序） |
 | 压缩 | `compaction/start / summary / end`（`trigger, durationMs, beforeTokens, afterTokens`）；失败 = `llm/auxiliary-end` 中 `purpose="compaction"` 且 `status` 为 `failed / aborted` |
 | 压缩拿掉的工具输出 | 同一压缩事务里的 `surface/replaced.data.sourceEventSeqs` 列出被摘要替换的原始事件编号；其中是 `tool/result` 的，按工具名累计条数和输出 token |
@@ -191,12 +191,12 @@
 
 ## 7. 页面
 
-视觉以 demo 方向 A 为准：与「使用统计」同一套骨架（`PageShell` wide、范围分段、指标卡、下划线 tab、表格），颜色全部用主题 token，浅色和深色主题都要验过。
+视觉方向：与「使用统计」同一套骨架（`PageShell` wide、范围分段、指标卡、下划线 tab、表格），颜色全部用主题 token，浅色和深色主题都要验过。
 
 - 标题「Harness 统计」，说明“插件、工具、上下文和压缩的使用情况，为优化 Harness 和自进化提供依据。不含 Token 与费用（见「使用统计」）。”
 - 筛选条：时间（24 小时 / 7 天 / 30 天 / 全部）、模式、模型、工作区、会话类型（主会话 / 子 Agent / 侧边对话 / 全部）、版本、刷新。
 - 4 张指标卡：加载的插件、工具调用、每次请求的上下文、压缩。
-- 7 个 tab：总览、插件、工具、上下文与 Skills、披露与压缩、运行、版本对比。每个 tab 的内容与 demo 一致；demo 的“裁剪工具输出”改名「压缩拿掉的工具输出」，“Agent 查过索引”改为「查索引 N 次 · 之后读了索引里的文件 M 次」。
+- 7 个 tab：总览、插件、工具、上下文与 Skills、披露与压缩、运行、版本对比。指标命名：「压缩拿掉的工具输出」（不叫“裁剪工具输出”）；索引转化写作「查索引 N 次 · 之后读了索引里的文件 M 次」。
 - 列表可排序；点「值得关注」跳到对应 tab；插件行点开显示该插件的服务、监听和依赖。
 - 图表：成本 vs 使用散点、每天调用趋势、6 类堆叠条、直方图。数值标签用文字色，系列色只用于图形；6 类沿用 Context 面板的 `--act-context-*` token；每个图都有悬停提示。
 
@@ -215,6 +215,6 @@
 |---|---|
 | Proxy 包装让某些服务对象行为变化（`===` 比较、`#private`、Cordis 自带代理） | 只包函数、`Reflect.apply` 回原对象、同插件同对象缓存同一 Proxy；跑默认 Harness 启动、挂载和真实 Host 端到端测试；环境变量一键关闭 |
 | 首次补历史耗时长 | 复用现有同步的进度、取消和失败隔离；先显示已有结果 |
-| `request/context` 很大，解析成本高 | 只在 Worker 里解析，只取 tools 名称、manifest 条目和 skills 列表三块；与使用统计共用同一次读取 |
-| manifest 超预算或旧记录不可比（`comparable=false`） | 这类请求不计入条目级统计，在上下文 tab 显示“N 次请求缺少明细” |
+| 读取成本 | 只在 Worker 里折叠；`request/context` 已是小字段，提示词与工具只在变化时出现；与使用统计共用同一次读取 |
+| 旧会话缺少 `request/system-prompt` / `request/tools`，折叠不出明细 | 这类请求不计入条目级统计，在上下文 tab 显示“N 次请求缺少明细” |
 | 统计文件无限增长 | 按月分文件；每行是小时级汇总，量级为每月几 MB；健康指标显示占用 |

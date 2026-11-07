@@ -184,7 +184,7 @@ export function CostScatter({ tools }: { tools: readonly HarnessToolRow[] }) {
         {labels.map((item) => (
           <text key={item.id} x={item.x} y={item.y} textAnchor={item.anchor} className={cn("pointer-events-none text-act-xxs", warnNames.has(item.id) ? "fill-text-main font-medium" : "fill-text-muted")}>{item.id}</text>
         ))}
-        <text x={w - right} y={h - 2} textAnchor="end" className="fill-text-faint text-act-xxs">调用率（被调用次数 ÷ 出现在请求里的次数，对数刻度）→</text>
+        <text x={w - right} y={h - 2} textAnchor="end" className="fill-text-faint text-act-xxs">调用率 →</text>
         <text x={left + 4} y={top - 1} className="fill-text-faint text-act-xxs">↑ 工具定义 token</text>
       </svg>
       {skipped > 0 ? <p className="m-0 mt-1 text-act-xxs text-text-faint">另有 {skipped} 个工具没有定义大小或出现次数，未画出，见下表。</p> : null}

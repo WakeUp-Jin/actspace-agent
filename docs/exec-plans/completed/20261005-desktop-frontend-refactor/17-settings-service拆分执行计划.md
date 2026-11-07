@@ -2,7 +2,7 @@
 
 > 状态：**实现完成，已归档，待人工验收**（2026-10-11），按 [00](00-总执行计划.md) 的顺序执行；进度见本文「进度记录」和 00 §11。
 > 总计划：[00 总执行计划](00-总执行计划.md)。执行顺序第 9 位，也是最后一位，排在 09 之后（C2 已拍板）。
-> 设计来源：[01 安全与 IPC 收口](../../../desktop-frontend-refactor/01-安全与IPC收口.md) 的 P1-4 和 S8。
+> 设计来源：[01 安全与 IPC 收口](../design-archive/desktop-frontend-refactor/01-安全与IPC收口.md) 的 P1-4 和 S8。
 > 执行记录：`docs/exec-runs/20261005-desktop-fe-17-settings-split/`。
 > 路径缩写：`M` = `apps/desktop/src/main`。行号基于 2026-10-05；11、13 会改到 IPC 注册，但不会动 settings-service 本体，行号预计基本不变。动手前仍要重新定位。
 

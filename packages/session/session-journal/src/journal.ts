@@ -4,6 +4,7 @@ import { defaultSessionProvenance, snapshotSessionJson, type SessionEventCandida
 import { SessionError } from "./errors.js";
 import { SessionEventValidator, type SessionValidationResult } from "./invariant-validator.js";
 import { SessionSurface, type SessionSurfaceView } from "./surface.js";
+import { trustSurfaceView, type TrustedSurfaceView } from "./surface-trust.js";
 
 export type SessionJournalOptions = {
   readonly registry: EventCodecRegistry;
@@ -161,8 +162,9 @@ export class SessionJournal {
   /** Compatibility for external consumers; new callers use explicit readEvents/ranges. */
   get events(): readonly SessionEventEnvelopeV1[] { return this.readEvents(); }
 
-  get surface(): SessionSurfaceView {
-    return this.#surface.view;
+  /** 事件进日志前都经过 snapshotSessionJson 校验、深度冻结，所以这里交出的视图登记为已信任（agent-spec-context-trusted-surface.md §3.1）。 */
+  get surface(): TrustedSurfaceView {
+    return trustSurfaceView(this.#surface.view);
   }
 
   get validation(): SessionValidationResult {

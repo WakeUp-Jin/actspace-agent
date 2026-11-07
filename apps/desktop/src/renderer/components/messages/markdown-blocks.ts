@@ -32,6 +32,9 @@ export type MarkdownBlockSplit = {
   readonly blocks: readonly MarkdownBlock[];
 };
 
+/** gfm 扩展只建一次：每次调用 gfm() / gfmFromMarkdown() 都会重新合并一整套语法扩展（规范 front-流式Markdown解析降频规范.md §3.3）。 */
+const PARSE_OPTIONS = { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] };
+
 /** 保留的未冻结块数：最后一块可能还在写，倒数第二块可能被后续内容改写（如 setext 标题、列表续行）。 */
 const LIVE_BLOCK_COUNT = 2;
 
@@ -95,7 +98,7 @@ export function normalizeLabel(label: string): string {
 }
 
 function topLevelNodes(markdown: string): TopLevelNode[] {
-  const tree = fromMarkdown(markdown, { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] });
+  const tree = fromMarkdown(markdown, PARSE_OPTIONS);
   return tree.children.flatMap((node) => {
     const end = node.position?.end.offset;
     if (end === undefined) return [];

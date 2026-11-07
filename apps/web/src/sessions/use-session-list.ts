@@ -23,7 +23,7 @@ function groupApprovals(requests: readonly ApprovalRequest[]): Map<string, reado
   return grouped;
 }
 
-/** Host 频道的订阅只在这里做一次；列表页、详情页顶栏、新建面板共用（front-web-pwa客户端规范 §9.1）。 */
+/** Host 频道的订阅只在这里做一次；列表页、详情页顶栏、新建面板共用（front-web-pwa客户端规范 §8.1）。 */
 export function SessionListProvider({ children }: { readonly children: ReactNode }) {
   const store = useConnectionStore();
   const connection = useHostConnection();

@@ -24,7 +24,7 @@
 
 高频写入期间main从782到794MiB、renderer从225到228MiB，GPU从空闲54MiB升到175MiB等，GPU分配波动贡献了主要峰值增量。停止后GPU回54MiB，main793MiB；没有据此认定内存泄漏。原应用已有约1GiB总足迹，本轮没有测全新启动和旧实现A/B，不能将全部绝对占用归因监听。
 
-压力期间真实界面的差异文件折叠/展开成功，无此次观察可见卡顿；操作工具耗时不等同于应用精确交互延迟。[真实交互记录](computer-use-results.md)。
+压力期间真实界面的差异文件折叠/展开成功，无此次观察可见卡顿；操作工具耗时不等同于应用精确交互延迟。真实交互记录（原始记录已清理，见 git 历史）。
 
 ## 切走后的实际影响
 
@@ -50,7 +50,7 @@
 
 ## 证据与复现边界
 
-- [测试点和分组](test-plan.md)、[真实交互](computer-use-results.md)。
+- 测试点和分组（原始记录已清理，见 git 历史）、真实交互（原始记录已清理，见 git 历史）。
 - `component-benchmark.json`为第一次三组连续组件数据；`component-no-watch.json`和`component-watch-and-query.json`为time新进程复测；`many-workspaces.json`为独立多根测量。
 - `*-idle.json`、`review-churn.json`、`review-recovery.json`、`ordinary-save.json`含每秒四进程数据；`environment.json`记录版本、硬件、夹具和源码hash。
 - `component-benchmark.cjs`、`native-probe.py`仅为测量工件；复用时必须先调整当前仓库compiled路径、真实main PID与fixture manifest，禁止盲目向真实项目写入。原执行脚本、raw top输出和夹具保留在本轮临时目录。

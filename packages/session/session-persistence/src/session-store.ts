@@ -29,7 +29,9 @@ export class SessionStore {
   async inspect(sessionId: string): Promise<SessionInspection> {
     const snapshot = await this.storage.inspect(sessionId);
     let validation: SessionValidationResult | null = null;
-    try { if (snapshot.header) validation = validateSessionEvents(snapshot.events, this.options.registry); } catch { /* Keep inspection available for diagnostics. */ }
+    // The backend already validated these exact events; reuse its result when it used the same codec set.
+    if (snapshot.header && snapshot.validated?.codecDigest === this.options.registry.digest) validation = snapshot.validated.result;
+    else try { if (snapshot.header) validation = validateSessionEvents(snapshot.events, this.options.registry); } catch { /* Keep inspection available for diagnostics. */ }
     return { ...snapshot, validation, accessState: snapshot.integrity === "complete" && validation ? validation.accessState : "corrupt" };
   }
 

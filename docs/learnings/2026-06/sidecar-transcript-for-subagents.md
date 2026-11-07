@@ -1,95 +1,62 @@
-# Sidecar Transcript 让子智能体可观测但不污染主上下文
+# Sidecar Transcript：子智能体可观测但不污染主上下文，详情页再适配回主消息语法
 
-关联 history：`docs/histories/2026-06/20260603-0804-agent-subagent-runtime-closeout.md`
+合并自：Sidecar Transcript 让子智能体可观测但不污染主上下文、Sidecar Transcript 详情页要适配回主消息语法。
 
-## 是什么
+关联 history：`docs/histories/2026-06/20260603-0804-agent-subagent-runtime-closeout.md`、`docs/histories/2026-06/20260604-0145-subagent-transcript-ui.md`
 
-当主 Agent 调用一个子智能体时，子智能体内部会产生一整套事件：收到的 prompt、thinking、读文件、grep、最终报告、usage、错误。这些事件对 UI 回放和排障很有价值，但不一定都应该进入主 Agent 的长期上下文。
+## 1. 拆分“主 Agent 需要知道什么”和“人类需要回看什么”
 
-Sidecar transcript 的做法是：
+子智能体隔离探索时会产生整套事件：收到的 prompt、thinking、读文件、grep、最终报告、usage、错误。全部写进主 session 的问题：
+- **上下文污染**：主 Agent 下一轮把子智能体的全部工具轨迹当成自己的历史，token 膨胀、推理焦点变散。
+- **角色混淆**：历史恢复时主消息流混入子智能体内部 user/tool/assistant 事件。
+- **恢复脆弱**：主 session selector 要同时理解两套事件语法，长期变成高耦合分支。
 
-- 主 session 只保存主 Agent 需要继续推理的摘要、stats 和 transcriptRef。
-- 子智能体完整事件流写到 sidecar JSONL，例如 `subagents/<parentTurnId>/<runId>.jsonl`。
-- UI 通过 typed ref 读取 sidecar，展示完整 transcript。
-
-## 为什么需要
-
-子智能体常用于隔离探索：它可能读几十个文件、跑多轮搜索、产生大量中间判断。如果把这些内部事件全部写入主 session，会有三个问题：
-
-- **上下文污染**：主 Agent 下一轮会把子智能体的所有工具轨迹当成自己的历史，token 膨胀且推理焦点变散。
-- **角色混淆**：历史恢复时，用户看到的主消息流会混入子智能体内部 user/tool/assistant 事件，难以判断谁做了什么。
-- **恢复脆弱**：主 session selector 需要同时理解主 Agent 和 SubAgent 两套事件语法，长期会变成高耦合分支。
-
-Sidecar transcript 把“主 Agent 需要知道什么”和“人类需要回看什么”拆开：前者是短摘要，后者是完整事件流。
-
-## 怎么做
-
-关键是让三条链路各自有清楚边界。
+做法：主 session 只存主 Agent 继续推理需要的摘要、stats 和 `transcriptRef`；完整事件流写 sidecar JSONL（`subagents/<parentTurnId>/<runId>.jsonl`）；UI 经 typed ref 读取。
 
 ```ts
 type AgentToolResult = {
-  modelOutput: string; // 给主 Agent：summary + stats + transcript ref
-  subagent: {
-    transcriptRef: SubAgentTranscriptRef;
-    transcriptEvents: SessionEvent[];
-    uiPreview: AgentToolPreview;
-  };
+  modelOutput: string;                 // 给主 Agent：summary + stats + transcript ref
+  subagent: { transcriptRef: SubAgentTranscriptRef; transcriptEvents: SessionEvent[]; uiPreview: AgentToolPreview };
 };
+// 主 session：tool_result.payload.uiPreview = { kind: "agent", description, status, summary, stats, transcriptRef }
+// runtime streaming：{ type: "subagent_event", toolCallId, transcriptRef, event /* 追加到 live modal */, preview /* 覆盖主流 Agent block */ }
 ```
 
-主 session 写入：
+重点不是文件名而是职责分层：主 session 是恢复与主上下文的事实来源，sidecar 是可观测性事实来源，runtime event 是当前 turn 的交互反馈。
+
+陷阱：
+- 不要把完整 transcript 塞进 `modelOutput`；
+- 不要让 renderer 用 raw args/output 反推 SubAgent 状态，聚合工具应提供 typed preview 或 typed stream event；
+- 不要让 renderer 传绝对路径读 transcript，IPC 输入是 `SubAgentTranscriptRef`，main 从 session root 派生路径并做 segment 校验；
+- 不要把 sidecar 当普通 session 恢复源，它服务回放和排障；
+- abort 要级联：主 turn 被取消时子智能体 run 也必须停止并落 error/aborted 事件。
+
+判断标准：一段内部事件“人类需要回看，但主模型不该每轮重读”，就适合 sidecar（后台研究的检索过程、批量文件分析的逐文件诊断、planner 候选方案同理）。
+
+## 2. 详情页展示时加一层薄 UI adapter
+
+raw event 对排障有价值，但不是用户界面语言。直接展示 JSON 参数、时间戳、边框卡片会造成：同一 Agent 行为在主消息区是 `Thinking / Read / Glob`、打开详情却变成调试面板（视觉分裂）；弹窗自己实现一套标题/状态/错误/工具摘要规则、长期与主区漂移；内部 prompt、raw tool name、完整参数成为噪音。
+
+做法：sidecar 仍保存完整事件，详情页读取后适配成主消息区已有组件的输入。`tool_call`（参数）与 `tool_result`（输出）按 id 配对，展示成 `Read App.tsx` 这类主流工具行：
 
 ```ts
-tool_result.payload.uiPreview = {
-  kind: "agent",
-  description,
-  status: "completed",
-  summary,
-  stats,
-  transcriptRef,
-};
+{ kind: "read", filePath: "App.tsx", displayText: "Read App.tsx", status: "completed" }
 ```
 
-sidecar 写入：
+映射：`thinking` → `ThinkingBlock`；`read_file`/`grep`/`glob`/`list_directory` → `ToolLogLine`；`user_message` → 详情页顶部任务输入区；`assistant_message` → 底部最终输出区；`llm_usage` → 轻量 usage 行。
 
-```txt
-<sessionDir>/subagents/<parentTurnId>/<runId>.jsonl
-```
+陷阱：
+- 不要为复用主 session selector 把 sidecar 混进恢复路径；
+- 工具行只需短摘要，长输出留给明确的展开路径；
+- 内部 prompt 不混进过程日志，需要确认任务时放顶部独立区；
+- 最终 assistant report 单独收在底部，避免“日志中途突然插入结论”；
+- 后端若给 sidecar `tool_result` 提供 typed `uiPreview`，adapter 先消费 preview，再回退到 `tool_call` 参数推导。
 
-runtime streaming：
+核心判断：主界面已有成熟组件语法时，详情页适配回那套语法，而不是再做一套 raw event UI。
 
-```ts
-{
-  type: "subagent_event",
-  toolCallId,
-  transcriptRef,
-  event,   // 追加到 live modal
-  preview, // 覆盖主消息流 Agent block
-}
-```
+## 自检
 
-这个模式的重点不是文件名，而是职责分层：主 session 是恢复和主上下文事实来源，sidecar 是可观测性事实来源，runtime event 是当前 turn 的交互反馈。
-
-## 常见陷阱
-
-- 不要把完整 transcript 塞进 `modelOutput`。主 Agent 只需要可操作摘要和 ref，完整过程会迅速吃掉上下文窗口。
-- 不要让 renderer 用 raw args 或 raw output 反推 SubAgent 状态。聚合工具应该提供 typed preview 或 typed stream event。
-- 不要让 renderer 传绝对路径读取 transcript。IPC 输入应是 `SubAgentTranscriptRef`，main 侧从 session root 派生路径并做 segment 校验。
-- 不要把 sidecar 当成普通 session 恢复源。它服务 modal 回放和排障，不参与主对话消息流恢复。
-- 不要忘记 abort 级联。主 turn 被取消时，子智能体 run 也必须停止并落 error/aborted 事件。
-
-## 可迁移场景
-
-这个模式不只适用于 SubAgent，也适用于任何“内部过程很长，但外部只需要摘要”的能力：
-
-- 后台研究任务：主对话保存结论，sidecar 保存检索和引用过程。
-- 批量文件分析：主消息保存 aggregate summary，sidecar 保存每个文件的诊断。
-- 多工具规划器：主上下文保存最终 plan，sidecar 保存 planner 的候选方案和评分。
-
-判断标准很简单：如果一段内部事件“人类需要回看，但主模型不该每轮都重读”，它就适合 sidecar。
-
-## 自检问题
-
-1. 这份数据刷新页面后是否还要恢复到主消息流？如果不要，它可能不属于主 session。
-2. 主 Agent 下一轮推理需要完整过程，还是只需要结果摘要和引用？
-3. UI 打开详情时，读取的是 typed ref 派生出的 sidecar，还是不安全的原始路径？
+1. 这份数据刷新后还要恢复到主消息流吗？不要就可能不属于主 session。
+2. 主 Agent 下一轮需要完整过程，还是只要摘要和引用？
+3. 详情读取的是 typed ref 派生的 sidecar 路径，还是不安全的原始路径？
+4. 详情页是否在复用主消息区的组件语言？

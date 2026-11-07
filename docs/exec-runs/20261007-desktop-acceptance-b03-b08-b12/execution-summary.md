@@ -15,11 +15,11 @@
 - shared163、client23、session-journal12、agent-service32通过；新增header兼容/fork1通过；Runtime投影/冷重开19通过。
 - Desktop typecheck、依赖构建、Electron构建、renderer构建通过。
 - IPC channel、renderer bridge、包边界、文档检查、diff whitespace通过。
-- [真实桌面逐项复验](computer-use-results.md)：B03同面板外部追加/移除自动更新；B08同会话不重启断开智谱后真实搜索仅Tavily，原配置恢复；B12实际首发创建工作树、切换返回、正常重启后再次工具pwd/branch均保持同目录。
+- 真实桌面逐项复验（原始记录已清理，见 git 历史）：B03同面板外部追加/移除自动更新；B08同会话不重启断开智谱后真实搜索仅Tavily，原配置恢复；B12实际首发创建工作树、切换返回、正常重启后再次工具pwd/branch均保持同目录。
 
 ## 真实运行时辅证
 
-- [脱敏运行时记录](runtime-evidence.json)：B08实际工具seq74为tavily,zhipu，断开后seq381仅tavily且成功；不是模型回复中的provider复述。
+- 脱敏运行时记录（原始记录已清理，见 git 历史）：B08实际工具seq74为tavily,zhipu，断开后seq381仅tavily且成功；不是模型回复中的provider复述。
 - B12会话56149031-44dd-4907-b1fe-90e65e08af6d，首发seq89与重启后seq681的bash均在工作树41969623运行，原fixture仍main。
 - 原搜索配置仅恢复zhipu加密单条，其它值未覆盖；Review标记均已移除，原文件85字节及已有变更保留。
 

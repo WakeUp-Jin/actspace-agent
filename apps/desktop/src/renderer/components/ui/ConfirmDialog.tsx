@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import { Button } from "./Button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "./Dialog";
 
@@ -14,6 +14,7 @@ export function ConfirmDialog({
   pendingLabel,
   onCancel,
   onConfirm,
+  returnFocus,
 }: {
   title: string;
   description: string;
@@ -21,6 +22,8 @@ export function ConfirmDialog({
   pendingLabel: string;
   onCancel: () => void;
   onConfirm: () => Promise<string | null | void>;
+  /** 触发器会在弹窗打开时卸载（比如从菜单项进入）时，指定关闭后把焦点还给谁。 */
+  returnFocus?: RefObject<HTMLElement | null> | HTMLElement | null;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +41,7 @@ export function ConfirmDialog({
   };
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !pending) onCancel(); }}>
-      <DialogContent role="alertdialog" size="md" withDescription closeOnOutsideClick={false} className="p-5">
+      <DialogContent role="alertdialog" size="md" withDescription closeOnOutsideClick={false} returnFocus={returnFocus} className="p-5">
         <DialogTitle className="text-act-lg font-semibold text-text-main">{title}</DialogTitle>
         <DialogDescription className="mt-2 text-act-xs leading-relaxed text-text-muted">{description}</DialogDescription>
         {error ? <p role="alert" className="mt-3 text-act-xs text-on-danger">{error}</p> : null}

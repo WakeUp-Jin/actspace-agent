@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import { memo, type ComponentProps } from "react";
 import { useActiveSession } from "../../session/active-session-context";
 import { useRunTargetContext } from "../../target/run-target-context";
 import { Composer } from "../Composer";
@@ -29,7 +29,7 @@ type ConversationComposerSlotProps = Pick<
  * 会话页里的 Composer：会话、草稿、模型和运行目标从 Context 读，
  * 其余（上下文用量、批注、聚焦请求等会话页自己算的）由 ConversationView 传入。
  */
-export function ConversationComposerSlot(props: ConversationComposerSlotProps) {
+export const ConversationComposerSlot = memo(function ConversationComposerSlot(props: ConversationComposerSlotProps) {
   const { sessionId, isStreaming, isAborting, isCompacting, onSend, onAbort } = useActiveSession();
   const {
     messageQueue, composerNotice, defaultModelId, selectedModelId, onSelectedModelChange, composerMode, onComposerModeChange,
@@ -69,4 +69,4 @@ export function ConversationComposerSlot(props: ConversationComposerSlotProps) {
       sessionId={sessionId}
     />
   );
-}
+});

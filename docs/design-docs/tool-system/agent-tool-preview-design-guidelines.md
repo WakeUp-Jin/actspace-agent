@@ -1,6 +1,6 @@
 # 工具预览设计规范
 
-这份文档约束工具事实到客户端预览的映射。2026-10-05 对照当前 Client、Desktop stream adapter 与 shared DTO 校准；持久字段以 Journal 契约为准，UI 字段不反向进入领域 ABI。
+这份文档约束工具事实到客户端预览的映射。持久字段以 Journal 契约为准，UI 字段不反向进入领域 ABI。
 
 ## 目标
 
@@ -43,7 +43,7 @@
 - 如果某个字段可能很长，优先由组件做视觉截断，不改变原始事实字段。
 - 展示文案使用产品动作词：`Read`、`Grep`、`Glob`、`Listed`、`Searched`、`Fetched`、`Edit`、`Write`、`Ran`。
 - 工具名到展示语义的映射集中在 Client preview builder；renderer 通过 `ToolUiPreview.kind` 消费。未知插件可用 generic fallback，不能承诺所有工具名都有专用卡片。
-- 工具调用进行中阶段（`tool_started` 之后、`tool_finished` 之前）所有工具行使用统一的 B 方案 text shimmer：`text-faint` 底字 + `text-main` 墨色扫光，收到 `tool_finished` 后立即停止，不人为延长 running。详见 [中间消息区规范 - 工具执行中态规范](../frontend/front-中间消息区规范.md#工具执行中态规范)。
+- 工具调用进行中阶段（`tool_started` 之后、`tool_finished` 之前）所有工具行使用统一的 B 方案 text shimmer：`text-faint` 底字 + `text-main` 墨色扫光，收到 `tool_finished` 后立即停止，不人为延长 running。详见 [中间消息区规范 - 运行中态](../frontend/front-中间消息区规范.md#运行中态)。
 - running 阶段后端 `tool_started.preview` 只推送当前能确定的最小字段（filePath / command / query），不传未生成的数值（diff stats、entryCount 等）；完成态字段在 `tool_finished` / 持久化事件中补齐。
 - `tool_finished` 是单个工具调用的完成事实。renderer 必须按 `toolCallId` 立即切换该工具的最终状态，不能为了最短动画时长等待同批其他工具完成；视觉平滑不能延迟真实生命周期状态。
 - **`tool_call_streaming` 事件契约**：首个参数分片只触发稳定动作占位；prepared 后一次发送完整摘要。Main 不再累积或解析可见 partial args，前端直接消费 typed preview。正文与 Thinking 保持流式，执行状态与结果继续实时更新。
@@ -57,7 +57,7 @@ Core 的工具参数使用独立 `tool-call-delta`，不能复用正文 `assista
 
 ToolRuntime 并行 body 结束后立即提交结果；OrderedToolCommitQueue 保留调用顺序，后发先完成的结果仍等待前序提交，但不再等待整批 body 完成。Renderer 收到单个 finished 立即收尾，也允许 finished 直接创建工具条目，迟到的参数、进度和审批不能回退终态。
 
-Read/List/Grep/Glob/Search 等轻量组件在失败时保留动作、目标和明确的终态标记（failed/denied/aborted/outcome unknown），错误诊断放在可展开详情中，不能替代工具身份；使用 danger 主题 token，长诊断允许换行。失败的 Read 不打开文件，失败详情不复用旧成功预览。Bash 保留 denied/cancelled，Write/Edit/Delete 使用已有 failed/denied 组件并保留错误说明。具体实现与验收见 [工具流式渲染设计](../frontend/front-agent-tool-stream-rendering.md)。
+Read/List/Grep/Glob/Search 等轻量组件在失败时保留动作、目标和明确的终态标记（failed/denied/aborted/outcome unknown），错误诊断放在可展开详情中，不能替代工具身份；使用 danger 主题 token，长诊断允许换行。失败的 Read 不打开文件，失败详情不复用旧成功预览。Bash 保留 denied/cancelled，Write/Edit/Delete 使用已有 failed/denied 组件并保留错误说明。具体实现与验收见 [工具流式渲染设计](../../exec-plans/completed/design-archive/frontend/front-agent-tool-stream-rendering.md)。
 
 ## 内置工具规范
 

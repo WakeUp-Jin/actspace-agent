@@ -1,6 +1,6 @@
 # Agent Journal 观测数据模型
 
-> 状态：当前 v2 Journal 观测边界。2026-09-06 已删除分析观测页面及专用 Analysis / Trace 投影和 IPC；本文保留公共 Journal、Context、Usage 与 Trajectory 的数据和安全边界。
+> 当前 v2 Journal 观测边界。分析观测页面及专用 Analysis / Trace 投影和 IPC 已删除；本文保留公共 Journal、Context、Usage 与 Trajectory 的数据和安全边界。
 
 ## 目标
 
@@ -45,8 +45,8 @@ sessions-v2/<sessionId>/journal.jsonl
 
 - `turn/start`、`turn/end`；
 - `step/start`、`step/end`；
-- `request/header`、`request/context`；
-- `assistant/chunk`、`assistant/message` 与 `llm/retry-started`、`llm/retry`；
+- `request/header`、`request/system-prompt`、`request/tools`、`request/context`；
+- `assistant/message` 与 `llm/retry-started`、`llm/retry`；流式片段只走实时通道，不进 Journal（旧会话的 `assistant/chunk` 只读兼容，见 [流式输出规范](../agent-plugin-runtime/agent-spec-live-assistant-stream.md)）；
 - `tool/call`、`tool/code-dispatch-start`、`tool/code-dispatch`、`tool/result`、`tool/recovery-outcome`；
 - `permission/asked`、`permission/decided` 等权限事实；
 - `compaction/start`、`compaction/summary`、`surface/replaced`、`compaction/end`；
@@ -63,11 +63,9 @@ sessions-v2/<sessionId>/journal.jsonl
 
 ## Request 观测
 
-逻辑请求由 `request/header` 与 `request/context` 在 dispatch 前冻结，至少记录：
+逻辑请求在 dispatch 前冻结（[请求记录规范](../agent-plugin-runtime/agent-spec-request-record.md)）：`request/header` 与 `request/context` 每次写；`request/system-prompt`、`request/tools` 只在内容变化时写，某次请求生效的是 seq 不大于其 `request/context` 的最近一条。对话不再随请求复制，从对话事件重新拼出。合起来记录：
 
-- messages；
-- rendered system prompt 与 system sections；
-- Host / Runtime facts；
+- system sections 与 model facts（渲染文本由它们推出）；
 - tool definitions；
 - contributor provenance；
 - route、model、registration 和 adapter version；

@@ -20,7 +20,7 @@ async function fixture(turns = 25) {
   const journal = new SessionJournal({ registry });
   const turn = (id: number) => {
     journal.append({ type: "turn/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: `t${id}` }, surface: null });
-    journal.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `u${id}`, content: `question ${id}` }, surface: { kind: "append", node: { kind: "user", messageId: `u${id}`, content: `question ${id}` } } });
+    journal.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `u${id}`, content: `question ${id}` }, surface: { kind: "append" } });
     journal.append({ type: "turn/end", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: `t${id}` }, surface: null });
   };
   for (let id = 0; id < turns; id++) turn(id);
@@ -58,29 +58,14 @@ describe("history window slimming", () => {
     expect(slimHistoryWindow([{ ...done, data: { ...done.data as object, firstTokenAt: empty.time } }])[0]!.data).toMatchObject({ firstTokenAt: empty.time });
   });
 
-  it("keeps the latest request context whole and bounds older large ones to identity fields", () => {
-    const [older, latest] = slimHistoryWindow([bigContext(0, "r0"), bigContext(1, "r1")]);
-    expect(older!.data).toEqual({ deferredDetail: true, turnId: "t", stepId: "s", requestId: "r0", snapshot: { prepared: { model: "m", route: "r", contextWindow: 1000 }, requestOptions: { temperature: 0 } } });
-    expect(JSON.stringify(latest!.data)).toContain("x".repeat(30_000));
-  });
-
-  it("keeps the system prompt and tools of bounded requests only where they first appear or change", () => {
-    const withPrompt = (seq: number, system: string, tools: string[]) => {
-      const event = bigContext(seq, `r${seq}`);
-      const data = event.data as { snapshot: Record<string, unknown> };
-      return { ...event, data: { ...data, snapshot: { ...data.snapshot, renderedSystemPrompt: system, systemSections: [system], contextSections: [{ id: "base", owner: "system", order: 0, content: system }], contextModelFacts: [], tools: tools.map(name => ({ name })) } } } as typeof event;
-    };
-    const out = slimHistoryWindow([withPrompt(0, "A", ["read"]), withPrompt(1, "A", ["read"]), withPrompt(2, "A", ["read", "write"]), withPrompt(3, "B", ["read", "write"]), withPrompt(4, "B", ["read", "write"])]);
-    const snapshots = out.map(event => (event.data as { snapshot: Record<string, unknown> }).snapshot);
-    expect(snapshots[0]).toMatchObject({ renderedSystemPrompt: "A", tools: [{ name: "read" }] });
-    expect(snapshots[0]).not.toHaveProperty("systemSections");
-    expect(snapshots[0]).toHaveProperty("contextSections", [{ id: "base", owner: "system", order: 0, content: "A" }]);
-    expect(snapshots[1]).not.toHaveProperty("contextSections");
-    expect(snapshots[1]).toMatchObject({ promptUnchanged: true });
-    expect(snapshots[1]).not.toHaveProperty("tools");
-    expect(snapshots[2]).toMatchObject({ renderedSystemPrompt: "A", tools: [{ name: "read" }, { name: "write" }] });
-    expect(snapshots[3]).toMatchObject({ renderedSystemPrompt: "B" });
-    expect(snapshots[4]).toHaveProperty("systemSections");
+  it("keeps small request contexts and prompt / tool records as they are", () => {
+    const records = [
+      envelope(0, "request/system-prompt", { requestId: "r0", turnId: "t", stepId: "s", digest: "p", sections: [], modelFacts: [], contributorProvenance: [] }),
+      envelope(1, "request/tools", { requestId: "r0", turnId: "t", stepId: "s", digest: "t", tools: [{ name: "read" }] }),
+      envelope(2, "request/context", { requestId: "r0", turnId: "t", stepId: "s", snapshot: { schemaVersion: 3, requestOptions: { temperature: 0 } } }),
+      envelope(3, "request/context", { requestId: "r1", turnId: "t", stepId: "s", snapshot: { schemaVersion: 3, requestOptions: { temperature: 0 } } }),
+    ];
+    expect(slimHistoryWindow(records)).toEqual(records);
   });
 });
 
@@ -148,6 +133,44 @@ describe("production Session projections", () => {
     expect((await f.controller().readProjection({ sessionId: "s" })).window).toEqual(tail.window);
   });
 
+  it("carries the latest prompt and tool records from before the window into a later page", async () => {
+    const f = await fixture(0);
+    const core = { ownerPluginId: "@actspace/core" };
+    const request = (turn: number, records: { prompt?: string; tools?: string[] }) => {
+      const ids = { turnId: `t${turn}`, stepId: `s${turn}`, requestId: `r${turn}` };
+      f.journal.append({ type: "turn/start", eventVersion: 1, source: core, data: { turnId: ids.turnId }, surface: null });
+      f.journal.append({ type: "step/start", eventVersion: 1, source: core, data: { turnId: ids.turnId, stepId: ids.stepId }, surface: null });
+      f.journal.append({ type: "request/header", eventVersion: 1, source: core, data: { ...ids, model: "m", routeId: "r" }, surface: null });
+      if (records.prompt) f.journal.append({ type: "request/system-prompt", eventVersion: 1, source: core, data: { ...ids, digest: records.prompt, sections: [{ id: "model-prompt", owner: "system", order: 0, content: records.prompt }], modelFacts: [], contributorProvenance: [] }, surface: null });
+      if (records.tools) f.journal.append({ type: "request/tools", eventVersion: 1, source: core, data: { ...ids, digest: records.tools.join(), tools: records.tools.map(name => ({ name })) }, surface: null });
+      f.journal.append({ type: "request/context", eventVersion: 1, source: core, data: { ...ids, snapshot: { schemaVersion: 3 } }, surface: null });
+      f.journal.append({ type: "assistant/message", eventVersion: 1, source: core, data: { ...ids, messageId: `a${turn}`, finishReason: "stop", content: [{ type: "text", text: "ok" }] }, surface: { kind: "append" } });
+      f.journal.append({ type: "step/end", eventVersion: 1, source: core, data: { turnId: ids.turnId, stepId: ids.stepId, status: "completed" }, surface: null });
+      f.journal.append({ type: "turn/end", eventVersion: 1, source: core, data: { turnId: ids.turnId, status: "completed" }, surface: null });
+    };
+    request(0, { prompt: "A", tools: ["read"] });
+    request(1, { prompt: "B" });
+    for (let turn = 2; turn < 25; turn++) request(turn, turn === 3 ? { tools: ["read", "write"] } : {});
+    await appendFile(f.path, f.journal.events.map(event => JSON.stringify(event)).join("\n") + "\n");
+    const seqOf = (type: string, requestId: string) => f.journal.events.find(event => event.type === type && (event.data as { requestId?: string }).requestId === requestId)!.seq;
+    const cold = f.controller();
+    const tail = await cold.readProjection({ sessionId: "s" });
+    // 20 轮窗口从 t5 开始：提示词沿用 t1 的 B，工具沿用 t3 的 read+write。
+    expect(tail.window.fromSeq).toBeGreaterThan(seqOf("request/tools", "r3"));
+    const carried = tail.window.events.filter(event => event.seq < tail.window.fromSeq);
+    expect(carried.map(event => event.seq)).toEqual([seqOf("request/system-prompt", "r1"), seqOf("request/tools", "r3")]);
+    expect(tail.window.events.filter(event => event.type === "request/context")).toHaveLength(20);
+    // 打开中的会话走同一条路径。
+    const live = f.controller(); await live.resume("s");
+    const liveTail = await live.readProjection({ sessionId: "s" });
+    expect(liveTail.window.events.filter(event => event.seq < liveTail.window.fromSeq).map(event => event.seq)).toEqual(carried.map(event => event.seq));
+    await live.closeAll();
+    // 从头开始的一页不需要补。
+    const older = await cold.readProjection({ sessionId: "s", beforeSeq: tail.window.beforeSeq! });
+    expect(older.window.fromSeq).toBe(0);
+    expect(older.window.events.filter(event => event.type === "request/system-prompt").map(event => event.seq)).toEqual([seqOf("request/system-prompt", "r0"), seqOf("request/system-prompt", "r1")]);
+  });
+
   it("observes a changed storage revision and ignores old JSONL checkpoint files", async () => {
     const f = await fixture(1); const controller = f.controller();
     const before = await controller.inspect("s");
@@ -198,7 +221,7 @@ describe("production Session projections", () => {
     f.journal.append({ type: "turn/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: "tool-turn" }, surface: null });
     f.journal.append({ type: "step/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: "tool-turn", stepId: "tool-step" }, surface: null });
     f.journal.append({ type: "tool/call", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { callId: "c", name: "bash", pluginId: "core", args: { command: output } }, surface: null });
-    f.journal.append({ type: "tool/result", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { callId: "c", name: "bash", status: "failed", summary: "failed", modelOutput: [{ type: "text", text: output }], failure: { code: "EXIT", message: "failed", retryable: false } }, surface: { kind: "append", node: { kind: "tool-result", messageId: "result", callId: "c", content: output, isError: true } } });
+    f.journal.append({ type: "tool/result", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { callId: "c", name: "bash", status: "failed", summary: "failed", modelOutput: [{ type: "text", text: output }], failure: { code: "EXIT", message: "failed", retryable: false } }, surface: { kind: "append" } });
     await appendFile(f.path, f.journal.events.slice(3).map(event => JSON.stringify(event)).join("\n") + "\n");
     const controller = f.controller();
     const page = await controller.readProjection({ sessionId: "s" });

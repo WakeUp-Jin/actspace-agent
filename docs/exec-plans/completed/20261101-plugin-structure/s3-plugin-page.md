@@ -24,7 +24,7 @@
 ## 必读
 
 - [02 插件结构设计](../../../design-docs/架构优化/02-插件结构设计.md) §7
-- demo [plugins-page-demo.html](../../../design-docs/frontend/plugins-page-demo.html)：按方案 B（用户 2026-11-01 选定）实现，浅色和深色都要对照
+- demo plugins-page-demo.html（原文已删除，见 git 历史）：按方案 B（用户 2026-11-01 选定）实现，浅色和深色都要对照
 - [功能减法 P6](../20261101-feature-subtraction/p6-optional-capabilities.md)：它的「机制」和 main 侧步骤 2、3 的行号与判空清单仍然有效，本子计划直接沿用，只把开关来源从 `tools.optionalCapabilities` 换成 `tools.plugins`
 - `docs/design-docs/frontend/front-主题与配色规范.md`、设置页现有样式（`SettingsPrimitives.tsx`、`SkillsSection.tsx`）
 

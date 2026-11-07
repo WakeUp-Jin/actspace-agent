@@ -33,11 +33,11 @@ export const SEARCH_PROVIDER_ROWS: Array<{
   tag?: string;
   description: string;
 }> = [
-  { provider: "deepseek", label: "DeepSeek", description: "搜索 ¥0.005 / 次成功请求。与 DeepSeek 模型和网页抓取共用官方 API Key；连接后需单独启用搜索。" },
-  { provider: "zhipu", label: "智谱 Web Search", description: "国内 · search_pro ¥0.03 / 次" },
+  { provider: "deepseek", label: "DeepSeek", description: "¥0.005 / 次" },
+  { provider: "zhipu", label: "智谱 Web Search", description: "search_pro ¥0.03 / 次" },
   { provider: "tavily", label: "Tavily", tag: "国际 1", description: "每月 1000 credits 免费，超出按量计费。" },
   { provider: "tinyfish", label: "TinyFish", tag: "国际 2", description: "搜索接口目前免费（按套餐限速）。" },
-  { provider: "exa", label: "Exa", tag: "国际 3", description: "语义搜索，按量计费。" },
+  { provider: "exa", label: "Exa", tag: "国际 3", description: "按量计费" },
 ];
 
 export function SearchSettings({
@@ -80,7 +80,6 @@ export function SearchSettings({
       <SettingGroup>
         <SettingRow
           title="允许联网搜索"
-          description="关闭后 Agent 不会获得联网搜索工具，已连接的通道保留。"
           control={
             <Toggle
               checked={tools.isEnabled(WEB_SEARCH_TOOL)}
@@ -94,7 +93,6 @@ export function SearchSettings({
       <SettingGroup
         title="搜索通道"
         headingLevel={3}
-        description="DeepSeek、智谱与国际通道并行搜索，结果去重、融合排序后取前几条，各来源分别计费。国际通道按 Tavily → TinyFish → Exa 使用首个可用来源。"
         meta={`${connectedCount} / ${SEARCH_PROVIDER_ROWS.length} 已连接`}
       >
         {SEARCH_PROVIDER_ROWS.map((row) => (
@@ -116,7 +114,7 @@ export function SearchSettings({
       <SettingGroup title="网页读取" headingLevel={3}>
         <SettingRow
           title="使用 DeepSeek 抓取网页"
-          description={<>开启后优先使用 DeepSeek，目标网址将发送至 DeepSeek，当前 ¥0.005 / 次成功请求。普通获取失败时回退本地；关闭时使用本地抓取。{!hasDeepseekKey ? "请先连接上方 DeepSeek。" : "使用上方共享的 DeepSeek Key，与搜索开关独立。"}</>}
+          description={hasDeepseekKey ? "网址将发送至 DeepSeek · ¥0.005 / 次" : "请先连接 DeepSeek"}
           control={<Toggle
             ariaLabel="使用 DeepSeek 抓取网页"
             checked={hasDeepseekKey && settingsV4?.settings.tools.deepseekFetchEnabled === true}
@@ -233,7 +231,7 @@ function SearchProviderRow({
         <SettingEditor
           id={editorId}
           returnFocusId={`${editorId}-trigger`}
-          hint={provider === "deepseek" ? "与 DeepSeek 模型及网页抓取共用官方 Key；更换会影响三者。Key 只保存在本机，不会回显。" : "Key 只保存在本机，不会回显。"}
+          hint={provider === "deepseek" ? "更换会影响模型与网页抓取" : "只保存在本机"}
           error={error}
           saving={saving}
           saveDisabled={!apiKey.trim()}

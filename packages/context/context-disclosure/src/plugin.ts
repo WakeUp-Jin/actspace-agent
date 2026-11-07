@@ -48,13 +48,12 @@ export class ProgressiveDisclosure implements CompactionDisclosure {
     const state = this.state(session);
     let scanned = this.scanned.get(session);
     if (!scanned || scanned.seq < state.boundary) {
-      const previous = latestContextEvent(session, "request/context", state.boundary);
+      // 提示词记录只在变化时写（agent-spec-request-record.md §3），边界前最近一条即当时生效的那份。
+      const previous = latestContextEvent(session, "request/system-prompt", state.boundary);
       scanned = { seq: state.boundary, enabled: previous ? disclosureEnabled(previous) : false };
     }
     for (const event of contextEvents(session, scanned.seq + 1)) {
-      if (event.type === "request/context") {
-        scanned.enabled = disclosureEnabled(event);
-      }
+      if (event.type === "request/system-prompt") scanned.enabled = disclosureEnabled(event);
       if (event.type === "tool/result" && scanned.enabled) await this.observe(session, event);
       scanned.seq = event.seq;
     }
@@ -174,7 +173,8 @@ export function apply(ctx: CordisContext): void {
   ctx.provide?.("context.disclosure", disclosure);
 }
 function record(value: unknown): Readonly<Record<string, RuntimeV2JsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {}; }
+/** 本次请求的提示词是否由 disclosure 参与组装：看 `request/system-prompt` 的 contributorProvenance。 */
 function disclosureEnabled(event: SessionEventEnvelopeV1): boolean {
-  const snapshot = record(record(event.data).snapshot);
-  return Array.isArray(snapshot.contributorProvenance) && snapshot.contributorProvenance.some(value => record(value).contributorId === "context-disclosure");
+  const provenance = record(event.data).contributorProvenance;
+  return Array.isArray(provenance) && provenance.some(value => record(value).contributorId === "context-disclosure");
 }

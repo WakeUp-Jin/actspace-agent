@@ -1,7 +1,5 @@
 # ActSpace v2 包结构与真实插件包规范
 
-> 状态：已实现并通过 workspace、应用构建与 package boundary 验证（2026-08-30）。Profile-first Runtime 决策已替代早期通用 Runtime facade / `@actspace/host` 目标。
->
 > 本文解决两个容易混淆的问题：ActSpace v2 的源码如何按 DSH 的方式分组，以及“插件”如何成为真正可装载、可诊断、可卸载的独立包，而不是一个巨大 ESM 包里的内部目录。
 
 ## 1. 决策摘要
@@ -118,7 +116,33 @@ flowchart LR
 
 一个 package 可以只提供公共库，不成为可装载插件；一个可装载插件包则必须同时提供 Static Manifest 和 Behavior Entry。不能通过“所有 workspace package 都自动当插件”降低准入边界。
 
-## 7. 已完成的单包结构迁移映射
+## 7. Package、Plugin、Entry 与 Service 的身份
+
+当前清单由[契约矩阵](agent-contract-matrix.generated.md)从实际声明生成，不再维护第二张手工包清单；矩阵的实际覆盖与限制见[生成规范](agent-spec-contract-matrix-generation.md)。新增 package / manifest 时同步显式源清单，完整性测试会检查遗漏。
+
+- Package 是 workspace 构建、依赖和公开导出的边界，以 `package.json` 与 `exports` 为准。
+- Plugin 是 manifest 中的稳定身份，进入诊断、来源和持久事件命名空间；npm version 不等于插件 ABI。
+- Entry 是某次组合中的稳定装载行，供 Bundle/Patch 寻址；同包可以拥有多个 Entry。
+- Service 是能力契约；一个包、一个插件、一个 Service 不必一一对应。
+- Host 数据和生命周期接口不能依赖默认 Harness 的私有实现；存储业务不能依赖 JSONL 文件布局。
+
+## 8. 服务接口、实现与消费者
+
+三者是职责边界，不要求每个服务额外创建三份包装对象：
+
+- 接口定义调用语义、失败和生命周期约束；调用者依赖接口，不依赖某个 JSONL、SDK 或默认 Loop 实现。
+- 提供者通过 Cordis Service / Behavior 发布服务，拥有 listener、timer、进程、注册与 disposer。
+- 消费者声明 inject，只读取所需能力；不能通过中央万能容器绕过依赖边界。
+
+当前生产机制是 Static Manifest + Codec discovery + Cordis Loader，没有 `defineServiceProvider` / `defineServiceConsumer` 这类额外框架层，也不给所有 class 套一层新框架。
+
+`ACTSPACE_SERVICE_IDS` / `ACTSPACE_SERVICE_DEFINITIONS`（`packages/composition/cordis-adapter/src/service-contract.ts`）是稳定名称及审计目录，不能据此宣称服务已激活；实际 required-service 校验和 Cordis settlement 才决定就绪。元数据与 manifest 不一致应修正来源，不能把目录当作第二套能力系统。
+
+存储是具体例子：`SessionStorage` 定义 inspect/list/create/open/flush 等语义；JSONL Provider 负责锁、编码、fsync 和物理修复；SessionStore 负责接纳、恢复、fork 和水位；调用方不读取 journal.jsonl 路径。内存 Provider 独立验证接口，不承诺数据库事务和持久性。相关边界见[存储规范](agent-spec-session-core-persistence-separation.md)和[启动链](agent-spec-dsh-plugin-assembly-and-agent-startup.md)。
+
+卸载意味着资源停止并释放，而不只是删掉服务名称。只读观察 emit 不阻塞提交；持久化屏障直接 await 能力方法，不能靠通知完成。
+
+## 9. 已完成的单包结构迁移映射
 
 迁移前 `packages/agent-runtime/src/` 的职责已按下面的规则拆分；本表用于追溯来源，不表示该旧目录仍存在：
 
@@ -137,7 +161,7 @@ flowchart LR
 
 旧 v1 Session 只保留一份迁移参考数据，不由新 Runtime 读取或导入。新格式只使用 `sessions-v2/<id>/journal.jsonl`。
 
-## 8. 前端边界
+## 10. 前端边界
 
 这次包结构调整不改变现有前端视觉产品：
 
@@ -146,7 +170,7 @@ flowchart LR
 - 后端插件的 `frontend.required=true` 在固定前端中拒绝激活，optional frontend contribution 只记录诊断并忽略；
 - 前端产品概念使用“扩展”时，文档可以称为 Extension；它不等同于后端 Plugin ABI，也不允许后端插件注入前端代码。
 
-## 9. 明确排除
+## 11. 明确排除
 
 - 不复制 DSH Agent Core 包；
 - 不引入 `vendor/` 源码镜像；
@@ -156,7 +180,7 @@ flowchart LR
 - 不通过包拆分引入前端插件加载、HMR、在线 reconcile、插件市场、签名和不可信代码隔离；
 - 不在这次重构中修改现有前端样式和布局。
 
-## 10. 验收标准
+## 12. 验收标准
 
 完成这次结构重构后，以下事实必须可以由仓库和测试证明：
 

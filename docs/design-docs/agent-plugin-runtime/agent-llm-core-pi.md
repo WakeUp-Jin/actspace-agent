@@ -2,7 +2,7 @@
 
 ## 1. 文档状态
 
-- 状态：重构方向与评审修订已确认；M0–M4 已实施，本文保留契约、边界和未完成的外部验收项。执行计划：[completed/20260922-llm-core-pi.md](../../exec-plans/completed/20260922-llm-core-pi.md)。
+- 本文保留契约、边界和未完成的外部验收项；M0–M4 均已实现。执行计划：[completed/20260922-llm-core-pi.md](../../exec-plans/completed/20260922-llm-core-pi.md)。
 - 执行入口：[LLM Core Pi 执行计划](../../exec-plans/completed/20260922-llm-core-pi.md)。
 - 与[现有 Adapter 设计](agent-target-llm-adapter.md)共享 ActSpace 领域边界；本文件记录本次 prepare、Host 和 pi-ai 收敛实现的契约与验收边界。
 - 目标：收敛 ActSpace 的 LLM 调用链，让 pi-ai 成为默认 Provider wire implementation，同时保留 ActSpace 自己的运行时、会话、凭据、重试和可观测性边界。

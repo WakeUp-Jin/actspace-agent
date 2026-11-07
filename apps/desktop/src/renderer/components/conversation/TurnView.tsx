@@ -3,7 +3,7 @@ import type { ComposerAttachment, MessageBlock } from "@actspace/shared";
 import { ResponseAnnotationPill } from "../composer/ResponseAnnotationPill";
 import { BackgroundNoticeRow } from "../messages/BackgroundNoticeRow";
 import { TodoListBlock } from "../messages/TodoListBlock";
-import { ReplyStreamingContext } from "../messages/reply-streaming-context";
+import { ReplyStreamingContext, WritingReplyContext } from "../messages/reply-streaming-context";
 import { ToolActivityGroup } from "../messages/ToolActivityGroup";
 import { USER_ANNOTATIONS_ROW_CLASS, UserMessage } from "../messages/UserMessage";
 import { renderMessageList, type SubagentOpenHandler, type ReadMessageBlock } from "./render-message";
@@ -111,6 +111,13 @@ function renderTurnBody(
   );
 }
 
+/** 正在写的回复：这一轮还在跑，且最后一项是回复。回复后面已经接了工具、思考或等待行，说明它写完了。 */
+function writingReplyId(turn: ConversationTurn, isActive: boolean): string | null {
+  if (!isActive) return null;
+  const last = turn.messages.at(-1);
+  return last?.kind === "assistant" ? last.id : null;
+}
+
 type TurnViewProps = {
   turn: ConversationTurn;
   /** 正在流式输出的最后一轮。 */
@@ -154,9 +161,11 @@ export const TurnView = memo(function TurnView({
       <TurnPrompt turn={turn} onOpenAttachmentPreview={onOpenAttachmentPreview} sessionId={sessionId} onOpenSubagent={onOpenSubagent} />
       <div className={ASSISTANT_TURN_GROUP_CLASS}>
         <ReplyStreamingContext.Provider value={isActive}>
-          <div className={TURN_BODY_CLASS}>
-            {renderTurnBody(turn, isActive, onOpenSubagent, onOpenReadFile, onOpenWorkspaceFile)}
-          </div>
+          <WritingReplyContext.Provider value={writingReplyId(turn, isActive)}>
+            <div className={TURN_BODY_CLASS}>
+              {renderTurnBody(turn, isActive, onOpenSubagent, onOpenReadFile, onOpenWorkspaceFile)}
+            </div>
+          </WritingReplyContext.Provider>
         </ReplyStreamingContext.Provider>
         {splitTurnMessages(turn.messages).finalReply.length > 0 && !isActive ? (
           <TurnTail

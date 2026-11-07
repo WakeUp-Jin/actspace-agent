@@ -26,7 +26,7 @@ function host() {
   return { port, indexes };
 }
 async function users(session: CompactionSession, count = 4) {
-  for (let i = 0; i < count; i++) { const messageId = `m${session.lastSeq + 1}`; await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId }, surface: { kind: "append", node: { kind: "user", messageId, content: `/file/${i}.ts` } } }); }
+  for (let i = 0; i < count; i++) { const messageId = `m${session.lastSeq + 1}`; await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId, content: `/file/${i}.ts` }, surface: { kind: "append" } }); }
 }
 async function fact(session: CompactionSession, paths: string[], reads = true) {
   await session.append({ type: STATE_EVENT, eventVersion: 1, source: { ownerPluginId: CONTEXT_OWNER }, data: { op: "fact", sourceSeq: session.lastSeq, callId: `call${session.lastSeq}`, time: new Date().toISOString(), paths: paths.map(path => ({ path, owner: "actspace.context-tools", read: reads })) }, surface: null });
@@ -178,7 +178,8 @@ it("persists ignored index reads across restart and fork before another compacti
   await session.append({ type: "turn/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: "t" }, surface: null });
   await session.append({ type: "step/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: "t", stepId: "s" }, surface: null });
   await session.append({ type: "request/header", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { requestId: "r", turnId: "t", stepId: "s" }, surface: null });
-  await session.append({ type: "request/context", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { requestId: "r", turnId: "t", stepId: "s", snapshot: { contributorProvenance: [{ contributorId: "context-disclosure" }] } }, surface: null });
+  await session.append({ type: "request/system-prompt", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { requestId: "r", turnId: "t", stepId: "s", digest: "p", sections: [], modelFacts: [], contributorProvenance: [{ contributorId: "context-disclosure" }] }, surface: null });
+  await session.append({ type: "request/context", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { requestId: "r", turnId: "t", stepId: "s", snapshot: { schemaVersion: 3 } }, surface: null });
   await session.append({ type: "tool/call", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { callId: "read-index", name: "read_file" }, surface: null });
   const result = await session.append({ type: "tool/result", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { callId: "read-index", name: "read_file", status: "completed", pluginId: "actspace.filesystem-read", detail: [{ label: "actspace.context.file", value: { path: indexPath, kind: "file", operation: "read" } }] }, surface: null });
   await disclosure.observe(session, result);
@@ -318,4 +319,34 @@ it("keeps a trace description when the same file is also reported as a plain rea
   const event = { seq: session.lastSeq + 1, type: "tool/result", time: new Date().toISOString(), data: { status: "completed", callId: "both", pluginId: "actspace.filesystem-read", name: "read_file", detail: [trace("/file/t.md", "Subagent transcript: t"), { label: "actspace.context.file", value: { path: "/file/t.md", kind: "file", operation: "read" } }] } } as unknown as SessionEventEnvelopeV1;
   await disclosure.observe(session, event);
   expect((await disclosure.hydrate(context(session), session)).status.paths).toMatchObject([{ path: "/file/t.md", description: "Subagent transcript: t", readsInCycle: 1 }]);
+});
+
+it("tracks reads only while the effective prompt record lists disclosure as a contributor", async () => {
+  const core = { ownerPluginId: "@actspace/core" };
+  const session = fixture(); const { port } = host(); const disclosure = new ProgressiveDisclosure(port);
+  await disclosure.hydrate(context(session), session);
+  const append = (type: string, data: Record<string, unknown>) => session.append({ type, eventVersion: 1, source: core, data: data as never, surface: null });
+  let call = 0;
+  const request = async (id: string, contributors: string[] | null) => {
+    await append("turn/start", { turnId: id });
+    await append("step/start", { turnId: id, stepId: id });
+    await append("request/header", { requestId: id, turnId: id, stepId: id });
+    // 提示词没变的请求不写 request/system-prompt，沿用前一条。
+    if (contributors) await append("request/system-prompt", { requestId: id, turnId: id, stepId: id, digest: contributors.join(), sections: [], modelFacts: [], contributorProvenance: contributors.map(contributorId => ({ contributorId })) });
+    await append("request/context", { requestId: id, turnId: id, stepId: id, snapshot: { schemaVersion: 3 } });
+    await append("assistant/message", { requestId: id, turnId: id, stepId: id, messageId: `a-${id}`, finishReason: "tool-calls", content: [] });
+    const callId = `read-${call++}`;
+    await append("tool/call", { turnId: id, stepId: id, callId, name: "read_file" });
+    await append("tool/result", { callId, name: "read_file", status: "completed", pluginId: "actspace.filesystem-read", detail: [{ label: "actspace.context.file", value: { path: `/file/${id}.ts`, kind: "file", operation: "read" } }] });
+    await append("step/end", { turnId: id, stepId: id, status: "completed" });
+    await append("turn/end", { turnId: id, status: "completed" });
+  };
+  await request("off", ["context-rules"]);
+  await request("on", ["context-rules", "context-disclosure"]);
+  await request("same", null);
+  await request("off-again", ["context-rules"]);
+  const view = await disclosure.hydrate(context(session), session);
+  expect(view.status.paths.map(path => path.path).sort()).toEqual(["/file/on.ts", "/file/same.ts"]);
+  // 重启后从边界前最近一条提示词记录恢复启用状态，结果一致。
+  expect((await new ProgressiveDisclosure(port).hydrate(context(session), session)).status.paths).toEqual(view.status.paths);
 });

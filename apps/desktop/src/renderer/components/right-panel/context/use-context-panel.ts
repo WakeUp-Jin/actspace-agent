@@ -3,6 +3,7 @@ import type { ContextState } from "@actspace/shared";
 import { liveEvents } from "../../../api/live-events";
 import { sessionsApi } from "../../../api/sessions";
 import { useOptionalSessionProjection } from "../../../session";
+import { jsonEqual } from "../../../json-equal";
 import { buildInterimPanelView, type ContextPanelData } from "./context-panel-model";
 
 /** One visible consumer, one in-flight refresh. A generation change replaces the
@@ -29,22 +30,30 @@ export function useContextPanel({ sessionId, revision, fallbackState }: {
     const run = async (retry = false) => {
       retryRequested ||= retry;
       if (stopped || document.hidden) return;
+      // 同一时刻只有一个请求在途；期间的触发合并成结束后的一次补拉，不并发重复请求。
       if (active) { pending = true; return; }
-      clearTimeout(timer); active = true; setLoading(true);
+      clearTimeout(timer); active = true;
+      // loading 只在还没有任何内容（首次加载 / 切会话 / 出错后重试）时才有意义；轮询与有内容后的刷新不抖动。
+      const showLoading = dataRef.current === null;
+      if (showLoading) setLoading(true);
       try {
         const panel = await sessionsApi.describeContextPanel({ sessionId, consumerId, versionToken: dataRef.current?.view.versionToken, retry: retryRequested });
         retryRequested = false;
         if (stopped) return;
         if (panel && "notModified" in panel) {
-          setData(previous => previous ? { ...previous, view: { ...previous.view, versionToken: panel.versionToken, history: panel.history } } : previous);
+          // notModified：内容没变，只有 token / 历史同步状态真的变了才更新，否则一次 setState 都不做。
+          const held = dataRef.current;
+          if (held && (held.view.versionToken !== panel.versionToken || !jsonEqual(held.view.history, panel.history))) {
+            const next = { ...held, view: { ...held.view, versionToken: panel.versionToken, history: panel.history } };
+            dataRef.current = next; setData(next);
+          }
         } else if (panel && "schemaVersion" in panel) {
           const next: ContextPanelData = { view: panel, source: "backend" };
           dataRef.current = next; setData(next);
         } else {
-          const described = await sessionsApi.describeContext({ sessionId });
-          if (stopped) return;
+          // 后端没有面板视图时，用会话投影里的上下文估算（调用方传入）拼一个临时视图。
           const { snapshot, fallbackState: fallback } = latest.current;
-          const next = buildInterimPanelView({ sessionId, contextState: described ?? fallback, activity: snapshot?.activity ?? null, usage: snapshot?.usage ?? null });
+          const next = buildInterimPanelView({ sessionId, contextState: fallback, activity: snapshot?.activity ?? null, usage: snapshot?.usage ?? null });
           dataRef.current = next; setData(next);
         }
         failures = 0; setError(null);
@@ -53,7 +62,7 @@ export function useContextPanel({ sessionId, revision, fallbackState }: {
       } finally {
         active = false;
         if (!stopped) {
-          setLoading(false);
+          if (showLoading) setLoading(false);
           const history = dataRef.current?.view.history;
           const delay = pending ? 0 : failures ? Math.min(10000, 1000 * 2 ** failures) : history?.status === "syncing" || history?.status === "rebuilding" ? 1000 : 5000;
           pending = false;

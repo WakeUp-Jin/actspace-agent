@@ -92,7 +92,7 @@ export function LocalUpdateSection() {
 
   return (
     <>
-        <SettingGroup title="更新来源" headingLevel={3} description="从本机源码重新构建并替换已安装的 Actspace.app。">
+        <SettingGroup title="更新来源" headingLevel={3}>
           <SettingRow
             title="源码目录"
             description={
@@ -127,7 +127,7 @@ export function LocalUpdateSection() {
             title="构建并更新"
             description={
               <span className="flex max-w-[430px] flex-col gap-1">
-                <span>先在当前应用内完成构建；构建完成后再退出、替换已安装的 Actspace.app 并自动重启。</span>
+                <span>构建完成后将退出并重启。</span>
                 {state?.logPath ? <span className="break-all text-text-subtle">日志：{state.logPath}</span> : null}
                 {reason ? <span className="text-on-danger">{reason}</span> : null}
                 {status ? <span className={status.includes("失败") ? "text-on-danger" : "text-text-muted"}>{status}</span> : null}

@@ -124,7 +124,7 @@ async function open(): Promise<DatabaseSync> {
   try {
   const appId = Number((prepare(db, "PRAGMA application_id").get() as { application_id: number }).application_id);
   const version = Number((prepare(db, "PRAGMA user_version").get() as { user_version: number }).user_version);
-  if ((appId !== 0 && appId !== 0x41555332) || (version !== 0 && version !== 16)) throw new Error("Usage read model schema mismatch; rebuild required.");
+  if ((appId !== 0 && appId !== 0x41555332) || (version !== 0 && version !== 17)) throw new Error("Usage read model schema mismatch; rebuild required.");
   await chmod(databasePath, 0o600).catch(() => undefined);
   db.exec("PRAGMA temp_store = FILE; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; PRAGMA cache_size = -32768; PRAGMA wal_autocheckpoint = 4096;");
   memoryTemp = false;
@@ -134,7 +134,7 @@ async function open(): Promise<DatabaseSync> {
     try { ingestHarnessArchive(db, root); } catch (error) { console.warn("[harness-stats] archive ingest failed", error); }
     prepare(db, "INSERT INTO harness_stats_health(id,last_rebuild_at) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET last_rebuild_at=excluded.last_rebuild_at").run(new Date().toISOString());
   }
-  else if (["usage_write_mode", "read_model_builds", "usage_activity_session_idx", "context_state", "context_request_seq", "context_event_seq", "building_context_state"].some(name => !prepare(db!, "SELECT 1 FROM sqlite_master WHERE name=?").get(name))) throw new Error("Usage read model schema incomplete; rebuild required.");
+  else if (["usage_write_mode", "read_model_builds", "usage_activity_session_idx", "context_state", "context_estimate_state", "context_request_seq", "context_event_seq", "building_context_state"].some(name => !prepare(db!, "SELECT 1 FROM sqlite_master WHERE name=?").get(name))) throw new Error("Usage read model schema incomplete; rebuild required.");
   addSideChatColumn(db);
   ensureContextBashTables(db);
   pruneSyncIndexes(db);

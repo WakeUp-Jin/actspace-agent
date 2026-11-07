@@ -5,7 +5,7 @@
 - **关联计划**：`docs/exec-plans/completed/20261103-subagent-background-redesign/README.md`（S1–S6）
 - **设计**：`docs/design-docs/子智能体和后台任务设计规范/`（01–05）
 - **执行过程**：[execution-process.md](execution-process.md)（步骤 0–8，和设计不同的地方都写在各步骤的「决定」里）
-- **验收**：[acceptance-handoff.md](acceptance-handoff.md)、[acceptance-results.md](acceptance-results.md)
+- **验收**：[acceptance-handoff.md](acceptance-handoff.md)、`acceptance-results.md`（原始记录已清理，见 git 历史）
 - **执行模式**：交互
 - **执行结果**：完成。Electron 验收 23 点：17 通过、0 失败、6 部分覆盖
 - **分支**：`feat/subagent-background-redesign`（已合入 origin/main 的 PR #32）

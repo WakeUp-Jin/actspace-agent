@@ -1,7 +1,7 @@
 import type { ContextPanelView } from "@actspace/shared";
 import type { MockClock } from "../clock";
 import type { MockHandlers } from "../handlers";
-import { mockContextPanelView, mockContextState } from "../context-panel-fixture";
+import { mockContextPanelView } from "../context-panel-fixture";
 import { mockContextPaths, mockContextPathsPage, mockDisclosureSummary } from "../context-paths-fixture";
 import { longSessionScenario } from "./long-session";
 
@@ -22,7 +22,6 @@ export function contextPaginationScenario(clock: MockClock): MockHandlers {
     return view;
   };
   return { sessions: {
-    describeContext: async ({ sessionId }) => mockContextState(full(sessionId)),
     describeContextPanel: async input => {
       if (input.release) return null;
       if (input.retry) failed = false;

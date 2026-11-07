@@ -68,6 +68,16 @@ export class SessionRunManager {
   #wakeSuspended = false;
   constructor(private readonly options: RunManagerOptions) { this.ledger = options.ledger; }
   get failure(): unknown { return this.#failure; }
+  /**
+   * Nothing runs, nothing is queued and no failure is cached, so the owner may drop this manager and
+   * release its Session handle; a later request opens a fresh one. Failed or blocked managers are kept:
+   * they cache recovery and durability failures that protect accepted writes.
+   */
+  get releasable(): boolean {
+    if (this.#closed || this.#failed || this.#active || this.#maintenance || this.#waking || this.ledger.blocked) return false;
+    const snapshot = this.ledger.snapshot();
+    return snapshot.queue.length === 0 && !snapshot.runs.some(run => run.state === "running") && !snapshot.tasks.some(task => task.state === "claimed");
+  }
 
   async submit(submissionId: string, content: RuntimeV2JsonValue, continuationOf: string | null = null): Promise<TaskReceipt> {
     this.#assertOpen();

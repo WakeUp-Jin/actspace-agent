@@ -22,20 +22,9 @@ export function providerUsageToContextSnapshot(
   };
 }
 
-/** Adapt the revision-bound request-context estimate to the existing Context visual contract. */
+/** 上下文估算投影派生出的用量快照（数字与面板「当前」同源）。 */
 export function contextEstimateToSnapshot(
   projection: RuntimeV2RequestContextEstimateProjection,
 ): ContextUsageSnapshot {
-  return {
-    throughJournalSeq: projection.throughJournalSeq,
-    basis: projection.contextState?.basis,
-    requestId: projection.requestId ?? undefined,
-    cumulativeTokens: projection.cumulativeTokens,
-    cumulativeUsage: projection.cumulativeUsage,
-    totalTokens: projection.totalEstimatedTokens,
-    maxTokens: projection.maxTokens,
-    percentUsed: projection.percentUsed,
-    estimator: projection.estimator,
-    buckets: projection.contextState?.buckets ?? [{ key: "conversation", name: "conversation", label: "Request context", tokens: projection.totalEstimatedTokens }],
-  };
+  return projection.usage;
 }

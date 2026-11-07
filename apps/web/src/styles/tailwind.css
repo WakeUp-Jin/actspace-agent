@@ -92,7 +92,7 @@
   --color-analysis-thinking-soft: var(--act-analysis-thinking-soft);
 
   /*
-   * 字号档位（front-全局视觉语言规范「字号」）：text-act-xxs … text-act-title。
+   * 字号档位（front-视觉token规范 §5）：text-act-xxs … text-act-title。
    * 用独立命名而不覆盖 Tailwind 默认 text-sm 等，避免「text-sm = 14px 还是 13px」的同名歧义；
    * 默认字号类由 pnpm check:frontend-tokens 禁止。只设字号，不带行高（行高继承或由 leading-* 指定）。
    */
@@ -104,7 +104,7 @@
   --text-act-xs: 12px;
   --text-act-sm: 13px;
   --text-act-md: 14px;
-  /* web 正文（front-web-pwa客户端规范 §10）：手机阅读距离更近，比桌面正文大一档。 */
+  /* web 正文（front-web-pwa客户端规范 §9）：手机阅读距离更近，比桌面正文大一档。 */
   --text-act-base: 15px;
   --text-act-lg: 16px;
   --text-act-xl: 20px;
@@ -117,7 +117,7 @@
   --radius-act-group: var(--act-radius-group);
   --radius-act-xl: var(--act-radius-xl);
   --radius-act-pill: var(--act-radius-pill);
-  /* web 底部弹层（front-web-pwa客户端规范 §7）。 */
+  /* web 底部弹层（front-web-pwa客户端规范 §6）。 */
   --radius-act-sheet: 26px;
 
   --shadow-act-xs: var(--act-shadow-xs);

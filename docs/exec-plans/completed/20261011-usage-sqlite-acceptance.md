@@ -12,7 +12,7 @@
 
 ## 接手必读与代码入口
 
-- [设计规范](../../design-docs/筛选存储改版V2-增加SQLite/README.md)、[Worker 规范](../../design-docs/筛选存储改版V2-增加SQLite/worker.md)。
+- [设计规范](../../design-docs/core-data-storage-design.md)、[Worker 规范](../../design-docs/core-data-storage-design.md)。
 - [实现计划](../completed/20261011-usage-sqlite-read-model.md)、[执行摘要](../../exec-runs/20261011-usage-sqlite-read-model/execution-summary.md)。
 - [验收矩阵](../../exec-runs/20261011-usage-sqlite-read-model/acceptance-matrix.md)、[Bug 详细复现](../../exec-runs/20261011-usage-sqlite-read-model/acceptance-bugs.md)、[真实 Electron 覆盖](../../exec-runs/20261011-usage-sqlite-read-model/electron-acceptance.md)。
 - `apps/desktop/src/main/runtime-v2/usage-read-model.ts`：查询调度、revision/stamp 校验、重建与 fallback。

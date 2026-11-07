@@ -22,7 +22,7 @@ open docs/tools/session-viewer/session-viewer.html
 
 - 首行可为 `recordKind: "header"` 的 Session Header；
 - 后续每行一个 `recordKind: "event"` 的 Event Envelope；
-- 支持当前 13 种核心事件，以及扩展事件和插件事件；
+- 支持当前 15 种核心事件，以及扩展事件和插件事件；其中 `request/system-prompt`、`request/tools` 只在提示词或工具变化时出现，`request/context` 只有小字段（2026-11-06 起，见[请求记录规范](../../design-docs/agent-plugin-runtime/agent-spec-request-record.md)）；
 - 会保留原始 JSON，不会执行文件中的脚本或 HTML；
 - 非法 JSON 行会被标记并显示行号，其余有效事件仍可继续查看。
 
@@ -32,7 +32,7 @@ open docs/tools/session-viewer/session-viewer.html
 - 去除连续流噪声后的关键路径摘要，帮助先定位一次 Agent run 的主流程；
 - 核心/扩展事件分布；
 - 按核心流程、请求、工具、异常和高频流的快捷筛选，以及事件类型和关键词过滤；
-- 连续的 `assistant/chunk`、`agent/inbox/spliced` 自动合并为一组，可展开查看原始事件；
+- 连续的 `assistant/chunk`、`agent/inbox/spliced` 自动合并为一组，可展开查看原始事件（`assistant/chunk` 只出现在 2026-11-05 之前的旧会话，新会话的流式文字不进日志）；
 - 事件时间线、序号、来源和提交状态；
 - 单条事件的格式化 JSON 详情；
 - 文件重新加载和清空当前数据。

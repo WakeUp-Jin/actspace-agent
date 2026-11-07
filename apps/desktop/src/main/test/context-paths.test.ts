@@ -12,7 +12,7 @@ function fixture() {
     status: { throughJournalSeq: 10, cycle: 2, facts: [], plugins: { "actspace.context.owners": ["actspace.context-disclosure"] },
       paths: Array.from({ length: 205 }, (_, i) => ({ id: String(i), path: `/src/${String(i).padStart(3, "0")}.ts`, owners: ["tool"], visibility: i < 100 ? "active" : "sleeping", readsInCycle: 1, addedCycle: 1, history: { sourceEventSeqs: [i], sessionId: "s" } })) },
   };
-  const runtime = { readContextProjection: vi.fn(async () => projection), readContextEntryText: vi.fn(), sessionQuerySource: vi.fn(async () => null) };
+  const runtime = { readContextProjection: vi.fn(async () => projection), readContextEntryText: vi.fn(), sessionQuerySource: vi.fn(async () => null), readSessionProjectionValue: vi.fn(async () => undefined) };
   const service = new ContextPanelService(runtime as never, {} as UsageReadModelService);
   return { service, runtime, set: (value: ManagedContextProjection | null) => { projection = value; }, current: () => projection! };
 }

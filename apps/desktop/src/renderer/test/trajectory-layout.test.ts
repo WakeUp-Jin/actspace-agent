@@ -25,7 +25,10 @@ const nodes = [
   node("turn/start", "00.000", t1),
   node("user/message", "00.100", { ...t1, content: "读一下 README" }),
   node("step/start", "00.200", { ...t1, stepId: "st1" }),
-  node("request/header", "00.200", { ...t1, stepId: "st1", requestId: "r1", routeId: "deepseek", model: "v4", prompt: { systemPrompt: "你是助手", tools: [] } }),
+  node("request/header", "00.200", { ...t1, stepId: "st1", requestId: "r1", routeId: "deepseek", model: "v4" }),
+  node("request/system-prompt", "00.200", { ...t1, stepId: "st1", requestId: "r1", digest: "p", sections: [{ id: "model-prompt", owner: "actspace.context-system", order: 0, content: "你是助手" }], modelFacts: [], contributorProvenance: [] }),
+  node("request/tools", "00.200", { ...t1, stepId: "st1", requestId: "r1", digest: "t", tools: [] }),
+  node("request/context", "00.200", { ...t1, stepId: "st1", requestId: "r1", snapshot: { schemaVersion: 3 } }),
   node("assistant/message", "01.000", { ...t1, stepId: "st1", requestId: "r1", messageId: "m1", content: "先读文件", usage: { outputTokens: 5 } }),
   node("tool/call", "01.100", { ...t1, stepId: "st1", callId: "c1", name: "read_file", arguments: { path: "README.md" } }, "c1"),
   node("tool/call", "01.200", { ...t1, stepId: "st1", callId: "c2", name: "bash", parentCallId: "c1", arguments: { command: "ls" } }, "c2"),
@@ -50,8 +53,13 @@ const layout = () => deriveLayout(buildTrajectorySnapshot(snapshot));
 describe("trajectory layout", () => {
   it("maps builder records onto the seven DSH kinds and appends request-only cells", () => {
     const { cells } = layout();
-    expect(cells.map(cell => cell.requestOnly ? "request" : cell.kind)).toEqual(["system", "user", "message", "tool", "subtool", "message", "user", "request"]);
+    // r3 is still open: its reply streams into an assistant placeholder (spec agent-spec-live-assistant-stream §6).
+    expect(cells.map(cell => cell.requestOnly ? "request" : cell.kind)).toEqual(["system", "user", "message", "tool", "subtool", "message", "user", "message"]);
+    expect(cells.at(-1)?.record).toMatchObject({ placeholder: true, requestId: "r3", state: "running" });
     expect(cells.map(cell => cell.index)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    // A turn that ended without a reply keeps the request-only cell.
+    const ended = deriveLayout(buildTrajectorySnapshot({ ...snapshot, nodes: [...nodes, { ...nodes.at(-1)!, key: "s:99", eventSeq: 99, eventType: "turn/end", data: { turnId: "t2" } }] }));
+    expect(ended.cells.map(cell => cell.requestOnly ? "request" : cell.kind).at(-1)).toBe("request");
   });
 
   it("puts the turn label on the first content row and the request dot on the first non-input row", () => {
@@ -67,7 +75,7 @@ describe("trajectory layout", () => {
     const requests = [...layout().requests.values()];
     expect(requests[0]).toMatchObject({ provider: "deepseek", model: "v4", status: "completed", toolCalls: 1, subtoolCalls: 1 });
     expect(requests[1]).toMatchObject({ retries: 1, lastAttemptError: "超时", retryDelayMs: 200, status: "completed" });
-    expect(requests[2]).toMatchObject({ status: "running", resultRecordId: null });
+    expect(requests[2]).toMatchObject({ status: "running", resultRecordId: "s:record:assistant:request:r3" });
   });
 
   it("collapses a turn into one summary row and an assistant's tool rows into one summary row", () => {
@@ -83,7 +91,7 @@ describe("trajectory layout", () => {
   it("search keeps matching rows and recomputes turn edges", () => {
     const current = layout();
     const rows = filterRows(flattenLayout(current.turns), new Set(current.cells.filter(cell => cell.kind === "message").map(cell => cell.recordId)));
-    expect(rows.map(row => [row.cell.kind, row.turnStart, row.turnEnd])).toEqual([["message", true, false], ["message", false, true]]);
+    expect(rows.map(row => [row.cell.kind, row.turnStart, row.turnEnd])).toEqual([["message", true, false], ["message", false, true], ["message", true, true]]);
   });
 
   it("chooses detail tabs by kind and present fields", () => {
@@ -97,7 +105,7 @@ describe("trajectory layout", () => {
 describe("trajectory timeline", () => {
   it("assigns lanes 0/1/2 and equal widths in sequence mode", () => {
     const model = deriveTimeline(layout().turns)!;
-    expect(model.spans.map(span => span.lane)).toEqual([0, 0, 1, 2, 2, 1, 0]);
+    expect(model.spans.map(span => span.lane)).toEqual([0, 0, 1, 2, 2, 1, 0, 1]);
     expect(model.turnBoundaries).toEqual([{ turn: 1, time: 1 }, { turn: 2, time: 6 }]);
   });
 

@@ -23,16 +23,16 @@ describe("auto reviewer", () => {
   });
   it("retains original user revisions, excludes reasoning and ordinary tool bodies", () => {
     const events = [
-      { type: "user/message", surface: { kind: "append", node: { content: "inspect files" } } },
-      { type: "assistant/message", surface: { kind: "append", node: { content: [{ type: "text", text: "May I inspect?" }, { type: "reasoning", text: "hidden-canary" }] } } },
-      { type: "user/message", surface: { kind: "append", node: { content: "yes, but no deletion" } } },
+      { type: "user/message", data: { messageId: "u1", content: "inspect files" }, surface: { kind: "append" } },
+      { type: "assistant/message", data: { messageId: "a1", content: [{ type: "text", text: "May I inspect?" }, { type: "reasoning", text: "hidden-canary" }] }, surface: { kind: "append" } },
+      { type: "user/message", data: { messageId: "u2", content: "yes, but no deletion" }, surface: { kind: "append" } },
       { type: "tool/result", data: { callId: "x", status: "completed", modelOutput: "tool-body-canary" } },
     ] as unknown as SessionEventEnvelopeV1[];
     const content = JSON.stringify(reviewConversation(events));
     expect(content).toContain("no deletion"); expect(content).toContain("May I inspect");
     expect(content).not.toContain("hidden-canary"); expect(content).not.toContain("tool-body-canary");
     expect(() => reviewConversation([])).toThrow();
-    expect(() => reviewConversation([{ ...events[0], surface: { kind: "append", node: { content: "x".repeat(65_000) } } }] as never)).toThrow();
+    expect(() => reviewConversation([{ ...events[0], data: { messageId: "u1", content: "x".repeat(65_000) } }] as never)).toThrow();
   });
 });
 

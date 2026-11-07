@@ -67,5 +67,5 @@
 
 ## 学习文档
 
-- [20261007-pure-annotation-tree-shaking](../../learnings/2026-10/20261007-pure-annotation-tree-shaking.md)：常量守卫之外，顶层调用也会把模块留在包里。
-- [20261007-tailwind-same-property-order](../../learnings/2026-10/20261007-tailwind-same-property-order.md)：Tailwind 同属性两个类，谁生效看样式表顺序。
+- [20261007-pure-annotation-tree-shaking](../../learnings/2026-10/20261006-dev-only-code-out-of-bundle.md)：常量守卫之外，顶层调用也会把模块留在包里。
+- [20261007-tailwind-same-property-order](../../learnings/2026-09/20260926-tailwind-utility-conflict-order.md)：Tailwind 同属性两个类，谁生效看样式表顺序。

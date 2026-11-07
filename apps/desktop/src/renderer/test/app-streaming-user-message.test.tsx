@@ -61,7 +61,6 @@ const settingsApiStub = {
   "settings.update": async () => defaultSettings,
   "providers.setKey": async () => ({ ok: true }),
   "providers.clearKey": async () => ({ ok: true }),
-  "sessions.describeContext": async () => null,
   "review.getSnapshot": async () => createReviewChanges(0, 0),
   "review.refreshSnapshot": async () => createReviewChanges(0, 0),
   "workspaces.listMarkdownFiles": async () => ({ ok: true as const, files: [], truncated: false, source: "walk" as const }),
@@ -3094,7 +3093,7 @@ sessionId: input.sessionId,
     // 早期页并入 store 之后再收到 live 的 journal 更新：接在窗口末尾，早期内容不丢（14 T10）。
     const pageCalls = getSessionPage.mock.calls.length;
     const liveMessage = { recordKind: 'event', seq: 21, type: 'user/message', eventVersion: 1, criticality: 'ignorable', time: latest.meta.createdAt, source: { ownerPluginId: '@actspace/core' },
-      data: { agentRunId: 'r3', messageId: 'v2-21', content: 'Live question' }, surface: { kind: 'append', node: { kind: 'user', messageId: 'v2-21', content: 'Live question' } },
+      data: { agentRunId: 'r3', messageId: 'v2-21', content: 'Live question' }, surface: { kind: 'append' },
       provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
     act(() => live.forEach(listener => listener({ event: { kind: 'journal-update', schemaVersion: 1, runtimeInstanceId: 'runtime-1', liveSeq: 1, throughJournalSeq: 21, sessionId: 'paged',
       update: { sessionId: 'paged', throughJournalSeq: 21, event: liveMessage, values: {} } } })));

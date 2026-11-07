@@ -1,6 +1,6 @@
 # 上下文管理引擎 V2
 
-状态：2026-10-18，V2 引擎、Context 面板与 SQLite 联合实现已完成。面板契约为 schemaVersion 2，SQLite 读模型为 schema 9；联合验收已收束，M/Small 结果、用户取消的 L 剩余长测和未覆盖边界见[联合执行摘要](../../../exec-runs/20261011-context-sqlite-integration/execution-summary.md)。
+V2 引擎、Context 面板与 SQLite 联合实现已落地。面板契约为 schemaVersion 2，SQLite 读模型为 schema 9；验收结果与未覆盖边界见[联合执行摘要](../../../exec-runs/20261011-context-sqlite-integration/execution-summary.md)。
 
 **Context 是按 Session 与 Agent 逻辑作用域隔离的长期状态；每次模型调用从它生成不可变的 LlmInput。** 模型与工具输出继续先进入 Session，再由对应插件更新 Context。
 
@@ -11,10 +11,8 @@
 | [01：总体设计与调用流程](01-总体设计与调用流程.md) | 用户输入之后如何组装、调用，再进入下一次组装；引擎管理什么；前端读取什么 |
 | [02：生命周期与状态更新](02-生命周期与状态更新.md) | Context 活多久，Run 结束怎么办，如何局部更新、恢复和保持请求一致 |
 | [03：插件包与职责边界](03-插件包与职责边界.md) | context 目录如何拆包，谁拥有状态，压缩策略位于哪里 |
-| [04：旧文档与源码漂移核对](04-旧文档与源码漂移核对.md) | 第一版哪些仍有效，哪些是 V2 的有意变化，哪些旧表述已经滞后 |
 | [05：Context 面板与 SQLite 联合设计](05-Context面板与SQLite联合设计.md) | 当前与历史数据如何分工、索引如何同步、面板如何刷新、Bug 修复如何共用基础能力 |
-| [06：原会话决策与联合方案校验](06-原会话决策与联合方案校验.md) | 对照完整 SQLite 会话，哪些是已确认约束、新增提案、历史遗漏；哪些验收仍未完成 |
-| [07：Step 增量更新与披露面板决策记录](07-Step增量更新与披露面板决策记录.md) | 2026-10-18 起持续讨论；读取链路、DSH 参考；T1–T5 后端/刷新已实施，路径 UI 待交接 |
+| [07：Step 增量更新与披露面板决策记录](07-Step增量更新与披露面板决策记录.md) | 读取链路、DSH 参考；T1–T5 后端与刷新的决策记录 |
 
 [联合执行计划](../../../exec-plans/completed/20261011-context-sqlite-integration/README.md) · [测试验收计划](../../../exec-plans/completed/20261011-context-sqlite-integration/acceptance.md)
 
@@ -30,8 +28,6 @@
 8. 每个上下文模块是独立插件包，统一归入 `packages/context/`；管理引擎是单独插件包，压缩策略通过引擎协作。
 
 ## 整理时补齐的边界
-
-以下是对已确认方向的细化，供本次文档审阅：
 
 当前实现入口：`packages/context/context-engine/src/instances.ts` 管理 `Session + logicalAgentScopeId` 实例，`packages/context/context-engine/src/reducers.ts` 管理受 owner/fields 约束的事件 reducer，`packages/context/context-engine/src/projection.ts` 生成 Host/UI 只读投影；`packages/context/*` 下的类型插件提供各自来源，`packages/core/agent-loop/src/loop.ts` 使用稳定 Agent 身份创建请求，并在已有实例时走 durable reconcile。
 
@@ -49,4 +45,4 @@ Host/IPC 接线已经由 Runtime 的 `context.engine.getProjection`、Desktop Ap
 
 包迁移与 V2 生命周期的既有实施记录保留；实现完成不代表未覆盖的验收点已通过。
 
-2026-10-18 追加实现：[Step 更新执行摘要](../../../exec-runs/20261018-context-step-update/execution-summary.md) · [CloudOps 前端交接](../../frontend/front-Context面板Step刷新与路径展示交接.md)。来源依赖缓存、Step 安全点压缩和路径分页已接入；未执行真实 Provider 性能测试或路径 UI 验收。
+Step 更新：[执行摘要](../../../exec-runs/20261018-context-step-update/execution-summary.md)。来源依赖缓存、Step 安全点压缩和路径分页已接入；面板前端见 `docs/design-docs/frontend/` 下的 Context 面板规范。

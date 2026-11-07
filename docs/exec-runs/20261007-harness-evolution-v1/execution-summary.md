@@ -1,6 +1,6 @@
 # Harness 自进化 V1 执行摘要
 
-分支：`codex/harness-evolution-v1`；[已完成计划](../../exec-plans/completed/20261007-harness-evolution-v1.md)。核心代码、自动化与构建已完成；真实桌面逐项记录见[Computer Use 验收](computer-use-acceptance.md)。未提交或推送 Git。原有设计文档变更已保留。
+分支：`codex/harness-evolution-v1`；[已完成计划](../../exec-plans/completed/20261007-harness-evolution-v1.md)。核心代码、自动化与构建已完成；真实桌面逐项记录见Computer Use 验收（原始记录已清理，见 git 历史）。未提交或推送 Git。原有设计文档变更已保留。
 
 ## 交付内容
 
@@ -59,8 +59,8 @@
 
 ## 追加验收
 
-后续按用户要求新增失败路径回归，本轮 169 项测试通过；Computer Use 补齐 Composer 启用选择和完整重启持久化。详见[追加测试记录](testing-retest.md)，本节更新上文首次验收中对应的未覆盖状态，真实模型闭环仍未覆盖。
+后续按用户要求新增失败路径回归，本轮 169 项测试通过；Computer Use 补齐 Composer 启用选择和完整重启持久化。详见追加测试记录（原始记录已清理，见 git 历史），本节更新上文首次验收中对应的未覆盖状态，真实模型闭环仍未覆盖。
 
 ## 真实模型验收补齐
 
-后续由 gpt-6.1-sol 操作真实 Electron，应用 deepseek-flash 自主开发并启用去重工具，下一条消息实际调用返回 `["a","b","c"]`，另一会话仍使用 main 且无新工具。此前“真实模型闭环未覆盖”的结论由本次结果更新。过程发现并修复目录/通用插件工具审批按钮缺失；详见[真实模型验收](real-model-acceptance.md)。本次是一个简单工具样例，不代表任意插件开发成功率或 V2 沙箱评估。
+后续由 gpt-6.1-sol 操作真实 Electron，应用 deepseek-flash 自主开发并启用去重工具，下一条消息实际调用返回 `["a","b","c"]`，另一会话仍使用 main 且无新工具。此前“真实模型闭环未覆盖”的结论由本次结果更新。过程发现并修复目录/通用插件工具审批按钮缺失；详见真实模型验收（原始记录已清理，见 git 历史）。本次是一个简单工具样例，不代表任意插件开发成功率或 V2 沙箱评估。

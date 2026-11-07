@@ -136,7 +136,14 @@ async function main() {
 
   if (prepareOnly) return;
 
-  const child = spawn(executable, [appEntry], {
+  // 排查内存 / CPU 时用：ACTSPACE_INSPECT_MAIN=9229 pnpm dev。主进程 inspector 监听 127.0.0.1:9229，
+  // 界面进程的 Chrome 调试端口是它 +1（9230）；两者都只绑本机。
+  const inspectPort = process.env.ACTSPACE_INSPECT_MAIN;
+  const inspectArgs = inspectPort && /^\d+$/.test(inspectPort)
+    ? [`--inspect=127.0.0.1:${inspectPort}`, `--remote-debugging-port=${Number(inspectPort) + 1}`, "--remote-debugging-address=127.0.0.1"]
+    : [];
+  if (inspectArgs.length > 0) console.log(`[dev-runtime] main inspector on 127.0.0.1:${inspectPort}, renderer debugging on 127.0.0.1:${Number(inspectPort) + 1}`);
+  const child = spawn(executable, [...inspectArgs, appEntry], {
     cwd: process.cwd(),
     env: {
       ...process.env,

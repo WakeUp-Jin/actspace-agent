@@ -109,15 +109,34 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
   function applyStreamEvent(event: StreamEvent, onSteered: (sessionId: string, messageId: string) => SteeredMessage | undefined) {
     const run = runs.get(event.sessionId);
     if (!run || run.agentRunId !== event.agentRunId) return;
-    // A recovered run keeps its durable transcript, including text completed
-    // before reload. Subsequent text is supplied by the live Journal projection.
-    if (run.recovered && (event.type === "assistant_text_delta" || event.type === "assistant_thinking_delta")) return;
+    // A recovered run starts from the host's live baseline (unsettled text only; settled messages are in the
+    // durable transcript). Deltas that arrive first wait for it; those the baseline already holds are dropped.
+    // A recovered operation (compaction) never gets a baseline, so its deltas are dropped as before.
+    if (run.recovered && (event.type === "assistant_text_delta" || event.type === "assistant_thinking_delta")) {
+      if (run.operationTaskId !== undefined) return;
+      if (run.liveCut === undefined) { (run.liveBuffer ??= []).push(event); return; }
+      if (event.liveRevision !== undefined && event.liveRevision <= run.liveCut) return;
+    }
     const state = run.state;
 
     switch (event.type) {
       case "agent_run_started":
         state.waitingForModel = true;
         break;
+
+      case "live_output_baseline": {
+        if (!run.recovered || run.liveCut !== undefined) break;
+        for (const segment of event.segments) {
+          if (!segment.text) continue;
+          appendOrMergeSegment(state.segments, segment.kind, segment.text, { messageId: segment.messageId, ...(segment.requestId === undefined ? {} : { llmCallId: segment.requestId }) });
+          if (segment.text.trim().length > 0) state.waitingForModel = false;
+        }
+        run.liveCut = event.revision;
+        const buffered = run.liveBuffer ?? [];
+        run.liveBuffer = undefined;
+        for (const delta of buffered) applyStreamEvent(delta, onSteered);
+        break;
+      }
 
       case "user_message_steered": {
         const item = onSteered(event.sessionId, event.messageId);
@@ -231,7 +250,7 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
         if (event.delta.trim().length > 0) {
           state.waitingForModel = false;
         }
-        appendOrMergeSegment(state.segments, "thinking", event.delta);
+        appendOrMergeSegment(state.segments, "thinking", event.delta, { llmCallId: event.llmCallId, messageId: event.messageId });
         break;
 
       case "assistant_text_delta":
@@ -239,7 +258,7 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
         if (event.delta.length > 0) {
           state.waitingForModel = false;
         }
-        appendOrMergeSegment(state.segments, "text", event.delta);
+        appendOrMergeSegment(state.segments, "text", event.delta, { llmCallId: event.llmCallId, messageId: event.messageId });
         break;
 
       case "llm_retry":
@@ -251,18 +270,26 @@ export function createLiveRunStore(terminalLimit = TERMINAL_RUN_LIMIT, options: 
       case "tool_call_streaming": {
         state.waitingForModel = false;
         upsertStreamingTool(state, event.toolCallId, event.toolName, event.preview);
+        const entry = state.activeTools.get(event.toolCallId);
+        if (entry && entry.llmCallId === undefined && event.llmCallId) entry.llmCallId = event.llmCallId;
         break;
       }
 
       case "tool_started": {
         state.waitingForModel = false;
         upsertStreamingTool(state, event.toolCallId, event.toolName, event.preview);
+        const entry = state.activeTools.get(event.toolCallId);
+        if (entry && entry.llmCallId === undefined && event.llmCallId) entry.llmCallId = event.llmCallId;
+        const started = state.activeTools.get(event.toolCallId);
+        if (started) started.started = true;
         break;
       }
 
       case "tool_finished": {
         if (state.activeTools.get(event.toolCallId)?.terminalStatus) break;
         upsertStreamingTool(state, event.toolCallId, event.toolName, event.preview);
+        const entry = state.activeTools.get(event.toolCallId);
+        if (entry && entry.llmCallId === undefined && event.llmCallId) entry.llmCallId = event.llmCallId;
         const tool = state.activeTools.get(event.toolCallId);
         if (tool) {
           if (event.preview) {

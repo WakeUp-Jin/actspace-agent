@@ -3,7 +3,7 @@ import { readFileReferenceBlocks, readResponseExcerptBlocks, renderFileReference
 import type { LlmMessage, LlmContentBlock } from "@actspace/llm-service";
 import type { ArtifactResolver } from "./types.js";
 
-export async function convertMessages(values: readonly RuntimeV2JsonValue[], sessionId: string, resolveArtifact?: ArtifactResolver, observe?: (message: LlmMessage, sourceIndex: number | null) => void): Promise<readonly LlmMessage[]> {
+export async function convertMessages(values: readonly RuntimeV2JsonValue[], sessionId: string, resolveArtifact?: ArtifactResolver): Promise<readonly LlmMessage[]> {
     const paths = new Map<string, string>();
     for (const value of values) {
       if (!isRecord(value) || !Array.isArray(value.content)) continue;
@@ -25,21 +25,19 @@ export async function convertMessages(values: readonly RuntimeV2JsonValue[], ses
     for (let index = 0; index < messages.length; index++) {
       const message = messages[index]!;
       repaired.push(message);
-      observe?.(message, index);
       if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
       const results = new Set<string>();
       let next = index + 1;
       while (messages[next]?.role === "tool") {
         const result = messages[next++]!;
         repaired.push(result);
-        observe?.(result, next - 1);
         if (result.callId) results.add(result.callId);
       }
       index = next - 1;
       for (const block of message.content) {
         if (block.type === "tool-call" && !results.has(block.callId)) {
           const missing: LlmMessage = { role: "tool", callId: block.callId, content: "No result was recorded for this tool call. Its outcome is unknown; do not assume it executed or succeeded." };
-          repaired.push(missing); observe?.(missing, null);
+          repaired.push(missing);
         }
       }
     }

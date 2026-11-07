@@ -157,7 +157,7 @@ function applyUsageValue(state: UsageState, event: SessionEventEnvelopeV1): Usag
 }
 
 /**
- * 模型侧计时：request/header 标请求开始，首个非空 chunk 标首 token，assistant/message 结算一次请求。
+ * 模型侧计时：request/header 标请求开始，assistant/message 的 firstTokenAt 标首 token（旧会话取首个非空 chunk），assistant/message 结算一次请求。
  * 一步可能有多次请求（重试），llm/retry 结算失败请求；结算后清空起点，不计重试等待。
  * 只有状态真的变了才返回新对象，流式 chunk 不会逐条触发投影推送。
  */
@@ -175,12 +175,15 @@ function applyTiming(state: ActivityState, event: SessionEventEnvelopeV1, data: 
   if (at === null) return state;
   const timing = { ...state.timing };
   if (open.startedAt !== null) timing.llmMs += Math.max(0, at - open.startedAt);
-  if (open.firstTokenAt !== null) {
-    timing.ttftMs += Math.max(0, open.firstTokenAt - (open.startedAt ?? open.firstTokenAt));
+  // New sessions record the first token on the settled message; old sessions derived it from journaled chunks above.
+  const recorded = event.type === "assistant/message" && typeof data.firstTokenAt === "string" ? Date.parse(data.firstTokenAt) : NaN;
+  const firstTokenAt = open.firstTokenAt ?? (Number.isFinite(recorded) ? recorded : null);
+  if (firstTokenAt !== null) {
+    timing.ttftMs += Math.max(0, firstTokenAt - (open.startedAt ?? firstTokenAt));
     timing.ttftSteps += 1;
     const output = number(record(data.usage).outputTokens);
     if (output > 0) {
-      timing.decodeMs += Math.max(0, at - open.firstTokenAt);
+      timing.decodeMs += Math.max(0, at - firstTokenAt);
       timing.decodeTokens += output;
     }
   }

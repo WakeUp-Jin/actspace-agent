@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * 本机未读（front-web-pwa客户端规范 §9.1）：localStorage `actspace.web.seen` 记录每个会话最后一次
+ * 本机未读（front-web-pwa客户端规范 §8.1）：localStorage `actspace.web.seen` 记录每个会话最后一次
  * 在前台查看时的 updatedAt。会话 updatedAt 更新且不是当前打开的会话时视为未读，只在本机生效。
  *
  * 详情页在会话打开期间随 updatedAt 调用 `markSeen`；列表页用 `seedSeen` 给没记录过的会话打基线。

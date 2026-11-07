@@ -1,24 +1,20 @@
-import { HostError, isRecord } from "@actspace/shared/host-protocol";
-/** Transient text until the journal records the completed message. Pages never truncate output. */
+import { HostError } from "@actspace/shared/host-protocol";
+import { LiveOutputBuffer, type LiveOutputPage } from "@actspace/shared/runtime-v2";
+/**
+ * Transient text until the journal records the completed message (agent-spec-live-assistant-stream §5).
+ * Pages are addressed by revision, so a message settling between pages never shifts what a client reads next.
+ */
 export class HostLiveOutput {
-  readonly #sessions = new Map<string, { runId: string; revision: number; chunks: { kind: string; messageId: string; text: string }[] }>();
-  accept(event: unknown): void {
-    if (!isRecord(event) || typeof event.sessionId !== "string" || typeof event.agentRunId !== "string") return;
-    if (event.kind !== "assistant-delta" && event.kind !== "reasoning-delta") return;
-    if (typeof event.message !== "string" || typeof event.messageId !== "string") return;
-    let state = this.#sessions.get(event.sessionId);
-    if (!state || state.runId !== event.agentRunId) { state = { runId: event.agentRunId, revision: 0, chunks: [] }; this.#sessions.set(event.sessionId, state); }
-    // Small independent chunks fit the wire bound even for a single oversized provider delta.
-    for (let offset = 0; offset < event.message.length; offset += 8192) state.chunks.push({ kind: event.kind, messageId: event.messageId, text: event.message.slice(offset, offset + 8192) });
-    state.revision++;
+  readonly #buffer = new LiveOutputBuffer();
+  /** Returns the live revision of a text/reasoning delta, null for other events. */
+  accept(event: unknown): number | null { return this.#buffer.accept(event); }
+  settle(sessionId: string, messageId: string): void { this.#buffer.settle(sessionId, messageId); }
+  describe(sessionId: string) { return this.#buffer.describe(sessionId); }
+  page(sessionId: string, runId: string, afterRevision: number): LiveOutputPage {
+    if (!Number.isSafeInteger(afterRevision) || afterRevision < 0) throw new TypeError("Invalid output revision");
+    const page = this.#buffer.page(sessionId, runId, afterRevision);
+    if (!page) throw new HostError("CONFLICT", "Output belongs to another Run; refresh snapshot", true);
+    return page;
   }
-  describe(sessionId: string) { const state = this.#sessions.get(sessionId); return state ? { runId: state.runId, revision: state.revision, chunks: state.chunks.length } : null; }
-  page(sessionId: string, runId: string, offset: number) {
-    const state = this.#sessions.get(sessionId);
-    if (!state || state.runId !== runId) throw new HostError("CONFLICT", "Output belongs to another Run; refresh snapshot", true);
-    if (!Number.isSafeInteger(offset) || offset < 0 || offset > state.chunks.length) throw new TypeError("Invalid output offset");
-    const chunks = state.chunks.slice(offset, offset + 4);
-    return { runId, revision: state.revision, offset, next: offset + chunks.length, total: state.chunks.length, chunks };
-  }
-  clear(sessionId: string, runId: string) { if (this.#sessions.get(sessionId)?.runId === runId) this.#sessions.delete(sessionId); }
+  clear(sessionId: string, runId: string) { this.#buffer.clear(sessionId, runId); }
 }

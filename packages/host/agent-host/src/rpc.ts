@@ -122,7 +122,7 @@ export class HostRpc {
         for (const key of ["pinned", "archived"]) if (patch[key] !== undefined && typeof patch[key] !== "boolean") throw new TypeError(`Invalid ${key}`);
         return app.updateSessionMetadata(sessionId, patch as { title?: string | null; pinned?: boolean; archived?: boolean });
       }
-      case "sessions.output": fields(params, ["sessionId", "runId", "offset"]); return this.options.output.page(stringParam(params, "sessionId", 128), stringParam(params, "runId", 128), integerParam(params, "offset", Number.MAX_SAFE_INTEGER));
+      case "sessions.output": fields(params, ["sessionId", "runId", "afterRevision"]); return this.options.output.page(stringParam(params, "sessionId", 128), stringParam(params, "runId", 128), integerParam(params, "afterRevision", Number.MAX_SAFE_INTEGER));
       case "tasks.submit": {
         fields(params, ["sessionId", "submissionId", "content", "uploadIds", "fileReferences", "responseAnnotations"]);
         if (typeof params.content !== "string") throw new TypeError("Task content must be text");

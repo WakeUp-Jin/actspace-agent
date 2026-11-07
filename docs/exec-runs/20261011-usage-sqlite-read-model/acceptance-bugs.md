@@ -1,6 +1,6 @@
 # SQLite 查询验收问题清单
 
-当前状态：已获用户授权恢复联合实现与验收；2026-10-12接受U-01批量追加和U-06首次复杂标题统计耗时限制。最新结果见本文后续更新及[联合验收](../20261011-context-sqlite-integration/acceptance-results.md)，以下初轮失败保留追溯，不代表当前全部仍失败。
+当前状态：已获用户授权恢复联合实现与验收；2026-10-12接受U-01批量追加和U-06首次复杂标题统计耗时限制。最新结果见本文后续更新及联合验收（原始记录已清理，见 git 历史），以下初轮失败保留追溯，不代表当前全部仍失败。
 
 历史暂停记录：当时用户要求暂停验收与修复，等待其他任务完成后按[统一验收计划](../../exec-plans/completed/20261011-usage-sqlite-acceptance.md)处理。用户在真实界面验收期间明确要求停止修复；该要求之后不修改业务实现、测试实现或构建脚本。源文件基线见本地 `artifacts/usage-read-model/acceptance-only-source-baseline.json`，HEAD 为 `c15c26b34d89fc8752c97d61773e38e87c853c63`，验收的是其上未提交工作树。报告及测试生成的临时数据可以更新。
 
@@ -92,7 +92,7 @@ U-09已定位WorkbenchLayout的view/settingsSection effect会在离开Usage时�
 | U-09 | 生命周期实现与回归通过，完整规模 CU 待验 | 已提交批次 cursor 保留、published/building 分代、离页释放等待者；需完成大数据离页/取消/退出/重开路线后才能关闭。 |
 | U-10 | 原失败回归修复通过 | catalog UTC 规范化和同时间稳定 cursor；indexed/fallback 原断言及 offset 边界/分页回归通过。 |
 
-新 Context 问题见 [联合 Bug 清单](../20261011-context-sqlite-integration/acceptance-bugs.md)。最终签收以联合矩阵为准。
+新 Context 问题见 联合 Bug 清单（原始记录已清理，见 git 历史）。最终签收以联合矩阵为准。
 
 ### 2026-10-12 继续复验
 

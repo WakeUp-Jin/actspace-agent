@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Check, ChevronLeft, Copy, FolderOpen, Square } from "lucide-react";
-import { createMessageBlocks, subagentKindLabel, subagentListStatusLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
+import { subagentKindLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
 import { IconButton } from "../ui/IconButton";
 import { Button } from "../ui/Button";
-import { AgentAvatar, SubagentStatus, SubagentStatusIcon, agentModelLabel, formatAgentDuration } from "../messages/AgentIdentity";
+import { AgentAvatar, SubagentStatus, agentModelLabel, formatAgentDuration } from "../messages/AgentIdentity";
 import { MarkdownProse } from "../messages/MarkdownProse";
 import { renderMessageList } from "../conversation/render-message";
 import { sessionsApi } from "../../api/sessions";
@@ -11,11 +11,14 @@ import { formatTokenCount } from "../../context-format";
 import { SessionViewToggle, type SessionMainView } from "../SessionViewToggle";
 import { TrajectoryView } from "../TrajectoryView";
 import type { SubagentFocus } from "./RightPanelContext";
+import { reconcileSubagents, reconcileTranscript, type TranscriptState } from "./subagent-transcript";
 
-// 列表每秒轮询；结束后记录可能拉取失败（父会话还在输出时主进程繁忙），拿到非空结果前继续重试，最多这么多次。
+// 有子智能体在跑时列表每秒轮询（耗时、状态要跟上），都没在跑时 5 秒一次，只为接住新派出的子智能体。
+// 结束后记录可能拉取失败（父会话还在输出时主进程繁忙），拿到非空结果前继续重试，最多这么多次。
 const POLL_MS = 1000;
+const IDLE_POLL_MS = 5000;
 const COMPLETED_TRANSCRIPT_RETRIES = 20;
-// 列表行：设置页分组卡里的一行，规范见 docs/design-docs/frontend/front-子Agent列表与详情顶部栏.md。
+// 列表行：设置页分组卡里的一行，规范见 docs/design-docs/frontend/front-子Agent与后台任务规范.md。
 const rowClass = "flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring";
 
 /** 右侧「子 Agent」面板（设计 05 §2）：一个子智能体一行；详情按种类分支，本地 / Fork 看对话与轨迹，Codex / Claude Code 看结果与原生记录。 */
@@ -31,6 +34,8 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
   const [missingAgent, setMissingAgent] = useState(false);
   const [stopping, setStopping] = useState<string>();
   const [stopError, setStopError] = useState<string>();
+  // 运行中的耗时用 Date.now() 现算；列表没变化时不 setState，所以靠这个每秒一次的计数让耗时继续走。
+  const [, setTick] = useState(0);
   useEffect(() => {
     if (!focus) return;
     setPendingAgent(focus.agentId);
@@ -47,12 +52,19 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
     if (!sessionId) return;
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
+    let delay = POLL_MS;
     async function refresh() {
       try {
         const items = await sessionsApi.getSubagents({ sessionId: sessionId! });
-        if (!disposed) { setAgents(items); setLoaded(true); setError(undefined); }
+        if (disposed) return;
+        // 数据没变就不 setState（保持引用），只在有运行中的子智能体时推进耗时。
+        setAgents((previous) => reconcileSubagents(previous, items));
+        setLoaded(true); setError(undefined);
+        const running = items.some((item) => item.status === "running");
+        if (running) setTick((value) => value + 1);
+        delay = running ? POLL_MS : IDLE_POLL_MS;
       } catch { if (!disposed) setError("无法加载子智能体，请稍后重试。"); }
-      finally { if (!disposed) timer = setTimeout(refresh, POLL_MS); }
+      finally { if (!disposed) timer = setTimeout(refresh, delay); }
     }
     void refresh();
     return () => { disposed = true; clearTimeout(timer); };
@@ -105,23 +117,20 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
   </section>;
 }
 
-/** 一行：头像、描述、最近一句（结论或怎么结束的）；右上 token，右下状态 / 第 N 轮 / 耗时。运行中的行右侧有停止。 */
+/** 一行：头像、描述、最近一句（结论或怎么结束的）；右上 token，右下状态文字 · 耗时。运行中的行右侧有停止。 */
 function SubagentRow({ agent, stopping, onOpen, onStop }: { agent: SubagentListItem; stopping: boolean; onOpen: () => void; onStop: () => void }) {
   const running = agent.status === "running";
-  const timing = [agent.activationCount > 1 ? `第 ${agent.activationCount} 轮` : undefined, formatAgentDuration(durationMs(agent))].filter(Boolean).join(" · ");
+  const latest = latestLine(agent);
   return <div className="flex items-center hover:bg-surface-subtle">
     <button type="button" className={rowClass} onClick={onOpen}>
       <AgentAvatar identity={agent.agentId} size={28} />
       <span className="flex min-w-0 flex-1 flex-col gap-px">
         <span className="truncate text-act-sm text-text-main" title={agent.description}>{agent.description}</span>
-        <span className={`truncate text-act-xs ${agent.status === "failed" ? "text-on-danger" : "text-text-faint"}`}>{latestLine(agent)}</span>
+        {latest ? <span className={`truncate text-act-xs ${agent.status === "failed" ? "text-on-danger" : "text-text-faint"}`}>{latest}</span> : null}
       </span>
       <span className="flex shrink-0 flex-col items-end gap-0.5 text-act-xs tabular-nums text-text-faint">
         {agent.totalTokens ? <span className="text-text-muted">{formatTokenCount(agent.totalTokens)} <span className="text-text-faint">tokens</span></span> : null}
-        <span className={`inline-flex items-center gap-1 ${running ? "text-operational" : ""}`}>
-          {running ? <SubagentStatusIcon status="running" size={12} /> : <SubagentStatus status={agent.status} />}
-          {running ? timing : `· ${timing}`}
-        </span>
+        <SubagentStatus status={agent.status} duration={formatAgentDuration(durationMs(agent))} />
       </span>
     </button>
     {running
@@ -152,10 +161,7 @@ function SubagentDetail({ sessionId, item, view, onToggleView, onBack, stopping,
       </div>
       <span className="flex min-w-0 shrink items-center gap-2 px-1 text-act-xs text-text-faint">
         {model ? <><span className="min-w-8 max-w-24 truncate text-text-muted" title={item.model}>{model}</span><Dot /></> : null}
-        {item.activationCount > 1 ? <><span className="shrink-0">第 {item.activationCount} 轮</span><Dot /></> : null}
-        <span className={`inline-flex shrink-0 items-center gap-1 tabular-nums ${running ? "text-operational" : item.status === "failed" ? "text-on-danger" : ""}`}>
-          <SubagentStatusIcon status={item.status} size={12} /><span className="sr-only">{subagentListStatusLabel(item.status)}</span>{formatAgentDuration(durationMs(item))}
-        </span>
+        <SubagentStatus status={item.status} duration={formatAgentDuration(durationMs(item))} />
       </span>
       {external ? null : <SessionViewToggle view={view} onToggle={onToggleView} />}
     </header>
@@ -177,14 +183,16 @@ function SubagentDetail({ sessionId, item, view, onToggleView, onBack, stopping,
 }
 
 /** 本地 / Fork：子会话的对话记录（Fork 去掉了复制来的前缀，见 `projectSubagentTranscript`）。 */
-function TranscriptDetail({ sessionId, item }: { sessionId: string; item: SubagentListItem }) {
+const TranscriptDetail = memo(function TranscriptDetail({ sessionId, item }: { sessionId: string; item: SubagentListItem }) {
   const [messages, setMessages] = useState<MessageBlock[]>([]);
+  // 上一次拉到的事件与块：轮询拿到相同内容时不换引用，变化时已有的块复用，只更新变化的尾部。
+  const transcript = useRef<TranscriptState | null>(null);
   // 执行记录的错误单独存：列表每秒轮询成功时会清掉列表错误，不能把这条也清掉。
   const [transcriptError, setTranscriptError] = useState<string>();
   const [settled, setSettled] = useState(false);
   const running = item.status === "running";
   // 只在换了子智能体时清空；从运行中变为结束时保留已显示的记录，不闪回结论。
-  useEffect(() => { setMessages([]); setTranscriptError(undefined); setSettled(false); }, [item.agentId]);
+  useEffect(() => { transcript.current = null; setMessages([]); setTranscriptError(undefined); setSettled(false); }, [item.agentId]);
   useEffect(() => {
     const ref: SubAgentTranscriptRef = { kind: "subagent_transcript", sessionId, agentRunId: "", runId: item.agentId, path: item.transcriptPath };
     let disposed = false;
@@ -193,10 +201,12 @@ function TranscriptDetail({ sessionId, item }: { sessionId: string; item: Subage
     async function refresh() {
       let loaded = false;
       try {
-        const blocks = createMessageBlocks(await sessionsApi.getSubAgentTranscript({ transcriptRef: ref }));
+        const events = await sessionsApi.getSubAgentTranscript({ transcriptRef: ref });
         if (disposed) return;
-        loaded = blocks.length > 0;
-        if (loaded || running) setMessages(blocks);
+        const next = reconcileTranscript(transcript.current, events);
+        transcript.current = next;
+        loaded = next.blocks.length > 0;
+        if (loaded || running) setMessages(next.blocks);
         setTranscriptError(undefined);
       } catch { if (!disposed) setTranscriptError("执行记录暂不可用，正在重试。"); }
       if (disposed) return;
@@ -219,7 +229,7 @@ function TranscriptDetail({ sessionId, item }: { sessionId: string; item: Subage
       ? conclusion ? <MarkdownProse content={conclusion} /> : <p className="text-act-sm text-text-muted">没有执行记录。</p>
       : null}
   </div>;
-}
+});
 
 /** Codex / Claude Code：只有最终回复和 CLI 自己的记录文件，没有 ActSpace 子会话，也就没有轨迹。 */
 function ExternalDetail({ sessionId, item }: { sessionId: string; item: SubagentListItem }) {
@@ -272,9 +282,9 @@ function durationMs(item: SubagentListItem): number {
   return Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : 0;
 }
 
-/** 列表第二行：运行中写「正在执行」；结束后是最终回复的第一行（去掉加粗、行内代码、标题、列表的 Markdown 标记），没有回复时写怎么结束的。 */
-function latestLine(item: SubagentListItem): string {
-  if (item.status === "running") return "正在执行";
+/** 列表第二行：最终回复的第一行（去掉加粗、行内代码、标题、列表的 Markdown 标记）；运行中或没有回复时不写，状态已在右侧。 */
+function latestLine(item: SubagentListItem): string | undefined {
+  if (item.status === "running") return undefined;
   const first = item.result?.split(/\r?\n/).map((line) => line.replace(/\*\*|`/g, "").replace(/^\s*(#+|[-*]|\d+\.)\s+/, "").replace(/\s+/g, " ").trim()).find(Boolean);
-  return first ?? subagentListStatusLabel(item.status);
+  return first;
 }

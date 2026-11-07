@@ -16,7 +16,7 @@
 - 后端：shell-tools 70、tools-runtime 32、journal 14、projection 14、agent-service 33、core-agent-loop 37、agent-host 44、runtime 54 个测试通过。
 - contract matrix 生成与测试、packages、harness-events 检查及测试、IPC、renderer bridge、前端 token/主题、docs/current-docs 通过。
 - Desktop 首轮全量 1711 通过、21 失败、2 跳过（8 个文件失败），包含多项超时及后续 DOM/context 异常。降低到 2 workers 后全量结果为 1726 通过、6 失败、2 跳过（3 文件失败）：消息流 4 项超时、2000 事件 IPC 1 项超时、workspace watcher 1 项断言失败。单 worker 隔离复测（未调整超时阈值）中，消息流和 IPC 相关选择用例全部通过；workspace watcher 仍失败，位置 `apps/desktop/src/main/test/review-workspace-watcher.test.ts:66`，断言所有回调参数均为字符串，实际含无参数回调。该模块未被本轮修改，未确认基线是否已有此问题，不扩展修复范围。因此桌面全量门槛仍未通过。
-- [Computer Use 逐项报告](computer-use-acceptance.md)：mock 三按钮操作、提示文案、浅深主题、480px 通过；真实 Electron 使用另一 checkout，本轮真实授权 IPC、复用、重启恢复与新会话隔离未覆盖。日志恢复和身份隔离的自动化证据不能替代实机验收。
+- Computer Use 逐项报告（原始记录已清理，见 git 历史）：mock 三按钮操作、提示文案、浅深主题、480px 通过；真实 Electron 使用另一 checkout，本轮真实授权 IPC、复用、重启恢复与新会话隔离未覆盖。日志恢复和身份隔离的自动化证据不能替代实机验收。
 
 ## 交付边界
 

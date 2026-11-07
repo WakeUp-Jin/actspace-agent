@@ -1,6 +1,6 @@
 # ActSpace v2 Runtime Projection 规范
 
-> 状态：v2 公共契约基线。
+> v2 公共契约基线。
 >
 > 本文定义 Runtime 如何把 Session 与工具运行事实投影给固定 Desktop 与 CLI run。它收口 durable Session projection、live progress、runtime diagnostics、generic tool DTO 和 allowlisted renderer 的边界。实现可以调整 IPC channel、类名和缓存结构，但不得把三个平面重新混成一个事件流。
 
@@ -765,7 +765,7 @@ Host Registry 是完整 Session Projection 的唯一生产驱动器。领域只�
 | `pendingInbox` | Inbox enqueue/claim/discard | Client |
 | `delegations` | delegation lifecycle | Client |
 | `surface`、`tools` | Journal Surface、tool lifecycle | Window support |
-| `requestContext` | request header/context/compaction | Client |
+| `contextEstimate` | request/system-prompt、request/tools、request header/context、补充上下文、surface append / replace（[请求记录规范](agent-spec-request-record.md) §6.3） | Client |
 
 Goal 不预建空 key。没有 producer 和 Journal event 时，Goal 是能力缺失，不是空值。
 
@@ -802,7 +802,7 @@ type SessionEventWindow = {
 Window 规则：
 
 - 默认按完整 Turn 分页（每页 20 个 Turn），同时受事件数（默认 2000，调用方可降低）和 JSON 字节数（默认约 2 MB）限制；
-- 历史页（非 `afterSeq`、非 `includeToolDetails`）先剔除展示用不到的负载再计上限：已有 `assistant/message` 定稿的消息不再携带其 `assistant/chunk` 流式增量；窗口内只保留最新一份完整 `request/context`，其余超过 24,000 字符的收敛为 `deferredDetail` 身份字段（request/turn/step id、`prepared.model/route/contextWindow`、`requestOptions`）；系统提示词与工具定义（`renderedSystemPrompt` / `systemPrompt` / `system` / `tools`）在窗口内第一次请求和它们变化的请求上保留原文，其余只带 `promptUnchanged: true`，renderer 沿用上一份，用于轨迹「系统」行和工具 Schema。2026-09-26 本机 59 个会话统计：chunk 占 journal 事件约 97%，request/context 占字节约 22%，精简前 55/59 个会话首页装不下一轮完整 Turn；
+- 历史页（非 `afterSeq`、非 `includeToolDetails`）先剔除展示用不到的负载再计上限：已有 `assistant/message` 定稿的消息不再携带其 `assistant/chunk` 流式增量（只有旧会话还有 chunk，新会话不再写入，见[流式输出规范](agent-spec-live-assistant-stream.md)）；`request/context` 已足够小，原样保留；窗口不从头开始时，把窗口起点之前最近一条 `request/system-prompt` 和 `request/tools` 放到窗口最前面（不占事件与字节预算），轨迹的「系统」行和工具 Schema 因此始终有内容（[请求记录规范](agent-spec-request-record.md) §7）。2026-09-26 本机 59 个会话统计：chunk 占 journal 事件约 97%，request/context 占字节约 22%，精简前 55/59 个会话首页装不下一轮完整 Turn；
 - 超大 Turn 可以在 Turn 内续页；
 - Surface replacement、跨页工具关联和请求关系进入 support；
 - 大型 args/result/detail/artifact 返回 `DeferredDetailRef`，详情必须按 `sessionId + callId/artifactId` 读取并重新执行 redaction；
@@ -837,7 +837,7 @@ Session Projection Cache 保存 reducer state、stateVersion、checkpoint seq、
 
 2026-10-18：Runtime 完成 definition 注册后调用 `seal()`，不再保留第二份完整重放正文，保留最近 512 条事件指纹和 pending transaction。已知重复幂等；冲突或超过保留范围、无法证明一致的旧重复要求 resync。未封口 registry 为兼容晚注册仍可保留历史，不能把生产封口行为泛化为所有实例。`checkpoint` 是派生状态对象，不表示启用了新的 JSON 检查点文件。
 
-Runtime 的 SessionReadModel 组合 Surface、tool lifecycle、workspaceRoot、updatedAt 和 requestContext；昂贵预览按语义输入复用，不能用累计 token 代替当前占用，也不虚构缺失模型容量。
+Runtime 的 SessionReadModel 组合 Surface、tool lifecycle、workspaceRoot、updatedAt 和 contextEstimate；昂贵预览按语义输入复用，不能用累计 token 代替当前占用，也不虚构缺失模型容量。
 
 `RuntimeSessionController.readProjection` 返回全会话水位、snapshot/values、window、activeMessageIds 和 deferredToolCalls。用户 Task 消息可以位于 turn/start 前；历史页尾不能覆盖最新 facts。大工具传输裁剪不修改 Journal 原文；完整导出不得只复制已加载页。
 

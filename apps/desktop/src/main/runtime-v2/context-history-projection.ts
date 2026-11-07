@@ -1,7 +1,6 @@
-import { loadRuntimeV2Module } from "./runtime-loader";
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type { ContextContentManifest, ContextPanelEvent, UsageActivityRow } from "@actspace/shared";
+import { applyContextEstimate, initialContextEstimate, viewContextEstimate, type ContextContentManifest, type ContextEstimateState, type ContextPanelEvent, type UsageActivityRow } from "@actspace/shared";
 import type { SessionQuerySource } from "@actspace/session-storage";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { prepare, type ProjectionDatabase } from "./usage-sql";
@@ -11,9 +10,13 @@ import { CONTEXT_PROJECTOR_VERSION } from "./context-history-version";
 
 /** 每会话最多记多少个（程序, 子命令）组合，超出的归入「其他」。 */
 export const CONTEXT_BASH_PROGRAM_LIMIT = 500;
+/** 「值得注意」里每会话最多追踪多少条不同的命令原文（用来找重复最多的），超出的新命令不再参与重复统计。 */
+export const CONTEXT_BASH_COMMAND_LIMIT = 500;
+/** 命令原文最多存多少个字符；重复判断按截断后的文本。 */
+export const CONTEXT_BASH_COMMAND_TEXT_LIMIT = 1_000;
 
 const associationTables = ["usage_projection_events", "usage_projection_requests", "usage_projection_groups", "usage_projection_turns"];
-export const contextTables = ["context_state", "context_request", "context_manifest_entry", "context_event", "context_session_stats", "context_identity", "context_usage_row", "context_bash_stats", "context_bash_program", "context_bash_call", ...associationTables.map(name => `context_${name}`)];
+export const contextTables = ["context_state", "context_estimate_state", "context_request", "context_manifest_entry", "context_event", "context_session_stats", "context_identity", "context_usage_row", "context_bash_stats", "context_bash_program", "context_bash_call", "context_bash_command", "context_bash_notable", ...associationTables.map(name => `context_${name}`)];
 const pattern = new RegExp(`\\b(${[...contextTables, ...associationTables].join("|")})\\b`, "g");
 const connections = new WeakMap<DatabaseSync, Map<boolean, ProjectionDatabase>>();
 export function contextConnection(db: DatabaseSync, stage: boolean): ProjectionDatabase {
@@ -26,13 +29,17 @@ export function contextConnection(db: DatabaseSync, stage: boolean): ProjectionD
   return connection;
 }
 /**
- * Bash 命令统计（`front-Context面板Bash命令统计.md` §4）。`program_failed` 让每个失败调用对每个程序只记一次失败：
- * 记在该程序在这次调用里第一次出现的那一行上。`context_bash_call.occurrences_json` 为 NULL 表示已计入，行保留用来去重。
+ * Bash 命令统计（存储设计见归档 `docs/exec-plans/completed/design-archive/frontend/front-Context面板Bash命令统计.md` §4，界面口径见 `front-Context面板规范.md` §5）。`program_failed` 让每个失败调用对每个程序只记一次失败：
+ * 记在该程序在这次调用里第一次出现的那一行上。`context_bash_call.occurrences_json` 为 NULL 表示已计入，行保留用来去重；
+ * 未计入时它是 `{ occurrences: [程序, 子命令][], command }`（旧格式是只有 occurrences 的数组）。
+ * 「值得注意」（归档 §5.1）：`context_bash_command` 按命令原文计数找重复最多的，`context_bash_notable` 记最慢的一条与后台调用数。
  */
 const BASH_TABLES_SQL = `
     CREATE TABLE IF NOT EXISTS context_bash_stats(session_id TEXT PRIMARY KEY,calls INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0,duration_ms INTEGER NOT NULL DEFAULT 0) STRICT;
     CREATE TABLE IF NOT EXISTS context_bash_program(session_id TEXT NOT NULL,program TEXT NOT NULL,subcommand TEXT NOT NULL,count INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0,program_failed INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(session_id,program,subcommand)) STRICT;
     CREATE TABLE IF NOT EXISTS context_bash_call(session_id TEXT NOT NULL,call_id TEXT NOT NULL,occurrences_json TEXT,started_at TEXT NOT NULL,PRIMARY KEY(session_id,call_id)) STRICT;
+    CREATE TABLE IF NOT EXISTS context_bash_command(session_id TEXT NOT NULL,command TEXT NOT NULL,count INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(session_id,command)) STRICT;
+    CREATE TABLE IF NOT EXISTS context_bash_notable(session_id TEXT PRIMARY KEY,slowest_command TEXT NOT NULL DEFAULT '',slowest_ms INTEGER NOT NULL DEFAULT 0,background_count INTEGER NOT NULL DEFAULT 0) STRICT;
 `;
 /** 使用统计库 Schema 版本不变；Worker 打开老库时补建 Bash 统计表（含 `building_*`）。 */
 export function ensureContextBashTables(db: DatabaseSync): void {
@@ -43,6 +50,7 @@ export function createContextHistorySchema(db: DatabaseSync): void {
   db.exec(BASH_TABLES_SQL);
   db.exec(`
     CREATE TABLE context_state(session_id TEXT PRIMARY KEY,target INTEGER NOT NULL,revision INTEGER NOT NULL,cursor TEXT,stamp TEXT NOT NULL,codec TEXT NOT NULL,generation TEXT NOT NULL,projector_version INTEGER NOT NULL) STRICT;
+    CREATE TABLE context_estimate_state(session_id TEXT PRIMARY KEY,state_json TEXT NOT NULL) STRICT;
     CREATE TABLE context_request(session_id TEXT NOT NULL,request_id TEXT NOT NULL,seq INTEGER NOT NULL,scope TEXT NOT NULL,turn_id TEXT,step_id TEXT,time TEXT NOT NULL,model_json TEXT,manifest_json TEXT,turn_index INTEGER NOT NULL,step_index INTEGER NOT NULL,PRIMARY KEY(session_id,request_id)) STRICT;
     CREATE INDEX context_request_seq ON context_request(session_id,seq DESC);
     CREATE TABLE context_manifest_entry(session_id TEXT NOT NULL,request_id TEXT NOT NULL,key TEXT NOT NULL,entry_json TEXT NOT NULL,PRIMARY KEY(session_id,request_id,key)) STRICT;
@@ -89,6 +97,7 @@ export async function commitContextBatch(db: DatabaseSync, source: SessionQueryS
     prepare(target, "INSERT OR IGNORE INTO context_state VALUES(?,?,-1,NULL,?,?,?,?)").run(id, source.throughSeq, source.stamp, source.codecSetDigest ?? "", randomUUID(), CONTEXT_PROJECTOR_VERSION);
     prepare(target, "INSERT OR IGNORE INTO context_session_stats(session_id) VALUES(?)").run(id);
     prepare(target, "INSERT OR IGNORE INTO context_bash_stats(session_id) VALUES(?)").run(id);
+    prepare(target, "INSERT OR IGNORE INTO context_bash_notable(session_id) VALUES(?)").run(id);
     await projectContextEvents(target, source, events, yieldBatch);
     prepare(target, "UPDATE context_state SET target=?,revision=?,cursor=?,stamp=?,codec=? WHERE session_id=?").run(source.throughSeq, final ? source.throughSeq : events.at(-1)?.seq ?? saved?.revision ?? -1, cursor, source.stamp, source.codecSetDigest ?? "", id);
     db.exec("COMMIT");
@@ -112,12 +121,22 @@ export async function commitContextBatch(db: DatabaseSync, source: SessionQueryS
   }
 }
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+/** 跨批次的估算折叠状态（与会话投影 `contextEstimate` 同一个函数，agent-spec-request-record.md §6.4），外加已见过的 `request/tools` 条数。 */
+type EstimateRow = { estimate: ContextEstimateState; toolRecords: number };
+function loadEstimate(db: ProjectionDatabase, id: string): EstimateRow {
+  const saved = prepare(db, "SELECT state_json FROM context_estimate_state WHERE session_id=?").get(id) as { state_json: string } | undefined;
+  if (saved) { try { return JSON.parse(saved.state_json) as EstimateRow; } catch { /* 损坏时从头折叠的结果由重建给出 */ } }
+  return { estimate: initialContextEstimate(), toolRecords: 0 };
+}
 async function projectContextEvents(db: ProjectionDatabase, source: SessionQuerySource, events: readonly SessionEventEnvelopeV1[], yieldBatch: () => Promise<void>): Promise<void> {
-  const { readPersistedContextManifest } = await loadRuntimeV2Module();
   const id = source.header.sessionId;
+  const fold = loadEstimate(db, id);
   const addEvent = (event: SessionEventEnvelopeV1, value: Omit<ContextPanelEvent, "at" | "turnIndex" | "stepIndex">) => prepare(db, "INSERT OR REPLACE INTO context_event VALUES(?,?,?,?)").run(id, value.id, event.seq, JSON.stringify({ ...value, at: new Date(event.time).toISOString(), turnIndex: null, stepIndex: null }));
   for (const event of events) {
     const data = record(event.data);
+    fold.estimate = applyContextEstimate(fold.estimate, event);
+    // 「工具清单已变化」：第一条 request/tools 之后，每条记一次（工具只在变化时才写这条事件）。
+    if (event.type === "request/tools" && fold.toolRecords++ > 0) addEvent(event, { id: `${event.seq}:tools`, kind: "tools-changed", label: "工具清单已变化", tokenDelta: null, inferred: true });
     const kind = event.type === "turn/start" ? "turn" : event.type === "step/start" ? "step" : event.type === "compaction/end" ? "compaction" : undefined;
     if (kind) {
       const identity = data[kind === "compaction" ? "compactionId" : `${kind}Id`];
@@ -125,23 +144,19 @@ async function projectContextEvents(db: ProjectionDatabase, source: SessionQuery
       if (typeof identity === "string" && prepare(db, "INSERT OR IGNORE INTO context_identity VALUES(?,?,?,?)").run(id, kind, identity, ordinal).changes) prepare(db, `UPDATE context_session_stats SET ${kind}_count=${kind}_count+1 WHERE session_id=?`).run(id);
     }
     if (event.type === "request/context" && typeof data.requestId === "string") {
-      const snapshot = record(data.snapshot); const prepared = record(snapshot.prepared); const manifest = readPersistedContextManifest(snapshot);
+      const snapshot = record(data.snapshot); const prepared = record(snapshot.prepared); const view = viewContextEstimate(fold.estimate);
       const counts = prepare(db, "SELECT turn_count,step_count FROM context_session_stats WHERE session_id=?").get(id) as { turn_count: number; step_count: number };
       const rawModel = record(snapshot.contextModel);
       const positive = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
-      const model = { modelKey: String(rawModel.modelKey ?? `${prepared.route ?? ""}/${prepared.model ?? ""}`).slice(0, 512), label: String(rawModel.label ?? prepared.model ?? "").slice(0, 160), contextWindow: positive(rawModel.contextWindow ?? prepared.contextWindow), autoCompactAtTokens: positive(rawModel.autoCompactAtTokens) };
-      const previous = prepare(db, "SELECT model_json,manifest_json FROM context_request WHERE session_id=? ORDER BY seq DESC LIMIT 1").get(id) as { model_json: string; manifest_json: string } | undefined;
+      const model = { modelKey: String(rawModel.modelKey ?? `${prepared.route ?? ""}/${prepared.model ?? ""}`).slice(0, 512), label: String(rawModel.label ?? prepared.model ?? "").slice(0, 160), contextWindow: positive(rawModel.contextWindow ?? prepared.contextWindow ?? view.contextWindow), autoCompactAtTokens: positive(rawModel.autoCompactAtTokens) };
+      const previous = prepare(db, "SELECT model_json FROM context_request WHERE session_id=? ORDER BY seq DESC LIMIT 1").get(id) as { model_json: string } | undefined;
       if (previous && record(JSON.parse(previous.model_json)).modelKey !== record(model).modelKey) addEvent(event, { id: `${event.seq}:model`, kind: "model-switch", label: "模型已切换", tokenDelta: null, inferred: true });
-      const previousTools = previous ? prepare(db, "SELECT key FROM context_manifest_entry WHERE session_id=? AND request_id=(SELECT request_id FROM context_request WHERE session_id=? ORDER BY seq DESC LIMIT 1) AND json_extract(entry_json,'$.bucket')='tools' ORDER BY key").all(id, id).map(row => row.key) : [];
-      const tools = manifest.entries.filter(entry => entry.bucket === "tools").map(entry => entry.key).sort();
-      if (previous && record(JSON.parse(previous.manifest_json)).comparable === true && manifest.comparable && JSON.stringify(previousTools) !== JSON.stringify(tools)) addEvent(event, { id: `${event.seq}:tools`, kind: "tools-changed", label: "工具清单已变化", tokenDelta: null, inferred: true });
-      const { entries, ...summary } = manifest;
+      // 只存非对话明细；对话项按 seq 对比（面板服务），不逐条存。
+      const entries = view.entries;
+      const summary: Omit<ContextContentManifest, "entries"> = { schemaVersion: 1, estimatorVersion: view.estimatorVersion, comparable: true, totalEstimatedTokens: view.totalEstimatedTokens, buckets: { ...view.buckets } };
       prepare(db, "INSERT OR REPLACE INTO context_request VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(id, data.requestId, event.seq, String(snapshot.logicalAgentScopeId ?? `main:${id}`), typeof data.turnId === "string" ? data.turnId : null, typeof data.stepId === "string" ? data.stepId : null, new Date(event.time).toISOString(), JSON.stringify(model), JSON.stringify(summary), Number((prepare(db, "SELECT ordinal FROM context_identity WHERE session_id=? AND kind='turn' AND id=?").get(id, typeof data.turnId === "string" ? data.turnId : "") as { ordinal: number } | undefined)?.ordinal ?? counts.turn_count), Number((prepare(db, "SELECT ordinal FROM context_identity WHERE session_id=? AND kind='step' AND id=?").get(id, typeof data.stepId === "string" ? data.stepId : "") as { ordinal: number } | undefined)?.ordinal ?? 0));
       prepare(db, "DELETE FROM context_manifest_entry WHERE session_id=? AND request_id=?").run(id, data.requestId);
-      for (const entry of entries) {
-        const { preview: _preview, fullTextAvailable: _full, ...metadata } = entry;
-        prepare(db, "INSERT INTO context_manifest_entry VALUES(?,?,?,?)").run(id, data.requestId, entry.key, JSON.stringify(metadata));
-      }
+      for (const entry of entries) prepare(db, "INSERT INTO context_manifest_entry VALUES(?,?,?,?)").run(id, data.requestId, entry.key, JSON.stringify(entry));
       prepare(db, "DELETE FROM context_manifest_entry WHERE session_id=? AND request_id NOT IN (SELECT request_id FROM context_request WHERE session_id=? ORDER BY seq DESC LIMIT 2)").run(id, id);
     }
     if (event.type === "tool/call" || event.type === "tool-workflow/run-start" || event.type === "tool/result") projectBashEvent(db, id, event, data);
@@ -149,6 +164,7 @@ async function projectContextEvents(db: ProjectionDatabase, source: SessionQuery
     if (event.type === "agent/mode-set") addEvent(event, { id: `${event.seq}:mode`, kind: "mode-switch", label: `模式：${String(data.mode ?? "未知").slice(0, 32)}`, tokenDelta: null });
     if (event.type === "plugin/actspace.context/supplement" && data.op === "add") addEvent(event, { id: `${event.seq}:inject`, kind: "inject", label: "上下文补充", source: String(data.owner ?? "").slice(0, 80), tokenDelta: null });
   }
+  prepare(db, "INSERT INTO context_estimate_state VALUES(?,?) ON CONFLICT(session_id) DO UPDATE SET state_json=excluded.state_json").run(id, JSON.stringify(fold));
   await projectUsageJournalBatch(db, { sessionId: id, title: null, throughJournalSeq: source.throughSeq, workspaceRoot: null }, events.filter(event => !event.type.startsWith("tool/")), async rows => {
     for (const row of rows) {
       if (row.kind !== "llm_request") continue;
@@ -170,7 +186,7 @@ function projectBashEvent(db: ProjectionDatabase, id: string, event: SessionEven
     const command = record(data.args).command;
     if (data.name !== "bash" || typeof command !== "string") return;
     const occurrences = parseBashPrograms(command).map(item => [item.program, item.subcommand]);
-    prepare(db, "INSERT OR IGNORE INTO context_bash_call VALUES(?,?,?,?)").run(id, callId, JSON.stringify(occurrences), event.time);
+    prepare(db, "INSERT OR IGNORE INTO context_bash_call VALUES(?,?,?,?)").run(id, callId, JSON.stringify({ occurrences, command: command.trim().slice(0, CONTEXT_BASH_COMMAND_TEXT_LIMIT) }), event.time);
     return;
   }
   if (event.type === "tool-workflow/run-start") {
@@ -186,8 +202,12 @@ function projectBashEvent(db: ProjectionDatabase, id: string, event: SessionEven
   const started = Date.parse(call.started_at); const ended = Date.parse(event.time);
   const duration = Number.isFinite(started) && Number.isFinite(ended) ? Math.max(0, Math.round(ended - started)) : 0;
   prepare(db, "UPDATE context_bash_stats SET calls=calls+1,failed=failed+?,duration_ms=duration_ms+? WHERE session_id=?").run(Number(failed), duration, id);
+  const saved = JSON.parse(call.occurrences_json) as [string, string][] | { occurrences: [string, string][]; command?: string };
+  const pairs = Array.isArray(saved) ? saved : saved.occurrences;
+  const commandText = Array.isArray(saved) ? "" : saved.command ?? "";
+  if (commandText) projectBashNotable(db, id, commandText, duration, hasBackgroundTask(data.detail));
   const failedPairs = new Set<string>(); const failedPrograms = new Set<string>();
-  for (const [rawProgram, rawSubcommand] of JSON.parse(call.occurrences_json) as [string, string][]) {
+  for (const [rawProgram, rawSubcommand] of pairs) {
     const known = prepare(db, "SELECT 1 FROM context_bash_program WHERE session_id=? AND program=? AND subcommand=?").get(id, rawProgram, rawSubcommand);
     const full = !known && Number((prepare(db, "SELECT COUNT(*) AS n FROM context_bash_program WHERE session_id=?").get(id) as { n: number }).n) >= CONTEXT_BASH_PROGRAM_LIMIT;
     const [program, subcommand] = full ? ["", ""] : [rawProgram, rawSubcommand];
@@ -197,6 +217,18 @@ function projectBashEvent(db: ProjectionDatabase, id: string, event: SessionEven
     if (programFailed) failedPrograms.add(program);
     prepare(db, "INSERT INTO context_bash_program VALUES(?,?,?,1,?,?) ON CONFLICT(session_id,program,subcommand) DO UPDATE SET count=count+1,failed=failed+excluded.failed,program_failed=program_failed+excluded.program_failed").run(id, program, subcommand, Number(pairFailed), Number(programFailed));
   }
+}
+/** 与 `tool-card.ts` 同一判据：Bash 结果带 `background-task` 明细即转入（或本来就在）后台运行。 */
+function hasBackgroundTask(detail: unknown): boolean {
+  return Array.isArray(detail) && detail.some(entry => record(entry).label === "background-task");
+}
+/** 最慢的一条（耗时与「合计耗时」同一个 `duration`，同耗时保留先出现的）、命令原文重复次数、后台调用数。 */
+function projectBashNotable(db: ProjectionDatabase, id: string, command: string, duration: number, background: boolean): void {
+  prepare(db, "UPDATE context_bash_notable SET slowest_command=?,slowest_ms=? WHERE session_id=? AND ?>slowest_ms").run(command, duration, id, duration);
+  if (background) prepare(db, "UPDATE context_bash_notable SET background_count=background_count+1 WHERE session_id=?").run(id);
+  const known = prepare(db, "SELECT 1 FROM context_bash_command WHERE session_id=? AND command=?").get(id, command);
+  if (!known && Number((prepare(db, "SELECT COUNT(*) AS n FROM context_bash_command WHERE session_id=?").get(id) as { n: number }).n) >= CONTEXT_BASH_COMMAND_LIMIT) return;
+  prepare(db, "INSERT INTO context_bash_command VALUES(?,?,1) ON CONFLICT(session_id,command) DO UPDATE SET count=count+1").run(id, command);
 }
 function applyUsage(db: ProjectionDatabase, id: string, row: Pick<UsageActivityRow, "tokens" | "costAmount" | "costCurrency">, sign: number): void {
   const t = row.tokens; const knownUsage = [t.inputTokens, t.outputTokens, t.cacheReadTokens, t.cacheWriteTokens].some(value => value !== null);

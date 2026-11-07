@@ -1,7 +1,9 @@
-import type { HarnessStatsTab } from "@actspace/shared";
+import { HARNESS_STATS_TABS, type HarnessStatsTab } from "@actspace/shared";
 import type { SettingsSectionId } from "../settings/SettingsNav";
 import type { SidebarView } from "../Sidebar";
-import { isHarnessStatsTab } from "./HarnessStatsPage";
+
+// 不从 HarnessStatsPage 引：这个模块在 WorkbenchLayout 里静态引入，会把整个统计页带进首屏 chunk。
+const isHarnessStatsTab = (value: string | null | undefined): value is HarnessStatsTab => HARNESS_STATS_TABS.includes(value as HarnessStatsTab);
 
 /**
  * 浏览器 mock 的起始位置：`?mock=harness-stats` 直接打开「设置 → Harness 统计」，

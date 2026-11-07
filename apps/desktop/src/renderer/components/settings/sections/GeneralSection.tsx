@@ -54,11 +54,7 @@ export function GeneralSection({ settingsV4, onUpdateNamespace }: SectionProps) 
   };
 
   return (
-    <SettingGroup
-      title="个人偏好"
-      headingLevel={3}
-      description="影响 Agent 对你的称呼与表达方式，不覆盖系统规则。"
-    >
+    <SettingGroup title="个人偏好" headingLevel={3}>
       <SettingLinkRow
         title="显示名称"
         value={saved?.displayName || "未设置"}
@@ -71,8 +67,7 @@ export function GeneralSection({ settingsV4, onUpdateNamespace }: SectionProps) 
       {editor.isOpen("displayName") ? (
         <SettingEditor
           id="personalization-display-name"
-          hint="最多 60 个字符"
-          error={saveError}
+                    error={saveError}
           saving={saving}
           saveAriaLabel="保存显示名称"
           onCancel={cancelEditing}
@@ -104,8 +99,7 @@ export function GeneralSection({ settingsV4, onUpdateNamespace }: SectionProps) 
       {editor.isOpen("responseStyle") ? (
         <SettingEditor
           id="personalization-response-style"
-          hint="一句话描述偏好的语气、详略或格式 · 最多 500 字"
-          error={saveError}
+                    error={saveError}
           saving={saving}
           saveAriaLabel="保存回复风格"
           onCancel={cancelEditing}

@@ -103,8 +103,6 @@ export type ModelPickerMenuProps = ModelListProps & {
   ariaLabel?: string;
   /** 列在分组之前、不属于任何供应商的项（例如设置里的「未配置」）；搜索时隐藏。 */
   pinned?: readonly CatalogModel[];
-  /** 列表下方的一行说明（例如「只列出能看图的模型」）。 */
-  footer?: ReactNode;
 };
 
 export type ModelPickerProps = ModelListProps & {
@@ -167,7 +165,7 @@ export function ModelPicker({ open, onOpenChange, triggerLabel, triggerTitle, di
 // 只在打开时挂载：搜索词、正在编辑的模型这些状态随浮层关闭一起丢掉。
 // 设置页的模型下拉也复用这个菜单，外面自己包 Popover 和触发器。
 export function ModelPickerMenu({
-  catalog, selectedModelId, onSelect, options, optionsPanel, side = "top", align = "start", ariaLabel = "模型", pinned = [], footer,
+  catalog, selectedModelId, onSelect, options, optionsPanel, side = "top", align = "start", ariaLabel = "模型", pinned = [],
 }: ModelPickerMenuProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [hoveredModelId, setHoveredModelId] = useState<string | null>(null);
@@ -342,7 +340,6 @@ export function ModelPickerMenu({
         ))}
         {filteredGroups.length === 0 ? <div className={MODEL_SEARCH_EMPTY_CLASS}>{emptyText}</div> : null}
       </div>
-      {footer ? <div className="border-t border-line/60 px-3 py-2 text-act-xxs text-text-faint">{footer}</div> : null}
       {editing !== null && panel ? (
         <div className={optionsMenuClass} style={{ top: `${optionsOffset}px` }}>
           {panel.render(editing)}

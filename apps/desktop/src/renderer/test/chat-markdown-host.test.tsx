@@ -27,7 +27,7 @@ const ROOT = "/work/repo";
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
 
 const activeSession: ActiveSessionValue = {
-  sessionId: "s1", title: "t", messages: [], contextSnapshot: null, isStreaming: false, isAborting: false, isCompacting: false,
+  sessionId: "s1", title: "t", contextSnapshot: null, isStreaming: false, isAborting: false, isCompacting: false,
   isSessionReady: true, sendScrollRequestId: 0, composerFocusRequestId: 0,
 };
 

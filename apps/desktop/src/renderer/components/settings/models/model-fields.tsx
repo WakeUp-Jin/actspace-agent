@@ -221,7 +221,7 @@ function Field({ label, extra, wide = false, onRestore, children }: { label: str
 function DefaultThinking({ effective, onChange }: { effective: EffectiveModel; onChange: (level: ThinkingLevel) => void }) {
   const levels = effective.thinking?.levels ?? null;
   if (!levels || levels.length === 0) {
-    return <Select value="" options={[]} onValueChange={() => undefined} disabled ariaLabel="默认思考" placeholder={levels ? "不支持思考" : "先在「显示更多」里勾档位"} className="w-full" />;
+    return <Select value="" options={[]} onValueChange={() => undefined} disabled ariaLabel="默认思考" placeholder={levels ? "不支持思考" : "未设置档位"} className="w-full" />;
   }
   return (
     <Select

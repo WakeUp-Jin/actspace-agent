@@ -15,7 +15,7 @@
 
 ## 背景
 
-- 必读：`AGENTS.md`、[Space 工作台设计](../../design-docs/多智能体协作/front-space-工作台设计.md)、[space-demo.html](../../design-docs/多智能体协作/space-demo.html)（交互以 demo 的脚本为准）、[前端新功能开发清单](../../design-docs/frontend/front-新功能开发清单.md)、[主题与配色规范](../../design-docs/frontend/front-主题与配色规范.md)、[基础组件封装规范](../../design-docs/frontend/front-基础组件封装规范.md)、[会话状态与数据流规范](../../design-docs/frontend/front-会话状态与数据流规范.md) §1。
+- 必读：`AGENTS.md`、[Space 工作台设计](../../design-docs/多智能体协作/front-space-工作台设计.md)、[space-demo.html](../../design-docs/多智能体协作/space-demo.html)（交互以 demo 的脚本为准）、[前端新功能开发清单](../../design-docs/frontend/front-新功能开发清单.md)、[主题与配色规范](../../design-docs/frontend/front-视觉token规范.md)、[基础组件封装规范](../../design-docs/frontend/front-组件与交互模式规范.md)、[会话状态与数据流规范](../../design-docs/frontend/front-会话状态与数据流规范.md) §1。
 - 相关代码（`R/` = `apps/desktop/src/renderer/`）：
   - 视图切换：`R/components/WorkbenchLayout.tsx`（`view` 状态、`mainContent` 分支、右栏显示条件 `view === "chat"`）；`R/components/Sidebar.tsx`（`SidebarView` 类型、主操作按钮、`nav-section`）；`R/components/sidebar/styles.ts`。
   - 布局宽度：`R/components/workbench/use-panel-layout.ts`、`R/components/WindowChromeBar.tsx`。

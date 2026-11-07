@@ -2,9 +2,9 @@ import { JsonlEventHistory } from "./event-history.js";
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { SessionError, SessionEventValidator, validateSessionHeader, type EventCodecRegistry, type SessionHeaderV1 } from "@actspace/session-journal";
-import type { SessionStorage, SessionStorageHandle, SessionStorageSnapshot } from "@actspace/session-storage";
-import { inspectJsonlSession } from "./jsonl-reader.js";
+import { SessionError, SessionEventValidator, codecReadsHistory, validateSessionHeader, type EventCodecRegistry, type SessionHeaderV1 } from "@actspace/session-journal";
+import type { SessionStorage, SessionStorageHandle, SessionStorageRefresh, SessionStorageSnapshot } from "@actspace/session-storage";
+import { readJsonlSession, refreshJsonlSession, type JournalResume, type SessionInspection } from "./jsonl-reader.js";
 import { JsonlSessionWriter, type JsonlWriterHooks } from "./jsonl-writer.js";
 import { sessionFileLayout } from "./layout.js";
 import { JsonlQueryReader } from "./query-reader.js";
@@ -16,7 +16,7 @@ export interface JsonlStorageOptions {
   readonly runtimeId: string;
   readonly registry: EventCodecRegistry;
   readonly writerHooks?: JsonlWriterHooks;
-  readonly lease?: Pick<AcquireWriterLeaseOptions, "heartbeatMs" | "staleMs" | "now" | "isProcessAlive" | "pid">;
+  readonly lease?: Pick<AcquireWriterLeaseOptions, "heartbeatMs" | "now" | "isProcessAlive" | "pid">;
 }
 
 /** Physical backend; file layout, fsync and cross-process writer ownership stay here. */
@@ -53,12 +53,41 @@ export class JsonlSessionStorage implements SessionStorage {
 
   async inspect(sessionId: string): Promise<SessionStorageSnapshot> {
     this.#assertOpen();
-    const inspection = await inspectJsonlSession(sessionFileLayout(this.options.dataRoot, sessionId).journalPath, this.options.registry, sessionId);
-    return Object.freeze({ header: inspection.header, events: inspection.events,
+    return this.#fullInspect(sessionId);
+  }
+
+  /** Append-only fast path for snapshot caches: unchanged files are not read, grown files read only their new bytes. */
+  async refresh(sessionId: string, base: SessionStorageSnapshot): Promise<SessionStorageRefresh> {
+    this.#assertOpen();
+    const resume = this.#resumes.get(base);
+    if (resume !== undefined) {
+      // Single use: the advanced hash/validator must never be shared with another refresh of the same base.
+      this.#resumes.delete(base);
+      const result = await refreshJsonlSession(this.journalPath(sessionId), resume);
+      if (result.kind === "unchanged") { this.#resumes.set(base, resume); return { kind: "unchanged", snapshot: base }; }
+      if (result.kind === "appended") return { kind: "appended", snapshot: this.#snapshot(result.inspection, result.resume), fromEvent: result.fromEvent };
+    }
+    return { kind: "replaced", snapshot: await this.#fullInspect(sessionId) };
+  }
+
+  async #fullInspect(sessionId: string): Promise<SessionStorageSnapshot> {
+    const { inspection, resume } = await readJsonlSession(sessionFileLayout(this.options.dataRoot, sessionId).journalPath, this.options.registry, sessionId);
+    return this.#snapshot(inspection, resume);
+  }
+
+  /** Resume state is keyed by the snapshot object, so it lives exactly as long as a caller retains that snapshot. */
+  readonly #resumes = new WeakMap<SessionStorageSnapshot, JournalResume>();
+  #snapshot(inspection: SessionInspection, resume: JournalResume | null): SessionStorageSnapshot {
+    const complete = inspection.tornTail === null && inspection.validation !== null;
+    const snapshot: SessionStorageSnapshot = Object.freeze({ header: inspection.header, events: inspection.events,
       revision: inspection.contentDigest,
-      integrity: inspection.tornTail === null && inspection.validation !== null ? "complete" : "repair-required",
-      ...(inspection.tornTail !== null || inspection.validation === null ? { problem: inspection.diagnostics.map(item => item.message).join("; ") } : {}),
+      integrity: complete ? "complete" as const : "repair-required" as const,
+      ...(!complete ? { problem: inspection.diagnostics.map(item => item.message).join("; ") } : {}),
+      ...(inspection.bytes !== undefined ? { bytes: inspection.bytes } : {}),
+      ...(complete ? { validated: Object.freeze({ codecDigest: this.options.registry.digest, accessState: inspection.accessState, result: inspection.validation! }) } : {}),
     });
+    if (resume !== null && complete) this.#resumes.set(snapshot, resume);
+    return snapshot;
   }
 
   async listSessionIds(): Promise<readonly string[]> {
@@ -162,7 +191,7 @@ export class JsonlSessionStorage implements SessionStorage {
         const copied = structuredClone(events);
         return serialize(async () => {
           await assertOwned(); if (blocked) throw new SessionError("SESSION_DURABILITY_FAILED", "Storage writer is blocked.");
-          const needsHistory = copied.some(event => this.options.registry.get(event.type)?.validateRelations !== undefined);
+          const needsHistory = copied.some(event => codecReadsHistory(this.options.registry.get(event.type)));
           const previous = needsHistory ? (await this.inspect(header.sessionId)).events : [];
           const before = queryStamp(await stat(writer!.journalPath));
           if (before !== proof.stamp) { blocked = true; proof.stamp = undefined; throw new SessionError("SESSION_CORRUPT", "Journal changed outside its owned writer."); }

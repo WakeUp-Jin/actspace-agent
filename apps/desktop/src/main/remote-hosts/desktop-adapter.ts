@@ -7,7 +7,7 @@ import { FixedRendererStreamAdapter } from "../runtime-v2/fixed-renderer-stream-
 import { executionEnvironment } from "../runtime-v2/approval-broker";
 import { randomUUID } from "node:crypto";
 import type { BrowserWindow } from "electron";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as C, type RuntimeV2SessionListItem, type RuntimeV2SessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
+import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as C, mergePieces, type LiveOutputPage, type LiveOutputPiece, type RuntimeV2SessionListItem, type RuntimeV2SessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
 import type { SessionListItem, SessionListPage, SessionListPageInput } from "@actspace/shared";
 import { HOST_IPC, isRecord, type SessionRef } from "@actspace/shared/host-protocol";
 import { RemoteSessionRouter, attachmentUploadSources, parseRemoteSessionKey, remoteSessionKey } from "./session-router";
@@ -123,7 +123,7 @@ export class RemoteDesktopAdapter {
     this.#subscribed.set(key, "");
     const sessionId = remoteSessionKey(ref), buffered: (() => void)[] = []; this.#replaying.set(sessionId, buffered);
     try {
-      const value = await this.#router.call(ref, "sessions.observe") as { subscriptionId: string; cursor: number; snapshot: { observation: RuntimeV2SessionObservation; tasks: TaskSnapshot; approvals: import("@actspace/shared/runtime-v2").ApprovalRequest[]; output: { runId: string; chunks: number } | null } };
+      const value = await this.#router.call(ref, "sessions.observe") as { subscriptionId: string; cursor: number; snapshot: { observation: RuntimeV2SessionObservation; tasks: TaskSnapshot; approvals: import("@actspace/shared/runtime-v2").ApprovalRequest[]; output: { runId: string; revision: number } | null } };
       if (this.#activeKey !== key) {
         await this.hosts.call(ref.hostId, "sessions.unobserve", { subscriptionId: value.subscriptionId });
         this.#subscribed.delete(key); return;
@@ -133,16 +133,19 @@ export class RemoteDesktopAdapter {
       const running = value.snapshot.tasks.runs.find(run => run.state === "running");
       if (running) {
         this.#send(C.agentStream, { type: "agent_run_started", sessionId, agentRunId: running.runId, recoveredReset: true });
+        // The renderer buffers this Run's text deltas until the baseline arrives, then drops frames the baseline already holds.
         const output = value.snapshot.output;
+        const pieces: LiveOutputPiece[] = [];
         if (output?.runId === running.runId) {
-          let offset = 0;
-          while (offset < output.chunks) {
-            const page = await this.#router.call(ref, "sessions.output", { runId: output.runId, offset }) as { next: number; chunks: { kind: string; messageId: string; text: string }[] };
-            if (page.next <= offset) throw new Error("Host output page did not advance");
-            for (const chunk of page.chunks.slice(0, output.chunks - offset)) this.#send(C.agentStream, { type: chunk.kind === "assistant-delta" ? "assistant_text_delta" : "assistant_thinking_delta", sessionId, agentRunId: running.runId, messageId: chunk.messageId, delta: chunk.text });
-            offset = page.next;
+          for (let after = 0; after < output.revision;) {
+            const page = await this.#router.call(ref, "sessions.output", { runId: output.runId, afterRevision: after }) as LiveOutputPage;
+            if (page.chunks.length === 0) break;
+            if (page.next <= after) throw new Error("Host output page did not advance");
+            pieces.push(...page.chunks.filter(chunk => chunk.revision <= output.revision));
+            after = page.next;
           }
         }
+        this.#send(C.agentStream, { type: "live_output_baseline", sessionId, agentRunId: running.runId, revision: output?.revision ?? 0, segments: mergePieces(pieces) });
       }
       this.#publishApprovals(ref.hostId, value.snapshot.approvals, ref.sessionId);
       for (const accept of buffered) accept();
@@ -231,6 +234,8 @@ export class RemoteDesktopAdapter {
       case C.showArtifactContextMenu: return this.#artifacts.menu(ref, String(input.artifactPath));
       case C.getSession: case C.getSessionPage: case C.getSessionProjectionSnapshot: return desktopRemotePage(ref.hostId, await observation());
       case C.getSessionObservation: return desktopRemoteObservation(ref.hostId, await observation());
+      // The adapter pushes the baseline itself right after `agent_run_started(recoveredReset)` (see #startObservation).
+      case C.getSessionLiveOutput: return null;
       case C.getSessionPreview: { const value = await observation(); return { sessionId, workspaceRoot: value.snapshot.workspaceRoot, contextSnapshot: null }; }
       case C.taskCommand: { const { sessionId: _ignored, ...command } = input; const result = await call("tasks.command", command) as { snapshot: TaskSnapshot; error?: string }; return { ...result, snapshot: { ...result.snapshot, sessionId } }; }
       case C.pinSession: case C.renameSession: case C.archiveSession: {
@@ -239,7 +244,6 @@ export class RemoteDesktopAdapter {
       }
       case C.setSessionAgentMode: { const result = await call("sessions.update", { patch: { mode: input.mode, expectedRevision: input.expectedRevision } }) as { agentMode: string; agentModeRevision: number }; return { ok: true, mode: result.agentMode, revision: result.agentModeRevision }; }
       case C.setSessionPermissionMode: await call("sessions.update", { patch: { permissionMode: input.mode } }); return { ok: true, mode: input.mode };
-      case C.revokeSessionGrant: await call("sessions.revokeGrant", { grantId: input.grantId }); return { ok: true };
       case C.forkSession: { const boundary = input.turnId !== undefined ? { turnId: input.turnId } : { boundarySeq: (await observation()).snapshot.throughJournalSeq }; const next = await call("sessions.fork", { ...boundary, newSessionId: randomUUID() }) as { sessionId: string }; return this.handle(C.getSessionPage, {}, { hostId: ref.hostId, sessionId: next.sessionId }); }
       case C.submitTask: {
         const paths = attachmentUploadSources(ref, input.attachments);

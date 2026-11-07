@@ -96,18 +96,11 @@ export function planSessionRecovery(events: readonly SessionEventEnvelopeV1[]): 
   for (const [callId, tool] of openTools) {
     const outcome: SessionRecoveryOutcome = tool.started ? "outcome-unknown" : "not-started";
     const sources = [tool.callSeq];
-    candidates.push(coreCandidate("tool/recovery-outcome", { callId, repairId, outcome, retryAllowed: outcome === "not-started" }, sources, {
-      kind: "append",
-      node: {
-        kind: "tool-result",
-        messageId: `recovery-${repairId}-${callId}`,
-        callId,
-        isError: true,
-        content: outcome === "not-started"
-          ? "The tool body was not started. Retry only if it is still needed."
-          : "The tool body may have run, but no result was durable. Verify external state before retrying.",
-      },
-    }));
+    const content = outcome === "not-started"
+      ? "The tool body was not started. Retry only if it is still needed."
+      : "The tool body may have run, but no result was durable. Verify external state before retrying.";
+    // 节点 recovery-${repairId}-${callId}、isError: true 由 surfaceNode 推出（agent-spec-surface-derived.md §4.2）。
+    candidates.push(coreCandidate("tool/recovery-outcome", { callId, repairId, outcome, retryAllowed: outcome === "not-started", content }, sources, { kind: "append" }));
   }
   if (openStepId !== null && openTurnId !== null) candidates.push(coreCandidate("step/end", { turnId: openTurnId, stepId: openStepId, reason: "interrupted", repairId }));
   if (openTurnId !== null) candidates.push(coreCandidate("turn/end", { turnId: openTurnId, reason: "interrupted", repairId }));

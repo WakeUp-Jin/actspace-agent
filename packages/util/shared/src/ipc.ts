@@ -271,15 +271,6 @@ export type SubAgentTranscriptGetInput = {
   transcriptRef: import("./session").SubAgentTranscriptRef;
 };
 
-/**
- * 按需重建某会话的完整 Context（含各 bucket 的内容预览），供右侧 Context 完整视图实时展示。
- *
- * Host 根据 Session 请求事实与当前 Surface 生成内容预览，不调用 LLM。
- */
-export type DescribeContextInput = {
-  sessionId: string;
-};
-
 // ─── 顶部 Environment 与本地 Git 操作 ───
 
 export type WorkspaceEnvironmentGetInput = {
@@ -681,9 +672,6 @@ export type SessionPermissionModeResult = {
   mode?: import("./runtime-v2/permission").PermissionMode;
   error?: string;
 };
-
-export type SessionGrantRevokeInput = { sessionId: string; grantId: string };
-export type SessionGrantRevokeResult = { ok: boolean; error?: string };
 
 export type SessionArchiveInput = {
   sessionId: string;

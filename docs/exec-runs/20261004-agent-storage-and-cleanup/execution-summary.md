@@ -33,7 +33,7 @@
 
 一次全 workspace test 在 Runtime 的新增 manifest 校验处中断；定位并修正静态 browser-tools 声明和测试的裁剪 manifest 后，Runtime 独立全套通过。以上按实际复验范围记录，不声称整条 `pnpm -r test` 最后一次完整成功。
 
-实机验收由 `gpt-6.1-sol` 子智能体执行，逐项状态、复现与证据见 [Computer Use 验收](computer-use-acceptance.md)。真实 UI 使用隔离本地 Provider 和 Host，不等同于线上 Provider、云部署或发行包验证。
+实机验收由 `gpt-6.1-sol` 子智能体执行，逐项状态、复现与证据见 Computer Use 验收（原始记录已清理，见 git 历史）。真实 UI 使用隔离本地 Provider 和 Host，不等同于线上 Provider、云部署或发行包验证。
 
 ## 实机发现与修复
 
@@ -51,7 +51,7 @@ Sol 已覆盖本地首发、流式、自动标题；队列排序/插入/撤回/�
 
 ## 统计与保护
 
-[前后统计](refactor-stats-after.md)以本轮开始时的脏工作树为 before；其中 Git diff 是相对 HEAD 的累计变化，不能全算为本轮产出。源代码目前净减少 906 行；测试净增加 38 行。文档字符以最终统计为准，包含新执行记录。
+前后统计（原始记录已清理，见 git 历史）以本轮开始时的脏工作树为 before；其中 Git diff 是相对 HEAD 的累计变化，不能全算为本轮产出。源代码目前净减少 906 行；测试净增加 38 行。文档字符以最终统计为准，包含新执行记录。
 
 SHA256 对照确认原有 815 个 histories/learnings 文件未变；新学习记录另建。既有前端工作台设计、产品概念及 myplan 未改动。不删除或迁移用户配置、历史数据。
 

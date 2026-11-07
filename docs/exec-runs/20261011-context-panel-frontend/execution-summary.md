@@ -58,7 +58,7 @@
 
 ## 已知风险和遗留事项
 
-- **后端未实现**：Electron 下只有过渡视图。后端按 [Context 面板后端数据需求](../../design-docs/frontend/front-Context面板后端数据需求.md) §2 替换 `fixed-renderer-ipc.ts` 里的 null handler 即可，前端不用改。
+- **后端未实现**：Electron 下只有过渡视图。后端按 [Context 面板后端数据需求](../../exec-plans/completed/design-archive/frontend/front-Context面板后端数据需求.md) §2 替换 `fixed-renderer-ipc.ts` 里的 null handler 即可，前端不用改。
 - **「展开全文」没有接线**：数据需求里的 `fullTextAvailable` / `readContextEntry` 还没有后端，前端目前只显示截断预览。
 - **全量测试的负载超时**：与本次改动无关，但在并行全量运行时会出现，建议另开任务调整这几条集成测试的超时或并发。
 - **与 V2 后端的合并**：两边都改 `fixed-renderer-ipc.ts` 的同一位置时，以后端实现为准，删掉本计划的 null handler。

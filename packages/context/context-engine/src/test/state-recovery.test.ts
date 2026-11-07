@@ -11,7 +11,7 @@ function fixture(seed: SessionJournal["events"] = []): ContextSession {
 const request = { sessionId: "s", turnId: "turn", stepId: "step", requestId: "r", routeId: "r", model: "m", options: {} };
 const owners = new Set(["runtime"]);
 async function user(session: ContextSession, id: string) {
-  return session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: id }, surface: { kind: "append", node: { kind: "user", messageId: id, content: id } } });
+  return session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: id, content: id }, surface: { kind: "append" } });
 }
 
 it("persists versions once, hides removed owners and restores only the latest version after compaction", async () => {
@@ -21,7 +21,7 @@ it("persists versions once, hides removed owners and restores only the latest ve
   await user(session, "two");
   await store.put({ op: "add", owner: "runtime", id: "state", text: "new", lifetime: "persistent", afterEventSeq: store.tailAnchor() });
   expect(session.journal.events.filter(event => event.type === SUPPLEMENT_EVENT)).toHaveLength(2);
-  const transaction = createCompactionTransaction({ surface: session.journal.surface, start: 0, end: 2, summary: { kind: "user", messageId: "summary", content: "summary" }, compactionId: "c", contributorIds: [], summaryDigest: "digest" });
+  const transaction = createCompactionTransaction({ surface: session.journal.surface, start: 0, end: 2, summary: { kind: "user", messageId: "summary", content: "summary" }, compactionId: "c", contributorIds: [], summaryDigest: "digest", replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test" });
   (session.journal as SessionJournal).appendMany(transaction);
   const recovered = fixture(session.journal.events); const restored = new ContextSupplements(recovered);
   await restored.refresh(owners);

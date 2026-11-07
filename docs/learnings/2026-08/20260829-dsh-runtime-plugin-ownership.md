@@ -15,7 +15,7 @@ Host facts
    ↓ prepare before Include
 cordis.yml + Include + Loader
    ↓ settlement
-Session → LLM/Tools/Prompt → Agent factory → AgentLoop → Subagent/RunController
+Session → LLM/Tools/Prompt → Agent factory → AgentLoop → Subagent/RunController（历史：`RunController` 已从代码中移除）
    ↓
 Headless runner: create/resume → agent.followup → durable inbox → flush
 ```
@@ -37,4 +37,4 @@ Headless runner: create/resume → agent.followup → durable inbox → flush
 
 - 如果没有 Host port，Agent Behavior 能否自行创建 credential、workspace 或 approval？如果能，边界泄漏了。
 - Loader settlement 前是否可能创建主 Agent？如果能，Agent 可能看到半组装的 Tools/LLM。
-- CLI 是否仍然需要知道 `RunController` 或 `AgentLoop` 的具体类？默认 headless path 中不应该需要。
+- CLI 是否仍然需要知道 `RunController`（历史符号，已移除）或 `AgentLoop` 的具体类？默认 headless path 中不应该需要。

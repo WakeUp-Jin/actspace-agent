@@ -44,7 +44,7 @@ PA 按原设计实现后，用户对照 Codex 的截图认为交互和样式不�
 
 ## 必读
 
-- `AGENTS.md`、`docs/FRONTEND.md`、`docs/design-docs/frontend/front-主题与配色规范.md`、`docs/design-docs/frontend/front-icon-button-tooltip-guidelines.md`。
+- `AGENTS.md`、`docs/design-docs/frontend/README.md`、`docs/design-docs/frontend/front-视觉token规范.md`、`docs/design-docs/frontend/front-组件与交互模式规范.md`。
 - [PA 子计划](pa-response-annotations.md) 的「关键设计」（可批注文本模型、`canAnnotate` 规则仍然适用）。
 - demo：`docs/exec-runs/20260928-composer-mentions-annotations/assets/pa2-annotation-demo.html`。
 

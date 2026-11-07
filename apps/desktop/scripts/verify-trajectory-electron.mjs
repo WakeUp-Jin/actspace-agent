@@ -28,10 +28,14 @@ for (let turn = 1; turn <= 25; turn++) {
   await append('user/message', { turnId: ids.turnId, messageId: `u${turn}` }, { kind: 'append', node: { kind: 'user', messageId: `u${turn}`, content: `Question ${turn}` } });
   await append('step/start', ids);
   await append('request/header', { ...ids, model: 'acceptance-model', routeId: 'default' });
-  await append('request/context', { ...ids, snapshot: { renderedSystemPrompt: 'You are the verification assistant.', tools: [{ name: 'read_file', description: 'Read a UTF-8 file', inputSchema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } }], requestOptions: {} } });
-  await append('assistant/chunk', { ...ids, messageId: `a${turn}`, chunkIndex: 0, kind: 'assistant-delta', content: 'Inspecting' });
+  // 提示词、工具只在第 1 轮写（只在变化时写）；翻到最早一页后系统行与 Schema 仍要能显示（agent-spec-request-record.md §7）。
+  if (turn === 1) {
+    await append('request/system-prompt', { ...ids, digest: 'verification-prompt', contributorProvenance: [], sections: [{ owner: 'actspace.context-system', id: 'core', order: 0, content: 'You are the verification assistant.' }], modelFacts: [] });
+    await append('request/tools', { ...ids, digest: 'verification-tools', tools: [{ name: 'read_file', description: 'Read a UTF-8 file', inputSchema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } }] });
+  }
+  await append('request/context', { ...ids, snapshot: { schemaVersion: 3, requestOptions: {} } });
   const content = [{ type: 'text', text: `Answer ${turn}` }, { type: 'tool-call', callId: `c${turn}`, name: 'read_file', arguments: '{"path":"example.txt"}' }];
-  await append('assistant/message', { ...ids, messageId: `a${turn}`, content, finishReason: 'tool-calls', usage: { outputTokens: 10 } }, { kind: 'append', node: { kind: 'assistant', messageId: `a${turn}`, content } });
+  await append('assistant/message', { ...ids, messageId: `a${turn}`, content, finishReason: 'tool-calls', firstTokenAt: new Date().toISOString(), usage: { outputTokens: 10 } }, { kind: 'append', node: { kind: 'assistant', messageId: `a${turn}`, content } });
   await append('tool/call', { turnId: ids.turnId, stepId: ids.stepId, callId: `c${turn}`, name: 'read_file', pluginId: 'core', args: { path: 'example.txt' } });
   await append('tool/result', { callId: `c${turn}`, name: 'read_file', status: 'completed', summary: '1 line read', modelOutput: [{ type: 'text', text: `File output ${turn}` }], detail: [], artifacts: [] });
   await append('step/end', { ...ids, reason: 'completed' });

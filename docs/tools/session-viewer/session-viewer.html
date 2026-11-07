@@ -409,7 +409,7 @@
 
         const CORE_TYPES = new Set([
           "turn/start", "turn/end", "step/start", "step/end", "user/message", "assistant/chunk", "assistant/message",
-          "tool/call", "tool/result", "todo/write", "request/header", "request/context", "session/end-seed"
+          "tool/call", "tool/result", "todo/write", "request/header", "request/system-prompt", "request/tools", "request/context", "session/end-seed"
         ]);
         const META_TYPES = new Set(["session/title-set", "session/pinned-set", "session/archived-set", "session/workspace-set"]);
         const STREAM_TYPES = new Set(["assistant/chunk", "agent/inbox/spliced"]);

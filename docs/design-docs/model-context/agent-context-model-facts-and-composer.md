@@ -1,6 +1,6 @@
 # Context 面板与模型能力事实规范
 
-状态：P00/P01 已实现，2026-09-09 全量类型与测试回归通过；Electron、真实 Provider 和截图人工验收仍待完成。
+P00/P01 已实现；Electron、真实 Provider 和截图人工验收见执行摘要。
 
 ## 1. 目标
 
@@ -48,7 +48,8 @@ Composer 临时状态
 
 Session Journal
   ├─ request/header：本次请求的 model、route、attempt、contextWindow
-  └─ request/context：冻结的完整 LogicalRequestSnapshot 与 prepared metadata
+  ├─ request/system-prompt、request/tools：提示词与工具，变化才写
+  └─ request/context：小快照（digest、prepared metadata、contextModel）
 ```
 
 API Key 继续只进入 `<userData>/secrets.json`，不得进入 settings、request snapshot、Journal 或 Projection。
@@ -62,7 +63,7 @@ Request Model Facts、Journal 事件、容量优先级、Usage 与 Context estim
 ## 6. Composer 与 Context Popup 展示规范
 
 - Context 面板左右边缘与 Composer 输入框完全对齐，宽度跟随 Composer，不使用固定 `820px` 上限；
-- 面板显示 request snapshot 的全部可用 bucket，右侧完整 Context 视图继续显示逐条 entry；
+- 面板显示 `contextEstimate` 投影的全部 bucket（与 Composer 圆环同一来源），右侧完整 Context 视图继续显示逐条 entry；
 - 百分比显示整数，`38.2149%` 显示为 `38%`；
 - Token 摘要和 bucket 数值使用无小数的紧凑单位：`76,430` 显示为 `76K`，`1,000,000` 显示为 `1M`；
 - 容量未知时显示 `0 / Tokens` 与 `0%`，不显示固定猜测值；

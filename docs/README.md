@@ -1,23 +1,30 @@
 # 文档导航
 
-当前架构从 [Host/Harness/Run 总览](design-docs/agent-plugin-runtime/agent-target-overall-architecture.md)进入；本次代码、目录与文档清理的状态见[最终收尾摘要](exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。P1–P5 的阶段记录保留作为实施证据。
-
-本目录是仓库知识的正式来源。先按任务选择入口，再进入具体专题；当前实现、未来设计和历史证据分开阅读。
+本目录是仓库知识的正式来源，也是唯一的总导航。先按任务选择入口，再进入具体专题；现行规则、执行过程和历史记录分开阅读。
 
 | 任务 | 入口 |
 |---|---|
-| 仓库协作与维护 | [协作约定](REPO_COLLAB_GUIDE.md)、[核心理念](design-docs/core-beliefs.md) |
-| 理解当前架构 | [架构总览](ARCHITECTURE.md)、[v2 总体架构](design-docs/agent-plugin-runtime/agent-target-overall-architecture.md) |
-| 查设计与契约 | [设计索引](design-docs/index.md)、[Agent 专题](design-docs/agent-index.md)、[前端专题](design-docs/frontend/README.md) |
-| 继续已有工作 | [执行计划](exec-plans/README.md)、[仓库 TODO](TODOLIST.md)、[执行记录](exec-runs/README.md) |
-| 查验证与安全要求 | [Agent 测试](design-docs/agent-plugin-runtime/agent-testing.md)、[前端验证](FRONTEND_VERIFICATION.md)、[安全](SECURITY.md) |
-| 查变更与学习 | [history 约定](HISTORY_GUIDE.md)、[学习文档](learnings/README.md)、[发布记录](releases/README.md) |
-| 查外部研究或诊断工具 | [参考资料](references/README.md)、[Session Viewer](tools/session-viewer/README.md) |
+| 仓库协作与维护 | [协作约定](REPO_COLLAB_GUIDE.md)（含编码行为纪律）、[编码规范](coding-standards/README.md)、[执行计划约定](PLANS_GUIDE.md)、[history 约定](HISTORY_GUIDE.md) |
+| 性能与内存 | [性能与内存约定](coding-standards/perf-memory-conventions.md)、[性能待办](exec-plans/perf-backlog.md)、[内存采样工具](tools/heap-monitor/README.md) |
+| 理解当前架构 | [架构总览](ARCHITECTURE.md)、[v2 总体架构](design-docs/agent-plugin-runtime/agent-target-overall-architecture.md)、[packages 地图](../packages/README.md) |
+| 做前端 | [前端规范入口](design-docs/frontend/README.md)：先读[新功能开发清单](design-docs/frontend/front-新功能开发清单.md)，再读[视觉 token](design-docs/frontend/front-视觉token规范.md)、[文案与状态表达](design-docs/frontend/front-文案与状态表达规范.md)、[组件与交互模式](design-docs/frontend/front-组件与交互模式规范.md)；验收见[前端验证](FRONTEND_VERIFICATION.md) |
+| 查后端设计与契约 | [设计索引](design-docs/index.md) |
+| 继续已有工作 | [执行计划](exec-plans/README.md)、[已完成计划索引](exec-plans/completed/README.md)、[技术债](exec-plans/tech-debt-tracker.md)、[性能待办](exec-plans/perf-backlog.md)、[执行记录](exec-runs/README.md) |
+| 查验证、稳定性与安全 | [Agent 测试](design-docs/agent-plugin-runtime/agent-testing.md)、[稳定性](RELIABILITY.md)、[安全](SECURITY.md)、[CI/CD 与供应链](CICD.md) |
+| 查变更与学习 | [学习文档索引](learnings/README.md)、[发布记录](releases/README.md)、[路线图](roadmap.md)、`histories/`（决策时间线） |
+| 查外部研究或诊断工具 | [参考资料](references/README.md)、[Session Viewer](tools/session-viewer/README.md)、[内存采样工具](tools/heap-monitor/README.md) |
 
-## 状态与维护
+## 各目录放什么
 
-- 当前实现以源码、公开契约和对应执行摘要共同核对；文档注明部分实施时，不能把目标当作已交付事实。
-- 多智能体协作（Space、Actor 名册）见 `docs/design-docs/多智能体协作/`，当前只做前端演示，不代表 v2 已实现对应 Runtime；原 Member、Room、Team 产品稿已删除。
-- 当前规范在原专题目录持续更新，失效文档经确认后删除。
-- 已完成实现的计划进入 `completed/`，保留尚未通过的人工门禁；被替代的计划经确认后删除。
-- 历史和学习按原时间组织，执行记录按任务组织；其中旧路径只作为当时记录，不构成当前 API 依据。
+- `design-docs/`：现行规则与设计，只写当前事实，不写日期、确认记录和实施流水。
+- `exec-plans/`：`active/` 只放还有下一步的计划；完成的进 `completed/`，原文不改；`completed/design-archive/` 放从设计文档拆出的决策表、验收矩阵和旧稿，只做追溯。
+- `exec-runs/`：每次执行只留 `execution-summary.md` 和被其他文档引用的证据文件。
+- `histories/`：决策时间线，按时间保留原样；里面的旧路径只代表当时，不作为当前依据。
+- `learnings/`：只收「下次还会踩、读代码看不出来」的教训，写法见 [WRITING_GUIDE](learnings/WRITING_GUIDE.md)。
+
+## 维护规则
+
+- 当前实现以源码和公开契约为准；文档注明部分实施时，不能把目标当作已交付事实。
+- 代码或流程变更让文档过期时，在同一轮里改掉；失效文档删除，需要时查 git 历史。
+- 多智能体协作（Space、Actor 名册）见 `design-docs/多智能体协作/`，当前只做前端演示，不代表 v2 已实现对应 Runtime。
+- 链接用相对路径，不链接 gitignored 或 `tmp/` 下的文件；`pnpm check:docs` 校验必需文件、现行文档和链接。

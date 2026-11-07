@@ -2,7 +2,7 @@
 
 状态：**实现与本轮验收收尾。2026-10-12 用户明确取消 L（510 万条）剩余验收，不作为本轮完成门槛；不标记 L 通过。保留并行测试失败、内存观察及未覆盖边界。没有提交或推送。**
 
-关联：[执行计划](../../exec-plans/completed/20261011-context-sqlite-integration/README.md)、[逐点结果](acceptance-results.md)、[执行过程](execution-process.md)、[Computer Use](computer-use.md)。基线为 `fix/context_manager_v1` 的 `2cbb634f` 加既有未提交改动。工作区保留用户其他改动和恢复 stash。
+关联：[执行计划](../../exec-plans/completed/20261011-context-sqlite-integration/README.md)、逐点结果（原始记录已清理，见 git 历史）、[执行过程](execution-process.md)、Computer Use（原始记录已清理，见 git 历史）。基线为 `fix/context_manager_v1` 的 `2cbb634f` 加既有未提交改动。工作区保留用户其他改动和恢复 stash。
 
 ## 已实现
 

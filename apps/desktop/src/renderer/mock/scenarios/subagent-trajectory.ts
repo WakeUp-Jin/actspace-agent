@@ -56,7 +56,7 @@ const finished = (agentId: string, external = false) => external ? `Subagent ${a
 const stopped = (agentId: string) => `Subagent ${agentId} was stopped before it finished. Send it a message to continue.`;
 /** 下一轮开头领取一条收件箱通知（子智能体完成 / 子智能体来信）。 */
 function claim(messageId: string, source: "subagent_notification" | "agent_message", notice: { taskId: string; kind: "subagent" | "agent_message"; title: string; status: string }, content: string): MockRawEvent {
-  return { type: "agent/inbox/spliced", data: { operation: "claim", messageId, target: "next-step", source, notice, opensTurn: true }, surface: { kind: "append", node: { kind: "user", messageId, content } } };
+  return { type: "agent/inbox/spliced", data: { operation: "claim", messageId, target: "next-step", source, notice, opensTurn: true, content: content }, surface: { kind: "append" } };
 }
 /** `closing` 为空时没有结论段（lost）。 */
 function notification(agentId: string, description: string, status: string, summary: string, closing?: string): string {

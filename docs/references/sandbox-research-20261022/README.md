@@ -1,6 +1,6 @@
 # 沙箱实现的思路
 
-> 入库说明（2026-10-25）：本文是用户提供的沙箱调研原稿，按原文保存，仅把 DSH 本地路径改为仓库内参考副本 `tmp/deepseek-harness`。实验脚本与原始数据未入库。当前决策以 [沙箱设计](../../design-docs/execution-safety/agent-沙箱设计.md) 为准。
+> 入库说明：本文是沙箱调研原稿，按原文保存；文中 `tmp/deepseek-harness/...` 路径指向 DSH 外部参考快照（本地克隆，不入库，新克隆没有）。实验脚本与原始数据未入库。当前决策以 [沙箱设计](../../design-docs/execution-safety/agent-沙箱设计.md) 为准。
 
 > 日期：2026-10-22。本文面向 Harness 开发者，整理当前架构方向、候选后端分析和本机实验结果。它是一份设计建议，不代表已经实现的产品能力。平台优先级为 **macOS > Linux > Windows**。
 
@@ -645,21 +645,21 @@ Windows 部分可以在 Mac/Linux 稳定后推进，也可在目标工具清晰�
 
 ### 14.2 DSH 本地仓库
 
-分析位置：`tmp/deepseek-harness`。记录的 HEAD 为 `687f282e8625c6b8d11ff58211a90524be2e4317`。这些源码和 README 用于理解当前机制；归档决策只用于历史选型理由，不作为新实现的当前能力声明。
+分析位置：DSH 外部参考快照（本地 `tmp/deepseek-harness`，不入库）。记录的 HEAD 为 `687f282e8625c6b8d11ff58211a90524be2e4317`。这些源码和 README 用于理解当前机制；归档决策只用于历史选型理由，不作为新实现的当前能力声明。
 
 | 编号 | 文件 | 主要用途 |
 |---|---|---|
-| D1 | [sandbox-local README](tmp/deepseek-harness/packages/sandbox/sandbox-local/README.md) | 后端选择、完整 / 部分执行事实、已知限制 |
-| D2 | [profiles.ts](tmp/deepseek-harness/packages/sandbox/sandbox-local/src/profiles.ts) | bwrap 参数、Landlock 授权和 Seatbelt SBPL |
-| D3 | [sandbox-local index.ts](tmp/deepseek-harness/packages/sandbox/sandbox-local/src/index.ts) | 平台选择、探测、包装与错误事实 |
-| D4 | [sandbox README](tmp/deepseek-harness/packages/sandbox/sandbox/README.md) | 统一模式、逐调用策略、文件效果范围 |
-| D5 | [sandbox-policy README](tmp/deepseek-harness/packages/sandbox/sandbox-policy/README.md) | 部署默认、会话策略与单次授权解析 |
-| D6 | [Windows ACL README](tmp/deepseek-harness/packages/sandbox/sandbox-windows-acl/README.md) | 受限令牌、常驻权限、硬链接、stdio 和兼容性限制 |
-| D7 | [Windows token.ts](tmp/deepseek-harness/packages/sandbox/sandbox-windows-acl/src/token.ts) | 令牌与完整性级别的实际 API 使用 |
-| D8 | [Windows ffi.ts](tmp/deepseek-harness/packages/sandbox/sandbox-windows-acl/src/ffi.ts) | Koffi / Win32 API 定义 |
-| D9 | [Windows 选型决策](tmp/deepseek-harness/.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md) | 为什么选择写限制方案，以及 mxc / AppContainer / landstrip 的取舍 |
-| D10 | [历史沙箱决策](tmp/deepseek-harness/.agents/notes/archived/feature/2026-07-06-sandbox.md) | Linux bwrap 不可用时的回退、分层与历史理由 |
-| D11 | [依赖替换否决记录](tmp/deepseek-harness/.agents/notes/rejected/simplification/2026-07-26-dependency-swaps-rejected-by-nih-audit.md) | 自有 Landlock 启动器与 landstrip 的历史审计 / 分发取舍 |
+| D1 | sandbox-local README（`tmp/deepseek-harness/packages/sandbox/sandbox-local/README.md`） | 后端选择、完整 / 部分执行事实、已知限制 |
+| D2 | profiles.ts（`tmp/deepseek-harness/packages/sandbox/sandbox-local/src/profiles.ts`） | bwrap 参数、Landlock 授权和 Seatbelt SBPL |
+| D3 | sandbox-local index.ts（`tmp/deepseek-harness/packages/sandbox/sandbox-local/src/index.ts`） | 平台选择、探测、包装与错误事实 |
+| D4 | sandbox README（`tmp/deepseek-harness/packages/sandbox/sandbox/README.md`） | 统一模式、逐调用策略、文件效果范围 |
+| D5 | sandbox-policy README（`tmp/deepseek-harness/packages/sandbox/sandbox-policy/README.md`） | 部署默认、会话策略与单次授权解析 |
+| D6 | Windows ACL README（`tmp/deepseek-harness/packages/sandbox/sandbox-windows-acl/README.md`） | 受限令牌、常驻权限、硬链接、stdio 和兼容性限制 |
+| D7 | Windows token.ts（`tmp/deepseek-harness/packages/sandbox/sandbox-windows-acl/src/token.ts`） | 令牌与完整性级别的实际 API 使用 |
+| D8 | Windows ffi.ts（`tmp/deepseek-harness/packages/sandbox/sandbox-windows-acl/src/ffi.ts`） | Koffi / Win32 API 定义 |
+| D9 | Windows 选型决策（`tmp/deepseek-harness/.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md`） | 为什么选择写限制方案，以及 mxc / AppContainer / landstrip 的取舍 |
+| D10 | 历史沙箱决策（`tmp/deepseek-harness/.agents/notes/archived/feature/2026-07-06-sandbox.md`） | Linux bwrap 不可用时的回退、分层与历史理由 |
+| D11 | 依赖替换否决记录（`tmp/deepseek-harness/.agents/notes/rejected/simplification/2026-07-26-dependency-swaps-rejected-by-nih-audit.md`） | 自有 Landlock 启动器与 landstrip 的历史审计 / 分发取舍 |
 
 DSH 的决策是该项目的取舍，不等于已证明自有实现优于所有开源方案；本文没有做全量框架或漏洞审计。
 

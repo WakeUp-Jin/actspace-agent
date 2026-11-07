@@ -134,6 +134,7 @@
         "general": {
           "performanceMonitoring": true,
           "showTurnCodeChanges": true,
+          "defaultPermissionMode": "default",
           "englishLearning": {
             "lastSessionId": null
           },
@@ -310,6 +311,7 @@
       "general": {
         "performanceMonitoring": true,
         "showTurnCodeChanges": true,
+        "defaultPermissionMode": "default",
         "englishLearning": {
           "lastSessionId": null
         },

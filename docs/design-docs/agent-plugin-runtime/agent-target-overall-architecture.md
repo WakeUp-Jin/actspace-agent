@@ -1,6 +1,6 @@
 # ActSpace v2 总体架构
 
-状态：2026-10-04 按 P1–P5 源码校准。P4 本机夹具验收已完成；P5 自动化与 Computer Use 分别见 [执行摘要](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)，不代表真实云部署或 Provider 验收。
+验收证据：P4 本机夹具验收已完成；P5 自动化与 Computer Use 分别见 [执行摘要](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)，不代表真实云部署或 Provider 验收。
 
 ## Host、Harness 与 Run
 
@@ -53,7 +53,7 @@ Journal 是恢复事实源，Projection、live progress 和 diagnostics 各自�
 ## 阅读路线与非目标
 
 - [Runtime 与 Composition](agent-target-runtime-architecture.md)：Profile 启动与生命周期。
-- [Cordis ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md)、[Loop surface](agent-spec-agent-loop-cordis-surface.md)：事件与屏障。
+- [Cordis ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md)、[Loop 插入面](agent-spec-cordis-event-abi-and-eventhub-retirement.md)：事件与屏障。
 - [Host 指南](agent-host-guide.md)：连接、附件与维护。
 - [测试策略](agent-testing.md)：包、进程和真实 UI 的证据边界。
 - [设计决策](agent-harness-host-refactor-decisions.md)：讨论历史；最新简化结论覆盖共享实例探索。

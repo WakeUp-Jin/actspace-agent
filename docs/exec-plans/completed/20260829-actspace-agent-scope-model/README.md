@@ -34,7 +34,7 @@
 - 设计契约：[Agent Scope 模型设计规范](../../../design-docs/agent-plugin-runtime/agent-spec-agent-scope-model.md)。
 - 现有 Scope：[packages/core/scope](../../../../packages/core/scope)。
 - 当前 Agent/Subagent 契约：[agent-spec-agent-and-subagent.md](../../../design-docs/agent-plugin-runtime/agent-spec-agent-and-subagent.md)。
-- 当前 Loop 事件契约：[agent-spec-agent-loop-cordis-surface.md](../../../design-docs/agent-plugin-runtime/agent-spec-agent-loop-cordis-surface.md)。
+- 当前 Loop 事件契约：[agent-spec-agent-loop-cordis-surface.md](../../../design-docs/agent-plugin-runtime/agent-spec-cordis-event-abi-and-eventhub-retirement.md)。
 - Cordis 原生事件 P0：`20260829-actspace-dsh-core-rebuild/p01-cordis-loop-surface.md` 的事件部分；本计划不接管其事件字段和 mode。
 - Cordis Service P0：`20260829-actspace-dsh-runtime-full-plugin-composition` 及当前并行执行的 Service 化任务；本计划只消费其 Context/effect 边界，不修改其服务所有权设计。
 

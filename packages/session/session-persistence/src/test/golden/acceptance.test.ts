@@ -109,13 +109,13 @@ describe("Session Format v1 golden acceptance inventory", () => {
     journal.append(candidate("agent/inbox/spliced", { operation: "enqueue", messageId: "turn-1", target: "next-turn", content: "follow" }));
     expect(journal.validation.relations.pendingInboxMessageIds).toEqual(["step-1", "turn-1"]);
     journal.append(candidate("turn/start", { turnId: "active-turn" }));
-    journal.append(candidate("agent/inbox/spliced", { operation: "claim", messageId: "step-1", target: "next-step" }, {
+    journal.append(candidate("agent/inbox/spliced", { operation: "claim", messageId: "step-1", target: "next-step", content: "steer" }, {
       provenance: { sourceEventSeqs: [0], contributorIds: ["main-inbox"], runtimeSelectionSeq: null },
-      surface: { kind: "append", node: { kind: "user", messageId: "step-1", content: "steer" } },
+      surface: { kind: "append" },
     }));
-    journal.append(candidate("agent/inbox/spliced", { operation: "claim", messageId: "turn-1", target: "next-turn" }, {
+    journal.append(candidate("agent/inbox/spliced", { operation: "claim", messageId: "turn-1", target: "next-turn", content: "follow" }, {
       provenance: { sourceEventSeqs: [1], contributorIds: ["main-inbox"], runtimeSelectionSeq: null },
-      surface: { kind: "append", node: { kind: "user", messageId: "turn-1", content: "follow" } },
+      surface: { kind: "append" },
     }));
     const reloaded = new SessionJournal({ registry: createCoreCodecRegistry(), seed: journal.events });
     expect(reloaded.validation.relations.pendingInboxMessageIds).toEqual([]);

@@ -1,72 +1,54 @@
 # 用 request id guard 防止旧请求覆盖新 UI 状态
 
-关联 history：`docs/histories/2026-06/20260604-0307-review-summary-refresh.md`
+合并自：用 request id guard 防止旧请求覆盖新 UI 状态（Review summary 刷新）、异步目录加载需要 request identity（slash 命令菜单）。
 
-## 是什么
+关联：`docs/histories/2026-06/20260604-0307-review-summary-refresh.md`、`docs/histories/2026-07/20260730-1419-composer-slash-command-menu.md`
 
-当一个 UI 状态来自异步请求，而且用户可以快速切换输入条件时，后发请求不一定后返回。request id guard 是一个轻量模式：每次刷新前递增一个本地序号，请求返回后只在序号仍然是最新时写入 state。
+## 问题
 
-这次 Review summary 的刷新逻辑就是这个形状：
+UI 状态来自异步请求，且用户能快速切换输入条件（workspace、账号、项目、query、tab、filter、强制 Retry）时，后发请求不一定后返回：
 
-```ts
-const requestId = ++requestIdRef.current;
-setSummary({ status: "loading" });
-
-const result = await getWorkspaceReview({ workspaceRoot });
-
-if (requestId !== requestIdRef.current) return;
-setSummary(toSummary(result));
+```text
+请求 A(workspace-a) 发出 → 切到 workspace-b → 请求 B 发出并先返回，界面显示 B → 请求 A 后返回，界面被覆盖成 A
 ```
 
-## 为什么需要
+React state 不知道响应是否过期；缓存 key 只能避免重复请求，不能判断在途响应是否仍属于当前 UI；`setLoading(true)` 只能表达“正在请求”，不能证明返回值属于当前输入。这类 bug 不是类型错误，只在网络/文件系统慢且用户快速切换时出现，很容易漏测。
 
-React 的 state 不知道某个异步响应是不是已经过期。假设用户从 workspace A 快速切到 workspace B：
-
-1. A 的 Review 请求先发出。
-2. B 的 Review 请求后发出。
-3. B 先返回并显示正确 summary。
-4. A 后返回，如果没有 guard，就会把 B 的状态覆盖回 A。
-
-这种 bug 不是类型错误，也不一定能靠普通 loading 状态避免。它通常只在网络慢、文件系统慢、用户快速切换时出现，所以很容易漏测。
-
-## 怎么用
-
-适合使用 request id guard 的条件：
-
-- 同一个 state 可能被多次异步刷新。
-- 刷新参数会变化，例如 workspace、query、scope、tab、filter。
-- 旧结果没有继续展示的价值。
-- 不一定需要取消真实请求，只需要忽略过期结果。
-
-推荐写法：
+## 解决：单调递增的 request id，响应、错误、loading 收尾都先验证
 
 ```ts
 const refreshIdRef = useRef(0);
-
-const refresh = useCallback(async (nextInput: Input) => {
-  const refreshId = ++refreshIdRef.current;
+const refresh = useCallback(async (input: Input) => {
+  const id = ++refreshIdRef.current;
   setState({ status: "loading" });
-
   try {
-    const data = await load(nextInput);
-    if (refreshId !== refreshIdRef.current) return;
+    const data = await load(input);
+    if (id !== refreshIdRef.current) return;
     setState({ status: "ready", data });
   } catch (error) {
-    if (refreshId !== refreshIdRef.current) return;
+    if (id !== refreshIdRef.current) return;
     setState({ status: "failed", error });
+  } finally {
+    if (id === refreshIdRef.current) setLoading(false);
   }
 }, []);
 ```
 
-## 常见陷阱
+这是拒绝过期响应提交状态，不是取消网络请求；底层支持 `AbortController` 时可同时取消旧请求省资源，但提交前的 identity 检查仍是最后防线。适用条件：同一 state 会被多次刷新、参数会变、旧结果没有继续展示价值。
 
-- 只保护 success，不保护 error：旧请求失败晚返回，也可能把新状态打成 failed。
-- 把 request id 存在 state 里：这会引入额外 render，`useRef` 更适合这种不参与渲染的时序标记。
-- 误以为 `setLoading(true)` 能解决竞态：loading 只能表达正在请求，不能证明返回值仍属于当前输入。
-- 在应该保留多份结果的场景使用 guard：如果不同请求对应不同 cache key，应写入 keyed cache，而不是丢弃旧结果。
+## 陷阱
 
-## 自检问题
+- 只保护 success 不保护 catch：旧请求晚失败会把新的成功状态打成 failed。
+- 无条件在 `finally` 关 loading：旧请求让仍在进行的新请求提前结束 loading。
+- request id 放 state：多一次 render；用 `useRef`。
+- 只比较参数字符串：同一 workspace 的强制 Retry 也产生并发请求，request id 能统一处理。
+- 参数变化后清 cache 却不隔离在途请求：旧响应仍会写回。
+- 应保留多份结果的场景（不同 cache key）不要用 guard 丢旧结果，写入 keyed cache。
+- effect 里的异步响应同样要检查本次 effect 是否已失效（先开 A 再开 B，A 迟到不能覆盖 B）。
 
-- 这个异步结果返回时，用户看到的输入条件还一定是发请求时的条件吗？
-- 旧请求失败晚返回时，会不会覆盖一个已经成功的新状态？
-- 这里需要取消底层请求，还是只需要忽略过期响应？
+## 自检
+
+1. 响应返回时，用户看到的输入条件还一定是发请求时的条件吗？
+2. 旧请求失败晚返回，会覆盖已成功的新状态吗？
+3. Retry 与自动加载并发时，哪个请求有权结束 loading？
+4. 需要取消底层请求，还是只忽略过期响应？
