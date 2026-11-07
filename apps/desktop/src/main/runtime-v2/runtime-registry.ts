@@ -3,6 +3,7 @@ import type { EnglishLearningService, SpeechHostPort } from "@actspace/english-l
 import { formatChatAttachmentIssue, type ChatAttachmentIssue, type EnglishLearningTargetInput, type EnglishLearningState } from "@actspace/shared";
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "../workspace-registry-service";
 import { FixedRendererStreamAdapter } from "./fixed-renderer-stream-adapter";
+import { SubagentActivityBoard } from "./subagent-activity";
 import { randomUUID } from "node:crypto";
 import { LiveOutputBuffer, surfaceNode, type LiveOutputBaseline } from "@actspace/shared/runtime-v2";
 import { readFile, stat } from "node:fs/promises";
@@ -61,6 +62,8 @@ export class DesktopRuntimeV2Registry {
   readonly #listeners = new Set<(event: RuntimeV2DesktopLiveEnvelope) => void>();
   /** Unsettled text of each running Session, for renderers that reattach mid-run (agent-spec-live-assistant-stream §5). */
   readonly #liveOutput = new LiveOutputBuffer();
+  /** 运行中子会话此刻在做什么，给右侧「子 Agent」列表第二行。 */
+  readonly #subagentActivity = new SubagentActivityBoard();
   #profile: BootedRuntimeProfile | undefined;
   #workspaceDiscovery?: { controller: AbortController; task: Promise<void> };
   #bootPromise: Promise<void> | undefined;
@@ -431,6 +434,8 @@ export class DesktopRuntimeV2Registry {
     this.#rendererStream.flush();
     return this.#liveOutput.baseline(sessionId);
   }
+  /** 运行中子会话此刻在做什么（只在内存里，没有时为空）。 */
+  subagentActivity(childSessionId: string): string | undefined { return this.#subagentActivity.label(childSessionId); }
   subscribeRendererStream(listener: (event: import("@actspace/shared").RuntimeStreamEvent) => void): () => void { return this.#rendererStream.subscribe(listener); }
 
   subscribe(listener: (event: RuntimeV2DesktopLiveEnvelope) => void): () => void {
@@ -576,6 +581,7 @@ export class DesktopRuntimeV2Registry {
       void this.options.browser?.endTurn?.(update.sessionId, update.turnId).catch((error: unknown) => this.options.log?.("browser turn cleanup failed", { error: String(error) }));
     }
     if (update.workspaceRoot) this.#streamWorkspaces.set(update.sessionId, update.workspaceRoot);
+    this.#subagentActivity.accept(update);
     const liveRevision = this.#liveOutput.accept(update);
     // 正文 / 思考增量带上 revision，界面恢复运行时据此丢掉底稿里已有的帧。
     this.#rendererStream.accept(liveRevision !== null && (update.kind === "assistant-delta" || update.kind === "reasoning-delta") ? { ...update, liveRevision } : update);

@@ -686,7 +686,12 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       if (status !== "running") rememberFinished(settledChildTokens, key, tokens);
       childTokens.set(agentId, tokens);
     }));
-    return items.map(item => childTokens.has(item.agentId) ? { ...item, totalTokens: childTokens.get(item.agentId)! } : item);
+    // 运行中的通用 / 探索 / Fork 带上此刻在做什么（列表第二行）；外部子智能体没有实时事件。
+    return items.map(item => {
+      const activity = item.status === "running" && (item.kind === "local" || item.kind === "fork") ? options.registry.subagentActivity(item.agentId) : undefined;
+      const tokens = childTokens.get(item.agentId);
+      return tokens === undefined && !activity ? item : { ...item, ...(tokens === undefined ? {} : { totalTokens: tokens }), ...(activity ? { activity } : {}) };
+    });
   });
   ipc.handle(contract.sessions.interruptSubagent, async (input) => options.registry.interruptSubagent(input.sessionId, input.agentId));
   ipc.handle(contract.sessions.revealSubagentRecord, async (input) => {

@@ -2,6 +2,7 @@ import { memo, type ReactNode } from "react";
 import type { ComposerAttachment, MessageBlock } from "@actspace/shared";
 import { ResponseAnnotationPill } from "../composer/ResponseAnnotationPill";
 import { BackgroundNoticeRow } from "../messages/BackgroundNoticeRow";
+import { SubagentMessageCard } from "../messages/SubagentMessageCard";
 import { TodoListBlock } from "../messages/TodoListBlock";
 import { ReplyStreamingContext, WritingReplyContext } from "../messages/reply-streaming-context";
 import { ToolActivityGroup } from "../messages/ToolActivityGroup";
@@ -9,11 +10,13 @@ import { USER_ANNOTATIONS_ROW_CLASS, UserMessage } from "../messages/UserMessage
 import { renderMessageList, type SubagentOpenHandler, type ReadMessageBlock } from "./render-message";
 import { TurnTail } from "../turn-tail/TurnTail";
 import { TurnActions } from "./TurnActions";
-import { finalAssistantMessages, getLatestTodoMessage, hasToolLikeItem, splitTurnMessages, workDurationMs, type ConversationTurn } from "./turns";
+import { finalAssistantMessages, getLatestTodoMessage, hasToolLikeItem, liftSubagentMessages, splitTurnMessages, workDurationMs, type ConversationTurn } from "./turns";
 
 const MESSAGE_TURN_CLASS = "message-turn relative flex min-w-0 flex-col gap-0";
 // 提问卡片不吸顶，跟着内容滚走；滚出视野后由 PinnedTurnPrompt 在顶部叠一行。
 const TURN_PROMPT_CLASS = "turn-prompt min-w-0 py-4";
+// 来信唤醒的一轮以来信卡片开头，占提问卡片的位置。
+const TURN_LETTER_CLASS = "turn-prompt min-w-0 pt-4 pb-2";
 const TURN_PROMPT_CARD_CLASS =
   "turn-prompt-card overflow-hidden rounded-act-lg border border-line bg-surface";
 const TURN_BODY_CLASS = "turn-body message-flow flex min-w-0 flex-col";
@@ -47,7 +50,11 @@ function TurnPrompt({
   sessionId?: string | null;
   onOpenSubagent?: SubagentOpenHandler;
 }) {
-  if (!turn.user) return turn.notice ? <BackgroundNoticeRow message={turn.notice} onOpenSubagent={onOpenSubagent} /> : null;
+  if (!turn.user) {
+    if (!turn.notice) return null;
+    if (turn.notice.taskKind === "agent_message") return <div className={TURN_LETTER_CLASS}><SubagentMessageCard message={turn.notice} onOpenSubagent={onOpenSubagent} /></div>;
+    return <BackgroundNoticeRow message={turn.notice} onOpenSubagent={onOpenSubagent} />;
+  }
   const latestTodo = getLatestTodoMessage(turn.messages);
 
   return (
@@ -88,9 +95,9 @@ function renderTurnBody(
   const attachTodoToPrompt = Boolean(turn.user);
   const preparationItems = workItems.filter((message) => message.kind === "workspace_preparation");
   const latestTodo = attachTodoToPrompt ? getLatestTodoMessage(workItems) : undefined;
-  const processItems = workItems.filter(
+  const { process: processItems, letters } = liftSubagentMessages(workItems.filter(
     (message) => message.kind !== "workspace_preparation" && (!attachTodoToPrompt || message.kind !== "todo"),
-  );
+  ), isActive);
   const processContent = processItems.length === 0
     ? null
     : hasToolLikeItem(processItems)
@@ -105,6 +112,7 @@ function renderTurnBody(
     <>
       {preparationItems.length > 0 ? renderMessageList(preparationItems, onOpenSubagent, false, onOpenReadFile, onOpenWorkspaceFile) : null}
       {processContent}
+      {letters.length > 0 ? renderMessageList(letters, onOpenSubagent, false, onOpenReadFile, onOpenWorkspaceFile) : null}
       {finalReply.length > 0 ? <div className={`message-flow${processContent ? " message-flow-final" : ""}`}>{renderMessageList(finalReply, onOpenSubagent, false, onOpenReadFile, onOpenWorkspaceFile)}</div> : null}
       {failures.length > 0 ? renderMessageList(failures, onOpenSubagent, false, onOpenReadFile, onOpenWorkspaceFile) : null}
     </>

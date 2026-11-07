@@ -29,7 +29,9 @@ it.each(["agent", "explore"] as const)("renders deferred %s as a directly usable
     deferredToolDetail,
   };
   render(<>{renderMessage(message, undefined, open)}</>);
-  expect(screen.getByText("检查完成")).toBeVisible();
+  // 单行卡片：结论不在卡片里（在右侧列表），只有标题和状态。
+  expect(screen.getByText("检查工作区")).toBeVisible();
+  expect(screen.queryByText("检查完成")).not.toBeInTheDocument();
   expect(screen.getByText("已完成")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: /Open SubAgent transcript/ }));
   expect(open).toHaveBeenCalledWith("child-session");

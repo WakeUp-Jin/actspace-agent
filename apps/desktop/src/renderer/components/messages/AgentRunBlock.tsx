@@ -1,36 +1,18 @@
-import { useState } from "react";
 import { subagentKindLabel, type MessageBlock } from "@actspace/shared";
-import "./agent-activity.css";
-import { AgentAvatar, AgentStatus, agentIdentity, agentLatestActivity, agentModelLabel } from "./AgentIdentity";
+import { AgentAvatar, AgentStatus, agentIdentity } from "./AgentIdentity";
 import { BackgroundTag } from "./BashRunBlock";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 
+// 单行派发卡片（front-子Agent与后台任务规范 §2.1）：此刻在做什么在右侧「子 Agent」列表第二行，模型在详情顶栏，卡片里都不写。
 const BLOCK_CLASS = "message-row agent-run max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)]";
 const BUTTON_CLASS =
-  "group/agent flex w-full min-w-0 items-center gap-3 rounded-act-md border border-line bg-surface-subtle px-3 py-2 text-left transition-[background-color,border-color,color,transform] duration-(--motion-base) ease-in-out hover:border-line-strong hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--act-color-focus-ring)] active:translate-y-px";
-const HEADER_CLASS = "flex min-w-0 items-center gap-2";
-const NAME_CLASS = "min-w-0 truncate text-act-md leading-[1.4] text-text-muted group-hover/agent:text-text-main group-focus-visible/agent:text-text-main";
+  "group/agent flex h-[34px] w-full min-w-0 items-center gap-2 rounded-act-md border border-line bg-surface-subtle pr-2.5 pl-[7px] text-left transition-[background-color,border-color,color,transform] duration-(--motion-base) ease-in-out hover:border-line-strong hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--act-color-focus-ring)] active:translate-y-px";
+const NAME_CLASS = "min-w-0 flex-1 truncate text-act-md leading-[1.4] text-text-muted group-hover/agent:text-text-main group-focus-visible/agent:text-text-main";
 const TYPE_CLASS = "shrink-0 text-act-xs leading-[1.4] text-text-faint";
-const LATEST_CLASS = "min-w-0 truncate text-act-xs leading-[1.45] text-text-muted";
-const ERROR_LATEST_CLASS = "text-on-danger";
 
-function kindLabel(message: AgentMessage): string {
+export function agentKindText(message: Pick<AgentMessage, "subagentKind" | "preset" | "agentKind">): string {
   return subagentKindLabel({ ...(message.subagentKind ? { subagentKind: message.subagentKind } : {}), ...(message.preset ? { preset: message.preset } : {}), ...(message.agentKind ? { agentKind: message.agentKind } : {}) });
-}
-
-function ActivityLine({ text, running }: { text: string; running: boolean }) {
-  const [frame, setFrame] = useState({ text, previous: "", revision: 0 });
-  // Reflect every semantic update immediately; the activity model retains the
-  // last operation even when a tool starts and finishes within one render.
-  if (frame.text !== text) {
-    setFrame({ text, previous: running ? frame.text : "", revision: frame.revision + 1 });
-  }
-  if (!running) return <span role="status">{text}</span>;
-  return <span className="agent-activity-transition" role="status" aria-label={frame.text}>
-    {frame.previous && <span key={`old-${frame.revision}`} className="agent-activity-out" aria-hidden="true">{frame.previous}</span>}
-    <span key={frame.revision} className={frame.previous ? "agent-activity-in" : undefined} aria-hidden="true">{frame.text}</span>
-  </span>;
 }
 
 export function AgentRunBlock({
@@ -43,36 +25,24 @@ export function AgentRunBlock({
   /** 打开右侧「子 Agent」并选中它；还没有 `subagent/spawned`（没有子智能体 id）的卡片只打开列表。 */
   onOpen?: (agentId: string | undefined) => void;
 }) {
-  const isRunning = message.status === "running";
-  const latest = agentLatestActivity(message);
-  const latestClass = message.error ? `${LATEST_CLASS} ${ERROR_LATEST_CLASS}` : LATEST_CLASS;
-  const model = agentModelLabel(message.model);
-
+  const kind = agentKindText(message);
+  const name = message.description || kind;
+  // 失败原因放在悬停里：卡片只有一行。
+  const title = message.status === "failed" && message.error ? `${name}\n${message.error}` : name;
   return (
     <article className={`${BLOCK_CLASS}${className ? ` ${className}` : ""}`}>
       <button
         className={BUTTON_CLASS}
         type="button"
         aria-label={`Open SubAgent transcript for ${message.description}`}
+        title={title}
         onClick={() => onOpen?.(message.transcriptRef?.runId)}
       >
-        <AgentAvatar identity={agentIdentity(message)} />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className={HEADER_CLASS}>
-            <span className={`${NAME_CLASS} flex-1`} title={message.description}>{message.description || message.displayText || kindLabel(message)}</span>
-            {message.background ? <BackgroundTag /> : null}
-            <AgentStatus status={message.status} />
-          </div>
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span className={TYPE_CLASS}>{kindLabel(message)}</span>
-            {model ? <>
-              <span aria-hidden="true" className="text-act-xs text-text-faint">·</span>
-              <span className={`${TYPE_CLASS} agent-run-model max-w-[40%] truncate`} title={message.model}>{model}</span>
-            </> : null}
-            <span aria-hidden="true" className="text-act-xs text-text-faint">·</span>
-            <div className={latestClass}><ActivityLine text={latest} running={isRunning} /></div>
-          </div>
-        </div>
+        <AgentAvatar identity={agentIdentity(message)} size={20} />
+        <span className={NAME_CLASS}>{name}</span>
+        <span className={TYPE_CLASS}>{kind}</span>
+        {message.background ? <BackgroundTag /> : null}
+        <AgentStatus status={message.status} />
       </button>
     </article>
   );

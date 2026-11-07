@@ -13,6 +13,8 @@ import type { ComposerReviewSummary } from "./Composer";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { BackgroundTaskLinkContext } from "./messages/BashRunBlock";
+import { SubagentStatusContext } from "./messages/subagent-status-context";
+import { subagentStatusByAgent, type SubagentCardStatus } from "@actspace/client/sessions";
 import { CompactionRetryContext } from "./messages/CompactCommandBlock";
 import type { SessionMainView } from "./SessionViewToggle";
 import { TrajectoryView } from "./lazy-pages";
@@ -104,6 +106,15 @@ export function ConversationView({
   const projectedComposerPhase = projectionView?.composerPhase;
   const effectiveContextSnapshot = contextSnapshot ?? projectionView?.contextSnapshot ?? null;
   const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
+  // 来信卡片取发送方状态：内容没变时沿用同一个 Map，流式时不让每张来信卡片重渲染。
+  const subagentStatusesRef = useRef<ReadonlyMap<string, SubagentCardStatus>>(new Map());
+  const subagentStatuses = useMemo(() => {
+    const next = subagentStatusByAgent(messages);
+    const previous = subagentStatusesRef.current;
+    if (next.size === previous.size && [...next].every(([id, status]) => previous.get(id) === status)) return previous;
+    subagentStatusesRef.current = next;
+    return next;
+  }, [messages]);
   // 输入历史只在用户消息变化时换新：输入框外壳靠它保持稳定，不随流式每帧重渲染。
   const inputHistory = useTranscriptSelect(userInputHistory, sameStringList);
   // Review 标签的「第 N 轮」：只有历史从头加载全了，已加载的用户轮次序号才是真实轮次。
@@ -336,6 +347,7 @@ export function ConversationView({
     <ResponseAnnotationContext.Provider value={annotations.contextValue}>
     <CompactionRetryContext.Provider value={onRetryCompaction}>
     <BackgroundTaskLinkContext.Provider value={openBackgroundTask}>
+    <SubagentStatusContext.Provider value={subagentStatuses}>
     <main className={CONVERSATION_SHELL_CLASS}>
       <ResponseSelectionMenu
         scrollContainerRef={scrollContainerRef}
@@ -417,6 +429,7 @@ export function ConversationView({
         </div>
       ) : null}
     </main>
+    </SubagentStatusContext.Provider>
     </BackgroundTaskLinkContext.Provider>
     </CompactionRetryContext.Provider>
     </ResponseAnnotationContext.Provider>

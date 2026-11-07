@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>子 Agent 列表 · 停止按钮 · 返回样式 Demo</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-read: "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "PingFang SC", monospace;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --selected: #e4e4e1; --hover: #f0f0ed;
+  --line: #deded9; --line-soft: #e9e9e5; --line-strong: #8c8c85;
+  --text: #20201e; --muted: #676762; --faint: #72726b; --subtle: #85857e;
+  --operational: #087a4b; --operational-soft: #e5f2ea;
+  --danger: #c74747; --danger-soft: #f8e9e9; --on-danger: #a93a3a;
+  --info: #3978b8; --info-soft: #e8f1f9;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --selected: #30312d; --hover: #2a2b27;
+  --line: #353630; --line-soft: #2e2f2a; --line-strong: #787870;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #787870;
+  --operational: #36c783; --operational-soft: #193a2b;
+  --danger: #e06b6b; --danger-soft: #452525; --on-danger: #f08a8a;
+  --info: #6ca6da; --info-soft: #1e3345;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.2);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 13px/1.55 var(--font-ui); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+svg { flex-shrink: 0; display: block; }
+code { font-family: var(--font-mono); font-size: 12px; background: var(--surface-subtle); padding: 0 4px; border-radius: 4px; }
+.num { font-variant-numeric: tabular-nums; }
+.ell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+
+.bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar h1 { margin: 0 6px 0 0; font-size: 13px; font-weight: 600; }
+.grp { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); flex-wrap: wrap; }
+.seg button { padding: 2px 9px; border-radius: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--selected); }
+
+.sec { padding: 28px 20px 8px; max-width: 1180px; margin: 0 auto; }
+.sec > h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+.sec > .lead { margin: 0 0 16px; color: var(--faint); font-size: 12.5px; max-width: 760px; }
+.cols { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.col-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.why { max-width: var(--pw, 380px); font-size: 12px; color: var(--faint); line-height: 1.6; min-height: 38px; }
+.panel { width: var(--pw, 380px); display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+.tabs { height: 44px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 10px; border-bottom: 1px solid var(--line); }
+.tab { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 6px; background: var(--selected); font-size: 12.5px; }
+.sp { flex: 1; }
+.body { padding: 14px 12px 18px; }
+.gh { display: flex; justify-content: space-between; padding: 0 6px 6px; font-size: 12px; color: var(--faint); }
+.gh.mt { margin-top: 14px; }
+
+.av { position: relative; flex: none; display: block; background: var(--surface-subtle); overflow: hidden; }
+.av img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ring { width: 13px; height: 13px; border-radius: 50%; border: 1.6px solid var(--operational); border-top-color: transparent; animation: spin .9s linear infinite; flex: none; }
+.ring.lg { width: 16px; height: 16px; border-width: 2px; }
+.st-ok { color: var(--operational); display: inline-flex; }
+.st-err { color: var(--danger); display: inline-flex; }
+.err-text { color: var(--on-danger); }
+.live { background: linear-gradient(90deg, var(--faint) 0%, var(--faint) 40%, var(--text) 50%, var(--faint) 60%, var(--faint) 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 2.4s linear infinite; }
+
+/* ---------- 行内容（所有列表变体共用） ---------- */
+.row { position: relative; display: flex; align-items: center; gap: 11px; width: 100%; padding: 10px 12px; text-align: left; }
+.row .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.row .t { font-size: 13px; }
+.row .s { font-size: 12px; color: var(--faint); }
+.row .r { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 11.5px; color: var(--faint); }
+.row .r .tok { color: var(--muted); }
+.row .r .tok small { font-size: 11px; color: var(--faint); margin-left: 2px; }
+.row .r .tm { display: inline-flex; align-items: center; gap: 5px; }
+.row .r .tm.run { color: var(--operational); }
+
+/* ---------- ① 列表边框 ---------- */
+/* 现状：整行贴满卡片，分隔线两头顶到圆角边框，悬停底色把边框和圆角盖住 */
+.b0 .box { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.b0 .row + .row { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.b0 .row:hover { background: var(--surface-subtle); }
+/* A 缩进分隔线 + 内缩圆角悬停 */
+.ba .box { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 4px; }
+.ba .row { border-radius: 8px; padding: 9px 10px; }
+.ba .row + .row::before { content: ""; position: absolute; top: 0; left: 50px; right: 10px; height: 1px; background: var(--line-soft); transition: opacity .1s; }
+.ba .row:hover { background: var(--hover); }
+.ba .row:hover::before, .ba .row:hover + .row::before { opacity: 0; }
+/* B 无外框：行自带圆角，悬停才出现底色，没有任何线 */
+.bb .box { padding: 0; }
+.bb .row { border-radius: 10px; padding: 9px 10px; }
+.bb .row:hover { background: var(--hover); }
+/* C 一行一张卡，之间留缝 */
+.bc .box { display: flex; flex-direction: column; gap: 6px; }
+.bc .row { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 10px 12px; transition: border-color .12s, background .12s; }
+.bc .row:hover { border-color: var(--line-strong); }
+
+/* ---------- ② 停止按钮 ---------- */
+.stop-slot { position: relative; flex: none; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; }
+.stop-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; color: var(--on-danger); background: var(--danger-soft); }
+.stop-btn:hover { background: color-mix(in srgb, var(--danger) 22%, var(--surface)); }
+.stop-btn i { width: 8px; height: 8px; border-radius: 2px; background: currentColor; display: block; }
+/* 现状 */
+.s0 .stop-old { flex: none; width: 28px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+.s0 .stop-old:hover { background: var(--surface-subtle); color: var(--text); }
+.s0 .stop-old i { width: 11px; height: 11px; background: currentColor; border-radius: 2px; display: block; }
+/* S1：最右固定一格，默认转圈，行悬停换成停止 */
+.s1 .stop-slot .ring { position: absolute; transition: opacity .12s; }
+.s1 .stop-slot .stop-btn { position: absolute; opacity: 0; transform: scale(.85); transition: opacity .12s, transform .12s; pointer-events: none; }
+.s1 .row:hover .stop-slot .ring, .s1 .row:focus-within .stop-slot .ring { opacity: 0; }
+.s1 .row:hover .stop-slot .stop-btn, .s1 .row:focus-within .stop-slot .stop-btn { opacity: 1; transform: none; pointer-events: auto; }
+/* S2：不占新位置，右下「运行中 · 1m」悬停变成「停止」小胶囊 */
+.s2 .tm .swap { position: relative; display: inline-flex; align-items: center; gap: 5px; min-width: 70px; justify-content: flex-end; height: 18px; }
+.s2 .tm .swap .a { display: inline-flex; align-items: center; gap: 5px; transition: opacity .12s; }
+.s2 .tm .swap .pill { position: absolute; right: 0; display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 8px; border-radius: 9px; background: var(--danger-soft); color: var(--on-danger); font-size: 11.5px; opacity: 0; pointer-events: none; transition: opacity .12s; }
+.s2 .pill i { width: 7px; height: 7px; border-radius: 1.5px; background: currentColor; display: block; }
+.s2 .row:hover .swap .a { opacity: 0; }
+.s2 .row:hover .swap .pill, .s2 .row:focus-within .swap .pill { opacity: 1; pointer-events: auto; }
+/* S3：头像外一圈转动的环，悬停头像盖上停止 */
+.s3 .avw { position: relative; flex: none; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; }
+.s3 .avw .orbit { position: absolute; inset: 0; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--operational); border-right-color: var(--operational); animation: spin 1s linear infinite; }
+.s3 .avw .stop-cover { position: absolute; inset: 3px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--danger) 82%, #000); color: #fff; opacity: 0; transition: opacity .12s; }
+.s3 .avw .stop-cover i { width: 9px; height: 9px; border-radius: 2px; background: currentColor; display: block; }
+.s3 .row:hover .stop-cover, .s3 .row:focus-within .stop-cover { opacity: 1; }
+.s3 .avw .av { border-radius: 50%; }
+.tipnote { margin-top: 10px; padding: 0 6px; font-size: 11.5px; color: var(--faint); }
+
+/* ---------- ③ 主会话里的返回 ---------- */
+.conv { width: 660px; max-width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 22px 28px 26px; font-family: var(--font-read); }
+.conv .ui { font-family: var(--font-ui); }
+.conv p { margin: 0; font-size: 15px; line-height: 1.85; }
+.conv .think { font-family: var(--font-ui); display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--faint); margin: 10px 0 2px; }
+.conv .think + p { margin-top: 2px; }
+.conv .tool { font-family: var(--font-ui); font-size: 13px; color: var(--muted); margin: 8px 0; display: flex; align-items: center; gap: 6px; }
+.conv .tool .res { color: var(--faint); }
+.item { margin: 0; }
+
+/* 现状 */
+.d0 .notice { display: flex; align-items: center; gap: 12px; padding: 10px 0; font-family: var(--font-ui); font-size: 12px; color: var(--faint); }
+.d0 .notice::before, .d0 .notice::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+.d0 .notice span { display: inline-flex; align-items: center; gap: 5px; }
+/* A 左对齐胶囊，点开看结论 */
+.da .chip { font-family: var(--font-ui); margin: 8px 0; }
+.da .chip > button { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 5px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-subtle); font-size: 12.5px; color: var(--muted); max-width: 100%; }
+.da .chip > button:hover { background: var(--hover); color: var(--text); }
+.da .chip .ok { color: var(--operational); }
+.da .chip .chev { transition: transform .15s; color: var(--faint); }
+.da .chip.open .chev { transform: rotate(90deg); }
+.da .chip .detail, .db .detail { display: none; margin: 6px 0 4px; padding: 10px 14px; border-radius: 10px; background: var(--surface-subtle); font-size: 13px; line-height: 1.7; color: var(--muted); font-family: var(--font-ui); }
+.da .chip.open .detail, .db .card.open .detail { display: block; }
+/* B 返回卡 */
+.db .card { font-family: var(--font-ui); margin: 10px 0; border: 1px solid var(--line); border-left: 3px solid var(--operational); border-radius: 10px; background: var(--surface); }
+.db .card > button { display: flex; align-items: center; gap: 11px; width: 100%; padding: 10px 12px; }
+.db .card .main { flex: 1; min-width: 0; }
+.db .card .t { font-size: 13px; display: flex; gap: 8px; align-items: baseline; }
+.db .card .t em { font-style: normal; font-size: 11.5px; color: var(--operational); flex: none; }
+.db .card .s { font-size: 12px; color: var(--faint); margin-top: 1px; }
+.db .card .go { font-size: 12px; color: var(--muted); padding: 3px 9px; border-radius: 6px; border: 1px solid var(--line); flex: none; }
+.db .card .go:hover { background: var(--hover); color: var(--text); }
+.db .card .detail { margin: 0 12px 10px; }
+/* C 聚合进度行 */
+.dc .agg { font-family: var(--font-ui); margin: 12px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.dc .agg > button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; font-size: 13px; }
+.dc .stack { display: inline-flex; }
+.dc .stack .av { border: 2px solid var(--surface); margin-left: -7px; border-radius: 50%; }
+.dc .stack .av:first-child { margin-left: 0; }
+.dc .agg .prog { color: var(--faint); font-size: 12px; margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.dc .agg .chev { color: var(--faint); transition: transform .15s; }
+.dc .agg.open .chev { transform: rotate(90deg); }
+.dc .agg ul { display: none; list-style: none; margin: 0; padding: 0 6px 6px; }
+.dc .agg.open ul { display: block; }
+.dc .agg li { display: flex; align-items: center; gap: 9px; padding: 6px 6px; border-radius: 7px; font-size: 12.5px; }
+.dc .agg li:hover { background: var(--hover); }
+.dc .agg li .s { color: var(--faint); font-size: 12px; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
+/* D 时间线 */
+.dd .rail { font-family: var(--font-ui); position: relative; margin: 6px 0; padding: 4px 0 4px 26px; }
+.dd .rail::before { content: ""; position: absolute; left: 8px; top: -6px; bottom: -6px; width: 1px; background: var(--line); }
+.dd .rail .dot { position: absolute; left: 0; top: 7px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.dd .rail > button { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--muted); }
+.dd .rail > button:hover { color: var(--text); }
+.dd .rail .tag { font-size: 11.5px; color: var(--operational); }
+.dd .rail .quote { margin: 4px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--faint); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dd .rail.open .quote { -webkit-line-clamp: unset; }
+.hint { padding: 6px 20px 40px; text-align: center; color: var(--faint); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>子 Agent 样式 · 第二轮</h1>
+  <div class="grp">主题 <span class="seg" data-k="theme"><button data-v="light">浅色</button><button data-v="dark">深色</button></span></div>
+  <div class="grp">面板宽度 <span class="seg" data-k="pw"><button data-v="360">窄 360</button><button data-v="420">宽 420</button></span></div>
+</div>
+
+<section class="sec">
+  <h2>① 列表边框</h2>
+  <p class="lead">现状的问题：整行贴满卡片，分隔线两头直接顶到圆角边框，悬停底色把边框和圆角盖住，边和线挤在一起。下面四种处理方式，列表内容相同，鼠标移上去看悬停。</p>
+  <div class="cols" id="listCols"></div>
+</section>
+
+<section class="sec">
+  <h2>② 运行中的停止按钮</h2>
+  <p class="lead">不要常驻停止按钮：运行中默认只有转圈，鼠标移到那一行（或键盘聚焦）才出现停止。点击行的其他地方仍是打开详情。下面是四种放法，移到「运行中」的行上看效果。</p>
+  <div class="cols" id="stopCols"></div>
+</section>
+
+<section class="sec">
+  <h2>③ 子智能体返回时，主会话的样子</h2>
+  <p class="lead">场景：主 Agent 并行派出 4 个子智能体后循环「等待 → 一个返回 → 再等待」。现状每次返回都是一条全宽分隔线，「等待子智能体」后面还跟着一句 <code>wait_agent completed Input arrived.</code>，看起来像调试输出。点开每个变体里的「已完成」，可以看到结论展开。</p>
+  <div class="cols" id="convCols"></div>
+</section>
+<p class="hint">正文是现有主会话样式，这次不动；只改子智能体返回那一块。</p>
+
+<script>
+const AV = n => `../../../apps/desktop/src/renderer/assets/subagents/companion-${n}.webp`;
+const P = {
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  chevR: '<path d="m9 18 6-6-6-6"/>',
+  chevD: '<path d="m6 9 6 6 6-6"/>',
+  rot: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  panelR: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/>',
+  hourglass: '<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
+};
+const ic = (k, s = 14, w = 1.8) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[k]}</svg>`;
+const avatar = (a, size, radius = 8) => `<span class="av" style="width:${size}px;height:${size}px;border-radius:${radius}px"><img src="${AV(a.av)}" alt=""></span>`;
+
+const AGENTS = [
+  { id: "a1", av: 3, title: "调研 opencode 与 pi-mono", line: "", tok: "1.7M", dur: "1m 13s", run: true },
+  { id: "a2", av: 6, title: "调研 codex 子智能体", line: "1. 模型可见的工具", tok: "5.8M", dur: "2m 01s", run: true },
+  { id: "a3", av: 1, title: "调研 grok-build 子智能体", line: "grok-build 子智能体实现笔记", tok: "5.4M", dur: "1m 49s" },
+  { id: "a4", av: 8, title: "调研 kimi-cli 子智能体", line: "kimi-cli 子智能体实现笔记", tok: "1.2M", dur: "59s" },
+];
+const state = { theme: "light", pw: "360" };
+
+/* ---------- ① ---------- */
+const rowHtml = (a, extra = {}) => `<button class="row" data-row>${extra.lead ?? avatar(a, 28, 8)}
+  <span class="main"><span class="t ell">${a.title}</span>${a.line ? `<span class="s ell">${a.line}</span>` : a.run ? `<span class="s ell"><span class="live">正在读取文件…</span></span>` : ""}</span>
+  <span class="r"><span class="tok num">${a.tok}<small>tokens</small></span><span class="tm num${a.run ? " run" : ""}">${extra.tm ?? ((a.run ? '<span class="ring"></span>' : "") + (a.run ? "运行中 · " : "空闲 · ") + a.dur)}</span></span>
+  ${extra.tail ?? ""}</button>`;
+const panel = (inner, why, cls) => `<div class="col ${cls}"><div class="why">${why}</div><div class="panel"><div class="tabs"><span class="tab">子 Agent</span><span class="sp"></span><span style="color:var(--muted)">${ic("plus", 15)}</span><span style="color:var(--muted);margin-left:8px">${ic("panelR", 15)}</span></div><div class="body">${inner}</div></div></div>`;
+const groupsHtml = (rowFn, wrap = true) => [["其他", AGENTS.filter(a => !a.run), 0], ["运行中", AGENTS.filter(a => a.run), 1]].map(([g, items]) => `<div class="gh"><span>${g}</span><span class="num">${items.length}</span></div><div class="box">${items.map(rowFn).join("")}</div>`).join('<div style="height:16px"></div>');
+function renderLists() {
+  const items = [
+    ["b0", "现状（对照）：线条顶到边框，悬停盖住圆角。"],
+    ["ba", "A 缩进分隔线：卡片内留 4px 内边距，悬停是内缩的小圆角底；分隔线从文字列开始、右侧留白，悬停那一行两侧的线自动淡出。"],
+    ["bb", "B 去掉外框：没有卡片、没有线，行自带圆角，悬停才出现底色。最轻，和侧边栏会话列表一致。"],
+    ["bc", "C 一行一卡：每个子智能体是一张独立小卡，卡间留 6px。区分度最高，也最占高度。"],
+  ];
+  document.getElementById("listCols").innerHTML = items.map(([cls, why]) => panel(groupsHtml(a => rowHtml(a)), why, cls)).join("");
+}
+
+/* ---------- ② ---------- */
+const stopBtn = '<span class="stop-btn" role="button" tabindex="0" title="停止"><i></i></span>';
+function renderStops() {
+  const only = AGENTS.slice(0, 3);
+  const mk = (cls, why, fn) => panel(`<div class="gh"><span>运行中 / 空闲</span><span class="num">${only.length}</span></div><div class="box" style="border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:4px">${only.map(fn).join("")}</div><div class="tipnote">${cls === "s0" ? "现状：每个运行中的行最右常驻一个灰色方块。" : "移到上面「运行中」的行试试。"}</div>`, why, cls);
+  const inset = `<style>.stopbox .row{border-radius:8px}</style>`;
+  const base = a => rowHtml(a);
+  document.getElementById("stopCols").innerHTML = [
+    mk("s0", "现状（对照）：常驻方块，很扎眼，而且一直占着位置。", a => a.run ? rowHtml(a, { tail: '<span class="stop-old" role="button"><i></i></span>' }) : base(a)),
+    mk("s1", "S1 最右固定一格：默认是转圈；鼠标移到行上，转圈换成红色圆形停止。该格宽度固定，换的时候不会挤动文字。", a => a.run ? rowHtml(a, { tm: "运行中 · " + a.dur, tail: `<span class="stop-slot"><span class="ring lg"></span>${stopBtn}</span>` }) : base(a)),
+    mk("s2", "S2 状态文字就地变身：右下「转圈 运行中 · 1m 13s」，悬停时整段换成一个「停止」小胶囊。不新增任何位置，最克制。", a => a.run ? rowHtml(a, { tm: `<span class="swap"><span class="a"><span class="ring"></span>运行中 · ${a.dur}</span><span class="pill" role="button" tabindex="0"><i></i>停止</span></span>` }) : base(a)),
+    mk("s3", "S3 头像外圈转动：运行中头像外围有一圈绿色转动的环；悬停时头像上盖一层红色停止。运行状态一眼能看到，右侧文字不变。", a => a.run ? rowHtml(a, { lead: `<span class="avw"><span class="orbit"></span>${avatar(a, 26, 13)}<span class="stop-cover" role="button" tabindex="0" title="停止"><i></i></span></span>`, tm: "运行中 · " + a.dur }) : base(a)),
+  ].join("");
+  document.querySelectorAll("#stopCols .box").forEach(b => b.classList.add("stopbox"));
+}
+
+/* ---------- ③ ---------- */
+const RET = [
+  { n: "pi-mono 子智能体实现", av: 3, s: "1m 02s", tok: "1.1M", body: "结论先行：pi-mono 的 subagent 是独立进程，父子之间靠 team 工具互发消息；父不会等返回值，而是在下一轮上下文里读到来信。" },
+  { n: "kimi-cli 子智能体实现", av: 4, s: "1m 15s", tok: "1.8M", body: "结论速览：kimi 的子智能体用 yaml 白名单限制工具，全新上下文，不继承父会话；结果以摘要形式回灌给父 agent。" },
+  { n: "grok-build 子智能体实现", av: 1, s: "1m 18s", tok: "1.9M", body: "grok-build 用 resume_from 复制 transcript 做上下文继承，并支持前台转后台；隔离靠独立 worktree。" },
+];
+const WAIT = (note = true) => `<div class="tool ui"><span style="display:inline-flex;color:var(--faint)">${ic("hourglass", 13)}</span>等待子智能体${note ? '<span class="res">· wait_agent completed Input arrived.</span>' : ""}</div>`;
+const THINK = '<div class="think">Thinking… <span style="display:inline-flex">' + ic("chevD", 12) + '</span></div>';
+const SAY = t => `<p>${t}</p>`;
+function convBody(variant) {
+  const out = [];
+  out.push(THINK, SAY("Now wait for subagents. Subagent 4 covers 思路. Let me wait."));
+  if (variant === "c") {
+    out.push(`<div class="agg item" data-toggle><button><span class="stack">${RET.map(r => avatar(r, 20, 10)).join("")}</span><span>已收到 3 个子智能体的回复</span><span class="prog"><span class="ring"></span>还在等 1 个</span><span class="chev">${ic("chevR", 13, 2.2)}</span></button>
+      <ul>${RET.map(r => `<li>${avatar(r, 18, 9)}<span class="ell">${r.n}</span><span class="s"><span class="st-ok">${ic("check", 12, 2.4)}</span>${r.s}</span></li>`).join("")}<li>${avatar({ av: 6 }, 18, 9)}<span class="ell">dsh 与 opencode 实现思路</span><span class="s"><span class="ring"></span>运行中</span></li></ul></div>`);
+    out.push(THINK, SAY("pi-mono 和 kimi 已经返回，我先对比这两个的上下文策略；grok-build 和 dsh 还在跑，等它们回来再汇总。"));
+    return out.join("");
+  }
+  RET.forEach((r, i) => {
+    out.push(WAIT(variant === "d0"));
+    if (variant === "d0") out.push(`<div class="notice"><span>${ic("rot", 12, 2.2)}子智能体 ${r.n} 已完成 ${ic("chevR", 12, 2.2)}</span></div>`);
+    if (variant === "a") out.push(`<div class="chip item" data-toggle><button><span class="ok" style="display:inline-flex">${ic("check", 13, 2.4)}</span>${avatar(r, 16, 8)}<span class="ell">${r.n} 已完成</span><span class="chev">${ic("chevR", 12, 2.2)}</span></button><div class="detail">${r.body}</div></div>`);
+    if (variant === "b") out.push(`<div class="card item" data-toggle><button><span style="display:inline-flex">${avatar(r, 28, 8)}</span><span class="main"><span class="t"><span class="ell">${r.n}</span><em>已完成</em></span><span class="s ell">${r.s} · ${r.tok} tokens · ${r.body.slice(0, 22)}…</span></span><span class="go" data-stop>查看</span></button><div class="detail">${r.body}</div></div>`);
+    if (variant === "d") out.push(`<div class="rail item" data-toggle><span class="dot" style="left:0">${avatar(r, 18, 9)}</span><button><span class="ell">${r.n}</span><span class="tag">已完成</span></button><p class="quote">${r.body}</p></div>`);
+    if (i === 0) out.push(THINK, SAY("pi-mono done, very detailed. Wait for others."));
+    if (i === 1) out.push(THINK, SAY("Good. Wait for grok-build and dsh/opencode."));
+  });
+  return out.join("");
+}
+function renderConv() {
+  const items = [
+    ["d0", "现状（对照）：每次返回一条全宽分隔线，三次连着出现，把正文切碎；「等待」后面还拖着调试文本。"],
+    ["a", "A 内联胶囊：左对齐一颗小胶囊（绿勾 + 头像 + 「xxx 已完成」），不再画整条线；点开在下面展开结论。「等待子智能体」只保留这四个字，去掉调试文本。"],
+    ["b", "B 返回卡：左侧绿色细边，头像 + 标题 + 用时 / token + 一行结论预览，右侧「查看」。信息最全，每次返回占 2 行，三次返回比较重。"],
+    ["c", "C 聚合进度行：同一轮等待里返回的子智能体合成一行：头像叠放 + 「已收到 3 个，还在等 1 个」；点开是各自耗时。连续返回不再刷屏，等待行也并进来。"],
+    ["d", "D 时间线：贴着正文左侧一根细竖线，每次返回是线上的一个头像节点 + 一句话 + 两行结论摘录，像进度日志，不打断阅读流。"],
+  ];
+  document.getElementById("convCols").innerHTML = items.map(([v, why]) => `<div class="col"><div class="why" style="max-width:660px">${why}</div><div class="conv d${v === "d0" ? "0" : v}">${convBody(v)}</div></div>`).join("");
+}
+
+function render() {
+  document.documentElement.dataset.theme = state.theme;
+  document.documentElement.style.setProperty("--pw", state.pw + "px");
+  document.querySelectorAll(".seg").forEach(s => s.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(state[s.dataset.k] === b.dataset.v))));
+}
+document.addEventListener("click", e => {
+  const seg = e.target.closest(".seg button");
+  if (seg) { state[seg.closest(".seg").dataset.k] = seg.dataset.v; return render(); }
+  if (e.target.closest("[data-stop]")) return;
+  const t = e.target.closest("[data-toggle]");
+  if (t) t.classList.toggle("open");
+});
+renderLists(); renderStops(); renderConv(); render();
+</script>
+</body>
+</html>

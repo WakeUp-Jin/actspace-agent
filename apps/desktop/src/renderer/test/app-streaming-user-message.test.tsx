@@ -1946,7 +1946,9 @@ sessionId: input.sessionId,
 
     // 卡片在对话里；右侧「子 Agent」列表里也有同名的一行。
     const card = await screen.findByRole("button", { name: /Open SubAgent transcript for Explore renderer flow/ });
-    expect(await within(card).findByText("正在读取 · App.tsx")).toBeTruthy();
+    // 单行卡片只有标题和状态；此刻在做什么在右侧「子 Agent」列表第二行。
+    expect(within(card).getByText("运行中")).toBeTruthy();
+    expect(within(card).queryByText("正在读取 · App.tsx")).toBeNull();
     expect(await screen.findByRole("button", { name: "审查待处理变更 +7 -2" })).toBeInTheDocument();
 
     await userEvent.click(card);
@@ -3223,7 +3225,9 @@ sessionId: input.sessionId,
     record.messageBlocks = createMessageBlocks(record.events);
     await fixture.select('background-a');
     expect(screen.getAllByText('Inspect background tools')).toHaveLength(1);
-    expect(screen.getByText('正在读取 · background files')).toBeInTheDocument();
+    // 子智能体卡片还在（单行，只有标题和状态）；它的动态不写在卡片上。
+    expect(screen.getByRole('button', { name: /Open SubAgent transcript for Background child/ })).toHaveTextContent('运行中');
+    expect(screen.queryByText('正在读取 · background files')).not.toBeInTheDocument();
     expect(screen.queryByText('stale tool progress')).not.toBeInTheDocument();
     expect(screen.getByLabelText('停止 Agent')).toBeInTheDocument();
     expect(document.querySelectorAll('.tool-log-line.is-running')).toHaveLength(0);

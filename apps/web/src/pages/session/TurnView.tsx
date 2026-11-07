@@ -13,6 +13,7 @@ import { BashRow } from "./blocks/BashRow";
 import { DiffCard } from "./blocks/DiffCard";
 import { ErrorRow } from "./blocks/ErrorRow";
 import { EventRow } from "./blocks/EventRow";
+import { SubagentLetter } from "./blocks/SubagentLetter";
 import { ExploreGroup } from "./blocks/ExploreGroup";
 import { GenericToolRow } from "./blocks/GenericToolRow";
 import { ThinkingRow } from "./blocks/ThinkingRow";
@@ -32,9 +33,9 @@ function BlockView({ block, sessionId }: { readonly block: MessageBlock; readonl
     case "bash": return <BashRow sessionId={sessionId} block={{ ...block, ...(block.runId ? { runId: block.runId } : {}) }} />;
     case "todo": return <TodoCard todos={block.todos} completedCount={block.completedCount} />;
     case "error": return <ErrorRow title={block.title} content={block.content} />;
+    case "background_notice": return block.taskKind === "agent_message" ? <SubagentLetter block={block} /> : <EventRow block={block} />;
     case "status":
-    case "context_compaction":
-    case "background_notice": return <EventRow block={block} />;
+    case "context_compaction": return <EventRow block={block} />;
     default: return <GenericToolRow block={block} />;
   }
 }
@@ -42,6 +43,8 @@ function BlockView({ block, sessionId }: { readonly block: MessageBlock; readonl
 // 单行过程（工具行、思考）之间 5px，其余块之间 14px。
 const LINE_KINDS: ReadonlySet<string> = new Set(["assistant", "todo", "error", "status", "context_compaction", "background_notice", "user"]);
 const isLine = (item: TranscriptItem) => item.type === "explore" || !LINE_KINDS.has(item.block.kind);
+
+const isLetter = (item: TranscriptItem) => item.type === "block" && item.block.kind === "background_notice" && item.block.taskKind === "agent_message";
 
 export function ItemView({ item, sessionId }: { readonly item: TranscriptItem; readonly sessionId: string }) {
   return (
@@ -116,8 +119,11 @@ export function TurnView({ turn, sessionId, active, approvalsAfter, renderApprov
   const [open, setOpen] = useState(false);
   const hasApprovals = turn.process.some(item => approvalsAfter.has(item.key));
   const folded = !active && !hasApprovals && turn.process.length > 0 && turn.reply.length > 0;
+  // 折叠后来信卡片不收进「Worked for」，排在过程后、回复前（与桌面端一致）。
+  const letters = folded ? turn.process.filter(isLetter) : [];
+  const processItems = letters.length ? turn.process.filter(item => !isLetter(item)) : turn.process;
   // 等审批的命令由审批卡代替那一行（卡里已经有命令），和桌面端一致
-  const process = turn.process.map(item => {
+  const process = processItems.map(item => {
     const requests = approvalsAfter.get(item.key) ?? [];
     const replaced = requests.length > 0 && item.type === "block" && item.block.kind === "bash";
     return (
@@ -139,6 +145,7 @@ export function TurnView({ turn, sessionId, active, approvalsAfter, renderApprov
           </ToolLine>
         </div>
       ) : process}
+      {letters.map(item => <ItemView key={item.key} item={item} sessionId={sessionId} />)}
       {trailing}
       {turn.reply.map(item => <ItemView key={item.key} item={item} sessionId={sessionId} />)}
       {changes ? <ChangesCard changes={changes} /> : null}
