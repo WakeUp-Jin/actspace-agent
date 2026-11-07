@@ -17,7 +17,7 @@ describe("fixed renderer v2 projection", () => {
     const agentRunId = "agent-run-inbox-claim";
     const journal = [
       event(0, "agent/inbox/spliced", { operation: "enqueue", messageId: "user-inbox-claim", target: "next-turn", content: "hello" }),
-      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "user-inbox-claim", target: "next-turn" }, append("user", "user-inbox-claim", "hello")),
+      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "user-inbox-claim", target: "next-turn", content: "hello" }, { kind: "append" }),
       event(2, "turn/start", { turnId: "turn-inbox-claim", agentRunId, mode: "agent" }),
     ];
     const snapshot = baseSnapshot({
@@ -40,7 +40,7 @@ describe("fixed renderer v2 projection", () => {
     const activeAgentRunId = "agent-run-active";
     const journal = [
       event(0, "turn/start", { turnId: "turn-active", agentRunId: activeAgentRunId, mode: "agent" }),
-      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "user-next-step", target: "next-step" }, append("user", "user-next-step", "continue")),
+      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "user-next-step", target: "next-step", content: "continue" }, { kind: "append" }),
       event(2, "turn/start", { turnId: "turn-later", agentRunId: "agent-run-later", mode: "agent" }),
     ];
     const snapshot = baseSnapshot({
@@ -62,8 +62,8 @@ describe("fixed renderer v2 projection", () => {
   it("projects a claimed Inbox follow-up as a user message after the stream completes", () => {
     const journal = [
       event(0, "agent/inbox/spliced", { operation: "enqueue", messageId: "user-1", target: "next-turn", content: "张飞是谁" }),
-      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "user-1", target: "next-turn" }, append("user", "user-1", "张飞是谁")),
-      event(2, "assistant/message", { messageId: "assistant-1", requestId: "request-1", content: "张飞是三国人物" }, append("assistant", "assistant-1", "张飞是三国人物")),
+      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "user-1", target: "next-turn", content: "张飞是谁" }, { kind: "append" }),
+      event(2, "assistant/message", { messageId: "assistant-1", requestId: "request-1", content: "张飞是三国人物" }, { kind: "append" }),
     ];
     const snapshot = baseSnapshot({
       throughJournalSeq: 2,
@@ -92,10 +92,10 @@ describe("fixed renderer v2 projection", () => {
     ];
     const journal = [
       event(0, "agent/inbox/spliced", { operation: "enqueue", messageId: "user-1", target: "next-turn", content: "张飞是谁" }),
-      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "user-1", target: "next-turn" }, append("user", "user-1", "张飞是谁")),
-      event(2, "assistant/message", { messageId: "assistant-1", requestId: "request-1", content: "张飞是三国人物" }, append("assistant", "assistant-1", "张飞是三国人物")),
+      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "user-1", target: "next-turn", content: "张飞是谁" }, { kind: "append" }),
+      event(2, "assistant/message", { messageId: "assistant-1", requestId: "request-1", content: "张飞是三国人物" }, { kind: "append" }),
       event(3, "agent/inbox/spliced", { operation: "enqueue", messageId: "user-2", target: "next-turn", content }),
-      event(4, "agent/inbox/spliced", { operation: "claim", messageId: "user-2", target: "next-turn" }, append("user", "user-2", content)),
+      event(4, "agent/inbox/spliced", { operation: "claim", messageId: "user-2", target: "next-turn", content: content }, { kind: "append" }),
     ];
     const snapshot = baseSnapshot({
       throughJournalSeq: 4,
@@ -122,7 +122,7 @@ describe("fixed renderer v2 projection", () => {
   it("preserves task notification provenance so the user projection can hide it", () => {
     const notification = [
       event(0, "agent/inbox/spliced", { operation: "enqueue", messageId: "notify-1", target: "next-step", content: "<task_notification>done</task_notification>", source: "task_notification" }),
-      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "notify-1", target: "next-step", source: "task_notification" }, append("user", "notify-1", "<task_notification>done</task_notification>")),
+      event(1, "agent/inbox/spliced", { operation: "claim", messageId: "notify-1", target: "next-step", source: "task_notification", content: "<task_notification>done</task_notification>" }, { kind: "append" }),
     ];
     const snapshot = baseSnapshot({
       throughJournalSeq: 1,
@@ -138,15 +138,14 @@ describe("fixed renderer v2 projection", () => {
 
   it("keeps compacted messages visible and attaches the summary to the compaction divider", () => {
     const journal = [
-      event(0, "user/message", { messageId: "user-1", agentRunId: "run-1", turnId: "turn-1" }, append("user", "user-1", "old question")),
-      event(1, "assistant/message", { messageId: "assistant-1", requestId: "request-1" }, append("assistant", "assistant-1", "old answer")),
+      event(0, "user/message", { messageId: "user-1", agentRunId: "run-1", turnId: "turn-1", content: "old question" }, { kind: "append" }),
+      event(1, "assistant/message", { messageId: "assistant-1", requestId: "request-1", content: "old answer" }, { kind: "append" }),
       eventAt(2, "compaction/start", { compactionId: "compact-1", start: 0, end: 2 }, "2026-08-23T00:00:00.000Z"),
       event(3, "compaction/summary", { compactionId: "compact-1", summaryDigest: "digest" }),
-      event(4, "surface/replaced", { compactionId: "compact-1", sourceEventSeqs: [0, 1] }, {
+      event(4, "surface/replaced", { compactionId: "compact-1", sourceEventSeqs: [0, 1], node: { kind: "user", messageId: "summary-1", content: "summary" } }, {
         kind: "replace",
         start: 0,
         end: 2,
-        node: { kind: "user", messageId: "summary-1", content: "summary" },
         sourceEventSeqs: [0, 1],
       }),
       eventAt(5, "compaction/end", { compactionId: "compact-1", summaryDigest: "digest" }, "2026-08-23T00:00:12.000Z"),
@@ -164,7 +163,7 @@ describe("fixed renderer v2 projection", () => {
   it("maps core file writes to the existing write diff preview", () => {
     const journal = [
       event(0, "tool/call", { callId: "call-1", name: "write_file", pluginId: "actspace.filesystem-write", agentRunId: "run-1", turnId: "turn-1", stepId: "step-1", args: { path: "src/a.ts", content: "next" } }),
-      event(1, "tool/result", { callId: "call-1", pluginId: "actspace.filesystem-write", name: "write_file", status: "completed", summary: "Updated src/a.ts", modelOutput: [{ type: "text", text: "--- a/src/a.ts\n+++ b/src/a.ts\n-old\n+next\n\nFile updated: src/a.ts" }], detail: [{ label: "result", value: { type: "update", path: "src/a.ts", additions: 1, deletions: 1 } }], artifacts: [], failure: null }, appendTool("tool-call-1", "call-1")),
+      event(1, "tool/result", { callId: "call-1", pluginId: "actspace.filesystem-write", name: "write_file", status: "completed", summary: "Updated src/a.ts", modelOutput: [{ type: "text", text: "--- a/src/a.ts\n+++ b/src/a.ts\n-old\n+next\n\nFile updated: src/a.ts" }], detail: [{ label: "result", value: { type: "update", path: "src/a.ts", additions: 1, deletions: 1 } }], artifacts: [], failure: null }, { kind: "append" }),
     ];
     const snapshot = baseSnapshot({
       messages: [{ kind: "tool-result", messageId: "tool-call-1", callId: "call-1", content: [{ type: "text", text: "done" }] }],
@@ -249,13 +248,7 @@ function eventAt(seq: number, type: string, data: RuntimeV2JsonValue, time: stri
   return { recordKind: "event", seq, type, eventVersion: 1, criticality: "required", time, source: { ownerPluginId: "@actspace/core" }, data, surface, provenance: { sourceEventSeqs: surface?.kind === "replace" ? surface.sourceEventSeqs : [], contributorIds: [], runtimeSelectionSeq: null } };
 }
 
-function append(kind: "user" | "assistant", messageId: string, content: RuntimeV2JsonValue): SessionEventEnvelopeV1["surface"] {
-  return { kind: "append", node: { kind, messageId, content } };
-}
 
-function appendTool(messageId: string, callId: string): SessionEventEnvelopeV1["surface"] {
-  return { kind: "append", node: { kind: "tool-result", messageId, callId, content: [{ type: "text", text: "done" }], isError: false } };
-}
 
 
 describe("live subagent projection", () => {

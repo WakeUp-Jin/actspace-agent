@@ -4,7 +4,7 @@ import { formatChatAttachmentIssue, type ChatAttachmentIssue, type EnglishLearni
 import { readWorkspaceRegistry, resolveWorkspaceSelection } from "../workspace-registry-service";
 import { FixedRendererStreamAdapter } from "./fixed-renderer-stream-adapter";
 import { randomUUID } from "node:crypto";
-import { LiveOutputBuffer, type LiveOutputBaseline } from "@actspace/shared/runtime-v2";
+import { LiveOutputBuffer, surfaceNode, type LiveOutputBaseline } from "@actspace/shared/runtime-v2";
 import { readFile, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import type {
@@ -698,7 +698,7 @@ function findArtifactRef(value: unknown, artifactId: string): { readonly mimeTyp
 function findHistoricalArtifactRef(events: readonly SessionEventEnvelopeV1[], artifactId: string): { readonly mimeType: string } | null {
   for (const event of events) {
     if (event.surface?.kind !== "append") continue;
-    const match = findArtifactRef(event.surface.node.content, artifactId);
+    const match = findArtifactRef(surfaceNode(event)?.content, artifactId);
     if (match !== null) return match;
   }
   return null;

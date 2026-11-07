@@ -1,4 +1,4 @@
-import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
+import { surfaceNode, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { relationContext, type EventCodecRegistry } from "./codec-registry.js";
 import { validateEventEnvelopeShape, type SessionEventEnvelopeV1 } from "./event-envelope.js";
 import { SessionError } from "./errors.js";
@@ -182,6 +182,8 @@ function createRelations(): MutableRelations {
 
 function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, dataValue: RuntimeV2JsonValue): void {
   const data = asRecord(dataValue, event.type);
+  // 进入对话的事件必须能从 data 推出节点（agent-spec-surface-derived.md §4.3）：缺 content / modelOutput / node 的直接拒绝。
+  if (event.surface !== null && surfaceNode(event) === null) invalid(`Event ${event.type} enters Surface but its data cannot derive a node.`);
   switch (event.type) {
     case "turn/start": {
       const turnId = id(data.turnId, event.type);
@@ -312,7 +314,7 @@ function applyRelations(state: MutableRelations, event: SessionEventEnvelopeV1, 
         if (operation === "claim") {
           const earliest = [...state.inbox].filter(([, candidate]) => candidate.status === "pending" && candidate.target === target).sort((left, right) => left[1].seq - right[1].seq)[0]?.[0];
           if (earliest !== messageId) invalid(`Inbox ${target} claims must preserve enqueue order.`);
-          if (event.surface?.kind !== "append" || event.surface.node.kind !== "user" || !event.provenance.sourceEventSeqs.includes(item.seq)) invalid("Claimed Inbox input must append a user Surface node citing enqueue.");
+          if (event.surface?.kind !== "append" || surfaceNode(event)?.kind !== "user" || !event.provenance.sourceEventSeqs.includes(item.seq)) invalid("Claimed Inbox input must append a user Surface node citing enqueue.");
           state.inbox.delete(messageId);
         } else {
           if (event.surface !== null) invalid("Discarded Inbox input cannot enter Surface.");

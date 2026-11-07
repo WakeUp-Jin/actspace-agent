@@ -5,7 +5,7 @@ import { ESTIMATOR_VERSION } from "../token-estimate";
 
 let seq = 0;
 const at = (type: string, data: unknown, surface?: unknown): ContextEstimateEvent => ({ seq: seq++, type, time: `2026-11-06T00:00:${String(seq).padStart(2, "0")}Z`, data, ...(surface ? { surface } : {}) });
-const user = (messageId: string, content: unknown) => at("user/message", { messageId }, { kind: "append", node: { kind: "user", messageId, content } });
+const user = (messageId: string, content: unknown) => at("user/message", { messageId, content: content }, { kind: "append" });
 const prompt = (core: string) => at("request/system-prompt", {
   requestId: "r", turnId: "t", stepId: "s", digest: core, contributorProvenance: [],
   sections: [{ owner: "actspace.context-system", id: "core", order: 0, content: core }, { owner: "actspace.context-rules", id: "agents", order: 1, content: "rule" }],
@@ -18,11 +18,13 @@ const fold = (events: ContextEstimateEvent[]) => foldContextEstimate(events);
 describe("contextEstimate fold", () => {
   it("matches the engine's describe for the same prompt, tools, supplements and conversation", () => {
     seq = 0;
-    const nodes = [{ kind: "user", messageId: "u1", content: "hello there" }, { kind: "assistant", messageId: "a1", content: [{ type: "text", text: "hi" }, { type: "tool-call", callId: "c1", name: "read", arguments: "{\"p\":1}" }] }, { kind: "tool-result", messageId: "tr1", callId: "c1", content: "file body" }];
+    const nodes = [{ kind: "user", messageId: "u1", content: "hello there" }, { kind: "assistant", messageId: "a1", content: [{ type: "text", text: "hi" }, { type: "tool-call", callId: "c1", name: "read", arguments: "{\"p\":1}" }] }, { kind: "tool-result", messageId: "tool-c1", callId: "c1", content: "file body", isError: false }];
     const state = fold([
       at("request/header", { requestId: "r1", contextWindow: 1000 }), prompt("core prompt"), tools(["read", "write"]),
       supplement({ op: "add", owner: "paths", id: "active", text: "a.ts", lifetime: "persistent", afterEventSeq: -1 }),
-      ...nodes.map(node => at("x/message", {}, { kind: "append", node })),
+      ...nodes.map(node => node.kind === "tool-result"
+        ? at("tool/result", { callId: node.callId!, status: "completed", modelOutput: node.content }, { kind: "append" })
+        : at(`${node.kind}/message`, { messageId: node.messageId, content: node.content }, { kind: "append" })),
     ]);
     // Supplements anchored on the empty conversation disappear once a message lands, like the engine's `retained`.
     const engine = [
@@ -72,7 +74,7 @@ describe("contextEstimate fold", () => {
     const replaced = estimateConversationNode({ kind: "user", messageId: "u1", content: "a".repeat(40) }) * 2;
     const summary = { kind: "user", messageId: "compaction-1", content: "summary" };
     const replace = (compactionId: string, node: typeof summary, sources: number[], tokens: { conversation: number; summarizedConversation: number }) =>
-      at("surface/replaced", { compactionId, sourceEventSeqs: sources, replacedTokens: tokens, estimatorVersion: ESTIMATOR_VERSION }, { kind: "replace", start: 0, end: sources.length, node, sourceEventSeqs: sources });
+      at("surface/replaced", { compactionId, sourceEventSeqs: sources, replacedTokens: tokens, estimatorVersion: ESTIMATOR_VERSION, node }, { kind: "replace", start: 0, end: sources.length, sourceEventSeqs: sources });
     const first = replace("k1", summary, [0, 1], { conversation: replaced, summarizedConversation: 0 });
     state = applyContextEstimate(state, first);
     expect(state.conversation).toBe(estimateConversationNode({ kind: "user", messageId: "u3", content: "c".repeat(40) }));

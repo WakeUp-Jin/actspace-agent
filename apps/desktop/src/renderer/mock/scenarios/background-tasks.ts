@@ -38,8 +38,8 @@ function subagentNotification(agentId: string, description: string, transcriptPa
 function claim(messageId: string, notice: { taskId: string; kind: "bash" | "subagent"; title: string; status: string }, content: string, source: "task_notification" | "subagent_notification" = "task_notification"): MockRawEvent {
   return {
     type: "agent/inbox/spliced",
-    data: { operation: "claim", messageId, target: "next-step", source, notice, opensTurn: true },
-    surface: { kind: "append", node: { kind: "user", messageId, content } },
+    data: { operation: "claim", messageId, target: "next-step", source, notice, opensTurn: true, content: content },
+    surface: { kind: "append" },
   };
 }
 

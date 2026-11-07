@@ -31,7 +31,7 @@ describe("chat projection identity", () => {
 
   it("adds the child's live baseline to the subagent transcript until the message settles", () => {
     const journal = [
-      envelope(1, "assistant/message", { agentRunId: "run-1", messageId: "a-1" }, { kind: "append", node: { kind: "assistant", messageId: "a-1", content: "complete" } }),
+      envelope(1, "assistant/message", { agentRunId: "run-1", messageId: "a-1", content: "complete" }, { kind: "append" }),
     ];
     const pending = { runId: "run-1", revision: 9, segments: [
       { kind: "text" as const, messageId: "a-1", text: "complete" },
@@ -55,17 +55,17 @@ describe("chat projection identity", () => {
   });
   it("drops a reasoning block that only holds a zero-width space", () => {
     const journal = [
-      envelope(7, "assistant/message", { agentRunId: "run-1", messageId: "a-1", content: "answer" },
-        { kind: "append", node: { kind: "assistant", messageId: "a-1", content: [{ type: "reasoning", text: "\u200B" }, { type: "text", text: "answer" }] } }),
+      envelope(7, "assistant/message", { agentRunId: "run-1", messageId: "a-1", content: [{ type: "reasoning", text: "\u200B" }, { type: "text", text: "answer" }] },
+        { kind: "append" }),
     ];
     const events = projectChatEvents(snapshot(["a-1"]), journal);
     expect(events.map((event) => event.type)).toEqual(["assistant_message"]);
   });
   it("stamps each projected event with the seq of the envelope it came from", () => {
     const journal = [
-      envelope(4, "user/message", { agentRunId: "run-1", messageId: "u-1", content: "question" }, { kind: "append", node: { kind: "user", messageId: "u-1", content: "question" } }),
-      envelope(7, "assistant/message", { agentRunId: "run-1", messageId: "a-1", content: "answer" },
-        { kind: "append", node: { kind: "assistant", messageId: "a-1", content: [{ type: "reasoning", text: "thinking it over" }, { type: "text", text: "answer" }] } }),
+      envelope(4, "user/message", { agentRunId: "run-1", messageId: "u-1", content: "question" }, { kind: "append" }),
+      envelope(7, "assistant/message", { agentRunId: "run-1", messageId: "a-1", content: [{ type: "reasoning", text: "thinking it over" }, { type: "text", text: "answer" }] },
+        { kind: "append" }),
     ];
     const events = projectChatEvents(snapshot(["u-1", "a-1"]), journal);
     expect(events.map((event) => [event.type, event.agentRunId, event.sourceSeq])).toEqual([

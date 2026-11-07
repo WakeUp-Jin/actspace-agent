@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionQuerySource } from "@actspace/session-storage";
+import { surfaceNode } from "@actspace/shared/runtime-v2";
 import { ESTIMATOR_VERSION, estimateConversationNode, foldContextEstimate, viewContextEstimate, type ContextPanelView } from "@actspace/shared";
 import { createReadModelSchema } from "../runtime-v2/usage-read-model-schema";
 import { commitContextBatch } from "../runtime-v2/context-history-projection";
@@ -17,7 +18,7 @@ const source = (throughSeq: number) => ({ header: { sessionId: SESSION, createdA
 function journal() {
   const events: SessionEventEnvelopeV1[] = [];
   const e = (type: string, data: Record<string, unknown>, surface: unknown = null) => { const seq = events.length; events.push({ recordKind: "event", seq, type, eventVersion: 1, criticality: "required", time: new Date(Date.parse("2026-11-06T00:00:00.000Z") + seq * 1000).toISOString(), source: { ownerPluginId: "@actspace/core" }, data, surface, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } } as unknown as SessionEventEnvelopeV1); return seq; };
-  const user = (messageId: string, text: string) => e("user/message", { messageId }, { kind: "append", node: { kind: "user", messageId, content: text } });
+  const user = (messageId: string, text: string) => e("user/message", { messageId, content: text }, { kind: "append" });
   const request = (requestId: string, tools: string[] | null) => {
     e("request/header", { requestId, turnId: "t", stepId: requestId, routeId: "p", model: "m", contextWindow: 10_000 });
     if (requestId === "r1") e("request/system-prompt", { requestId, turnId: "t", stepId: requestId, digest: "p", contributorProvenance: [], sections: [{ owner: "actspace.context-system", id: "core", order: 0, content: "core prompt" }], modelFacts: [] });
@@ -31,7 +32,7 @@ function journal() {
   request("r2", ["read", "write"]);
   const replaced = estimateConversationNode({ kind: "user", messageId: "u1", content: "a".repeat(4000) }) + estimateConversationNode({ kind: "user", messageId: "u2", content: "b".repeat(4000) });
   e("compaction/start", { compactionId: "k1" });
-  e("surface/replaced", { compactionId: "k1", sourceEventSeqs: [u1, u2], replacedTokens: { conversation: replaced, summarizedConversation: 0 }, estimatorVersion: ESTIMATOR_VERSION }, { kind: "replace", start: 0, end: 2, node: { kind: "user", messageId: "summary-k1", content: "short summary" }, sourceEventSeqs: [u1, u2] });
+  e("surface/replaced", { compactionId: "k1", sourceEventSeqs: [u1, u2], replacedTokens: { conversation: replaced, summarizedConversation: 0 }, estimatorVersion: ESTIMATOR_VERSION, node: { kind: "user", messageId: "summary-k1", content: "short summary" } }, { kind: "replace", start: 0, end: 2, sourceEventSeqs: [u1, u2] });
   e("compaction/end", { compactionId: "k1" });
   const lastRequest = request("r3", null);
   const u3 = user("u3", "next question");
@@ -79,9 +80,9 @@ it("marks conversation entries after the previous request as new", async () => {
   const { events } = journal();
   const surface = { entries: [] as { node: unknown; sourceEventSeqs: number[] }[] };
   for (const event of events) {
-    const op = event.surface as { kind: string; node: unknown; start?: number; end?: number; sourceEventSeqs?: number[] } | null;
-    if (op?.kind === "append") surface.entries.push({ node: op.node, sourceEventSeqs: [event.seq] });
-    if (op?.kind === "replace") surface.entries.splice(op.start!, op.end! - op.start!, { node: op.node, sourceEventSeqs: [...op.sourceEventSeqs!, event.seq] });
+    const op = event.surface;
+    if (op?.kind === "append") surface.entries.push({ node: surfaceNode(event), sourceEventSeqs: [event.seq] });
+    if (op?.kind === "replace") surface.entries.splice(op.start, op.end - op.start, { node: surfaceNode(event), sourceEventSeqs: [...op.sourceEventSeqs, event.seq] });
   }
   const estimate = viewContextEstimate(foldContextEstimate(events));
   const values: Record<string, unknown> = { contextEstimate: estimate, surface };

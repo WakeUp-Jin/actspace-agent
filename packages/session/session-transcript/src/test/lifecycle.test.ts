@@ -15,7 +15,7 @@ const at = "2026-10-28T13:58:00.000Z";
 function event(seq: number, type: string, data: Record<string, unknown>, surface: unknown = null): SessionEventEnvelopeV1 {
   return { recordKind: "event", seq, type, eventVersion: 1, criticality: "required", time: at, source: { ownerPluginId: "@actspace/core" }, data, surface, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } } as unknown as SessionEventEnvelopeV1;
 }
-const userMessage = (seq: number, text: string) => event(seq, "user/message", { messageId: `m${seq}` }, { kind: "append", node: { kind: "user", messageId: `m${seq}`, content: text } });
+const userMessage = (seq: number, text: string) => event(seq, "user/message", { messageId: `m${seq}`, content: text }, { kind: "append" });
 function header(sessionId: string, lineage: SessionHeaderV1["lineage"] = null): SessionHeaderV1 {
   return { recordKind: "header", format: "actspace-session", formatVersion: 1, backend: "raw-jsonl", backendSchemaVersion: 1, sessionId, createdAt: at, lineage, createdWith: { profileId: "test", runtimeContractVersion: "2", manifestDigest: "d", plugins: [], codecSetDigest: "c" } } as SessionHeaderV1;
 }

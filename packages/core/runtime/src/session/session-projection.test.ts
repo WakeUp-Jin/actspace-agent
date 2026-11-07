@@ -20,7 +20,7 @@ async function fixture(turns = 25) {
   const journal = new SessionJournal({ registry });
   const turn = (id: number) => {
     journal.append({ type: "turn/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: `t${id}` }, surface: null });
-    journal.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `u${id}`, content: `question ${id}` }, surface: { kind: "append", node: { kind: "user", messageId: `u${id}`, content: `question ${id}` } } });
+    journal.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `u${id}`, content: `question ${id}` }, surface: { kind: "append" } });
     journal.append({ type: "turn/end", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: `t${id}` }, surface: null });
   };
   for (let id = 0; id < turns; id++) turn(id);
@@ -144,7 +144,7 @@ describe("production Session projections", () => {
       if (records.prompt) f.journal.append({ type: "request/system-prompt", eventVersion: 1, source: core, data: { ...ids, digest: records.prompt, sections: [{ id: "model-prompt", owner: "system", order: 0, content: records.prompt }], modelFacts: [], contributorProvenance: [] }, surface: null });
       if (records.tools) f.journal.append({ type: "request/tools", eventVersion: 1, source: core, data: { ...ids, digest: records.tools.join(), tools: records.tools.map(name => ({ name })) }, surface: null });
       f.journal.append({ type: "request/context", eventVersion: 1, source: core, data: { ...ids, snapshot: { schemaVersion: 3 } }, surface: null });
-      f.journal.append({ type: "assistant/message", eventVersion: 1, source: core, data: { ...ids, messageId: `a${turn}`, finishReason: "stop", content: [{ type: "text", text: "ok" }] }, surface: { kind: "append", node: { kind: "assistant", messageId: `a${turn}`, content: [{ type: "text", text: "ok" }] } } });
+      f.journal.append({ type: "assistant/message", eventVersion: 1, source: core, data: { ...ids, messageId: `a${turn}`, finishReason: "stop", content: [{ type: "text", text: "ok" }] }, surface: { kind: "append" } });
       f.journal.append({ type: "step/end", eventVersion: 1, source: core, data: { turnId: ids.turnId, stepId: ids.stepId, status: "completed" }, surface: null });
       f.journal.append({ type: "turn/end", eventVersion: 1, source: core, data: { turnId: ids.turnId, status: "completed" }, surface: null });
     };
@@ -221,7 +221,7 @@ describe("production Session projections", () => {
     f.journal.append({ type: "turn/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: "tool-turn" }, surface: null });
     f.journal.append({ type: "step/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: "tool-turn", stepId: "tool-step" }, surface: null });
     f.journal.append({ type: "tool/call", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { callId: "c", name: "bash", pluginId: "core", args: { command: output } }, surface: null });
-    f.journal.append({ type: "tool/result", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { callId: "c", name: "bash", status: "failed", summary: "failed", modelOutput: [{ type: "text", text: output }], failure: { code: "EXIT", message: "failed", retryable: false } }, surface: { kind: "append", node: { kind: "tool-result", messageId: "result", callId: "c", content: output, isError: true } } });
+    f.journal.append({ type: "tool/result", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { callId: "c", name: "bash", status: "failed", summary: "failed", modelOutput: [{ type: "text", text: output }], failure: { code: "EXIT", message: "failed", retryable: false } }, surface: { kind: "append" } });
     await appendFile(f.path, f.journal.events.slice(3).map(event => JSON.stringify(event)).join("\n") + "\n");
     const controller = f.controller();
     const page = await controller.readProjection({ sessionId: "s" });

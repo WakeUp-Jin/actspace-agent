@@ -9,7 +9,7 @@ export async function compactionSession() {
     now: () => "2026-09-30T00:00:00.000Z",
   });
   for (let index = 0; index < 5; index += 1) {
-    await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `m-${index}` }, surface: { kind: "append", node: { kind: "user", messageId: `m-${index}`, content: `message-${index}` } } });
+    await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `m-${index}`, content: `message-${index}` }, surface: { kind: "append" } });
   }
   return session;
 }

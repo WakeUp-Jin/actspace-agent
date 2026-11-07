@@ -6,7 +6,7 @@ import type { UsageReadModelService } from "../runtime-v2/usage-read-model";
 const nodes = [
   { kind: "user", messageId: "u1", content: "inspect the repo" },
   { kind: "assistant", messageId: "a1", content: [{ type: "text", text: "reading" }, { type: "tool-call", callId: "c1", name: "read", arguments: "{}" }] },
-  { kind: "tool-result", messageId: "t1", callId: "c1", content: "file body" },
+  { kind: "tool-result", messageId: "tool-c1", callId: "c1", content: "file body", isError: false },
 ];
 let seq = 0;
 const at = (type: string, data: unknown, surface?: unknown): ContextEstimateEvent => ({ seq: seq++, type, time: "2026-11-06T00:00:00Z", data, ...(surface ? { surface } : {}) });
@@ -14,7 +14,9 @@ const estimate = viewContextEstimate(foldContextEstimate([
   at("request/header", { requestId: "r1", contextWindow: 100_000 }),
   at("request/system-prompt", { requestId: "r1", digest: "d", contributorProvenance: [], sections: [{ owner: "actspace.context-system", id: "core", order: 0, content: "core prompt" }], modelFacts: [] }),
   at("request/tools", { requestId: "r1", digest: "t", tools: [{ name: "read", description: "read a file", inputSchema: {} }] }),
-  ...nodes.map(node => at("x/message", {}, { kind: "append", node })),
+  ...nodes.map(node => node.kind === "tool-result"
+    ? at("tool/result", { callId: node.callId, status: "completed", modelOutput: node.content }, { kind: "append" })
+    : at(`${node.kind}/message`, { messageId: node.messageId, content: node.content }, { kind: "append" })),
 ]));
 
 function service(projection: ManagedContextProjection | null) {

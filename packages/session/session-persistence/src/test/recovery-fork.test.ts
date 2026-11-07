@@ -141,8 +141,8 @@ describe("cold fork and compaction provenance", () => {
     const registry = createCoreCodecRegistry();
     const store = new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot, runtimeId: "runtime-1", registry }));
     const session = await store.create(headerInput(registry, "compact"));
-    await session.append(candidate("user/message", { messageId: "u1" }, { surface: { kind: "append", node: { kind: "user", messageId: "u1", content: "one" } } }));
-    await session.append(candidate("assistant/message", { messageId: "a1" }, { surface: { kind: "append", node: { kind: "assistant", messageId: "a1", content: "two" } } }));
+    await session.append(candidate("user/message", { messageId: "u1", content: "one" }, { surface: { kind: "append" } }));
+    await session.append(candidate("assistant/message", { messageId: "a1", content: "two" }, { surface: { kind: "append" } }));
     const before = session.journal.events;
     const transaction = createCompactionTransaction({ surface: session.journal.surface, start: 0, end: 2, summary: { kind: "user", messageId: "summary", content: "condensed" }, compactionId: "compact-1", contributorIds: ["summary-provider"], summaryDigest: "sha256-summary", replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test" });
     await session.append(transaction[0] as SessionEventCandidateV1);

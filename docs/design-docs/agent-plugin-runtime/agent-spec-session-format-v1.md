@@ -134,7 +134,7 @@ Header 后的每条记录使用统一 envelope：
 | `time` | Session 接纳事件时冻结的 RFC3339 时间；不作为排序依据 |
 | `source` | 事件所有者以及可选 Agent、Turn、Step identity |
 | `data` | 通过 codec 校验后冻结的 lossless JSON value |
-| `surface` | 无 Surface 变化时为 `null`，否则是核心定义的 append 或 replace operation |
+| `surface` | 无 Surface 变化时为 `null`，否则是核心定义的 append 或 replace 标记；标记不带节点，节点由 `surfaceNode(event)` 从 `data` 推出（[对话内容只存一份](agent-spec-surface-derived.md)），带 `node` 的旧格式按不可读拒绝 |
 | `provenance` | 形成本事实或 Surface node 的源事件、contributor 和 runtime selection 引用 |
 
 接纳边界必须先完成 codec、关系、Surface operation、大小限制和 secret policy 校验，再把整个不可变 event 分配给下一个 `seq`。验证失败不能消耗 `seq`，也不能留下半条逻辑事实。

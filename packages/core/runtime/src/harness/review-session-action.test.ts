@@ -4,7 +4,7 @@ import { reviewSessionAction } from "./review-session-action.js";
 
 it.each([null, "title", "logicalRequestId", "sessionId", "callId", "purpose", "agentRunId", "turnId", "stepId"])("ignores only its own billing facts; foreign change=%s", async foreign => {
   const events: { seq: number; type: string; data: Record<string, unknown>; surface?: unknown }[] = [
-    { seq: 0, type: "user/message", data: {}, surface: { kind: "append", node: { content: "inspect files" } } },
+    { seq: 0, type: "user/message", data: { messageId: "u", content: "inspect files" }, surface: { kind: "append" } },
     { seq: 1, type: "tool/call", data: { agentRunId: "r", turnId: "t", stepId: "step", callId: "c" } },
   ];
   const session = { header: { sessionId: "s" }, journal: { get lastSeq() { return events.at(-1)!.seq; }, iterateEvents: () => events.values() } } as unknown as SessionHandle;

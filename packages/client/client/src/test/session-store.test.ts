@@ -167,8 +167,9 @@ it("accepts message surfaces after recovery/committed", () => {
   const store = new ClientSessionStore(); store.applyEnvelope(envelope("recovered", -1, null));
   for (const [seq, type] of ["recovery/start", "recovery/committed", "user/message"].entries()) {
     expect(store.applyJournalUpdate({ sessionId: "recovered", throughJournalSeq: seq, values: {}, event: {
-      recordKind: "event", seq, type, eventVersion: 1, criticality: "core", time: "2026-10-04T00:00:00.000Z", source: { kind: "runtime" }, data: {}, provenance: { emitter: "runtime" },
-      surface: type === "user/message" ? { kind: "append", node: { kind: "user", messageId: "next", content: "after recovery" } } : null,
+      recordKind: "event", seq, type, eventVersion: 1, criticality: "core", time: "2026-10-04T00:00:00.000Z", source: { kind: "runtime" }, provenance: { emitter: "runtime" },
+      data: type === "user/message" ? { messageId: "next", content: "after recovery" } : {},
+      surface: type === "user/message" ? { kind: "append" } : null,
     } })).toBe(true);
   }
   expect(store.get("recovered").snapshot?.messages).toEqual([expect.objectContaining({ messageId: "next", content: "after recovery" })]);

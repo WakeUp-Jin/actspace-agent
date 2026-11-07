@@ -68,7 +68,7 @@ it("query descriptors wait for the real writer fsync while old durable cursors r
     const before = await storage.querySource("durable");
     const cursor = (await storage.readEventBatch("durable", { throughSeq: before.throughSeq })).cursor;
     const event = new SessionJournal({ registry }).append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" },
-      data: { messageId: "pending", content: "pending durability" }, surface: { kind: "append", node: { kind: "user", messageId: "pending", content: "pending durability" } } });
+      data: { messageId: "pending", content: "pending durability" }, surface: { kind: "append" } });
     armed = true;
     const append = writer.append([event]);
     await atSync;

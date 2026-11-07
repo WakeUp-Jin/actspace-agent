@@ -127,7 +127,7 @@ describe("trajectory runtime builder", () => {
   it("projects task notifications and context supplements as CONTEXT records with their source", () => {
     const nodes = [
       snapshot.nodes[0]!,
-      { ...snapshot.nodes[1]!, key: "s:20", eventSeq: 20, eventType: "agent/inbox/spliced", kind: "user" as const, data: { operation: "claim", messageId: "n1", target: "current-turn", source: "task_notification" }, surface: { kind: "append", node: { kind: "user", messageId: "n1", content: [{ type: "text", text: "后台任务完成" }, { type: "runtime-context", context: { agentMode: "agent" } }] } } },
+      { ...snapshot.nodes[1]!, key: "s:20", eventSeq: 20, eventType: "agent/inbox/spliced", kind: "user" as const, data: { operation: "claim", messageId: "n1", target: "current-turn", source: "task_notification", content: [{ type: "text", text: "后台任务完成" }, { type: "runtime-context", context: { agentMode: "agent" } }] }, surface: { kind: "append" } },
       { ...snapshot.nodes[1]!, key: "s:21", eventSeq: 21, eventType: "plugin/actspace.context/supplement", kind: "other" as const, data: { op: "add", id: "runtime-state", owner: "actspace.context-runtime", text: "当前目录 /tmp", afterEventSeq: 20, lifetime: "turn", turnId: "t1" } },
       { ...snapshot.nodes[1]!, key: "s:22", eventSeq: 22, eventType: "plugin/actspace.context/supplement", kind: "other" as const, data: { op: "remove", id: "runtime-state", owner: "actspace.context-runtime" } },
     ] as RuntimeV2TrajectorySnapshot["nodes"];

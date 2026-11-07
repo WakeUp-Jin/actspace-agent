@@ -9,6 +9,7 @@ import type {
 } from "@actspace/shared";
 import type { HostConnection } from "@actspace/shared/host-protocol";
 import { encodeSessionLocator } from "@actspace/shared/session-locator";
+import { surfaceNode } from "@actspace/shared/runtime-v2";
 import { foldContextEstimate, viewContextEstimate } from "@actspace/shared";
 import type {
   RuntimeV2DesktopSessionProjection,
@@ -257,7 +258,7 @@ export function journal(session: MockSession): SessionEventEnvelopeV1[] {
       seq: events.length,
       type: message.role === "user" ? "user/message" : "assistant/message",
       data: { agentRunId: message.agentRunId, messageId: message.id, content: message.content },
-      surface: { kind: "append", node: { kind: message.role, messageId: message.id, content: message.content } },
+      surface: { kind: "append" },
     });
     if (message.usage) {
       events.push({ ...base(message), seq: events.length, type: "step/end", data: { agentRunId: message.agentRunId, reason: "completed", usage: message.usage }, surface: null });
@@ -285,7 +286,7 @@ export function snapshot(session: MockSession, throughJournalSeq: number): Runti
     metadata: { title: session.title, pinned: session.pinned, archived: session.archived },
     messages: session.messages.flatMap((message) => [
       // 原始事件里的 surface append（如唤醒回合领取的任务通知）也是可见消息。
-      ...(message.events ?? []).flatMap((raw) => raw.surface?.kind === "append" && raw.surface.node.kind === "user" ? [{ kind: "user" as const, messageId: raw.surface.node.messageId, content: raw.surface.node.content }] : []),
+      ...(message.events ?? []).flatMap((raw) => { const node = raw.surface?.kind === "append" ? surfaceNode({ type: raw.type, data: raw.data, surface: raw.surface }) : null; return node?.kind === "user" ? [{ kind: "user" as const, messageId: node.messageId, content: node.content }] : []; }),
       ...(message.role === "tool" && !message.tool ? [] : [message.role === "tool"
         ? { kind: "tool-result" as const, messageId: message.id, content: message.content, callId: message.id }
         : { kind: message.role, messageId: message.id, content: message.content }]),

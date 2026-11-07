@@ -11,7 +11,7 @@ function fixture(seed: SessionJournal["events"] = []): ContextSession {
 const request = { sessionId: "s", turnId: "turn", stepId: "step", requestId: "r", routeId: "r", model: "m", options: {} };
 const owners = new Set(["runtime"]);
 async function user(session: ContextSession, id: string) {
-  return session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: id }, surface: { kind: "append", node: { kind: "user", messageId: id, content: id } } });
+  return session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: id, content: id }, surface: { kind: "append" } });
 }
 
 it("persists versions once, hides removed owners and restores only the latest version after compaction", async () => {

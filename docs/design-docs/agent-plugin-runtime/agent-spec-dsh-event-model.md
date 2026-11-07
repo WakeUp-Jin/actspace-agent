@@ -112,7 +112,7 @@ criticality  = "required" | "ignorable"，由 codec 固定
 time         = RFC3339 UTC 时间
 source       = { ownerPluginId, agentId?, turnId?, stepId? }
 data         = 事件 payload，禁止把 UI 临时字段塞入此处
-surface      = null | { kind: "append", node } | { kind: "replace", start, end, node, sourceEventSeqs }
+surface      = null | { kind: "append" } | { kind: "replace", start, end, sourceEventSeqs }   // 只做标记，节点由 surfaceNode(event) 从 data 推出
 provenance   = { sourceEventSeqs: number[], contributorIds: string[], runtimeSelectionSeq: number | null }
 ```
 
@@ -170,7 +170,7 @@ Usage、轨迹和窗口分页分别消费辅助事实：每次尝试计一次请
 
 ## 7. 表面投影
 
-Surface node 是最小的模型可见历史节点；envelope 的 `surface` 是 append/replace operation 或 null，不是 UI 分类字符串：
+Surface node 是最小的模型可见历史节点；envelope 的 `surface` 是 append/replace 标记或 null，不是 UI 分类字符串。节点不在 `surface` 里再存一份，而是由 `@actspace/shared/runtime-v2` 的 `surfaceNode(event)` 从事件 `data` 推出（`user/message`、`assistant/message`、Inbox claim 取 `data.content`；`tool/result` 取 `modelOutput`，`isError = status !== "completed"`；`tool/recovery-outcome` 取 `data.content`；`surface/replaced` 取 `data.node`），详见 [对话内容只存一份](agent-spec-surface-derived.md)：
 
 - `user`：用户可见输入消息；
 - `assistant`：收束后的 Assistant 消息；chunk 保留为 Journal 事实，不单独创建完整历史消息；
@@ -189,5 +189,5 @@ CLI `run` 默认输出最终文本，`--jsonl` 才输出结构化流；显式持
 2. 无工具、含工具、重试、错误、取消五种顺序都能由 `seq` 重放；
 3. 扩展目录中的 codec 不影响核心事件，未知扩展按策略记录诊断或 fail closed；
 4. `session/event` 只能在 Journal 接纳且 coordinator 入队后触发，通知丢失不会破坏恢复；
-5. 任意 projection 只依赖 `surface` 和已提交事件，不读取 Agent Loop 私有状态；
+5. 任意 projection 只依赖 `surface` 标记、`surfaceNode(event)` 推出的节点和已提交事件，不读取 Agent Loop 私有状态；
 6. 新格式从空 Session 开始，旧 Session 文件明确视为不可读。

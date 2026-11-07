@@ -1,3 +1,4 @@
+import { surfaceNode } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1, SessionSurfaceNodeV1 } from "./event-envelope.js";
 import { SessionError } from "./errors.js";
 
@@ -38,9 +39,12 @@ export class SessionSurface {
   apply(event: SessionEventEnvelopeV1): void {
     const operation = event.surface;
     if (operation === null) return;
-    validateEligible(event, operation.node.kind);
+    // 节点从 data 推出，surface 只是标记（agent-spec-surface-derived.md §4.2）。
+    const node = surfaceNode(event);
+    if (node === null) invalid(`Event ${event.type} enters Surface but its data cannot derive a node.`);
+    validateEligible(event, node.kind);
     if (operation.kind === "append") {
-      this.#entries.push(createEntry(operation.node, event));
+      this.#entries.push(createEntry(node, event));
       return;
     }
     if (operation.end > this.#entries.length) invalid("Surface replacement span is outside the current Surface.");
@@ -48,7 +52,7 @@ export class SessionSurface {
     const expected = uniqueSorted(shadowed.flatMap((entry) => entry.sourceEventSeqs));
     const supplied = uniqueSorted(operation.sourceEventSeqs);
     if (!sameNumbers(expected, supplied)) invalid("Surface replacement must cite every shadowed source event and no unrelated event.");
-    const replacement = createEntry(operation.node, event, supplied);
+    const replacement = createEntry(node, event, supplied);
     this.#entries.splice(operation.start, operation.end - operation.start, replacement);
     this.#replaceGeneration += 1;
   }

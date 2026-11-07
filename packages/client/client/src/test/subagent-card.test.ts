@@ -80,7 +80,7 @@ describe("subagent cards from subagent/* events", () => {
   });
 
   it("shows a forked subagent only what it did after the fork", () => {
-    const message = (seq: number, messageId: string, content: string) => ({ ...envelope(seq, "user/message", { agentRunId: "run-1", messageId, content }), surface: { kind: "append", node: { kind: "user", messageId, content } } }) as SessionEventEnvelopeV1;
+    const message = (seq: number, messageId: string, content: string) => ({ ...envelope(seq, "user/message", { agentRunId: "run-1", messageId, content }), surface: { kind: "append" } }) as SessionEventEnvelopeV1;
     const child = [message(2, "u-1", "Parent question"), message(3, "u-2", "Fork task")];
     const forked = { ...snapshot(), messages: ["u-1", "u-2"].map(messageId => ({ kind: "user", messageId, content: "" })) as RuntimeV2SessionSnapshot["messages"] };
     const texts = (lineage: RuntimeV2SessionSnapshot["lineage"]) => projectSubagentTranscript({ ...forked, lineage }, child).flatMap(event => event.type === "user_message" ? [JSON.stringify(event.payload)] : []);
@@ -149,8 +149,8 @@ describe("inbox notices from subagents", () => {
 
   it("keeps every claimed notice in the saved session, marking which one opened the turn", () => {
     const claim = (seq: number, messageId: string, opensTurn?: boolean) => ({
-      ...envelope(seq, "agent/inbox/spliced", { operation: "claim", agentRunId: "run-1", messageId, source: "subagent_notification", notice: { taskId: messageId, kind: "subagent", title: "Map the repo", status: "completed" }, ...(opensTurn === undefined ? {} : { opensTurn }) }),
-      surface: { kind: "append", node: { kind: "user", messageId, content: "<subagent_notification />" } },
+      ...envelope(seq, "agent/inbox/spliced", { operation: "claim", agentRunId: "run-1", messageId, source: "subagent_notification", notice: { taskId: messageId, kind: "subagent", title: "Map the repo", status: "completed" }, ...(opensTurn === undefined ? {} : { opensTurn }), content: "<subagent_notification />" }),
+      surface: { kind: "append" },
     }) as SessionEventEnvelopeV1;
     const saved = { ...snapshot(), messages: ["m1", "m2"].map(messageId => ({ kind: "user", messageId, content: "" })) as RuntimeV2SessionSnapshot["messages"] };
     const notices = projectChatSession(saved, [claim(1, "m1", true), claim(2, "m2")], "/w").events

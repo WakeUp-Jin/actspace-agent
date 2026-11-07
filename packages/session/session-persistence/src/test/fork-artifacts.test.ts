@@ -1,3 +1,4 @@
+import { surfaceNode } from "@actspace/shared/runtime-v2";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -27,7 +28,7 @@ async function fixture() {
   const parent = await store.create({ sessionId: "parent", lineage: null, createdAt: new Date().toISOString(), createdWith });
   async function message(id: string) {
     const content = [{ type: "image", artifactId: id, mimeType: "image/png" }, { type: "artifact", artifact: { artifactId: id, mediaType: "image/png" } }, { type: "text", text: `keep ${id}` }];
-    await parent.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: id, content }, surface: { kind: "append", node: { kind: "user", messageId: id, content } } });
+    await parent.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: id, content }, surface: { kind: "append" } });
     await parent.flush();
   }
   async function fork(parentSessionId = "parent", newSessionId = "child", boundarySeq = 0) {
@@ -43,7 +44,9 @@ it("copies referenced artifacts once, rewrites data and surface, preserves paren
   expect(f.artifacts.copyForSession.mock.calls).toEqual([["parent", "child", "image"]]);
   const event = child.journal.events[0]!;
   expect(event.data).toMatchObject({ content: [{ artifactId: "child-image" }, { artifact: { artifactId: "child-image" } }, { text: "keep image" }] });
-  expect(event.surface).toMatchObject({ node: { content: [{ artifactId: "child-image" }, { artifact: { artifactId: "child-image" } }, { text: "keep image" }] } });
+  // surface 只是标记，节点从改写后的 data 推出（agent-spec-surface-derived.md §4.2）。
+  expect(event.surface).toEqual({ kind: "append" });
+  expect(surfaceNode(event)?.content).toEqual((event.data as { content: unknown }).content);
   expect(JSON.stringify((await f.store.inspect("parent")).events)).not.toContain("child-image");
   await child.close();
   const grandchild = await f.fork("child", "grandchild");

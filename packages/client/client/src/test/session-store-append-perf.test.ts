@@ -39,7 +39,7 @@ function perEventMicros(size: number, batch = 400, rounds = 7): number {
 }
 
 function surfaceEvent(seq: number, type: string, messageId?: string) {
-  return { ...event(seq, type), surface: messageId ? { kind: "append" as const, node: { kind: "user" as const, messageId, content: messageId } } : null };
+  return { ...event(seq, type), ...(messageId ? { data: { messageId, content: messageId }, surface: { kind: "append" as const } } : {}) };
 }
 
 function apply(store: ClientSessionStore, seq: number, type: string, messageId?: string, tool?: unknown): boolean {

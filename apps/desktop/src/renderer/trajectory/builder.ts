@@ -1,5 +1,6 @@
 import { contextCategory, contextSectionRecords, fixedSystemText } from "./context-sections";
 import { indexRequestRecords, isRequestRecordEvent, renderSystemPrompt, sortSystemSections, type EffectiveRequestRecord } from "@actspace/shared";
+import { surfaceNode as deriveSurfaceNode, type SessionSurfaceOperationV1 } from "@actspace/shared/runtime-v2";
 import type { RuntimeV2JsonValue, RuntimeV2TrajectoryNode, RuntimeV2TrajectorySnapshot } from "@actspace/shared/runtime-v2";
 import type {
   TrajectoryAssistantMetrics,
@@ -490,8 +491,8 @@ function mergeNodes(nodes: readonly RuntimeV2TrajectoryNode[], effective: (atSeq
       continue;
     }
     const kind = recordKind(node);
-    const surface = asRecord(node.surface);
-    const surfaceNode = asRecord(surface.node);
+    // 轨迹节点带着原事件的 type/data/surface，按同一规则推出对话节点（agent-spec-surface-derived.md §4.2）。
+    const surfaceNode = asRecord((deriveSurfaceNode({ type: node.eventType, data: node.data, surface: (node.surface ?? null) as SessionSurfaceOperationV1 | null }) ?? undefined) as RuntimeV2JsonValue | undefined);
     if (node.eventType === "agent/inbox/spliced" && (data.operation !== "claim" || surfaceNode.kind !== "user")) continue;
     // Background task notifications and Context supplements reach the model as user content but are CONTEXT rows.
     const notice = node.eventType === "agent/inbox/spliced" && data.source === "task_notification";

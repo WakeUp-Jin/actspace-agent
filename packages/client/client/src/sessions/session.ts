@@ -1,3 +1,4 @@
+import { surfaceNode } from "@actspace/shared/runtime-v2";
 import type { RuntimeV2DesktopSessionProjection, RuntimeV2EventWindow, RuntimeV2JsonValue, RuntimeV2LiveEvent, RuntimeV2SessionSnapshot, RuntimeV2SessionUpdate } from "@actspace/shared/runtime-v2";
 import { liveOverlayFromEvent, type ClientLiveOverlay } from "./live-overlay.js";
 import { emptyClientSessionCell, type ClientSessionCell } from "./session-snapshot.js";
@@ -171,7 +172,7 @@ export class ClientSessionStore {
     if (event.seq !== cell.window.throughJournalSeq + 1 || update.throughJournalSeq !== event.seq) return false;
     const snapshot = cell.snapshot;
     const pendingTransaction = hasPendingTransaction(cell.window);
-    const node = !pendingTransaction && event.surface?.kind === "append" ? event.surface.node : null;
+    const node = !pendingTransaction && event.surface?.kind === "append" ? surfaceNode(event) : null;
     const messages = node ? snapshot.messages.concat([{ kind: node.kind, messageId: node.messageId, content: node.content, ...(node.kind === "tool-result" ? { callId: node.callId } : {}) }]) : snapshot.messages;
     const values: Record<string, RuntimeV2JsonValue | undefined> = { ...cell.projectionValues, ...update.values };
     const tools = update.tool ? withToolUpdated(snapshot.tools, update.tool) : snapshot.tools;

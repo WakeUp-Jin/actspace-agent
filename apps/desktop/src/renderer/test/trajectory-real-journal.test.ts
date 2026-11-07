@@ -25,7 +25,7 @@ describe('real Journal → trajectory', () => {
     const { journal, append } = makeJournal();
     const ids = { turnId: 'turn-1', stepId: 'step-1', requestId: 'request-1' };
     append('agent/inbox/spliced', { operation: 'enqueue', messageId: 'u', target: 'next-turn', content: '真实用户内容' });
-    append('agent/inbox/spliced', { operation: 'claim', messageId: 'u', target: 'next-turn' }, { kind: 'append', node: { kind: 'user', messageId: 'u', content: [{ type: 'text', text: '真实用户内容' }] } });
+    append('agent/inbox/spliced', { operation: 'claim', messageId: 'u', target: 'next-turn', content: [{ type: 'text', text: '真实用户内容' }] }, { kind: 'append' });
     append('turn/start', { turnId: ids.turnId });
     append('step/start', ids);
     append('request/header', { ...ids, model: 'test-model', routeId: 'test-route' });
@@ -90,7 +90,7 @@ describe('real Journal history window → system rows and schemas', () => {
   it('keeps the initial system row, early tool schemas, the user turn and context time when later requests write no prompt records', () => {
     const { journal, append } = makeJournal();
     const read = tool('read_file');
-    append('user/message', { messageId: 'u1', agentRunId: 'run-1' }, { kind: 'append', node: { kind: 'user', messageId: 'u1', content: [{ type: 'text', text: '读一下文件' }] } });
+    append('user/message', { messageId: 'u1', agentRunId: 'run-1', content: [{ type: 'text', text: '读一下文件' }] }, { kind: 'append' });
     append('turn/start', { turnId: 't1', agentRunId: 'run-1', mode: 'agent', modeRevision: 1 });
     const step = (stepId: string, model: string, callId: string) => {
       const ids = { turnId: 't1', stepId, requestId: `r-${stepId}` };

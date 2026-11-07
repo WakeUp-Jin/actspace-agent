@@ -5,7 +5,7 @@ import type { SessionStorage } from "../index.js";
 export function storageContract(name: string, fixture: () => Promise<{ storage: SessionStorage; cleanup(): Promise<void> }>) {
   const registry = createCoreCodecRegistry();
   const header = () => createSessionHeader({ sessionId: "contract", createdAt: "2026-10-04T00:00:00.000Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } });
-  const event = () => new SessionJournal({ registry }).append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "m", content: "hello" }, surface: { kind: "append", node: { kind: "user", messageId: "m", content: "hello" } } });
+  const event = () => new SessionJournal({ registry }).append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "m", content: "hello" }, surface: { kind: "append" } });
   describe(`${name} storage contract`, () => {
     it("creates once, rejects another writer, allows immutable read snapshots and persists a flush", async () => {
       const f = await fixture();

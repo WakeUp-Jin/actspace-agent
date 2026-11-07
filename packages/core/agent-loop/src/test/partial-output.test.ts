@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { SessionJournal, createCoreCodecRegistry, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { LlmStreamEvent } from "@actspace/llm-service";
+import { surfaceNode } from "@actspace/shared/runtime-v2";
 import { runToolStreamFixture } from "../testing.js";
 
 it.each(["error", "aborted", "throw"] as const)("preserves partial text and identity after %s, without executing partial tools", async (ending) => {
@@ -24,7 +25,8 @@ it.each(["error", "aborted", "throw"] as const)("preserves partial text and iden
   const firstTokenAt = (message.data as { firstTokenAt?: string }).firstTokenAt;
   expect(Date.parse(firstTokenAt ?? "")).toBeGreaterThanOrEqual(Date.parse(header.time));
   expect(message.data).toMatchObject({ messageId: expect.any(String), content: [{ type: "text", text: "Keep this answer." }], finishReason: ending === "aborted" ? "aborted" : "failed" });
-  expect(message.surface).toMatchObject({ kind: "append", node: { kind: "assistant", content: [{ type: "text", text: "Keep this answer." }] } });
+  expect(message.surface).toEqual({ kind: "append" });
+  expect(surfaceNode(message)).toMatchObject({ kind: "assistant", content: [{ type: "text", text: "Keep this answer." }] });
   expect(journal.filter(event => event.type === "assistant/message")).toHaveLength(1);
   expect(executed).toBe(0);
   const replay = new SessionJournal({ registry: createCoreCodecRegistry(), seed: journal });

@@ -18,7 +18,7 @@ import {
   CNY_PER_USD,
   hasVisibleText,
 } from "@actspace/shared";
-import { foldSubagentTree, lastActivationModel, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView, type SubagentView } from "@actspace/shared/runtime-v2";
+import { foldSubagentTree, lastActivationModel, surfaceNode, type SessionSurfaceNodeV1, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2ToolView, type SubagentView } from "@actspace/shared/runtime-v2";
 import type { LiveOutputBaseline, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { inheritedThroughSeq } from "@actspace/shared/session-list-page";
 
@@ -231,7 +231,7 @@ type SurfaceProjectionBase = Omit<SessionEvent, "type" | "payload"> & { readonly
 
 function projectSurfaceNode(
   projected: SessionEvent[],
-  node: NonNullable<SessionEventEnvelopeV1["surface"]>["node"],
+  node: SessionSurfaceNodeV1,
   base: SurfaceProjectionBase,
   index: EventIndex,
   source?: string,
@@ -279,7 +279,8 @@ function compactionSummaryText(events: readonly SessionEventEnvelopeV1[], compac
   if (!compactionId) return undefined;
   const replacement = events.find((event) => event.surface?.kind === "replace" && string(record(event.data).compactionId) === compactionId);
   if (replacement?.surface?.kind !== "replace") return undefined;
-  const content = replacement.surface.node.content;
+  const content = surfaceNode(replacement)?.content;
+  if (content === undefined) return undefined;
   const text = isRecord(content) && typeof content.text === "string" ? content.text : contentText(content, false);
   return text.trim() || undefined;
 }
@@ -726,7 +727,7 @@ function backgroundNotice(value: RuntimeV2JsonValue | undefined, opensTurn: bool
   const notice = record(value); const taskId = string(notice.taskId); const kind = notice.kind;
   return taskId && (kind === "bash" || kind === "agent" || kind === "subagent" || kind === "agent_message") ? { taskId, taskKind: kind, title: string(notice.title) ?? taskId, status: string(notice.status) ?? "completed", opensTurn } : undefined;
 }
-function appendNode(event: SessionEventEnvelopeV1) { return event.surface?.kind === "append" ? event.surface.node : null; }
+function appendNode(event: SessionEventEnvelopeV1) { return event.surface?.kind === "append" ? surfaceNode(event) : null; }
 function contentBlocks(value: RuntimeV2JsonValue): readonly EventRecord[] { return Array.isArray(value) ? value.filter(isRecord) : []; }
 function contentText(value: RuntimeV2JsonValue, includeReasoning = true): string { if (typeof value === "string") return value; if (!Array.isArray(value)) return JSON.stringify(value ?? null, null, 2); return value.flatMap((entry) => { if (typeof entry === "string") return [entry]; if (!isRecord(entry)) return [JSON.stringify(entry)]; if (entry.type === "text" && typeof entry.text === "string") return [entry.text]; if (includeReasoning && entry.type === "reasoning" && typeof entry.text === "string") return [entry.text]; if (entry.type === "image") return [typeof entry.alt === "string" ? `[${entry.alt}]` : "[image]"]; if (entry.type === "artifact") return [typeof entry.label === "string" ? `[${entry.label}]` : "[attachment]"]; return []; }).join(""); }
 function attachmentViews(value: RuntimeV2JsonValue | undefined) { return contentBlocks(value ?? []).filter((entry) => entry.type === "artifact").map((entry, index) => { const artifactId = string(record(entry.artifact).artifactId) ?? `attachment-${index}`; return { id: artifactId, path: artifactId, kind: (string(record(entry.artifact).mediaType)?.startsWith("image/") ? "image" : "file") as "image" | "file", name: string(entry.label) ?? `Attachment ${index + 1}`, mimeType: string(record(entry.artifact).mediaType) ?? undefined }; }); }

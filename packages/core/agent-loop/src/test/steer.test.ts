@@ -174,7 +174,7 @@ describe("Host-owned input source", () => {
         claim: async () => {
           if (!pending) return { messageIds: [], configuration: {} };
           pending = false;
-          await session!.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "owned-input" }, surface: { kind: "append", node: { kind: "user", messageId: "owned-input", content: "Continue" } } });
+          await session!.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "owned-input", content: "Continue" }, surface: { kind: "append" } });
           await session!.flush();
           return { messageIds: ["owned-input"], configuration: { model: "new-model", thinkingEnabled: true } };
         },

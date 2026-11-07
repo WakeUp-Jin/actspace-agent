@@ -1,5 +1,5 @@
 import { initialContextEstimate, viewContextEstimate, type SessionEvent, type SessionRecord } from "@actspace/shared";
-import type { RuntimeV2DesktopSessionProjection, RuntimeV2JsonValue, RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import { surfaceNode, type RuntimeV2DesktopSessionProjection, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 
 export function projectionFixture(sessionId = "s", throughJournalSeq = -1, events: readonly SessionEventEnvelopeV1[] = []): RuntimeV2DesktopSessionProjection {
   const snapshot: RuntimeV2SessionSnapshot = { kind: "session-snapshot", schemaVersion: 1, sessionId, createdAt: "2026-09-21T00:00:00Z", updatedAt: "2026-09-21T00:00:00Z", throughJournalSeq, workspaceRoot: "/tmp/workspace", agentForm: "agent", permissionMode: "default", sessionGrants: [], accessState: "read-write", metadata: { title: null, pinned: false, archived: false }, messages: [], tools: [], pendingInbox: [], todos: [], delegations: [], lineage: null,
@@ -18,7 +18,7 @@ export function recordProjectionFixture(record: SessionRecord): RuntimeV2Desktop
   });
   const events: SessionEventEnvelopeV1[] = sourceEvents.map((event, seq) => legacyEventToJournal(event, seq));
   const value = projectionFixture(record.meta.id, events.length - 1, events);
-  return { ...value, activeMessageIds: events.flatMap(event => event.surface ? [event.surface.node.messageId] : []), snapshot: { ...value.snapshot, metadata: { title: record.meta.title, pinned: record.meta.pinned ?? false, archived: record.meta.archived ?? false }, workspaceRoot: record.meta.workspaceRoot, agentForm: record.meta.agentForm ?? "agent", agentMode: record.meta.agentMode ?? (record.meta.agentForm === "chat" ? "chat" : "agent"), agentModeRevision: record.meta.agentModeRevision ?? 0, messages: events.flatMap(event => event.surface ? [event.surface.node] : []), activity: { ...value.snapshot.activity, turnCount: record.meta.agentRunCount, completedTurnCount: record.meta.agentRunCount } } };
+  return { ...value, activeMessageIds: events.flatMap(event => { const node = surfaceNode(event); return node ? [node.messageId] : []; }), snapshot: { ...value.snapshot, metadata: { title: record.meta.title, pinned: record.meta.pinned ?? false, archived: record.meta.archived ?? false }, workspaceRoot: record.meta.workspaceRoot, agentForm: record.meta.agentForm ?? "agent", agentMode: record.meta.agentMode ?? (record.meta.agentForm === "chat" ? "chat" : "agent"), agentModeRevision: record.meta.agentModeRevision ?? 0, messages: events.flatMap(event => { const node = surfaceNode(event); return node ? [node] : []; }), activity: { ...value.snapshot.activity, turnCount: record.meta.agentRunCount, completedTurnCount: record.meta.agentRunCount } } };
 }
 
 function legacyEventToJournal(event: SessionEvent, seq: number): SessionEventEnvelopeV1 {
@@ -30,18 +30,18 @@ function legacyEventToJournal(event: SessionEvent, seq: number): SessionEventEnv
   if (event.type === "user_message") {
     type = "user/message";
     data = { ...identity, messageId: event.id, content: payload.content ?? "" };
-    surface = { kind: "append", node: { kind: "user", messageId: event.id, content: payload.content ?? "" } };
+    surface = { kind: "append" };
   } else if (event.type === "assistant_message" || event.type === "assistant_reply") {
     type = "assistant/message";
     data = { ...identity, messageId: event.id, content: payload.content ?? "", ...(payload.usage === undefined ? {} : { usage: payload.usage }), ...(payload.stopReason === undefined ? {} : { finishReason: payload.stopReason }) };
-    surface = { kind: "append", node: { kind: "assistant", messageId: event.id, content: payload.content ?? "" } };
+    surface = { kind: "append" };
   } else if (event.type === "tool_call") {
     type = "tool/call";
     data = { ...identity, callId: payload.id ?? payload.toolCallId ?? event.id, name: payload.name ?? payload.toolName ?? "tool", args: payload.arguments ?? payload.args ?? {} , pluginId: "fixture" };
   } else if (event.type === "tool_result") {
     type = "tool/result";
-    surface = { kind: "append", node: { kind: "tool-result", messageId: event.id, callId: String(payload.toolCallId ?? event.id), content: payload.modelOutput ?? "", isError: payload.ok === false || payload.status === "failed" } };
-    data = { ...identity, callId: payload.toolCallId ?? payload.callId ?? event.id, name: payload.toolName ?? "tool", status: payload.status ?? (payload.ok === false ? "failed" : "completed"), summary: payload.summary ?? "Tool completed", ...(payload.detail === undefined ? {} : { detail: payload.detail }), ...(payload.modelOutput === undefined ? {} : { modelOutput: payload.modelOutput }), ...(payload.uiPreview === undefined ? {} : { renderer: payload.uiPreview }) };
+    surface = { kind: "append" };
+    data = { ...identity, callId: payload.toolCallId ?? payload.callId ?? event.id, name: payload.toolName ?? "tool", status: payload.status ?? (payload.ok === false ? "failed" : "completed"), summary: payload.summary ?? "Tool completed", ...(payload.detail === undefined ? {} : { detail: payload.detail }), modelOutput: payload.modelOutput ?? "", ...(payload.uiPreview === undefined ? {} : { renderer: payload.uiPreview }) };
   } else if (event.type === "thinking") {
     type = "assistant/chunk";
     data = { ...identity, messageId: event.id, chunkIndex: 0, kind: "reasoning", content: payload.content ?? "" };

@@ -77,11 +77,11 @@ describe("Session Journal", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-08-29T12:00:00.000Z" });
     journal.append(candidate("turn/start", { turnId: "turn-1" }));
     journal.append(candidate("step/start", { turnId: "turn-1", stepId: "step-1" }));
-    journal.append(candidate("user/message", { messageId: "user-1", content: "hello" }, { surface: { kind: "append", node: { kind: "user", messageId: "user-1", content: "hello" } } }));
+    journal.append(candidate("user/message", { messageId: "user-1", content: "hello" }, { surface: { kind: "append" } }));
     journal.append(candidate("request/header", { requestId: "request-1", turnId: "turn-1", stepId: "step-1" }));
     journal.append(candidate("request/context", { requestId: "request-1", turnId: "turn-1", stepId: "step-1", messages: [{ role: "user", content: "hello" }] }));
     journal.append(candidate("assistant/chunk", { messageId: "assistant-1", requestId: "request-1", chunkIndex: 0, delta: "world" }));
-    journal.append(candidate("assistant/message", { messageId: "assistant-1", requestId: "request-1", content: "world", finishReason: "stop" }, { surface: { kind: "append", node: { kind: "assistant", messageId: "assistant-1", content: "world" } } }));
+    journal.append(candidate("assistant/message", { messageId: "assistant-1", requestId: "request-1", content: "world", finishReason: "stop" }, { surface: { kind: "append" } }));
     journal.append(candidate("step/end", { turnId: "turn-1", stepId: "step-1", status: "completed" }));
     journal.append(candidate("turn/end", { turnId: "turn-1", status: "completed" }));
 
@@ -206,13 +206,13 @@ describe("Session Journal", () => {
 
   it("applies compaction replacement as an append-only transaction", () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-08-29T12:00:00.000Z" });
-    journal.append(candidate("user/message", { messageId: "user-1" }, { surface: { kind: "append", node: { kind: "user", messageId: "user-1", content: "one" } } }));
-    journal.append(candidate("assistant/message", { messageId: "assistant-1", content: "two" }, { surface: { kind: "append", node: { kind: "assistant", messageId: "assistant-1", content: "two" } } }));
+    journal.append(candidate("user/message", { messageId: "user-1", content: "one" }, { surface: { kind: "append" } }));
+    journal.append(candidate("assistant/message", { messageId: "assistant-1", content: "two" }, { surface: { kind: "append" } }));
     journal.append(candidate("compaction/start", { compactionId: "compact-1", start: 0, end: 2 }));
     journal.append(candidate("compaction/summary", { compactionId: "compact-1", summaryDigest: "digest" }));
-    journal.append(candidate("surface/replaced", { compactionId: "compact-1", sourceEventSeqs: [0, 1], replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test" }, {
+    journal.append(candidate("surface/replaced", { compactionId: "compact-1", sourceEventSeqs: [0, 1], replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test", node: { kind: "user", messageId: "summary-1", content: "summary" } }, {
       provenance: { sourceEventSeqs: [0, 1], contributorIds: ["compactor"], runtimeSelectionSeq: null },
-      surface: { kind: "replace", start: 0, end: 2, sourceEventSeqs: [0, 1], node: { kind: "user", messageId: "summary-1", content: "summary" } },
+      surface: { kind: "replace", start: 0, end: 2, sourceEventSeqs: [0, 1] },
     }));
     journal.append(candidate("compaction/end", { compactionId: "compact-1", summaryDigest: "digest" }));
     expect(journal.events).toHaveLength(6);
@@ -223,6 +223,35 @@ describe("Session Journal", () => {
     expect(journal.surface.entries).toHaveLength(1);
     expect(journal.surface.entries[0]?.node).toMatchObject({ messageId: "summary-1" });
     expect(journal.surface.replaceGeneration).toBe(1);
+  });
+
+  // agent-spec-surface-derived.md §9：surface 只做标记，节点从 data 推出；旧格式和缺字段的事件都被拒。
+  it("rejects old-format Surface nodes and events whose node cannot be derived", () => {
+    const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
+    const oldFormat = { kind: "append", node: { kind: "user", messageId: "user-1", content: "hello" } } as unknown as SessionEventCandidateV1["surface"];
+    expect(() => journal.append(candidate("user/message", { messageId: "user-1", content: "hello" }, { surface: oldFormat }))).toThrow(/old Session format/);
+    expect(() => journal.append(candidate("user/message", { messageId: "user-1" }, { surface: { kind: "append" } }))).toThrow(/cannot derive a node/);
+    expect(journal.events).toHaveLength(0);
+
+    journal.append(candidate("agent/inbox/spliced", { operation: "enqueue", messageId: "inbox-1", target: "next-step", content: "steer" }));
+    expect(() => journal.append(candidate("agent/inbox/spliced", { operation: "claim", messageId: "inbox-1", target: "next-step" }, {
+      surface: { kind: "append" }, provenance: { sourceEventSeqs: [0], contributorIds: [], runtimeSelectionSeq: null },
+    }))).toThrow(/cannot derive a node/);
+    journal.append(candidate("agent/inbox/spliced", { operation: "claim", messageId: "inbox-1", target: "next-step", content: "steer" }, {
+      surface: { kind: "append" }, provenance: { sourceEventSeqs: [0], contributorIds: [], runtimeSelectionSeq: null },
+    }));
+    expect(journal.surface.entries.map(entry => entry.node)).toEqual([{ kind: "user", messageId: "inbox-1", content: "steer" }]);
+
+    journal.append(candidate("compaction/start", { compactionId: "compact-1", start: 0, end: 1 }));
+    journal.append(candidate("compaction/summary", { compactionId: "compact-1", summaryDigest: "digest" }));
+    expect(() => journal.append(candidate("surface/replaced", { compactionId: "compact-1", sourceEventSeqs: [0, 2], replacedTokens: { conversation: 0, summarizedConversation: 0 }, estimatorVersion: "test" }, {
+      provenance: { sourceEventSeqs: [0, 2], contributorIds: [], runtimeSelectionSeq: null }, surface: { kind: "replace", start: 0, end: 1, sourceEventSeqs: [0, 2] },
+    }))).toThrow(/node must be a user, assistant or tool-result Surface node/);
+  });
+
+  it("rejects a tool recovery outcome without model-visible content", () => {
+    const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
+    expect(() => journal.append(candidate("tool/recovery-outcome", { repairId: "repair-1", callId: "call-1", outcome: "not-started" }, { surface: { kind: "append" } }))).toThrow(/content must be a string/);
   });
 });
 

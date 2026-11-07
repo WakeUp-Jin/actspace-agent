@@ -11,7 +11,7 @@ it("preserves historical summaries, signed reasoning, attachments and runtime bl
   const run = await runToolStreamFixture({ terminalOnly: true, thinkingEnabled: true,
     seedSession: async session => {
       await session.append({ type: "assistant/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" },
-        data: { messageId: "summary", content: historical }, surface: { kind: "append", node: { kind: "assistant", messageId: "summary", content: historical } } });
+        data: { messageId: "summary", content: historical }, surface: { kind: "append" } });
     },
     content: [
       { type: "text", text: "Continue" },

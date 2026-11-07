@@ -22,7 +22,7 @@ async function fixture() {
   const store = new DesktopArtifactStore(root);
   const ref = await store.create({ bytes: Buffer.from("owned image"), mediaType: "image/png", owner: { sessionId: "session", callId: "attachment", pluginId: "desktop", name: "user-attachment" } });
   const content = [{ type: "artifact", artifact: { artifactId: ref.artifactId, mediaType: ref.mediaType } }];
-  const journal = [{ type: "user/message", surface: { kind: "append", node: { kind: "user", messageId: "original", content } } }];
+  const journal = [{ type: "user/message", data: { messageId: "original", content }, surface: { kind: "append" } }];
   const snapshot = { messages: [{ kind: "user", content: { text: "compacted summary" } }], tools: [] };
   const app = {
     inspectSession: vi.fn(async () => snapshot),
@@ -59,7 +59,7 @@ describe("Desktop historical artifact authorization", () => {
 
   it("rejects an unreferenced staged image and an ID mentioned only in text", async () => {
     const f = await fixture();
-    f.journal[0].surface.node.content = [{ type: "text", text: f.ref.artifactId }] as unknown as typeof f.content;
+    (f.journal[0] as unknown as { data: { content: unknown } }).data.content = [{ type: "text", text: f.ref.artifactId }];
     await expect(f.registry.resolveArtifact("session", f.ref.artifactId)).rejects.toThrow("not referenced");
     f.journal.length = 0;
     await expect(f.registry.resolveArtifact("session", f.ref.artifactId)).rejects.toThrow("not referenced");

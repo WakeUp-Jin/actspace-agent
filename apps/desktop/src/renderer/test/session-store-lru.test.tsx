@@ -1,7 +1,7 @@
 import { act, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ClientSessionStore, type ClientSessionCell } from "@actspace/client/sessions";
-import type { RuntimeV2DesktopSessionProjection, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
+import { surfaceNode, type RuntimeV2DesktopSessionProjection, type SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { createSessionCellRetention, SESSION_CELL_RETAIN_LIMIT, useSessionCell } from "../session/session-store";
 import { loadEarlier } from "../session/session-pages";
 import { projectionFixture } from "./projection-fixture";
@@ -10,7 +10,7 @@ import { projectionFixture } from "./projection-fixture";
 function message(seq: number): SessionEventEnvelopeV1 {
   const messageId = `m-${seq}`;
   return { recordKind: "event", seq, type: "user/message", eventVersion: 1, criticality: "ignorable", time: "2026-10-06T00:00:00.000Z", source: { ownerPluginId: "@actspace/core" },
-    data: { agentRunId: "run", messageId, content: `message ${seq}` }, surface: { kind: "append", node: { kind: "user", messageId, content: `message ${seq}` } },
+    data: { agentRunId: "run", messageId, content: `message ${seq}` }, surface: { kind: "append" },
     provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
 }
 
@@ -18,7 +18,7 @@ function message(seq: number): SessionEventEnvelopeV1 {
 function page(sessionId: string, fromSeq: number, toSeq: number, latest = toSeq): RuntimeV2DesktopSessionProjection {
   const events = Array.from({ length: toSeq - fromSeq + 1 }, (_, index) => message(fromSeq + index));
   const base = projectionFixture(sessionId, latest, events);
-  return { ...base, activeMessageIds: events.map((event) => event.surface!.node.messageId), snapshot: { ...base.snapshot, messages: events.map((event) => event.surface!.node) },
+  return { ...base, activeMessageIds: events.map((event) => surfaceNode(event)!.messageId), snapshot: { ...base.snapshot, messages: events.map((event) => surfaceNode(event)!) },
     window: { ...base.window, fromSeq, throughJournalSeq: toSeq, beforeSeq: fromSeq === 0 ? null : fromSeq } };
 }
 

@@ -2,7 +2,7 @@
 import { SessionError } from "./errors.js";
 
 export type { SessionEventCriticality, SessionEventSourceV1, SessionEventProvenanceV1, SessionSurfaceNodeV1, SessionSurfaceOperationV1, SessionEventEnvelopeV1, SessionEventCandidateV1 } from "@actspace/shared/runtime-v2";
-import type { SessionEventEnvelopeV1, SessionEventProvenanceV1, SessionSurfaceOperationV1, SessionSurfaceNodeV1 } from "@actspace/shared/runtime-v2";
+import type { SessionEventEnvelopeV1, SessionEventProvenanceV1, SessionSurfaceOperationV1 } from "@actspace/shared/runtime-v2";
 
 const FORBIDDEN_SECRET_KEYS = new Set([
   "authorization",
@@ -68,27 +68,20 @@ export function defaultSessionProvenance(): SessionEventProvenanceV1 {
   return Object.freeze({ sourceEventSeqs: Object.freeze([]), contributorIds: Object.freeze([]), runtimeSelectionSeq: null });
 }
 
+/** surface 只是标记，节点内容在 data 里（agent-spec-surface-derived.md §4.1）；带 `node` 的旧格式直接拒绝。 */
 function validateSurfaceOperation(value: unknown): asserts value is SessionSurfaceOperationV1 {
   if (!isPlainRecord(value)) invalid("Surface operation must be an object.");
+  if ("node" in value) invalid("Surface operation must not carry a node (old Session format); the node is derived from event data.");
   if (value.kind === "append") {
-    validateSurfaceNode(value.node);
+    if (Object.keys(value).length !== 1) invalid("Surface append operation only has kind.");
     return;
   }
   if (value.kind !== "replace") invalid("Surface operation kind is invalid.");
+  if (Object.keys(value).some(key => !["kind", "start", "end", "sourceEventSeqs"].includes(key))) invalid("Surface replace operation has unknown fields.");
   if (!Number.isSafeInteger(value.start) || !Number.isSafeInteger(value.end) || (value.start as number) < 0 || (value.end as number) <= (value.start as number)) {
     invalid("Surface replace span must be a non-empty integer range.");
   }
   validateIntegerArray(value.sourceEventSeqs, "surface.sourceEventSeqs");
-  validateSurfaceNode(value.node);
-}
-
-function validateSurfaceNode(value: unknown): asserts value is SessionSurfaceNodeV1 {
-  if (!isPlainRecord(value) || !["user", "assistant", "tool-result"].includes(String(value.kind))) invalid("Invalid Surface node.");
-  requireNonEmptyString(value.messageId, "surface.node.messageId");
-  if (value.kind === "tool-result") {
-    requireNonEmptyString(value.callId, "surface.node.callId");
-    if (typeof value.isError !== "boolean") invalid("tool-result isError must be boolean.");
-  }
 }
 
 /** Validates a plain JSON value and returns an upper bound of its serialized UTF-8 size in bytes. */

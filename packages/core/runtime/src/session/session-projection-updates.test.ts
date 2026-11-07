@@ -20,7 +20,7 @@ describe("projection updates sent to observers (journal-update values)", () => {
       const updates: RuntimeV2SessionUpdate[] = [];
       const unsubscribe = controller.subscribeProjection(update => { updates.push(update); });
       const session = await controller.resume("s");
-      await session.append({ type: "user/message", eventVersion: 1, source: core, data: { messageId: "u1", content: "hi" }, surface: { kind: "append", node: { kind: "user", messageId: "u1", content: "hi" } } });
+      await session.append({ type: "user/message", eventVersion: 1, source: core, data: { messageId: "u1", content: "hi" }, surface: { kind: "append" } });
       await session.append({ type: "session/title-set", eventVersion: 1, source: core, data: { title: "hello" }, surface: null });
       const byType = (type: string) => updates.find(update => update.event.type === type)!;
       const changed = byType("user/message").values.contextEstimate;

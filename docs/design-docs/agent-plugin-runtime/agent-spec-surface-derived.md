@@ -2,7 +2,7 @@
 
 > 管日志里进入模型对话的那几种事件（用户消息、回复、工具结果、Inbox 插入、恢复结果、压缩替换）把内容存在哪里，以及所有读取方怎样拿到对话节点。事件词汇见[事件模型](agent-spec-dsh-event-model.md) §7，请求记录见[请求记录](agent-spec-request-record.md)，投影架构见[Runtime Projection](agent-spec-runtime-projection.md)。
 
-状态：草案（2026-11-07）。§8 三条决定均已确认，下一步写执行计划。
+状态：已实现（2026-11-07），执行计划 [20261107-surface-derived](../../exec-plans/active/20261107-surface-derived.md)。实机对比（§9 最后一条）待用户删除旧会话后重跑。
 
 ## 1. 为什么改
 
@@ -103,6 +103,8 @@ type SessionSurfaceOperationV1 =
 - **工具与文档：** `docs/tools/session-viewer/`（查看器显示 surface 节点）。
 
 上面每一处只读 `surface.kind`（append / replace）、`sourceEventSeqs`、`start` / `end` 的代码不用改。
+
+实现后核对（2026-11-07）：实际改动的读取方是 `context-estimate.ts`、`composer-reference-validation.ts`、`session-controller.ts`、`client/sessions/chat.ts` 与 `session.ts`、`auto-review/context.ts`、`session-transcript/render.ts`、`usage-catalog-projection.ts`、`runtime-registry.ts`、`trajectory/builder.ts`、渲染进程 `mock/mock-db.ts`，以及 `agent-loop/loop.ts` 里压缩摘要的 messageId。其余列出的位置读的是折叠后的 entries 或只读 `surface.kind`，没有改。`docs/tools/session-viewer/` 只显示原始 JSON，不用改。
 
 测试和 mock 里手写的 envelope（`renderer/mock/`、`renderer/test/projection-fixture.ts`、`trajectory-complete.json`、各包 `test/` 里的 fixture）要一起改成新格式。执行计划里会按包列出。
 

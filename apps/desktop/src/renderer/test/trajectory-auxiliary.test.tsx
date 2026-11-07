@@ -43,7 +43,7 @@ describe('auxiliary Journal → trajectory requests', () => {
 
   it('links a committed compaction to its one billed request; old summaries keep their fallback view', () => {
     const journal = new SessionJournal({ registry: createCoreCodecRegistry() });
-    journal.append({ type: 'user/message', eventVersion: 1, source: { ownerPluginId: '@actspace/core' }, data: { messageId: 'u', content: 'old history' }, surface: { kind: 'append', node: { messageId: 'u', kind: 'user', content: 'old history' } } });
+    journal.append({ type: 'user/message', eventVersion: 1, source: { ownerPluginId: '@actspace/core' }, data: { messageId: 'u', content: 'old history' }, surface: { kind: 'append' } });
     const start = { sessionId: 'session', purpose: 'compaction', logicalRequestId: 'compact', attemptId: 'compact-1', attempt: 1, routeId: 'utility', model: 'summary-model', startedAt: '2026-10-23T00:00:00Z' };
     for (const [type, data] of [['llm/auxiliary-start', start], ['llm/auxiliary-end', { ...start, finishedAt: '2026-10-23T00:00:02Z', status: 'completed', usage }]] as const) journal.append({ type, data, eventVersion: 1, source: { ownerPluginId: '@actspace/core' }, surface: null });
     const commit = (attemptId?: string) => journal.appendMany(createCompactionTransaction({ surface: journal.surface, start: 0, end: 1, compactionId: attemptId ?? 'legacy', contributorIds: [], summaryDigest: 'digest', replacedTokens: { conversation: 8, summarizedConversation: 0 }, estimatorVersion: 'test', summary: { messageId: attemptId ?? 'legacy', kind: 'user', content: { text: 'summary', ...(attemptId ? { metadata: { attemptId } } : {}) } } }));

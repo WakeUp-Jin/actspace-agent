@@ -1,3 +1,4 @@
+import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionEventCandidateV1, SessionSurfaceNodeV1 } from "./event-envelope.js";
 import type { SessionSurfaceView } from "./surface.js";
 import { SessionError } from "./errors.js";
@@ -21,8 +22,9 @@ export function createCompactionReplacement(options: {
     type: "surface/replaced",
     eventVersion: 1,
     source: { ownerPluginId: "@actspace/core" },
-    data: { compactionId: options.compactionId, sourceEventSeqs: sources, replacedTokens: { conversation: options.replacedTokens.conversation, summarizedConversation: options.replacedTokens.summarizedConversation }, estimatorVersion: options.estimatorVersion },
-    surface: { kind: "replace", start: options.start, end: options.end, node: options.summary, sourceEventSeqs: sources },
+    data: { compactionId: options.compactionId, sourceEventSeqs: sources, replacedTokens: { conversation: options.replacedTokens.conversation, summarizedConversation: options.replacedTokens.summarizedConversation }, estimatorVersion: options.estimatorVersion, node: options.summary as SessionSurfaceNodeV1 & RuntimeV2JsonValue },
+    // 摘要节点只存在 data.node，surface 只记替换范围（agent-spec-surface-derived.md §4.2）。
+    surface: { kind: "replace", start: options.start, end: options.end, sourceEventSeqs: sources },
     provenance: { sourceEventSeqs: sources, contributorIds: options.contributorIds, runtimeSelectionSeq: null },
   };
   return Object.freeze(candidate);

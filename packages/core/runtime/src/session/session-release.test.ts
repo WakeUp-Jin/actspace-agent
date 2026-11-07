@@ -18,7 +18,7 @@ async function setup(options: { maxIdleSessions?: number } = {}) {
   }, store);
   const seed = async (id: string) => {
     const session = await store.create({ sessionId: id, createdAt: "2026-11-04T00:00:00.000Z", lineage: null, createdWith });
-    await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `m-${id}`, content: id }, surface: { kind: "append", node: { kind: "user", messageId: `m-${id}`, content: id } } });
+    await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: `m-${id}`, content: id }, surface: { kind: "append" } });
     await session.flush(); await session.close();
   };
   const open = (ids: readonly string[]) => ids.map(id => controller.getOpen(id) !== undefined);
@@ -149,7 +149,7 @@ describe("idle Session release", () => {
       const session = await controller.resume("a");
       await controller.release("a");
       // A closed Session no longer feeds projection listeners (the model was dropped with it).
-      await expect(session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "x", content: "x" }, surface: { kind: "append", node: { kind: "user", messageId: "x", content: "x" } } })).rejects.toBeTruthy();
+      await expect(session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "x", content: "x" }, surface: { kind: "append" } })).rejects.toBeTruthy();
       expect(updates).toBe(0);
       unsubscribe();
       const unpin = controller.addPin(() => true);

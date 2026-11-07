@@ -56,8 +56,8 @@ describe("chat projection turn usage", () => {
       journal.push(envelope(journal.length + 1, "llm/auxiliary-start", identity));
       journal.push(envelope(journal.length + 1, "llm/auxiliary-end", { ...identity, status: "completed", usage: { inputTokens: 100, outputTokens: 20, cost: null } }));
     }
-    const assistant = envelope(journal.length + 1, "assistant/message", { agentRunId: "run-1", messageId: "answer" });
-    journal.push({ ...assistant, surface: { kind: "append", node: { kind: "assistant", messageId: "answer", content: "Done" } } });
+    const assistant = envelope(journal.length + 1, "assistant/message", { agentRunId: "run-1", messageId: "answer", content: "Done" });
+    journal.push({ ...assistant, surface: { kind: "append" } });
     const state = { ...snapshot(), messages: [{ kind: "assistant" as const, messageId: "answer", content: "Done" }] };
     const events = projectChatEvents(state, journal);
     const usage = events.filter(event => event.type === "llm_usage");

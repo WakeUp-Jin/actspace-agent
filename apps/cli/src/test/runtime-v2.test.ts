@@ -37,7 +37,9 @@ describe("Runtime v2 CLI candidate", () => {
     expect(journal).toContain('"type":"turn/start"');
     expect(journal).toContain('"type":"permission/mode-set"');
     expect(journal).toContain('"type":"request/header"');
-    expect(journal).toContain('"type":"assistant/chunk"');
+    // 正文流不写日志，只写定稿的消息（agent-spec-live-assistant-stream.md）。
+    expect(journal).not.toContain('"type":"assistant/chunk"');
+    expect(journal).toContain('"type":"assistant/message"');
     expect(journal).toContain('"type":"session/end-seed"');
     const eventTypes = journal.trim().split("\n").map((line) => JSON.parse(line) as { recordKind?: string; type?: string }).filter((row) => row.recordKind === "event").map((row) => row.type);
     expect(eventTypes).not.toContain("agent/inbox/spliced");

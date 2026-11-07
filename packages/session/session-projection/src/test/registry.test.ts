@@ -7,7 +7,7 @@ const source = { ownerPluginId: "@actspace/core" } as const;
 function eventJournal(): SessionEventEnvelopeV1[] {
   const journal = new SessionJournal({ registry: createCoreCodecRegistry(), now: () => "2026-08-30T00:00:00.000Z" });
   journal.append({ type: "turn/start", eventVersion: 1, source, data: { turnId: "turn-1" }, surface: null });
-  journal.append({ type: "user/message", eventVersion: 1, source, data: { messageId: "user-1", content: "hello" }, surface: { kind: "append", node: { kind: "user", messageId: "user-1", content: "hello" } } });
+  journal.append({ type: "user/message", eventVersion: 1, source, data: { messageId: "user-1", content: "hello" }, surface: { kind: "append" } });
   journal.append({ type: "turn/end", eventVersion: 1, source, data: { turnId: "turn-1" }, surface: null });
   return [...journal.events];
 }

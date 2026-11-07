@@ -1,3 +1,4 @@
+import { surfaceNode } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1, SessionHeaderV1 } from "@actspace/session-journal";
 
 /** One rendered piece of the transcript, anchored to the Journal seq it cites; tool lines keep their call id. */
@@ -53,7 +54,7 @@ export function reduceTranscript(state: TranscriptState, event: SessionEventEnve
   switch (event.type) {
     case "user/message":
     case "agent/inbox/spliced": {
-      const node = event.surface?.kind === "append" ? event.surface.node : null;
+      const node = event.surface?.kind === "append" ? surfaceNode(event) : null;
       if (node?.kind !== "user") return base;
       const content = contentText(node.content);
       if (event.type === "agent/inbox/spliced" && data.source === "subagent_notification") {
@@ -89,7 +90,7 @@ export function reduceTranscript(state: TranscriptState, event: SessionEventEnve
       if (callId !== null) delete pending[callId];
       const head = call?.head ?? (typeof data.name === "string" ? data.name : "tool");
       const child = delegatedChild(data);
-      const status = typeof data.status === "string" ? data.status : event.surface?.kind === "append" && event.surface.node.kind === "tool-result" && event.surface.node.isError ? "failed" : "completed";
+      const status = typeof data.status === "string" ? data.status : surfaceNodeIsError(event) ? "failed" : "completed";
       const output = resultText(data, event);
       const outcome = [status, child ? `subagent session ${child} (transcript: ../${child}/transcript.md)` : null].filter(Boolean).join(" · ");
       const text = `- [#${call?.seq ?? event.seq}] ${head}\n  → ${outcome}${output ? `: ${output}` : ""}`;
@@ -97,7 +98,7 @@ export function reduceTranscript(state: TranscriptState, event: SessionEventEnve
       return child && !state.children.includes(child) ? { ...next, children: [...state.children, child] } : next;
     }
     case "surface/replaced": {
-      const node = event.surface?.kind === "replace" ? event.surface.node : null;
+      const node = event.surface?.kind === "replace" ? surfaceNode(event) : null;
       const summary = node ? contentText(node.content).trim() : "";
       const quoted = summary ? summary.split("\n").map(line => line ? `> ${line}` : ">").join("\n") : "> (no summary text)";
       return { ...push(base, event.seq, `---\n\n### Context compaction [#${event.seq}] · ${formatTime(event.time)}\n\nThe messages above were summarized for the model at this point. Summary:\n\n${quoted}\n\n---`), speaker: null };
@@ -237,11 +238,16 @@ function delegatedChild(data: Record<string, unknown>): string | null {
   return null;
 }
 
+function surfaceNodeIsError(event: SessionEventEnvelopeV1): boolean {
+  const node = event.surface?.kind === "append" ? surfaceNode(event) : null;
+  return node?.kind === "tool-result" && node.isError;
+}
+
 function resultText(data: Record<string, unknown>, event: SessionEventEnvelopeV1): string {
   const failure = record(data.failure);
   const raw = (typeof failure.message === "string" && failure.message)
     || contentText(data.modelOutput)
-    || (event.surface?.kind === "append" ? contentText(event.surface.node.content) : "")
+    || (event.surface?.kind === "append" ? contentText(surfaceNode(event)?.content) : "")
     || (typeof data.summary === "string" ? data.summary : "");
   const lines = raw.split("\n").map(line => line.trim()).filter(Boolean);
   if (!lines.length) return "";

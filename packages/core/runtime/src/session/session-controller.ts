@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { mainAgentFormComposition } from "@actspace/agent";
 import type { RuntimeV2SessionListItem, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 import type { MainAgentForm } from "@actspace/shared/runtime-v2";
+import { surfaceNode } from "@actspace/shared/runtime-v2";
 import type { EventCodecRegistry } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { SessionHandle as RuntimeSessionHandle } from "@actspace/session-persistence";
@@ -154,7 +155,7 @@ export class RuntimeSessionController {
       const records = (await Promise.all(carried.map(seq => live ? live.journal.readEvents(seq, seq + 1) : this.#cache.events(read!, seq, seq + 1)))).flat();
       journal = [...records, ...journal];
     }
-    const messageIds = new Set(journal.flatMap(event => event.surface ? [event.surface.node.messageId] : []));
+    const messageIds = new Set(journal.flatMap(event => { const node = surfaceNode(event); return node ? [node.messageId] : []; }));
     const callIds = new Set(journal.flatMap(event => {
       const data = eventData(event);
       return data && typeof data.callId === "string" ? [data.callId] : [];
@@ -510,7 +511,9 @@ function boundToolEvent(event: SessionEventEnvelopeV1): SessionEventEnvelopeV1 {
   }
   if (typeof data.summary === "string") bounded.summary = data.summary.slice(0, 1_000);
   if (data.failure !== undefined) bounded.failure = data.failure;
-  return { ...event, data: bounded, surface: event.surface ? { ...event.surface, node: { ...event.surface.node, content: "" } } : null };
+  // surface 只是标记，节点内容来自 data；裁掉 data 后窗口里这条事件推不出节点。client 的对话消息只来自 snapshot.messages
+  // （这里同样清空了被延后的工具结果），窗口事件只用来定位，不拼节点（agent-spec-surface-derived.md §6）。
+  return { ...event, data: bounded };
 }
 function jsonRecord(value: RuntimeV2JsonValue | undefined): Readonly<Record<string, RuntimeV2JsonValue>> | null {
   return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : null;

@@ -13,6 +13,7 @@ import { CONTEXT_BUCKET_REGISTRY } from "./context-buckets";
 import { describeSupplementEntry, describeSystemEntries, describeToolEntries, estimateConversationNode, type ContextSurfaceNodeInput } from "./context-entries";
 import { REQUEST_SYSTEM_PROMPT_EVENT, REQUEST_TOOLS_EVENT } from "./request-record";
 import { ESTIMATOR_VERSION } from "./token-estimate";
+import { surfaceNode, type SurfaceNodeSource } from "./runtime-v2/session-events";
 
 export const CONTEXT_SUPPLEMENT_EVENT = "plugin/actspace.context/supplement";
 
@@ -114,8 +115,9 @@ export function describeRequestTools(data: unknown): ContextPanelEntry[] {
 
 function surfaceOf(event: ContextEstimateEvent): { kind: "append"; node: ContextSurfaceNodeInput } | { kind: "replace"; node: ContextSurfaceNodeInput; sourceEventSeqs: readonly number[] } | null {
   const surface = record(event.surface);
-  const node = record(surface.node);
-  if (typeof node.kind !== "string" || typeof node.messageId !== "string") return null;
+  // 节点从 data 推出，surface 只是标记（agent-spec-surface-derived.md §4.2）。
+  const node = event.surface ? surfaceNode(event as unknown as SurfaceNodeSource) : null;
+  if (!node) return null;
   const input = node as unknown as ContextSurfaceNodeInput;
   if (surface.kind === "append") return { kind: "append", node: input };
   if (surface.kind === "replace") return { kind: "replace", node: input, sourceEventSeqs: array(surface.sourceEventSeqs).filter((seq): seq is number => typeof seq === "number") };

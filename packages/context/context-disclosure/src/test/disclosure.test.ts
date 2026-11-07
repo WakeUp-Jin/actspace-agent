@@ -26,7 +26,7 @@ function host() {
   return { port, indexes };
 }
 async function users(session: CompactionSession, count = 4) {
-  for (let i = 0; i < count; i++) { const messageId = `m${session.lastSeq + 1}`; await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId }, surface: { kind: "append", node: { kind: "user", messageId, content: `/file/${i}.ts` } } }); }
+  for (let i = 0; i < count; i++) { const messageId = `m${session.lastSeq + 1}`; await session.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId, content: `/file/${i}.ts` }, surface: { kind: "append" } }); }
 }
 async function fact(session: CompactionSession, paths: string[], reads = true) {
   await session.append({ type: STATE_EVENT, eventVersion: 1, source: { ownerPluginId: CONTEXT_OWNER }, data: { op: "fact", sourceSeq: session.lastSeq, callId: `call${session.lastSeq}`, time: new Date().toISOString(), paths: paths.map(path => ({ path, owner: "actspace.context-tools", read: reads })) }, surface: null });

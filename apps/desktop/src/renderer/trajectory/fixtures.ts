@@ -83,7 +83,7 @@ function errorsFixture(): RuntimeV2TrajectorySnapshot {
   extra(node => node.eventType === "user/message" && (node.data as Record<string, RuntimeV2JsonValue>).messageId === "user-1", "plugin/actspace.context/supplement",
     { turnId: "turn-1", op: "add", owner: "actspace.context-runtime", id: "runtime-state", lifetime: "turn", content: "运行环境：macOS · 工作目录 actspace-agent · 本轮执行预算剩余 18 步" });
   extra(node => node.eventType === "turn/end" && (node.data as Record<string, RuntimeV2JsonValue>).turnId === "turn-1", "agent/inbox/spliced",
-    { operation: "claim", target: "next-turn", source: "task_notification", taskId: "task-build", content }, { node: { kind: "user", content } });
+    { operation: "claim", messageId: "notice-task-build", target: "next-turn", source: "task_notification", taskId: "task-build", content }, { kind: "append" });
   // 插入后重排 eventSeq，保持 Journal 序号严格递增。
   return snapshot(nodes.map((node, eventSeq) => cloneNode(node, { eventSeq, key: `${node.sessionId}:${eventSeq}` })));
 }

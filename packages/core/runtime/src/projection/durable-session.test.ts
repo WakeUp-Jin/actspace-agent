@@ -11,13 +11,13 @@ describe("durable usage summary", () => {
     const append = (type: string, data: RuntimeV2JsonValue) => journal.append({ type, eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null });
     append("turn/start", { turnId: "t" });
     append("step/start", { turnId: "t", stepId: "s" });
-    journal.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "u" }, surface: { kind: "append", node: { kind: "user", messageId: "u", content: "hello" } } });
+    journal.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "u", content: "hello" }, surface: { kind: "append" } });
     append("request/header", { requestId: "r", turnId: "t", stepId: "s", contextWindow: 1000 });
     append("request/system-prompt", { requestId: "r", turnId: "t", stepId: "s", digest: "p", sections: [{ owner: "actspace.context-system", id: "core", order: 0, content: "be helpful" }], modelFacts: [], contributorProvenance: [] });
     append("request/tools", { requestId: "r", turnId: "t", stepId: "s", digest: "t", tools: [{ name: "read", description: "read a file", inputSchema: {} }] });
     append("request/context", { requestId: "r", turnId: "t", stepId: "s", snapshot: { schemaVersion: 3 } });
     for (let i = 0; i < 10; i++) append("assistant/chunk", { requestId: "r", messageId: "a", chunkIndex: i, chunk: { type: "text-delta", text: "hello" } });
-    journal.append({ type: "assistant/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "a", requestId: "r", content: "final" }, surface: { kind: "append", node: { kind: "assistant", messageId: "a", content: "final" } } });
+    journal.append({ type: "assistant/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "a", requestId: "r", content: "final" }, surface: { kind: "append" } });
     const live = new SessionReadModel(header, codecs);
     for (const [index, event] of journal.events.entries()) {
       live.apply(event);

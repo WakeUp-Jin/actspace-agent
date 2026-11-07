@@ -1,6 +1,7 @@
 import { prepare } from "./usage-sql";
 import type { ProjectionDatabase } from "./usage-sql";
 import type { SessionQuerySource } from "@actspace/session-storage";
+import { surfaceNode } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 
 /** Query-only fields. No transcript, recovery state, tools or Agent context. */
@@ -13,7 +14,7 @@ export function projectQueryCatalog(db: ProjectionDatabase, descriptor: SessionQ
   if (reset) prepare(db, "DELETE FROM catalog_pending_tasks WHERE session_id=?").run(h.sessionId);
   const excerpt = prepare(db, "INSERT INTO session_excerpt_search(session_id,event_seq,content) VALUES(?,?,?)");
   for (const event of events) {
-    const node = event.surface?.node;
+    const node = surfaceNode(event);
     // Search is explicitly over bounded excerpts, never raw tool outputs/context.
     if (node && (node.kind === "user" || node.kind === "assistant")) {
       const text = excerptText(node.content);
