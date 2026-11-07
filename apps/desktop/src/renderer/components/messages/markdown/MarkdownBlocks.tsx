@@ -1,11 +1,11 @@
 import { createContext, memo, useContext, useMemo } from "react";
-import Markdown from "react-markdown";
 import { isFenceClosed } from "../mermaid-renderer";
 import type { MarkdownBlock } from "../markdown-blocks";
 import { BLOCK_COMPONENTS, FOOTNOTE_COMPONENTS } from "./components-map";
 import { BlockStateContext } from "./contexts";
 import { useLazyChunks } from "./lazy-plugins";
 import type { createPipelineCache } from "./pipeline";
+import { renderMarkdown } from "./processor";
 
 /** 每条回复一个管线缓存（插件数组按组合只建一次，见 pipeline.ts），由 MarkdownProse 提供。 */
 export const PipelineContext = createContext<ReturnType<typeof createPipelineCache> | null>(null);
@@ -16,7 +16,8 @@ function usePipeline() {
   return pipelines;
 }
 
-function isOpenFence(source: string): boolean {
+/** 块是不是一个还没闭合的代码围栏。 */
+export function isOpenFence(source: string): boolean {
   const block = source.trimStart();
   return /^(`{3,}|~{3,})/.test(block) && !isFenceClosed(block);
 }
@@ -38,9 +39,7 @@ export const MarkdownBlockView = memo(function MarkdownBlockView({ block, defs, 
   const state = useMemo(() => ({ source: block.source, fenceOpen }), [block.source, fenceOpen]);
   return (
     <BlockStateContext.Provider value={state}>
-      <Markdown remarkPlugins={pipeline.remarkPlugins} rehypePlugins={pipeline.rehypePlugins} remarkRehypeOptions={pipeline.remarkRehypeOptions} components={BLOCK_COMPONENTS}>
-        {defs ? `${block.source}\n\n${defs}` : block.source}
-      </Markdown>
+      {renderMarkdown(defs ? `${block.source}\n\n${defs}` : block.source, pipeline, BLOCK_COMPONENTS)}
     </BlockStateContext.Provider>
   );
 }, sameBlockView);
@@ -51,9 +50,7 @@ export const FootnoteSection = memo(function FootnoteSection({ source, live }: {
   const state = useMemo(() => ({ source, fenceOpen: false }), [source]);
   return (
     <BlockStateContext.Provider value={state}>
-      <Markdown remarkPlugins={pipeline.remarkPlugins} rehypePlugins={pipeline.rehypePlugins} remarkRehypeOptions={pipeline.remarkRehypeOptions} components={FOOTNOTE_COMPONENTS}>
-        {source}
-      </Markdown>
+      {renderMarkdown(source, pipeline, FOOTNOTE_COMPONENTS)}
     </BlockStateContext.Provider>
   );
 });

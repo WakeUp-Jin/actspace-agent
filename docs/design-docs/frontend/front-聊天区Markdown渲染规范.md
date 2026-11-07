@@ -9,19 +9,20 @@
 | 包含 | 用 `MarkdownProse` 渲染的两处：助手回复（`AssistantReply`）、右侧子 Agent 面板（`SubagentsPanel`，本地 / Fork 子智能体的对话记录与外部 Agent 最终结果）；两处共用同一套实现，没有开关 |
 | 不包含 | 「文档」面板（CodeMirror 6，见 [front-Markdown编辑与渲染规范.md](front-Markdown编辑与渲染规范.md)）；轨迹详情里的 Markdown；用户消息；生成图片的轮尾列表 |
 
-与「文档」面板的关系：共用路径识别规则（`components/markdown-common/paths.ts`）、提示框写法与语义色（`callouts.ts`）、链接 / 路径颜色规则（`--act-color-link`）、代码高亮配色 `.act-code-hl`、KaTeX 懒加载 chunk。各自不同：聊天区是阅读场景用「A 书页」排版、原始 HTML 按白名单渲染、技术栈 `react-markdown`；文档面板是编辑场景用 Codex 排版、原始 HTML 按原文显示、用 CM6。生成图片是工具产物，不并入 Markdown，只管回复文字里写的图片。
+与「文档」面板的关系：共用路径识别规则（`components/markdown-common/paths.ts`）、提示框写法与语义色（`callouts.ts`）、链接 / 路径颜色规则（`--act-color-link`）、代码高亮配色 `.act-code-hl`、KaTeX 懒加载 chunk。各自不同：聊天区是阅读场景用「A 书页」排版、原始 HTML 按白名单渲染、技术栈 unified（remark / rehype，处理器常驻，见 `markdown/processor.ts`）；文档面板是编辑场景用 Codex 排版、原始 HTML 按原文显示、用 CM6。生成图片是工具产物，不并入 Markdown，只管回复文字里写的图片。
 
 ## 2. 架构
 
 ```text
 MarkdownProse（content, onOpenWorkspaceFile）
   ├─ 平滑输出：流式时按帧放出积压的文字
+  ├─ 降频解析：尾部最多每 100ms 解析一次，之间新放出的字作为原样尾巴显示
   ├─ 分块：splitMarkdownBlocks + 合并未闭合的 <details>
   ├─ 全局定义：脚注、引用式链接定义
-  └─ 每块一个 react-markdown
+  └─ 每块用常驻的 unified 处理器解析渲染（processor.ts）
        remark：gfm → math* → callouts → codeMeta → breaks
-       rehype：raw* → sanitize* → inlinePaths → katex* → highlight → streamTail（只在流式的最后一块）
-       components：a / pre / code / img / table 覆盖
+       rehype：raw* → sanitize* → inlinePaths → katex* → highlight → streamTail（只在流式的最后一块，放尾巴和渐显的占位）
+       components：a / pre / code / img / table 覆盖，加上尾巴与渐显组件（StreamTail.tsx）
 ```
 
 带 `*` 的插件按需加载。宿主能力经 context 注入，`MarkdownProse` 的 props 不变：
@@ -152,7 +153,8 @@ UI 字体 14px，数字等宽（`tabular-nums`）；无外框和底色，外层�
 
 - 沿用 `splitMarkdownBlocks`：除最后两块外冻结复用，只重解析尾部；其后 `mergeHtmlBlocks` 合并未闭合的 `<details>`。
 - 脚注与引用式链接定义（`definitions.ts`）：分块时全局收集 `[x]: url` 和 `[^x]: …`；块里引用了哪些定义，就把它们追加到该块源码末尾再解析（定义本身不在块内显示）；每块自己生成的脚注区去掉，整条回复只在最后渲染一次脚注区，编号按定义在全文中第一次被引用的顺序；块的 memo 依赖它用到的定义内容，定义到达或变化只重渲染引用它的块。不再因出现脚注或引用式定义就退回整条一块。
-- 正常流式每次更新渲染耗时约 0.4ms；平滑输出每帧只重渲染最后一块。数学（`remark-math`、`rehype-katex`、KaTeX 与 CSS）在某块源码第一次出现 `$` 时按需加载；原始 HTML（`rehype-raw`、`rehype-sanitize`）在第一次出现像 HTML 标签的文本（`/<\/?[a-z][\w-]*[\s>/]/i`）时按需加载；加载完成前这一块按原文显示，加载后只重渲染需要的块。主包增量不超过 10KB（gzip）。
+- 尾部降频解析：流式时最后一块最多每 100ms 重新解析一次，遇到新的一行、平滑输出追平网络、回复写完时立即解析；两次之间新放出的字作为原样尾巴接在最后一块末尾（没闭合的代码块里接在代码区），末尾渐显和光标由尾巴组件负责。处理器按管线组合常驻，不每次重建。详见 [流式 Markdown 解析降频规范](front-流式Markdown解析降频规范.md)。
+- 正常流式每次更新渲染耗时约 0.4ms；平滑输出每帧只重渲染最后一块，两次解析之间只重渲染尾巴组件。数学（`remark-math`、`rehype-katex`、KaTeX 与 CSS）在某块源码第一次出现 `$` 时按需加载；原始 HTML（`rehype-raw`、`rehype-sanitize`）在第一次出现像 HTML 标签的文本（`/<\/?[a-z][\w-]*[\s>/]/i`）时按需加载；加载完成前这一块按原文显示，加载后只重渲染需要的块。主包增量不超过 10KB（gzip）。
 - `MarkdownProse` 与 `AssistantReply` 仍用 `memo`；新加的 context 值和插件数组必须是稳定引用，否则整页历史回复每帧重渲染（见 [front-会话状态与数据流规范.md](front-会话状态与数据流规范.md)）。
 
 ## 7. 安全

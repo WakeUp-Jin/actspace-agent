@@ -2,11 +2,11 @@ import { act, render } from "@testing-library/react";
 import { memo, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// 包一层 react-markdown 的默认导出，数每个块被渲染了几次（性能约束：规范 §12 稳定引用、§9.1 每帧只渲染最后一块）。
+// 包一层 renderMarkdown（每块一次解析渲染），数每个块被渲染了几次（性能约束：规范 §12 稳定引用、§9.1 每帧只渲染最后一块）。
 const markdownSpy = vi.hoisted(() => vi.fn());
-vi.mock("react-markdown", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react-markdown")>();
-  return { ...actual, default: (props: { children?: string }) => { markdownSpy(props.children); return actual.default(props as never); } };
+vi.mock("../components/messages/markdown/processor", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../components/messages/markdown/processor")>();
+  return { ...actual, renderMarkdown: (...args: Parameters<typeof actual.renderMarkdown>) => { markdownSpy(args[0]); return actual.renderMarkdown(...args); } };
 });
 
 import { MarkdownProse } from "../components/messages/MarkdownProse";

@@ -229,9 +229,15 @@ importers:
       dompurify:
         specifier: ^3.4.16
         version: 3.4.16
+      hast-util-to-jsx-runtime:
+        specifier: 2.3.6
+        version: 2.3.6
       highlight.js:
         specifier: ^11.11.1
         version: 11.12.0
+      html-url-attributes:
+        specifier: 3.0.1
+        version: 3.0.1
       katex:
         specifier: 0.16.47
         version: 0.16.47
@@ -298,9 +304,21 @@ importers:
       remark-math:
         specifier: 6.0.0
         version: 6.0.0
+      remark-parse:
+        specifier: 11.0.0
+        version: 11.0.0
+      remark-rehype:
+        specifier: 11.1.2
+        version: 11.1.2
+      unified:
+        specifier: 11.0.5
+        version: 11.0.5
       unist-util-visit:
         specifier: 5.0.0
         version: 5.0.0
+      vfile:
+        specifier: 6.0.3
+        version: 6.0.3
       ws:
         specifier: 8.21.0
         version: 8.21.0
@@ -6801,9 +6819,6 @@ packages:
   unist-util-visit@5.0.0:
     resolution: {integrity: sha512-MR04uvD+07cwl/yhVuVWAtw+3GOR/knlL55Nd/wAdblk27GCVt3lqpTivy/tkJcZoNPzTwS1Y+KMojlLDhoTzg==}
 
-  unist-util-visit@5.1.0:
-    resolution: {integrity: sha512-m+vIdyeCOpdr/QeQCu2EzxX/ohgS8KbnPDgFni4dQsfSCtpz8UqDyY5GjRru8PDKuYn7Fq19j1CQ+nJSsGKOzg==}
-
   universalify@0.1.2:
     resolution: {integrity: sha512-rBJeI5CXAlmy1pV+617WB9J63U6XcazHHF2f2dbJix4XzpUF0RS3Zbj0FGIOCAva5P/d/GBOYaACQ1w+0azUkg==}
     engines: {node: '>= 4.0.0'}
@@ -12010,7 +12025,7 @@ snapshots:
     dependencies:
       '@types/nlcst': 2.0.3
       nlcst-to-string: 4.0.0
-      unist-util-visit: 5.1.0
+      unist-util-visit: 5.0.0
 
   retry@0.13.1: {}
 
@@ -12405,12 +12420,6 @@ snapshots:
       unist-util-is: 6.0.1
 
   unist-util-visit@5.0.0:
-    dependencies:
-      '@types/unist': 3.0.3
-      unist-util-is: 6.0.1
-      unist-util-visit-parents: 6.0.2
-
-  unist-util-visit@5.1.0:
     dependencies:
       '@types/unist': 3.0.3
       unist-util-is: 6.0.1

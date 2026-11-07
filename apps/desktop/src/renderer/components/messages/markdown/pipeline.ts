@@ -32,9 +32,9 @@ export type BlockPipeline = {
 /**
  * 管线（规范 §4）：
  *   remark：gfm → math* → callouts → codeMeta → breaks
- *   rehype：raw* → sanitize* → inlinePaths → katex* → highlight → streamTail（只在流式的最后一块）
- * 带 `*` 的来自按需加载的 chunk。每种组合的插件数组只建一次，之后都是同一个引用，
- * 否则平滑输出的每一帧 react-markdown 都会认为插件变了，所有块跟着重新解析。
+ *   rehype：raw* → sanitize* → inlinePaths → katex* → highlight → streamTail（只在流式的最后一块，放尾巴和渐显的占位，见 StreamTail.tsx）
+ * 带 `*` 的来自按需加载的 chunk。每种组合的管线对象只建一次，之后都是同一个引用：
+ * processor.ts 按这个对象缓存已冻结的 unified 处理器，换了引用就会重建。
  */
 export function createPipelineCache(prefix: string) {
   const cache = new Map<string, BlockPipeline>();
@@ -57,7 +57,7 @@ export function createPipelineCache(prefix: string) {
             rehypeInlinePaths,
             ...(math?.MATH_REHYPE_PLUGINS ?? []),
             rehypeSharedHighlight,
-            ...(tail ? [rehypeStreamTail] : []),
+            ...(tail ? [[rehypeStreamTail, { skipFootnoteSection: kind === "block" }]] : []),
           ] as PluginList,
           remarkRehypeOptions,
         };

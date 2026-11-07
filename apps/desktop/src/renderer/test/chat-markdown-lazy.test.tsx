@@ -1,11 +1,11 @@
 import { render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// 数 react-markdown 的渲染次数，并记录两个懒加载 chunk 是否被加载过（chunk 模块被 mock 包一层，工厂只在第一次 import 时运行）。
+// 数 renderMarkdown 的调用次数，并记录两个懒加载 chunk 是否被加载过（chunk 模块被 mock 包一层，工厂只在第一次 import 时运行）。
 const hoisted = vi.hoisted(() => ({ markdown: vi.fn(), loads: { math: 0, html: 0 } }));
-vi.mock("react-markdown", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react-markdown")>();
-  return { ...actual, default: (props: { children?: string }) => { hoisted.markdown(props.children); return actual.default(props as never); } };
+vi.mock("../components/messages/markdown/processor", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../components/messages/markdown/processor")>();
+  return { ...actual, renderMarkdown: (...args: Parameters<typeof actual.renderMarkdown>) => { hoisted.markdown(args[0]); return actual.renderMarkdown(...args); } };
 });
 vi.mock("../components/messages/markdown/math-chunk", async (importOriginal) => {
   hoisted.loads.math += 1;

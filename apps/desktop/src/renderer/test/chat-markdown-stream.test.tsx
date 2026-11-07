@@ -2,101 +2,146 @@ import { act, render, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MarkdownProse } from "../components/messages/MarkdownProse";
 import { ReplyStreamingContext } from "../components/messages/reply-streaming-context";
+import { toJsxRuntime } from "hast-util-to-jsx-runtime";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
+import { BLOCK_COMPONENTS } from "../components/messages/markdown/components-map";
+import { BlockStateContext } from "../components/messages/markdown/contexts";
 import type { HastNode } from "../components/messages/markdown/hast-types";
-import { rehypeStreamTail, TAIL_LEVELS } from "../components/messages/markdown/rehype-stream-tail";
+import { rehypeStreamTail, TAIL_LEVELS, type StreamTailOptions } from "../components/messages/markdown/rehype-stream-tail";
+import { NO_TAIL, StreamTailContext, type StreamTail } from "../components/messages/markdown/StreamTail";
 import { nextCut, snapCut, useSmoothText } from "../components/messages/markdown/smooth-text";
 
 /** 流式效果：末尾渐显、光标、平滑输出（规范 §7，T19）。 */
 
 const text = (value: string): HastNode => ({ type: "text", value });
 const el = (tagName: string, children: HastNode[], className?: string[]): HastNode => ({ type: "element", tagName, properties: className ? { className } : {}, children });
-const run = (tree: HastNode) => { rehypeStreamTail()(tree); return tree; };
-const flat = (node: HastNode): string => (node.type === "text" ? node.value ?? "" : (node.children ?? []).map(flat).join(""));
-const spansOf = (node: HastNode, level: number): HastNode[] => {
-  const hits: HastNode[] = [];
-  const walk = (n: HastNode) => {
-    if (n.tagName === "span" && (n.properties?.className as string[] | undefined)?.includes(`md-tail-${level}`)) hits.push(n);
-    n.children?.forEach(walk);
-  };
-  walk(node);
-  return hits;
-};
-const carets = (node: HastNode): HastNode[] => {
-  const hits: HastNode[] = [];
-  const walk = (n: HastNode) => {
-    if ((n.properties?.className as string[] | undefined)?.includes("md-caret")) hits.push(n);
-    n.children?.forEach(walk);
-  };
-  walk(node);
-  return hits;
-};
 
-describe("rehypeStreamTail", () => {
+/** 插件只放占位元素，渐显和光标由组件按尾巴生成：跑插件，再用和聊天区一样的组件映射渲染成 DOM。 */
+function renderTail(children: HastNode[], tail: StreamTail = NO_TAIL, options?: StreamTailOptions, source = ""): HTMLElement {
+  const tree = el("root", children);
+  tree.type = "root";
+  rehypeStreamTail(options)(tree);
+  const output = toJsxRuntime(tree as never, { Fragment, jsx, jsxs, components: BLOCK_COMPONENTS as never, passNode: true });
+  const { container } = render(
+    <BlockStateContext.Provider value={{ source, fenceOpen: false }}>
+      <StreamTailContext.Provider value={tail}>{output}</StreamTailContext.Provider>
+    </BlockStateContext.Provider>,
+  );
+  return container;
+}
+const levelText = (root: Element, level: number) => Array.from(root.querySelectorAll(`.md-tail-${level}`)).map((node) => node.textContent).join("");
+
+describe("rehypeStreamTail + 尾巴组件", () => {
   it("光标放在结尾空白之前，不落在结尾换行后面", () => {
-    const p = el("p", [text("你好世界  \n")]);
-    run(el("root", [p]));
-    const kinds = p.children!.map((child) => (child.type === "text" ? `text:${JSON.stringify(child.value)}` : (child.properties!.className as string[]).join(" ")));
-    const caretAt = kinds.findIndex((kind) => kind === "md-caret");
-    expect(caretAt).toBeGreaterThan(-1);
-    expect(kinds[kinds.length - 1]).toBe('text:"  \\n"');
-    expect(caretAt).toBe(kinds.length - 2);
-    expect(flat(p)).toBe("你好世界  \n");
+    const root = renderTail([el("p", [text("你好世界  \n")])]);
+    const p = root.querySelector("p")!;
+    expect(p.textContent).toBe("你好世界  \n");
+    const caret = p.querySelector(".md-caret")!;
+    expect(caret).not.toBeNull();
+    // 光标后面只剩结尾空白。
+    expect(caret.parentElement!.nextSibling?.textContent).toBe("  \n");
   });
 
   it("末尾有纯空白文本节点时，光标跟在最后一个可见字后面", () => {
-    const li = el("li", [text("项目")]);
-    const ul = el("ul", [text("\n"), li, text("\n")]);
-    run(el("root", [ul]));
-    expect(carets(li)).toHaveLength(1);
-    expect(carets(ul)).toHaveLength(1);
-    expect(ul.children![ul.children!.length - 1]).toEqual(text("\n"));
-    expect(ul.children![0]).toEqual(text("\n"));
+    const root = renderTail([el("ul", [text("\n"), el("li", [text("项目")]), text("\n")])]);
+    const li = root.querySelector("li")!;
+    expect(li.querySelectorAll(".md-caret")).toHaveLength(1);
+    expect(root.querySelectorAll(".md-caret")).toHaveLength(1);
+    expect(root.querySelector("ul")!.lastChild?.textContent).toBe("\n");
   });
 
   it("代码块里不放光标，文字原样保留", () => {
-    const code = el("code", [text("const a = 1;\n")]);
-    const tree = el("root", [el("pre", [code])]);
-    run(tree);
-    expect(carets(tree)).toHaveLength(0);
-    expect(flat(tree)).toBe("const a = 1;\n");
+    const root = renderTail([el("pre", [el("code", [text("const a = 1;\n")])])]);
+    expect(root.querySelector(".md-caret")).toBeNull();
+    expect(root.querySelector("code")!.textContent).toBe("const a = 1;\n");
   });
 
   it("公式内部不渐显、不放光标", () => {
-    const math = el("span", [el("span", [text("x²")])], ["katex"]);
-    const tree = el("root", [el("p", [text("前文"), math])]);
-    run(tree);
-    expect(flat(math)).toBe("x²");
-    expect(spansOf(math, 1)).toHaveLength(0);
-    expect(carets(math)).toHaveLength(0);
-    // 最后一段可见文字是“前文”，光标跟在它后面。
-    expect(carets(tree)).toHaveLength(1);
+    const root = renderTail([el("p", [text("前文"), el("span", [el("span", [text("x²")])], ["katex"])])]);
+    const math = root.querySelector(".katex")!;
+    expect(math.textContent).toBe("x²");
+    expect(math.querySelector(".md-tail, .md-caret")).toBeNull();
+    expect(root.querySelectorAll(".md-caret")).toHaveLength(1);
+    expect(levelText(root, 1)).toBe("前文");
   });
 
   it("标了批注排除的节点内部也不参与", () => {
     const excluded: HastNode = { type: "element", tagName: "span", properties: { dataAnnotationExclude: "" }, children: [text("隐藏")] };
-    const tree = el("root", [el("p", [text("可见"), excluded])]);
-    run(tree);
-    expect(spansOf(excluded, 1)).toHaveLength(0);
+    const root = renderTail([el("p", [text("可见"), excluded])]);
+    expect(root.querySelector("[data-annotation-exclude]")!.querySelector(".md-tail")).toBeNull();
   });
 
   it("渐显的层数和字数：末尾 10 / 12 / 14 个字，更前面的不处理", () => {
     const value = "甲".repeat(20) + "乙".repeat(14) + "丙".repeat(12) + "丁".repeat(10);
-    const p = el("p", [text(value)]);
-    run(el("root", [p]));
-    const [one, two, three] = [1, 2, 3].map((level) => spansOf(p, level).map(flat).join(""));
+    const root = renderTail([el("p", [text(value)])]);
     expect(TAIL_LEVELS).toEqual([10, 22, 36]);
-    expect(one).toBe("丁".repeat(10));
-    expect(two).toBe("丙".repeat(12));
-    expect(three).toBe("乙".repeat(14));
-    expect(spansOf(p, 4)).toHaveLength(0);
-    expect(flat(p)).toBe(value);
+    expect(levelText(root, 1)).toBe("丁".repeat(10));
+    expect(levelText(root, 2)).toBe("丙".repeat(12));
+    expect(levelText(root, 3)).toBe("乙".repeat(14));
+    expect(root.querySelector(".md-tail-4")).toBeNull();
+    expect(root.querySelector("p")!.textContent).toBe(value);
   });
 
   it("层数可以跨文本节点累计", () => {
-    const p = el("p", [text("一二三四五"), el("strong", [text("六七八九十十一")])]);
-    run(el("root", [p]));
-    expect(spansOf(p, 1).map(flat).join("")).toBe("三四五六七八九十十一".slice(-10));
-    expect(flat(p)).toBe("一二三四五六七八九十十一");
+    const root = renderTail([el("p", [text("一二三四五"), el("strong", [text("六七八九十十一")])])]);
+    expect(levelText(root, 1)).toBe("三四五六七八九十十一".slice(-10));
+    expect(root.querySelector("p")!.textContent).toBe("一二三四五六七八九十十一");
+    // 光标在加粗外面。
+    expect(root.querySelector("strong .md-caret")).toBeNull();
+  });
+
+  it("有尾巴时：尾巴接在最后一个字后面、带渐显，已解析部分只承担剩下的渐显字数，光标在尾巴后面", () => {
+    const root = renderTail([el("p", [text("甲".repeat(30))])], { text: "乙".repeat(12), lead: "" });
+    const p = root.querySelector("p")!;
+    expect(p.textContent).toBe("甲".repeat(30) + "乙".repeat(12));
+    const raw = p.querySelector(".md-tail-raw")!;
+    expect(raw.textContent).toBe("乙".repeat(12));
+    expect(levelText(raw, 1)).toBe("乙".repeat(10));
+    expect(levelText(raw, 2)).toBe("乙".repeat(2));
+    // 已解析部分从第 13 个字开始：md-tail-2 还剩 10 个、md-tail-3 14 个。
+    expect(levelText(p, 2)).toBe("甲".repeat(10) + "乙".repeat(2));
+    expect(levelText(p, 3)).toBe("甲".repeat(14));
+    expect(raw.lastElementChild).toHaveClass("md-caret");
+  });
+
+  it("尾巴超过 36 个字时已解析部分不再渐显；结尾空白放在光标后面；段末被吃掉的空格补回", () => {
+    const root = renderTail([el("p", [text("已解析")])], { text: "新".repeat(40) + " ", lead: " " });
+    const p = root.querySelector("p")!;
+    expect(p.textContent).toBe("已解析 " + "新".repeat(40) + " ");
+    expect(p.querySelector("act-fade, .md-tail-raw ~ .md-tail")).toBeNull();
+    expect(p.firstChild?.textContent).toBe("已解析");
+    expect(p.querySelector(".md-caret")!.nextSibling?.textContent).toBe(" ");
+  });
+
+  it("尾巴不进加粗、链接：接在行内元素后面", () => {
+    const root = renderTail([el("p", [text("看 "), el("strong", [text("重点")])])], { text: "后文", lead: "" });
+    expect(root.querySelector("strong")!.textContent).toBe("重点");
+    expect(root.querySelector("p > .md-tail-raw")!.textContent).toBe("后文");
+  });
+
+  it("没闭合的代码块：尾巴接在代码最后一行的行尾，不高亮、不放光标；源码以换行结尾时另起一行", () => {
+    const code = () => [el("pre", [el("code", [el("span", [text("const")], ["hljs-keyword"]), text(" a = 1;\n")], ["language-ts"])])];
+    const sameLine = renderTail(code(), { text: "0", lead: "" }, undefined, "```ts\nconst a = 1;");
+    expect(sameLine.querySelector("code")!.textContent).toBe("const a = 1;0\n");
+    expect(sameLine.querySelector(".md-caret")).toBeNull();
+    const nextLine = renderTail(code(), { text: "le", lead: "" }, undefined, "```ts\nconst a = 1;\n");
+    expect(nextLine.querySelector("code")!.textContent).toBe("const a = 1;\nle\n");
+    expect(nextLine.querySelector(".md-tail-raw")!.parentElement!.tagName).toBe("CODE");
+    // 尾巴以换行结尾时不多出空行：和下一次解析的结果（代码末尾只有一个换行）行数相同，代码块不回缩。
+    const endsWithBreak = renderTail(code(), { text: "le\nx = 2;\n", lead: "" }, undefined, "```ts\nconst a = 1;\n");
+    expect(endsWithBreak.querySelector("code")!.textContent).toBe("const a = 1;\nle\nx = 2;\n");
+  });
+
+  it("隐藏的脚注区不接尾巴、不渐显：落在它前面的正文上", () => {
+    const section: HastNode = { type: "element", tagName: "section", properties: { dataFootnotes: true }, children: [el("ol", [el("li", [el("p", [text("注释")])])])] };
+    const root = renderTail([el("p", [text("正文")]), text("\n"), section], { text: "续", lead: "" }, { skipFootnoteSection: true });
+    expect(root.querySelector("section")).toBeNull();
+    expect(root.querySelector("p")!.textContent).toBe("正文续");
+  });
+
+  it("块里没有可接的容器（最后是分隔线）时，尾巴和光标都不显示", () => {
+    const root = renderTail([el("hr", [])], { text: "x", lead: "" });
+    expect(root.querySelector(".md-tail-raw, .md-caret")).toBeNull();
   });
 });
 

@@ -40,6 +40,7 @@
 - [中间消息区](front-中间消息区规范.md)：消息语法、工具流、执行状态。
 - [轮尾与导航](front-轮尾与导航规范.md)：轮尾操作、用量胶囊、轮次导航、压缩显示、交付卡片。
 - [聊天区 Markdown 渲染](front-聊天区Markdown渲染规范.md)：`MarkdownProse` 排版、公式、Mermaid、流式稳定性。
+- [流式 Markdown 解析降频](front-流式Markdown解析降频规范.md)：尾部最多每 100ms 解析一次、原样尾巴、处理器常驻。
 - [聊天输入框](front-聊天输入框规范.md)：Composer、模式、模型、附件、`/` 菜单、发送。
 - [文件引用与回复批注](front-composer-file-mentions-and-response-annotations.md)：`@` 工作区文件、选区批注、引用托盘。
 - [工作区、Git 与运行目标](front-workspace-git-worktree-context.md)：初始 Composer 的工作区、分支、本机 / 远端、工作树。
