@@ -7,7 +7,7 @@ import { FixedRendererStreamAdapter } from "../runtime-v2/fixed-renderer-stream-
 import { executionEnvironment } from "../runtime-v2/approval-broker";
 import { randomUUID } from "node:crypto";
 import type { BrowserWindow } from "electron";
-import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as C, mergePieces, type LiveOutputPage, type LiveOutputPiece, type RuntimeV2SessionListItem, type RuntimeV2SessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
+import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as C, mergePieces, rewindErrorMessage, type LiveOutputPage, type LiveOutputPiece, type RuntimeV2SessionListItem, type RuntimeV2SessionObservation, type TaskSnapshot } from "@actspace/shared/runtime-v2";
 import type { SessionListItem, SessionListPage, SessionListPageInput } from "@actspace/shared";
 import { HOST_IPC, isRecord, type SessionRef } from "@actspace/shared/host-protocol";
 import { RemoteSessionRouter, attachmentUploadSources, parseRemoteSessionKey, remoteSessionKey } from "./session-router";
@@ -256,10 +256,15 @@ export class RemoteDesktopAdapter {
           if (!record.ready) { await this.#router.upload(ref, paths, (bytes, total) => progress(bytes, total), record.uploadIds, save, id => this.#artifacts.read(ref, id)); record.ready = true; await save(); }
           progress(0, 0, "submitting");
           submitted = true;
-          return await call("tasks.submit", { submissionId: input.submissionId, content: input.userInput, fileReferences: input.fileReferences ?? [], responseAnnotations: input.responseAnnotations ?? [], ...(record.uploadIds.length ? { uploadIds: record.uploadIds } : {}) });
+          const params = { submissionId: input.submissionId, content: input.userInput, fileReferences: input.fileReferences ?? [], responseAnnotations: input.responseAnnotations ?? [], ...(record.uploadIds.length ? { uploadIds: record.uploadIds } : {}), ...(input.rewind ? { rewind: input.rewind } : {}) };
+          if (!input.agentRunId) return await call("tasks.submit", params);
+          // An older Host refuses the unknown parameter before admitting anything; it then starts the Run under its own id.
+          try { return await call("tasks.submit", { ...params, agentRunId: input.agentRunId }); }
+          catch (error) { if (!input.rewind && error instanceof Error && error.message === "Unexpected Host parameter") return await call("tasks.submit", params); throw error; }
           } catch (error) {
             const rejected = !submitted || (isRecord(error) && typeof error.kind === "string");
-            return { status: "submission-failed", acknowledgement: rejected ? "rejected" : "unknown", message: error instanceof Error ? error.message : "提交失败，请稍后重试。" };
+            const rewindMessage = input.rewind && rejected ? rewindErrorMessage(error) : undefined;
+            return { status: "submission-failed", acknowledgement: rejected ? "rejected" : "unknown", message: rewindMessage ?? (error instanceof Error ? error.message : "提交失败，请稍后重试。") };
           } finally { progress(0, 0, "finished"); }
         });
       }

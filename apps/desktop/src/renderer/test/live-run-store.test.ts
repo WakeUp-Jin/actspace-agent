@@ -163,4 +163,34 @@ describe("task queue store", () => {
     expect(runs.isTerminal("run-1")).toBe(true);
     expect(effects.patchLocal).toHaveBeenCalledWith("s1", expect.objectContaining({ messageQueue: expect.anything() }));
   });
+
+  // agent-edit-resend-rewind.md §5.5：空闲发送的任务正在开始，不进托盘；它没开始就结束时卸下乐观 run。
+  it("keeps the task an optimistic run is starting out of the tray, and drops the run if the task never starts", () => {
+    const tasks = createTaskQueueStore();
+    const runs = createLiveRunStore();
+    const patchLocal = vi.fn();
+    const effects = { tasks, runs, patchLocal, notice: vi.fn(), refreshSession: vi.fn() };
+    const task = (taskId: string, submissionId: string, state: string) => ({ taskId, submissionId, content: { kind: "composer-task", original: { userInput: taskId }, prepared: taskId }, acceptedSeq: 1, state, targetRunId: null, runId: null, continuationOf: null });
+    tasks.rememberOptions("s1", "sub-a", { mode: "agent", selectedSkills: [] } as never, "optimistic-run");
+    expect(tasks.requestedRun("sub-a")).toBe("optimistic-run");
+    const optimistic = run("s1", "optimistic-run");
+    runs.start(optimistic);
+    const pending = { ...snapshot("s1", 1), queue: ["a", "b"], tasks: [task("a", "sub-a", "pending"), task("b", "sub-b", "pending")] } as unknown as TaskSnapshot;
+    applyTaskSnapshot(pending, effects);
+    expect(patchLocal.mock.calls.at(-1)![1].messageQueue.items.map((item: { id: string }) => item.id)).toEqual(["b"]);
+    expect(runs.get("s1")).toBe(optimistic);
+
+    // Cancelled before it started: the optimistic run goes away.
+    applyTaskSnapshot({ ...pending, revision: 2, queue: ["b"], tasks: [task("a", "sub-a", "cancelled"), task("b", "sub-b", "pending")] } as unknown as TaskSnapshot, effects);
+    expect(runs.has("s1")).toBe(false);
+  });
+
+  it("forgets a rewound Session's snapshot so the next, lower revision is accepted", () => {
+    const tasks = createTaskQueueStore();
+    tasks.rememberOptions("s1", "sub-1", { mode: "agent", selectedSkills: [] } as never);
+    expect(tasks.accept(snapshot("s1", 9))).not.toBeNull();
+    tasks.forgetSnapshot("s1");
+    expect(tasks.accept(snapshot("s1", 1))).not.toBeNull();
+    expect(tasks.options("sub-1")).toBeDefined();
+  });
 });

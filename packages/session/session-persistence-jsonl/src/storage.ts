@@ -7,6 +7,7 @@ import type { SessionStorage, SessionStorageHandle, SessionStorageRefresh, Sessi
 import { readJsonlSession, refreshJsonlSession, type JournalResume, type SessionInspection } from "./jsonl-reader.js";
 import { JsonlSessionWriter, type JsonlWriterHooks } from "./jsonl-writer.js";
 import { sessionFileLayout } from "./layout.js";
+import { retireJsonlSession, rewriteJsonlPrefix } from "./rewind.js";
 import { JsonlQueryReader } from "./query-reader.js";
 import { queryStamp } from "./query-stamp.js";
 import { SessionWriterLease, type AcquireWriterLeaseOptions } from "./writer-lease.js";
@@ -139,6 +140,23 @@ export class JsonlSessionStorage implements SessionStorage {
     // Rename while owned. A later creator at the original ID cannot be removed by cleanup.
     await rename(layout.sessionDir, retired);
     try { await handle.close(); } finally { await rm(retired, { recursive: true, force: true }); }
+  }
+
+  /** The Session must be closed in this process; the writer lease rejects any other holder. */
+  async rewritePrefix(sessionId: string, input: import("@actspace/session-storage").SessionPrefixRewrite): Promise<{ readonly archive: string }> {
+    this.#assertOpen();
+    this.#assertNoHandle(sessionId);
+    return rewriteJsonlPrefix(this.options, sessionId, input);
+  }
+
+  async retireInto(sessionId: string, parentSessionId: string, label: string): Promise<void> {
+    this.#assertOpen();
+    this.#assertNoHandle(sessionId);
+    await retireJsonlSession(this.options, sessionId, parentSessionId, label);
+  }
+
+  #assertNoHandle(sessionId: string): void {
+    if ([...this.#handles].some(handle => handle.header.sessionId === sessionId)) throw new SessionError("SESSION_WRITER_LOCKED", `Session ${sessionId} is still open in this process.`);
   }
 
   async close(): Promise<void> {

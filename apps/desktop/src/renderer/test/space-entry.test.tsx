@@ -70,8 +70,8 @@ describe("Space 演示入口（T4）", () => {
     expect(screen.getByText("开发中演示")).toBeInTheDocument();
     expect(within(section).getByRole("button", { name: /支付链路提速/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByPlaceholderText("接下来做什么？")).toBeInTheDocument();
-    // 协调 Agent 右栏默认三个标签
-    expect(screen.getByRole("tab", { name: "Actor" })).toBeInTheDocument();
+    // 协调 Agent 右栏默认三个标签（右栏晚一拍挂上，全量并行跑时同步查询会落空）
+    expect(await screen.findByRole("tab", { name: "Actor" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "库" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "记忆" })).toBeInTheDocument();
   });

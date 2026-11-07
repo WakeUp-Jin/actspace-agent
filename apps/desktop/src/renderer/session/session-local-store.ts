@@ -20,6 +20,11 @@ export type SessionLocalState = {
   draft?: ComposerDraftRestore;
   composer?: ComposerSessionState;
   compactionFailure?: CompactionBlock;
+  /**
+   * 编辑提问重发进行中：这条提问（`fromSeq` 是它的 durable 序号）及之后的 durable 内容先从消息流里拿掉，
+   * 新提问作为乐观 run 显示在原位置；会话重载完清掉（agent-edit-resend-rewind.md §5.2）。
+   */
+  rewinding?: { readonly fromSeq: number };
   lastSendOptions?: ComposerSendOptions;
   /** 侧边对话输入框选的模型；没选过时用主会话的。 */
   selectedModelId?: ModelSelectionId;

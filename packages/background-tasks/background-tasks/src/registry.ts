@@ -159,6 +159,17 @@ export class BackgroundTaskRegistry {
     }
   }
 
+  /**
+   * The Session rewound past these tasks' start (agent-edit-resend-rewind.md §3.5): drop them, so the list and
+   * `task_output` no longer show them. A task still running is kept; the rewind stops it first.
+   */
+  forget(sessionId: string, taskIds: readonly string[]): void {
+    for (const taskId of taskIds) {
+      const entry = this.#entries.get(taskId);
+      if (entry?.source.sessionId === sessionId && entry.status !== "running") this.#entries.delete(taskId);
+    }
+  }
+
   /** Host shutdown: stop processes but leave the Journal open so the next start reports them as lost. */
   async dispose(): Promise<void> {
     this.#disposed = true;

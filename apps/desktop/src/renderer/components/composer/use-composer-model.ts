@@ -31,13 +31,15 @@ export type ComposerModelSource = {
   readonly remoteReady: boolean;
   /** 一起下发给 configure 的 Skills。 */
   readonly selectedSkills: readonly string[];
+  /** 选择变化时给会话下发 configure；消息流里的提问编辑器传 false，发送时再随提交一起配置。 */
+  readonly configure?: boolean;
 };
 
 /**
  * 09 T30：输入框的模型。本机按设置页的模型表选、带 Thinking / 推理强度等运行时选项；远端读 Host 的模型目录（15）。
  * 选中的模型和运行时选项变化时，给当前会话下发 configure。
  */
-export function useComposerModel({ target, sessionId, models, defaultModelId, selectedModelId: controlledSelectedModelId, onSelectedModelChange, remoteReady, selectedSkills }: ComposerModelSource) {
+export function useComposerModel({ target, sessionId, models, defaultModelId, selectedModelId: controlledSelectedModelId, onSelectedModelChange, remoteReady, selectedSkills, configure = true }: ComposerModelSource) {
   const isRemoteTarget = target.kind === "remote";
   const modelList: ComposerModelOption[] = models === undefined
     ? LEGACY_MODEL_OPTIONS
@@ -69,9 +71,9 @@ export function useComposerModel({ target, sessionId, models, defaultModelId, se
 
   const configurationKey = JSON.stringify({ model: isRemoteTarget ? catalog.selectedModelId : selectedModelId, thinkingEnabled: runtimeOptions.thinkingEnabled, reasoningEffort: runtimeOptions.reasoningEffort, selectedSkillIds: selectedSkills });
   useEffect(() => {
-    if (!sessionId || (isRemoteTarget && !remoteReady)) return;
+    if (!configure || !sessionId || (isRemoteTarget && !remoteReady)) return;
     void tasksApi.command({ sessionId, op: "configure", configuration: JSON.parse(configurationKey) }).catch(error => console.error("Failed to update execution configuration", error));
-  }, [sessionId, configurationKey, isRemoteTarget, remoteReady]);
+  }, [configure, sessionId, configurationKey, isRemoteTarget, remoteReady]);
 
   // 默认模型可能在 Composer 挂载后才异步到达（settings:get）；只在用户尚未手动
   // 选择过模型时同步，避免覆盖用户当前会话里的临时选择。

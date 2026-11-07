@@ -50,12 +50,13 @@ export function takeSteering(queue: SessionMessageQueue, id: string): { queue: S
   return { queue: { ...queue, steering: queue.steering.filter((candidate) => candidate !== item) }, item };
 }
 
-export function projectTaskQueue(snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot): SessionMessageQueue {
+/** `starting`：空闲发送时正在开始的那条任务，它已作为乐观消息显示在消息流里，不进托盘。 */
+export function projectTaskQueue(snapshot: import("@actspace/shared/runtime-v2").TaskSnapshot, starting?: (task: import("@actspace/shared/runtime-v2").TaskRecord) => boolean): SessionMessageQueue {
   const items: QueuedComposerMessage[] = []; const steering: QueuedComposerMessage[] = [];
   for (const id of snapshot.queue) {
     const task = snapshot.tasks.find(task => task.taskId === id);
     // 后台任务唤醒不是用户消息，不进排队列表。
-    if (!task || task.state !== "pending" || isBackgroundWake(task.content)) continue;
+    if (!task || task.state !== "pending" || isBackgroundWake(task.content) || starting?.(task)) continue;
     const envelope = task.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
     const original = envelope?.kind === "composer-task" ? envelope.original as unknown as import("@actspace/shared/runtime-v2").SubmitTaskInput : null;
     const text = original?.userInput ?? (typeof task.content === "string" ? task.content : "待执行消息");

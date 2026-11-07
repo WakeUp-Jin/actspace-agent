@@ -31,7 +31,7 @@ const DEFAULT_ACTIVE_SESSION: ActiveSessionValue = {
 const ACTIVE_SESSION_KEYS = {
   sessionId: true, title: true, messages: true, contextSnapshot: true, contextState: true, isStreaming: true, isAborting: true,
   isCompacting: true, isSessionReady: true, sendScrollRequestId: true, composerFocusRequestId: true, onSend: true, onAbort: true,
-  onRetryCompaction: true,
+  onRetryCompaction: true, onResendTurn: true, readTaskSnapshot: true,
 } satisfies Record<keyof TestActiveSession, true>;
 
 const EMPTY_MESSAGES: MessageBlock[] = [];

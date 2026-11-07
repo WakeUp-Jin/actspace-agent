@@ -1,4 +1,4 @@
-import { isBackgroundWake, taskOperation, type SubmitTaskInput, type TaskContentEnvelope, type TaskSnapshot } from "@actspace/shared/runtime-v2";
+import { isBackgroundWake, taskOperation, type SubmitTaskInput, type TaskContentEnvelope, type TaskRecord, type TaskSnapshot } from "@actspace/shared/runtime-v2";
 import type { ComposerSendOptions } from "../components/Composer";
 import type { SessionLocalState } from "./session-local-store";
 import { projectTaskQueue, taskAttachments, type QueuedComposerMessage } from "./message-queue";
@@ -12,26 +12,34 @@ import { upsertCompactionSegment } from "./live-runs/stream-state";
 
 export interface TaskQueueStore {
   snapshot(sessionId: string): TaskSnapshot | undefined;
-  /** 提交时带上的附件预览等本地选项；任务结算后释放。 */
-  rememberOptions(sessionId: string, submissionId: string, options: ComposerSendOptions): void;
+  /**
+   * 提交时带上的附件预览等本地选项；任务结算后释放。`agentRunId` 是空闲发送时为这条任务申请的 run id：
+   * 乐观 run 用这个 id 先显示用户消息，托盘不再把这条任务当排队消息（agent-edit-resend-rewind.md §5.5）。
+   */
+  rememberOptions(sessionId: string, submissionId: string, options: ComposerSendOptions, agentRunId?: string): void;
   options(submissionId: string): ComposerSendOptions | undefined;
+  /** 为这条提交申请的 run id。 */
+  requestedRun(submissionId: string): string | undefined;
   forgetOptions(submissionId: string): void;
   /** 引导的正文：loop 读到后用它在当前回合里显示用户消息。 */
   rememberSteer(sessionId: string, messageId: string, item: QueuedComposerMessage): void;
   takeSteer(messageId: string): QueuedComposerMessage | undefined;
   evict(sessionId: string): void;
+  /** 会话回退后任务快照的修订号变小：丢掉旧快照，下一份快照直接接受；提交的本地选项保留。 */
+  forgetSnapshot(sessionId: string): void;
   /** 供 applyTaskSnapshot 写入；较旧的修订返回 null，不写入。 */
   accept(snapshot: TaskSnapshot): { previous: TaskSnapshot | undefined } | null;
 }
 
 export function createTaskQueueStore(): TaskQueueStore {
   const snapshots = new Map<string, TaskSnapshot>();
-  const submitted = new Map<string, { sessionId: string; options: ComposerSendOptions }>();
+  const submitted = new Map<string, { sessionId: string; options: ComposerSendOptions; agentRunId?: string }>();
   const steers = new Map<string, { sessionId: string; item: QueuedComposerMessage }>();
   return {
     snapshot: (sessionId) => snapshots.get(sessionId),
-    rememberOptions(sessionId, submissionId, options) { submitted.set(submissionId, { sessionId, options }); },
+    rememberOptions(sessionId, submissionId, options, agentRunId) { submitted.set(submissionId, { sessionId, options, ...(agentRunId ? { agentRunId } : {}) }); },
     options: (submissionId) => submitted.get(submissionId)?.options,
+    requestedRun: (submissionId) => submitted.get(submissionId)?.agentRunId,
     forgetOptions(submissionId) { submitted.delete(submissionId); },
     rememberSteer(sessionId, messageId, item) { steers.set(messageId, { sessionId, item }); },
     takeSteer(messageId) {
@@ -44,6 +52,7 @@ export function createTaskQueueStore(): TaskQueueStore {
       for (const [id, entry] of submitted) if (entry.sessionId === sessionId) submitted.delete(id);
       for (const [id, entry] of steers) if (entry.sessionId === sessionId) steers.delete(id);
     },
+    forgetSnapshot(sessionId) { snapshots.delete(sessionId); },
     accept(snapshot) {
       const previous = snapshots.get(snapshot.sessionId);
       if ((previous?.revision ?? -2) > snapshot.revision) return null;
@@ -70,13 +79,17 @@ export function applyTaskSnapshot(snapshot: TaskSnapshot, { tasks, runs, patchLo
   if (!accepted) return;
   const { previous } = accepted;
   for (const run of snapshot.runs) if (run.state !== "running") runs.markTerminal(run.runId);
+  const existing = runs.get(snapshot.sessionId);
+  // 乐观 run 正是为这条任务申请的：它正在开始，消息已在消息流里，不进托盘。
+  const starting = (task: TaskRecord) => existing !== undefined && tasks.requestedRun(task.submissionId) === existing.agentRunId;
+  // 先认出乐观 run 的任务，再释放结算任务的本地选项（申请的 run id 也在里面）。
+  const optimistic = existing && !existing.operationTaskId ? snapshot.tasks.find(starting) : undefined;
   const settled = snapshot.tasks.filter(task => !["pending", "claimed"].includes(task.state) && previous?.tasks.find(item => item.taskId === task.taskId)?.state !== task.state);
   for (const task of settled) tasks.forgetOptions(task.submissionId);
   if (settled.length) refreshSession(snapshot.sessionId);
-  const queue = projectTaskQueue(snapshot);
+  const queue = projectTaskQueue(snapshot, starting);
   patchLocal(snapshot.sessionId, { messageQueue: queue });
   const running = snapshot.runs.find(run => run.state === "running" && !runs.isTerminal(run.runId));
-  const existing = runs.get(snapshot.sessionId);
   const operation = snapshot.tasks.find(task => task.state === "claimed" && task.runId === null && taskOperation(task.content));
   // Initial hydration must not replay notices from historical operations.
   for (const task of settled.filter(task => previous && taskOperation(task.content))) {
@@ -89,6 +102,8 @@ export function applyTaskSnapshot(snapshot: TaskSnapshot, { tasks, runs, patchLo
     }
   }
   if (existing?.operationTaskId && !operation) runs.end(snapshot.sessionId);
+  // 乐观 run 的任务没开始就结束了（被取消、开始前失败）：卸下它。
+  if (existing && optimistic && optimistic.state !== "pending" && optimistic.state !== "claimed" && !snapshot.runs.some(run => run.runId === existing.agentRunId)) runs.end(snapshot.sessionId, existing);
   if (operation && !runs.has(snapshot.sessionId)) {
     const state = createEmptyStreamingState();
     upsertCompactionSegment(state, operation.taskId);

@@ -20,14 +20,20 @@ function taskText(content: unknown): string {
   return "";
 }
 
-/** 排队中的消息：queue 里还在 pending 的任务，按队列顺序。 */
+/**
+ * 排队中的消息：queue 里还在 pending 的任务，按队列顺序。会话空闲（没有运行中的 run、没有已认领的任务、
+ * 队列没暂停）时，队首那条正在开始，马上出现在消息流里，不进托盘（agent-edit-resend-rewind.md §5.5）。
+ */
 export function queuedMessages(tasks: TaskSnapshot | null): QueuedMessage[] {
   if (!tasks) return [];
   const byId = new Map(tasks.tasks.map(task => [task.taskId, task]));
+  let starting = !tasks.paused && !tasks.runs.some(run => run.state === "running") && !tasks.tasks.some(task => task.state === "claimed");
   const items: QueuedMessage[] = [];
   for (const taskId of tasks.queue) {
     const task = byId.get(taskId);
-    if (task && task.state === "pending" && !isBackgroundWake(task.content)) items.push({ taskId, text: taskText(task.content) });
+    if (!task || task.state !== "pending") continue;
+    if (starting) { starting = false; continue; }
+    if (!isBackgroundWake(task.content)) items.push({ taskId, text: taskText(task.content) });
   }
   return items;
 }

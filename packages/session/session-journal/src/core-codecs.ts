@@ -79,6 +79,7 @@ export const PERSISTED_EXTENSION_EVENT_TYPES = [
   "recovery/committed",
   "recovery/start",
   "surface/replaced",
+  "session/rewound",
 ] as const;
 
 export type PersistedExtensionEventType = (typeof PERSISTED_EXTENSION_EVENT_TYPES)[number];
@@ -124,6 +125,7 @@ function createExtensionCodec(type: PersistedExtensionEventType): EventCodec {
       if (type === "tool/recovery-outcome" && typeof (data as Readonly<Record<string, RuntimeV2JsonValue>>).content !== "string") throw invalid(type, "content must be a string");
       if (type === "subagent/spawned") validateSubagentSpawned(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
       if (type === "subagent/activation") validateSubagentActivation(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
+      if (type === "session/rewound") validateSessionRewound(type, data as Readonly<Record<string, RuntimeV2JsonValue>>);
     },
   });
 }
@@ -139,6 +141,17 @@ function validateSurfaceReplaced(type: PersistedExtensionEventType, data: Readon
   requireId(data.estimatorVersion, type, "estimatorVersion");
   // 压缩摘要节点只存在 data 里，surface 只记替换范围（agent-spec-surface-derived.md §4.2）。
   if (!isSurfaceNode(data.node)) throw invalid(type, "node must be a user, assistant or tool-result Surface node");
+}
+
+/** 从某一轮重来之后，重新打开的会话追加这一条（agent-edit-resend-rewind.md §3.6）。 */
+function validateSessionRewound(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {
+  for (const field of ["cutSeq", "droppedThroughSeq"] as const) {
+    if (!Number.isSafeInteger(data[field]) || (data[field] as number) < 0) throw invalid(type, `${field} must be a non-negative integer`);
+  }
+  if ((data.droppedThroughSeq as number) < (data.cutSeq as number)) throw invalid(type, "droppedThroughSeq must not be before cutSeq");
+  requireId(data.runId, type, "runId");
+  requireId(data.archive, type, "archive");
+  requireTimestamp(data.rewoundAt, type, "rewoundAt");
 }
 
 function validateBackgroundTaskData(type: PersistedExtensionEventType, data: Readonly<Record<string, RuntimeV2JsonValue>>): void {

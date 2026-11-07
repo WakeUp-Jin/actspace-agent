@@ -57,18 +57,31 @@ function setupQueueFixture() {
   const live = new Set<(event: any) => void>();
   const state = (id: string) => { if (!states.has(id)) states.set(id, { sessionId: id, revision: 0, paused: false, tasks: [], queue: [], runs: [] }); return states.get(id)!; };
   const publish = (id: string, next: TaskSnapshot) => { states.set(id, { ...next, revision: state(id).revision + 1 }); for (const fn of live) fn({ event: { kind: "journal-update", message: "task-queue-updated", sessionId: id } }); };
+  // Host 用客户端申请的 run id 开始任务（空闲发送的乐观 run，§5.5）；`hold` 时先不开始，留在 pending。
+  const requested = new Map<string, string>();
+  const rewinds: NonNullable<SubmitTaskInput["rewind"]>[] = [];
+  let hold = false;
   const schedule = (id: string) => {
     const current = state(id);
-    if (pending.has(id) || current.paused || !current.queue.length) return;
+    if (hold || pending.has(id) || current.paused || !current.queue.length) return;
     const task = current.tasks.find(task => task.taskId === current.queue[0])!;
     const original = (task.content as TaskContentEnvelope).original as { userInput: string };
     if (original.userInput === "/compact") { void executeCompaction({ sessionId: id, agentRunId: "compact" }); publish(id, { ...current, queue: current.queue.slice(1), tasks: current.tasks.map(item => item === task ? { ...item, state: "completed" } : item) }); return; }
-    const agentRunId = `host-${task.taskId}`;
+    const agentRunId = requested.get(task.taskId) ?? `host-${task.taskId}`;
     publish(id, { ...current, queue: current.queue.slice(1), tasks: current.tasks.map(item => item === task ? { ...item, state: "claimed", runId: agentRunId } : item) });
     void startExecution({ sessionId: id, agentRunId, userInput: original.userInput });
   };
   const submitTask = vi.fn(async (input: SubmitTaskInput) => {
     const current = state(input.sessionId); const taskId = input.submissionId;
+    if (input.agentRunId) requested.set(taskId, input.agentRunId);
+    if (input.rewind) {
+      // Host 侧回退：日志截到被编辑轮之前（agent-edit-resend-rewind.md §3）。
+      const record = records.get(input.sessionId)!;
+      const cut = record.events.findIndex(event => event.agentRunId === input.rewind!.runId);
+      const events = record.events.slice(0, cut);
+      records.set(input.sessionId, { ...record, events, messageBlocks: createMessageBlocks(events) });
+      rewinds.push(input.rewind);
+    }
     const task = { taskId, submissionId: taskId, content: { kind: "composer-task", original: { userInput: input.userInput }, prepared: input.userInput }, acceptedSeq: ++seq, state: "pending" as const, targetRunId: null, runId: null, continuationOf: null };
     publish(input.sessionId, { ...current, tasks: [...current.tasks, task], queue: [...current.queue, taskId] });
     schedule(input.sessionId);
@@ -150,7 +163,17 @@ function setupQueueFixture() {
   };
   const sentTexts = () => startExecution.mock.calls.map(([input]) => input.userInput);
   const seedTasks = (id: string, tasks: TaskSnapshot["tasks"]) => { states.set(id, { ...state(id), tasks }); };
-  return { records, pending, startExecution, submitTask, taskCommand, seedTasks, executeCompaction, designateSupplement, clearDesignation, abort, event, finish, sentTexts, nextSeq: () => ++seq };
+  const holdStart = (value: boolean, sessionId = "queue-a") => { hold = value; if (!value) schedule(sessionId); };
+  const seedTurns = (sessionId: string, turns: readonly [runId: string, prompt: string][]) => {
+    const record = records.get(sessionId)!; const timestamp = new Date().toISOString();
+    const events: SessionEvent[] = turns.flatMap(([runId, prompt]) => [
+      { id: `v2-${++seq}`, sessionId, agentRunId: runId, type: "user_message" as const, timestamp, schemaVersion: 2 as const, payload: { content: prompt } },
+      { id: `v2-${++seq}`, sessionId, agentRunId: runId, type: "assistant_message" as const, timestamp, schemaVersion: 2 as const, payload: { content: `reply to ${prompt}` } },
+    ]);
+    records.set(sessionId, { ...record, meta: { ...record.meta, agentRunCount: turns.length }, events, messageBlocks: createMessageBlocks(events) });
+  };
+  const liveEvent = (event: unknown) => { for (const fn of live) fn({ event }); };
+  return { holdStart, rewinds, seedTurns, liveEvent, records, pending, startExecution, submitTask, taskCommand, seedTasks, executeCompaction, designateSupplement, clearDesignation, abort, event, finish, sentTexts, nextSeq: () => ++seq };
 }
 
 function renderApp() {
@@ -206,6 +229,104 @@ describe("App message queue", () => {
     expect(fixture.submitTask).not.toHaveBeenCalled();
   });
 
+  // agent-edit-resend-rewind.md §5.5：空闲时发送不经过托盘，用户消息马上出现在消息流里。
+  it("shows an idle send in the message flow right away and never in the queue tray", async () => {
+    const fixture = setupQueueFixture();
+    fixture.holdStart(true);
+    renderApp();
+    await selectSession("queue-a", "Queue A");
+    await userEvent.type(await screen.findByLabelText("消息输入框"), "idle question");
+    await userEvent.click(screen.getByLabelText("发送消息"));
+    await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledOnce());
+    const agentRunId = fixture.submitTask.mock.calls[0]![0].agentRunId;
+    expect(agentRunId).toEqual(expect.any(String));
+    // 任务还在 pending（Host 尚未开始）：消息已在消息流里，托盘不出现。
+    await waitFor(() => expect(screen.getByText("idle question")).toBeInTheDocument());
+    expect(tray()).toBeNull();
+    expect(screen.getByLabelText("停止 Agent")).toBeInTheDocument();
+
+    await act(async () => fixture.holdStart(false));
+    await waitFor(() => expect(fixture.pending.get("queue-a")?.input.agentRunId).toBe(agentRunId));
+    expect(screen.getAllByText("idle question")).toHaveLength(1);
+    expect(tray()).toBeNull();
+    await act(async () => fixture.finish("queue-a", "completed"));
+    await waitFor(() => expect(screen.getByText("reply to idle question")).toBeInTheDocument());
+    expect(screen.getAllByText("idle question")).toHaveLength(1);
+  });
+
+  it("stopping an idle send before it starts cancels the task and takes the message back out", async () => {
+    const fixture = setupQueueFixture();
+    fixture.holdStart(true);
+    renderApp();
+    await selectSession("queue-a", "Queue A");
+    await userEvent.type(await screen.findByLabelText("消息输入框"), "never mind");
+    await userEvent.click(screen.getByLabelText("发送消息"));
+    await waitFor(() => expect(screen.getByText("never mind")).toBeInTheDocument());
+    await userEvent.click(screen.getByLabelText("停止 Agent"));
+    await waitFor(() => expect(fixture.taskCommand).toHaveBeenCalledWith(expect.objectContaining({ op: "cancel" })));
+    await waitFor(() => expect(screen.queryByText("never mind")).toBeNull());
+    expect(screen.queryByLabelText("停止 Agent")).toBeNull();
+    expect(fixture.startExecution).not.toHaveBeenCalled();
+  });
+
+  // agent-edit-resend-rewind.md §5.2、§5.4：从第一轮编辑重发，后面的轮次消失，新提问接着运行。
+  it("resends an edited prompt from that turn: later turns disappear and the new prompt runs in their place", async () => {
+    const fixture = setupQueueFixture();
+    fixture.seedTurns("queue-a", [["run-1", "first prompt"], ["run-2", "second prompt"]]);
+    renderApp();
+    await selectSession("queue-a", "Queue A");
+    await userEvent.click(await screen.findByText("first prompt"));
+    const input = await screen.findByRole("textbox", { name: "编辑提问内容" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "edited prompt{Enter}");
+    await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledOnce());
+    const submitted = fixture.submitTask.mock.calls[0]![0];
+    expect(submitted).toMatchObject({ userInput: "edited prompt", rewind: { runId: "run-1" } });
+    expect(submitted.agentRunId).toEqual(expect.any(String));
+    await waitFor(() => expect(fixture.pending.get("queue-a")?.input.agentRunId).toBe(submitted.agentRunId));
+    await waitFor(() => expect(screen.queryByText("second prompt")).toBeNull());
+    expect(screen.queryByText("first prompt")).toBeNull();
+    expect(screen.queryByText("reply to second prompt")).toBeNull();
+    expect(screen.getAllByText("edited prompt")).toHaveLength(1);
+    expect(tray()).toBeNull();
+    await act(async () => fixture.finish("queue-a", "completed"));
+    await waitFor(() => expect(screen.getByText("reply to edited prompt")).toBeInTheDocument());
+    expect(screen.getAllByText("edited prompt")).toHaveLength(1);
+  });
+
+  it("keeps the conversation and reopens the editor when the Host refuses the rewind", async () => {
+    const fixture = setupQueueFixture();
+    fixture.seedTurns("queue-a", [["run-1", "first prompt"], ["run-2", "second prompt"]]);
+    const refused = vi.fn(async (_input: SubmitTaskInput) => ({ status: "submission-failed", acknowledgement: "rejected", message: "这段对话有了新内容，看过最新内容后再编辑。" }));
+    overrideBridge({ "tasks.submit": refused });
+    renderApp();
+    await selectSession("queue-a", "Queue A");
+    await userEvent.click(await screen.findByText("second prompt"));
+    await userEvent.type(await screen.findByRole("textbox", { name: "编辑提问内容" }), " again{Enter}");
+    expect(await screen.findByText("这段对话有了新内容，看过最新内容后再编辑。")).toBeInTheDocument();
+    expect(refused).toHaveBeenCalledWith(expect.objectContaining({ userInput: "second prompt again", rewind: expect.objectContaining({ runId: "run-2" }) }));
+    expect(await screen.findByRole("textbox", { name: "编辑提问内容" })).toHaveValue("second prompt again");
+    expect(screen.getByText("first prompt")).toBeInTheDocument();
+    expect(screen.getByText("reply to second prompt")).toBeInTheDocument();
+    expect(screen.queryByLabelText("停止 Agent")).toBeNull();
+  });
+
+  it("reloads the Session when another window rewound it", async () => {
+    const fixture = setupQueueFixture();
+    fixture.seedTurns("queue-a", [["run-1", "first prompt"], ["run-2", "second prompt"]]);
+    renderApp();
+    await selectSession("queue-a", "Queue A");
+    await screen.findByText("second prompt");
+    // 另一个窗口从第二轮重来：日志变短，序号回退。
+    const record = fixture.records.get("queue-a")!;
+    const events = record.events.slice(0, 2);
+    fixture.records.set("queue-a", { ...record, events, messageBlocks: createMessageBlocks(events) });
+    act(() => fixture.liveEvent({ kind: "journal-update", sessionId: "queue-a", update: { sessionId: "queue-a", throughJournalSeq: 2, event: { recordKind: "event", seq: 2, type: "session/rewound", eventVersion: 1, criticality: "ignorable", time: new Date().toISOString(), source: { ownerPluginId: "@actspace/core" }, data: {}, surface: null, provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } } } }));
+    await waitFor(() => expect(screen.queryByText("second prompt")).toBeNull());
+    expect(screen.getByText("first prompt")).toBeInTheDocument();
+    await waitFor(() => expect(fixture.taskCommand).toHaveBeenCalledWith(expect.objectContaining({ op: "snapshot", sessionId: "queue-a" })));
+  });
+
   it("queues messages while running and sends them one turn at a time after completion", async () => {
     const fixture = setupQueueFixture();
     renderApp();
@@ -219,6 +340,8 @@ describe("App message queue", () => {
     expect(screen.queryByLabelText("停止 Agent")).not.toBeInTheDocument();
     await userEvent.click(screen.getByLabelText("加入队列"));
     await queueText("third");
+    // 运行中发送的才是排队消息：不带 run id，进托盘。
+    expect(fixture.submitTask.mock.calls[1]![0].agentRunId).toBeUndefined();
 
     expect(within(tray()!).getByRole("img", { name: /^2 条排队/ })).toBeInTheDocument();
     expect(within(tray()!).getByText("second")).toBeInTheDocument();

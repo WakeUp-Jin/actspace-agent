@@ -1,6 +1,6 @@
 import { formatChatAttachmentIssue, formatComposerReferenceIssue } from "@actspace/shared";
 import type { ComposerAttachment, MainAgentForm } from "@actspace/shared";
-import type { SubmitTaskInput, TaskConfiguration, TaskSubmissionFailure, TaskSubmissionResult } from "@actspace/shared/runtime-v2";
+import type { SubmitTaskInput, TaskConfiguration, TaskRewind, TaskSubmissionFailure, TaskSubmissionResult } from "@actspace/shared/runtime-v2";
 import type { ComposerDraftRestore, ComposerSendOptions } from "../components/Composer";
 import type { NewSessionInput } from "./session-actions-context";
 import type { RunTargetReadiness } from "../target/readiness";
@@ -32,7 +32,7 @@ export type SessionGatewayDeps = {
     write(sessionId: string, record: Omit<PendingSubmissionRecord, "createdAt">): void;
     clear(sessionId: string): void;
   };
-  rememberOptions(sessionId: string, submissionId: string, options: ComposerSendOptions): void;
+  rememberOptions(sessionId: string, submissionId: string, options: ComposerSendOptions, agentRunId?: string): void;
   forgetOptions(submissionId: string): void;
   /** 第一次提交结果未知、正在用同一标识核对。 */
   notice(sessionId: string, text: string): void;
@@ -45,9 +45,15 @@ export type SessionGatewayDeps = {
 export type SessionGateway = {
   /** 已有会话直接返回；新建页按运行目标建会话（远端还要 ready）。 */
   ensureSession(sessionId: string | null, send: SendTarget, options: ComposerSendOptions): Promise<string>;
-  /** 写 pending 记录 → configure → submit（结果未知时用同一标识再核对一次）。失败时放回草稿并抛错。 */
-  submit(sessionId: string, text: string, options: ComposerSendOptions, model: string | undefined): Promise<TaskSubmissionResult>;
+  /**
+   * 写 pending 记录 → configure → submit（结果未知时用同一标识再核对一次）。失败时放回草稿并抛错。
+   * `agentRunId`：乐观显示用的 run id，Host 用它开始这条任务。`rewind`：从某一轮重来（编辑提问重发）；
+   * 这种提交失败时内容回到原地编辑器，不写 pending 记录、不放回下方输入框。
+   */
+  submit(sessionId: string, text: string, options: ComposerSendOptions, model: string | undefined, extra?: SubmitExtra): Promise<TaskSubmissionResult>;
 };
+
+export type SubmitExtra = { readonly agentRunId?: string; readonly rewind?: TaskRewind };
 
 const NOT_READY = "Host is not ready; your draft has been preserved";
 const CONFIGURE_FAILED = "无法更新任务配置，草稿已保留。";
@@ -85,29 +91,31 @@ export function createSessionGateway(deps: SessionGatewayDeps): SessionGateway {
       return created.meta.id;
     },
 
-    async submit(sessionId, text, options, model) {
+    async submit(sessionId, text, options, model, extra = {}) {
       const submitted = { sessionId, userInput: text, attachments: options.attachments?.map(withoutPreview), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations };
       const serialized = JSON.stringify(submitted);
-      const saved = deps.pending.read(sessionId);
+      const rewinding = extra.rewind !== undefined;
+      const saved = rewinding ? null : deps.pending.read(sessionId);
       // 同样的内容再次发送时复用 submissionId，让 Runtime 去重。
       const submissionId = saved?.content === serialized ? saved.id : deps.newSubmissionId();
-      deps.rememberOptions(sessionId, submissionId, options);
-      deps.pending.write(sessionId, { content: serialized, id: submissionId, draft: { sessionId, text, attachments: options.attachments?.map(withoutPreview), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } });
+      deps.rememberOptions(sessionId, submissionId, options, extra.agentRunId);
+      if (!rewinding) deps.pending.write(sessionId, { content: serialized, id: submissionId, draft: { sessionId, text, attachments: options.attachments?.map(withoutPreview), fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } });
       const restore = (error: string, issues?: Pick<TaskSubmissionFailure, "attachmentIssue" | "referenceIssue">) => {
+        if (rewinding) return;
         deps.restoreDraft(sessionId, { id: deps.now(), sessionId, text, attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations, error, ...issues });
       };
       try {
         const configured = await deps.configure(sessionId, { model, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, selectedSkillIds: options.selectedSkills });
         if (!configured) throw new Error(CONFIGURE_FAILED);
       } catch (error) {
-        deps.pending.clear(sessionId);
+        if (!rewinding) deps.pending.clear(sessionId);
         deps.forgetOptions(submissionId);
         const message = error instanceof Error ? error.message : CONFIGURE_FAILED;
         restore(message);
         throw new Error(message);
       }
       const attempt = async (): Promise<TaskSubmissionResult> => {
-        try { return await deps.submit({ ...submitted, submissionId }); }
+        try { return await deps.submit({ ...submitted, submissionId, ...(extra.agentRunId ? { agentRunId: extra.agentRunId } : {}), ...(extra.rewind ? { rewind: extra.rewind } : {}) }); }
         catch { return { status: "submission-failed", acknowledgement: "unknown", message: UNKNOWN }; }
       };
       let result = await attempt();
@@ -116,8 +124,8 @@ export function createSessionGateway(deps: SessionGatewayDeps): SessionGateway {
         result = await attempt();
       }
       if (failed(result)) {
-        if (result.acknowledgement === "rejected") {
-          deps.pending.clear(sessionId);
+        if (result.acknowledgement === "rejected" || rewinding) {
+          if (!rewinding) deps.pending.clear(sessionId);
           deps.forgetOptions(submissionId);
         }
         const message = result.acknowledgement === "unknown" ? UNKNOWN : result.message;
@@ -125,7 +133,7 @@ export function createSessionGateway(deps: SessionGatewayDeps): SessionGateway {
         restore(result.attachmentIssue ? formatChatAttachmentIssue(result.attachmentIssue) : result.referenceIssue ? formatComposerReferenceIssue(result.referenceIssue) : message, issues);
         throw new Error(message);
       }
-      deps.pending.clear(sessionId);
+      if (!rewinding) deps.pending.clear(sessionId);
       return result;
     },
   };

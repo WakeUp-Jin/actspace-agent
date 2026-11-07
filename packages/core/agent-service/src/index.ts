@@ -9,3 +9,4 @@ export { manifest } from "./manifest.js";
 export { apply, activate } from "./plugin.js";
 export * from "./application.js";
 export * from "./session-commands.js";
+export * from "./rewind-cut.js";

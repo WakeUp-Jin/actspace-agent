@@ -28,7 +28,8 @@ it("can send a new Session while the historical catalog is rebuilding, without a
   await act(async () => finishList({ items: [], groups: [], indexing: false, failed: 0 }));
   await user.click(screen.getByRole("textbox", { name: /消息|输入/ }));
   await user.paste("Continue this Session");
-  await user.click(screen.getByLabelText("发送消息"));
+  // 首条消息是空闲发送：乐观 run 已经开始（这里的 mock 任务不会真正运行），第二条进队列。
+  await user.click(screen.getByLabelText(/发送消息|加入队列/));
   await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
   expect(submit.mock.calls[1][0].sessionId).toBe(submit.mock.calls[0][0].sessionId);
   expect(create).toHaveBeenCalledOnce();

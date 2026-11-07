@@ -45,7 +45,12 @@ export class ManagedRuns {
       },
       harnessId: session => session.header.sessionId, acquire: (id, signal) => harnesses.acquireSession?.(id, signal) ?? harnesses.acquire("main", signal),
       readConfiguration: session => ({ ...this.#settings.get(session.header.sessionId), mode: sessions.snapshot(session).agentMode ?? "agent" }),
-      onSnapshot: (id, snapshot) => { this.#states.set(id, snapshot); onSnapshot?.(snapshot); },
+      onSnapshot: (id, snapshot) => {
+        this.#states.set(id, snapshot);
+        // A requested id lives until its task leaves the queue: started (consumed above) or cancelled.
+        if (this.#requestedRunIds.size) for (const task of snapshot.tasks) if (task.state !== "pending") this.#requestedRunIds.delete(`${id}/${task.submissionId}`);
+        onSnapshot?.(snapshot);
+      },
     });
   }
   async inspectCapability<T, R>(name: string, inspect: (service: T | undefined) => R, sessionId?: string): Promise<R> {
@@ -66,6 +71,15 @@ export class ManagedRuns {
     if (clean.durationMs !== undefined && (!Number.isFinite(clean.durationMs) || clean.durationMs < 0)) throw new Error("Invalid execution duration");
     if (clean.deadline !== undefined && !Number.isFinite(clean.deadline)) throw new Error("Invalid execution deadline");
     this.#settings.set(sessionId, structuredClone(clean));
+  }
+  /**
+   * Start the task of `submissionId` as Run `runId` (a client shows the prompt under that id before the Run exists).
+   * Register before submitting; the returned function withdraws an id whose submission failed.
+   */
+  requestRunId(sessionId: string, submissionId: string, runId: string): () => void {
+    const key = `${sessionId}/${submissionId}`;
+    this.#requestedRunIds.set(key, runId);
+    return () => { if (this.#requestedRunIds.get(key) === runId) this.#requestedRunIds.delete(key); };
   }
   async initialize(sessionId: string): Promise<void> {
     this.#states.set(sessionId, await this.service.snapshot(sessionId));

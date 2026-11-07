@@ -213,7 +213,9 @@ export class SessionObserver {
       }
       case "projection": {
         const update = value.update;
-        if (isRecord(update) && update.sessionId === this.sessionId && !this.store.applyJournalUpdate(update as never)) void this.#resync();
+        if (!isRecord(update) || update.sessionId !== this.sessionId) return;
+        if (isRecord(update.event) && update.event.type === "session/rewound") { void this.#rewound(); return; }
+        if (!this.store.applyJournalUpdate(update as never)) void this.#resync();
         return;
       }
       case "tasks":
@@ -223,6 +225,22 @@ export class SessionObserver {
         if (Array.isArray(value.requests)) { this.#approvalRevision++; this.#approvals = (value.requests as ApprovalRequest[]).filter(item => item.sessionId === this.sessionId); this.#schedule(); }
         return;
     }
+  }
+
+  /**
+   * 会话从某一轮重来（agent-edit-resend-rewind.md §5.4）：日志 seq 变小，任务快照的修订号也从头算。
+   * 整体替换投影，丢掉旧任务快照后重新取，卸下已结束的 live run。旧内容在新内容到达前继续显示。
+   */
+  async #rewound(): Promise<void> {
+    if (!this.store.isResetting(this.sessionId)) this.store.reset(this.sessionId);
+    this.#tasks = null;
+    const run = this.#live.get(this.sessionId);
+    if (run && this.#live.isTerminal(run.agentRunId) && this.#live.end(this.sessionId, run)) this.#runStartedAt = null;
+    this.#schedule();
+    try {
+      const [, result] = await Promise.all([this.refresh(), this.connection.client.call("tasks.command", { sessionId: this.sessionId, op: "snapshot" }) as Promise<{ snapshot?: TaskSnapshot }>]);
+      if (!this.#disposed && result?.snapshot) this.applyTasks(result.snapshot);
+    } catch (error) { this.options.onError?.(error); }
   }
 
   async #resync(): Promise<void> {
