@@ -12,6 +12,7 @@ export * from "./header.js";
 export * from "./invariant-validator.js";
 export * from "./journal.js";
 export * from "./surface.js";
+export { isTrustedSurfaceView, surfaceViewVersion, type TrustedSurfaceView } from "./surface-trust.js";
 
 export * from "./workspace.js";
 

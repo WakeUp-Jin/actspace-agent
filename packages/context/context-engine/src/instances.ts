@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Context, ContextIdentity, ContextInstanceSnapshot } from "./types.js";
+import { surfaceViewVersion } from "@actspace/session-journal";
 import { freezeContextView } from "./context-snapshot.js";
 
 const DEFAULT_LOGICAL_SCOPE = "main";
@@ -109,9 +110,12 @@ export function contextIdentity(sessionId: string, logicalAgentScopeId = DEFAULT
 function identityKey(identity: ContextIdentity): string { return `${identity.sessionId}\u0000${identity.logicalAgentScopeId}`; }
 
 function stateDigest(context: Context): string {
-  const { request: _request, status, ...state } = context;
+  const { request: _request, status, content } = context;
   const { contextRevision: _revision, instanceGeneration: _generation, logicalAgentScopeId: _scope, ...stableStatus } = status;
-  return JSON.stringify({ ...state, status: stableStatus });
+  // 对话用版本号代替整段转字符串（agent-spec-context-trusted-surface.md §3.3）：已信任视图版本号相同即内容相同；
+  // 普通对象的版本号就是它的 JSON，判断结果和改前一致。
+  const { conversation, ...rest } = content;
+  return JSON.stringify({ content: { ...rest, conversation: surfaceViewVersion(conversation) }, status: stableStatus });
 }
 
 function snapshot(entry: Entry): ContextInstanceSnapshot {

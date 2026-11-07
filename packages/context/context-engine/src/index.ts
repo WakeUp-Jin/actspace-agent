@@ -19,3 +19,5 @@ export * from "./content-manifest.js";
 
 
 export { contextEvents, latestContextEvent } from "./supplements.js";
+/** 会话源等不直接依赖日志包的插件，用它给对话算缓存 key（agent-spec-context-trusted-surface.md §3.4）。 */
+export { surfaceViewVersion, isTrustedSurfaceView, type TrustedSurfaceView } from "@actspace/session-journal";

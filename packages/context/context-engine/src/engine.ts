@@ -11,7 +11,8 @@ import { projectContext } from "./projection.js";
 import type { ContextProjection } from "./types.js";
 import { convertMessages, surfaceMessage } from "./conversion.js";
 import { freezeRequest } from "./request-snapshot.js";
-import { freezeContextView } from "./context-snapshot.js";
+import { contextValue, freezeContextView, isCheckedContextValue } from "./context-snapshot.js";
+import type { LlmMessage } from "@actspace/llm-service";
 import { renderSystemPrompt } from "./system.js";
 
 export type ContextEngineOptions = {
@@ -130,8 +131,24 @@ export class ContextEngine {
     };
     appendSupplements(-1);
     entries.forEach((entry, index) => { values.push(surfaceMessage(entry.node)); appendSupplements(index); });
-    const messages = await convertMessages(values, context.request.sessionId, this.options.resolveArtifact);
-    const input = freezeRequest({ requestId: context.request.requestId, sessionId: context.request.sessionId, routeId: context.request.routeId, model: context.request.model, options: context.request.options, messages: [...(system ? [{ role: "system", content: system }] : []), ...messages], tools: context.content.tools } as unknown as RuntimeV2JsonValue) as unknown as LlmInput;
-    return input;
+    const converted = await convertMessages(values, context.request.sessionId, this.options.resolveArtifact);
+    const messages = [...(system ? [{ role: "system", content: system } as LlmMessage] : []), ...converted];
+    // 不再整份序列化复制（agent-spec-context-trusted-surface.md §3.5）：消息由引擎新建，字段引用的是已检查、已冻结的
+    // 对话节点、补充文字和系统提示词，外壳浅冻结即可。对话没经过日志或引擎检查（调用方直接传入的 Context）时，照旧整份检查、复制、冻结。
+    const checked = isCheckedContextValue(context.content.conversation)
+      ? Object.freeze(messages.map(freezeMessage))
+      : freezeRequest(messages as unknown as RuntimeV2JsonValue) as unknown as readonly LlmMessage[];
+    return Object.freeze({
+      requestId: context.request.requestId, sessionId: context.request.sessionId, routeId: context.request.routeId, model: context.request.model,
+      options: contextValue(context.request.options),
+      messages: checked,
+      tools: contextValue(context.content.tools),
+    });
   }
+}
+
+/** 引擎新建的消息外壳、content 数组和块冻结；块里引用的对话数据已由日志冻结。 */
+function freezeMessage(message: LlmMessage): LlmMessage {
+  if (Array.isArray(message.content)) { for (const block of message.content) Object.freeze(block); Object.freeze(message.content); }
+  return Object.freeze(message);
 }

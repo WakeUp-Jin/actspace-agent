@@ -15,6 +15,8 @@ export type SessionSurfaceView = {
 export class SessionSurface {
   #entries: SessionSurfaceEntry[] = [];
   #replaceGeneration = 0;
+  /** 当前状态的视图；对话没变时反复读到同一个对象，变了才换新的（下游可以按对象身份判断「没变」）。 */
+  #view: SessionSurfaceView | undefined;
 
   static fromEvents(events: readonly SessionEventEnvelopeV1[]): SessionSurface {
     const surface = new SessionSurface();
@@ -45,6 +47,7 @@ export class SessionSurface {
     validateEligible(event, node.kind);
     if (operation.kind === "append") {
       this.#entries.push(createEntry(node, event));
+      this.#view = undefined;
       return;
     }
     if (operation.end > this.#entries.length) invalid("Surface replacement span is outside the current Surface.");
@@ -55,10 +58,12 @@ export class SessionSurface {
     const replacement = createEntry(node, event, supplied);
     this.#entries.splice(operation.start, operation.end - operation.start, replacement);
     this.#replaceGeneration += 1;
+    this.#view = undefined;
   }
 
   get view(): SessionSurfaceView {
-    return Object.freeze({ entries: Object.freeze([...this.#entries]), replaceGeneration: this.#replaceGeneration });
+    this.#view ??= Object.freeze({ entries: Object.freeze([...this.#entries]), replaceGeneration: this.#replaceGeneration });
+    return this.#view;
   }
 }
 

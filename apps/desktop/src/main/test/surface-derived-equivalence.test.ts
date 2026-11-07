@@ -14,51 +14,19 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
 import { ContextEngine } from "@actspace/context-engine";
-import { SessionJournal, createCoreCodecRegistry, type EventCodec, type SessionEventEnvelopeV1, type SessionHeaderV1 } from "@actspace/session-journal";
+import type { SessionEventEnvelopeV1, SessionHeaderV1 } from "@actspace/session-journal";
 import { foldTranscript, renderTranscript } from "@actspace/session-transcript";
 import { foldContextEstimate, viewContextEstimate } from "@actspace/shared";
-import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
+import type { RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 import { projectChatSession } from "@actspace/client/sessions";
+import { SURFACE_FIXTURES as FIXTURES, convert, readOldFixture, seedJournal } from "./surface-fixture";
 
-const FIXTURES = join(__dirname, "fixtures", "surface-derived");
-
-type OldEvent = Omit<SessionEventEnvelopeV1, "surface" | "data"> & { data: Record<string, RuntimeV2JsonValue>; surface: (Record<string, RuntimeV2JsonValue> & { node?: Record<string, RuntimeV2JsonValue> }) | null };
-
-/** 旧格式 → 新格式：节点内容搬进 data 对应字段，surface 只留标记（与 T6 转换脚本同一套规则）。 */
-function convert(event: OldEvent): SessionEventEnvelopeV1 {
-  if (!event.surface?.node) return event as unknown as SessionEventEnvelopeV1;
-  const { node, ...marker } = event.surface;
-  const data = { ...event.data };
-  switch (event.type) {
-    case "user/message": case "assistant/message": case "agent/inbox/spliced": case "tool/recovery-outcome":
-      data.content = node.content!; break;
-    case "tool/result":
-      // 旧格式里 node.content 就是 modelOutput，isError 就是 status !== "completed"：转换时不搬，只核对。
-      expect(node.content).toEqual(data.modelOutput);
-      expect(node.isError).toBe(data.status !== "completed");
-      break;
-    case "surface/replaced":
-      data.node = node; break;
-    default:
-      throw new Error(`unexpected surface on ${event.type}`);
-  }
-  return { ...event, data, surface: marker } as unknown as SessionEventEnvelopeV1;
-}
-
-function project(header: SessionHeaderV1, events: readonly SessionEventEnvelopeV1[]) {
-  const known = createCoreCodecRegistry();
-  // 插件事件（agent-service task/run、context supplement）与 surface 无关，用宽松 codec 登记，只为回放。
-  const pluginCodecs = [...new Map(events.filter(event => known.get(event.type) === undefined).map(event => [event.type, {
-    type: event.type, ownerPluginId: event.source.ownerPluginId, currentVersion: event.eventVersion, criticality: event.criticality, validate: () => undefined,
-  } as EventCodec])).values()];
-  const journal = new SessionJournal({ registry: createCoreCodecRegistry(pluginCodecs), seed: events });
-  return journal;
+function project(_header: SessionHeaderV1, events: readonly SessionEventEnvelopeV1[]) {
+  return seedJournal(events);
 }
 
 it("derives the same conversation, model request, transcript, estimate and chat projection as the old double-stored format", async () => {
-  const [headerLine, ...lines] = readFileSync(join(FIXTURES, "old-format.jsonl"), "utf8").trim().split("\n");
-  const header = JSON.parse(headerLine!) as SessionHeaderV1;
-  const oldEvents = lines.map(line => JSON.parse(line) as OldEvent);
+  const { header, oldEvents } = readOldFixture();
   const expected = JSON.parse(readFileSync(join(FIXTURES, "expected.json"), "utf8"));
   const events = oldEvents.map(convert);
   // 新格式的日志里不再有任何 surface.node。

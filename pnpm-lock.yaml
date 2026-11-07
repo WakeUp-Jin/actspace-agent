@@ -308,6 +308,9 @@ importers:
       '@actspace/agent-loop':
         specifier: workspace:*
         version: link:../../packages/core/agent-loop
+      '@actspace/context-conversation':
+        specifier: workspace:*
+        version: link:../../packages/context/context-conversation
       '@actspace/context-engine':
         specifier: workspace:*
         version: link:../../packages/context/context-engine
