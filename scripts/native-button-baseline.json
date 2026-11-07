@@ -23,6 +23,7 @@
   "components/messages/CompactCommandBlock.tsx": 2,
   "components/messages/FileDiffBlock.tsx": 2,
   "components/messages/ResponseAnnotationMarkers.tsx": 1,
+  "components/messages/SubagentMessageCard.tsx": 1,
   "components/messages/ThinkingBlock.tsx": 1,
   "components/messages/TodoListBlock.tsx": 1,
   "components/messages/ToolActivityGroup.tsx": 1,

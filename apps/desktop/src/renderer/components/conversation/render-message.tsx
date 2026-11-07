@@ -8,6 +8,7 @@ import { AgentRunBlock } from "../messages/AgentRunBlock";
 import { BashRunBlock } from "../messages/BashRunBlock";
 import { BrowserApprovalBlock } from "../messages/BrowserApprovalBlock";
 import { BackgroundNoticeRow } from "../messages/BackgroundNoticeRow";
+import { SubagentMessageCard } from "../messages/SubagentMessageCard";
 import { CompactCommandBlock } from "../messages/CompactCommandBlock";
 import { DeleteFileBlock } from "../messages/DeleteFileBlock";
 import { FileDiffBlock } from "../messages/FileDiffBlock";
@@ -75,7 +76,10 @@ export function renderMessage(
     case "context_compaction":
       return <CompactCommandBlock key={renderKey} message={message} className={className} />;
     case "background_notice":
-      return <BackgroundNoticeRow key={renderKey} message={message} onOpenSubagent={onOpenSubagent} />;
+      // 子智能体来信是卡片，Bash 通知仍是分隔行（front-子Agent与后台任务规范 §2.1）。
+      return message.taskKind === "agent_message"
+        ? <SubagentMessageCard key={renderKey} message={message} onOpenSubagent={onOpenSubagent} />
+        : <BackgroundNoticeRow key={renderKey} message={message} onOpenSubagent={onOpenSubagent} />;
     case "workspace_preparation":
       return <WorkspacePreparationBlock key={renderKey} message={message} />;
     case "todo":

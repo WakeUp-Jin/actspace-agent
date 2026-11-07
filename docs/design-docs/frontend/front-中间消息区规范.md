@@ -102,8 +102,9 @@
 
 ## 子 Agent 与其他消息块
 
-- `agent` 块是主消息流里可点击的紧凑两行入口（头像、任务名、类型、状态、最新活动），点击在右侧「子 Agent」面板打开详情，不在主流内展开 transcript；规则见子 Agent 规范。组件只消费 `MessageBlock.kind === "agent"` 字段，不解析 raw args 或磁盘路径。
-- Todo、后台任务通知分隔行（`BackgroundNoticeRow`）、压缩分隔线、错误块都是独立 timeline item，不贴到上一条回复里。
+- `agent` 块是主消息流里可点击的单行入口（高 34px：头像、任务名、类型、「后台」、状态；2026-11-08 起不再有模型和最新活动），点击在右侧「子 Agent」面板打开详情，不在主流内展开 transcript；规则见子 Agent 规范。组件只消费 `MessageBlock.kind === "agent"` 字段，不解析 raw args 或磁盘路径。
+- 子智能体来信是来信卡片（`SubagentMessageCard`），头部同 `agent` 单行卡片，正文直接显示；本轮结束后不收进「Worked for」，排在过程组后、最终回复前。
+- Todo、后台任务通知分隔行（`BackgroundNoticeRow`，只剩 Bash 通知；子智能体完成通知不显示）、来信卡片、压缩分隔线、错误块都是独立 timeline item，不贴到上一条回复里。
 
 ## 运行中态
 

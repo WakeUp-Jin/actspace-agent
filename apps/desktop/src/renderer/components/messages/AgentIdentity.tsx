@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Check, CircleAlert, Loader2, Square } from "lucide-react";
 import { resolveModelSpecByApiModel, subagentListStatusLabel, type MessageBlock, type SubagentListStatus } from "@actspace/shared";
 import companion1 from "../../assets/subagents/companion-1.webp";
@@ -9,6 +10,7 @@ import companion6 from "../../assets/subagents/companion-6.webp";
 import companion7 from "../../assets/subagents/companion-7.webp";
 import companion8 from "../../assets/subagents/companion-8.webp";
 import companion9 from "../../assets/subagents/companion-9.webp";
+import "./agent-activity.css";
 
 type AgentMessage = Extract<MessageBlock, { kind: "agent" }>;
 const companions = [companion1, companion2, companion3, companion4, companion5, companion6, companion7, companion8, companion9];
@@ -31,9 +33,9 @@ export function agentModelLabel(model: string | undefined): string | undefined {
   return resolveModelSpecByApiModel(model)?.label ?? model;
 }
 
-const avatarSizeClass = { 18: "h-[18px] w-[18px] rounded-act-xs", 28: "h-7 w-7 rounded-act-md", 32: "h-8 w-8 rounded-act-md" } as const;
+const avatarSizeClass = { 18: "h-[18px] w-[18px] rounded-act-xs", 20: "h-5 w-5 rounded-act-xs", 28: "h-7 w-7 rounded-act-md", 32: "h-8 w-8 rounded-act-md" } as const;
 
-export function AgentAvatar({ identity, size = 32 }: { identity: string; size?: 18 | 28 | 32 }) {
+export function AgentAvatar({ identity, size = 32 }: { identity: string; size?: 18 | 20 | 28 | 32 }) {
   return <img src={agentAvatarSource(identity)} alt="" aria-hidden="true" draggable={false} width={size} height={size}
     className={`shrink-0 bg-surface-subtle object-cover ${avatarSizeClass[size]}`} />;
 }
@@ -65,21 +67,18 @@ export function SubagentStatus({ status, duration }: { status: SubagentListStatu
   </span>;
 }
 
-function compactText(value: string | undefined): string | undefined {
-  const compact = value?.replace(/\s+/g, " ").trim();
-  return compact || undefined;
-}
-
-/** 子 Agent 现在在做什么（运行中）或结果第一行（结束后）；失败时是错误。对话卡片和右侧列表共用。 */
-export function agentLatestActivity(message: AgentMessage): string {
-  if (message.error) return compactText(message.error) ?? "执行失败";
-  if (message.status === "running") {
-    // Only event-derived labels may appear here, never streamed model output.
-    const live = compactText(message.displayText);
-    return live && /^(正在|达到|已停止|执行失败)/.test(live) ? live : "正在思考";
-  }
-  const summaryLine = message.summary?.split(/\r?\n/).find((line) => line.trim().length > 0);
-  return compactText(summaryLine) ?? labels[message.status];
+/**
+ * 一行会变的文字（右侧列表运行中那一行的第二行）：`animate` 时换内容旧的上滑淡出、新的从下滑入，
+ * 不等计时器，每次变化立刻显示；不动画时直接替换（结束后的结论）。
+ */
+export function ActivityLine({ text, animate, className }: { text: string; animate: boolean; className?: string }) {
+  const [frame, setFrame] = useState({ text, previous: "", revision: 0 });
+  if (frame.text !== text) setFrame({ text, previous: animate ? frame.text : "", revision: frame.revision + 1 });
+  if (!animate) return <span className={`truncate ${className ?? ""}`}>{text}</span>;
+  return <span className={`agent-activity-transition ${className ?? ""}`} title={frame.text}>
+    {frame.previous ? <span key={`old-${frame.revision}`} className="agent-activity-out" aria-hidden="true">{frame.previous}</span> : null}
+    <span key={frame.revision} className={frame.previous ? "agent-activity-in" : undefined}>{frame.text}</span>
+  </span>;
 }
 
 /** 子 Agent 耗时：38s / 1m 12s / 1h 05m。 */

@@ -59,7 +59,7 @@ describe("AgentRunBlock", () => {
     expect(screen.getByText("Inspect Agent block")).toBeInTheDocument();
     expect(screen.getByText("Agent")).toBeInTheDocument();
     expect(screen.getByText("已完成")).toBeInTheDocument();
-    expect(screen.getByText("Found the relevant renderer components.")).toBeInTheDocument();
+    expect(screen.queryByText("Found the relevant renderer components.")).not.toBeInTheDocument();
     expect(screen.queryByText("Explored 1 files · 2 tools · 4s · 900 tokens")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Open SubAgent transcript/ }));
@@ -67,66 +67,31 @@ describe("AgentRunBlock", () => {
     expect(onOpen).toHaveBeenCalledWith("run-1");
   });
 
-  it("shows the model the subagent requested, and nothing for older events without one", () => {
-    const { rerender } = render(<AgentRunBlock message={{ ...makeAgentBlock(), model: "claude-sonnet-5-5" }} />);
-    const model = screen.getByText("claude-sonnet-5-5");
-    expect(model).toHaveClass("agent-run-model", "truncate");
-    expect(model).toHaveAttribute("title", "claude-sonnet-5-5");
-
-    rerender(<AgentRunBlock message={makeAgentBlock()} />);
-    expect(document.querySelector(".agent-run-model")).toBeNull();
-  });
-
-  it("shows event-derived activity without streaming model text", () => {
-    render(
+  it("is one row: no model, no activity line, no streamed reply text", () => {
+    const { container } = render(
       <AgentRunBlock
         message={makeAgentBlock({
           status: "running",
-          summary: undefined,
-          stats: undefined,
+          model: "claude-sonnet-5-5",
+          summary: "private streamed reply",
           displayText: "正在读取 · ConversationView.tsx",
-          recentEvents: [
-            {
-              id: "recent-1",
-              type: "tool_call",
-              title: "Read",
-              summary: "Read ConversationView.tsx",
-              timestamp: "2026-06-02T10:00:01.000Z",
-            },
-          ],
+          recentEvents: [{ id: "recent-1", type: "tool_call", title: "Read", summary: "Read ConversationView.tsx", timestamp: "2026-06-02T10:00:01.000Z" }],
         })}
       />,
     );
-
-    expect(screen.queryByText("Running")).not.toBeInTheDocument();
-    const runningSummary = screen.getByText("正在读取 · ConversationView.tsx");
-    expect(runningSummary).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveAttribute("aria-label", "正在读取 · ConversationView.tsx");
-    expect(screen.queryByText("Read ConversationView.tsx")).not.toBeInTheDocument();
+    expect(screen.getByText("运行中")).toBeInTheDocument();
+    expect(container.querySelector("img")).toHaveAttribute("width", "20");
+    for (const hidden of ["claude-sonnet-5-5", "正在读取 · ConversationView.tsx", "Read ConversationView.tsx", "private streamed reply", "Found the relevant renderer components."]) {
+      expect(screen.queryByText(hidden)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("shows operation context immediately through rapid updates and terminal errors", () => {
-    vi.useFakeTimers();
-    try {
-      const message = makeAgentBlock({ status: "running", displayText: "正在思考" });
-      const { rerender, unmount } = render(<AgentRunBlock message={message} />);
-      rerender(<AgentRunBlock message={{ ...message, displayText: "正在读取 · a.ts" }} />);
-      expect(screen.getByRole("status")).toHaveAttribute("aria-label", "正在读取 · a.ts");
-      rerender(<AgentRunBlock message={{ ...message, displayText: "正在分析 · 刚读取 a.ts" }} />);
-      expect(screen.getByRole("status")).toHaveAttribute("aria-label", "正在分析 · 刚读取 a.ts");
-      expect(vi.getTimerCount()).toBe(0);
-      rerender(<AgentRunBlock message={{ ...message, displayText: "正在整理回复" }} />);
-      rerender(<AgentRunBlock message={{ ...message, status: "failed", error: "达到 300 步执行上限" }} />);
-      expect(screen.getByRole("status")).toHaveTextContent("达到 300 步执行上限");
-      unmount();
-      expect(vi.getTimerCount()).toBe(0);
-    } finally { vi.useRealTimers(); }
-  });
-
-  it("never uses a running summary as streamed reply text", () => {
-    render(<AgentRunBlock message={makeAgentBlock({ status: "running", summary: "private streamed reply", displayText: "untrusted reply" })} />);
-    expect(screen.getByRole("status")).toHaveAttribute("aria-label", "正在思考");
-    expect(screen.queryByText("private streamed reply")).not.toBeInTheDocument();
+  it("puts a failure's reason in the hover title and marks the status", () => {
+    render(<AgentRunBlock message={makeAgentBlock({ status: "failed", error: "达到 300 步执行上限" })} />);
+    expect(screen.getByRole("button", { name: /Open SubAgent transcript/ })).toHaveAttribute("title", "Inspect Agent block\n达到 300 步执行上限");
+    expect(screen.getByText("失败")).toHaveClass("text-danger");
+    expect(screen.queryByText("达到 300 步执行上限")).not.toBeInTheDocument();
   });
 
   it("names the kind of new subagents and opens only the list before the subagent exists", async () => {

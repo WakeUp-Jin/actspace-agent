@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, RotateCcw } from "lucide-react";
-import { subagentActivationStatusLabel, type MessageBlock } from "@actspace/shared";
+import { agentMessageBody, subagentActivationStatusLabel, type MessageBlock } from "@actspace/shared";
 import { Button } from "../ui/Button";
 
 type BackgroundNoticeMessage = Extract<MessageBlock, { kind: "background_notice" }>;
@@ -34,7 +34,7 @@ export function backgroundNoticeBody(message: Pick<BackgroundNoticeMessage, "tas
     const note = xmlText(message.content, "note");
     return [closing && closing !== "(no closing message)" ? closing : summary, note].filter(Boolean).join("\n\n") || message.content;
   }
-  if (message.taskKind === "agent_message") return /^\s*<agent_message\b[^>]*>\n?([\s\S]*?)\n?<\/agent_message>\s*$/.exec(message.content)?.[1] ?? message.content;
+  if (message.taskKind === "agent_message") return agentMessageBody(message.content);
   return message.content;
 }
 

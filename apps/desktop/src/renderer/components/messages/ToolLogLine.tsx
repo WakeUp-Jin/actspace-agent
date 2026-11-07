@@ -399,7 +399,7 @@ export function ToolLogLine({ message, className, onOpenFile, onExpand, onOpenSu
     <OverflowToolLine
       className={getToolLogLineClass(status, className)}
       status={status}
-      text={`${message.title}: ${message.content}`}
+      text={message.content ? `${message.title}: ${message.content}` : message.title}
     />
   );
 }

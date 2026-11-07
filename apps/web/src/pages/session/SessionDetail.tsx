@@ -1,13 +1,15 @@
 import type { ApprovalRequest } from "@actspace/shared/runtime-v2";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { queuedMessages } from "../../sessions/composer-state";
-import { approvalAnchorIndex, toolBlockForCall } from "../../sessions/transcript-model";
+import { approvalAnchorIndex, itemBlocks, toolBlockForCall } from "../../sessions/transcript-model";
 import { buildTurns } from "../../sessions/turn-model";
 import { useComposer } from "../../sessions/use-composer";
 import { useSessionObservation } from "../../sessions/use-session-observation";
 import { Button } from "../../ui/Button";
 import { ApprovalCard } from "./ApprovalCard";
 import { ThinkingWait } from "./blocks/EventRow";
+import { SubagentStatusContext } from "./blocks/SubagentLetter";
+import { subagentStatusByAgent } from "@actspace/client/sessions";
 import { Composer } from "./Composer";
 import { DetailHeader } from "./DetailHeader";
 import { TurnView } from "./TurnView";
@@ -27,6 +29,8 @@ export function SessionDetail({ sessionId }: { readonly sessionId: string }) {
   const { items, approvals } = observation;
   const queued = useMemo(() => queuedMessages(observation.tasks), [observation.tasks]);
   const turns = useMemo(() => buildTurns(items), [items]);
+  // 来信卡片的状态跟着派发卡片：子智能体 id → 状态。
+  const subagentStatuses = useMemo(() => subagentStatusByAgent(items.flatMap(itemBlocks)), [items]);
 
   // 审批卡挂在对应工具条目之后（按条目 key）；找不到的放在最后一轮末尾
   const { after, trailing } = useMemo(() => {
@@ -91,6 +95,7 @@ export function SessionDetail({ sessionId }: { readonly sessionId: string }) {
             <p className="m-0 py-16 text-center text-act-md text-text-faint">加载中…</p>
           ) : null}
           {observation.hasMore ? <Button variant="ghost" busy={observation.loadingOlder} onClick={() => void loadOlder()}>加载更早的消息</Button> : null}
+          <SubagentStatusContext.Provider value={subagentStatuses}>
           {turns.map(turn => (
             <TurnView
               key={turn.key}
@@ -102,6 +107,7 @@ export function SessionDetail({ sessionId }: { readonly sessionId: string }) {
               trailing={turn === lastTurn ? tailExtras : undefined}
             />
           ))}
+          </SubagentStatusContext.Provider>
           {turns.length === 0 ? tailExtras : null}
         </div>
       </div>
