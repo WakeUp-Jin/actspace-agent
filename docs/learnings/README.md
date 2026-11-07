@@ -47,7 +47,7 @@ Harness / Runtime / Host 的边界，Cordis 插件所有权与生命周期，设
 - 2026-10-04 [插件副作用的释放权：Effect 所有权、通知观察者生命周期、依赖顺序关闭](2026-10/20261004-notification-lifetime.md)
 - 2026-10-06 [进程边界的接口只写一份：从契约生成各端，生产者也受契约约束](2026-10/20261006-single-contract-bridge.md)
 
-## 会话、事件、投影与读模型（49）
+## 会话、事件、投影与读模型（50）
 
 Session Journal 的事实与视图、事件平面、投影一致性、派生索引与分页。
 
@@ -96,6 +96,7 @@ Session Journal 的事实与视图、事件平面、投影一致性、派生索�
 - 2026-10-18 [为什么文件写成功，界面却找不到它](2026-10/20261018-canonical-path-display.md)
 - 2026-10-18 [为什么上下文展示应保留来源，而不是解析提示词](2026-10/20261018-context-provenance.md)
 - 2026-10-18 [增量计算首先要说清楚依赖](2026-10/20261018-context-source-invalidation.md)
+- 2026-11-07 [高频路径上的工作量，不能跟着会话长度涨](2026-11/hot-path-cost-grows-with-session.md)
 - 2026-10-18 [运行结束不等于提示结束](2026-10/20261018-live-run-notice-lifetime.md)
 - 2026-10-18 [读取状态不等于接管恢复](2026-10/20261018-read-does-not-own-recovery.md)
 - 2026-10-18 [多个搜索引擎的分数为什么不能直接排序](2026-10/20261018-reciprocal-rank-fusion.md)

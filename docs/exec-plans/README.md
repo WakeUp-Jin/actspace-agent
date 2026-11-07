@@ -8,6 +8,7 @@
 - `completed/`：实现已经完成；尚未执行的人工验收边界可以保留在计划中，但不能因此长期占用 `active/`。索引见 [completed/README.md](completed/README.md)。
 - `templates/`：新计划模板。
 - `tech-debt-tracker.md`：暂不立项、但需要持续跟踪的技术债。
+- `perf-backlog.md`：性能与内存优化任务总表，实机采样发现的热点先登记在这里。
 
 具体维护规则见 `docs/PLANS_GUIDE.md`。
 
@@ -15,9 +16,12 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
-| [对话内容只存一份](active/20261107-surface-derived.md) | 2026-11-07 T1–T9 已实现，自动化检查通过（未提交）；79 个旧会话已按用户确认删除（列表 `tmp/old-sessions-20261107.txt`）；下一步实机重跑，对比日志大小。 |
-| [流式输出只走实时通道](active/20261105-live-assistant-stream.md) | 2026-11-05 T1–T13 已实现（未提交），run2 实机内存对比已完成；§9 功能清单待用户确认。 |
-| [请求记录只在变化时写完整内容](active/20261106-request-record.md) | 2026-11-06 T1–T11 已实现，自动化验证通过（未提交）；实机对比（规范 §9）待用户删除旧会话后重跑。 |
+| [性能第三轮：高频路径不再整份读日志](active/20261108-perf-round3.md) | 2026-11-07 立项，R1–R4 方案已拍板（自动审查、压缩摘要、子 Agent 面板、读旧事件深拷贝）；下一步按 spec → 代码执行。性能任务总表见 [性能待办](perf-backlog.md)。 |
+| [上下文引擎不再每次请求复制对话](active/20261107-context-trusted-surface.md) | 2026-11-07 T1–T6 已实现并提交；run8 实测 `stateDigest` 239 → 87 MB、`toLlmInput` 156 → 31 MB；随 `fix/bug-batch-1104` 的 PR 合入。 |
+| [流式 Markdown：尾部解析降频与解析器常驻](active/20261107-markdown-stream-throttle.md) | 2026-11-07 T1–T5 已实现并提交；run8 实测渲染进程 Markdown 约 722 → 48 MB；剩 Electron 看流式观感。 |
+| [对话内容只存一份](active/20261107-surface-derived.md) | 2026-11-07 T1–T9 已实现并提交（cd0ff335）；79 个旧会话已按用户确认删除；run7/run8 已实机重跑；剩 Electron 功能验收。 |
+| [流式输出只走实时通道](active/20261105-live-assistant-stream.md) | 2026-11-05 T1–T13 已实现并提交（c6538dd7），run2 实机内存对比已完成；§9 功能清单待用户确认。 |
+| [请求记录只在变化时写完整内容](active/20261106-request-record.md) | 2026-11-06 T1–T11 已实现并提交（c6538dd7）；run4 日志 8.57 → 1.60 MB；剩 Electron 功能验收。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 2026-10-07 立项（来源：17 的特征测试）；下一步由用户拍板 D1–D4，再开始执行。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB 待实施。 |
 | [前端基础组件](active/frontend-ui-components-foundation.md) | Button / IconButton / Tooltip / Menu / Popover / Dialog / Select 等已落地；只剩 Switch、Textarea、Tabs 三个基础组件及对应迁移。 |

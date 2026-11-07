@@ -18,6 +18,10 @@ ActSpace 是一个本地优先的 Agent 工作台：桌面端（Electron）、We
 - 清单之后读三份全局规范：`front-视觉token规范.md`（颜色、字号、圆角、主题硬约束）、`front-文案与状态表达规范.md`（说明文字、状态表达、空值写法）、`front-组件与交互模式规范.md`（按钮、弹层、设置行、表格、对标与 demo）。
 - 再按 `docs/design-docs/frontend/README.md` 的路由表读对应区域规范；验收方式见 `docs/FRONTEND_VERIFICATION.md`。
 
+## 写高频路径前要读
+
+- `docs/coding-standards/perf-memory-conventions.md`：每次请求、流式片段、每帧渲染、IPC 轮询、审批、工具调用会经过的代码，工作量不能随会话长度增长；提交前跑 `pnpm check:hot-path-reads`。性能任务总表见 `docs/exec-plans/perf-backlog.md`。
+
 ## 代码改完前要读
 
 - `docs/HISTORY_GUIDE.md`：什么时候记 history、怎么命名、怎么脱敏。

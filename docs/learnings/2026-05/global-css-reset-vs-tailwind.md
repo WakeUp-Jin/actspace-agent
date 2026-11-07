@@ -112,6 +112,6 @@ button {
 
 ## 相关文档
 
-- `docs/coding-standards/team/frontend-style-scope-conventions.md`
+- `docs/coding-standards/frontend-style-scope-conventions.md`
 - `docs/learnings/2026-05/tailwind-page-slice-migration.md`
 - `docs/learnings/2026-05/color-as-identity-badge-not-container.md`

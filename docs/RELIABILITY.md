@@ -54,6 +54,7 @@ Desktop 启动必须初始化：
 - `pnpm check:packages`：校验 workspace package、manifest、behavior、codec 和 lifecycle 边界。
 - `pnpm check:v2-legacy-removal -- --strict`：确认当前生产入口没有回连 v1 engine、旧 Session 或已退役能力。
 - `pnpm typecheck`、`pnpm test`、`pnpm build`：类型、行为与制品构建基线。
+- 卡顿、内存高：用 [内存采样工具](tools/heap-monitor/README.md) 从启动录到退出，按函数统计分配；热点登记在 [性能待办](exec-plans/perf-backlog.md)。写高频路径的规则见 [性能与内存约定](coding-standards/perf-memory-conventions.md)，`pnpm check:hot-path-reads` 拦截新增的整份读日志和整份深拷贝。
 
 ## 发布门禁
 
@@ -72,5 +73,6 @@ Desktop 启动必须初始化：
 - `packages/core/runtime` 的直接 lifecycle / shutdown 测试仍需补强；当前主要由 CLI 和 Host integration 间接覆盖。
 - 真实 Provider、Browser、DMG、签名与公证受当前网络或宿主能力限制，仍未形成最终发布证据。
 - Renderer 主 bundle 及部分大型组件需要后续性能和可维护性拆分，但尚未排期。
+- 运行时的分配热点（整份读日志、流式片段重复解析等）按 [性能待办](exec-plans/perf-backlog.md) 逐项处理。
 
 CI/CD、制品规则与供应链边界见 [`CICD.md`](CICD.md)。

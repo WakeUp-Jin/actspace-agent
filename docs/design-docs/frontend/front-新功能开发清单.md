@@ -51,6 +51,7 @@
 | 当前会话、会话动作、输入框、运行目标从 Context 读（`useActiveSession`、`useSessionActions`、`useComposerContext`、`RunTargetContext`），不逐层传 prop | 同上 §8 | 评审 |
 | 本机 / 远端的差异只通过 `RunTarget` 和 `capabilitiesOf` 的能力表判断，组件不判断 `hostId` 或 `host:` 前缀 | [工作区、Git 与运行目标](front-workspace-git-worktree-context.md)「运行目标（本机与远端）」 | 评审 |
 | 读写失败要让用户看到；确实只需打控制台的，在代码注释里写明理由 | [会话状态与数据流规范](front-会话状态与数据流规范.md) §11 | 评审 |
+| 流式、每帧、每个实时事件经过的代码，工作量和已输出的长度、会话长度无关：已定稿的块 memo 住，渲染函数里不建解析器等重对象，实时事件只更新受影响的部分；IPC 轮询不低于 1 秒、没变化不重算 | [性能与内存约定](../../coding-standards/perf-memory-conventions.md) §6、§7 | 评审；渲染次数用计数测试锁住（参考 `chat-markdown-render-count.test.tsx`） |
 
 ## 6. 怎么调用 main
 

@@ -1,0 +1,110 @@
+{
+  "apps/desktop/src/main/model-store-service.ts": {
+    "json-roundtrip": 1
+  },
+  "apps/desktop/src/main/remote-hosts/registry.ts": {
+    "structured-clone": 4
+  },
+  "apps/desktop/src/main/remote-hosts/session-cache.ts": {
+    "structured-clone": 7
+  },
+  "apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts": {
+    "inspect-events": 3,
+    "json-roundtrip": 2
+  },
+  "apps/desktop/src/main/runtime-v2/runtime-registry.ts": {
+    "inspect-events": 3
+  },
+  "apps/desktop/src/main/runtime-v2/usage-source-cache.ts": {
+    "inspect-events": 1
+  },
+  "apps/desktop/src/main/settings/utils.ts": {
+    "json-roundtrip": 1
+  },
+  "packages/client/client/src/sessions/trajectory.ts": {
+    "json-roundtrip": 1
+  },
+  "packages/composition/boot/src/harness-mount.ts": {
+    "structured-clone": 2
+  },
+  "packages/composition/composition/src/harness-patch.ts": {
+    "structured-clone": 1
+  },
+  "packages/composition/cordis-adapter/src/cordis-tree.ts": {
+    "structured-clone": 1
+  },
+  "packages/composition/cordis-adapter/src/plugin-artifact.ts": {
+    "structured-clone": 2
+  },
+  "packages/context/context-disclosure/src/plugin.ts": {
+    "structured-clone": 1
+  },
+  "packages/context/context-engine/src/supplements.ts": {
+    "journal-events": 2
+  },
+  "packages/core/agent-loop/src/loop.ts": {
+    "per-entry-read": 1
+  },
+  "packages/core/agent-service/src/task-ledger.ts": {
+    "full-read": 1
+  },
+  "packages/core/agent-service/src/task-projection.ts": {
+    "structured-clone": 1
+  },
+  "packages/core/runtime/src/harness/evolution-approval.ts": {
+    "json-roundtrip": 1
+  },
+  "packages/core/runtime/src/harness/managed-runs.ts": {
+    "full-read": 1,
+    "structured-clone": 2
+  },
+  "packages/core/runtime/src/harness/review-session-action.ts": {
+    "full-iterate": 2
+  },
+  "packages/core/runtime/src/session/session-controller.ts": {
+    "full-read": 4,
+    "per-entry-read": 1
+  },
+  "packages/english-learning/english-learning/src/service.ts": {
+    "structured-clone": 1
+  },
+  "packages/harness-evolution/harness-control/src/candidate.ts": {
+    "structured-clone": 2
+  },
+  "packages/harness-evolution/harness-control/src/selection-store.ts": {
+    "structured-clone": 1
+  },
+  "packages/harness-evolution/harness-control/src/service.ts": {
+    "structured-clone": 9
+  },
+  "packages/harness-evolution/plugin-manager/src/plugin.ts": {
+    "json-roundtrip": 1
+  },
+  "packages/host/agent-host/src/auth.ts": {
+    "structured-clone": 4
+  },
+  "packages/host/agent-host/src/rpc.ts": {
+    "json-roundtrip": 1
+  },
+  "packages/session/session-journal/src/journal.ts": {
+    "full-read": 1,
+    "per-entry-read": 1
+  },
+  "packages/session/session-persistence-jsonl/src/repair.ts": {
+    "journal-events": 1
+  },
+  "packages/session/session-persistence-jsonl/src/storage.ts": {
+    "structured-clone": 1
+  },
+  "packages/session/session-persistence/src/recovery.ts": {
+    "full-read": 1
+  },
+  "packages/session/session-projection/src/registry.ts": {
+    "json-roundtrip": 1,
+    "structured-clone": 2
+  },
+  "packages/subagent/subagent/src/manager.ts": {
+    "full-iterate": 2,
+    "full-read": 1
+  }
+}
