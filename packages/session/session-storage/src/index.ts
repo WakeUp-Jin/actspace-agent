@@ -1,4 +1,4 @@
-import type { SessionHeaderV1, SessionEventEnvelopeV1, SessionAccessState, SessionValidationResult } from "@actspace/session-journal";
+import type { SessionHeaderV1, SessionEventEnvelopeV1, SessionEventCandidateV1, SessionAccessState, SessionValidationResult } from "@actspace/session-journal";
 
 /** Opaque revision: compare only within one storage identity and session. */
 export interface SessionStorageSnapshot {
@@ -69,6 +69,18 @@ export interface SessionStorageHandle {
   close(): Promise<void>;
 }
 
+/** Keep the Journal before `cutSeq`, append `closing` after it, and archive the old file (agent-edit-resend-rewind.md §3.4). */
+export interface SessionPrefixRewrite {
+  /** The rewrite refuses a Journal whose last seq differs: something wrote after the caller decided the cut. */
+  readonly expectedLastSeq: number;
+  /** First seq dropped; events before it are kept byte-for-byte. */
+  readonly cutSeq: number;
+  /** Appended after the prefix; the provider assigns seq and time and validates them. */
+  readonly closing: readonly SessionEventCandidateV1[];
+  /** Path-safe name shared by the archive file and retired child directories. */
+  readonly label: string;
+}
+
 /** Host-owned physical storage. Business recovery and fork belong to SessionStore. */
 export interface SessionStorage {
   readonly identity: symbol;
@@ -87,5 +99,9 @@ export interface SessionStorage {
   open(sessionId: string, access: "read" | "write"): Promise<SessionStorageHandle>;
   /** Remove only a session for which this caller currently owns a write handle. */
   discard(handle: SessionStorageHandle): Promise<void>;
+  /** Rewrite a closed Session to a prefix. Fails when another writer holds it. Returns the archive path relative to the Session. */
+  rewritePrefix?(sessionId: string, input: SessionPrefixRewrite): Promise<{ readonly archive: string }>;
+  /** Move a closed Session out of the catalog into `parentSessionId`'s recovery area. */
+  retireInto?(sessionId: string, parentSessionId: string, label: string): Promise<void>;
   close(): Promise<void>;
 }

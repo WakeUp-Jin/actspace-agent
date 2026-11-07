@@ -96,8 +96,8 @@ type Activation = {
   /** A fork's first Turn runs with the parent's selected skills. */
   readonly selectedSkillIds?: readonly string[];
   readonly controller: AbortController;
-  /** `caller`: a synchronous `agent` call is waiting; `parent`: notify the main Session. */
-  delivery: "caller" | "parent";
+  /** `caller`: a synchronous `agent` call is waiting; `parent`: notify the main Session; `dropped`: the main Session rewound past it, tell no one. */
+  delivery: "caller" | "parent" | "dropped";
   /** Set inside the child lock when settlement starts; later messages become a new activation. */
   settling: boolean;
   settled: boolean;
@@ -367,6 +367,19 @@ export class SubagentManager implements SubagentHostPort {
     }
   }
 
+  /**
+   * The main Session is rewinding (agent-edit-resend-rewind.md §3.2): stop its running activations and wait until
+   * each has settled. They settle with `delivery: "lost"`, without a notice or a wake. One already settling keeps its delivery.
+   */
+  async stopAll(rootId: string): Promise<void> {
+    const stopping = [...this.#active.values()].filter(activation => activation.rootId === rootId);
+    for (const activation of stopping) {
+      if (!activation.settling) activation.delivery = "dropped";
+      activation.controller.abort("rewind");
+    }
+    await Promise.all(stopping.map(activation => activation.result.promise));
+  }
+
   /** Host shutdown: stop every activation without settling it, so the next start reports it as lost. */
   async dispose(): Promise<void> {
     this.#disposing = true;
@@ -499,7 +512,7 @@ export class SubagentManager implements SubagentHostPort {
       try {
         const root = await this.options.openSession(rootId);
         const summary = settleSummary({ agentId, description: activation.description, status: outcome.status, ...(outcome.error === undefined ? {} : { error: outcome.error }), external: isExternal(activation.kind) });
-        const delivery = activation.delivery === "caller" ? "returned" : "notified";
+        const delivery = activation.delivery === "caller" ? "returned" : activation.delivery === "dropped" ? "lost" : "notified";
         await root.append(coreEvent("subagent/activation", { op: "settle", agentId, activationId: activation.activationId, status: outcome.status, summary, ...(bounded.text ? { result: bounded.text } : {}), ...(bounded.truncated ? { resultTruncated: true } : {}), delivery, endedAt: this.#now() }));
         if (delivery === "notified") {
           const notice = subagentNotification({ agentId, description: activation.description, status: outcome.status, summary, transcriptPath: activation.transcriptPath, closing: omitted ? "omitted" : bounded });
@@ -526,7 +539,7 @@ export class SubagentManager implements SubagentHostPort {
       const done = (value: Settled | "moved") => { clearTimeout(timer); signal.removeEventListener("abort", abort); resolve(value); };
       void activation.result.promise.then(done);
       // Settlement already chose the caller; its result follows.
-      const timer = setTimeout(() => { if (!activation.settling) { activation.delivery = "parent"; done("moved"); } }, this.options.syncWaitMs ?? SUBAGENT_SYNC_WAIT_MS);
+      const timer = setTimeout(() => { if (!activation.settling && activation.delivery === "caller") { activation.delivery = "parent"; done("moved"); } }, this.options.syncWaitMs ?? SUBAGENT_SYNC_WAIT_MS);
       timer.unref?.();
       const abort = () => activation.controller.abort("parent-abort");
       signal.addEventListener("abort", abort, { once: true });

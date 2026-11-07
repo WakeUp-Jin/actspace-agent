@@ -767,6 +767,8 @@ export type ComposerAttachment = {
   path?: string;
   /** An authenticated artifact owned by this remote session, not a local path. */
   remoteArtifact?: { sessionId: string; artifactId: string };
+  /** An attachment this local Session already stores (an edited prompt resends it without a path). */
+  artifactId?: string;
   mimeType?: string;
   previewUrl?: string;
 };

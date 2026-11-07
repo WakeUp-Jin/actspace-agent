@@ -1,10 +1,12 @@
-import { taskOperation, type BackgroundBashTaskView } from "@actspace/shared/runtime-v2";
+import { isBackgroundWake, taskOperation, type BackgroundBashTaskView } from "@actspace/shared/runtime-v2";
 
 import { SessionModeWriter } from "./session-commands.js";
 import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
 import type { EventCodecRegistry, SessionEventCandidateV1, SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { resolveSideChatBoundary, resolveTurnBoundary } from "@actspace/side-chat";
 import { projectTasks } from "./task-projection.js";
+import { TaskError } from "./contracts.js";
+import { RewindError, resolveRewindCut } from "./rewind-cut.js";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type {
@@ -50,6 +52,8 @@ export type ApplicationSessionService = {
   browseToolDetail(sessionId: string, callId: string): Promise<DesktopBrowsePage>;
   export(sessionId: string): Promise<string>;
   getOpen(sessionId: string): SessionHandle | undefined;
+  /** Replace the Journal with a prefix plus closing events and reopen it (agent-edit-resend-rewind.md §3.4). */
+  rewrite?(sessionId: string, input: { readonly expectedLastSeq: number; readonly cutSeq: number; readonly closing: readonly SessionEventCandidateV1[]; readonly label: string; readonly retire: readonly string[] }): Promise<{ readonly session: SessionHandle; readonly archive: string; readonly retireFailures: readonly { readonly sessionId: string; readonly error: unknown }[] }>;
 };
 
 export type ApplicationRunService = {
@@ -62,6 +66,8 @@ export type ApplicationRunService = {
   isActive(sessionId: string): boolean;
   abort(sessionId: string): boolean;
   isIdle?: () => boolean;
+  /** Start `submissionId`'s task as Run `runId`; the returned function withdraws the request. */
+  requestRunId?(sessionId: string, submissionId: string, runId: string): () => void;
 };
 
 /** The parts of `@actspace/background-tasks`' registry the application reads; kept structural like the other runtime services. */
@@ -71,19 +77,24 @@ type BackgroundTaskRegistryLike = {
   list(sessionId: string): readonly BackgroundTaskRecordLike[];
   output(sessionId: string, taskId: string): Promise<{ readonly task: BackgroundTaskRecordLike; readonly output: { readonly text: string } }>;
   stopByUser(sessionId: string, taskId: string): Promise<BackgroundTaskRecordLike>;
+  stop?(sessionId: string, taskId: string, reason: string): Promise<BackgroundTaskRecordLike>;
+  forget?(sessionId: string, taskIds: readonly string[]): void;
 };
 /** The parts of the subagent manager (`subagent.manager`) the application reads. */
 type SubagentManagerLike = {
   readonly activeCount: number;
   running(sessionId: string): readonly unknown[];
   interrupt(input: { readonly sessionId: string; readonly callId: string; readonly agentId: string }): Promise<{ readonly ok: boolean; readonly text: string }>;
+  stopAll?(rootId: string): Promise<void>;
 };
 type AgentRuntimeService = { readonly runs: ApplicationRunService; readonly subagents?: SubagentManagerLike; readonly backgroundTasks?: BackgroundTaskRegistryLike };
 
 export type AgentApplicationContract = {
   readonly browserAvailable: () => Promise<boolean>;
   readonly taskCommand: (input: import("@actspace/shared/runtime-v2").TaskCommand) => Promise<import("@actspace/shared/runtime-v2").TaskCommandResult>;
-  readonly submitTask: (sessionId: string, submissionId: string, content: RuntimeV2JsonValue) => Promise<import("@actspace/shared/runtime-v2").TaskReceipt>;
+  readonly submitTask: (sessionId: string, submissionId: string, content: RuntimeV2JsonValue, agentRunId?: string) => Promise<import("@actspace/shared/runtime-v2").TaskReceipt>;
+  /** Drop the edited Turn and everything after it, then accept `content` in its place (agent-edit-resend-rewind.md §3.2). */
+  readonly rewindAndSubmit: (sessionId: string, rewind: RewindRequest, submissionId: string, content: RuntimeV2JsonValue, agentRunId?: string) => Promise<import("@actspace/shared/runtime-v2").TaskReceipt>;
   readonly listBackgroundTasks: (sessionId: string) => readonly BackgroundBashTaskView[];
   readonly readBackgroundTaskOutput: (sessionId: string, taskId: string) => Promise<import("@actspace/shared/runtime-v2").BackgroundTaskOutputView>;
   readonly stopBackgroundTask: (sessionId: string, taskId: string) => Promise<BackgroundBashTaskView>;
@@ -121,6 +132,9 @@ export type AgentApplicationContract = {
   readonly revokeSessionGrant: (sessionId: string, grantId: string) => Promise<RuntimeV2SessionSnapshot>;
 };
 
+/** The edited Turn's Run, and the Journal position the client saw when it decided to edit. */
+export type RewindRequest = { readonly runId: string; readonly expectedThroughSeq: number };
+
 /** Fork at a Journal position, or at the end of one finished Turn (a fork from an assistant reply). */
 export type ForkBoundary = { readonly turnId: string };
 const FORK_TITLE_SUFFIX = "（分叉）";
@@ -150,12 +164,81 @@ export class AgentApplication implements AgentApplicationContract {
   async browserAvailable(): Promise<boolean> {
     return this.#runs.inspectCapability<{ available?: boolean; registrations?: readonly unknown[]; definitions?: readonly unknown[] }, boolean>("tools.browser", browser => browser?.available === true && (browser.registrations?.length ?? 0) > 0 && browser.registrations?.length === browser.definitions?.length);
   }
-  async submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue) {
+  async submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue, agentRunId?: string) {
     this.#modeWriter.assertAvailable(sessionId);
+    this.#assertNotHeld(sessionId);
     const session = await this.#sessions.resume(sessionId);
     const model = this.#runs.configuration(sessionId).model;
-    const receipt = await this.#runs.service.submit(sessionId, submissionId, content);
+    const receipt = await this.#submit(sessionId, submissionId, content, agentRunId);
     if (!taskOperation(content)) emitNotification(this.ctx, "application/run-preparing", { session, input: { sessionId, content, model }, snapshot: this.#sessions.snapshot(session) });
+    return receipt;
+  }
+
+  /** A client that shows the prompt before the Run exists asks for the Run id it already rendered. */
+  async #submit(sessionId: string, submissionId: string, content: RuntimeV2JsonValue, agentRunId: string | undefined) {
+    const withdraw = agentRunId && this.#runs.requestRunId ? this.#runs.requestRunId(sessionId, submissionId, agentRunId) : undefined;
+    try { return await this.#runs.service.submit(sessionId, submissionId, content); }
+    catch (error) { withdraw?.(); throw error; }
+  }
+
+  #assertNotHeld(sessionId: string): void {
+    if (this.#runs.service?.isHeld?.(sessionId)) throw new TaskError("SESSION_BUSY");
+  }
+
+  async rewindAndSubmit(sessionId: string, rewind: RewindRequest, submissionId: string, content: RuntimeV2JsonValue, agentRunId?: string) {
+    this.#modeWriter.assertAvailable(sessionId);
+    const service = this.#runs.service;
+    let session = await this.#sessions.resume(sessionId);
+    // A retry whose first attempt rewound but lost its receipt must not rewind again.
+    if ((await service.snapshot(sessionId)).tasks.some(task => task.submissionId === submissionId)) return service.submit(sessionId, submissionId, content);
+    if (session.header.lineage?.origin === "delegation" || !this.#sessions.rewrite) throw new RewindError("REWIND_UNAVAILABLE", "这个会话不能编辑提问。");
+    const release = service.hold(sessionId);
+    let rewound: { readonly cutSeq: number; readonly retireFailures: readonly string[] } | undefined;
+    let receipt: import("@actspace/shared/runtime-v2").TaskReceipt;
+    try {
+      const tasks = await service.snapshot(sessionId);
+      if (tasks.runs.some(run => run.state === "running") || tasks.tasks.some(task => task.state === "claimed")) throw new TaskError("SESSION_BUSY");
+      const queued = tasks.queue.map(id => tasks.tasks.find(task => task.taskId === id)!);
+      if (queued.some(task => !isBackgroundWake(task.content))) throw new TaskError("SESSION_BUSY");
+      // Only background wakes are waiting; they would read notifications the rewind is about to re-home.
+      let revision = tasks.revision;
+      for (const task of queued) revision = (await service.cancel(sessionId, task.taskId, revision)).revision;
+      await session.flush();
+      if (session.journal.readEvents(rewind.expectedThroughSeq + 1).some(event => event.type === "turn/start" || event.type === "user/message")) throw new RewindError("REWIND_CONFLICT", "这段对话有了新内容。");
+      // Running work is stopped without notifying anyone; each stop writes its settle before returning.
+      await this.#subagents?.stopAll?.(sessionId);
+      const backgroundTasks = this.#backgroundTasks;
+      if (backgroundTasks?.stop) await Promise.all(backgroundTasks.list(sessionId).filter(task => task.status === "running").map(task => backgroundTasks.stop!(sessionId, task.taskId, "rewind")));
+      // An idle Session may have been swept while the stops ran; the rewrite needs the open handle.
+      session = await this.#sessions.resume(sessionId);
+      await session.flush();
+      // perf-allow: 只在用户点「编辑重发」时走一次，要在整份日志里找被编辑的那一轮
+      const events = session.journal.readEvents();
+      const registry = required<{ readonly registry: EventCodecRegistry }>(this.ctx, "session.journal").registry;
+      const lineage = session.header.lineage;
+      const cut = resolveRewindCut(sessionId, events, registry, rewind.runId, lineage && lineage.origin !== "delegation" ? lineage.parentBoundarySeq : -1);
+      const label = `rewind-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+      const result = await this.#sessions.rewrite(sessionId, { expectedLastSeq: events.at(-1)?.seq ?? -1, cutSeq: cut.cutSeq, closing: cut.closing, label, retire: cut.droppedChildIds });
+      session = result.session;
+      rewound = { cutSeq: cut.cutSeq, retireFailures: result.retireFailures.map(item => item.sessionId) };
+      try {
+        // Context instances cache "through seq"; a shorter Journal would otherwise reuse the dropped conversation.
+        await this.#runs.inspectCapability<{ readonly instances?: { evict(sessionId: string, scope?: string): boolean } }, void>("context.engine", engine => {
+          engine?.instances?.evict(sessionId, `main:${sessionId}`);
+          engine?.instances?.evict(sessionId);
+        }, sessionId);
+        this.#backgroundTasks?.forget?.(sessionId, cut.droppedBackgroundTaskIds);
+        await this.#runs.initialize(sessionId);
+      } finally {
+        // Clients, transcript and other observers learn of the rewind from this ordinary Journal fact.
+        await session.append(core("session/rewound", { cutSeq: cut.cutSeq, droppedThroughSeq: cut.droppedThroughSeq, runId: rewind.runId, archive: result.archive, rewoundAt: new Date().toISOString() }));
+        await session.flush();
+      }
+      receipt = await this.#submit(sessionId, submissionId, content, agentRunId);
+    } finally { release(); }
+    const model = this.#runs.configuration(sessionId).model;
+    if (!taskOperation(content)) emitNotification(this.ctx, "application/run-preparing", { session, input: { sessionId, content, model }, snapshot: this.#sessions.snapshot(session) });
+    emitNotification(this.ctx, "application/session-rewound", { sessionId, ...rewound! });
     return receipt;
   }
   async taskCommand(input: import("@actspace/shared/runtime-v2").TaskCommand): Promise<import("@actspace/shared/runtime-v2").TaskCommandResult> {
@@ -327,6 +410,7 @@ export class AgentApplication implements AgentApplicationContract {
   }
 
   async updateSessionMetadata(sessionId: string, patch: { readonly title?: string | null; readonly pinned?: boolean; readonly archived?: boolean }) {
+    this.#assertNotHeld(sessionId);
     if (patch.title !== undefined) emitNotification(this.ctx, "application/title-changing", { sessionId });
     const session = await this.#sessions.resume(sessionId);
     const events: SessionEventCandidateV1[] = [];
@@ -358,6 +442,7 @@ export class AgentApplication implements AgentApplicationContract {
   }
 
   async updateSessionPermissionMode(sessionId: string, mode: import("@actspace/shared/runtime-v2").PermissionMode) {
+    this.#assertNotHeld(sessionId);
     const session = await this.#sessions.resume(sessionId);
     const snapshot = this.#sessions.snapshot(session);
     if (snapshot.permissionMode === mode) return snapshot;
@@ -377,6 +462,7 @@ export class AgentApplication implements AgentApplicationContract {
   }
 
   async revokeSessionGrant(sessionId: string, grantId: string) {
+    this.#assertNotHeld(sessionId);
     const session = await this.#sessions.resume(sessionId);
     const snapshot = this.#sessions.snapshot(session);
     const grant = snapshot.sessionGrants.find((candidate) => candidate.grantId === grantId);
@@ -409,6 +495,9 @@ export interface ApplicationEvents {
   "application/run-preparing": (event: { session: SessionHandle; input: RuntimeV2RunTurnRequest; snapshot: RuntimeV2SessionSnapshot }) => void;
   /** @mode emit */
   "application/title-changing": (event: { sessionId: string }) => void;
+  // A Session dropped its tail and accepted the edited prompt; `retireFailures` are subagent Sessions left in place.
+  /** @mode emit */
+  "application/session-rewound": (event: { sessionId: string; cutSeq: number; retireFailures: readonly string[] }) => void;
 }
 declare module "@actspace/cordis-adapter" { interface DomainEvents extends ApplicationEvents {} }
 

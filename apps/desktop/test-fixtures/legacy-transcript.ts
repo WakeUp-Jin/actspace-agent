@@ -39,9 +39,12 @@ export function legacyMergeTranscript(durable: DurableTranscript, live: LiveTran
     return [];
   })();
 
-  const { compactionFailure, isStreaming } = local;
-  const durableUserKeys = new Set(persistedMessages.filter(block => block.kind === "user").map(block => block.renderKey ?? block.id));
+  const { compactionFailure, isStreaming, rewindFromSeq } = local;
+  // 编辑提问重发（agent-edit-resend-rewind.md §5.2）是 T13 之后的新规则：回退进行中 durable 截到被编辑的提问为止。
+  const rewindCut = rewindFromSeq === undefined ? -1 : persistedMessages.findIndex(block => block.sourceSeq !== undefined && block.sourceSeq >= rewindFromSeq);
+  const persisted = rewindCut < 0 ? persistedMessages : persistedMessages.slice(0, rewindCut);
+  const durableUserKeys = new Set(persisted.filter(block => block.kind === "user").map(block => block.renderKey ?? block.id));
   const visibleStreaming = streamingBlocks.filter(block => block.kind !== "user" || !durableUserKeys.has(block.renderKey ?? block.id));
-  const withStreaming = visibleStreaming.length === 0 ? persistedMessages : [...persistedMessages, ...visibleStreaming];
+  const withStreaming = visibleStreaming.length === 0 ? persisted : [...persisted, ...visibleStreaming];
   return compactionFailure && !isStreaming ? [...withStreaming, compactionFailure] : withStreaming;
 }

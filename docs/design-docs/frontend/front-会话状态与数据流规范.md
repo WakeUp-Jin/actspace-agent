@@ -115,6 +115,7 @@ mergeTranscript(
 2. **user 去重**：durable 已有相同 renderKey 的 user 块时，丢掉 live 的占位 user 块，保留 durable 的。
 3. **追加 live 块**。没有 durable 对应物的块（steer 插入的 user、workspace-preparation）保持原样显示，不套用「run 完成后整组让位」。恢复的 run 里 live 的正文 / 思考从实时底稿开始：消息定稿后 durable 里出现同一 run、同样内容的块，live 的这一块不再显示；live 块的序号从底稿重新数，与 durable 同一 run 的 renderKey 撞上时加 `:live` 后缀。规则与 Web 端（`apps/web` 的 transcript-model）一致。
 4. **本地装饰**：不在流式时追加压缩失败块；后台 bash 状态（`bashUpdates`）覆写 durable bash 块的 `backgroundStatus` / `exitCode`。
+5. **回退进行中**（`local.rewindFromSeq`，来自 `SessionLocalState.rewinding`）：durable 部分截到 `sourceSeq >= fromSeq` 的第一块之前，被编辑轮及之后不再显示，新提问由乐观 run 显示。会话重载完清掉。
 
 `mergeTranscript` 是纯函数。改动它时，`R/test/transcript.test.ts` 的场景必须全部通过；App 级用例经 `R/test/helpers/transcript-shadow.ts` 与基准实现（`apps/desktop/test-fixtures/legacy-transcript.ts`）逐次对照，有意改变行为时要同时更新对照基准。
 
@@ -131,6 +132,7 @@ type SessionLocalState = {
   composer?: ComposerSessionState;             // mode、selectedSkills
   compactionFailure?: CompactionBlock;
   bashUpdates: Record<string, BashTaskUpdate>;
+  rewinding?: { fromSeq: number };            // 编辑提问重发进行中，见 §4 第 5 步、§6.1
   lastSendOptions?: ComposerSendOptions;
   approvalPending: boolean;
   failed: boolean;
@@ -162,6 +164,15 @@ type SessionLocalState = {
   - Host 从未连接变为已连接时，把它的后台会话移出已补齐集合，紧接着的列表刷新会重新补齐（断线期间收不到它们的事件）。
   - 选中会话时另外刷新一次审批和队列（原有行为）。
 - `session-ipc-budget.test.tsx` 记录并约束各场景的 IPC 次数与 `createMessageBlocks` 调用次数；改动补齐或读页逻辑时看它的数字。
+- **乐观 run**：空闲发送和编辑重发在提交前用客户端生成的 `agentRunId` 先 `liveRuns.start`，用户块 id 为 `turn:${agentRunId}:user:0`，与 durable 的 renderKey 相同，落盘后按 §4 第 2 步去重。`rememberOptions(…, agentRunId)` 记下申请的 run id：`applyTaskSnapshot` 不把这条任务投影进托盘；任务没开始就结束（取消、开始前失败）时卸下乐观 run。提交失败同样卸下。
+
+### 6.1 会话回退后的重载
+
+Host 回退会话时日志被改写成更短的前缀，序号和任务快照修订号都会变小，增量合并不再成立（[编辑提问重发](../agent-runtime/agent-edit-resend-rewind.md) §5.4）。
+
+- 收到 `session/rewound`（以及发起回退的窗口在提交成功后）：`ClientSessionStore.reset(sessionId)` 丢掉在途读取、拒绝日志增量，下一份信封整体替换 cell；`DesktopSessionBridge` 对它整页重读（未被观看的保留 cell 也 reset，重新打开时直接替换）。
+- App 同时 `taskQueue.forgetSnapshot`（下一份更小修订号的快照直接接受）、清空本地队列投影和压缩失败块、重读任务快照，重载完清掉 `rewinding`。
+- Web 端 `SessionObserver` 同样处理：reset store、丢掉任务快照、卸下已结束的 run，再整页刷新并重取任务快照。
 
 ## 7. live 事件订阅
 

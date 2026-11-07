@@ -19,6 +19,15 @@ it("lists pending queued tasks in queue order with their text", () => {
   expect(queuedMessages(null)).toEqual([]);
 });
 
+it("leaves out the task an idle Session is starting, but not while busy or paused", () => {
+  const task = (taskId: string, state: string) => ({ taskId, submissionId: taskId, content: taskId, acceptedSeq: 1, state, targetRunId: null, runId: null, continuationOf: null });
+  const idle = { sessionId: "s", revision: 2, paused: false, runs: [], queue: ["a", "b"], tasks: [task("a", "pending"), task("b", "pending")] };
+  expect(queuedMessages(idle as never)).toEqual([{ taskId: "b", text: "b" }]);
+  expect(queuedMessages({ ...idle, paused: true } as never).map(item => item.taskId)).toEqual(["a", "b"]);
+  const running = { ...idle, runs: [{ runId: "r", taskId: "x", state: "running" }] };
+  expect(queuedMessages(running as never).map(item => item.taskId)).toEqual(["a", "b"]);
+});
+
 it("formats elapsed time and status priority", () => {
   expect(formatElapsed(12_400)).toBe("12s");
   expect(formatElapsed(65_000)).toBe("1m 05s");

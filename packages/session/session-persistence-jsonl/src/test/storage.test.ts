@@ -158,3 +158,28 @@ it("loads the Session history before a write only for codecs that declare readsH
     await writer.close();
   } finally { await storage.close(); await rm(dataRoot, { recursive: true, force: true }); }
 });
+
+it("rewind keeps the whole old Journal in recovery and retired children under the parent", async () => {
+  const { readFile, stat } = await import("node:fs/promises");
+  const dataRoot = await mkdtemp(join(tmpdir(), "storage-rewind-"));
+  const registry = createCoreCodecRegistry();
+  const storage = new JsonlSessionStorage({ dataRoot, runtimeId: "test", registry });
+  const header = (sessionId: string) => createSessionHeader({ sessionId, createdAt: "2026-11-07T00:00:00.000Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } });
+  try {
+    const journal = new SessionJournal({ registry });
+    const writer = await storage.create(header("parent"));
+    await writer.append(["a", "b", "c"].map(id => journal.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: id, content: id }, surface: { kind: "append" } })));
+    await writer.flush(); await writer.close();
+    const before = await readFile(storage.journalPath("parent"), "utf8");
+    const { archive } = await storage.rewritePrefix("parent", { expectedLastSeq: 2, cutSeq: 1, closing: [], label: "rewind-1" });
+    expect(await readFile(join(dataRoot, "sessions-v2", "parent", archive), "utf8")).toBe(before);
+    expect((await readFile(storage.journalPath("parent"), "utf8")).trim().split("\n")).toHaveLength(2);
+    const child = await storage.create(header("child")); await child.close();
+    await storage.retireInto("child", "parent", "rewind-1");
+    const retired = join(dataRoot, "sessions-v2", "parent", "recovery", "rewind-1", "sessions", "child");
+    expect((await stat(join(retired, "journal.jsonl"))).isFile()).toBe(true);
+    await expect(stat(join(retired, ".writer-lock"))).rejects.toThrow();
+    // The parent's own lease is free again.
+    const reopened = await storage.open("parent", "write"); await reopened.close();
+  } finally { await storage.close(); await rm(dataRoot, { recursive: true, force: true }); }
+});

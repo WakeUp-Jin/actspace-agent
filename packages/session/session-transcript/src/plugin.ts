@@ -58,6 +58,8 @@ export class SessionTranscriptService {
       else if (event.type === "turn/end") { service.#activeTurns.delete(sessionId); return service.render(sessionId); }
       // The generated title usually lands after a short first Turn has ended; a manual rename can come any time.
       else if (TITLE_EVENTS.has(event.type)) return service.#retitle(sessionId);
+      // A rewind replaced the Journal under a fresh handle; the transcript follows the shorter history.
+      else if (event.type === "session/rewound") return service.render(sessionId);
     });
     listen("session/created", (payload: { sessionId: string }) => this.#created(payload.sessionId));
     listen("session/disposed", (payload: { sessionId: string }) => { this.#activeTurns.delete(payload.sessionId); this.#detachPrompt(payload.sessionId); });
@@ -195,7 +197,7 @@ export class SessionTranscriptService {
     if (!lineage || lineage.origin === "delegation") return false;
     const list = this.#branches.get(lineage.parentSessionId) ?? [];
     if (list.some(item => item.sessionId === header.sessionId)) return false;
-    list.push({ sessionId: header.sessionId, origin: lineage.origin, boundarySeq: lineage.parentBoundarySeq });
+    list.push({ sessionId: header.sessionId, origin: lineage.origin, boundarySeq: lineage.parentBoundarySeq, createdAt: header.createdAt });
     list.sort((a, b) => a.boundarySeq - b.boundarySeq || a.sessionId.localeCompare(b.sessionId));
     this.#branches.set(lineage.parentSessionId, list);
     return true;

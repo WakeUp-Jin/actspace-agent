@@ -82,11 +82,25 @@ describe("session transcript rendering", () => {
     expect(sideMarkdown).toContain("侧边提问");
     expect(sideMarkdown).not.toContain("主会话回答");
 
-    const branches: TranscriptBranch[] = [{ sessionId: "s-side", origin: "side-chat", boundarySeq: 2 }];
+    const branches: TranscriptBranch[] = [{ sessionId: "s-side", origin: "side-chat", boundarySeq: 2, createdAt: "2026-11-07T00:00:00.000Z" }];
     const parentMarkdown = renderTranscript(header(), foldTranscript(parentEvents), branches);
     const mark = parentMarkdown.indexOf("> Side chat opened here → session s-side (transcript: ../s-side/transcript.md)");
     expect(mark).toBeGreaterThan(parentMarkdown.indexOf("主会话回答"));
     expect(mark).toBeLessThan(parentMarkdown.indexOf("后续问题"));
+  });
+
+  it("drops branch marks a later rewind cut away, and keeps earlier and later ones", () => {
+    seq = 0;
+    const events = [user("一"), assistant([{ type: "text", text: "答一" }]), event("turn/end", { reason: "completed" }), event("session/rewound", { cutSeq: 3, droppedThroughSeq: 9, runId: "r", archive: "recovery/a.journal.jsonl", rewoundAt: "2026-11-07T10:00:00.000Z" }), user("新问题")];
+    const branches: TranscriptBranch[] = [
+      { sessionId: "kept-before", origin: "fork", boundarySeq: 2, createdAt: "2026-11-07T09:00:00.000Z" },
+      { sessionId: "dropped", origin: "side-chat", boundarySeq: 5, createdAt: "2026-11-07T09:30:00.000Z" },
+      { sessionId: "kept-after", origin: "side-chat", boundarySeq: 4, createdAt: "2026-11-07T11:00:00.000Z" },
+    ];
+    const markdown = renderTranscript(header(), foldTranscript(events), branches);
+    expect(markdown).toContain("session kept-before");
+    expect(markdown).toContain("session kept-after");
+    expect(markdown).not.toContain("session dropped");
   });
 
   it("describes subagent origin and renders an empty session", () => {

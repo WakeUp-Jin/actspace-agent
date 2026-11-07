@@ -28,12 +28,14 @@ export type TranscriptState = {
   readonly tasks: Readonly<Record<string, string>>;
   /** Calls whose background log was pruned. */
   readonly prunedCalls: readonly string[];
+  /** `session/rewound` facts: branches opened from the dropped part before the rewind are no longer marked. */
+  readonly rewinds: readonly { readonly cutSeq: number; readonly at: string }[];
 };
 
 /** Another Session that branched off this one (side chat or fork) at `boundarySeq`. */
-export type TranscriptBranch = { readonly sessionId: string; readonly origin: "fork" | "side-chat"; readonly boundarySeq: number };
+export type TranscriptBranch = { readonly sessionId: string; readonly origin: "fork" | "side-chat"; readonly boundarySeq: number; readonly createdAt: string };
 
-export const EMPTY_TRANSCRIPT: TranscriptState = Object.freeze({ blocks: Object.freeze([]), pending: Object.freeze({}), title: null, speaker: null, children: Object.freeze([]), lastTime: null, throughSeq: -1, tasks: Object.freeze({}), prunedCalls: Object.freeze([]) });
+export const EMPTY_TRANSCRIPT: TranscriptState = Object.freeze({ blocks: Object.freeze([]), pending: Object.freeze({}), title: null, speaker: null, children: Object.freeze([]), lastTime: null, throughSeq: -1, tasks: Object.freeze({}), prunedCalls: Object.freeze([]), rewinds: Object.freeze([]) });
 
 const LINE_LIMIT = 200;
 
@@ -50,6 +52,7 @@ export function reduceTranscript(state: TranscriptState, event: SessionEventEnve
     // A manual rename to an empty title clears it.
     return event.type === "session/title-set" && data.title === null ? { ...base, title: null } : base;
   }
+  if (event.type === "session/rewound" && typeof data.cutSeq === "number" && typeof data.rewoundAt === "string") return { ...base, rewinds: [...state.rewinds, { cutSeq: data.cutSeq, at: data.rewoundAt }] };
   if (event.seq <= inheritedThroughSeq) return base;
   switch (event.type) {
     case "user/message":
@@ -168,7 +171,9 @@ export function renderTranscript(header: SessionHeaderV1, state: TranscriptState
   const pruned = new Set(state.prunedCalls);
   // A Turn still in progress shows its unanswered calls; `turn/end` turns them into "no result recorded".
   const running: TranscriptBlock[] = Object.values(state.pending).sort((a, b) => a.seq - b.seq).map(call => ({ seq: call.seq, text: `- [#${call.seq}] ${call.head}\n  → running` }));
-  const marks: TranscriptBlock[] = branches.map(branch => ({
+  // A branch cut from a part a later rewind dropped points at content that is no longer here (its seqs were reused).
+  const kept = branches.filter(branch => !state.rewinds.some(rewind => branch.boundarySeq >= rewind.cutSeq && branch.createdAt < rewind.at));
+  const marks: TranscriptBlock[] = kept.map(branch => ({
     seq: branch.boundarySeq,
     text: `> ${branch.origin === "side-chat" ? "Side chat" : "Fork"} opened here → session ${branch.sessionId} (transcript: ../${branch.sessionId}/transcript.md)`,
   }));
