@@ -66,10 +66,13 @@ export class DesktopSessionBridge {
     this.#unsubscribeLive ??= this.transport.subscribeLive(event => this.#applyLive(event));
   }
   #applyLive(event: RuntimeV2LiveEvent): void {
+    const type = event.update?.event.type;
+    // A rewound Journal restarts its seqs below the cell's; nothing merges until a full reload replaces it.
+    // Retained cells of Sessions nobody watches reset too, so reopening one replaces it instead of merging.
+    if (type === "session/rewound" && !this.store.isResetting(event.sessionId)) this.store.reset(event.sessionId);
     const applied = this.store.applyLiveEvent(event);
     if (this.store.selectedSessionId !== event.sessionId && !this.#watched.has(event.sessionId)) return;
-    const type = event.update?.event.type;
-    if (!applied || event.kind === "resync-required" || type === "compaction/end" || type === "recovery/end" || type === "surface/replaced") {
+    if (!applied || event.kind === "resync-required" || type === "compaction/end" || type === "recovery/end" || type === "surface/replaced" || type === "session/rewound") {
       this.#pendingRefresh.add(event.sessionId); this.#refresh(event.sessionId);
     }
   }
@@ -92,6 +95,13 @@ export class DesktopSessionBridge {
       if (count > 0) this.#watched.set(sessionId, count);
       else { this.#watched.delete(sessionId); this.#pendingRefresh.delete(sessionId); this.#reportObserved(); }
     };
+  }
+  /** Reload a Session whose Journal was rewound; the window that asked for the rewind calls this once it is accepted. */
+  reset(sessionId: string): Promise<void> {
+    if (this.#disposed) return Promise.resolve();
+    this.store.reset(sessionId);
+    this.#pendingRefresh.add(sessionId); this.#refresh(sessionId);
+    return this.#refreshes.get(sessionId) ?? Promise.resolve();
   }
   refreshRelated(sessionId: string): Promise<void> {
     if (!this.#watched.has(sessionId)) return Promise.resolve();

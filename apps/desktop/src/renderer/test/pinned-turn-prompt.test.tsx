@@ -86,29 +86,20 @@ describe("PinnedTurnPrompt", () => {
     expect(screen.queryByTestId("pinned-turn-prompt")).not.toBeInTheDocument();
 
     scrollTo(400);
-    const row = await screen.findByRole("button", { name: /^展开提问：macOS 拿到 profile 之后内核做了什么 第二个问题/ });
-    expect(row).toHaveAttribute("aria-expanded", "false");
+    const row = await screen.findByRole("button", { name: /^回到提问：macOS 拿到 profile 之后内核做了什么 第二个问题/ });
+    // 一行，没有展开面板。
+    expect(row).not.toHaveAttribute("aria-expanded");
     expect(screen.getByLabelText("任务 2/5")).toBeInTheDocument();
   });
 
-  it("点开显示全文和跳转，点外面或 Esc 收起", async () => {
+  it("点击回到这一轮，不展开全文", async () => {
     const onJump = vi.fn();
     render(<Harness onJump={onJump} />);
     scrollTo(400);
-    await userEvent.click(await screen.findByRole("button", { name: /^展开提问/ }));
-    expect(screen.getByRole("button", { name: "收起提问" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText((_, element) => element?.textContent === LONG_QUESTION && element.tagName === "DIV")).toBeInTheDocument();
-
-    fireEvent.pointerDown(document.body);
-    expect(screen.getByRole("button", { name: /^展开提问/ })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /^展开提问/ }));
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.getByRole("button", { name: /^展开提问/ })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /^展开提问/ }));
-    await userEvent.click(screen.getByRole("button", { name: "跳到这条提问" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^回到提问/ }));
     expect(onJump).toHaveBeenCalledWith("t1");
+    expect(screen.queryByText((_, element) => element?.textContent === LONG_QUESTION && element.tagName === "DIV")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "跳到这条提问" })).not.toBeInTheDocument();
   });
 
   it("滚到下一轮后换成下一轮的提问；一轮快滚完时不叠", async () => {
@@ -117,7 +108,7 @@ describe("PinnedTurnPrompt", () => {
     await waitFor(() => expect(screen.queryByTestId("pinned-turn-prompt")).not.toBeInTheDocument());
 
     scrollTo(2200);
-    expect(await screen.findByRole("button", { name: "展开提问：那 Linux 上对应的机制是什么？" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "回到提问：那 Linux 上对应的机制是什么？" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/^任务/)).not.toBeInTheDocument();
   });
 });

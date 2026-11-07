@@ -251,10 +251,16 @@ export class DesktopRuntimeV2Registry {
     try { return await this.requireApp().interruptSubagent(sessionId, agentId); }
     finally { this.#admittedWork--; }
   }
-  async submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue) {
+  async submitTask(sessionId: string, submissionId: string, content: RuntimeV2JsonValue, agentRunId?: string) {
     this.assertAdmission();
     this.#admittedWork++;
-    try { return await this.requireApp().submitTask(sessionId, submissionId, content); }
+    try { return await this.requireApp().submitTask(sessionId, submissionId, content, agentRunId); }
+    finally { this.#admittedWork--; }
+  }
+  async rewindAndSubmit(sessionId: string, rewind: import("@actspace/shared/runtime-v2").TaskRewind, submissionId: string, content: RuntimeV2JsonValue, agentRunId?: string) {
+    this.assertAdmission();
+    this.#admittedWork++;
+    try { return await this.requireApp().rewindAndSubmit(sessionId, rewind, submissionId, content, agentRunId); }
     finally { this.#admittedWork--; }
   }
   abortRun(sessionId: string, reason?: string): boolean {
@@ -348,6 +354,22 @@ export class DesktopRuntimeV2Registry {
       const created = await this.#artifacts.create({ bytes: await readFile(path), mediaType, owner: { sessionId, callId: `attachment-${randomUUID()}`, pluginId: "@actspace/desktop", name: "user-attachment" } });
       return Object.freeze({ artifactId: created.artifactId, mimeType: created.mediaType, name: basename(path).slice(0, 240), sizeBytes: created.size });
     } finally { this.#admittedWork--; }
+  }
+
+  /**
+   * An attachment this Session already stores, sent again by an edited prompt. The artifact is reused as is;
+   * Chat text attachments carry their decoded body like a fresh import.
+   */
+  async reuseAttachment(sessionId: string, artifactId: string, name: string, chat: boolean): Promise<RuntimeV2AttachmentRef> {
+    this.assertAdmission();
+    if (this.#artifacts === undefined) throw new Error("Artifact store is unavailable.");
+    const stored = await this.#artifacts.readForSession(sessionId, artifactId);
+    const base = { artifactId, mimeType: stored.mediaType, name: name.slice(0, 240), sizeBytes: stored.bytes.byteLength };
+    if (!chat || stored.mediaType.startsWith("image/")) return Object.freeze(base);
+    let textContent: string;
+    try { textContent = new TextDecoder("utf-8", { fatal: true }).decode(stored.bytes).replace(/^\uFEFF/, ""); }
+    catch { throw new ChatAttachmentValidationError({ code: "invalid_utf8", fileName: base.name }); }
+    return Object.freeze({ ...base, textContent });
   }
 
   async importChatAttachments(sessionId: string, paths: readonly string[]): Promise<readonly RuntimeV2AttachmentRef[]> {

@@ -14,6 +14,15 @@ import type { HostObservations } from "./observation.js";
 import type { HostUploads } from "./uploads.js";
 
 type Params = Readonly<Record<string, unknown>>;
+/** Rewind refusals keep their code in the message so the desktop adapter can show the same wording as a local Session. */
+function rewindHostError(error: unknown): HostError | undefined {
+  const code = isRecord(error) && typeof error.code === "string" ? error.code : error instanceof Error ? error.message : undefined;
+  if (code === "SESSION_BUSY") return new HostError("CONFLICT", "SESSION_BUSY", true);
+  if (code === "REWIND_CONFLICT") return new HostError("CONFLICT", "REWIND_CONFLICT");
+  if (code === "REWIND_TURN_NOT_FOUND" || code === "REWIND_INHERITED" || code === "REWIND_UNAVAILABLE") return new HostError("FORBIDDEN", code);
+  return undefined;
+}
+
 function fields(input: Params, allowed: readonly string[]): void {
   if (Object.keys(input).some(key => !allowed.includes(key))) throw new TypeError("Unexpected Host parameter");
 }
@@ -124,9 +133,22 @@ export class HostRpc {
       }
       case "sessions.output": fields(params, ["sessionId", "runId", "afterRevision"]); return this.options.output.page(stringParam(params, "sessionId", 128), stringParam(params, "runId", 128), integerParam(params, "afterRevision", Number.MAX_SAFE_INTEGER));
       case "tasks.submit": {
-        fields(params, ["sessionId", "submissionId", "content", "uploadIds", "fileReferences", "responseAnnotations"]);
+        fields(params, ["sessionId", "submissionId", "content", "uploadIds", "fileReferences", "responseAnnotations", "rewind", "agentRunId"]);
         if (typeof params.content !== "string") throw new TypeError("Task content must be text");
         const sessionId = stringParam(params, "sessionId", 128), submissionId = stringParam(params, "submissionId", 128);
+        const agentRunId = params.agentRunId === undefined ? undefined : stringParam(params, "agentRunId", 128);
+        let rewind: { runId: string; expectedThroughSeq: number } | undefined;
+        if (params.rewind !== undefined) {
+          if (!isRecord(params.rewind)) throw new TypeError("Invalid rewind");
+          fields(params.rewind, ["runId", "expectedThroughSeq"]);
+          rewind = { runId: stringParam(params.rewind, "runId", 128), expectedThroughSeq: integerParam(params.rewind, "expectedThroughSeq", Number.MAX_SAFE_INTEGER) };
+        }
+        // A rewind replaces the edited Turn; any other submission queues behind the Session's work.
+        const admit = async (content: RuntimeV2JsonValue) => {
+          if (!rewind) return app.submitTask(sessionId, submissionId, content, agentRunId);
+          try { return await app.rewindAndSubmit(sessionId, rewind, submissionId, content, agentRunId); }
+          catch (error) { throw rewindHostError(error) ?? error; }
+        };
         const ids = params.uploadIds ?? [];
         if (!Array.isArray(ids) || ids.some(id => typeof id !== "string")) throw new TypeError("Invalid attachment list");
         const original = { userInput: params.content, uploadIds: ids as string[], fileReferences: params.fileReferences ?? [], responseAnnotations: params.responseAnnotations ?? [] };
@@ -137,20 +159,20 @@ export class HostRpc {
             ? stored === params.content && !ids.length && Array.isArray(original.fileReferences) && !original.fileReferences.length && Array.isArray(original.responseAnnotations) && !original.responseAnnotations.length
             : isRecord(stored) && stored.kind === "composer-task" && isRecord(stored.original) && isDeepStrictEqual({ fileReferences: [], responseAnnotations: [], ...stored.original }, original);
           if (!matches) throw new HostError("CONFLICT", "Submission identity already belongs to different content");
-          return app.submitTask(sessionId, submissionId, stored);
+          return app.submitTask(sessionId, submissionId, stored, agentRunId);
         }
         const referencesInput = await validateRunReferences({ inspectSession: id => app.inspectSession(id), readSessionProjection: input => app.readSessionProjection(input), resolveFile: resolveWorkspaceFileReference }, { sessionId, fileReferences: params.fileReferences, responseAnnotations: params.responseAnnotations });
         if (!referencesInput.ok) throw new HostError("FORBIDDEN", `Invalid message reference: ${referencesInput.issue.code}`);
         const referenceBlocks: RuntimeV2JsonValue[] = [...fileReferenceBlocks(referencesInput.fileReferences), ...responseExcerptBlocks(referencesInput.responseAnnotations)];
         if (!params.content.trim() && ids.length === 0 && !referenceBlocks.length) throw new TypeError("Task content is empty");
-        if (!ids.length && !referenceBlocks.length) return app.submitTask(sessionId, submissionId, params.content);
+        if (!ids.length && !referenceBlocks.length) return admit(params.content);
         const references = ids.length ? await uploads.pin(context.deviceId, sessionId, ids as string[], submissionId) : [];
         const blocks: RuntimeV2JsonValue[] = params.content ? [{ type: "text", text: params.content }, ...referenceBlocks] : [...referenceBlocks];
         for (const ref of references) {
           const stored = await uploads.resolve(sessionId, ref.id);
           blocks.push({ type: "artifact", artifact: { artifactId: ref.id, mediaType: stored.mediaType }, label: ref.name });
         }
-        return app.submitTask(sessionId, submissionId, { kind: "composer-task", original: JSON.parse(JSON.stringify(original)), prepared: blocks });
+        return admit({ kind: "composer-task", original: JSON.parse(JSON.stringify(original)), prepared: blocks });
       }
       case "tasks.lookup": {
         fields(params, ["sessionId", "submissionId"]); const submissionId = stringParam(params, "submissionId", 128);

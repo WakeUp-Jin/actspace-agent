@@ -87,6 +87,8 @@ export type ComposerAttachmentsOptions = {
   readonly onBeforePick: () => void;
   /** 移除一个附件后：Composer 用它更新跟这个附件有关的发送错误。 */
   readonly onRemoved: (attachmentId: string) => void;
+  /** 没有附件草稿时的初始附件（消息流里编辑提问时是原提问的附件）。 */
+  readonly initial?: readonly ComposerAttachment[];
 };
 
 /**
@@ -94,9 +96,9 @@ export type ComposerAttachmentsOptions = {
  * 选图、选文件、粘贴图片、拖放文件都走这里，失败写进 `error`。
  */
 export function useComposerAttachments({
-  draftKey, readAttachmentDraft, writeAttachmentDraft, isChatForm, isRemoteTarget, inputLocked, onBeforePick, onRemoved,
+  draftKey, readAttachmentDraft, writeAttachmentDraft, isChatForm, isRemoteTarget, inputLocked, onBeforePick, onRemoved, initial,
 }: ComposerAttachmentsOptions) {
-  const [attachments, setAttachmentState] = useState<ComposerAttachment[]>(() => draftKey && readAttachmentDraft ? readAttachmentDraft(draftKey) : []);
+  const [attachments, setAttachmentState] = useState<ComposerAttachment[]>(() => draftKey && readAttachmentDraft ? readAttachmentDraft(draftKey) : [...(initial ?? [])]);
   const attachmentsRef = useRef(attachments);
   // 附件改动同时写回当前 draftKey 的草稿（16 T14）。ref 同步更新，连续两次改动不会基于旧值。
   const setAttachments = (update: ComposerAttachment[] | ((current: ComposerAttachment[]) => ComposerAttachment[])) => {

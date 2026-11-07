@@ -65,3 +65,25 @@ it("pages older history through sessions.page with beforeSeq", async () => {
   await act(async () => { await result.current.loadOlder(); });
   expect(client.calls.find(call => call.method === "sessions.page")?.params).toEqual({ sessionId: "s1", beforeSeq: 4 });
 });
+
+it("reloads the whole Session and its task snapshot when the Journal was rewound", async () => {
+  let rewound = false;
+  const client = fakeClient(method => {
+    if (method === "sessions.observe") return observeResult("s1", { title: "旧标题", tasks: taskSnapshot({ revision: 9 }) });
+    if (method === "sessions.page") return observationFixture("s1", { title: rewound ? "回退后" : "旧标题", seq: 3 });
+    if (method === "tasks.command") return { snapshot: taskSnapshot({ revision: 1 }) };
+    if (method === "approvals.list") return [];
+    return null;
+  });
+  const connection = fakeConnection(client);
+  const store = new FakeConnectionStore(connection);
+  const { result } = renderHook(() => useSessionObservation("s1"), { wrapper: connectionWrapper(store) });
+  await waitFor(() => expect(result.current.status).toBe("ready"));
+  rewound = true;
+  // The rewind's own update carries a seq below what the store holds; it must not count as a gap or be merged.
+  act(() => { connection.events.accept({ subscriptionId: "sub-1", epoch: "e1", cursor: 2, value: { kind: "projection", update: { sessionId: "s1", event: { seq: 3, type: "session/rewound" } } } }); });
+  await waitFor(() => expect(result.current.title).toBe("回退后"));
+  // The smaller task revision is accepted after the rewind.
+  await waitFor(() => expect(result.current.tasks?.revision).toBe(1));
+  expect(client.calls.find(call => call.method === "tasks.command")?.params).toEqual({ sessionId: "s1", op: "snapshot" });
+});

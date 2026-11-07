@@ -42,6 +42,8 @@ export class AgentService {
   readonly #externalLedgers = new Map<string, TaskLedger>();
   /** Managers whose open already settled; release decides on these only, never on a pending open. */
   readonly #settled = new Map<string, SessionRunManager>();
+  /** Sessions a rewind holds: tasks may be accepted or cancelled, but no Run starts. */
+  readonly #held = new Set<string>();
   #closed = false;
   #draining = false;
   #closing: Promise<void> | undefined;
@@ -96,6 +98,24 @@ export class AgentService {
     if (!manager || this.#closed || this.#draining) return;
     void manager.then(value => value.wake(), () => undefined);
   }
+  /**
+   * Hold a Session while it rewinds (agent-edit-resend-rewind.md §3.2): no Run, operation or wake starts
+   * until the returned release runs, which then starts whatever is queued. A second hold is `SESSION_BUSY`.
+   */
+  hold(sessionId: string): () => void {
+    if (this.#closed) throw new Error("Agent service is closed");
+    if (this.#held.has(sessionId)) throw new TaskError("SESSION_BUSY");
+    this.#held.add(sessionId);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.#held.delete(sessionId);
+      const manager = this.#settled.get(sessionId);
+      if (manager && !this.#closed) { manager.wake(); manager.kick(); }
+    };
+  }
+  isHeld(sessionId: string): boolean { return this.#held.has(sessionId); }
   /** Stop queue claims without aborting owned Runs or their approval waits. */
   beginDrain(): void { this.#draining = true; }
   get draining(): boolean { return this.#draining; }
@@ -107,7 +127,11 @@ export class AgentService {
     await Promise.all(managers.flatMap(result => result.status === "fulfilled" ? [result.value.waitForIdle()] : []));
   }
   async stop(sessionId: string, runId: string): Promise<boolean> { return (await this.#manager(sessionId)).stop(runId); }
-  async exclusive<T>(sessionId: string, operation: () => Promise<T>): Promise<T> { return (await this.#manager(sessionId)).exclusive(operation); }
+  async exclusive<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
+    // Mode, workspace and compaction writes wait out a rewind instead of landing in a Journal about to be replaced.
+    if (this.#held.has(sessionId)) throw new TaskError("SESSION_BUSY");
+    return (await this.#manager(sessionId)).exclusive(operation);
+  }
   async waitForTask(sessionId: string, taskId: string): Promise<RunRecord | null> {
     const manager = await this.#manager(sessionId);
     if (manager.blocked) throw manager.failure ?? new Error("DURABILITY_BLOCKED");
@@ -172,7 +196,7 @@ export class AgentService {
       if (session.header.sessionId !== sessionId) throw new Error("Session owner mismatch");
       const ledger = await TaskLedger.open(session);
       ledger.subscribe(snapshot => this.ports.onSnapshot?.(sessionId, snapshot));
-      return new SessionRunManager({ ledger, canStart: () => !this.#draining, operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: () => this.ports.harnessId(session), acquire: (id, signal) => this.ports.acquire(id, signal), readConfiguration: () => this.ports.readConfiguration(session), hasPendingNotifications: () => this.ports.hasPendingNotifications?.(session) ?? false, onFailure: error => this.ports.onFailure?.(sessionId, error) });
+      return new SessionRunManager({ ledger, canStart: () => !this.#draining && !this.#held.has(sessionId), operationForTask: task => this.ports.operationForTask?.(session, task), runIdForTask: task => this.ports.runIdForTask?.(sessionId, task), harnessId: () => this.ports.harnessId(session), acquire: (id, signal) => this.ports.acquire(id, signal), readConfiguration: () => this.ports.readConfiguration(session), hasPendingNotifications: () => this.ports.hasPendingNotifications?.(session) ?? false, onFailure: error => this.ports.onFailure?.(sessionId, error) });
     })();
     // Only an unacquired writer lease may be retried by the next request.
     // Recovery and durability failures remain cached to protect accepted writes.

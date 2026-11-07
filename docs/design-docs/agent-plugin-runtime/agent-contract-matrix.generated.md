@@ -1,12 +1,12 @@
 # Agent Contract Matrix
 
 > Generated artifact; edit source declarations instead. Do not hand-edit this file.
-> Generator 1.0.0; source digest `8ee2cd42c1256970dd1f0a066c67769cfd73727c83763c9fc87e4a719f982e99`.
+> Generator 1.0.0; source digest `8f7ea474b4789a1acfe5ab5ce36928e6ba2a0291af5165eac355e2553cf88151`.
 
 This document is an audit view of the current ActSpace v2 declarations. It never activates Runtime services, plugins, Session persistence, tools or Cordis entries.
 
 - Services: 58
-- Events: 85 (Session core 14, Loop interventions 8, notifications 7)
+- Events: 87 (Session core 14, Loop interventions 8, notifications 7)
 - Plugins: 53
 - Packages: 73
 
@@ -78,6 +78,7 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | eventType | category | plane | status | scope | mode | codecStatus | producerStatus | containment | owner | sourceRefs | tests |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | application/run-preparing | domain | domain | declared |  | emit | n/a | not-inferred |  | packages/core | packages/core/agent-service/src/application.ts | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
+| application/session-rewound | domain | domain | declared |  | emit | n/a | not-inferred |  | packages/core | packages/core/agent-service/src/application.ts | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | application/title-changing | domain | domain | declared |  | emit | n/a | not-inferred |  | packages/core | packages/core/agent-service/src/application.ts | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | harness/selection-updated | domain | domain | declared |  | emit | n/a | not-inferred |  | packages/harness-evolution | packages/harness-evolution/harness-control/src/contracts.ts | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | session/created | domain | domain | declared |  | emit | n/a | not-inferred |  | packages/core | packages/core/runtime/src/session/session-plugin.ts | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
@@ -139,6 +140,7 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | session/archived-set | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | session/end-seed | core | session | active | session |  | present | present |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#CORE_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | session/pinned-set | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
+| session/rewound | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | session/title | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | session/title-llm-request | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |
 | session/title-set | extension | session | active | session |  | present | none |  | @actspace/session-journal | packages/session/session-journal/src/core-codecs.ts#PERSISTED_EXTENSION_EVENT_TYPES | session-journal/core-codec-contract<br>cordis-adapter/event-contract |

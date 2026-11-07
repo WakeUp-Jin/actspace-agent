@@ -35,6 +35,8 @@ export class ClientSessionStore {
   readonly #listeners = new Set<ClientSessionListener>();
   #batchDepth = 0;
   readonly #pendingEmits = new Set<string>();
+  /** Sessions whose Journal was rewound: the next envelope replaces the cell instead of merging into the longer old one. */
+  readonly #resetting = new Set<string>();
 
   get selectedSessionId(): string | null {
     return this.#selectedSessionId;
@@ -117,10 +119,35 @@ export class ClientSessionStore {
     return !gap && event.kind !== "resync-required";
   }
 
+  /**
+   * The Session's Journal was rewound (agent-edit-resend-rewind.md §5.4): its seqs restart below what this cell holds.
+   * Reads already in flight are discarded and Journal updates are refused until the next envelope, which replaces the
+   * snapshot, window and values outright. The old content stays visible until then.
+   */
+  reset(sessionId: string): void {
+    const cell = this.#cells.get(sessionId);
+    if (cell === undefined) return;
+    this.#resetting.add(sessionId);
+    this.#overlays.delete(sessionId);
+    this.#cells.set(sessionId, Object.freeze({ ...cell, requestGeneration: cell.requestGeneration + 1 }));
+  }
+
+  isResetting(sessionId: string): boolean { return this.#resetting.has(sessionId); }
+
   applyEnvelope(envelope: RuntimeV2DesktopSessionProjection, requestGeneration?: number): boolean {
     const cell = this.#cell(envelope.sessionId);
     if (requestGeneration !== undefined && requestGeneration !== cell.requestGeneration) return false;
     if (envelope.snapshot.sessionId !== envelope.sessionId || envelope.snapshot.throughJournalSeq !== envelope.throughJournalSeq) throw new Error("Session projection revision mismatch.");
+    if (this.#resetting.delete(envelope.sessionId)) {
+      const values: Record<string, RuntimeV2JsonValue> = {};
+      const revisions: Record<string, number> = {};
+      for (const [key, value] of Object.entries(envelope.values)) if (value !== undefined) { values[key] = value; revisions[key] = envelope.throughJournalSeq; }
+      this.#overlays.delete(envelope.sessionId);
+      this.#cells.set(envelope.sessionId, Object.freeze({ ...cell, snapshot: envelope.snapshot, window: envelope.window, deferredToolCalls: [...envelope.deferredToolCalls], watermarks: envelope.watermarks ?? null,
+        projectionValues: Object.freeze(values), projectionRevisions: Object.freeze(revisions), status: "ready" as const, error: null, liveGap: false }));
+      this.#emit(envelope.sessionId);
+      return true;
+    }
     const older = cell.snapshot !== null && envelope.throughJournalSeq < cell.snapshot.throughJournalSeq;
     const sameRevision = cell.snapshot !== null && envelope.throughJournalSeq === cell.snapshot.throughJournalSeq;
     if (sameRevision && Object.keys(cell.projectionValues).length > 0 && JSON.stringify(envelope.values) !== JSON.stringify(cell.projectionValues)) {
@@ -166,7 +193,7 @@ export class ClientSessionStore {
 
   applyJournalUpdate(update: RuntimeV2SessionUpdate): boolean {
     const cell = this.#cell(update.sessionId);
-    if (!cell.window || !cell.snapshot) return false;
+    if (!cell.window || !cell.snapshot || this.#resetting.has(update.sessionId)) return false;
     const event = update.event;
     if (event.seq <= cell.window.throughJournalSeq) return true;
     if (event.seq !== cell.window.throughJournalSeq + 1 || update.throughJournalSeq !== event.seq) return false;
@@ -202,6 +229,7 @@ export class ClientSessionStore {
   applyProjectionValue(input: { readonly sessionId: string; readonly key: string; readonly throughJournalSeq: number; readonly value: RuntimeV2JsonValue }): boolean {
     const cell = this.#cell(input.sessionId);
     if (!Number.isSafeInteger(input.throughJournalSeq) || input.throughJournalSeq < -1) throw new TypeError("Projection seq must be an integer >= -1.");
+    if (this.#resetting.has(input.sessionId)) return false;
     if (cell.snapshot !== null && input.throughJournalSeq < cell.snapshot.throughJournalSeq) return false;
     if (input.throughJournalSeq < (cell.projectionRevisions[input.key] ?? -1)) return false;
     const nextValues = Object.freeze({ ...cell.projectionValues, [input.key]: input.value });
@@ -234,6 +262,7 @@ export class ClientSessionStore {
    */
   evict(sessionId: string): boolean {
     if (sessionId === this.#selectedSessionId) return false;
+    this.#resetting.delete(sessionId);
     this.#overlays.delete(sessionId);
     this.#pendingEmits.delete(sessionId);
     return this.#cells.delete(sessionId);

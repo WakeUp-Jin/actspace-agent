@@ -15,6 +15,7 @@ import { SessionReadModel } from "../projection/durable-session.js";
 import type { RendererAllowlist } from "../projection/tool-dto.js";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { SessionProjectionService } from "@actspace/session-projection";
+import type { SessionPrefixRewrite } from "@actspace/session-storage";
 
 export class RuntimeSessionController {
   readonly store: SessionStore;
@@ -362,6 +363,60 @@ export class RuntimeSessionController {
     await closing;
     return true;
   }
+  /**
+   * Rewind an open Session to a prefix (agent-edit-resend-rewind.md §3.4): close it, let storage keep `events[0..cutSeq)`
+   * plus `closing` (archiving the old Journal), move the dropped subagent Sessions into its recovery area, and reopen it.
+   * Release gates must agree (nothing running or queued); pins and viewers do not block, the caller stopped the work.
+   * A reopen elsewhere waits for the whole rewrite. A storage failure reopens the unchanged Session and rethrows.
+   */
+  async rewrite(sessionId: string, input: { readonly expectedLastSeq: number; readonly cutSeq: number; readonly closing: SessionPrefixRewrite["closing"]; readonly label: string; readonly retire: readonly string[] }): Promise<{ readonly session: SessionHandle; readonly archive: string; readonly retireFailures: readonly { readonly sessionId: string; readonly error: unknown }[] }> {
+    const storage = this.store.storage;
+    if (this.#ephemeral.has(sessionId) || !storage.rewritePrefix || !storage.retireInto) throw new SessionRewriteError("REWIND_UNAVAILABLE", "This Session cannot be rewound.");
+    const session = this.#open.get(sessionId);
+    if (session === undefined || this.#closing.has(sessionId)) throw new SessionRewriteError("SESSION_BUSY", `Session ${sessionId} is not open.`);
+    for (const gate of this.#gates) { let ok = false; try { ok = gate.canRelease(sessionId); } catch { /* treated as busy */ } if (!ok) throw new SessionRewriteError("SESSION_BUSY", `Session ${sessionId} has running or queued work.`); }
+    this.#open.delete(sessionId);
+    this.#recent.delete(sessionId);
+    const holders = [...this.#gates].map(gate => gate.release(sessionId));
+    const retireFailures: { sessionId: string; error: unknown }[] = [];
+    let archive: string | undefined;
+    const work = (async () => {
+      let closeError: unknown;
+      for (const result of await Promise.allSettled(holders)) if (result.status === "rejected") closeError ??= result.reason;
+      try { await session.flush(); } catch (caught) { closeError ??= caught; }
+      try { await session.close(); } catch (caught) { closeError ??= caught; }
+      this.#models.delete(sessionId);
+      this.#changes.delete(sessionId);
+      try { await this.options.onDisposed?.(sessionId, closeError === undefined ? { ok: true } : { ok: false, error: closeError }); } catch { /* observers cannot block the rewrite */ }
+      if (closeError !== undefined) throw closeError;
+      ({ archive } = await storage.rewritePrefix!(sessionId, { expectedLastSeq: input.expectedLastSeq, cutSeq: input.cutSeq, closing: input.closing, label: input.label }));
+      // The rewrite already happened; a child that cannot move stays as an unlisted directory, which affects nothing.
+      for (const childId of input.retire) {
+        try {
+          if (this.#external.has(childId)) throw new SessionRewriteError("SESSION_BUSY", `Subagent Session ${childId} is in use.`);
+          const open = this.#open.get(childId);
+          if (open !== undefined) { this.#open.delete(childId); this.#recent.delete(childId); await open.close(); this.#models.delete(childId); this.#changes.delete(childId); }
+          await storage.retireInto!(childId, sessionId, input.label);
+          this.#globalIndex.remove(childId);
+        } catch (error) { retireFailures.push({ sessionId: childId, error }); }
+      }
+      // Summaries only accept a growing seq; the rewritten Journal is shorter.
+      this.#globalIndex.remove(sessionId);
+    })();
+    const tracked = work.catch(() => undefined);
+    this.#closing.set(sessionId, tracked);
+    try { await work; }
+    catch (error) {
+      if (this.#closing.get(sessionId) === tracked) this.#closing.delete(sessionId);
+      // Storage left the old Journal in place; reopen it so the Session stays usable.
+      await this.resume(sessionId).catch(() => undefined);
+      throw error;
+    }
+    if (this.#closing.get(sessionId) === tracked) this.#closing.delete(sessionId);
+    const reopened = await this.resume(sessionId);
+    if (this.#globalIndexReady) this.#globalIndex.replace(this.summary(this.snapshot(reopened), this.options.profileId));
+    return { session: reopened, archive: archive!, retireFailures };
+  }
   /** Release the oldest idle Sessions beyond the limit. Concurrent calls share one pass and a pass that overlaps a change runs again. */
   sweep(): Promise<void> {
     if (this.#sweeping) { this.#sweepAgain = true; return this.#sweeping; }
@@ -448,6 +503,10 @@ export class RuntimeSessionController {
 }
 
 const DEFAULT_MAX_IDLE_SESSIONS = 3;
+
+export class SessionRewriteError extends Error {
+  constructor(readonly code: "SESSION_BUSY" | "REWIND_UNAVAILABLE", message: string) { super(message); this.name = "SessionRewriteError"; }
+}
 
 /** Holder of per-Session state that keeps a handle alive (the run scheduler, for one). */
 export type SessionReleaseGate = {

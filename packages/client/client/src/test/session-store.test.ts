@@ -31,6 +31,28 @@ function page(sessionId: string, revision: number, fromSeq: number, pageThrough:
 }
 
 describe("ClientSessionStore", () => {
+  it("replaces a rewound Session wholesale on the next envelope, ignoring stale reads and Journal updates in between", () => {
+    const store = new ClientSessionStore();
+    store.select("s");
+    store.applyEnvelope(page("s", 30, 0, 30), store.get("s").requestGeneration);
+    const inFlight = store.get("s").requestGeneration;
+    store.reset("s");
+    expect(store.isResetting("s")).toBe(true);
+    // The old content stays visible; a read started before the reset and Journal updates of the old seqs are dropped.
+    expect(store.get("s").snapshot?.throughJournalSeq).toBe(30);
+    expect(store.applyEnvelope(page("s", 31, 0, 31), inFlight)).toBe(false);
+    expect(store.applyJournalUpdate({ sessionId: "s", throughJournalSeq: 31, event: journalEvent(31), values: {} } as never)).toBe(false);
+    // The rewound Journal is shorter; it replaces the window instead of merging into the longer one.
+    expect(store.applyEnvelope(page("s", 8, 0, 8), store.get("s").requestGeneration)).toBe(true);
+    expect(store.isResetting("s")).toBe(false);
+    expect(store.get("s").window!.events.map(event => event.seq)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(store.get("s").snapshot?.throughJournalSeq).toBe(8);
+    expect(store.applyJournalUpdate({ sessionId: "s", throughJournalSeq: 9, event: journalEvent(9), values: {} } as never)).toBe(true);
+    // Resetting a Session the store never held is a no-op.
+    store.reset("unknown");
+    expect(store.isResetting("unknown")).toBe(false);
+  });
+
   it("evicts a Session's cell and overlay, but never the selected Session", () => {
     const store = new ClientSessionStore();
     store.applySnapshot(snapshot("session-1", 3), { runtimeInstanceId: "runtime-1" });

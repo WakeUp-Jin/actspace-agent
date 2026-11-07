@@ -102,7 +102,15 @@ export class EnglishLearningService {
 
   private observe(sessionId: string | undefined, event: SessionEventEnvelopeV1): void {
     const binding = this.binding;
-    if (!binding || sessionId !== binding.session.header.sessionId || event.type !== "turn/end" || event.seq <= binding.watermark) return;
+    if (!binding || sessionId !== binding.session.header.sessionId) return;
+    // The bound Session rewound: its Journal is shorter and lives under a new handle; bind that one from its new end.
+    if (event.type === "session/rewound") {
+      const sessions = this.ctx.get?.("session.runtime") as { getOpen(id: string): AgentHandle["session"] | undefined } | undefined;
+      const reopened = sessions?.getOpen(sessionId);
+      if (reopened && !this.closed) void this.bind(reopened).catch(() => undefined);
+      return;
+    }
+    if (event.type !== "turn/end" || event.seq <= binding.watermark) return;
     const turnId = record(event.data).turnId;
     if (typeof turnId !== "string") return;
     const injected = binding.injected.get(turnId);
