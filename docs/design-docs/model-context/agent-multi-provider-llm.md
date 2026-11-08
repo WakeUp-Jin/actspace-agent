@@ -239,7 +239,7 @@ Provider adapter 可提供：
 - 连接测试实现。
 - 模型目录加载与归一化。
 
-Kimi thinking 等供应商差异由当前 pi-ai adapter / 私有 wire 实现处理；业务层不维护旧协议 Service 分支。
+Kimi thinking 等供应商差异由当前 pi-ai adapter / 私有 wire 实现处理；业务层不维护旧协议 Service 分支。复用 pi-ai 内置服务商的连接，思考参数由 pi-ai 按模型生成；自定义中转仍由 `reasoning-options.ts` 生成（2026-11-08）。
 
 ### DeepSeek V4.1 目录与兼容（2026-09-10）
 
@@ -557,9 +557,9 @@ renderer 只调用结构化 IPC：
 
 `PiAiAdapter` 在 Provider I/O 前决定使用 pi-ai 或兼容 wire backend：
 
-- 常规请求通过 `streamPiAi()` 调用 pi-ai `streamSimple`。
-- 显式请求代理、官方 OpenRouter 的非 Anthropic 请求，以及具备 Files 接线的 DeepSeek 图片请求使用 `LegacyProxyWireEngine`。
-- 开始 Provider I/O 后不跨 backend fallback；代理是 request-scoped，不修改进程全局 dispatcher。
+- 常规请求通过 `streamPiAi()` 调用 pi-ai `streamSimple`。连接 Base URL 与 pi-ai 内置服务商的模型地址完全一致时复用该内置服务商（按模型取协议、地址、思考参数和兼容开关）；其余连接自建 Provider。规则见 [LLM Core Pi §17](../agent-plugin-runtime/agent-llm-core-pi.md#17-pi-ai-150-与复用内置服务商2026-11-08)。
+- 官方 OpenRouter 的 Completions / Responses 请求（读取账单金额），以及具备 Files 接线的 DeepSeek 图片请求使用 `LegacyProxyWireEngine`。
+- 开始 Provider I/O 后不跨 backend fallback；代理是 request-scoped，pi-ai 路径通过请求级 `fetch` 传入（2026-11-08 起不再因代理进兼容 backend），不修改进程全局 dispatcher。
 
 协议转换、图片字节读取、reasoning 参数和 usage 归一由对应 adapter/wire 路径负责。业务层不再实例化 `OpenAICompletionsService`、`OpenAIResponsesService` 或携带明文 Key 的旧 `LLMConfig`。
 

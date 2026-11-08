@@ -158,8 +158,8 @@ Adapter 内部可以使用小型私有函数或文件分隔消息转换、模型
 
 Provider 构造遵循以下规则：
 
-1. 已有 pi-ai catalog provider 且协议未被 route 覆盖时，优先复用 pi-ai 的 Provider implementation。
-2. 自定义 route 或显式协议覆盖时，通过 pi-ai 的公开 `createProvider` 和对应的公开 protocol factory 构造 Provider。
+1. 连接的 Base URL 与 pi-ai 某个内置服务商的模型地址完全一致时，复用该内置服务商的 stream 实现；规则见 §17。
+2. 其余连接（自定义中转、智谱通用 API、MiniMax OpenAI 接口、火山方舟等）通过 pi-ai 的公开 `createProvider` 和对应的公开 protocol factory 构造 Provider。
 3. Provider 的 models 集合由当前 route 的 resolved model facts 组成。
 4. credential 只在请求 dispatch 边界交给 pi-ai 的 auth resolver，不写入持久化对象或共享 DTO。
 5. Desktop 启动时不初始化未使用的 Provider SDK，按 route 或 protocol 延迟加载。
@@ -235,8 +235,10 @@ interface PreparedAdapterCall {
 
 Legacy transport 只在明确理由成立时使用：
 
-- pi-ai 当前公开 API 无法提供合格的 request-scoped proxy。
-- 某个 route 的图片上传或 Provider-specific wire 能力尚未达到 parity。
+- 官方 OpenRouter 的 Chat Completions / Responses 需要读取原始账单 `usage.cost`（pi-ai 1.5.0 只在 Completions 且 `is_byok` 时读取）。
+- 某个 route 的图片上传或 Provider-specific wire 能力尚未达到 parity（当前为 DeepSeek Files 上传）。
+
+> 2026-11-08 改：pi-ai 1.5.0 每次请求可传 `fetch`，代理不再是 legacy 理由，见 §17.4。
 - 结构化错误、abort 或 stream 语义未通过该 route 的采用门禁。
 
 Legacy backend 必须：
@@ -387,8 +389,7 @@ owner lease 在成功、不可重试失败、重试耗尽、backoff abort、snap
 
 | Route / 特性 | 当前兼容路径 | 采用 pi-ai 的必要证据 |
 |---|---|---|
-| 无代理的普通 Completions / Responses / Anthropic | 当前 pi-ai wire | public exports、协议 fixture、错误元数据、一次 dispatch 单次 wire |
-| 任意 provider 的显式 proxy | legacy proxy | request-scoped transport、direct/proxy 并发 canary |
+| 普通 Completions / Responses / Anthropic（含显式代理） | pi-ai wire；代理经 pi-ai 的请求级 `fetch`（2026-11-08 起） | public exports、协议 fixture、错误元数据、一次 dispatch 单次 wire；代理需 direct/proxy 并发 canary |
 | OpenRouter 直连 Completions / Responses | legacy，保留原始账单 cost | provider-reported cost 与 estimated cost 来源不混淆，billing fixture parity |
 | DeepSeek 图片且配置文件上传器 | legacy 文件上传 | image/artifact/file replay、上传取消及生命周期 parity |
 | 自定义连接及显式协议覆盖 | 按上述特性选择 | endpoint owner、protocol、credential 身份与 capability 一致 |
@@ -420,3 +421,59 @@ Desktop 在 prepare 阶段应用连接级关闭开关，`promptCacheMode: off` �
 - 其他模型不注入 Claude 缓存参数。本轮不改变 Responses backend 或切换 SDK。
 
 请求参数正确不代表每次都能命中；缓存最小长度、前缀一致性、有效期和上游路由仍由服务商决定。官方依据：[OpenRouter prompt caching](https://openrouter.ai/docs/guides/best-practices/prompt-caching)。本地回归覆盖模式策略、关闭优先、直接/代理请求体、真实 pi-ai 序列化，以及账单和 usage 不回退；真实服务商命中另行验收。
+
+## 17. pi-ai 1.5.0 与复用内置服务商（2026-11-08）
+
+> 执行计划：[20261108-pi-ai-builtin-providers](../../exec-plans/active/20261108-pi-ai-builtin-providers.md)。起因是外部 PR #34（OpenCode Go）：同一个服务商下不同模型走不同协议、还要带会话请求头，这些 pi-ai 内置服务商已经做好，我们自己拼 Provider 做不到。
+
+### 17.1 依赖
+
+- `@earendil-works/pi-ai` 0.82.1 → 1.5.0；`openai` 6.26.0 → 7.19.0、`@anthropic-ai/sdk` 0.91.1 → 0.129.0，与 pi-ai 自带版本一致，兼容 backend 和 pi-ai 用同一份 SDK。openai 7 唯一的破坏性改动是要求 Node 22；Electron 39.8.10 自带 Node 22.22.1，满足 pi-ai 的 `>=22.19`。
+- 用量补丁按原规则移植为 `patches/@earendil-works__pi-ai@1.5.0.patch`：1.5.0 仍会把缺失的 usage 填成 0，补丁照旧在三种协议的原始 usage 边界附带 `actspaceWireUsage`（见[目录与费用设计](../model-context/agent-model-catalog-and-usage-cost.md)）。
+
+### 17.2 什么时候复用内置服务商
+
+只按连接的 Base URL 判断：规范化后的 Base URL（去掉末尾 `/`）与 pi-ai 某个内置服务商的某个模型地址**完全相同**，并且这个地址只属于一个内置服务商，就复用它。其余一律走 §5.2 第 2 条的自建 Provider。
+
+- 判断不看我们的服务商 id 或模板 id，所以官方模板和自定义中转一视同仁：自定义中转填了 `https://api.deepseek.com`，也复用 pi-ai 的 deepseek。
+- 地址表是 `packages/llm/llm-pi-ai/src/builtin-providers.ts` 里的静态表（Base URL → 内置服务商 id），只收我们支持的三种协议、且地址里没有占位符的条目。测试从 `builtinProviders()` 现算一遍并与静态表比对，升级 pi-ai 时表不一致就失败。属于多个内置服务商的地址（目前只有阿里 token-plan 国际站）不收。
+- 当前模板的结果：DeepSeek、Anthropic、OpenAI、OpenRouter、Kimi（`.cn` / `.ai`）、小米 MiMo 复用；智谱（我们用通用 API `api/paas/v4`，pi-ai 的 zai 是 Coding Plan 地址）、MiniMax（我们用 OpenAI 接口 `/v1`，pi-ai 的 minimax 是 `/anthropic`）、火山方舟、其他自定义中转不复用，行为不变。
+- 只加载用到的那一个服务商模块（`@earendil-works/pi-ai/providers/<id>`，实测约 33 ms、2 MB），不导入 `providers/all`（约 58 ms、11 MB）。
+
+### 17.3 模型从哪里来
+
+复用时，pi-ai 的 `Models` 里注册一个包装 Provider（DSH `reuseCatalogProvider` 同款）：id 与名称用内置服务商的，`auth.apiKey` 用 ActSpace 的请求级凭据解析器，`getModels()` 只返回本次请求的一个模型，`stream` / `streamSimple` 转给内置服务商实例，不复制。内置服务商自己的会话请求头（OpenCode `x-opencode-session`）、按模型分协议、兼容开关因此全部保留。
+
+| 情况 | 协议与地址 | 思考参数、兼容开关 | 上下文、最大输出、输入类型 |
+|---|---|---|---|
+| pi-ai 认识这个模型 id | 取 pi-ai 模型的 `api` 和 `baseUrl`（同一服务商下不同模型可以不同） | 取 pi-ai 模型的 `reasoning`、`thinkingLevelMap`、`compat`、`headers` | 取我们的设置（含用户修改）；我们没有时用 pi-ai 的 |
+| pi-ai 不认识（新模型、中转自定义名） | 取连接的协议和 Base URL | 不带 `compat`，请求格式由 pi-ai 按服务商 id 与地址自动识别（如 `max_tokens`）；思考参数仍按 ActSpace 规则（见 §17.4） | 取我们的设置 |
+
+- 价格不变：仍由 ActSpace 的价格快照计算，pi-ai 模型里的 `cost` 不用。
+- 去掉 pi-ai 模型里的 `allowedFallbackModels`（如 `claude-fable-5` 配了服务端改用 opus）：请求只用用户选的模型，价格快照和回放身份才对得上。
+- 实际协议以最终模型的 `api` 为准：图片消息准备、usage 的缓存口径、回放身份都用它，不用连接上配置的协议。
+- 兼容 backend 的选择（§14）仍按连接协议在 Provider I/O 前决定；官方 OpenRouter 的 Completions / Responses 连接照旧进兼容 backend，不会因为 pi-ai 把 `anthropic/*` 标成 Anthropic 协议而改道。
+
+### 17.4 思考参数
+
+- pi-ai 认识的内置模型，思考参数完全交给 pi-ai：ActSpace 只传标准档位（`reasoning: "low" | … | "max"`，关闭时不传），pi-ai 按模型的 `thinkingFormat` 和 `thinkingLevelMap` 生成请求字段，并把模型不支持的档位就近取整。用户没选（自动）时去掉 pi-ai 推断出的思考字段，交给服务商默认。`onPayload` 不再改写思考字段，只保留 DeepSeek 图片请求体校验。
+- 其余情况（不复用的连接，以及复用地址但 pi-ai 不认识的模型 id）保留 `reasoning-options.ts` 的现有改写，行为不变。pi-ai 对不认识的 id 没有档位表，按地址识别的格式也不全（例如 Kimi 会被识别成不发任何思考字段），交给它会丢掉思考开关。兼容 backend 也继续用它。
+
+### 17.5 代理
+
+pi-ai 1.5.0 的三个协议实现都把请求级 `fetch` 传给 SDK client。代理连接改为：从 `ProviderProxyPool` 取该代理地址的 `fetch`，作为 `fetch` 选项传给 pi-ai；不改全局 dispatcher。代理本身不再是进入兼容 backend 的理由；仍进兼容 backend 的只有官方 OpenRouter 的 Completions / Responses（账单金额）和配置了文件上传的 DeepSeek 图片请求，这两条照旧在兼容 backend 里走代理。代理连接失败仍归类为 `proxy`。
+
+### 17.6 回放身份
+
+- 持久化的回放信封（§15）仍用 ActSpace 稳定的服务商 id（`deepseek`、`kimi`、`anthropic`、`custom` 等，即原来的 wire provider），旧会话的思考签名继续匹配。
+- 交给 pi-ai 的历史 assistant 消息用最终模型的 pi-ai 服务商 id、`api` 和模型 id。pi-ai 只在三者都与本次请求相同时保留思考块；用我们的 id 会让它把同模型的思考也丢掉。
+- 各 Host 的 `adapterVersion` 升一版（`actspace.desktop-pi-ai.v3`、`actspace.cli-pi-ai.v3`，`PiAiAdapter` 默认值 `pi-ai-1.5.0`），请求快照能区分升级前后。
+
+### 17.7 新增服务商的做法
+
+pi-ai 内置了的服务商（如 OpenCode Go）：在 `PROVIDER_TEMPLATES` 加模板，默认 Base URL 填 pi-ai 的地址，加图标和目录服务商 id。请求层不用改，地址命中就复用内置实现。pi-ai 没有内置的服务商按自定义连接处理。
+
+### 17.8 验证
+
+- 自动化：地址表与 pi-ai 一致；复用 / 不复用的选择；认识与不认识的模型各取哪些字段；多协议服务商按模型分协议并带会话头；思考参数由 pi-ai 生成（DeepSeek、Kimi、Anthropic、OpenAI Responses 各一例）；代理 `fetch` 被使用且直连请求不受影响；回放签名在同模型下保留；用量补丁的全部既有测试；兼容 backend 在新版 SDK 下的既有测试。
+- 真实服务商与打包后的 Electron 运行时由用户验收，不以自动化代替。

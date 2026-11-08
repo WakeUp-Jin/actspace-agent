@@ -124,7 +124,7 @@ models.dev / OpenRouter public API
 
 Token 的已知性按字段保存：没有 usage、空对象、缺失字段和无效的负数/非数值均为 `null`；供应商明确返回的有限非负数（包括 `0`）才是用量事实。部分响应只能推进已经报告的字段，后续部分帧不清空早先事实。成功、失败和取消使用同一规则，缺输入或输出时不生成整次费用估算。SDK 预填的零计数和零费用均不能充当响应事实。
 
-固定依赖 `@earendil-works/pi-ai@0.82.1` 通过版本化 pnpm patch，在 Chat Completions、Responses 和 Anthropic 原始 usage 边界附带 `actspaceWireUsage.version = 1` 的字段存在性元数据；普通 SDK 消费者的数值契约不变。适配层只读取这份元数据，再归一化互斥缓存桶。缺少兼容元数据时保守返回未知。补丁升级须重新通过真实 SDK/SSE 的缺失、部分、显式零、非零、缓存、非法值、失败和取消测试，以及离线 frozen-lockfile 全新安装验证；不能直接改 node_modules 或只测试模拟的 SDK 对象。
+固定依赖 `@earendil-works/pi-ai@1.5.0`（2026-11-08 从 0.82.1 升级，补丁同步移植）通过版本化 pnpm patch，在 Chat Completions、Responses 和 Anthropic 原始 usage 边界附带 `actspaceWireUsage.version = 1` 的字段存在性元数据；普通 SDK 消费者的数值契约不变。适配层只读取这份元数据，再归一化互斥缓存桶。缺少兼容元数据时保守返回未知。补丁升级须重新通过真实 SDK/SSE 的缺失、部分、显式零、非零、缓存、非法值、失败和取消测试，以及离线 frozen-lockfile 全新安装验证；不能直接改 node_modules 或只测试模拟的 SDK 对象。
 
 这项修复仅影响新请求。历史 Journal 没有保留原始字段存在性，不能猜测旧零计数的真实性或自动重写历史事实；请求次数仍按实际请求生命周期累计，不以 token 是否为零或未知决定是否计数。
 

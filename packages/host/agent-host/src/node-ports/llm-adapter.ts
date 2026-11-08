@@ -14,7 +14,7 @@ export type NodePiAiProvider = {
 };
 
 export class NodeLlmAdapter implements LlmAdapter {
-  readonly adapterVersion = "actspace.cli-pi-ai.v2";
+  readonly adapterVersion = "actspace.cli-pi-ai.v3";
   readonly #proxies = new ProviderProxyPool();
   readonly #deepSeekFiles = new DeepSeekFileUploader();
   constructor(private readonly options: { readonly mock: boolean; readonly model?: string; readonly provider: NodePiAiProvider; readonly readArtifact: (sessionId: string, artifactId: string) => Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }> }) {}
@@ -35,7 +35,7 @@ export class NodeLlmAdapter implements LlmAdapter {
       deepSeekFiles: this.#deepSeekFiles,
     } as const;
     const adapter = new PiAiAdapter({
-      wire: engineOptions,
+      wire: { ...engineOptions, proxies: this.#proxies },
       legacyProxy: { ...engineOptions, proxies: this.#proxies },
     }, this.adapterVersion);
     const request = Object.freeze({ ...input.request, model: apiModel });

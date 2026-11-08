@@ -12,7 +12,7 @@ type SessionArtifactReader = (sessionId: string, artifactId: string) => Promise<
 
 /** Desktop v2 provider boundary. The historical filename remains until P15 removes v1 source. */
 export class DesktopLegacyLlmAdapter implements LlmAdapter {
-  readonly adapterVersion = "actspace.desktop-pi-ai.v2";
+  readonly adapterVersion = "actspace.desktop-pi-ai.v3";
   readonly #proxies = new ProviderProxyPool();
   #deepSeekFiles: DeepSeekFileUploader | undefined;
 
@@ -100,7 +100,7 @@ export class DesktopLegacyLlmAdapter implements LlmAdapter {
       ...(deepSeekFiles === undefined ? {} : { deepSeekFiles }),
     } as const;
     const adapter = new PiAiAdapter({
-      wire: engineOptions,
+      wire: { ...engineOptions, proxies: this.#proxies },
       legacyProxy: { ...engineOptions, proxies: this.#proxies },
     }, this.adapterVersion);
     const request = Object.freeze({ ...input.request, model: requestModel, options: Object.freeze(requestOptions), contextWindow: model.definition.contextWindow });

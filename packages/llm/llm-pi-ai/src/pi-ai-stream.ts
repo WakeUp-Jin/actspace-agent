@@ -2,7 +2,9 @@ import { prepareImageMessages } from "./image-messages.js";
 import { validateDeepSeekImage, validateDeepSeekImageMessages, validateDeepSeekPayload } from "./deepseek-images.js";
 import { type ModelPricingSnapshot } from "@actspace/shared";
 import { calculateUsageCost } from "@actspace/llm-service";
-import { withReasoningPayload } from "./reasoning-options.js";
+import { withReasoningPayload, withoutReasoningPayload } from "./reasoning-options.js";
+import { builtinChatModel, builtinProviderForBaseUrl, loadBuiltinProvider, type PiAiBuiltinLoader, type PiAiBuiltinProvider } from "./builtin-providers.js";
+import { ProviderProxyError, type ProviderProxyPool } from "@actspace/llm-service";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { LlmRuntimeError, providerCodeFromUnknown, retryAfterMsFromUnknown, type LlmFailure, type LlmFailureKind } from "@actspace/llm-service";
@@ -25,9 +27,12 @@ export type PiAiConnectionOptions = {
   readonly readArtifact?: PiAiArtifactReader;
   readonly deepSeekFiles?: DeepSeekFileUploader;
   readonly load?: PiAiPublicLoader;
+  readonly loadBuiltin?: PiAiBuiltinLoader;
+  readonly proxies?: ProviderProxyPool;
   readonly cacheRetention?: "short" | "long" | "none";
 };
 
+type ProviderFetch = Awaited<ReturnType<ProviderProxyPool["getFetch"]>>;
 type PiAiPublicLoader = (route: PiAiWireRoute) => Promise<{ readonly core: PiAiCoreModule; readonly api: PiAiApiModule }>;
 type PiAiCoreModule = {
   createModels(): PiAiModels;
@@ -45,20 +50,30 @@ type PiAiEvent = { readonly type: string; readonly contentIndex?: number; readon
 
 /** Private protocol implementation; backend selection belongs to PiAiAdapter. */
 export async function streamPiAi(options: PiAiConnectionOptions, input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
+    const proxyState = { failed: false };
     try {
       const { core, api } = await (options.load ?? loadPiAiPublicModules)(options.route);
       if (typeof core.createModels !== "function" || typeof core.createProvider !== "function" || typeof api.streamSimple !== "function") throw failure("unsupported-capability", "pi-ai public stream exports are unavailable.");
       const baseUrl = input.credential.baseUrl ?? options.baseUrl;
       if (baseUrl === undefined) throw failure("invalid-request", `No base URL is configured for pi-ai route ${input.request.routeId}.`);
       const modelId = options.modelId ?? input.request.model;
-      const model = createModel(options, modelId, baseUrl);
-      const provider = core.createProvider({ id: options.providerId, name: options.providerId, baseUrl, auth: { apiKey: { name: "ActSpace credential", resolve: async () => ({ auth: input.credential.apiKey === undefined ? {} : { apiKey: input.credential.apiKey }, source: "ActSpace credential" }) } }, models: [model], api } as never);
-      const models = core.createModels(); models.setProvider(provider);
-      const resolved = models.getModel(options.providerId, modelId);
+      const credentialAuth = { apiKey: { name: "ActSpace credential", resolve: async () => ({ auth: input.credential.apiKey === undefined ? {} : { apiKey: input.credential.apiKey }, source: "ActSpace credential" }) } };
+      const builtinId = builtinProviderForBaseUrl(baseUrl);
+      const builtin = builtinId === undefined ? undefined : await (options.loadBuiltin ?? loadBuiltinProvider)(builtinId);
+      const target = builtin === undefined
+        ? { providerId: options.providerId, model: createModel(options, modelId, baseUrl), api: options.route, input: options.modelFacts?.input ?? (["text", "image"] as const), known: false }
+        : builtinTarget(builtin, options, modelId, baseUrl);
+      const provider = builtin === undefined
+        ? core.createProvider({ id: options.providerId, name: options.providerId, baseUrl, auth: credentialAuth, models: [target.model], api } as never)
+        : { id: builtin.id, name: builtin.name, baseUrl, auth: credentialAuth, getModels: () => [target.model], stream: (model: unknown, context: unknown, streamOptions: unknown) => builtin.stream(model, context, streamOptions), streamSimple: (model: unknown, context: unknown, streamOptions: unknown) => builtin.streamSimple(model, context, streamOptions) };
+      const models = core.createModels(); models.setProvider(provider as PiAiProvider);
+      const resolved = models.getModel(target.providerId, modelId);
       if (resolved === undefined) throw failure("invalid-request", `pi-ai did not publish model ${modelId}.`);
-      const deepseek = options.providerId === "deepseek" && options.route === "openai-completions";
-      const messages = prepareImageMessages(input.request.messages, options.modelFacts?.input.includes("image") ?? true, options.route === "anthropic-messages");
-      if (deepseek) validateDeepSeekImageMessages(messages, options.modelFacts?.input.includes("image") ?? true);
+      const wireApi = target.api;
+      const supportsImage = target.input.includes("image");
+      const deepseek = options.providerId === "deepseek" && wireApi === "openai-completions";
+      const messages = prepareImageMessages(input.request.messages, supportsImage, wireApi === "anthropic-messages");
+      if (deepseek) validateDeepSeekImageMessages(messages, supportsImage);
       const readArtifact = options.readArtifact;
       const checkedReader: PiAiArtifactReader | undefined = deepseek && readArtifact ? async (sessionId, artifactId) => {
         const artifact = await readArtifact(sessionId, artifactId);
@@ -69,15 +84,70 @@ export async function streamPiAi(options: PiAiConnectionOptions, input: LlmAdapt
         input.request.tools,
         input.request.sessionId,
         checkedReader,
-        { api: options.route, provider: options.providerId, model: modelId },
-        { provider: options.providerId, protocol: options.route, model: modelId },
+        // pi-ai keeps thinking only when the history names the request's own provider, api and model.
+        { api: wireApi, provider: target.providerId, model: modelId },
+        { provider: options.providerId, protocol: wireApi, model: modelId },
       );
-      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: input.request.options.temperature, maxTokens: input.request.options.maxTokens ?? Math.min(32_768, options.modelFacts?.maxTokens ?? 32_768), reasoning: input.request.options.reasoning === false ? undefined : input.request.options.reasoningEffort === "ultra" ? "max" : input.request.options.reasoningEffort ?? (input.request.options.reasoning ? "high" : undefined), sessionId: input.request.sessionId, cacheRetention: options.cacheRetention, onPayload: (payload: Record<string, unknown>) => { const body = withReasoningPayload(payload, options.route, options.providerId, input.request.options); if (deepseek) validateDeepSeekPayload(body); return body; }, headers: input.credential.headers } as never);
-      return fromPiAiEvents(events, input.request.requestId, options.pricing ?? null, { providerId: options.providerId, protocol: options.route, modelId, endpoint: baseUrl });
+      const fetch = await proxyFetch(options, input, proxyState);
+      const requestOptions = input.request.options;
+      const reasoning = requestOptions.reasoning === false ? undefined : requestOptions.reasoningEffort === "ultra" ? "max" : requestOptions.reasoningEffort ?? (requestOptions.reasoning ? "high" : undefined);
+      // pi-ai owns thinking fields only for models it knows; "auto" (nothing chosen) sends none of them.
+      // Unknown ids, even on a built-in address, keep ActSpace's provider rules: pi-ai has no thinking map for them.
+      const automaticReasoning = requestOptions.reasoning === undefined && requestOptions.reasoningEffort === undefined;
+      const onPayload = (payload: Record<string, unknown>) => {
+        const body = !target.known ? withReasoningPayload(payload, wireApi, options.providerId, requestOptions) : automaticReasoning ? withoutReasoningPayload(payload) : payload;
+        if (deepseek) validateDeepSeekPayload(body);
+        return body;
+      };
+      const events = models.streamSimple(resolved, context, { apiKey: input.credential.apiKey, signal: input.signal, maxRetries: 0, maxRetryDelayMs: 0, temperature: requestOptions.temperature, maxTokens: requestOptions.maxTokens ?? Math.min(32_768, options.modelFacts?.maxTokens ?? 32_768), reasoning, sessionId: input.request.sessionId, cacheRetention: options.cacheRetention, onPayload, headers: input.credential.headers, ...(fetch === undefined ? {} : { fetch }) } as never);
+      return fromPiAiEvents(events, input.request.requestId, options.pricing ?? null, { providerId: options.providerId, protocol: wireApi, modelId, endpoint: baseUrl }, proxyState);
     } catch (error) {
       if (error instanceof LlmRuntimeError) throw error;
-      throw new LlmRuntimeError(classifyFailure(error, input.credential.baseUrl ?? options.baseUrl), error);
+      throw new LlmRuntimeError(classifyFailure(error, input.credential.baseUrl ?? options.baseUrl, proxyState.failed), error);
     }
+}
+
+/**
+ * A connection on a built-in provider's address: pi-ai's own model when it knows the id
+ * (per-model api, address, thinking map and compat), otherwise the connection's protocol and address
+ * with pi-ai's address-based compat detection.
+ * Capacity facts prefer ActSpace settings; pricing never comes from pi-ai.
+ */
+function builtinTarget(builtin: PiAiBuiltinProvider, options: PiAiConnectionOptions, modelId: string, baseUrl: string): { providerId: string; model: RuntimeV2JsonValue; api: PiAiWireRoute; input: readonly string[]; known: boolean } {
+  const known = builtinChatModel(builtin, modelId);
+  const facts = options.modelFacts;
+  if (known === undefined) {
+    const model = { ...(createModel(options, modelId, baseUrl, false) as Record<string, RuntimeV2JsonValue>), provider: builtin.id };
+    return { providerId: builtin.id, model, api: options.route, input: facts?.input ?? ["text", "image"], known: false };
+  }
+  const input = facts?.input ?? known.input ?? ["text", "image"];
+  // Server-side fallbacks would answer with another model than the one priced and replayed for this request.
+  const { allowedFallbackModels: _fallbacks, ...compat } = (known.compat ?? {}) as Record<string, unknown>;
+  const model = {
+    ...known,
+    ...(known.compat === undefined ? {} : { compat }),
+    provider: builtin.id,
+    input: [...input],
+    contextWindow: facts?.contextWindow ?? known.contextWindow ?? 262_144,
+    maxTokens: facts?.maxTokens ?? known.maxTokens ?? 32_768,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  } as unknown as RuntimeV2JsonValue;
+  return { providerId: builtin.id, model, api: known.api, input, known: true };
+}
+
+/** Request-scoped proxy transport; records proxy failures so the terminal error keeps its kind. */
+async function proxyFetch(options: PiAiConnectionOptions, input: LlmAdapterDispatchInput, state: { failed: boolean }): Promise<ProviderFetch | undefined> {
+  const proxyUrl = input.credential.proxyUrl;
+  if (proxyUrl === undefined) return undefined;
+  if (options.proxies === undefined) throw failure("invalid-request", "Missing request-scoped proxy pool.");
+  let base: ProviderFetch;
+  try { base = await options.proxies.getFetch(proxyUrl); } catch (error) { state.failed = true; throw error; }
+  return async (url, init) => {
+    try { return await base(url, init); } catch (error) {
+      if (error instanceof ProviderProxyError) state.failed = true;
+      throw error;
+    }
+  };
 }
 
 async function loadPiAiPublicModules(route: PiAiWireRoute): Promise<{ readonly core: PiAiCoreModule; readonly api: PiAiApiModule }> {
@@ -87,8 +157,8 @@ async function loadPiAiPublicModules(route: PiAiWireRoute): Promise<{ readonly c
   return { core: core as unknown as PiAiCoreModule, api: api as unknown as PiAiApiModule };
 }
 
-function createModel(options: PiAiConnectionOptions, model: string, baseUrl: string): RuntimeV2JsonValue {
-  return { id: model, name: model, api: options.route, provider: options.providerId, baseUrl, ...(options.providerId === "deepseek" && options.route === "openai-completions" ? { compat: { maxTokensField: "max_tokens" } } : {}), reasoning: options.modelFacts?.reasoning ?? true, input: options.modelFacts ? [...options.modelFacts.input] : ["text", "image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: options.modelFacts?.contextWindow ?? 262_144, maxTokens: options.modelFacts?.maxTokens ?? 32_768 };
+function createModel(options: PiAiConnectionOptions, model: string, baseUrl: string, withCompat = true): RuntimeV2JsonValue {
+  return { id: model, name: model, api: options.route, provider: options.providerId, baseUrl, ...(withCompat && options.providerId === "deepseek" && options.route === "openai-completions" ? { compat: { maxTokensField: "max_tokens" } } : {}), reasoning: options.modelFacts?.reasoning ?? true, input: options.modelFacts ? [...options.modelFacts.input] : ["text", "image"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: options.modelFacts?.contextWindow ?? 262_144, maxTokens: options.modelFacts?.maxTokens ?? 32_768 };
 }
 
 async function toPiAiContext(messages: readonly LlmMessage[], tools: readonly { readonly name: string; readonly description: string; readonly inputSchema: RuntimeV2JsonValue }[], sessionId?: string, readArtifact?: PiAiArtifactReader, replay?: { api: string; provider: string; model: string }, replayIdentity?: { provider: string; protocol: string; model: string }): Promise<PiAiContext> {
@@ -135,7 +205,7 @@ async function toPiUserContent(message: LlmMessage, sessionId?: string, readArti
   return content;
 }
 
-async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: string, pricing: ModelPricingSnapshot | null, identity: { readonly providerId: string; readonly protocol: string; readonly modelId: string; readonly endpoint?: string }): AsyncGenerator<LlmStreamEvent> {
+async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: string, pricing: ModelPricingSnapshot | null, identity: { readonly providerId: string; readonly protocol: string; readonly modelId: string; readonly endpoint?: string }, proxyState: { readonly failed: boolean }): AsyncGenerator<LlmStreamEvent> {
   const calls = new Map<number, { callId: string; name: string }>();
   for await (const event of events) {
     if (event.type === "text_delta") yield { type: "text-delta", text: event.delta ?? "" };
@@ -143,7 +213,7 @@ async function* fromPiAiEvents(events: AsyncIterable<PiAiEvent>, requestId: stri
     else if (event.type === "toolcall_start") { const block = event.partial?.content[event.contentIndex ?? -1] as { id?: string; name?: string } | undefined; calls.set(event.contentIndex ?? -1, { callId: block?.id ?? `${requestId}:${event.contentIndex ?? 0}`, name: block?.name ?? "unknown" }); }
     else if (event.type === "toolcall_delta") { const call = calls.get(event.contentIndex ?? -1) ?? { callId: `${requestId}:${event.contentIndex ?? 0}`, name: "unknown" }; yield { type: "tool-call-delta", callId: call.callId, name: call.name, argumentsDelta: event.delta ?? "" }; }
     else if (event.type === "done" && event.message !== undefined) { yield { type: "done", stopReason: mapStopReason(event.message.stopReason), usage: calculateUsageCost(mapUsage(event.message.usage, identity.protocol), pricing), content: toActSpaceContent(event.message.content, identity) }; return; }
-    else if (event.type === "error") { const terminal = event.error; if (terminal?.stopReason === "aborted") yield { type: "aborted", usage: calculateUsageCost(mapUsage(terminal.usage, identity.protocol), pricing), reason: terminal.errorMessage ?? "pi-ai request aborted" }; else yield { type: "error", usage: calculateUsageCost(mapUsage(terminal?.usage, identity.protocol), pricing), failure: classifyFailure(terminal ?? new Error("pi-ai stream failed"), identity.endpoint) }; return; }
+    else if (event.type === "error") { const terminal = event.error; if (terminal?.stopReason === "aborted") yield { type: "aborted", usage: calculateUsageCost(mapUsage(terminal.usage, identity.protocol), pricing), reason: terminal.errorMessage ?? "pi-ai request aborted" }; else yield { type: "error", usage: calculateUsageCost(mapUsage(terminal?.usage, identity.protocol), pricing), failure: classifyFailure(terminal ?? new Error("pi-ai stream failed"), identity.endpoint, proxyState.failed) }; return; }
   }
   yield { type: "error", failure: { kind: "malformed-stream", message: "pi-ai stream ended without a terminal event.", retryable: false, attempt: 1 } };
 }
@@ -171,7 +241,7 @@ function mapStopReason(reason: string): string { return reason === "toolUse" ? "
 function messageText(message: LlmMessage): string { if (typeof message.content === "string") return message.content; return message.content.map((block) => block.type === "text" ? block.text : block.type === "reasoning" ? block.text : block.type === "tool-result" ? block.content : "").join(""); }
 function parseArguments(value: string): RuntimeV2JsonValue { try { return JSON.parse(value) as RuntimeV2JsonValue; } catch { return { $raw: value }; } }
 function failure(kind: LlmFailureKind, message: string): LlmRuntimeError { return new LlmRuntimeError({ kind, message, retryable: false, attempt: 1 }); }
-function classifyFailure(error: unknown, endpoint?: string): LlmFailure {
+function classifyFailure(error: unknown, endpoint?: string, proxyFailed = false): LlmFailure {
   const rawMessage = error instanceof Error
     ? error.message
     : typeof error === "object" && error !== null && typeof (error as { errorMessage?: unknown }).errorMessage === "string"
@@ -185,7 +255,9 @@ function classifyFailure(error: unknown, endpoint?: string): LlmFailure {
   const httpStatus = Number.isFinite(status) && status > 0 ? status : undefined;
   const providerCode = providerCodeFromUnknown(error);
   const contextOverflow = /context(?:_|\s|-)*(?:length|window)|too many tokens|maximum context/i.test(`${providerCode ?? ""} ${message}`);
-  const kind: LlmFailureKind = contextOverflow
+  const kind: LlmFailureKind = proxyFailed || error instanceof ProviderProxyError
+    ? "proxy"
+    : contextOverflow
     ? "context-overflow"
     : httpStatus === 401
       ? "authentication"
@@ -212,7 +284,7 @@ function classifyFailure(error: unknown, endpoint?: string): LlmFailure {
   return {
     kind,
     message: describeTransportFailure(kind, message, cause, endpoint),
-    retryable: kind === "rate-limit" || kind === "provider" || kind === "network" || kind === "timeout",
+    retryable: kind === "rate-limit" || kind === "provider" || kind === "network" || kind === "timeout" || kind === "proxy",
     ...(cause.code === undefined || (kind !== "timeout" && kind !== "network") ? {} : { causeCode: cause.code }),
     ...(httpStatus === undefined ? {} : { httpStatus }),
     ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
