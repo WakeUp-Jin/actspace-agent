@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -20,7 +21,7 @@ const commandSurfacePath = path.join(
 const raw = execFileSync("go", ["run", ".", "commands", "--json"], {
   cwd: cliDir,
   encoding: "utf8",
-  env: { ...process.env, GOCACHE: process.env.GOCACHE || "/private/tmp/abb-go-cache" },
+  env: { ...process.env, GOCACHE: process.env.GOCACHE || path.join(tmpdir(), "abb-go-cache") },
 });
 const report = JSON.parse(raw);
 
