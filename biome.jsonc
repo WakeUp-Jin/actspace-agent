@@ -48,6 +48,7 @@
       "a11y": { "preset": "none" },
       "correctness": {
         "noUnusedImports": "error",
+        "noUnusedVariables": "error",
         // 存量命中较多，先以 warning 暴露、不阻塞 CI；清零后再升 error。
         "useExhaustiveDependencies": "warn",
         // `case x: return this.handle();` 在 void 方法里是仓库惯用写法，tsc 已经约束返回类型。
@@ -68,7 +69,8 @@
         "noExportsInTest": "off"
       },
       "nursery": {
-        "noFloatingPromises": "warn"
+        // 类型推断不完整，可能漏报，但不会误报：明确不等待的调用写 `void`。
+        "noFloatingPromises": "error"
       }
     }
   },

@@ -20,10 +20,10 @@ async function connect(port, code) {
 }
 for (const lockedSession of [false, true]) test(`blocked recovery retains diagnostics and can stop normally (locked Session: ${lockedSession})`, { timeout: 20000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'host-lifecycle-'));
-  const waiting = []; let requests = 0;
+  const waiting = [];
   const provider = createServer(async (request, response) => {
     for await (const _chunk of request) { /* consume request */ }
-    requests++; waiting.push(response);
+    waiting.push(response);
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     response.write(': waiting\n\n');
   });

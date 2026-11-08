@@ -15,8 +15,8 @@ Biome 读取 `.gitignore`，`dist/`、`node_modules/` 等不会被扫描。检�
 
 ## 规则分层
 
-- **error（阻塞 CI）**：Biome `recommended` 预设里剩下的规则，加上 `noUnusedImports`。
-- **warn（可见但不阻塞）**：存量命中多、修复会改行为或需要逐处判断的规则——`useExhaustiveDependencies`、`noExplicitAny`、`noNonNullAssertion`、`noUnusedVariables`、`useIterableCallbackReturn`、`noAssignInExpressions`、`noArrayIndexKey`，以及 nursery 的 `noFloatingPromises`。新代码不要再增加这些 warning；某条规则清零后把它升为 error。
+- **error（阻塞 CI）**：Biome `recommended` 预设里剩下的规则，加上 `noUnusedImports`、`noUnusedVariables`，以及 nursery 的 `noFloatingPromises`（故意不等待的 Promise 写 `void promise`，并保证内部已处理 rejection；它的类型推断不完整，没报不代表没问题）。
+- **warn（可见但不阻塞）**：存量命中多、修复会改行为或需要逐处判断的规则——`useExhaustiveDependencies`、`noExplicitAny`、`noNonNullAssertion`、`useIterableCallbackReturn`、`noAssignInExpressions`、`noArrayIndexKey`。新代码不要再增加这些 warning；某条规则清零后把它升为 error。
 - **off**：与仓库惯用写法冲突或误报的规则，原因写在 `biome.jsonc` 里（a11y 整组、`noVoidTypeReturn`、`useHookAtTopLevel`、`noControlCharactersInRegex`、`noImplicitAnyLet`、`noExportsInTest`）。测试文件额外关闭 `noComponentHookFactories` 和 `useYield`。
 - CSS 不由 Biome 检查，由 `check:frontend-tokens` / `check:frontend-theme` 负责。
 

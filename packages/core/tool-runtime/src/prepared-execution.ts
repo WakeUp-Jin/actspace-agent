@@ -239,7 +239,7 @@ export class PreparedToolExecution {
       await this.environment.journal.recordDispatch({ callId: this.callId, pluginId: this.pluginId, name: this.name, registrationId: this.registrationId, definitionVersion: this.definitionVersion, definitionDigest: this.definitionDigest });
       try {
         await this.environment.journal.checkpointBeforeBody();
-      } catch (error) {
+      } catch {
         return this.#rememberTerminal(this.#failureResult("failed", { code: "CHECKPOINT_FAILED", message: "Tool dispatch could not pass its durability checkpoint.", retryable: true, phase: "checkpoint" }));
       }
       this.#checkToolScope();
@@ -462,7 +462,7 @@ export class PreparedToolExecution {
       if (decision.kind === "deny" && decision.code === "timeout") return { code: "APPROVAL_TIMEOUT", message: APPROVAL_TIMEOUT_MESSAGE, retryable: false, phase: "approval" };
       if (decision.kind !== "once" && decision.kind !== "session") return { code: decision.code === "broker-unavailable" ? "APPROVAL_REQUIRED" : "APPROVAL_DENIED", message: decision.code, retryable: false, phase: "approval" };
       return { kind: "once", requestId: request.requestId, callId: this.callId, sessionId: this.input.sessionId, agentRunId: this.input.agentRunId, pluginId: this.pluginId, toolName: this.name, definitionDigest: this.definitionDigest, normalizedArgsDigest, issuedAt: decision.decidedAt, expiresAt: request.expiresAt };
-    } catch (error) {
+    } catch {
       await this.#recordPermission("permission/decided", { requestId: request.requestId, kind: "deny", code: this.#controller.signal.aborted ? "aborted" : "timeout", decidedAt: new Date().toISOString() });
       return { code: "APPROVAL_TIMEOUT", message: this.#controller.signal.aborted ? "Approval was aborted." : APPROVAL_TIMEOUT_MESSAGE, retryable: !!this.#controller.signal.aborted, phase: "approval" };
     } finally {

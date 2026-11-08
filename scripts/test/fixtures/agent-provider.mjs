@@ -88,7 +88,7 @@ export async function startAgentProvider({ scenario = "success", logPath, onRequ
         });
       }
       if (!response.destroyed) { part(delta); part({}, finish); response.end("data: [DONE]\n\n"); }
-    } catch (error) {
+    } catch {
       if (!response.headersSent) response.writeHead(500, { "content-type": "application/json" });
       response.end(JSON.stringify({ error: { message: "fixture request failed" } }));
     }

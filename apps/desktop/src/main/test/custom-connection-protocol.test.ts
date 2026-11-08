@@ -6,7 +6,6 @@ import { afterEach, expect, it, vi } from "vitest";
 import { SettingsService, type SecretCrypto } from "../settings-service";
 import { ModelStoreService } from "../model-store-service";
 import { ModelRuntimeService } from "../model-runtime-service";
-import type { ModelApi } from "@actspace/shared";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { DesktopLegacyLlmAdapter } from "../runtime-v2/legacy-llm-adapter";
 import { ModelConnectionsService } from "../model-connections-service";
@@ -31,7 +30,6 @@ async function fixture() {
   await settings.clearProviderKey("openrouter");
   return { root, settings };
 }
-const protocols: ModelApi[] = ["openai-completions", "openai-responses", "anthropic-messages"];
 /** 设置 › 模型的新写入入口；这些用例不走网络。 */
 function connectionsService(settings: SettingsService) {
   return new ModelConnectionsService(settings, new ModelStoreService({ settings }), {} as ProviderNetworkService);

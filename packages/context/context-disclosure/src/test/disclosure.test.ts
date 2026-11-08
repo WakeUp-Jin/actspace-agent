@@ -306,7 +306,7 @@ it("registers trace files from any plugin's completed result with their descript
     ["/file/logs/bash_2.log", "Bash log: pnpm test", 0, "active"],
   ]);
   let navigation = "";
-  createDisclosureSource().get(view, value => { navigation = (value.supplements as readonly { text: string }[])[0]!.text; });
+  await createDisclosureSource().get(view, value => { navigation = (value.supplements as readonly { text: string }[])[0]!.text; });
   expect(navigation).toContain('"/file/agents/child.md" — Subagent transcript: review the diff');
   // A fresh disclosure over the same Journal (restart) folds the durable facts into the same paths.
   const replayed = await new ProgressiveDisclosure(port).hydrate(context(session), session);

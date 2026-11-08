@@ -47,13 +47,6 @@ describe("filesystem-read ports", () => {
     }
   });
 });
-async function waitFor(predicate: () => boolean, timeoutMs = 1_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!predicate()) {
-    if (Date.now() >= deadline) throw new Error("Timed out waiting for asynchronous notification.");
-    await new Promise((resolveWait) => setTimeout(resolveWait, 10));
-  }
-}
 
 it("returns the body after compaction even if unchanged and reports successful file facts", async () => {
   const root = await workspace(); await writeFile(join(root, "content.txt"), "keep this evidence");

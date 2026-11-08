@@ -26,7 +26,7 @@ test('real Host drains an active parent and child before closing', { timeout: 60
   const root = await mkdtemp(join(tmpdir(), 'host-lifecycle-'));
   const waiting = []; let requests = 0;
   const provider = createServer(async (request, response) => {
-    let body = ''; for await (const chunk of request) body += chunk;
+    for await (const _chunk of request) { /* consume request */ }
     requests++;
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     if (requests === 2) { waiting.push(response); response.write(': child waiting\n\n'); return; }
