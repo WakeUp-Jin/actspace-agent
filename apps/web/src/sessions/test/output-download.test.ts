@@ -29,7 +29,8 @@ it("reads bounded chunks of a session-owned snapshot and verifies the complete f
     { method: "artifacts.read", params: { sessionId: "session-1", artifactId: "artifact-1", offset: 0, length: HOST_LIMITS.chunkBytes } },
     { method: "artifacts.read", params: { sessionId: "session-1", artifactId: "artifact-1", offset: HOST_LIMITS.chunkBytes, length: 3 } },
   ]);
-});
+  // 256 KiB 走 base64 + jsdom FileReader，本机约 0.9s；CI 上 pnpm -r 并行跑多个包时会超过默认 5s。
+}, 20_000);
 
 it("downloads an empty file without requesting an invalid zero-byte chunk", async () => {
   const client = fixture(new Uint8Array());
