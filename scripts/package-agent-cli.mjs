@@ -20,6 +20,8 @@ try {
   run("pnpm", ["--filter", "@actspace/agent-cli", "deploy", "--legacy", "--prod", "--offline", packageRoot]);
 } catch {
   process.stderr.write("Offline managed CLI deploy failed; retrying with registry access.\n");
+  // A failed deploy leaves a partial tree behind, and pnpm refuses to deploy into a non-empty directory.
+  await rm(packageRoot, { recursive: true, force: true });
   run("pnpm", ["--filter", "@actspace/agent-cli", "deploy", "--legacy", "--prod", packageRoot]);
 }
 run("node", [join(repoRoot, "scripts/check-provider-proxy-package.mjs"), packageRoot]);
