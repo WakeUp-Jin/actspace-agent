@@ -152,7 +152,7 @@ describe("三处使用方", () => {
     render(
       <TooltipProvider>
         <MarkdownHostContext.Provider value={{ openPath }}>
-          <SubagentsPanel sessionId="parent" />
+          <RightPanelProvider initialOpen><SubagentsPanel sessionId="parent" /></RightPanelProvider>
         </MarkdownHostContext.Provider>
       </TooltipProvider>,
     );

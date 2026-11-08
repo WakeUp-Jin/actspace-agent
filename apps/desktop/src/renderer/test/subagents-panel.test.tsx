@@ -3,6 +3,7 @@ import { expect, it, vi } from "vitest";
 import type { MessageBlock, SubagentListItem } from "@actspace/shared";
 import { SubagentsPanel } from "../components/right-panel/SubagentsPanel";
 import { TooltipProvider } from "../components/ui/Tooltip";
+import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { overrideBridge } from "./helpers/bridge";
 
 // 子轨迹本身由 TrajectoryView 渲染（另有测试），这里只看面板把哪个会话、从哪个 seq 之后交给它。
@@ -21,7 +22,7 @@ const item = (agentId: string, status: SubagentListItem["status"], extra: Partia
   agentId, kind: "local", preset: "general", description: agentId, status, activationCount: 1, background: false,
   createdAt: "2026-11-04T09:05:00.000Z", activeSince: "2026-11-04T09:05:00.000Z", transcriptPath: `/data/sessions/${agentId}.jsonl`, ...extra,
 });
-const panel = (focus?: Parameters<typeof SubagentsPanel>[0]["focus"]) => render(<TooltipProvider><SubagentsPanel sessionId="parent" focus={focus} /></TooltipProvider>);
+const panel = (focus?: Parameters<typeof SubagentsPanel>[0]["focus"]) => render(<TooltipProvider><RightPanelProvider initialOpen><SubagentsPanel sessionId="parent" focus={focus} /></RightPanelProvider></TooltipProvider>);
 // 行按钮的可读名称以描述开头；运行中的行旁边还有「停止 <描述>」按钮。
 const row = (description: string) => screen.getByRole("button", { name: new RegExp(`^${description}`) });
 
@@ -110,8 +111,9 @@ it("navigates within the panel while rejecting stale transcript responses", asyn
   unmount();
 });
 
-it("renders the transcript with the main conversation's message flow and drops empty reply text", async () => {
+it("renders the transcript with the main conversation's turn layout and drops empty reply text", async () => {
   const blocks: MessageBlock[] = [
+    { kind: "user", id: "u1", content: "Read the docs.", createdAt: "now" },
     { kind: "thinking", id: "t1", title: "Thinking", content: "plan", status: "completed", createdAt: "now" },
     { kind: "assistant", id: "a1", content: "  ", createdAt: "now" },
     { kind: "assistant", id: "a2", content: "Done reading.", createdAt: "now" },
@@ -123,8 +125,30 @@ it("renders the transcript with the main conversation's message flow and drops e
   panel();
   fireEvent.click(await screen.findByRole("button", { name: /^first/ }));
   await screen.findByText("Done reading.");
-  const flow = screen.getByLabelText("子 Agent 执行内容").querySelector(".message-flow")!;
-  expect(Array.from(flow.children).map((child) => child.getAttribute("data-flow-kind"))).toEqual(["process", "prose"]);
+  // 委派的任务是提问卡片，和主会话一样。
+  expect(screen.getByLabelText("子 Agent 执行内容").querySelector(".turn-prompt-card")).toHaveTextContent("Read the docs.");
+  const flow = screen.getByLabelText("子 Agent 执行内容").querySelector(".turn-body")!;
+  // 空白回复不占位：只剩一段正文（只有思考、没有工具的轮次按主会话规则不收进 Worked for）。
+  expect(Array.from(flow.querySelectorAll("[data-flow-kind='prose']"))).toHaveLength(1);
+  // 子会话的回复操作里没有「分叉会话」。
+  expect(screen.queryByText("分叉会话")).toBeNull();
+});
+
+it("folds a finished agent's tool work into Worked for, like the main conversation", async () => {
+  const blocks = [
+    { kind: "user", id: "u1", content: "Find usages.", createdAt: "2026-11-08T00:00:00.000Z" },
+    { kind: "tool", id: "tool-1", toolCallId: "c1", toolName: "grep", title: "Grep", status: "completed", createdAt: "2026-11-08T00:00:01.000Z" },
+    { kind: "assistant", id: "a1", content: "Found three.", createdAt: "2026-11-08T00:00:05.000Z" },
+  ] as unknown as MessageBlock[];
+  overrideBridge({
+    "sessions.getSubagents": vi.fn().mockResolvedValue([item("first", "ended")]),
+    "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue(blocks),
+  });
+  panel();
+  fireEvent.click(await screen.findByRole("button", { name: /^first/ }));
+  await screen.findByText("Found three.");
+  const toggle = screen.getByRole("button", { name: /^Worked for/ });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
 });
 
 it("keeps retrying a finished agent's transcript before falling back to its result", async () => {

@@ -67,7 +67,8 @@ export function TrajectoryView({ snapshot, onAbort, isAborting, sessionId: watch
   const source = useTrajectorySource(snapshot, watchedSessionId);
   const shown = useMemo(() => trajectoryAfterSeq(source.snapshot ?? null, afterSeq), [source.snapshot, afterSeq]);
   const bridge = source.projection?.bridge;
-  const projectionCell = source.projection?.cell;
+  // 右栏看子会话时是子会话的 cell，空状态里的「加载中 / 出错」才对得上。
+  const projectionCell = source.sourceCell;
   // 流式层的数据：会话实时运行里按请求归组的未定稿正文、思考和工具调用（不再来自日志 chunk）。
   const storeLive = useRequestOutputs(shown?.sessionId ?? null);
   const live = liveOverride ?? source.fixtureLive ?? storeLive;
