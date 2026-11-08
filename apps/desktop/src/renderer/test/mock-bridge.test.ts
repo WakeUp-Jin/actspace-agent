@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeStreamEvent } from "@actspace/shared";
 import { projectChatWindow } from "@actspace/client/sessions";
 import { desktopBridgeContract } from "@actspace/shared/desktop-bridge";
-import { createMockBridge, type MockBridgeHandle } from "../mock/create-mock-bridge";
+import { createMockBridge, type MockBridgeHandle, type MockHandlers } from "../mock/create-mock-bridge";
 import { MOCK_SCENARIOS, type MockScenario } from "../mock/scenarios";
 import { collectPresentedFiles, collectTurnChanges } from "../components/turn-tail/turn-tail-data";
 import { groupMessagesIntoTurns } from "../components/conversation/turns";
 
 let handle: MockBridgeHandle | null = null;
-function open(scenario?: MockScenario, handlers?: Parameters<typeof createMockBridge>[0]["handlers"]) {
+function open(scenario?: MockScenario, handlers?: MockHandlers) {
   handle = createMockBridge({ scenario, handlers });
   return handle;
 }

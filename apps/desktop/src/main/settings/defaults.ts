@@ -52,8 +52,8 @@ export function defaultSettingsFromEnv(dataRoot: string): PersistedSettingsV3 {
     ACTSPACE_BASH_ALWAYS_ASK: process.env.ACTSPACE_BASH_ALWAYS_ASK === "1",
   };
   const imageGeneration = safeImageGenerationDefaults(
-    env.IMAGE_GENERATION_BASE_URL,
-    env.IMAGE_GENERATION_MODEL,
+    env.IMAGE_GENERATION_BASE_URL ?? "",
+    env.IMAGE_GENERATION_MODEL ?? "",
   );
   return {
     version: 3,

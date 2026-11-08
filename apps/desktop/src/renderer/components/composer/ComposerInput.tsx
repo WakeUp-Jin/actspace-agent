@@ -66,7 +66,7 @@ export function useComposerLayout({ surface, mode, message, inputRef, hasExtras,
     const body = bodyRef.current;
     if (!input || !body) return;
 
-    function measureInput() {
+    const measureInput = () => {
       // 测量必须使用独立 DOM：改变正在编辑的 textarea 的网格宽度或把高度
       // 暂时归零，会改变其 scrollTop，IME 提交后浏览器不一定重新展示光标。
       // 复制完整网格以复用控件宽度、gap 和响应式断点，避免布局判定反馈循环。
@@ -104,7 +104,7 @@ export function useComposerLayout({ surface, mode, message, inputRef, hasExtras,
       const height = `${contentHeight}px`;
       if (input.style.height !== height) input.style.height = height;
       setIsInputMultiline(inlineContentHeight > COMPOSER_SINGLE_LINE_MAX_PX);
-    }
+    };
 
     measureInput();
 
@@ -137,7 +137,7 @@ export function composerPlaceholder(mode: ComposerMode, surface: "followup" | "i
 }
 
 export type ComposerInputProps = {
-  inputRef: RefObject<HTMLTextAreaElement | null>;
+  inputRef: RefObject<HTMLTextAreaElement>;
   surface: "followup" | "initial";
   placeholder: string;
   value: string;

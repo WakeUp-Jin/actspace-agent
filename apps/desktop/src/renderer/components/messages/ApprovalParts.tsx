@@ -117,7 +117,7 @@ function useGrantSuggestion(requestId: string | undefined, pick: (suggestion: Gr
     if (!requestId) return;
     void approvalsApi.listPending().then((pending) => {
       const request = pending.find((item) => item.requestId === requestId);
-      if (active) setResult({ requestId, suggestion: request?.grantSuggestions.find(pick) });
+      if (active) setResult({ requestId, suggestion: request?.grantSuggestions?.find(pick) });
     }).catch(() => undefined);
     return () => { active = false; };
   }, [requestId, pick]);
@@ -136,12 +136,12 @@ export function useFileGrantSuggestions(requestId: string | undefined): readonly
   useEffect(() => {
     let active = true;
     if (requestId) void approvalsApi.listPending().then(pending => {
-      const suggestions = pending.find(item => item.requestId === requestId)?.grantSuggestions.filter(item => item.selector.kind === "exact" || item.selector.kind === "subtree") ?? [];
+      const suggestions = pending.find(item => item.requestId === requestId)?.grantSuggestions?.filter(item => item.selector.kind === "exact" || item.selector.kind === "subtree") ?? [];
       if (active) setResult({ requestId, suggestions });
     }).catch(() => undefined);
     return () => { active = false; };
   }, [requestId]);
-  return result?.requestId === requestId ? result.suggestions : [];
+  return result !== undefined && result.requestId === requestId ? result.suggestions : [];
 }
 
 /** Backend-owned command prefix; the renderer never derives authorization from command text. */

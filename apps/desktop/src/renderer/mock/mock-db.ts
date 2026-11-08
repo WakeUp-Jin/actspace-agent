@@ -276,7 +276,7 @@ export function snapshot(session: MockSession, throughJournalSeq: number): Runti
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     throughJournalSeq,
-    workspaceRoot: session.workspaceRoot,
+    workspaceRoot: session.workspaceRoot ?? null,
     agentForm: session.agentForm,
     agentMode: session.agentMode,
     agentModeRevision: session.agentModeRevision,

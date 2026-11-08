@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ReviewChangeNotification, ReviewFileDiff, ReviewSnapshot } from "@actspace/shared";
+import type { ReviewChangeNotification, ReviewCommit, ReviewFileDiff, ReviewSnapshot } from "@actspace/shared";
 import { ReviewRenderView } from "../components/right-panel/ReviewRenderView";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { TestWorkbenchLayout } from "./helpers/workbench";
@@ -450,7 +450,7 @@ function reviewBridge(snapshot: ReviewSnapshot) {
     }) })),
     "review.getFileContents": vi.fn(async (_input: { fileIds: string[] }) => ({ ok: true as const, outcomes: [] })),
     "review.listBranches": vi.fn(async () => ({ ok: true as const, branches: [] })),
-    "review.listCommits": vi.fn(async () => ({ ok: true as const, commits: [] })),
+    "review.listCommits": vi.fn(async () => ({ ok: true as const, commits: [] as ReviewCommit[] })),
     "events.reviewChanged": vi.fn((_callback: (notification: ReviewChangeNotification) => void) => () => undefined),
   };
 }

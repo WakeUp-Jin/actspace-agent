@@ -9,7 +9,7 @@ import { prepareExecutionContext, rollbackPreparedExecution } from "../workspace
 import { homedir } from "node:os";
 import { stat } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
-import { dialog, nativeImage, nativeTheme, shell, type BrowserWindow } from "electron";
+import { dialog, nativeImage, nativeTheme, shell, type BrowserWindow, type OpenDialogOptions, type OpenDialogReturnValue } from "electron";
 import { spawn } from "node:child_process";
 import {
   fileReferenceBlocks,
@@ -101,7 +101,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   usageReadModels.set(options.registry, readModel);
   const contextPanel = new ContextPanelService(options.registry, readModel);
   let pendingQuickOpen = false;
-  let unsubscribeSettingsV4 = () => undefined;
+  let unsubscribeSettingsV4: () => void = () => undefined;
   const ipc = createIpcRegistrar({
     getWindow: options.getMainWindow,
     untrustedMessage: "Runtime v2 fixed renderer IPC rejected an untrusted sender.",
@@ -461,7 +461,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   // 不接受 renderer 自己拼的路径；建成功后作废，名字不合法或目录已存在时可以换个名字重试。
   let pickedParentDirectory: string | null = null;
   ipc.handle(contract.dialogs.selectFiles, async (input = {}) => {
-    const result = await dialog.showOpenDialog(options.getMainWindow(), {
+    const result = await showOpenDialog(options.getMainWindow(), {
       properties: ["openFile", "multiSelections"],
       filters: input.remote === true ? [{ name: "Files", extensions: ["*"] }] : [{ name: "Chat attachments", extensions: ["png", "jpg", "jpeg", "webp", "gif", "txt", "md", "markdown", "json", "csv"] }],
     });
@@ -478,7 +478,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     return { canceled: result.canceled, attachments };
   });
   ipc.handle(contract.dialogs.selectImages, async () => {
-    const result = await dialog.showOpenDialog(options.getMainWindow(), {
+    const result = await showOpenDialog(options.getMainWindow(), {
       properties: ["openFile", "multiSelections"],
       filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
     });
@@ -493,7 +493,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
   ipc.handle(contract.dialogs.importComposerImage, (input) => importComposerImage(input, options.roots.tmpRoot, imagePreviewDataUrl));
   ipc.handle(contract.dialogs.selectWorkspaceDirectory, async (input = {}): Promise<SelectWorkspaceDirectoryResult> => {
-    const result = await dialog.showOpenDialog(options.getMainWindow(), { properties: ["openDirectory"] });
+    const result = await showOpenDialog(options.getMainWindow(), { properties: ["openDirectory"] });
     if (result.canceled || !result.filePaths[0]) return { canceled: true };
     if (!input.registerWorkspace) {
       pickedParentDirectory = resolvePath(result.filePaths[0]);
@@ -636,7 +636,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     disabled: options.settings.get().skills.disabled,
   }));
   ipc.handle(contract.skills.install, async () => {
-    const result = await dialog.showOpenDialog(options.getMainWindow(), { title: "选择 Skill 目录（需包含 SKILL.md）", properties: ["openDirectory"] });
+    const result = await showOpenDialog(options.getMainWindow(), { title: "选择 Skill 目录（需包含 SKILL.md）", properties: ["openDirectory"] });
     if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
     return installFixedRendererSkill(options.roots.dataRoot, result.filePaths[0]);
   });
@@ -644,7 +644,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
 
   ipc.handle(contract.updates.getState, () => options.localUpdate.getState());
   ipc.handle(contract.updates.selectSource, async () => {
-    const result = await dialog.showOpenDialog(options.getMainWindow(), { title: "选择 actspace 源码目录", properties: ["openDirectory"] });
+    const result = await showOpenDialog(options.getMainWindow(), { title: "选择 actspace 源码目录", properties: ["openDirectory"] });
     if (result.canceled || !result.filePaths[0]) return { canceled: true, state: await options.localUpdate.getState() };
     return { canceled: false, state: await options.localUpdate.setSourceRoot(result.filePaths[0]) };
   });
@@ -833,4 +833,9 @@ function isSupportedSessionImageMime(value: string): value is "image/png" | "ima
 
 function safeErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** 主窗口已关闭时弹无父窗口的对话框；Electron 运行时接受 undefined 父窗口，类型上不接受。 */
+function showOpenDialog(window: BrowserWindow | undefined, dialogOptions: OpenDialogOptions): Promise<OpenDialogReturnValue> {
+  return window === undefined ? dialog.showOpenDialog(dialogOptions) : dialog.showOpenDialog(window, dialogOptions);
 }
