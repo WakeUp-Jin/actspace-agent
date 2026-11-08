@@ -112,7 +112,7 @@ IPC 通道：
 
 | 通道 | 入参 | 返回 | 用途 |
 | --- | --- | --- | --- |
-| `session:list` | `SessionListInput | undefined` | `SessionListItem[]` | 侧边栏取未归档列表；设置页取归档列表 |
+| `session:list` | `SessionListInput \| undefined` | `SessionListItem[]` | 侧边栏取未归档列表；设置页取归档列表 |
 | `session:archive` | `SessionArchiveInput` | `SessionArchiveResult` | 归档或恢复会话 |
 
 实现约束：

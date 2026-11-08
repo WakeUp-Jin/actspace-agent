@@ -4,7 +4,7 @@
 
 命令参数与行为见 [命令面](agent-browser-use-command-surface.md)，调用与权限见 [集成设计](agent-browser-use-integration-design.md)。本页维护实现职责、底层原语和代码入口，具体算法以当前 Go handler 和 Locator Runtime 为准。
 
-### 从 CDP 原语出发
+## 从 CDP 原语出发
 
 Chrome DevTools Protocol 是所有浏览器操作的最底层。页面操作主要使用以下 CDP 原语；Tabs、History、Tab Groups 等浏览器级操作通过 Chrome Extension API 执行：
 
@@ -26,7 +26,7 @@ Chrome DevTools Protocol 是所有浏览器操作的最底层。页面操作主�
 | 事件 | `Runtime.exceptionThrown` | JS 异常 |
 | 事件 | `Page.loadEventFired` / `Page.domContentEventFired` | 加载完成 |
 
-### 三层封装原则
+## 三层封装原则
 
 ```
 层级 3  Locator subset：声明式 + 自动等待 + 基础框架感知
@@ -40,7 +40,7 @@ Chrome DevTools Protocol 是所有浏览器操作的最底层。页面操作主�
 
 每层不是独立实现，而是在下一层基础上增加封装。实现时应尽量复用下层逻辑。
 
-### 职责分层（在 actspace 架构中谁做什么）
+## 职责分层（在 actspace 架构中谁做什么）
 
 | 职责 | 执行方 | 说明 |
 |------|--------|------|

@@ -111,7 +111,7 @@ separators 是 `position: absolute`，不占 grid 列，所以 DOM 顺序就是 
 
 另一个有用技巧：**`grid-column: -1` 永远指向显式 track 的最后一列**，无论 grid 有几列。如果你有一个元素必须始终落在最右（比如"右栏"），它比 `grid-column: 3` 更稳健——sidebar 折叠后即使列数变了，它依然贴右。
 
-## 通用模式
+## 具体处理思路
 
 > **响应式 grid：列数会变时，子项的 `grid-column` 必须跟着变。**
 

@@ -1,0 +1,16 @@
+{
+  // 规则配置在 .markdownlint.json；这里只决定扫哪些文件，让 `markdownlint-cli2 "**/*.md"` 在本机与 CI 结果一致。
+  "ignores": [
+    "**/node_modules/**",
+    "dist/**",
+    "artifacts/**",
+    "tmp/**",
+    "logs/**",
+    // 第三方 skill 原文，不按本仓库的 Markdown 规则改写。
+    ".agents/skills/**",
+    // 已完成任务的历史记录按 docs/PLANS_GUIDE.md 保持原样。
+    "docs/histories/**",
+    // 测试 fixture 是故意的畸形 Markdown。
+    "**/test/fixtures/**"
+  ]
+}

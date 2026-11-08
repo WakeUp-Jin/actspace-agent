@@ -364,7 +364,7 @@ const BACKSLASH_WHITESPACE_RE = /\\[ \t]|[^\t\n\\]\\\n/，
 
 🌴 我这里简单的总结一下：上面三条规则，每一条都对应一个已验证的 tree-sitter-bash 分歧
 
-![](../../assets/blog/source/bash-tool-design/01.png)
+![Bash 工具的接口定义](../../assets/blog/source/bash-tool-design/01.png)
 
 🎃 一个完整的例子：
 
@@ -671,7 +671,7 @@ export function isDangerousRemovalPath(resolvedPath: string): boolean
   }
 ```
 
-## 三、完整的24条静态验证规则：
+## 三、完整的24条静态验证规则
 
 <table>
   <colgroup>
@@ -709,7 +709,7 @@ export function isDangerousRemovalPath(resolvedPath: string): boolean
   </tbody>
 </table>
 
-### 
+###
 ## 四、权限验证
 
 权限策略状态一共有三种：allow（允许执行）、deny（拒绝执行）、ask（询问用户）
@@ -720,7 +720,7 @@ export function isDangerousRemovalPath(resolvedPath: string): boolean
 2. 静态规则检查命中的大部分结果都会是ask状态
 3. 一般只读命令是直接allow状态
 
-![](../../assets/blog/source/bash-tool-design/02.png)
+![Bash 工具的运行效果](../../assets/blog/source/bash-tool-design/02.png)
 
 配置文件的定义格式一般如下：
 
