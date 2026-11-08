@@ -49,6 +49,6 @@ export async function loadCordisBehavior(
   return toCordisBehavior(await load(specifier), entryId);
 }
 
-function asRecord(value: unknown): Record<string, any> | undefined {
-  return value !== null && typeof value === "object" ? value as Record<string, any> : undefined;
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" ? value as Record<string, unknown> : undefined;
 }
