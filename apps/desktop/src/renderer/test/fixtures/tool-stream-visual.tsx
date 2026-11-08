@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createMessageBlocks, type MessageBlock, type SessionEvent, type ToolUiPreview } from "@actspace/shared";
 import { ToolLogLine } from "../../components/messages/ToolLogLine";

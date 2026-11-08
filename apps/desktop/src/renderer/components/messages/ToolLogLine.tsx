@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, File, Search } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import { ToolLogShimmer } from "./ToolLogShimmer";
 import { observeOverflow } from "./overflow-observer";

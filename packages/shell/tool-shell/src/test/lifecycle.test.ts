@@ -1,7 +1,6 @@
 import { mkdtemp, mkdir, realpath, symlink, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CordisContextClass } from "@actspace/cordis-adapter";
 import { describe, expect, it } from "vitest";
 import { materializeToolArguments, ToolRuntime } from "@actspace/tool-runtime";
 import type { SandboxService } from "@actspace/sandbox/types";

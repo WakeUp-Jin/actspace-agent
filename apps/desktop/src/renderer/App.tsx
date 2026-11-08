@@ -48,8 +48,6 @@ import type {
   ContextUsageSnapshot,
   MessageBlock,
   ModelSelectionId,
-  ModelId,
-  ModelKey,
   UsableModelView,
   SessionEvent,
   SessionRunLocation,

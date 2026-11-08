@@ -20,7 +20,7 @@ import { setFocusEffect } from "../components/markdown-editor/core/focus";
 import { currentInlineDecorations } from "../components/markdown-editor/core/inline";
 import { indentCommand, listIndentWidth, outdentCommand, saveCommand } from "../components/markdown-editor/core/keymap";
 import { clearImageCache, peekImage } from "../components/markdown-editor/core/widgets/image-cache";
-import { cleanupViews, decos, focusView, hasClass, makeHost, mountEditor } from "./markdown-editor-helpers";
+import { cleanupViews, decos, focusView, makeHost, mountEditor } from "./markdown-editor-helpers";
 
 afterEach(() => {
   cleanupViews();

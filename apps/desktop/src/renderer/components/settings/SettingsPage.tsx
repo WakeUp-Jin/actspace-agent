@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   AppSettings,
   SecretProviderId,
-  SettingsV4Snapshot,
   UsageActivitySnapshot,
   WorkspaceEntry,
 } from "@actspace/shared";

@@ -2,11 +2,9 @@ import { toolPreview } from "./tool-card.js";
 import {
   type BackgroundNotice,
   createMessageBlocks,
-  type ContextUsageSnapshot,
   contextEstimateState,
   contextEstimateUsage,
   type ContextEstimateView,
-  type MessageBlock,
   type SessionEvent,
   type SessionRecord,
   normalizeModelKey,

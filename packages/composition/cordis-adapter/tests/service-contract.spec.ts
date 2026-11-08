@@ -6,7 +6,6 @@ import {
   CordisContextClass,
   CordisService,
   type CordisServiceContext,
-  defineServiceDefinition,
   defineBuiltinPluginManifest,
   validatePluginManifest,
 } from "../src/index.js";

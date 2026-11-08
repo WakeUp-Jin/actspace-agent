@@ -1,14 +1,13 @@
 // @vitest-environment node
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import { SettingsService, type SecretCrypto } from "../settings-service";
 import { ModelStoreService } from "../model-store-service";
 import { ModelRuntimeService } from "../model-runtime-service";
-import type { ModelApi, ModelKey } from "@actspace/shared";
+import type { ModelApi } from "@actspace/shared";
 import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
-import { DesktopCredentialResolver } from "../runtime-v2/credential-resolver";
 import { DesktopLegacyLlmAdapter } from "../runtime-v2/legacy-llm-adapter";
 import { ModelConnectionsService } from "../model-connections-service";
 import type { ProviderNetworkService } from "../runtime-v2/provider-network-service";

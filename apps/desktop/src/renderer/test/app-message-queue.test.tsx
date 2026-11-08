@@ -1,4 +1,4 @@
-import type { FixtureRunInput, FixtureCompactionInput, FixtureCompactionResult } from "./task-host-fixture";
+import type { FixtureRunInput, FixtureCompactionInput } from "./task-host-fixture";
 import type { TaskSnapshot, TaskCommand, SubmitTaskInput, TaskContentEnvelope } from "@actspace/shared/runtime-v2";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { render } from "@testing-library/react";

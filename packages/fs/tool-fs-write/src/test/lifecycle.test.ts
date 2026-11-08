@@ -1,4 +1,3 @@
-import { CordisContextClass } from "@actspace/cordis-adapter";
 import { describe, expect, it } from "vitest";
 import { ToolRuntime } from "@actspace/tool-runtime";
 import { apply, registerTools, TOOL_DEFINITIONS } from "../plugin.js";

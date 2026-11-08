@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { EMPTY_LLM_USAGE, type LlmService, type LlmStreamEvent } from "@actspace/llm-service";
-import { createLlmImageInspector, createNodeToolPorts } from "../node-ports.js";
+import { createLlmImageInspector } from "../node-ports.js";
 
 const parent = { sessionId: "session", agentRunId: "run", turnId: "turn", stepId: "step", callId: "tool-call" };
 const input = { ...parent, artifactId: "image", mediaType: "image/png", question: "What is visible?", signal: new AbortController().signal };

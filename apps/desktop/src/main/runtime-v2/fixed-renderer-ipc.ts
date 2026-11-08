@@ -14,24 +14,19 @@ import { spawn } from "node:child_process";
 import {
   fileReferenceBlocks,
   responseExcerptBlocks,
-  type ComposerReferenceIssue,
   type FileReference,
   type ResponseAnnotationReference,
-  type AgentRunResult,
   type AppSettings,
-  type ArtifactContextMenuInput,
   type BootstrapState,
   type ComposerAttachment,
   type PendingApprovalInfo,
   type SessionListItem,
-  type SessionRecord,
   type SelectWorkspaceDirectoryResult,
   type UsageStatisticsGetInput,
   type UsageActivitySnapshot,
   type SettingsV4ChangedNotification,
   type SettingsV4Snapshot,
   type SettingsV4UpdateResult,
-  type SettingsV4UpdateInput,
   contextEstimateUsage,
   type ContextEstimateView,
 } from "@actspace/shared";
@@ -41,7 +36,6 @@ import {
   type RuntimeV2JsonValue,
   type RuntimeV2SessionListItem,
   type RuntimeV2SessionSnapshot,
-  type RuntimeV2DesktopSessionProjection,
   type TaskSubmissionResult,
   rewindErrorMessage,
 } from "@actspace/shared/runtime-v2";
@@ -71,7 +65,6 @@ import type { ProviderNetworkService } from "./provider-network-service";
 import { ChatAttachmentValidationError, type DesktopRuntimeV2Registry } from "./runtime-registry";
 import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRendererSkill } from "./fixed-renderer-skills";
 import {
-  projectChatEvents,
   projectSubagentTranscript,
   projectSubagentItems,
   subagentChildrenWithoutModel,

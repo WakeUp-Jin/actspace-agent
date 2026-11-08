@@ -4,7 +4,6 @@ import userEvent from "@testing-library/user-event";
 import type { AppSettings, BootstrapState, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { App } from "../App";
 import { TooltipProvider } from "../components/ui/Tooltip";
-import { recordProjectionFixture } from "./projection-fixture";
 import { setupBridge } from "./helpers/bridge";
 import { projectRecord } from "./helpers/session-records";
 const bootstrapState: BootstrapState = {
