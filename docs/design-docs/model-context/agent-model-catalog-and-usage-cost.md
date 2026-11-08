@@ -1,6 +1,6 @@
 # 本地模型目录与使用费用设计
 
-> 执行入口：[使用统计更新计划](../../exec-plans/completed/20260906-actspace-usage-statistics/README.md)；2026-11-08 目录生成规则与删除运行时刷新见[目录价格锁定计划](../../exec-plans/active/20261108-catalog-price-lock.md)。页面设计：[使用统计页面更新](../../exec-plans/completed/design-archive/frontend/front-usage-statistics-refresh.md)。
+> 执行入口：[使用统计更新计划](../../exec-plans/completed/20260906-actspace-usage-statistics/README.md)；2026-11-08 目录生成规则与删除运行时刷新见[目录价格锁定计划](../../exec-plans/completed/20261108-catalog-price-lock.md)。页面设计：[使用统计页面更新](../../exec-plans/completed/design-archive/frontend/front-usage-statistics-refresh.md)。
 
 ## 目标与已有证据
 
@@ -155,7 +155,7 @@ Session 与全局统计保留全部辅助请求的请求数、Token 与费用；
 | 已有条目在上游消失 | 保留，不删除；旧会话和旧配置仍能查到价格 |
 | 改价清单里的条目 | 用清单里的价格覆盖，每次生成都重新应用 |
 
-- **改价清单**：`packages/util/shared/src/model-catalog-overrides.ts`，每行写服务商（`source` + `sourceProviderId`）、模型、四个单价（USD / 百万 token，缺失写 `null`）、价格来源链接和核对日期。需要改已有模型的价格时只改这里，不手改生成文件。清单指向目录里不存在的模型时生成失败，避免留下过期条目。测试会核对生成文件与清单一致。
+- **改价清单**：`packages/util/shared/src/model-catalog-overrides.ts`，每行写服务商（`source` + `sourceProviderId`）、模型、四个单价（USD / 百万 token，缺失写 `null`）、价格来源链接和核对日期。需要改已有模型的价格时只改这里，不手改生成文件。清单指向目录里不存在的模型时生成失败，避免留下过期条目。测试会核对生成文件与清单一致。清单里的行删掉后，价格停留在最后一次覆盖的值，不会回到上游价格（已有条目锁定）。
 - **报告**：每次生成在终端打印新增、保留、上游价格变了但被锁定、上游已下架、清单覆盖的条数；被锁定的价格变化逐条列出（服务商、模型、旧价 → 上游新价），维护者据此决定要不要写进改价清单。
 - **离线模式**：`pnpm models:generate --offline` 不联网，只重新应用改价清单并重写文件，用于单独改价。
 - **文件格式**：生成文件一行一个模型，diff 能直接看出加了哪些模型、改了哪些价格。内容没有变化时不重写文件，`generatedAt` 和 `contentHash` 保持不变。
