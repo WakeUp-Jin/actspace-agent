@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useRef, useState } from "react";
-import { Copy, FolderOpen, Loader2, Maximize2, Minimize2, PanelRight, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Copy, FolderOpen, Loader2, Maximize2, Minimize2, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
 import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
 import { workspacesApi } from "../../../api/workspaces";
 import { Button } from "../../ui/Button";
@@ -12,7 +12,7 @@ import { DocsOutline } from "./DocsOutline";
 import type { DocsListingStatus } from "./use-docs-listing";
 
 /**
- * 「文档」面板的正文区（树的左侧）：操作栏 + 提示条 + Markdown 编辑器 + 空状态。
+ * 「MD 文档」面板的正文区（树的左侧）：操作栏 + 提示条 + Markdown 编辑器 + 空状态。
  * 预览和源码是同一个编辑器（`markdown-editor/`，懒加载）的两种模式，切换只重新配置，光标和撤销历史都保留。
  * 路径（工作区名弱化、文件名主色，未保存时文件名旁有圆点）在左，操作在右：
  * 预览 / 源码、大纲、在 Finder 中显示、用默认应用打开、复制路径、展开面板、收起文件树。
@@ -100,7 +100,7 @@ export function DocsReader({
               <span className="min-w-0 truncate font-medium text-text-main" title={path}>{fileName}</span>
             </>
           ) : (
-            <span>文档</span>
+            <span>MD 文档</span>
           )}
         </div>
         {path && dirty ? <span className="size-1.5 shrink-0 rounded-full bg-warning" role="img" aria-label="有未保存的改动" /> : null}
@@ -125,8 +125,11 @@ export function DocsReader({
         <IconButton label={expandLabel} aria-pressed={docsExpanded} onClick={toggleDocsExpanded}>
           {docsExpanded ? <Minimize2 size={15} strokeWidth={1.8} aria-hidden="true" /> : <Maximize2 size={15} strokeWidth={1.8} aria-hidden="true" />}
         </IconButton>
+        {/* 用方向箭头而不是 PanelRight：PanelRight 已是窗口右上角「收起右侧面板」的图标，并排会认错。 */}
         <IconButton label={treeLabel} aria-expanded={!docsTreeCollapsed} onClick={toggleDocsTreeCollapsed}>
-          <PanelRight size={15} strokeWidth={1.8} aria-hidden="true" />
+          {docsTreeCollapsed
+            ? <ChevronsLeft size={15} strokeWidth={1.8} aria-hidden="true" />
+            : <ChevronsRight size={15} strokeWidth={1.8} aria-hidden="true" />}
         </IconButton>
       </div>
 

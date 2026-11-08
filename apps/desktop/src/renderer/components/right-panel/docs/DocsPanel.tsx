@@ -6,7 +6,7 @@ import { useDocsDraft } from "./use-docs-draft";
 import { useDocsListing } from "./use-docs-listing";
 
 /**
- * 「文档」面板外壳（见 `front-文档面板规范.md`）：左边正文，最右边目录树（可收起）。
+ * 「MD 文档」面板外壳（见 `front-文档面板规范.md`）：左边正文，最右边目录树（可收起）。
  * 从左到右是聊天 → 正文 → 文件树，正文紧挨聊天区。
  * 草稿、选中文件、展开层级都在 `RightPanelContext`：面板随切标签、收起右栏反复卸载，状态不能留在这里。
  */
@@ -34,7 +34,7 @@ export function DocsPanel({
     syncDocsRoot(workspaceRoot);
   }, [workspaceRoot, syncDocsRoot]);
 
-  const { listing, status, error } = useDocsListing({ workspaceRoot, revalidateKey });
+  const { listing, status, error, loadMore } = useDocsListing({ workspaceRoot, revalidateKey });
   const { doc, saveError, setDraft, save, reload } = useDocsDraft({ workspaceRoot, revalidateKey, editedPaths });
   const workspaceLabel = workspaceLabelOf(workspaceRoot);
 
@@ -56,6 +56,8 @@ export function DocsPanel({
           workspaceLabel={workspaceLabel}
           files={listing?.files ?? null}
           truncated={listing?.truncated ?? false}
+          incompleteDirs={listing?.incompleteDirs ?? []}
+          onLoadMore={loadMore}
           status={status}
           error={error}
           editedPaths={editedPaths}

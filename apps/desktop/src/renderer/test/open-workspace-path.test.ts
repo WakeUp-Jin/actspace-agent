@@ -29,14 +29,14 @@ describe("openWorkspacePath", () => {
     expect(stat).toHaveBeenCalledWith({ workspaceRoot: "/ws", relativePath: "docs/a.md" });
     expect(read).not.toHaveBeenCalled();
     expect(open).not.toHaveBeenCalled();
-    expect(openTab).toHaveBeenCalledWith({ id: "docs", kind: "docs", title: "文档", select: "docs/a.md" });
+    expect(openTab).toHaveBeenCalledWith({ id: "docs", kind: "docs", title: "MD 文档", select: "docs/a.md" });
   });
 
   it("passes the line to the docs panel for Markdown only; other files ignore it", async () => {
     const { open } = install();
     const openTab = vi.fn();
     await openWorkspacePath({ workspaceRoot: "/ws", relativePath: "docs/a.md", line: 12, openTab });
-    expect(openTab).toHaveBeenCalledWith({ id: "docs", kind: "docs", title: "文档", select: "docs/a.md", line: 12 });
+    expect(openTab).toHaveBeenCalledWith({ id: "docs", kind: "docs", title: "MD 文档", select: "docs/a.md", line: 12 });
 
     openTab.mockClear();
     await openWorkspacePath({ workspaceRoot: "/ws", relativePath: "main.ts", line: 12, openTab });

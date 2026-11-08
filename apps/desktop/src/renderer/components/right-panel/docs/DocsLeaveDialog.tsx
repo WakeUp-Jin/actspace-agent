@@ -5,8 +5,8 @@ import { useRightPanel } from "../RightPanelContext";
 import { saveDocsDoc } from "./use-docs-draft";
 
 /**
- * 有未保存内容时离开（切换到另一篇文档、关闭「文档」标签）的确认：保存 / 不保存 / 取消。
- * 挂在 `RightPanel` 外壳上而不是 `DocsPanel` 里：从标签栏关闭「文档」时，面板可能并没有挂载。
+ * 有未保存内容时离开（切换到另一篇文档、关闭「MD 文档」标签）的确认：保存 / 不保存 / 取消。
+ * 挂在 `RightPanel` 外壳上而不是 `DocsPanel` 里：从标签栏关闭「MD 文档」时，面板可能并没有挂载。
  */
 export function DocsLeaveDialog({ workspaceRoot }: { workspaceRoot?: string }) {
   const { docsPendingLeave, clearDocsPendingLeave, docsDoc, setDocsDoc } = useRightPanel();

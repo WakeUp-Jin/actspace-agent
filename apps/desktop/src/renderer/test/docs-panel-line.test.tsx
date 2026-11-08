@@ -19,7 +19,7 @@ function Probe({ path, line }: { path: string; line?: number }) {
   const { openTab, docsPendingLine } = useRightPanel();
   return (
     <>
-      <button type="button" onClick={() => openTab({ id: "docs", kind: "docs", title: "文档", select: path, line })}>probe-open</button>
+      <button type="button" onClick={() => openTab({ id: "docs", kind: "docs", title: "MD 文档", select: path, line })}>probe-open</button>
       <output data-testid="pending-line">{docsPendingLine ? `${docsPendingLine.path}:${docsPendingLine.line}` : "none"}</output>
     </>
   );
@@ -28,7 +28,7 @@ function Probe({ path, line }: { path: string; line?: number }) {
 async function openDocs(path: string, line?: number) {
   const view = render(
     <TooltipProvider delayDuration={0}>
-      <RightPanelProvider initialOpen initialTabs={[{ id: "docs", kind: "docs", title: "文档" }]}>
+      <RightPanelProvider initialOpen initialTabs={[{ id: "docs", kind: "docs", title: "MD 文档" }]}>
         <Probe path={path} line={line} />
         <RightPanel workspaceRoot="/ws" />
       </RightPanelProvider>

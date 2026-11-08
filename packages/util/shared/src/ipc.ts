@@ -392,6 +392,8 @@ export type WorkspaceOpenResult = {
 export type WorkspaceListMarkdownFilesInput = {
   /** 工作区根的绝对路径。 */
   workspaceRoot: string;
+  /** 用户点了「继续加载」：非 git 遍历用放大的上限再走一遍。 */
+  expanded?: boolean;
 };
 
 export type WorkspaceListMarkdownFilesResult =
@@ -399,9 +401,11 @@ export type WorkspaceListMarkdownFilesResult =
       ok: true;
       /** 相对 workspaceRoot 的 POSIX 路径，已去重、按路径排序。 */
       files: string[];
-      /** 超过 5000 篇或遍历项数上限，清单只是前一部分。 */
+      /** 超过篇数上限或遍历项数上限，清单只是前一部分。 */
       truncated: boolean;
-      /** git 仓库用 `git ls-files`（遵守 .gitignore）；否则是有上限的递归遍历。 */
+      /** 截断时没有走完的目录（相对路径，最多 20 个，按遍历顺序）；没有截断时不给。 */
+      incompleteDirs?: string[];
+      /** git 仓库用 `git ls-files`（遵守 .gitignore）；否则是有上限的递归遍历，遇到本身是 git 仓库的子目录改用 `git ls-files`。 */
       source: "git" | "walk";
     }
   | { ok: false; error: "not_found" | "not_a_directory" | "escapes_root" };

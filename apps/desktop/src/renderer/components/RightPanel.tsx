@@ -36,7 +36,7 @@ import { WorkspaceOperationBar } from "./right-panel/WorkspaceOperationBar";
 
 const RIGHT_PANEL_CLASS = "flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-line bg-surface";
 // 右面板纵向两段：① tab 条（全宽）→ ② 内容。文件标签（本机图片）在内容上方多一条操作栏；
-// 「文档」标签的操作栏和目录树都在它自己的面板里（`right-panel/docs`）。
+// 「MD 文档」标签的操作栏和目录树都在它自己的面板里（`right-panel/docs`）。
 const RIGHT_PANEL_CONTENT_CLASS = "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden";
 export const RightPanel = memo(function RightPanel({
   developmentEnabled = true,
@@ -56,7 +56,7 @@ export const RightPanel = memo(function RightPanel({
   workspaceRoot?: string;
   /** 递增即触发已打开文件 Tab 的新鲜度重校验、文档清单刷新（当前会话 turn 结束时由 App 递增）。 */
   fileRevalidateKey?: number;
-  /** 当前会话里 Agent 写过 / 改过的文件路径（绝对或工作区相对），「文档」面板据此标绿点。 */
+  /** 当前会话里 Agent 写过 / 改过的文件路径（绝对或工作区相对），「MD 文档」面板据此标绿点。 */
   agentEditedPaths?: readonly string[];
   onOpenReview?: () => void;
   onSendToAgent?: (text: string) => void;
@@ -241,10 +241,10 @@ function RightPanelLauncher({
       },
       {
         id: "docs",
-        label: "文档",
+        label: "MD 文档",
         description: "工作区里的 Markdown，可预览和编辑",
         icon: <BookOpen size={15} strokeWidth={1.8} />,
-        onClick: () => openTab({ id: "docs", kind: "docs", title: "文档" }),
+        onClick: () => openTab({ id: "docs", kind: "docs", title: "MD 文档" }),
       },
       {
         id: "review",

@@ -57,7 +57,7 @@ Tab 过多时不加可见滚动条，用三层兜底：
 
 | kind | 内容 | id |
 |---|---|---|
-| `docs` | 「文档」面板，单一实例；Markdown 不生成独立文件 Tab | `docs` |
+| `docs` | 「MD 文档」面板，单一实例；Markdown 不生成独立文件 Tab | `docs` |
 | `image` | 图片渲染 | `file:<相对路径>`（带 host / workspace 时用带命名空间的形式，`workspaceFileTabId`） |
 | `text` | 说明文字：读取失败、远端 Host 文本预览；用 `CodeRenderView` 显示 | 同上 |
 | `review` | 「改动」：只查看改动，不含暂存、还原、已查看、复制 apply、创建 PR | `review:<执行根目录>`，同一 workspace 去重 |
@@ -67,7 +67,7 @@ Tab 过多时不加可见滚动条，用三层兜底：
 
 ## 5. 「+」新建对象菜单
 
-- 放在 chrome-right、PanelRight 折叠按钮左侧；点开是轻量菜单：「侧边对话」（排第一，仅本地运行目标）、「文档」、「改动」、「上下文」。「文档」「改动」属开发类对象。
+- 放在 chrome-right、PanelRight 折叠按钮左侧；点开是轻量菜单：「侧边对话」（排第一，仅本地运行目标）、「MD 文档」、「改动」、「上下文」。「MD 文档」「改动」属开发类对象。
 - 「改动」入口首次默认选当前 workspace 的 Git `Uncommitted`，之后恢复该 workspace 最近一次选择。
 - 「+」仅在右侧面板打开时显示：它的语义是「往面板里加对象」，面板关着时没有意义；面板关闭时 chrome-right 只保留 PanelRight 按钮。
 - 菜单与折叠按钮同属 chrome-right，`-webkit-app-region: no-drag`。
@@ -78,7 +78,7 @@ Tab 过多时不加可见滚动条，用三层兜底：
 
 | 类型 | 行为 |
 |---|---|
-| `.md` / `.markdown` | 在「文档」面板里读写 |
+| `.md` / `.markdown` | 在「MD 文档」面板里读写 |
 | `.png` `.jpg` `.jpeg` `.gif` `.webp` `.svg` | 应用内图片预览，超过 5MB 提示过大 |
 | 其他所有文件（含 HTML、代码、CSV、PDF） | 交给系统默认应用；main 的 `readWorkspaceFile` 只返回 stat（`renderKind: "external"`），不读内容 |
 
@@ -90,7 +90,7 @@ Tab 过多时不加可见滚动条，用三层兜底：
 
 | 扩展名（大小写不敏感） | 行为 |
 |---|---|
-| `.md` / `.markdown` | `statFile` 确认文件还在，再打开「文档」Tab 并选中该文件（带行号时一并定位） |
+| `.md` / `.markdown` | `statFile` 确认文件还在，再打开「MD 文档」Tab 并选中该文件（带行号时一并定位） |
 | `.png` `.jpg` `.jpeg` `.gif` `.webp` `.svg` | `readFile` 后打开 `image` Tab |
 | 其他 | `workspaces.openFile({ action: "open" })`，即系统默认应用 / 默认浏览器 |
 
@@ -109,7 +109,7 @@ macOS 上 `shell.openPath` 对没有关联应用的文件返回 `Failed to open 
 
 ## 7. 文件 Tab 的操作栏与外部打开
 
-文件 Tab（图片、远端 Host 文本）上方有 Workspace 操作栏（`WorkspaceOperationBar`）：左边面包屑 `<workspace 名> › <相对路径>`（根名弱化、文件名主色），右边「在外部应用中打开」菜单（`OpenInAppMenu`），下方按需挂「已变更」提示条。没有刷新按钮、文件树开关和预览 / 源码切换；需要重读的唯一场景是文件已变更，提示条自带「重新加载」。Markdown 不在这里，「文档」面板有自己的操作栏。
+文件 Tab（图片、远端 Host 文本）上方有 Workspace 操作栏（`WorkspaceOperationBar`）：左边面包屑 `<workspace 名> › <相对路径>`（根名弱化、文件名主色），右边「在外部应用中打开」菜单（`OpenInAppMenu`），下方按需挂「已变更」提示条。没有刷新按钮、文件树开关和预览 / 源码切换；需要重读的唯一场景是文件已变更，提示条自带「重新加载」。Markdown 不在这里，「MD 文档」面板有自己的操作栏。
 
 外部打开的目标是**当前文件**，不是 workspace 根；`relativePath` 越界按 `escapes_root` 拒绝。不同工具接受的目标形态不同，main 侧分派并有单测锁住实际参数：
 
@@ -144,7 +144,7 @@ macOS 上 `shell.openPath` 对没有关联应用的文件返回 `Failed to open 
 - 文件已删除、变为目录或符号链接逃出工作区时，`statFile` 返回的 `not_found`、`not_a_file`、`escapes_root` 也是快照失效信号：显示过期提示并提供重新加载，重读后显示文件不可用说明，不继续把旧正文当作当前文件。
 - 检测与重读都使用 Tab 绑定的工作区，不误标另一个工作区的同路径文件。临时 IPC 异常保留快照，等下一次触发重查，不当作文件失效。
 - 读盘结果转换只从目标提取 `workspaceRoot` / `hostId`，不展开整个旧 Tab，避免旧正文、渲染类型或截断状态混入新结果。
-- mtime 重校验只对本地 Tab 做，带 `hostId` 的远端 Tab 不查。「文档」面板的新鲜度与未保存草稿处理见[文档面板规范](front-文档面板规范.md)。
+- mtime 重校验只对本地 Tab 做，带 `hostId` 的远端 Tab 不查。「MD 文档」面板的新鲜度与未保存草稿处理见[文档面板规范](front-文档面板规范.md)。
 
 ## 10. IPC 契约与 main 侧规则
 
@@ -156,7 +156,7 @@ macOS 上 `shell.openPath` 对没有关联应用的文件返回 `Failed to open 
 | `workspaces.statFile` | 只取 `size` 与 `mtimeMs`，不读内容，供 §9 重校验；`error: not_found \| not_a_file \| escapes_root` |
 | `workspaces.openFile` | `{ action: "open" \| "reveal", applicationId? }`，返回 `ok` 与 `error: invalid_target \| not_registered \| open_failed \| no_application` |
 | `workspaces.listOpenTools` / `WorkspaceOpenInput` | 外部应用工具目录与打开目标（`relativePath` 为空表示 workspace 根） |
-| `workspaces.listMarkdownFiles` / `writeMarkdownFile` | 「文档」面板的清单与保存，见文档面板规范 |
+| `workspaces.listMarkdownFiles` / `writeMarkdownFile` | 「MD 文档」面板的清单与保存，见文档面板规范 |
 | `sessions.readArtifact` | 会话生成图片，见下 |
 
 main 侧规则：
@@ -176,9 +176,9 @@ main 侧规则：
 
 ## 11. 边界
 
-- 应用内只渲染 `md`（在「文档」面板里）和图片；其余交给系统默认应用。
+- 应用内只渲染 `md`（在「MD 文档」面板里）和图片；其余交给系统默认应用。
 - 「改动」需要 Git：无 Git 时显示「当前目录不是 Git 仓库」。
-- 不做：通用工作区文件树、新建 / 删除 / 重命名、快速打开、多 root、PDF 预览；写入只限「文档」面板里的 Markdown 保存。
+- 不做：通用工作区文件树、新建 / 删除 / 重命名、快速打开、多 root、PDF 预览；写入只限「MD 文档」面板里的 Markdown 保存。
 
 ## 12. Review / Diff 展示边界
 
