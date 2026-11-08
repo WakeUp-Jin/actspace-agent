@@ -33,3 +33,4 @@ Agent 这边 `gh` 只读、不能手动 `workflow_dispatch`，要在合并前验
 - `docs/CICD.md`、`docs/exec-plans/active/20261108-ci-pipelines.md`、`docs/exec-plans/tech-debt-tracker.md`、`docs/exec-runs/20261108-ci-pipelines/execution-process.md`、`docs/exec-runs/20261108-ci-pipelines/execution-summary.md`
 - `browser-bridge/apps/cli/instance_registry.go`、`instance_registry_unix.go`（新）、`instance_registry_windows.go`（新）：`ownedByCurrentUser` 按构建标签拆分，Windows 恒为 `false`，让 CLI 在 Windows 上可编译
 - `.github/workflows/ci.yml`：`browser-bridge` job 加 Windows / macOS 交叉编译步骤
+- `browser-bridge/apps/cli/main.go`：dev host 构建的默认 `GOCACHE` 由 `/private/tmp/abb-go-cache` 改为 `os.TempDir()` 下，Linux runner 与 Windows 都能写

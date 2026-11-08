@@ -76,6 +76,7 @@
 - **影响文件**：`.github/workflows/release.yml`、`scripts/release-package.sh`、`scripts/package-browser-components.mjs`、`docs/CICD.md`、计划、技术债表。
 - **验证**：`actionlint` 与 `check-action-pinning.sh` 通过；Linux 本机 `GOTOOLCHAIN=go1.26.10 ./scripts/release-package.sh` 生成 `actspace-desktop-linux-x64.tar.gz` 与 `release-manifest-linux-x64.json`；macOS / Windows 分支靠 PR 上的四平台 dry-run 验证。
 - **操作**：PR 首轮 dry-run：darwin-arm64、linux-x64 通过；windows-x64 在 `go build` 浏览器桥 CLI 时失败——`instance_registry.go` 用 `syscall.Stat_t` 判断文件属主，Windows 没有这个类型。拆成 `instance_registry_unix.go` / `instance_registry_windows.go`（Windows 实现恒为 `false`，只保证能编译），并在 `ci.yml` 的 `browser-bridge` job 加 Windows / macOS 交叉编译步骤，让这类问题在 CI 快检里就暴露。
+- **操作**：rebase 到合入 #54（Dependabot action 升级）/ #55（基线修复）后的 `main`，新 `release.yml` 套用升级后的 action 版本。`Browser Bridge` job 在 `main` 上仍因 `main.go` 的 dev host 构建默认 `GOCACHE=/private/tmp/abb-go-cache`（macOS 专属路径）失败，改为 `filepath.Join(os.TempDir(), "abb-go-cache")`，与 #55 对 `check-browser-command-registry.mjs` 的修法一致。
 
 ## 遇到的问题
 

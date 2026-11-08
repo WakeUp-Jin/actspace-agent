@@ -1436,7 +1436,7 @@ func ensureDevHostWrapper() (string, error) {
 		buildCmd.Dir = cwd
 		cacheDir := os.Getenv("GOCACHE")
 		if cacheDir == "" {
-			cacheDir = "/private/tmp/abb-go-cache"
+			cacheDir = filepath.Join(os.TempDir(), "abb-go-cache")
 		}
 		buildCmd.Env = append(os.Environ(), "GOCACHE="+cacheDir)
 		output, err := buildCmd.CombinedOutput()
