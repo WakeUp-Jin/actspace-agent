@@ -15,7 +15,6 @@ import {
   type SettingsUpdateInput,
   type SettingsV2UpdateInput,
   type SettingsV4,
-  type SettingsV4Models,
   type SettingsV4Snapshot,
   type SettingsV4UpdateInput,
 } from "@actspace/shared";
@@ -176,7 +175,7 @@ export async function updateModelStorage(store: SettingsStore, input: ModelStora
       if (input.taskModels) store.settings.taskModels = sanitizeTaskModels({ ...store.settings.taskModels, ...input.taskModels });
       if (input.connections) {
         const current = store.getV4();
-        await applyNamespaceV4(store, { namespace: "models", expectedRevision: current.revision, patch: { connections: input.connections } as Partial<SettingsV4Models> });
+        await applyNamespaceV4(store, { namespace: "models", expectedRevision: current.revision, patch: { connections: input.connections } });
         return;
       }
       await store.writeSettingsFile();
@@ -335,11 +334,11 @@ function applySettingsV4NamespacePatch(settings: SettingsV4, input: SettingsV4Up
   return next;
 }
 
-function applyRecordPatch<T>(current: Record<string, T>, patch: Record<string, T> | undefined): Record<string, T> {
+function applyRecordPatch<T>(current: Record<string, T>, patch: Record<string, T | null | undefined> | undefined): Record<string, T> {
   const next = { ...current };
   for (const [key, value] of Object.entries(patch ?? {})) {
     if (value === null) delete next[key];
-    else next[key] = value as T;
+    else if (value !== undefined) next[key] = value;
   }
   return next;
 }

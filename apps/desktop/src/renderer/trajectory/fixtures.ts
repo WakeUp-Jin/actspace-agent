@@ -104,8 +104,7 @@ function longFixture(): RuntimeV2TrajectorySnapshot {
       nodes.push(cloneNode(node, {
         key: `mock-long-session:${eventSeq}`, sessionId: "mock-long-session", eventSeq,
         callId: node.callId === null ? null : `batch-${repeat + 1}:${node.callId}`,
-        // fixture JSON 里有一条记录的 time 是 null，类型声明没有体现；保留原值。
-        ...((node.time as string | null) === null ? {} : { time: new Date(Date.parse(node.time) + repeat * 360_000).toISOString() }),
+        time: new Date(Date.parse(node.time) + repeat * 360_000).toISOString(),
         data: remap(node.data),
       }));
     }
