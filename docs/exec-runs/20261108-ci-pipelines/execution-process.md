@@ -71,12 +71,13 @@
 ### 步骤 8：桌面发布矩阵（P4，第二个 PR）
 
 - **操作**：`release.yml` 重写：`push` 到 `v*` tag、`workflow_dispatch`（可选 `tag`）、改到打包脚本的 `pull_request` 三种触发；`package` job 四平台矩阵（`macos-latest` arm64、`macos-15-intel` x64、`ubuntu-latest`、`windows-latest`，`shell: bash`），先校验 tag 等于 `v` + `apps/desktop/package.json` 版本，再 `setup-go`（`go-version-file`）+ pnpm 缓存 + `release-package.sh`，非 PR 时生成 attestation 并上传完整产物（tag 时保留 1 天），PR 只传 manifest；`release` job 下载全部、`anchore/sbom-action` 出 SBOM、`node -e` 把四份 manifest 合成 `release-manifest.json`，`softprops/action-gh-release` 建草稿。
-- **操作**：`release-package.sh` 把 `uname -s` 的 `MINGW*/MSYS*/CYGWIN*` 映射为 `windows`；新增 `windows)` 分支（复制 Electron runtime、`electron.exe` → `ActSpace.exe`、应用放 `resources/app`）；Windows 产物用 `7z` 打 zip，没有 7z 时退回 PowerShell `Compress-Archive`；manifest 改名 `release-manifest-<platform>-<arch>.json` 以便四个平台不互相覆盖。
+- **操作**：`release-package.sh` 把 `uname -s` 的 `MINGW*/MSYS*/CYGWIN*` 映射为 `windows`；新增 `windows)` 分支（复制 Electron runtime、`electron.exe` → `ActSpace.exe`、应用放 `resources/app`）；Windows 产物用 `7z` 打 zip，没有 7z 时用 Windows 自带的 bsdtar（`tar.exe -a`）；manifest 改名 `release-manifest-<platform>-<arch>.json` 以便四个平台不互相覆盖。
 - **操作**：`package-browser-components.mjs` 的「必须在 dist 下」检查改用 `path.relative`，manifest 文件键统一 `/` 分隔符，否则 Windows 上 `verify-browser-components.mjs` 要求的 `bin/abb` 键匹配不上。
 - **影响文件**：`.github/workflows/release.yml`、`scripts/release-package.sh`、`scripts/package-browser-components.mjs`、`docs/CICD.md`、计划、技术债表。
 - **验证**：`actionlint` 与 `check-action-pinning.sh` 通过；Linux 本机 `GOTOOLCHAIN=go1.26.10 ./scripts/release-package.sh` 生成 `actspace-desktop-linux-x64.tar.gz` 与 `release-manifest-linux-x64.json`；macOS / Windows 分支靠 PR 上的四平台 dry-run 验证。
 - **操作**：PR 首轮 dry-run：darwin-arm64、linux-x64 通过；windows-x64 在 `go build` 浏览器桥 CLI 时失败——`instance_registry.go` 用 `syscall.Stat_t` 判断文件属主，Windows 没有这个类型。拆成 `instance_registry_unix.go` / `instance_registry_windows.go`（Windows 实现恒为 `false`，只保证能编译），并在 `ci.yml` 的 `browser-bridge` job 加 Windows / macOS 交叉编译步骤，让这类问题在 CI 快检里就暴露。
 - **操作**：rebase 到合入 #54（Dependabot action 升级）/ #55（基线修复）后的 `main`，新 `release.yml` 套用升级后的 action 版本。`Browser Bridge` job 在 `main` 上仍因 `main.go` 的 dev host 构建默认 `GOCACHE=/private/tmp/abb-go-cache`（macOS 专属路径）失败，改为 `filepath.Join(os.TempDir(), "abb-go-cache")`，与 #55 对 `check-browser-command-registry.mjs` 的修法一致。
+- **操作**：第三轮 dry-run：`darwin-x64` 在 `hdiutil create` 报 `Resource busy`（GitHub macOS runner 的已知偶发），脚本加最多 5 次重试；`windows-x64` 在「Browser components verified」之后静默 36 分钟没有产出 zip，被下一次推送取消——打包步骤最后一步是压缩，怀疑 `command -v 7z` 没命中、退到了 PowerShell `Compress-Archive`（20k 文件时慢到以小时计）。改成 7z / Windows bsdtar 两选一、都传原生 Windows 路径、不再静默输出；脚本各阶段打时间戳；`release.yml` 的 package job 加 45 分钟超时。
 
 ## 遇到的问题
 

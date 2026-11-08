@@ -241,10 +241,21 @@ esac
 
 phase "archive ${artifact_name}"
 if [[ "${artifact_extension}" == "zip" ]]; then
+  # Both tools get native Windows paths so MSYS path mangling can't bite. PowerShell's Compress-Archive is
+  # deliberately not a fallback: on a 20k-file tree it runs for the better part of an hour.
+  artifact_root_win="$(cygpath -w "${artifact_root}")"
+  artifact_path_win="$(cygpath -w "${artifact_path}")"
+  windows_tar="$(cygpath -u "${SYSTEMROOT:-C:/Windows}")/System32/tar.exe"
   if command -v 7z >/dev/null 2>&1; then
-    (cd "${artifact_root}" && 7z a -tzip -r -bso0 -bsp0 "${artifact_path}" .)
+    phase "archive via 7z"
+    7z a -tzip -bsp0 "${artifact_path_win}" "${artifact_root_win}\\*"
+  elif [[ -x "${windows_tar}" ]]; then
+    # Windows 10+ ships bsdtar; -a picks the zip format from the extension.
+    phase "archive via bsdtar"
+    "${windows_tar}" -a -c -f "${artifact_path_win}" -C "${artifact_root_win}" .
   else
-    powershell.exe -NoProfile -Command "Compress-Archive -Path '$(cygpath -w "${artifact_root}")\*' -DestinationPath '$(cygpath -w "${artifact_path}")' -Force"
+    echo "Neither 7z nor the Windows bsdtar is available to create ${artifact_name}." >&2
+    exit 1
   fi
 else
   tar -czf "${artifact_path}" -C "${artifact_root}" .
