@@ -5,6 +5,7 @@ import type { RunTargetValue } from "./target/run-target-context";
 import type { SideChatRuntimeValue } from "./components/right-panel/side-chat/side-chat-runtime";
 import { sideChatOpenError } from "./components/right-panel/side-chat/use-open-side-chat";
 import { createEmptyStreamingState } from "./session/session-run-state";
+import { REWIND_ERROR_MESSAGES, taskOperation } from "@actspace/shared/runtime-v2";
 import { upsertStreamingTool } from "./session/live-runs/stream-state";
 import type { CompactionBlock } from "./session/live-runs/stream-blocks";
 import { getSessionTitle } from "./session/session-title";
@@ -19,7 +20,7 @@ import { attachLiveBaseline } from "./session/live-runs/live-baseline";
 import { loadEarlier } from "./session/session-pages";
 import { createSessionLocalStore, useSessionLocalIds, useSessionLocalState, type ComposerSessionState, type SessionLocalState } from "./session/session-local-store";
 import type { SessionBrowseState } from "./session/SessionBrowseContext";
-import type { ActiveSessionValue } from "./session/active-session-context";
+import type { ActiveSessionValue, TurnResend } from "./session/active-session-context";
 import type { SessionActionsValue } from "./session/session-actions-context";
 import { useSessionDrafts, type ComposerContextValue } from "./components/composer/composer-context";
 import {
@@ -361,6 +362,20 @@ export function App() {
       if (event.sessionId) void refreshTaskQueue(event.sessionId).catch(reportSessionFailure(event.sessionId, QUEUE_REFRESH_FAILED));
     });
   }, [selectedSessionId, refreshTaskQueue, reportSessionFailure]);
+  // 会话从某一轮重来（agent-edit-resend-rewind.md §5.4）：日志和任务快照的序号都变小了。丢掉旧快照、
+  // 本地队列和压缩失败块后重新取；durable 页由 DesktopSessionBridge 整体替换，App 自己的读页也重读一次。
+  const handleSessionRewound = useCallback((sessionId: string) => {
+    taskQueue.forgetSnapshot(sessionId);
+    patchLocal(sessionId, { messageQueue: EMPTY_MESSAGE_QUEUE, compactionFailure: undefined });
+    sessionStore.reset(sessionId);
+    void refreshSessionRef.current(sessionId).finally(() => patchLocal(sessionId, { rewinding: undefined }));
+    void refreshTaskQueue(sessionId).catch(reportSessionFailure(sessionId, QUEUE_REFRESH_FAILED));
+  }, [taskQueue, patchLocal, sessionStore, refreshTaskQueue, reportSessionFailure]);
+  const handleSessionRewoundRef = useRef(handleSessionRewound);
+  handleSessionRewoundRef.current = handleSessionRewound;
+  useEffect(() => liveEvents.subscribe(({ event }) => {
+    if (event.kind === "journal-update" && event.update?.event.type === "session/rewound") handleSessionRewoundRef.current(event.sessionId);
+  }), []);
   // 启动时清理超过 7 天的未确认提交记录。
   useEffect(() => { sweepExpiredPendingSubmissions(); }, []);
   // 14 S10：激活会话时，上次未确认的提交恢复为草稿（本地与远端会话相同）。先查任务快照：
@@ -902,13 +917,27 @@ export function App() {
     configure: async (sessionId, configuration) => Boolean(await taskCommand({ sessionId, op: "configure", configuration })),
     submit: (input) => tasksApi.submit(input),
     pending: { read: readPendingSubmission, write: writePendingSubmission, clear: clearPendingSubmission },
-    rememberOptions: (sessionId, submissionId, options) => taskQueue.rememberOptions(sessionId, submissionId, options),
+    rememberOptions: (sessionId, submissionId, options, agentRunId) => taskQueue.rememberOptions(sessionId, submissionId, options, agentRunId),
     forgetOptions: (submissionId) => taskQueue.forgetOptions(submissionId),
     notice: (sessionId, text) => setComposerNotice({ sessionId, text }),
     restoreDraft: (sessionId, draft) => patchLocal(sessionId, { draft }),
     newSubmissionId: () => crypto.randomUUID(),
     now: Date.now,
   }), [createSessionForInput, taskCommand, taskQueue, patchLocal]);
+
+  /**
+   * 乐观 run（agent-edit-resend-rewind.md §5.2、§5.5）：提交前就用申请的 run id 把用户消息挂进消息流，
+   * Host 用同一个 id 开始这条任务，`agent_run_started` 对上它，消息原地继续。返回卸下它的函数（已被替换时什么也不做）。
+   */
+  const startOptimisticRun = useCallback((sessionId: string, agentRunId: string, text: string, options: ComposerSendOptions) => {
+    const state = createEmptyStreamingState();
+    state.waitingForModel = true;
+    const run: import("./session/session-run-state").SessionRunState = { sessionId, agentRunId, state, aborting: false,
+      userBlock: { kind: "user", id: `turn:${agentRunId}:user:0`, runId: agentRunId, content: text, createdAt: new Date().toISOString(),
+        attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } };
+    liveRuns.start(run);
+    return () => { liveRuns.end(sessionId, run); };
+  }, [liveRuns]);
 
   // 向一个已存在的会话提交（主会话和右栏的侧边对话共用）：pending 记录、configure、提交和队列刷新。
   const sendToSession = useCallback(async (
@@ -922,9 +951,19 @@ export function App() {
     setCompactionFailureForSession(sessionId, null);
     let result: import("@actspace/shared/runtime-v2").TaskSubmissionResult;
     const inFlight = sendsInFlightRef.current;
+    // 空闲（没有 run、队列为空、没暂停、没有别的发送在途）时这条消息马上开始：直接显示在消息流里，不进托盘。
+    // /compact 是独立操作，不开 Agent run。
+    const queued = taskQueue.snapshot(sessionId);
+    const idle = !liveRuns.has(sessionId) && !inFlight.get(sessionId) && !taskOperation(text) &&
+      !queued?.paused && !(queued?.tasks.some(task => task.state === "pending" || task.state === "claimed"));
+    const agentRunId = idle ? crypto.randomUUID() : undefined;
+    const endOptimistic = agentRunId ? startOptimisticRun(sessionId, agentRunId, text, options) : undefined;
     inFlight.set(sessionId, (inFlight.get(sessionId) ?? 0) + 1);
     try {
-      result = await sessionGateway.submit(sessionId, text, options, !isLocalSession(sessionId) ? targetChoices.modelId : options.model);
+      result = await sessionGateway.submit(sessionId, text, options, !isLocalSession(sessionId) ? targetChoices.modelId : options.model, agentRunId ? { agentRunId } : undefined);
+    } catch (error) {
+      endOptimistic?.();
+      throw error;
     } finally {
       const remaining = (inFlight.get(sessionId) ?? 1) - 1;
       if (remaining > 0) inFlight.set(sessionId, remaining); else inFlight.delete(sessionId);
@@ -938,7 +977,42 @@ export function App() {
     if (resumeAfterAcceptance && snapshot?.paused && snapshot.tasks.some(task => task.taskId === acceptedTaskId && task.state === "pending")) {
       await taskCommand({ op: "resume", sessionId, revision: snapshot.revision });
     }
-  }, [sessionGateway, targetChoices, setFailedForSession, setCompactionFailureForSession, taskCommand, taskQueue, refreshTaskQueue, reportSessionFailure, patchLocal]);
+  }, [sessionGateway, targetChoices, setFailedForSession, setCompactionFailureForSession, taskCommand, taskQueue, refreshTaskQueue, reportSessionFailure, patchLocal, liveRuns, startOptimisticRun]);
+
+  /**
+   * 编辑提问重发（agent-edit-resend-rewind.md §5.2）：被编辑轮及之后先从消息流拿掉，新提问作为乐观 run 显示在原位置，
+   * 再带 `rewind` 提交。成功后会话整体重载；失败时卸下乐观 run、恢复原来的消息流，错误抛给编辑器（它会重新打开）。
+   */
+  const resendTurn = useCallback(async (edit: TurnResend) => {
+    const { sessionId, runId, fromSeq, text, options } = edit;
+    const refuse = (message: string) => {
+      setComposerNotice({ sessionId, text: message });
+      return new Error(message);
+    };
+    const expectedThroughSeq = sessionStore.peek(sessionId)?.snapshot?.throughJournalSeq;
+    if (expectedThroughSeq === undefined) throw refuse(REWIND_ERROR_MESSAGES.REWIND_CONFLICT!);
+    if (liveRuns.has(sessionId) || sendsInFlightRef.current.get(sessionId)) throw refuse(REWIND_ERROR_MESSAGES.SESSION_BUSY!);
+    patchLocal(sessionId, { lastSendOptions: options, rewinding: { fromSeq } });
+    setFailedForSession(sessionId, false);
+    setCompactionFailureForSession(sessionId, null);
+    const agentRunId = crypto.randomUUID();
+    const endOptimistic = startOptimisticRun(sessionId, agentRunId, text, options);
+    const inFlight = sendsInFlightRef.current;
+    inFlight.set(sessionId, (inFlight.get(sessionId) ?? 0) + 1);
+    try {
+      await sessionGateway.submit(sessionId, text, options, !isLocalSession(sessionId) ? targetChoices.modelId : options.model, { agentRunId, rewind: { runId, expectedThroughSeq } });
+    } catch (error) {
+      endOptimistic();
+      patchLocal(sessionId, { rewinding: undefined });
+      throw refuse(error instanceof Error ? error.message : String(error));
+    } finally {
+      const remaining = (inFlight.get(sessionId) ?? 1) - 1;
+      if (remaining > 0) inFlight.set(sessionId, remaining); else inFlight.delete(sessionId);
+    }
+    // 实时事件可能晚到或丢失：发起回退的窗口自己重载一次（重复的重载由 store 的整体替换标记合并）。
+    handleSessionRewound(sessionId);
+    if (activeSessionIdRef.current === sessionId) setSendScrollRequestId(value => value + 1);
+  }, [sessionStore, liveRuns, patchLocal, setFailedForSession, setCompactionFailureForSession, startOptimisticRun, sessionGateway, targetChoices, handleSessionRewound]);
 
   const handleSend = useCallback(async (
     text: string,
@@ -997,6 +1071,18 @@ export function App() {
   const abortSession = useCallback(async (sessionId: string) => {
     const run = liveRuns.get(sessionId);
     if (!run) return;
+    // 乐观 run 还没开始（§5.5）：停止就是取消这条待执行任务；快照里任务结束后乐观 run 随之卸下。
+    const snapshot = taskQueue.snapshot(sessionId);
+    const pending = snapshot?.tasks.find(task => task.state === "pending" && taskQueue.requestedRun(task.submissionId) === run.agentRunId);
+    if (snapshot && pending && !snapshot.runs.some(item => item.runId === run.agentRunId)) {
+      run.aborting = true;
+      liveRuns.refresh(sessionId);
+      if (!await taskCommand({ op: "cancel", sessionId, taskId: pending.taskId, revision: snapshot.revision }).catch(() => false)) {
+        run.aborting = false;
+        liveRuns.refresh(sessionId);
+      }
+      return;
+    }
 
     const input: AbortAgentRunInput = {
       sessionId,
@@ -1016,7 +1102,7 @@ export function App() {
       run.aborting = false;
       liveRuns.refresh(sessionId);
     }
-  }, [liveRuns]);
+  }, [liveRuns, taskQueue, taskCommand]);
   const handleAbort = useCallback(async () => {
     const sessionId = activeSessionIdRef.current;
     if (sessionId) await abortSession(sessionId);
@@ -1517,6 +1603,7 @@ export function App() {
   const activeSession = useShallowStable<ActiveSessionValue>({
     sessionId: activeSessionId, title, contextSnapshot, contextState, isStreaming, isAborting, isCompacting, isSessionReady,
     sendScrollRequestId, composerFocusRequestId, onSend: handleSend, onAbort: activeSessionId && liveRuns.get(activeSessionId)?.operationTaskId ? undefined : handleAbort, onRetryCompaction: handleRetryCompaction,
+    onResendTurn: resendTurn, readTaskSnapshot: taskQueue.snapshot,
   });
   const drafts = useSessionDrafts(localStore, activeSessionId);
   const activeComposerNotice = composerNotice && composerNotice.sessionId === activeSessionId ? composerNotice.text : null;

@@ -43,6 +43,17 @@
 
 - 用户消息用卡片显示；超长内容两态折叠：默认只露约 88px（`overflow-hidden`、无滚动条，底部随主题翻转的渐隐遮罩暗示还有内容）；点击展开到 `min(240px, 32vh)` 并内部滚动；**收起只通过点击卡片以外的任意位置**，再点卡片不收起；存在文本选区（拖选复制）时不触发展开。未超过折叠高度的短消息无手型光标、无遮罩、无点击交互。
 - 提问卡片不吸顶，跟着内容滚走；滚出视野后的一行提问条见轮次导航规范。
+
+## 编辑提问重发
+
+点提问卡片原地编辑后重新发送：从这一轮重来，这一轮和之后的内容消失，上下文只留之前的轮次；工作区文件不回滚。后端语义见 [编辑提问重发](../agent-runtime/agent-edit-resend-rewind.md)。实现：`conversation/TurnPromptEditor.tsx`、`use-turn-editing.ts`、`turn-prompt-draft.ts`、`turn-edit-context.ts`。
+
+- 可编辑：会话空闲（没有运行中的回合、队列为空且没暂停）、提问已落盘（有 `runId` 和 `sourceSeq`，乐观显示的不行）、不是从父会话继承的轮次、由 `ConversationView` 提供了 `TurnEditContext`（侧边对话不提供）。可编辑卡片 `cursor-text`，hover 边框变 `line-strong`，`title` 为「点击编辑并重新发送」。拖选文字、点卡片里的按钮或链接不进入编辑。
+- 编辑器取代卡片，外观同 Composer 聚焦态（`rounded-act-xl border-composer-focus shadow-act-composer-focus`）：正文自动长高到 240px 后内部滚动；文件引用和回复批注可移除；附件可删可加（`+`），原有图片按 artifactId 读预览，不依赖原来的本机路径；模型选择与下方 Composer 共用；底栏右侧 `取消` 和圆形发送（`发送修改后的提问`）。不加任何说明文字。
+- 编辑时这一轮的回复和之后所有轮次变淡（`opacity-30` + 降饱和，不可点击）；更早的轮次不变。
+- Enter 发送（输入法组合中不算）；Esc、`取消`、点编辑器外面（编辑器自己打开的菜单、Tooltip 除外）取消。会话变忙、换会话、这一轮不见了时自动取消。
+- 发送：变淡部分先淡出（240ms），再交给 App：被编辑轮及之后从消息流拿掉，新提问作为乐观消息显示在原位置，带 `rewind` 提交。失败时消息流恢复原样，编辑器带着刚才的内容重新打开，原因显示在 Composer 提示行。
+- 编辑器初始内容优先取任务快照里这一轮的任务（原始输入、文件引用、批注、附件），找不到时退回 durable 用户块。
 - 用户消息里的图片缩略图是可点击、可键盘聚焦的入口，激活后在右侧打开 Image Tab，与 Composer 发送前预览一致；没有预览数据时按钮禁用，renderer 不直接读本地路径。
 - 图片预览恢复只对缺少预览的图片调用会话产物 IPC；无待加载图片时不更新预览状态，相同结果保持原状态引用，避免纯文本消息触发 effect 反馈循环。上下文压缩不撤销历史消息的图片访问：main 在投影缺少引用时查该 Session 已验证 Journal 的 append surface，仍校验会话所有权、媒体类型和字节完整性，不接受文本中的 ID、其他 Session 或 renderer 本地路径；回滚暂存附件须保护已持久化的历史引用。
 
@@ -91,8 +102,9 @@
 
 ## 子 Agent 与其他消息块
 
-- `agent` 块是主消息流里可点击的紧凑两行入口（头像、任务名、类型、状态、最新活动），点击在右侧「子 Agent」面板打开详情，不在主流内展开 transcript；规则见子 Agent 规范。组件只消费 `MessageBlock.kind === "agent"` 字段，不解析 raw args 或磁盘路径。
-- Todo、后台任务通知分隔行（`BackgroundNoticeRow`）、压缩分隔线、错误块都是独立 timeline item，不贴到上一条回复里。
+- `agent` 块是主消息流里可点击的单行入口（高 34px：头像、任务名、类型、「后台」、状态；2026-11-08 起不再有模型和最新活动），点击在右侧「子 Agent」面板打开详情，不在主流内展开 transcript；规则见子 Agent 规范。组件只消费 `MessageBlock.kind === "agent"` 字段，不解析 raw args 或磁盘路径。
+- 子智能体来信是来信卡片（`SubagentMessageCard`），头部同 `agent` 单行卡片，正文直接显示；本轮结束后不收进「Worked for」，排在过程组后、最终回复前。
+- Todo、后台任务通知分隔行（`BackgroundNoticeRow`，只剩 Bash 通知；子智能体完成通知不显示）、来信卡片、压缩分隔线、错误块都是独立 timeline item，不贴到上一条回复里。
 
 ## 运行中态
 

@@ -73,8 +73,14 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
   const subagentTitle = subagentToolTitle(toolName, args, describeAgent);
   const linkedAgent = toolName === "send_message" || toolName === "interrupt_agent" ? string(args.agent_id) : null;
   const subagentLink = linkedAgent ? { agentId: linkedAgent, verb: toolName === "send_message" ? "发消息给" : "停止", target: describeAgent?.(linkedAgent) ?? linkedAgent } : undefined;
-  return { kind: "generic", title: subagentTitle ?? toolName, content: [toolName === "send_message" ? string(args.message) : undefined, summary, output, errorMessage].filter(Boolean).join("\n\n"), ...(artifacts.length ? { artifacts } : {}), ...(subagentLink ? { subagentLink } : {}) };
+  // 等待 / 查看类子智能体工具只显示标题：工具结果（「wait_agent completed」「Input arrived.」、清单原文）是给模型看的，失败时才带错误。
+  const titleOnly = SUBAGENT_TITLE_ONLY_TOOLS.has(toolName);
+  const content = titleOnly ? errorMessage ?? "" : [toolName === "send_message" ? string(args.message) : undefined, summary, output, errorMessage].filter(Boolean).join("\n\n");
+  return { kind: "generic", title: subagentTitle ?? toolName, content, ...(artifacts.length ? { artifacts } : {}), ...(subagentLink ? { subagentLink } : {}) };
 }
+
+/** Subagent tools whose result is only for the model: the row shows just the title. */
+const SUBAGENT_TITLE_ONLY_TOOLS: ReadonlySet<string> = new Set(["wait_agent", "list_agents", "list_subagent_models"]);
 
 /** Tools that create a subagent, and the kind they create. */
 const SUBAGENT_SPAWN_TOOLS: Readonly<Record<string, SubagentKind>> = Object.freeze({ agent: "local", agent_fork: "fork", agent_codex: "codex", agent_claude_code: "claude-code" });

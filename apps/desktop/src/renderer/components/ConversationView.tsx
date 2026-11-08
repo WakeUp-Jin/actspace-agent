@@ -13,6 +13,8 @@ import type { ComposerReviewSummary } from "./Composer";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { useRightPanel } from "./right-panel/RightPanelContext";
 import { BackgroundTaskLinkContext } from "./messages/BashRunBlock";
+import { SubagentStatusContext } from "./messages/subagent-status-context";
+import { subagentStatusByAgent, type SubagentCardStatus } from "@actspace/client/sessions";
 import { CompactionRetryContext } from "./messages/CompactCommandBlock";
 import type { SessionMainView } from "./SessionViewToggle";
 import { TrajectoryView } from "./lazy-pages";
@@ -26,6 +28,9 @@ import { TurnNavigator, useTurnNavigator } from "./conversation/TurnNavigator";
 import { TurnView } from "./conversation/TurnView";
 import { PinnedTurnPrompt } from "./conversation/PinnedTurnPrompt";
 import { createTurnNavigationItems, groupMessagesIntoTurns, userInputHistory } from "./conversation/turns";
+import { TurnEditContext } from "./conversation/turn-edit-context";
+import { useTurnEditing } from "./conversation/use-turn-editing";
+import { isQueueEmpty } from "../session/message-queue";
 import { useWorkspaceFileLinks } from "./conversation/use-workspace-file-links";
 
 const CONVERSATION_SHELL_CLASS =
@@ -47,6 +52,9 @@ const COMPOSER_ZONE_CLASS = "composer-zone col-start-1 row-start-2 grid min-w-0 
 // 距顶部小于该距离时预取更早消息，让用户上滑时历史已经接上，而不是撞到顶部再等。
 const EARLIER_PRELOAD_THRESHOLD_PX = 240;
 const SCROLL_BOTTOM_THRESHOLD_PX = 80;
+// 吸顶提问条点回某一轮时，提问卡片顶部留出的距离。
+const TURN_JUMP_OFFSET_PX = 8;
+const selectLineage = (cell: import("@actspace/client/sessions").ClientSessionCell | null): unknown => cell?.snapshot?.lineage ?? null;
 
 export function ConversationView({
   contextSnapshot,
@@ -78,13 +86,14 @@ export function ConversationView({
   /** 返回整页设置后，通过已有 Composer 聚焦通道恢复键盘入口。 */
   focusRequest?: number;
 }) {
-  const { sessionId, isStreaming, isAborting, sendScrollRequestId, composerFocusRequestId, onAbort, onRetryCompaction } = useActiveSession();
+  const { sessionId, isStreaming, isAborting, sendScrollRequestId, composerFocusRequestId, onAbort, onRetryCompaction, onResendTurn, readTaskSnapshot } = useActiveSession();
   const messages = useTranscriptMessages();
-  const { draftRestore, draftKey, readAnnotationDraft, writeAnnotationDraft } = useComposerContext();
+  const { draftRestore, draftKey, readAnnotationDraft, writeAnnotationDraft, messageQueue } = useComposerContext();
   // 投影只订阅派生出的小块（见 workbench/projection-view.ts）：流式时 cell 每帧换一次，这几个值几乎不变。
   const projectionTarget = useOptionalProjectionTarget();
   const projectionMatches = projectionTarget !== null && projectionTarget.sessionId !== null && (sessionId === null || sessionId === undefined || projectionTarget.sessionId === sessionId);
   const projectionView = useProjectionSelect<SessionProjectionView | null>(selectSessionView, sameSessionView, projectionMatches ? undefined : null);
+  const lineage = useProjectionSelect(selectLineage, Object.is, projectionMatches ? undefined : null);
   const browse = useSessionBrowse();
   const { target, selectedWorkspaceRoot } = useRunTargetContext();
   // 14 S9：App 读页失败用 browse.messageError；投影 cell 的打开 / refresh 失败（bridge 重试用完前也会先显示）用 cell 的 status/error。
@@ -104,6 +113,15 @@ export function ConversationView({
   const projectedComposerPhase = projectionView?.composerPhase;
   const effectiveContextSnapshot = contextSnapshot ?? projectionView?.contextSnapshot ?? null;
   const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
+  // 来信卡片取发送方状态：内容没变时沿用同一个 Map，流式时不让每张来信卡片重渲染。
+  const subagentStatusesRef = useRef<ReadonlyMap<string, SubagentCardStatus>>(new Map());
+  const subagentStatuses = useMemo(() => {
+    const next = subagentStatusByAgent(messages);
+    const previous = subagentStatusesRef.current;
+    if (next.size === previous.size && [...next].every(([id, status]) => previous.get(id) === status)) return previous;
+    subagentStatusesRef.current = next;
+    return next;
+  }, [messages]);
   // 输入历史只在用户消息变化时换新：输入框外壳靠它保持稳定，不随流式每帧重渲染。
   const inputHistory = useTranscriptSelect(userInputHistory, sameStringList);
   // Review 标签的「第 N 轮」：只有历史从头加载全了，已加载的用户轮次序号才是真实轮次。
@@ -113,6 +131,10 @@ export function ConversationView({
     for (const turn of turns) if (turn.user) numbers.set(turn.id, numbers.size + 1);
     return numbers;
   }, [browse?.hasEarlier, turns]);
+  const turnEditing = useTurnEditing({
+    sessionId: sessionId ?? null, turns, lineage, onResendTurn, readTaskSnapshot,
+    busy: isStreaming || Boolean(messageQueue && (!isQueueEmpty(messageQueue.queue) || messageQueue.queue.paused)),
+  });
   const turnNavigationItems = useMemo(
     () => createTurnNavigationItems(turns, isStreaming),
     [isStreaming, turns],
@@ -256,6 +278,19 @@ export function ConversationView({
     if (scrolled) updateConversationViewport();
   }, [scrollToTurn, updateConversationViewport]);
 
+  // 吸顶提问条：平滑滚回这一轮（卡片顶部留 8px），可编辑就直接进入编辑（agent-edit-resend-rewind.md §5.3）。
+  const { start: startTurnEdit, editableTurnIds } = turnEditing;
+  const jumpToPinnedTurn = useCallback((turnId: string) => {
+    const el = scrollContainerRef.current;
+    const turnElement = el?.querySelector<HTMLElement>(`[data-conversation-turn-id="${CSS.escape(turnId)}"]`);
+    if (!el || !turnElement) return;
+    stickToBottomRef.current = false;
+    setIsAwayFromBottom(true);
+    const top = el.scrollTop + turnElement.getBoundingClientRect().top - el.getBoundingClientRect().top - TURN_JUMP_OFFSET_PX;
+    el.scrollTo?.({ top: Math.max(0, top), behavior: "smooth" });
+    if (editableTurnIds.has(turnId)) startTurnEdit(turnId);
+  }, [editableTurnIds, startTurnEdit]);
+
   useEffect(() => {
     if (sendScrollRequestId === 0) {
       return;
@@ -336,6 +371,7 @@ export function ConversationView({
     <ResponseAnnotationContext.Provider value={annotations.contextValue}>
     <CompactionRetryContext.Provider value={onRetryCompaction}>
     <BackgroundTaskLinkContext.Provider value={openBackgroundTask}>
+    <SubagentStatusContext.Provider value={subagentStatuses}>
     <main className={CONVERSATION_SHELL_CLASS}>
       <ResponseSelectionMenu
         scrollContainerRef={scrollContainerRef}
@@ -363,6 +399,7 @@ export function ConversationView({
               {browse?.earlierLoading && <p role="status" className="flex items-center justify-center gap-1.5 py-2 text-act-xs leading-4 text-text-faint"><Loader2 className="animate-spin" size={12} aria-hidden="true" />正在加载更早消息…</p>}
               {browse?.earlierError && <p role="alert" className="px-5 text-act-xs leading-4 text-text-muted">{browse.earlierError} <button type="button" onClick={requestEarlier}>重试</button></p>}
               {isInitialComposer ? null : (
+                <TurnEditContext.Provider value={turnEditing.value}>
                 <div ref={messageStackRef} className={MESSAGE_STACK_CLASS}>
                   {turns.map((turn, turnIndex) => (
                     <TurnView
@@ -378,15 +415,19 @@ export function ConversationView({
                       onOpenSubagent={openSubagent}
                       onOpenReadFile={openReadFile}
                       onOpenWorkspaceFile={openWorkspaceFile}
+                      editable={turnEditing.editableTurnIds.has(turn.id)}
+                      dim={turnEditing.dimOf(turnIndex)}
+                      leaving={turnEditing.leaving}
                     />
                   ))}
                   <div ref={bottomAnchorRef} aria-hidden="true" />
                 </div>
+                </TurnEditContext.Provider>
               )}
           </section>
 
-          {isInitialComposer ? null : (
-            <PinnedTurnPrompt scrollRef={scrollContainerRef} turns={turns} className={MESSAGE_COLUMN_WIDTH_CLASS} onJump={navigateToTurn} />
+          {isInitialComposer || turnEditing.editing ? null : (
+            <PinnedTurnPrompt scrollRef={scrollContainerRef} turns={turns} className={MESSAGE_COLUMN_WIDTH_CLASS} onJump={jumpToPinnedTurn} />
           )}
           <TurnNavigator
             items={turnNavigationItems}
@@ -417,6 +458,7 @@ export function ConversationView({
         </div>
       ) : null}
     </main>
+    </SubagentStatusContext.Provider>
     </BackgroundTaskLinkContext.Provider>
     </CompactionRetryContext.Provider>
     </ResponseAnnotationContext.Provider>

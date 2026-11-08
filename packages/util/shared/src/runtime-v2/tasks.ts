@@ -55,7 +55,30 @@ export type TaskCommand = { readonly sessionId: string } & (
   | { readonly op: "stop"; readonly runId: string }
 );
 export type TaskCommandResult = { readonly snapshot: TaskSnapshot; readonly error?: string };
-export type SubmitTaskInput = { readonly sessionId: string; readonly submissionId: string; readonly userInput: string; readonly attachments?: import("../session").ComposerAttachment[]; readonly fileReferences?: import("../composer-content").FileReference[]; readonly responseAnnotations?: import("../composer-content").ResponseAnnotationReference[] };
+export type SubmitTaskInput = {
+  readonly sessionId: string; readonly submissionId: string; readonly userInput: string; readonly attachments?: import("../session").ComposerAttachment[]; readonly fileReferences?: import("../composer-content").FileReference[]; readonly responseAnnotations?: import("../composer-content").ResponseAnnotationReference[];
+  /** Start over from this Turn: drop it and everything after it, then accept this prompt in its place. */
+  readonly rewind?: TaskRewind;
+  /** The Run id the client already shows this prompt under; the Host starts the task with it. */
+  readonly agentRunId?: string;
+};
+/** The edited Turn's Run, and the Journal position (`throughJournalSeq`) the client saw. */
+export type TaskRewind = { readonly runId: string; readonly expectedThroughSeq: number };
+/** Rewind refusals the client shows with its own wording (agent-edit-resend-rewind.md §3.7). */
+export const REWIND_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
+  SESSION_BUSY: "正在运行或有排队消息，结束后再编辑。",
+  REWIND_CONFLICT: "这段对话有了新内容，看过最新内容后再编辑。",
+  REWIND_TURN_NOT_FOUND: "这条提问不能再编辑。",
+  REWIND_INHERITED: "这条提问不能再编辑。",
+  REWIND_UNAVAILABLE: "这条提问不能再编辑。",
+});
+/** The client-facing message of a rewind refusal, or undefined for any other failure. */
+export function rewindErrorMessage(error: unknown): string | undefined {
+  const code = error && typeof error === "object" && "code" in error ? (error as { code?: unknown }).code : undefined;
+  const fromMessage = error instanceof Error ? error.message : undefined;
+  const key = typeof code === "string" && code in REWIND_ERROR_MESSAGES ? code : fromMessage && fromMessage in REWIND_ERROR_MESSAGES ? fromMessage : undefined;
+  return key ? REWIND_ERROR_MESSAGES[key] : undefined;
+}
 export type TaskContentEnvelope = { readonly kind: "composer-task"; readonly original: RuntimeV2JsonValue; readonly prepared: RuntimeV2JsonValue };
 
 /** A rejected preparation is distinct from an unacknowledged network submission. */

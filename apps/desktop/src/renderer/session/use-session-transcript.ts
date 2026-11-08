@@ -9,6 +9,7 @@ import { mergeTranscript } from "./transcript";
 
 const EMPTY_EVENTS: SessionEvent[] = [];
 export const selectCompactionFailure = (state: SessionLocalState) => state.compactionFailure ?? null;
+export const selectRewindFromSeq = (state: SessionLocalState) => state.rewinding?.fromSeq;
 
 export type SessionTranscript = {
   readonly sessionRecord: SessionRecord | null;
@@ -20,14 +21,14 @@ export type SessionTranscript = {
 };
 
 /** durable 记录、live run 和本地块合并成完整消息序列（规则见 transcript.ts）。引用随输入变化，输入不变则不变。 */
-export function useMergedMessages(sessionRecord: SessionRecord | null, live: LiveRunView, compactionFailure: CompactionBlock | null): MessageBlock[] {
+export function useMergedMessages(sessionRecord: SessionRecord | null, live: LiveRunView, compactionFailure: CompactionBlock | null, rewindFromSeq?: number): MessageBlock[] {
   const persistedEvents = sessionRecord?.events ?? EMPTY_EVENTS;
   const { blocks, runId, recovered, isStreaming } = live;
   return useMemo<MessageBlock[]>(() => mergeTranscript(
     { blocks: sessionRecord?.messageBlocks, events: persistedEvents },
     { blocks, runId, recovered },
-    { compactionFailure, isStreaming },
-  ), [sessionRecord?.messageBlocks, persistedEvents, blocks, runId, recovered, compactionFailure, isStreaming]);
+    { compactionFailure, isStreaming, rewindFromSeq },
+  ), [sessionRecord?.messageBlocks, persistedEvents, blocks, runId, recovered, compactionFailure, isStreaming, rewindFromSeq]);
 }
 
 /**
@@ -42,7 +43,8 @@ export function useSessionTranscript(
   const live = useLiveRunView(stores.liveRuns, sessionId);
   const { sessionRecord, historyBefore } = useChatSessionRecord(stores.sessionStore, sessionId, workspaceRoot);
   const compactionFailure = useSessionLocalState(stores.localStore, sessionId, selectCompactionFailure);
-  const messages = useMergedMessages(sessionRecord, live, compactionFailure);
+  const rewindFromSeq = useSessionLocalState(stores.localStore, sessionId, selectRewindFromSeq);
+  const messages = useMergedMessages(sessionRecord, live, compactionFailure, rewindFromSeq);
   const isCompacting = live.blocks.some((block) => block.kind === "context_compaction" && block.status === "running");
   return { sessionRecord, historyBefore, live, messages, isCompacting };
 }

@@ -11,10 +11,15 @@ type TodoMessageBlock = Extract<MessageBlock, { kind: "todo" }>;
 export type ConversationTurn = {
   id: string;
   user: UserMessageBlock | null;
-  /** 后台任务通知唤醒的轮次没有用户输入，以这条分隔行开头。 */
+  /** 后台任务通知唤醒的轮次没有用户输入，以这条分隔行开头；子智能体完成唤醒的轮次没有开头行。 */
   notice?: BackgroundNoticeBlock;
   messages: MessageBlock[];
 };
+
+/** 子智能体一次激活结束的通知：对话里不显示，结果看派发时那张卡片。 */
+export function isSubagentCompletionNotice(message: BackgroundNoticeBlock): boolean {
+  return message.taskKind === "subagent";
+}
 
 const TOOL_LOG_MESSAGE_KINDS = new Set<MessageBlock["kind"]>([
   "read",
@@ -47,8 +52,16 @@ export function groupMessagesIntoTurns(messages: MessageBlock[]): ConversationTu
       continue;
     }
 
+    const opensTurn = message.kind === "background_notice" && (message.opensTurn !== false || !currentTurn);
+
+    // 子智能体完成通知不显示（派发卡片已经变成完成）：轮内读到的直接跳过；唤醒空闲会话的只断开上一轮，后面的回复自成一轮。
+    if (message.kind === "background_notice" && isSubagentCompletionNotice(message)) {
+      if (opensTurn) currentTurn = null;
+      continue;
+    }
+
     // 轮内读到的通知留在这一轮里它被读到的位置；唤醒空闲会话的通知开启新的一轮。
-    if (message.kind === "background_notice" && message.opensTurn === false && currentTurn) {
+    if (message.kind === "background_notice" && !opensTurn && currentTurn) {
       currentTurn.messages.push(message);
       continue;
     }
@@ -119,6 +132,20 @@ export function splitTurnMessages(messages: MessageBlock[]): {
     finalReply: rest.slice(splitIndex),
     failures,
   };
+}
+
+/** 子智能体发来的消息（来信卡片）。 */
+export function isSubagentMessageNotice(message: MessageBlock): message is BackgroundNoticeBlock {
+  return message.kind === "background_notice" && message.taskKind === "agent_message";
+}
+
+/**
+ * 一轮结束后，来信卡片不收进「Worked for」：从过程里拿出来，排在过程组后、最终回复前
+ * （front-子Agent与后台任务规范 §2.1）。运行中保持原位。
+ */
+export function liftSubagentMessages(processItems: MessageBlock[], running: boolean): { process: MessageBlock[]; letters: MessageBlock[] } {
+  if (running || !processItems.some(isSubagentMessageNotice)) return { process: processItems, letters: [] };
+  return { process: processItems.filter((message) => !isSubagentMessageNotice(message)), letters: processItems.filter(isSubagentMessageNotice) };
 }
 
 function normalizeTurnPreviewText(content: string): string {

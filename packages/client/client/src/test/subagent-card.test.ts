@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeV2SessionSnapshot, SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { projectChatSession, projectSubagentTranscript, subagentChildrenWithoutModel } from "../sessions/chat.js";
-import { projectSubagentItems } from "../sessions/subagent-list.js";
+import { projectSubagentItems, subagentStatusByAgent } from "../sessions/subagent-list.js";
 import { FixedRendererStreamAdapter } from "../live/stream-adapter.js";
 
 // S3 第 7 步：agent 卡片读 subagent/* 新事件；五个管理工具的行名；收件箱两种新来源转成 BackgroundNotice。
@@ -79,6 +79,30 @@ describe("subagent cards from subagent/* events", () => {
     expect(projectSubagentItems(fork)[0]).toMatchObject({ kind: "fork", inheritedThroughSeq: 40, status: "interrupted", activationCount: 0 });
   });
 
+  it("keeps each subagent's latest message to the parent, timed when it was sent", () => {
+    const at = (seq: number, time: string, data: SessionEventEnvelopeV1["data"]) => ({ ...envelope(seq, "agent/inbox/spliced", data), time });
+    const letter = (messageId: string, body: string) => ({ source: "agent_message", senderId: "sa-1", messageId, content: `<agent_message from="sa-1" relation="child">\n${body}\n</agent_message>` });
+    expect(projectSubagentItems(journal())[0]!.lastMessage).toBeUndefined();
+    const items = projectSubagentItems(journal([
+      at(6, "2026-11-04T00:00:10.000Z", { operation: "enqueue", ...letter("m-1", "first note") }),
+      at(7, "2026-11-04T00:00:20.000Z", { operation: "enqueue", ...letter("m-2", "\n**Only** one file\nmore detail") }),
+      // 领取同一条：时间仍是发送时。
+      at(8, "2026-11-04T00:00:30.000Z", { operation: "claim", ...letter("m-2", "\n**Only** one file\nmore detail") }),
+      // 别的来源、别的发送方不算。
+      at(9, "2026-11-04T00:00:40.000Z", { operation: "enqueue", source: "subagent_notification", senderId: "sa-1", messageId: "n-1", content: "done" }),
+    ]));
+    expect(items[0]!.lastMessage).toEqual({ text: "**Only** one file", at: "2026-11-04T00:00:20.000Z" });
+    // 只有领取（enqueue 不在日志里）时用领取时间。
+    const claimed = projectSubagentItems(journal([at(6, "2026-11-04T00:01:00.000Z", { operation: "claim", ...letter("m-3", "late") })]));
+    expect(claimed[0]!.lastMessage).toEqual({ text: "late", at: "2026-11-04T00:01:00.000Z" });
+  });
+
+  it("maps each subagent to its dispatch card's status, the later card winning", () => {
+    const card = (id: string, runId: string | undefined, status: "running" | "completed") => ({ kind: "agent", id, description: id, status, displayText: id, createdAt: "now", ...(runId ? { transcriptRef: { kind: "subagent_transcript", sessionId: "s", agentRunId: "r", runId } } : {}) }) as Parameters<typeof subagentStatusByAgent>[0][number];
+    const statuses = subagentStatusByAgent([card("a", "sa-1", "running"), card("b", undefined, "running"), card("c", "sa-1", "completed"), card("d", "sa-2", "running")]);
+    expect([...statuses]).toEqual([["sa-1", "completed"], ["sa-2", "running"]]);
+  });
+
   it("shows a forked subagent only what it did after the fork", () => {
     const message = (seq: number, messageId: string, content: string) => ({ ...envelope(seq, "user/message", { agentRunId: "run-1", messageId, content }), surface: { kind: "append" } }) as SessionEventEnvelopeV1;
     const child = [message(2, "u-1", "Parent question"), message(3, "u-2", "Fork task")];
@@ -127,6 +151,8 @@ describe("subagent cards from subagent/* events", () => {
     expect(titles[0]!.subagentLink).toEqual({ agentId: "sa-1", verb: "发消息给", target: "Map the repo" });
     expect(titles[1]!.subagentLink).toEqual({ agentId: "sa-1", verb: "停止", target: "Map the repo" });
     expect(titles[2]!.subagentLink).toBeUndefined();
+    // 等待 / 查看类只显示标题，不带「wait_agent completed」「Input arrived.」这类给模型看的结果。
+    expect(titles.slice(2).map(preview => preview.content)).toEqual(["", "", ""]);
   });
 });
 

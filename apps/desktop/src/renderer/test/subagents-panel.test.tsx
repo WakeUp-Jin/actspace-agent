@@ -43,9 +43,8 @@ it("groups running and other agents as cards, shows status text, tokens and dura
     panel();
     expect(await screen.findByRole("group", { name: "运行中 · 1" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "其他 · 4" })).toBeInTheDocument();
-    // 运行中：第二行不写，右上 token，右下「运行中 · 耗时」；列表不显示种类、模型和第 N 轮。
-    expect(row("scan")).toHaveTextContent(/12\.6K tokens.*运行中 · 1m 12s/);
-    expect(row("scan")).not.toHaveTextContent("正在执行");
+    // 运行中：第二行是此刻在做什么（没有动态时「正在思考」），右上 token，右下「运行中 · 耗时」；列表不显示种类、模型和第 N 轮。
+    expect(row("scan")).toHaveTextContent(/正在思考.*12\.6K tokens.*运行中 · 1m 12s/);
     expect(row("scan")).not.toHaveTextContent(/通用|deepseek|第 \d+ 轮/);
     // 结束的：最终回复第一行，右下只有状态文字和最近一次激活的耗时（没有图标、没有第 N 轮）；没有 token 时不显示。
     expect(row("review")).toHaveTextContent(/提交顺序没问题.*空闲 · 9s/);
@@ -56,6 +55,12 @@ it("groups running and other agents as cards, shows status text, tokens and dura
     // 没有最终回复时左侧不再重复写状态，状态只在右侧出现一次。
     expect(row("old").textContent?.match(/已中断/g)).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: /^停止 / })).toHaveLength(1);
+    // 停止不常驻：平时是转圈，悬停或聚焦这一行才显示停止按钮（键盘也能按到）。
+    const stop = screen.getByRole("button", { name: "停止 scan" });
+    expect(stop.className).toMatch(/(^| )opacity-0( |$)/);
+    expect(stop.className).toContain("group-hover/row:opacity-100");
+    expect(stop.className).toContain("focus-visible:opacity-100");
+    expect(stop.parentElement?.querySelector(".animate-spin")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "停止 scan" }));
     await waitFor(() => expect(interrupt).toHaveBeenCalledWith({ sessionId: "parent", agentId: "scan" }));
   } finally { vi.useRealTimers(); }
@@ -208,4 +213,35 @@ it("returns to the list with a note when the focused agent is not found", async 
   panel({ agentId: "gone", view: "trajectory", revision: 1 });
   expect(await screen.findByText("找不到这个子智能体。")).toBeInTheDocument();
   expect(screen.getByRole("group", { name: "其他 · 1" })).toBeInTheDocument();
+});
+
+it("shows a running agent's live activity, a recent message for 6 seconds with a blue dot, and nothing for external agents", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date("2026-11-08T10:00:03.000Z") });
+  overrideBridge({
+    "sessions.getSubagents": vi.fn().mockResolvedValue([
+      item("scan", "running", { activity: "正在读取 · transaction.ts" }),
+      item("bench", "running", { activity: "正在执行 · node bench.ts", lastMessage: { text: "单写入者约 4.2 万条/秒", at: "2026-11-08T10:00:00.000Z" } }),
+      item("port", "running", { kind: "codex", preset: undefined }),
+    ]),
+    "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue([]),
+  });
+  try {
+    panel();
+    expect(await screen.findByRole("group", { name: "运行中 · 3" })).toBeInTheDocument();
+    expect(row("scan")).toHaveTextContent("正在读取 · transaction.ts");
+    expect(row("bench")).toHaveTextContent("来信：单写入者约 4.2 万条/秒");
+    expect(row("bench")).not.toHaveTextContent("正在执行");
+    expect(screen.getByText("来信：")).toHaveClass("text-info");
+    const dot = screen.getByTestId("subagent-letter-dot");
+    expect(dot).toHaveClass("bg-info");
+    expect(dot.parentElement?.querySelector(".animate-spin")).toBeNull();
+    // 停止按钮照常在这一格里。
+    expect(dot.parentElement?.querySelector("button")).toHaveAccessibleName("停止 bench");
+    // 外部子智能体没有实时事件：运行中不写第二行。
+    expect(row("port")).not.toHaveTextContent(/正在/);
+    // 6 秒后恢复动态和转圈（列表每秒轮询）。
+    await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+    await waitFor(() => expect(row("bench")).toHaveTextContent("正在执行 · node bench.ts"));
+    expect(screen.queryByTestId("subagent-letter-dot")).toBeNull();
+  } finally { vi.useRealTimers(); }
 });

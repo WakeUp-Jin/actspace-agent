@@ -24,7 +24,16 @@ export type LocalTranscript = {
   /** 压缩失败没有 durable 事件，运行结束后按会话保留分隔线。 */
   readonly compactionFailure: MessageBlock | undefined;
   readonly isStreaming: boolean;
+  /** 编辑提问重发进行中：从这个 durable 序号起的内容已被这次重发替换，不再显示。 */
+  readonly rewindFromSeq?: number;
 };
+
+/** 回退进行中：durable 序列到被编辑的提问为止（块按日志顺序排列）。 */
+function beforeRewind(blocks: MessageBlock[], fromSeq: number | undefined): MessageBlock[] {
+  if (fromSeq === undefined) return blocks;
+  const index = blocks.findIndex((block) => block.sourceSeq !== undefined && block.sourceSeq >= fromSeq);
+  return index < 0 ? blocks : blocks.slice(0, index);
+}
 
 // live 块里除了这些，都是工具块（toolEntryToBlock 产出）。todo 块虽由 toolEntryToBlock 产出，但旧实现
 // 只认 id 含 `:tool:` 的块，todo 的 id 是 `turn:<run>:todo`，恢复时不隐藏 durable 的 todo；保持一致。
@@ -50,7 +59,7 @@ export function durableTranscript(durable: DurableTranscript, live: LiveTranscri
 
 /** 合并后的完整序列：durable 在前，live 接在后面，最后是本地块。 */
 export function mergeTranscript(durable: DurableTranscript, live: LiveTranscript, local: LocalTranscript): MessageBlock[] {
-  const persisted = durableTranscript(durable, live);
+  const persisted = beforeRewind(durableTranscript(durable, live), local.rewindFromSeq);
   // 恢复时 durable 的 user 消息和任务快照生成的占位 user 块可能同时存在：按身份去重，保留 durable 的（带元数据）。
   const durableUserKeys = new Set(persisted.filter((block) => block.kind === "user").map((block) => block.renderKey ?? block.id));
   let visibleLive = live.blocks.filter((block) => block.kind !== "user" || !durableUserKeys.has(block.renderKey ?? block.id));

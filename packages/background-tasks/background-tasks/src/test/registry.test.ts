@@ -102,6 +102,17 @@ describe("BackgroundTaskRegistry", () => {
     expect(inbox().pending()).toHaveLength(1);
   });
 
+  it("forgets ended tasks a rewind dropped, and keeps running tasks and other Sessions' tasks", async () => {
+    const { registry } = setup("parent", "other");
+    const ended = source("bash_1"), running = source("bash_2"), other = source("bash_3", "other");
+    await registry.register(ended); await registry.register(running); await registry.register(other);
+    ended.finish(); other.finish();
+    await flush(); await flush();
+    registry.forget("parent", ["bash_1", "bash_2", "bash_3", "missing"]);
+    expect(registry.list("parent").map(task => task.taskId)).toEqual(["bash_2"]);
+    expect(registry.list("other").map(task => task.taskId)).toEqual(["bash_3"]);
+  });
+
   it("hides tasks owned by another Session", async () => {
     const { registry } = setup("parent", "other");
     await registry.register(source("bash_1", "other"));

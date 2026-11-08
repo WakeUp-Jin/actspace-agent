@@ -1,9 +1,9 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { Check, ChevronLeft, Copy, FolderOpen, Square } from "lucide-react";
+import { Check, ChevronLeft, Copy, FolderOpen, Loader2, Square } from "lucide-react";
 import { subagentKindLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
 import { IconButton } from "../ui/IconButton";
 import { Button } from "../ui/Button";
-import { AgentAvatar, SubagentStatus, agentModelLabel, formatAgentDuration } from "../messages/AgentIdentity";
+import { ActivityLine, AgentAvatar, SubagentStatus, agentModelLabel, formatAgentDuration } from "../messages/AgentIdentity";
 import { MarkdownProse } from "../messages/MarkdownProse";
 import { renderMessageList } from "../conversation/render-message";
 import { sessionsApi } from "../../api/sessions";
@@ -18,8 +18,14 @@ import { reconcileSubagents, reconcileTranscript, type TranscriptState } from ".
 const POLL_MS = 1000;
 const IDLE_POLL_MS = 5000;
 const COMPLETED_TRANSCRIPT_RETRIES = 20;
-// 列表行：设置页分组卡里的一行，规范见 docs/design-docs/frontend/front-子Agent与后台任务规范.md。
-const rowClass = "flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring";
+// 列表行：没有外框和分隔线，行自带圆角，悬停才有底色；规范见 docs/design-docs/frontend/front-子Agent与后台任务规范.md。
+const rowClass = "flex min-w-0 flex-1 items-center gap-3 rounded-act-md px-2.5 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring";
+// 运行中最右一格的转圈：停止中保持转圈，不再换成按钮。
+const ROW_SPINNER_CLASS = "absolute animate-spin text-operational transition-opacity duration-(--motion-fast) motion-reduce:animate-none";
+// 刚来信时转圈换成的蓝点（规范 §2.2）。
+const ROW_LETTER_DOT_CLASS = "absolute size-[7px] rounded-full bg-info transition-opacity duration-(--motion-fast)";
+/** 来信摘要在列表第二行停留多久（规范 §2.2）。 */
+export const RECENT_MESSAGE_MS = 6000;
 
 /** 右侧「子 Agent」面板（设计 05 §2）：一个子智能体一行；详情按种类分支，本地 / Fork 看对话与轨迹，Codex / Claude Code 看结果与原生记录。 */
 export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null; focus?: SubagentFocus }) {
@@ -106,7 +112,7 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
       const title = running ? "运行中" : "其他";
       return <div key={String(running)} className="mb-4.5" role="group" aria-label={`${title} · ${items.length}`}>
         <h2 className="mb-1.5 flex items-center justify-between px-1.5 text-act-xs font-normal text-text-faint"><span>{title}</span><span className="tabular-nums">{items.length}</span></h2>
-        <div className="divide-y divide-line/60 overflow-hidden rounded-act-group border border-line bg-surface">
+        <div className="flex flex-col gap-px">
           {items.map((agent) => <SubagentRow key={agent.agentId} agent={agent} stopping={stopping === agent.agentId}
             onOpen={() => { setSelectedId(agent.agentId); setView("chat"); setMissingAgent(false); setStopError(undefined); }}
             onStop={() => void stop(agent.agentId)} />)}
@@ -117,16 +123,23 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
   </section>;
 }
 
-/** 一行：头像、描述、最近一句（结论或怎么结束的）；右上 token，右下状态文字 · 耗时。运行中的行右侧有停止。 */
+/**
+ * 一行：头像、描述、第二行（运行中是此刻在做什么，刚来信时是来信摘要，结束后是结论）；右上 token，右下状态文字 · 耗时。
+ * 运行中的行最右一格平时转圈（刚来信时是蓝点），悬停或聚焦这一行时换成停止。
+ */
 function SubagentRow({ agent, stopping, onOpen, onStop }: { agent: SubagentListItem; stopping: boolean; onOpen: () => void; onStop: () => void }) {
   const running = agent.status === "running";
-  const latest = latestLine(agent);
-  return <div className="flex items-center hover:bg-surface-subtle">
+  const line = secondLine(agent, Date.now());
+  const idleClass = stopping ? "" : " group-hover/row:opacity-0 group-focus-within/row:opacity-0";
+  return <div className="group/row flex items-center rounded-act-md transition-colors duration-(--motion-fast) hover:bg-hover-overlay">
     <button type="button" className={rowClass} onClick={onOpen}>
       <AgentAvatar identity={agent.agentId} size={28} />
       <span className="flex min-w-0 flex-1 flex-col gap-px">
         <span className="truncate text-act-sm text-text-main" title={agent.description}>{agent.description}</span>
-        {latest ? <span className={`truncate text-act-xs ${agent.status === "failed" ? "text-on-danger" : "text-text-faint"}`}>{latest}</span> : null}
+        {line ? <span className={`flex min-w-0 text-act-xs ${agent.status === "failed" ? "text-on-danger" : "text-text-faint"}`}>
+          {line.letter ? <span className="shrink-0 text-info">来信：</span> : null}
+          <ActivityLine text={line.text} animate={running} className="min-w-0 flex-1" />
+        </span> : null}
       </span>
       <span className="flex shrink-0 flex-col items-end gap-0.5 text-act-xs tabular-nums text-text-faint">
         {agent.totalTokens ? <span className="text-text-muted">{formatTokenCount(agent.totalTokens)} <span className="text-text-faint">tokens</span></span> : null}
@@ -134,7 +147,15 @@ function SubagentRow({ agent, stopping, onOpen, onStop }: { agent: SubagentListI
       </span>
     </button>
     {running
-      ? <span className="shrink-0 pr-2"><IconButton label={`停止 ${agent.description}`} tooltip="停止" disabled={stopping} onClick={onStop}><Square size={12} fill="currentColor" /></IconButton></span>
+      ? <span className="relative mr-2 grid size-7 shrink-0 place-items-center">
+        {line?.letter && !stopping
+          ? <span aria-hidden="true" data-testid="subagent-letter-dot" className={`${ROW_LETTER_DOT_CLASS}${idleClass}`} />
+          : <Loader2 size={15} aria-hidden="true" className={`${ROW_SPINNER_CLASS}${idleClass}`} />}
+        <IconButton label={`停止 ${agent.description}`} tooltip="停止" variant="danger" shape="round" disabled={stopping} onClick={onStop}
+          className={`absolute inset-0 ${stopping ? "opacity-0" : "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 group-focus-within/row:opacity-100"}`}>
+          <Square size={11} fill="currentColor" />
+        </IconButton>
+      </span>
       : null}
   </div>;
 }
@@ -282,9 +303,18 @@ function durationMs(item: SubagentListItem): number {
   return Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : 0;
 }
 
-/** 列表第二行：最终回复的第一行（去掉加粗、行内代码、标题、列表的 Markdown 标记）；运行中或没有回复时不写，状态已在右侧。 */
-function latestLine(item: SubagentListItem): string | undefined {
-  if (item.status === "running") return undefined;
+/**
+ * 列表第二行（规范 §2、§2.2）：
+ * - 运行中：最近 6 秒内来信时是来信摘要（`letter`），否则是此刻在做什么；本地 / Fork 没有动态时写「正在思考」，Codex / Claude Code 不写。
+ * - 结束后：最终回复的第一行（去掉加粗、行内代码、标题、列表的 Markdown 标记）；没有回复时不写，状态已在右侧。
+ */
+export function secondLine(item: SubagentListItem, now: number): { text: string; letter?: true } | undefined {
+  if (item.status === "running") {
+    const sent = item.lastMessage ? Date.parse(item.lastMessage.at) : NaN;
+    if (item.lastMessage && now - sent < RECENT_MESSAGE_MS) return { text: item.lastMessage.text, letter: true };
+    if (item.activity) return { text: item.activity };
+    return isExternal(item) ? undefined : { text: "正在思考" };
+  }
   const first = item.result?.split(/\r?\n/).map((line) => line.replace(/\*\*|`/g, "").replace(/^\s*(#+|[-*]|\d+\.)\s+/, "").replace(/\s+/g, " ").trim()).find(Boolean);
-  return first;
+  return first ? { text: first } : undefined;
 }

@@ -66,3 +66,26 @@ describe("AgentService release", () => {
     expect(service.canRelease("opening")).toBe(false);
   });
 });
+
+describe("AgentService hold", () => {
+  it("accepts tasks but starts no Run while held, refuses a second hold, and starts the queue on release", async () => {
+    const { service } = fixture();
+    await service.submit("s", "one", "first"); await service.waitForIdle("s");
+    const release = service.hold("s");
+    expect(() => service.hold("s")).toThrow(expect.objectContaining({ code: "SESSION_BUSY" }));
+    expect(service.isHeld("s")).toBe(true);
+    await service.submit("s", "two", "second");
+    await new Promise(resolve => setTimeout(resolve, 10));
+    let snapshot = await service.snapshot("s");
+    expect(snapshot.queue).toHaveLength(1);
+    expect(snapshot.runs).toHaveLength(1);
+    release(); release();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await service.waitForIdle("s");
+    snapshot = await service.snapshot("s");
+    expect(snapshot.queue).toEqual([]);
+    expect(snapshot.runs.map(run => run.state)).toEqual(["completed", "completed"]);
+    expect(service.isHeld("s")).toBe(false);
+    await service.dispose();
+  });
+});

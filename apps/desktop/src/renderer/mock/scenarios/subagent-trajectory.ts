@@ -132,6 +132,11 @@ function seedBench(db: MockDb, parent: MockSession): void {
 }
 
 const MOCK_TOKENS: Record<string, number> = { [EXPLORE]: 18_420, [FORK]: 41_300, [WAL]: 6_820, [SCRIPT]: 12_630, [BENCH]: 3_410 };
+// 真实 Host 的动态来自子智能体的实时事件（主进程内存）；mock 按打开页面后的秒数轮换几句。
+const MOCK_ACTIVITY = ["正在读取 · bench/append.ts", "正在执行 · node bench/append.ts --writers 4", "正在分析 · 刚执行 node bench/append.ts", "正在整理回复"];
+const MOCK_OPENED = Date.now();
+// 压测子智能体在打开页面后第 8 秒来信一次（列表第二行先显示「来信：」，6 秒后恢复动态）。
+const BENCH_MESSAGE_AT = new Date(MOCK_OPENED + 8_000).toISOString();
 
 export function subagentTrajectoryScenario({ db }: MockClock): MockHandlers {
   const parent = seedSession(db, { title: "查看pi-durable设计", minutesAgo: 1, turns: [["帮我看一下 pi-durable 的设计，重点是会话事务和存储层。", null]] });
@@ -202,9 +207,17 @@ export function subagentTrajectoryScenario({ db }: MockClock): MockHandlers {
   return {
     sessions: {
       // 真实 Host 从子会话快照读 token；mock 子会话没有用量，按 id 给固定值（外部子智能体没有）。
-      getSubagents: async ({ sessionId }) => sessionId === parent.id
-        ? projectSubagentItems(journal(parent)).map((item) => MOCK_TOKENS[item.agentId] ? { ...item, totalTokens: MOCK_TOKENS[item.agentId] } : item)
-        : [],
+      getSubagents: async ({ sessionId }) => {
+        if (sessionId !== parent.id) return [];
+        const now = Date.now();
+        const activity = MOCK_ACTIVITY[Math.floor((now - MOCK_OPENED) / 3000) % MOCK_ACTIVITY.length];
+        return projectSubagentItems(journal(parent)).map((item) => ({
+          ...item,
+          ...(MOCK_TOKENS[item.agentId] ? { totalTokens: MOCK_TOKENS[item.agentId] } : {}),
+          ...(item.status === "running" && item.agentId === BENCH ? { activity } : {}),
+          ...(item.agentId === BENCH && now >= Date.parse(BENCH_MESSAGE_AT) ? { lastMessage: { text: "单写入者约 4.2 万条/秒，4 个并发时降到 1.1 万，正在跑 8 个。", at: BENCH_MESSAGE_AT } } : {}),
+        }));
+      },
       getSubAgentTranscript: async ({ transcriptRef }) => {
         const session = db.sessions.get(transcriptRef.runId);
         if (!session) return [];

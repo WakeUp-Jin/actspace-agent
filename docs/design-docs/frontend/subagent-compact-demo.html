@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>子智能体紧凑卡片 Demo</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-read: "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "PingFang SC", monospace;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --selected: #e4e4e1; --hover: #ececea;
+  --line: #deded9; --line-soft: #e9e9e5; --line-strong: #8c8c85;
+  --text: #20201e; --muted: #676762; --faint: #72726b; --subtle: #85857e;
+  --operational: #087a4b; --info: #3978b8; --info-soft: #e8f1f9; --on-danger: #a93a3a;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --selected: #30312d; --hover: #2c2d29;
+  --line: #353630; --line-soft: #2e2f2a; --line-strong: #787870;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #787870;
+  --operational: #36c783; --info: #6ca6da; --info-soft: #1e3345; --on-danger: #f08a8a;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.2);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 13px/1.55 var(--font-ui); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+svg { flex-shrink: 0; display: block; }
+code { font-family: var(--font-mono); font-size: .86em; background: var(--surface-subtle); padding: 1px 5px; border-radius: 4px; }
+.ell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes flashCard { 0% { box-shadow: 0 0 0 3px var(--info-soft); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes flashBg { 0% { background-color: var(--info-soft); } 100% { background-color: transparent; } }
+@keyframes slideIn { from { opacity: 0; transform: translateY(60%); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+.bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar h1 { margin: 0 4px 0 0; font-size: 13px; font-weight: 600; }
+.grp { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
+.seg { display: inline-flex; flex-wrap: wrap; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.seg button { padding: 2px 9px; border-radius: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--selected); }
+.pbtn { padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); font-size: 12px; color: var(--muted); }
+.pbtn:hover { color: var(--text); border-color: var(--line-strong); }
+
+.page { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 20px 16px 40px; }
+.note { width: 1180px; max-width: 100%; display: flex; flex-wrap: wrap; gap: 16px; }
+.note > div { flex: 1 1 340px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.note h2 { margin: 0 0 6px; font-size: 14px; }
+.note p { margin: 0 0 6px; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+.note ul { margin: 0; padding-left: 16px; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+.steps { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; margin: 0; padding: 0; }
+.steps li { padding: 3px 8px; border-radius: 6px; font-size: 12px; color: var(--faint); cursor: pointer; border: 1px solid var(--line-soft); }
+.steps li:hover { background: var(--hover); }
+.steps li.on { color: var(--text); background: var(--selected); border-color: var(--line); }
+
+.win { width: 1180px; max-width: 100%; height: 820px; display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.wtitle { height: 42px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line-soft); font-size: 13.5px; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.flow { padding: 18px 36px 28px; display: flex; flex-direction: column; }
+.turn { display: flex; flex-direction: column; padding-bottom: 16px; }
+.u { margin: 6px 0 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-size: 14px; }
+.tl { font-size: 13px; color: var(--muted); padding: 3px 0; display: flex; gap: 6px; align-items: center; min-width: 0; }
+.tl .v { color: var(--faint); }
+.worked { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--faint); padding: 4px 0; width: fit-content; }
+.worked:hover { color: var(--text); }
+.worked .chev { transition: transform .15s; }
+.worked.open .chev { transform: rotate(90deg); }
+.proc { display: flex; flex-direction: column; padding: 2px 0 4px; }
+.rp { margin: 8px 0 0; font-family: var(--font-read); font-size: 15.5px; line-height: 1.85; }
+.ring { width: 12px; height: 12px; border-radius: 50%; border: 1.6px solid var(--operational); border-top-color: transparent; animation: spin .9s linear infinite; flex: none; }
+.ok { color: var(--operational); display: inline-flex; }
+.av { flex: none; overflow: hidden; background: var(--surface); display: block; }
+.av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bgtag { display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 4px; font-size: 11px; color: var(--info); background: var(--info-soft); flex: none; }
+.st { display: inline-flex; align-items: center; gap: 5px; flex: none; font-size: 12px; color: var(--muted); }
+.kind { font-size: 12px; color: var(--faint); flex: none; }
+.fresh { animation: rise .32s ease both; }
+
+/* ---------- 现状：两行卡片 ---------- */
+.k0 { display: flex; align-items: center; gap: 12px; width: 100%; margin: 4px 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-subtle); }
+.k0 .av { width: 32px; height: 32px; border-radius: 8px; }
+.k0 .b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.k0 .r1 { display: flex; align-items: center; gap: 8px; }
+.k0 .nm { flex: 1; font-size: 14px; color: var(--muted); }
+.k0 .st { width: 68px; }
+.k0 .r2 { display: flex; gap: 6px; font-size: 12px; color: var(--faint); min-width: 0; }
+.e0 { margin: 8px 0 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.e0 .hd { display: flex; align-items: center; gap: 9px; padding: 7px 12px; background: var(--surface-subtle); border-bottom: 1px solid var(--line-soft); font-size: 12.5px; color: var(--muted); }
+.e0 .hd .av { width: 20px; height: 20px; border-radius: 6px; }
+.e0 .hd .st { margin-left: auto; }
+.e0 .bd { padding: 9px 14px 10px; font-size: 13.5px; line-height: 1.65; }
+.lbl { font-size: 11.5px; color: var(--info); margin-right: 6px; }
+
+/* ---------- K1 单行卡片 ---------- */
+.k1 { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; margin: 3px 0; padding: 0 10px 0 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-subtle); transition: border-color .15s, background .15s; }
+.k1:hover { border-color: var(--line-strong); background: var(--surface); }
+.k1 .av { width: 20px; height: 20px; border-radius: 5px; }
+.k1 .nm { flex: 1; font-size: 13.5px; color: var(--muted); }
+.k1:hover .nm { color: var(--text); }
+.e1 { margin: 6px 0 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.e1 .hd { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px 0 7px; background: var(--surface-subtle); font-size: 13px; color: var(--muted); }
+.e1 .hd .av { width: 20px; height: 20px; border-radius: 5px; }
+.e1 .hd .nm { flex: 1; }
+.e1 .bd { padding: 7px 12px 8px 35px; font-size: 13.5px; line-height: 1.65; border-top: 1px solid var(--line-soft); }
+.e1.fresh { animation: rise .32s ease both, flashCard 1.6s ease-out both; }
+.k1.flash, .e1.flash { animation: flashCard 1.6s ease-out both; }
+
+/* ---------- K2 无框行 ---------- */
+.k2 { display: flex; align-items: center; gap: 7px; width: 100%; height: 28px; margin: 1px 0; padding: 0 6px; margin-left: -6px; border-radius: 6px; font-size: 13px; color: var(--muted); }
+.k2:hover { background: var(--hover); color: var(--text); }
+.k2 .v { color: var(--faint); flex: none; }
+.k2 .av { width: 18px; height: 18px; border-radius: 9px; }
+.k2 .nm { min-width: 0; }
+.k2 .sp { flex: 1; }
+.e2 { margin: 6px 0 4px; padding: 2px 0; }
+.e2 .hd { display: flex; align-items: center; gap: 7px; height: 26px; font-size: 13px; color: var(--muted); }
+.e2 .hd .av { width: 18px; height: 18px; border-radius: 9px; }
+.e2 .hd .lbl2 { color: var(--faint); }
+.e2 .hd .sp { flex: 1; }
+.e2 .bd { margin: 2px 0 0 8px; padding: 2px 0 2px 16px; border-left: 2px solid var(--line); font-size: 13.5px; line-height: 1.65; border-radius: 0 6px 6px 0; }
+.e2.fresh .bd { animation: flashBg 1.8s ease-out both; }
+.e2.fresh { animation: rise .32s ease both; }
+
+/* ---------- K3 胶囊 ---------- */
+.k3wrap { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+.k3 { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px 0 4px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-subtle); font-size: 13px; color: var(--muted); max-width: 100%; }
+.k3:hover { border-color: var(--line-strong); background: var(--surface); color: var(--text); }
+.k3 .av { width: 20px; height: 20px; border-radius: 10px; }
+.e3 { margin: 6px 0 4px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.e3 .bd { margin-left: 12px; padding: 7px 12px; border-radius: 4px 10px 10px 10px; border: 1px solid var(--line-soft); background: var(--surface); font-size: 13.5px; line-height: 1.65; max-width: 600px; }
+.e3.fresh { animation: rise .32s ease both; }
+.e3.fresh .bd { animation: flashCard 1.6s ease-out both; }
+
+/* ---------- 右侧面板 ---------- */
+.panel { width: 320px; flex: none; border-left: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; }
+.ptabs { height: 42px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--line-soft); font-size: 13px; color: var(--muted); }
+.ptabs b { font-weight: 500; color: var(--text); }
+.plist { padding: 12px 10px; overflow-y: auto; }
+.pgh { display: flex; justify-content: space-between; padding: 0 6px; margin: 0 0 6px; font-size: 12px; color: var(--faint); }
+.pgrp { margin-bottom: 16px; display: flex; flex-direction: column; gap: 1px; }
+.prow { display: flex; align-items: center; gap: 10px; padding: 9px 8px 9px 10px; border-radius: 8px; }
+.prow:hover { background: var(--hover); }
+.prow .av { width: 28px; height: 28px; border-radius: 7px; }
+.prow .b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.prow .nm { font-size: 13px; color: var(--text); }
+.prow .ln { position: relative; height: 18px; overflow: hidden; font-size: 12px; color: var(--faint); }
+.prow .ln > span { position: absolute; inset: 0; }
+.prow .ln .in { animation: slideIn .28s ease both; }
+.prow .ln .msg { color: var(--info); }
+.prow .r { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; flex: none; }
+.prow .slot { width: 28px; display: grid; place-items: center; flex: none; }
+.prow .dot { width: 7px; height: 7px; border-radius: 4px; background: var(--info); }
+.prow.flash { animation: flashBg 1.8s ease-out both; }
+.pnote { margin: 4px 6px 0; padding: 8px 10px; border-radius: 8px; background: var(--surface-subtle); font-size: 12px; color: var(--faint); line-height: 1.6; }
+
+.comp { flex: none; padding: 0 0 14px; }
+.cbox { margin: 0 36px; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--faint); font-size: 14px; }
+.cbox .sp { flex: 1; }
+.send { width: 26px; height: 26px; border-radius: 13px; background: var(--subtle); display: grid; place-items: center; color: var(--surface); }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>子智能体紧凑卡片</h1>
+  <div class="grp">对话里的样子 <span class="seg" data-k="v">
+    <button data-v="0">现状（两行卡片）</button><button data-v="1">K1 单行卡片</button><button data-v="2">K2 无框行</button><button data-v="3">K3 胶囊</button>
+  </span></div>
+  <div class="grp">面板第二行 <span class="seg" data-k="p">
+    <button data-v="live">实时动态</button><button data-v="msg">实时动态 + 来信</button>
+  </span></div>
+  <div class="grp">主题 <span class="seg" data-k="theme"><button data-v="light">浅色</button><button data-v="dark">深色</button></span></div>
+  <button class="pbtn" data-play>▶ 从头播放</button>
+</div>
+
+<div class="page">
+  <div class="note">
+    <div id="note"></div>
+    <div><h2>场景</h2><ol class="steps" id="steps"></ol>
+      <p style="margin:8px 0 0">点步骤跳到那一刻。右侧面板「运行中」的第二行每 2 秒换一次，模拟实时动态。灰色「Worked」可以点开看收起的过程。</p></div>
+  </div>
+  <div class="win">
+    <div class="main">
+      <div class="wtitle"><span style="color:var(--faint)">∿</span>复核 pi-durable 提交流程</div>
+      <div class="scroll" id="scroll"><div class="flow" id="flow"></div></div>
+      <div class="comp"><div class="cbox">＋<span>继续追问…</span><span class="sp"></span><span style="font-size:13px">deepseek-flash ⌄</span><span class="send">↑</span></div></div>
+    </div>
+    <aside class="panel">
+      <div class="ptabs"><b>子 Agent</b><span style="flex:1"></span><span style="font-size:12px;color:var(--faint)">✕</span></div>
+      <div class="plist" id="plist"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const AV = n => `../../../apps/desktop/src/renderer/assets/subagents/companion-${n}.webp`;
+const img = (n, cls = "") => `<span class="av ${cls}"><img src="${AV(n)}" alt=""></span>`;
+const CHEV = '<svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+const CHECK = '<span class="ok"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>';
+
+const A = { id: "a", av: 1, name: "复核事务提交顺序", kind: "Fork", tokens: "18.2k", acts: ["正在读取 session/transaction.ts", "正在检索 notifyObservers 的调用方", "正在思考", "正在读取 session/sync.ts", "正在读取 session/replay.ts"], result: "已把 notifyObservers 挪到 commit 之后，相关测试通过" };
+const B = { id: "b", av: 6, name: "调研 WAL 模式", kind: "探索", tokens: "9.6k", acts: ["正在检索 WAL 相关代码", "正在读取 storage/sqlite/open.ts", "正在思考"], result: "WAL 下读写互不阻塞，适合一写多读" };
+const M1 = { from: A, at: 3, text: "只需要改 <code>session/transaction.ts</code> 一处：把 notifyObservers 挪到 commit 之后。我先确认没有别的调用方再动手。", plain: "只需要改 session/transaction.ts 一处：把 notifyObservers 挪到 commit 之后…" };
+const M2 = { from: A, at: 5, text: "查完了：调用方只有 <code>sync.ts</code> 和 <code>replay.ts</code>，都在 commit 之后才读，不受影响。可以开始改了吗？", plain: "查完了：调用方只有 sync.ts 和 replay.ts，不受影响。可以开始改了吗？" };
+
+const STEPS = ["① 派发，两个都在后台跑", "② 本轮结束", "③ 来信，唤醒主 Agent", "④ WAL 完成（不显示）", "⑤ 运行中又来一条", "⑥ 本轮结束", "⑦ 复核也完成（不显示）"];
+const NOTES = {
+  0: { t: "现状（两行卡片）", d: "派发卡片两行，约 52px，第二行是实时动态。来信用上一版的「C 卡片回响」，头部和正文分两块。放在这里作对照。" },
+  1: { t: "K1 单行卡片", d: "还是那张卡片，砍成一行，34px（原来约 52px）：小头像、名字、种类、「后台」标记，最右是转圈或完成。动态挪到右侧面板。来信沿用 C 的结构，头部就是这张单行卡片，正文从名字下方对齐，不再另起标签。", li: ["和现状最像，只是变矮", "来信的头部和派发卡完全一样，一眼认出是同一个"] },
+  2: { t: "K2 无框行", d: "派发和其他工具行一样，是一行文字：「派发」+ 小圆头像 + 名字 + 后台 + 转圈，28px，没有框。来信是同样一行，正文挂在下面，左边一根细线。", li: ["最矮，和 Read / Grep 那些行节奏一致", "子智能体不再像一个「对象」，存在感最弱"] },
+  3: { t: "K3 胶囊", d: "派发变成一个按内容宽度的胶囊，几个子智能体并排放在一行。来信是同一个胶囊，下面挂一个消息气泡。", li: ["一次派好几个时最省地方（并排一行）", "胶囊像标签，点进去看详情的意图很明确"] },
+};
+
+// 第 1 轮的 Worked 默认展开，方便看派发卡片从转圈变成已完成。
+const state = { v: "1", p: "msg", theme: "light", step: 7, open: { w1: true }, tick: 0, timer: null };
+const DONE_AT = { a: 7, b: 4 };
+const status = (ag, s) => s >= DONE_AT[ag.id] ? "done" : "run";
+// 这一步刚完成：卡片轻闪一下。
+const flip = (ag, s) => s === DONE_AT[ag.id] ? " flash" : "";
+const fresh = at => at === state.step ? " fresh" : "";
+const st = (ag, s, label = true) => status(ag, s) === "run" ? `<span class="st"><span class="ring"></span>${label ? "运行中" : ""}</span>` : `<span class="st">${CHECK}${label ? "已完成" : ""}</span>`;
+const tool = (verb, target) => `<div class="tl"><span class="v">${verb}</span><span class="ell">${target}</span></div>`;
+const reply = (html, at) => `<p class="rp${fresh(at)}">${html}</p>`;
+const worked = (id, label, inner) => `<button class="worked${state.open[id] ? " open" : ""}" data-open="${id}">${label}${CHEV}</button>${state.open[id] ? `<div class="proc">${inner}</div>` : ""}`;
+
+function dispatch(agents, s) {
+  const v = state.v;
+  if (v === "0") return agents.map(ag => `<button class="k0">${img(ag.av)}<span class="b"><span class="r1"><span class="nm ell">${ag.name}</span><span class="bgtag">后台</span><span style="width:68px">${st(ag, s)}</span></span><span class="r2"><span>${ag.kind}</span><span>·</span><span class="ell" style="color:var(--muted)">${status(ag, s) === "run" ? ag.acts[0] : ag.result}</span></span></span></button>`).join("");
+  if (v === "1") return agents.map(ag => `<button class="k1${flip(ag, s)}">${img(ag.av)}<span class="nm ell">${ag.name}</span><span class="kind">${ag.kind}</span><span class="bgtag">后台</span>${st(ag, s)}</button>`).join("");
+  if (v === "2") return agents.map(ag => `<button class="k2"><span class="v">派发</span>${img(ag.av)}<span class="nm ell">${ag.name}</span><span class="bgtag">后台</span><span class="sp"></span>${st(ag, s, false)}</button>`).join("");
+  return `<div class="k3wrap">${agents.map(ag => `<button class="k3">${img(ag.av)}<span class="ell">${ag.name}</span>${st(ag, s, false)}</button>`).join("")}</div>`;
+}
+function echo(m, s) {
+  const v = state.v, a = m.from, f = fresh(m.at);
+  if (v === "0") return `<div class="e0${f}"><div class="hd">${img(a.av)}<span>${a.name}</span>${st(a, s)}</div><div class="bd"><span class="lbl">来信</span>${m.text}</div></div>`;
+  if (v === "1") return `<div class="e1${f || flip(a, s)}"><div class="hd">${img(a.av)}<span class="nm ell">${a.name}</span><span class="lbl" style="margin:0">来信</span>${st(a, s)}</div><div class="bd">${m.text}</div></div>`;
+  if (v === "2") return `<div class="e2${f}"><div class="hd"><span class="lbl2">来信</span>${img(a.av)}<span class="ell">${a.name}</span><span class="sp"></span>${st(a, s, false)}</div><div class="bd">${m.text}</div></div>`;
+  return `<div class="e3${f}"><button class="k3">${img(a.av)}<span class="ell">${a.name}</span><span class="lbl" style="margin:0">来信</span>${st(a, s, false)}</button><div class="bd">${m.text}</div></div>`;
+}
+
+function render() {
+  const s = state.step, out = [];
+  if (state.renderedStep !== s) { state.renderedStep = s; state.msgTick = state.tick; }
+  const disp = tool("Thinking…", "") + dispatch([A, B], s) + tool("Read", "storage/sqlite/schema.ts");
+  let t1 = `<div class="u">后台派两个子智能体：一个复核事务提交顺序，一个调研 WAL 模式。你先看存储层。</div>`;
+  t1 += s === 1 ? disp : worked("w1", "Worked for 14s ", disp) + reply("两个子智能体已在后台运行，有结果会告诉你。存储层：<code>entries</code> 是追加式事件日志，<code>forks</code> 记录分叉点，一次提交在单个 SQLite 事务里完成。", 2);
+  out.push(`<div class="turn">${t1}</div>`);
+  if (s >= 3) out.push(`<div class="turn">${echo(M1, s)}${reply("复核那边确认只需改 <code>transaction.ts</code> 一处。我回复它先查清其他调用方，确认没有影响再动手。", 3)}</div>`);
+  if (s >= 4) out.push(`<div class="turn">${reply("WAL 调研回来了：开启 WAL 后读不阻塞写，适合我们「一写多读」的场景；代价是多一个 <code>-wal</code> 文件，需要定期 checkpoint。", 4)}</div>`);
+  if (s >= 5) {
+    const before = tool("Thinking…", "") + tool("Grep", "forks in storage/");
+    const after = tool("发消息给", "复核事务提交顺序") + tool("Read", "storage/sqlite/migrations.ts");
+    let t4 = `<div class="u">forks 表的 parent_id 要不要加索引？</div>`;
+    t4 += s === 5 ? before + echo(M2, s) + after : worked("w4", "Worked for 21s ", before + after) + echo(M2, s) + reply("建议加：按父会话找分支是高频查询，现在是全表扫描。另外复核那边查完了调用方，没有影响，我已经让它开始改。", 6);
+    out.push(`<div class="turn">${t4}</div>`);
+  }
+  // 复核完成唤醒主 Agent：通知不显示，只有主 Agent 的回复；上面两张卡片（派发、来信）都变成已完成。
+  if (s >= 7) out.push(`<div class="turn">${reply("复核那边改完了：<code>notifyObservers</code> 已挪到 commit 之后，相关测试通过。", 7)}</div>`);
+  document.getElementById("flow").innerHTML = out.join("");
+  renderPanel(true);
+  renderSide();
+  const sc = document.getElementById("scroll");
+  // 有卡片刚完成就滚到它那里，否则停在底部。
+  requestAnimationFrame(() => {
+    const flipped = sc.querySelector(".k1.flash");
+    // 只滚对话区，不带动整页。
+    sc.scrollTop = flipped ? flipped.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - sc.clientHeight / 3 : sc.scrollHeight;
+  });
+}
+
+let lastLines = {};
+function panelLine(ag, s) {
+  if (status(ag, s) === "done") return { key: "r", html: ag.result };
+  const m = [M2, M1].find(x => x.from === ag && s === x.at);
+  if (state.p === "msg" && m && state.tick - state.msgTick < 3) return { key: "m" + m.at, html: `<span class="msg">来信：</span>${m.plain}` };
+  const act = ag.acts[state.tick % ag.acts.length];
+  return { key: act, html: act };
+}
+function renderPanel() {
+  const s = state.step;
+  const row = ag => {
+    const run = status(ag, s) === "run";
+    const ln = panelLine(ag, s);
+    const changed = lastLines[ag.id] !== undefined && lastLines[ag.id] !== ln.key;
+    lastLines[ag.id] = ln.key;
+    const unread = ln.key.startsWith("m");
+    return `<div class="prow">${img(ag.av)}<span class="b"><span class="nm ell">${ag.name}</span><span class="ln"><span class="ell${changed ? " in" : ""}">${ln.html}</span></span></span>
+      <span class="r"><span style="color:var(--muted)">${ag.tokens} <span style="color:var(--faint)">tokens</span></span><span>${run ? "运行中" : "已完成"} · ${run ? (s * 12 + state.tick * 2) + "s" : "48s"}</span></span>
+      ${run ? `<span class="slot">${unread ? '<span class="dot"></span>' : '<span class="ring" style="width:15px;height:15px"></span>'}</span>` : ""}</div>`;
+  };
+  const running = [A, B].filter(a => status(a, s) === "run"), done = [A, B].filter(a => status(a, s) === "done");
+  document.getElementById("plist").innerHTML =
+    (running.length ? `<div class="pgh"><span>运行中</span><span>${running.length}</span></div><div class="pgrp">${running.map(row).join("")}</div>` : "") +
+    (done.length ? `<div class="pgh"><span>其他</span><span>${done.length}</span></div><div class="pgrp">${done.map(row).join("")}</div>` : "") +
+    `<p class="pnote">${state.p === "live" ? "新增：运行中的第二行显示它此刻在做什么（现在面板里运行中这一行是空的，动态只在对话卡片里），跑完换成结论第一行。" : "运行中的第二行显示它此刻在做什么；刚来信时这一行先换成来信摘要（蓝色「来信：」），右侧转圈换成蓝点，下一次动态到来后恢复。"}</p>`;
+}
+function renderSide() {
+  const n = NOTES[state.v];
+  document.getElementById("note").innerHTML = `<h2>${n.t}</h2><p>${n.d}</p>${n.li ? `<ul>${n.li.map(x => `<li>${x}</li>`).join("")}</ul>` : ""}`;
+  document.getElementById("steps").innerHTML = STEPS.map((t, i) => `<li class="${i + 1 === state.step ? "on" : ""}" data-step="${i + 1}">${t}</li>`).join("");
+  document.querySelectorAll(".seg").forEach(sg => sg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(state[sg.dataset.k] === b.dataset.v))));
+  document.documentElement.dataset.theme = state.theme;
+}
+
+setInterval(() => { state.tick += 1; renderPanel(); }, 2000);
+function stopPlay() { clearInterval(state.timer); state.timer = null; }
+document.addEventListener("click", e => {
+  const seg = e.target.closest(".seg button");
+  if (seg) { state[seg.closest(".seg").dataset.k] = seg.dataset.v; return render(); }
+  const step = e.target.closest("[data-step]");
+  if (step) { stopPlay(); state.step = Number(step.dataset.step); return render(); }
+  const open = e.target.closest("[data-open]");
+  if (open) { state.open[open.dataset.open] = !state.open[open.dataset.open]; return render(); }
+  if (e.target.closest("[data-play]")) {
+    stopPlay(); state.step = 1; render();
+    state.timer = setInterval(() => { if (state.step >= STEPS.length) return stopPlay(); state.step += 1; render(); }, 2200);
+  }
+});
+{ // 链接参数：?v=1&step=5&p=msg&theme=dark&open=w1
+  const q = new URLSearchParams(location.search);
+  if (NOTES[q.get("v")]) state.v = q.get("v");
+  if (q.get("p") === "live") state.p = "live";
+  if (q.get("theme") === "dark") state.theme = "dark";
+  if (Number(q.get("step")) >= 1 && Number(q.get("step")) <= STEPS.length) state.step = Number(q.get("step"));
+  if (q.get("open")) state.open[q.get("open")] = true;
+}
+render();
+</script>
+</body>
+</html>

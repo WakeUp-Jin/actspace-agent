@@ -233,6 +233,24 @@ describe("SubagentManager", () => {
     await f.close();
   });
 
+  it("stops every running subagent of a rewinding Session without notifying or waking it", async () => {
+    const f = await fixture({ syncWaitMs: 60_000, script: async ({ signal }) => { await new Promise(resolve => signal.addEventListener("abort", resolve, { once: true })); return { reason: "aborted", finalText: "partial" }; } });
+    const background = idOf(await f.spawn());
+    const sync = f.spawn({ background: false, description: "sync job" });
+    await until(() => f.turns.length === 2);
+    await f.manager.stopAll("root");
+    expect(f.manager.runningCount("root")).toBe(0);
+    const tree = subagentTree(f.root);
+    expect(tree.agents[background]!.activations[0]!.settle).toMatchObject({ status: "interrupted", delivery: "lost" });
+    const syncId = Object.keys(tree.agents).find(id => id !== background)!;
+    expect(tree.agents[syncId]!.activations[0]!.settle).toMatchObject({ status: "interrupted", delivery: "lost" });
+    // The synchronous caller still gets its answer: the tool call is closed, not left hanging.
+    expect((await sync).text.split("\n")[0]).toMatch(/was stopped before it finished\.$/);
+    expect(pendingTexts(f.root)).toEqual([]);
+    expect(f.woken).toEqual([]);
+    await f.close();
+  });
+
   it("records an activation cut off by an exit as lost and continues it after restart", async () => {
     const first = await fixture({ script: async ({ signal }) => { await new Promise(resolve => signal.addEventListener("abort", resolve, { once: true })); return { reason: "aborted" }; } });
     const agentId = idOf(await first.spawn());

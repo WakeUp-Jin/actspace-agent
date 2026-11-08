@@ -6,3 +6,4 @@ export * from "./storage.js";
 export * from "./layout.js";
 export * from "./writer-lease.js";
 export * from "./repair.js";
+export * from "./rewind.js";

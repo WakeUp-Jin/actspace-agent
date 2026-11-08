@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { RuntimeStreamEvent } from "@actspace/shared";
-import { SubagentActivity } from "../runtime-v2/subagent-activity";
+import { SubagentActivity, SubagentActivityBoard } from "../runtime-v2/subagent-activity";
 import { FixedRendererStreamAdapter } from "../runtime-v2/fixed-renderer-stream-adapter";
 
 describe("subagent activity in the parent stream", () => {
@@ -66,5 +66,33 @@ describe("subagent operation context", () => {
     expect(activity.accept({ ...child, kind: "tool-prepared", callId: "grep", name: "grep", arguments: { pattern: "AgentRunBlock" } })).toBe("正在执行 2 项工具调用 · 正在搜索 · AgentRunBlock");
     expect(activity.accept({ ...child, kind: "tool-finished", callId: "grep", name: "grep", result: result as never, resultEventId: "g" })).toBe("正在读取 · a.ts");
     expect(activity.accept({ ...child, kind: "tool-finished", callId: "read", name: "read_file", result: { ...result, status: "failed" } as never, resultEventId: "r" })).toBe("正在分析 · 刚尝试读取 a.ts");
+  });
+});
+
+describe("subagent activity board (panel second line)", () => {
+  it("keeps one label per child session, ignores top-level sessions, and forgets a child when its run ends", () => {
+    const board = new SubagentActivityBoard();
+    const a = { ...child, sessionId: "child-a", parentSessionId: "parent" };
+    const b = { ...child, sessionId: "child-b", parentSessionId: "parent" };
+    board.accept({ ...child, sessionId: "parent", kind: "tool-prepared", callId: "x", name: "read_file", arguments: { path: "parent.ts" } });
+    expect(board.label("parent")).toBeUndefined();
+    board.accept({ ...a, kind: "tool-prepared", callId: "read", name: "read_file", arguments: { path: "/w/a.ts" } });
+    board.accept({ ...b, kind: "run-state", message: "request-started" });
+    expect(board.label("child-a")).toBe("正在读取 · a.ts");
+    expect(board.label("child-b")).toBe("正在思考");
+    board.accept({ ...a, kind: "tool-finished", callId: "read", name: "read_file", result: result as never, resultEventId: "r" });
+    board.accept({ ...a, kind: "assistant-delta", messageId: "m", message: "private reply" });
+    expect(board.label("child-a")).toBe("正在整理回复");
+    board.accept({ ...a, kind: "run-state", message: "completed" });
+    expect(board.label("child-a")).toBeUndefined();
+    expect(board.label("child-b")).toBe("正在思考");
+  });
+
+  it("keeps at most 200 children, dropping the oldest", () => {
+    const board = new SubagentActivityBoard();
+    for (let i = 0; i <= 200; i++) board.accept({ ...child, sessionId: `c${i}`, parentSessionId: "parent", kind: "run-state", message: "request-started" });
+    expect(board.label("c0")).toBeUndefined();
+    expect(board.label("c1")).toBe("正在思考");
+    expect(board.label("c200")).toBe("正在思考");
   });
 });

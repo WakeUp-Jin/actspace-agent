@@ -66,3 +66,20 @@ it("forks by Journal position or by assistant turn, never both and never neither
   await expect(rpc.dispatch("sessions.fork", { sessionId: "p", boundarySeq: 7, turnId: "turn-1", newSessionId: "child" }, context)).rejects.toThrow("exactly one");
   expect(forkMainSession).toHaveBeenCalledTimes(2);
 });
+
+it("passes a rewind and the client's Run id to the application and maps rewind refusals to Host errors", async () => {
+  const submitTask = vi.fn(async () => ({ task: { taskId: "plain" } }));
+  let refusal: string | undefined;
+  const rewindAndSubmit = vi.fn(async () => { if (refusal) throw Object.assign(new Error(refusal), { code: refusal }); return { task: { taskId: "edited" } }; });
+  const rpc = new HostRpc({ state: () => "ready", application: { submitTask, rewindAndSubmit, taskCommand: async () => ({ snapshot: { tasks: [] } }), inspectSession: async () => ({}) } } as unknown as HostRpcOptions);
+  await rpc.dispatch("tasks.submit", { sessionId: "s", submissionId: "a", content: "hi", agentRunId: "run-new" }, context);
+  expect(submitTask).toHaveBeenCalledWith("s", "a", "hi", "run-new");
+  await rpc.dispatch("tasks.submit", { sessionId: "s", submissionId: "b", content: "edited", rewind: { runId: "run-2", expectedThroughSeq: 40 }, agentRunId: "run-new" }, context);
+  expect(rewindAndSubmit).toHaveBeenCalledWith("s", { runId: "run-2", expectedThroughSeq: 40 }, "b", "edited", "run-new");
+  await expect(rpc.dispatch("tasks.submit", { sessionId: "s", submissionId: "c", content: "x", rewind: { runId: "r", expectedThroughSeq: -2 } }, context)).rejects.toBeInstanceOf(TypeError);
+  await expect(rpc.dispatch("tasks.submit", { sessionId: "s", submissionId: "c", content: "x", rewind: { runId: "r", expectedThroughSeq: 1, extra: true } }, context)).rejects.toBeInstanceOf(TypeError);
+  for (const [code, kind] of [["SESSION_BUSY", "CONFLICT"], ["REWIND_CONFLICT", "CONFLICT"], ["REWIND_INHERITED", "FORBIDDEN"]] as const) {
+    refusal = code;
+    await expect(rpc.dispatch("tasks.submit", { sessionId: "s", submissionId: `d-${code}`, content: "x", rewind: { runId: "r", expectedThroughSeq: 1 } }, context)).rejects.toMatchObject({ kind, message: code });
+  }
+});

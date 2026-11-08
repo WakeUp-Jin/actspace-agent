@@ -474,6 +474,10 @@ export type SubagentListItem = {
   /** The latest activation's final reply and summary. */
   result?: string;
   summary?: string;
+  /** Running local / fork only: what it is doing now (`SubagentActivity` label, from live events kept in memory by the Host). */
+  activity?: string;
+  /** Its latest message to the parent Session (`agent_message`): first line of the body and when it was sent. */
+  lastMessage?: { text: string; at: string };
 };
 
 export type ToolPreviewKind =
@@ -767,6 +771,8 @@ export type ComposerAttachment = {
   path?: string;
   /** An authenticated artifact owned by this remote session, not a local path. */
   remoteArtifact?: { sessionId: string; artifactId: string };
+  /** An attachment this local Session already stores (an edited prompt resends it without a path). */
+  artifactId?: string;
   mimeType?: string;
   previewUrl?: string;
 };

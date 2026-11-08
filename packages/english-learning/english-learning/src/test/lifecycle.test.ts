@@ -27,6 +27,24 @@ describe("English learning lifecycle and scoped prompt", () => {
       await expect(service.enableSession("idle")).resolves.toMatchObject({ enabled: true, targetSessionId: "idle" });
     } finally { await service.dispose(); await root.dispose(); }
   });
+  it("rebinds to the reopened handle when its Session rewinds, from the new Journal end", async () => {
+    const root = await createCordisRoot();
+    const extensions = new PromptExtensionRegistry();
+    root.context.provide?.("actspace.host.prompt", { extensions });
+    let current = { header: { sessionId: "s", lineage: null }, journal: { lastSeq: 40, events: [] } };
+    root.context.provide?.("session.runtime", { getOpen: (id: string) => id === "s" ? current : undefined });
+    const service = new EnglishLearningService(root.context, fakeHost());
+    try {
+      await service.enableSession("s");
+      const before = service.getState().revision;
+      current = { header: { sessionId: "s", lineage: null }, journal: { lastSeq: 12, events: [] } };
+      await emitNotification(root.context, "session/event", { type: "session/rewound", seq: 12, data: {} }, { sessionId: "s" });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(service.getState()).toMatchObject({ enabled: true, targetSessionId: "s" });
+      expect(service.getState().revision).toBeGreaterThan(before);
+      expect(extensions.list("s", "run", "main")).toHaveLength(1);
+    } finally { await service.dispose(); await root.dispose(); }
+  });
   it("releases host subscriptions and playback with its owning Cordis effect", async () => {
     const root = await createCordisRoot();
     const host = fakeHost();

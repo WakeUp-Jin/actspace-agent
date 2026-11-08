@@ -28,6 +28,11 @@ export function subagentActivationStatusLabel(status: string): string {
   }
 }
 
+/** The body of an `<agent_message from=… relation=…>` inbox item; other text is returned as is. */
+export function agentMessageBody(content: string): string {
+  return /^\s*<agent_message\b[^>]*>\n?([\s\S]*?)\n?<\/agent_message>\s*$/.exec(content)?.[1] ?? content;
+}
+
 /** Panel status of one subagent: working, idle and continuable, or done for good. */
 export const SUBAGENT_LIST_STATUSES = ["running", "idle", "interrupted", "failed", "ended"] as const;
 export type SubagentListStatus = (typeof SUBAGENT_LIST_STATUSES)[number];

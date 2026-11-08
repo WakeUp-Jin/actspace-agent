@@ -56,6 +56,7 @@
 - [多供应商与 Host prepare](model-context/agent-multi-provider-llm.md)、[模型目录与使用费用](model-context/agent-model-catalog-and-usage-cost.md)、[token usage 与 Context 状态](model-context/agent-token-usage-and-context-state.md)。
 - [渐进式会话加载](agent-runtime/agent-progressive-session-loading.md)：会话浏览按需加载。
 - [会话记录 Markdown](agent-runtime/agent-session-transcript.md)：每个会话派生一份精简 `transcript.md`，Agent 据此读取历史会话，读取不弹审批。
+- [编辑提问重发](agent-runtime/agent-edit-resend-rewind.md)：从某一轮重来，日志截到它之前（旧日志存档），停掉在跑的后台任务和子 Agent。
 - [Skill 加载](tool-system/agent-skill-loading.md)、[Web 工具](tool-system/agent-web-tools.md)、[工具输出、文件引用与图片输入](tool-system/agent-tool-output-references.md)、[受控子进程](tool-system/agent-subprocess-runner-guidelines.md)、[图片检查工具](tool-system/agent-image-inspection-tool.md)、[图片生成工具](tool-system/agent-image-generation-tool.md)、[工具预览契约](tool-system/agent-tool-preview-design-guidelines.md)。
 
 ## Browser Use

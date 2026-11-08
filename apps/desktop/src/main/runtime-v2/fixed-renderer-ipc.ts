@@ -43,6 +43,7 @@ import {
   type RuntimeV2SessionSnapshot,
   type RuntimeV2DesktopSessionProjection,
   type TaskSubmissionResult,
+  rewindErrorMessage,
 } from "@actspace/shared/runtime-v2";
 import type { AppDataRoots } from "../app-paths";
 import { createIpcRegistrar, type IpcRegistrar } from "../ipc/registry";
@@ -273,6 +274,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       if (existing) {
         const content = existing.content as import("@actspace/shared/runtime-v2").TaskContentEnvelope;
         if (content?.kind !== "composer-task" || !isDeepStrictEqual(content.original, JSON.parse(JSON.stringify(original)))) throw new Error("SUBMISSION_CONFLICT");
+        // A retry after a rewind that lost its reply lands here too: the task exists, so nothing rewinds again.
         return options.registry.submitTask(input.sessionId, input.submissionId, existing.content);
       }
       const references = await validateRunReferences(options.registry, input);
@@ -295,7 +297,16 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
         } };
       }
       // Once admission is attempted a missing reply is uncertain; never delete imported content needed by a durable Task.
-      return options.registry.submitTask(input.sessionId, input.submissionId, { kind: "composer-task", original: JSON.parse(JSON.stringify(original)), prepared: prepared.content });
+      const content = { kind: "composer-task", original: JSON.parse(JSON.stringify(original)), prepared: prepared.content } as const;
+      if (!input.rewind) return options.registry.submitTask(input.sessionId, input.submissionId, content, ...(input.agentRunId ? [input.agentRunId] : []));
+      try { return await options.registry.rewindAndSubmit(input.sessionId, input.rewind, input.submissionId, content, input.agentRunId); }
+      catch (error) {
+        // A refused rewind changed nothing; the client keeps the editor open with this message.
+        const message = rewindErrorMessage(error);
+        if (message === undefined) throw error;
+        await options.registry.rollbackImportedAttachments(input.sessionId, prepared.importedArtifactIds).catch(() => undefined);
+        return { status: "submission-failed", acknowledgement: "rejected", message };
+      }
     });
     submissions.set(key, attempt);
     try { return await attempt; } finally { if (submissions.get(key) === attempt) submissions.delete(key); }
@@ -684,7 +695,12 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
       if (status !== "running") rememberFinished(settledChildTokens, key, tokens);
       childTokens.set(agentId, tokens);
     }));
-    return items.map(item => childTokens.has(item.agentId) ? { ...item, totalTokens: childTokens.get(item.agentId)! } : item);
+    // 运行中的通用 / 探索 / Fork 带上此刻在做什么（列表第二行）；外部子智能体没有实时事件。
+    return items.map(item => {
+      const activity = item.status === "running" && (item.kind === "local" || item.kind === "fork") ? options.registry.subagentActivity(item.agentId) : undefined;
+      const tokens = childTokens.get(item.agentId);
+      return tokens === undefined && !activity ? item : { ...item, ...(tokens === undefined ? {} : { totalTokens: tokens }), ...(activity ? { activity } : {}) };
+    });
   });
   ipc.handle(contract.sessions.interruptSubagent, async (input) => options.registry.interruptSubagent(input.sessionId, input.agentId));
   ipc.handle(contract.sessions.revealSubagentRecord, async (input) => {
@@ -761,9 +777,12 @@ async function toRunContent(
   if (attachments.length === 0) return { content: blocks, importedArtifactIds: [] };
   const snapshot = await registry.inspectSession(sessionId);
   const usableAttachments = attachments.filter((attachment) => Boolean(attachment.path));
+  // An edited prompt resends attachments the Session already stores; they are reused, never imported again or rolled back.
+  const reuse = (chat: boolean) => Promise.all(attachments.filter((attachment) => !attachment.path && attachment.artifactId).map((attachment) => registry.reuseAttachment(sessionId, attachment.artifactId!, attachment.name, chat)));
   if (snapshot.agentMode === "chat") {
+    const reused = await reuse(true);
     const imported = await registry.importChatAttachments(sessionId, usableAttachments.map((attachment) => attachment.path!));
-    for (const attachment of imported) {
+    for (const attachment of [...reused, ...imported]) {
       blocks.push({
         type: "artifact",
         artifact: { artifactId: attachment.artifactId, mediaType: attachment.mimeType },
@@ -777,9 +796,10 @@ async function toRunContent(
   const importedArtifactIds: string[] = [];
   try {
     for (const attachment of attachments) {
-      if (!attachment.path) continue;
-      const imported = await registry.importAttachment(sessionId, attachment.path);
-      importedArtifactIds.push(imported.artifactId);
+      const imported = attachment.path ? await registry.importAttachment(sessionId, attachment.path)
+        : attachment.artifactId ? await registry.reuseAttachment(sessionId, attachment.artifactId, attachment.name, false) : undefined;
+      if (!imported) continue;
+      if (attachment.path) importedArtifactIds.push(imported.artifactId);
       if (attachment.kind === "image") {
         blocks.push({ type: "artifact", artifact: { artifactId: imported.artifactId, mediaType: imported.mimeType }, label: imported.name });
       } else {

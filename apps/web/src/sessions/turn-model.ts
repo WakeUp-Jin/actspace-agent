@@ -30,6 +30,11 @@ export function buildTurns(items: readonly TranscriptItem[]): Turn[] {
       raw.push(current);
       continue;
     }
+    // 子智能体完成通知不显示（派发卡片已经变成完成）：轮内读到的跳过；唤醒空闲会话的只断开上一轮。
+    if (item.type === "block" && item.block.kind === "background_notice" && item.block.taskKind === "subagent") {
+      if (!current || item.block.opensTurn !== false) current = null;
+      continue;
+    }
     // 轮内读到的通知留在这一轮里它被读到的位置；唤醒空闲会话的通知单独成一段。
     if (current && item.type === "block" && item.block.kind === "background_notice" && item.block.opensTurn === false) {
       current.items.push(item);

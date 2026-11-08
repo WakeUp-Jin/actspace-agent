@@ -3,7 +3,7 @@ import type { MessageBlock, SessionRecord } from "@actspace/shared";
 import type { LiveRunStore } from "./live-runs/live-run-store";
 import { useLiveRunView } from "./live-runs/live-run-store";
 import { useSessionLocalState, type SessionLocalStore } from "./session-local-store";
-import { selectCompactionFailure, useMergedMessages } from "./use-session-transcript";
+import { selectCompactionFailure, selectRewindFromSeq, useMergedMessages } from "./use-session-transcript";
 
 // 主会话的消息序列：流式输出时每帧都在变，所以不放在 App 的状态里，也不放进 React context 值。
 // 它是一个小 store：TranscriptProvider 每帧重算 messages 并写进去，消费者用 selector 订阅——
@@ -78,7 +78,8 @@ export function SessionTranscriptProvider({
   const store = storeRef.current;
   const live = useLiveRunView(liveRuns, sessionId);
   const compactionFailure = useSessionLocalState(localStore, sessionId, selectCompactionFailure);
-  const messages = useMergedMessages(sessionRecord, live, compactionFailure);
+  const rewindFromSeq = useSessionLocalState(localStore, sessionId, selectRewindFromSeq);
+  const messages = useMergedMessages(sessionRecord, live, compactionFailure, rewindFromSeq);
   store.setSilently(messages);
   useLayoutEffect(() => { store.notify(); });
   return <TranscriptContext.Provider value={store}>{children}</TranscriptContext.Provider>;
