@@ -19,6 +19,7 @@
 - **`release.yml` 重写**：`push` 到 `v*` tag、`workflow_dispatch`（可选 `tag`）、改到打包脚本的 `pull_request` 三种触发。`package` job 四平台矩阵（`macos-latest` arm64、`macos-15-intel` x64、`ubuntu-latest` x64、`windows-latest` x64），统一 `shell: bash`；第一步校验 tag 等于 `v` + `apps/desktop/package.json` 版本；`actions/setup-go` 按 `go.mod` 装 Go；非 PR 时生成 artifact attestation 并上传完整产物（tag 时保留 1 天），PR 只上传各平台 manifest。`release` job 下载全部产物、`anchore/sbom-action` 出 SBOM、把四份 manifest 合成 `release-manifest.json`，`softprops/action-gh-release` 创建**草稿** Release。
 - **`release-package.sh` Windows 分支**：`uname -s` 的 `MINGW*/MSYS*/CYGWIN*` 映射为 `windows`；复制 Electron runtime，`electron.exe` 改名 `ActSpace.exe`，应用放 `resources/app`；用 `7z` 打 zip，缺 7z 时退回 PowerShell `Compress-Archive`；manifest 改名 `release-manifest-<platform>-<arch>.json`，四个平台不再互相覆盖。
 - **`package-browser-components.mjs`**：输出目录「必须在 dist 下」的检查改用 `path.relative`（原先按 `/` 前缀匹配在 Windows 上必失败）；manifest 文件键统一 `/` 分隔符，让 `verify-browser-components.mjs` 要求的 `bin/abb` 在 Windows 上也能匹配。
+- **浏览器桥 CLI 的 Windows 编译**：PR 首轮四平台 dry-run 里 Windows 在 `go build` 失败（`syscall.Stat_t` Unix-only）；`ownedByCurrentUser` 拆成 `_unix.go` / `_windows.go`，并在 `ci.yml` 的 `browser-bridge` job 加交叉编译步骤。
 - **文档**：`docs/CICD.md` 新增「桌面发布」节（怎么发版本、产物清单、runner 选择），工作流表更新；exec plan P4 勾掉并补四条决策；tech-debt 表把「release.yml 没装 Go」标完成，新增 Windows 图标 / 签名、Windows 未实机运行、artifact 中转三条；exec-runs 过程与摘要补 P4 步骤和人工验证项。
 
 ### 🧠 Design Intent (Why)
@@ -30,3 +31,5 @@ Agent 这边 `gh` 只读、不能手动 `workflow_dispatch`，要在合并前验
 - `.github/workflows/release.yml`
 - `scripts/release-package.sh`、`scripts/package-browser-components.mjs`
 - `docs/CICD.md`、`docs/exec-plans/active/20261108-ci-pipelines.md`、`docs/exec-plans/tech-debt-tracker.md`、`docs/exec-runs/20261108-ci-pipelines/execution-process.md`、`docs/exec-runs/20261108-ci-pipelines/execution-summary.md`
+- `browser-bridge/apps/cli/instance_registry.go`、`instance_registry_unix.go`（新）、`instance_registry_windows.go`（新）：`ownedByCurrentUser` 按构建标签拆分，Windows 恒为 `false`，让 CLI 在 Windows 上可编译
+- `.github/workflows/ci.yml`：`browser-bridge` job 加 Windows / macOS 交叉编译步骤

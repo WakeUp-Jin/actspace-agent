@@ -74,7 +74,8 @@
 - **操作**：`release-package.sh` 把 `uname -s` 的 `MINGW*/MSYS*/CYGWIN*` 映射为 `windows`；新增 `windows)` 分支（复制 Electron runtime、`electron.exe` → `ActSpace.exe`、应用放 `resources/app`）；Windows 产物用 `7z` 打 zip，没有 7z 时退回 PowerShell `Compress-Archive`；manifest 改名 `release-manifest-<platform>-<arch>.json` 以便四个平台不互相覆盖。
 - **操作**：`package-browser-components.mjs` 的「必须在 dist 下」检查改用 `path.relative`，manifest 文件键统一 `/` 分隔符，否则 Windows 上 `verify-browser-components.mjs` 要求的 `bin/abb` 键匹配不上。
 - **影响文件**：`.github/workflows/release.yml`、`scripts/release-package.sh`、`scripts/package-browser-components.mjs`、`docs/CICD.md`、计划、技术债表。
-- **验证**：`actionlint` 与 `check-action-pinning.sh` 通过；Linux 本机 `GOTOOLCHAIN=go1.26.10 ./scripts/release-package.sh` 生成 `actspace-desktop-linux-x64.tar.gz` 与 `release-manifest-linux-x64.json`；macOS / Windows 分支靠 PR 上的四平台 dry-run 验证，结果补记在 PR。
+- **验证**：`actionlint` 与 `check-action-pinning.sh` 通过；Linux 本机 `GOTOOLCHAIN=go1.26.10 ./scripts/release-package.sh` 生成 `actspace-desktop-linux-x64.tar.gz` 与 `release-manifest-linux-x64.json`；macOS / Windows 分支靠 PR 上的四平台 dry-run 验证。
+- **操作**：PR 首轮 dry-run：darwin-arm64、linux-x64 通过；windows-x64 在 `go build` 浏览器桥 CLI 时失败——`instance_registry.go` 用 `syscall.Stat_t` 判断文件属主，Windows 没有这个类型。拆成 `instance_registry_unix.go` / `instance_registry_windows.go`（Windows 实现恒为 `false`，只保证能编译），并在 `ci.yml` 的 `browser-bridge` job 加 Windows / macOS 交叉编译步骤，让这类问题在 CI 快检里就暴露。
 
 ## 遇到的问题
 

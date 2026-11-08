@@ -170,3 +170,11 @@ jobs:
       - name: Browser Bridge Go tests
         working-directory: browser-bridge
         run: go test ./packages/protocol/... ./apps/cli/...
+
+      # release.yml 会在 macOS / Windows runner 上 go build 这个 CLI；这里提前交叉编译，
+      # 省得 Unix-only 的 syscall 用法要等到发布流水线才暴露。
+      - name: Browser Bridge cross-compile
+        working-directory: browser-bridge/apps/cli
+        run: |
+          GOOS=windows GOARCH=amd64 go build -o /dev/null .
+          GOOS=darwin GOARCH=arm64 go build -o /dev/null .

@@ -15,7 +15,7 @@
 
 | 工作流 | 触发 | 内容 |
 |---|---|---|
-| `ci.yml` | `pull_request`（忽略纯文档路径）、`push: main`、手动 | 五个并行 job：`repository-checks`（`scripts/ci.sh` + markdownlint）、`typecheck-test`（contract matrix、Biome lint、typecheck、`pnpm test`）、`build`（`pnpm build`；`main` 上额外跑一次 Linux `release-package.sh` 冒烟，不上传产物）、`site`（check / test / build）、`browser-bridge`（契约检查 + Go 测试）。 |
+| `ci.yml` | `pull_request`（忽略纯文档路径）、`push: main`、手动 | 五个并行 job：`repository-checks`（`scripts/ci.sh` + markdownlint）、`typecheck-test`（contract matrix、Biome lint、typecheck、`pnpm test`）、`build`（`pnpm build`；`main` 上额外跑一次 Linux `release-package.sh` 冒烟，不上传产物）、`site`（check / test / build）、`browser-bridge`（契约检查 + Go 测试 + Windows / macOS 交叉编译，保证发布矩阵能 `go build`）。 |
 | `docs.yml` | `pull_request` 且只改 `docs/**`、`*.md` 等文档路径 | `scripts/ci.sh` + markdownlint，与 `ci.yml` 的 `paths-ignore` 互补。 |
 | `agent-cli-binaries.yml` | `pull_request` 改到 CLI / packages / 打包脚本时、手动 | 在 CLI 支持的最低 Node 大版本上构建并校验 managed package，artifact 保留 3 天。 |
 | `supply-chain-security.yml` | `pull_request` 改到依赖清单 / lockfile / patches 时、每周一定时、手动 | 依赖变更审查（仅 PR）、OSV 扫描。 |
