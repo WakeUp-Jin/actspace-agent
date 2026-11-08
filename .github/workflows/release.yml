@@ -40,6 +40,8 @@ jobs:
   package:
     name: 打包（${{ matrix.platform }}-${{ matrix.arch }}）
     runs-on: ${{ matrix.runner }}
+    # 正常 10–15 分钟；超时多半是某一步卡住，别让它占满 6 小时。
+    timeout-minutes: 45
     permissions:
       contents: read
       attestations: write
@@ -149,6 +151,7 @@ jobs:
     needs: package
     if: github.event_name != 'pull_request' && (github.event_name == 'push' || inputs.tag != '')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:

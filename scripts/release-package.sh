@@ -29,6 +29,11 @@ is_truthy() {
   esac
 }
 
+# Timestamped phase markers so a slow or stuck CI run shows which phase it is in.
+phase() {
+  echo "[release-package $(date -u +%H:%M:%S)] $*" >&2
+}
+
 require_env() {
   local name="$1"
   if [[ -z "${!name:-}" ]]; then
@@ -82,14 +87,18 @@ git_sha="${GITHUB_SHA:-$(git -C "${repo_root}" rev-parse HEAD 2>/dev/null || ech
 rm -rf "${dist_dir}"
 mkdir -p "${artifact_root}"
 
+phase "build desktop"
 pnpm --filter @actspace/desktop build
+phase "deploy production dependencies"
 if ! pnpm --filter @actspace/desktop --prod deploy --legacy --offline "${deploy_dir}"; then
   echo "Offline deploy failed; retrying with registry access so local packaging can hydrate the pnpm store." >&2
   rm -rf "${deploy_dir}"
   pnpm --filter @actspace/desktop --prod deploy --legacy "${deploy_dir}"
 fi
 
+phase "check provider proxy package"
 node "${repo_root}/scripts/check-provider-proxy-package.mjs" "${deploy_dir}"
+phase "build browser components"
 node "${repo_root}/scripts/package-browser-components.mjs" "${deploy_dir}/browser-components"
 # The tool sandbox only uses this bundled nono (never one on PATH); without it macOS falls back to Seatbelt and
 # Linux bash needs approval, so a missing or unverified binary fails the package.
@@ -98,6 +107,7 @@ if [[ "${platform}" == "darwin" || "${platform}" == "linux" ]]; then
   node "${repo_root}/scripts/sandbox/fetch-nono.mjs" --out "${deploy_dir}/${nono_relative}"
 fi
 
+phase "prune deploy dir"
 find "${deploy_dir}" -type d -name test -prune -exec rm -rf {} +
 find "${deploy_dir}" \( -name "*.map" -o -name "*.d.ts" -o -name "*.d.mts" \) -type f -delete
 if [[ ! -d "${electron_runtime_dir}" ]]; then
@@ -106,6 +116,7 @@ if [[ ! -d "${electron_runtime_dir}" ]]; then
   exit 1
 fi
 
+phase "assemble ${platform} application"
 case "${platform}" in
   darwin)
     runtime_app="${electron_runtime_dir}/Electron.app"
@@ -186,7 +197,18 @@ case "${platform}" in
     mkdir -p "${dmg_root}"
     cp -R "${packaged_app}" "${dmg_root}/${app_bundle_name}"
     ln -s /Applications "${dmg_root}/Applications"
-    hdiutil create -volname "${app_name}" -srcfolder "${dmg_root}" -ov -format UDZO "${dmg_path}"
+    # GitHub 托管的 macOS runner 上 hdiutil 偶发 "Resource busy"（挂载点被 Spotlight / 杀毒扫描占住），
+    # 重试几次即可，见 electron-builder#6110 等同类问题。
+    dmg_attempt=1
+    until hdiutil create -volname "${app_name}" -srcfolder "${dmg_root}" -ov -format UDZO "${dmg_path}"; do
+      if (( dmg_attempt >= 5 )); then
+        echo "hdiutil create failed after ${dmg_attempt} attempts" >&2
+        exit 1
+      fi
+      dmg_attempt=$((dmg_attempt + 1))
+      echo "hdiutil create failed; retrying (${dmg_attempt}/5) in 5s" >&2
+      sleep 5
+    done
     rm -rf "${dmg_root}"
     dmg_manifest_value="\"${dmg_name}\""
     dmg_size_bytes="$(wc -c < "${dmg_path}" | tr -d '[:space:]')"
@@ -217,6 +239,7 @@ case "${platform}" in
     ;;
 esac
 
+phase "archive ${artifact_name}"
 if [[ "${artifact_extension}" == "zip" ]]; then
   if command -v 7z >/dev/null 2>&1; then
     (cd "${artifact_root}" && 7z a -tzip -r -bso0 -bsp0 "${artifact_path}" .)
@@ -227,6 +250,7 @@ else
   tar -czf "${artifact_path}" -C "${artifact_root}" .
 fi
 
+phase "write ${manifest_name}"
 artifact_size_bytes="$(wc -c < "${artifact_path}" | tr -d '[:space:]')"
 cat > "${dist_dir}/${manifest_name}" <<EOF
 {
