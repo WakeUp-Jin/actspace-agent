@@ -59,6 +59,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Install ripgrep
+        # tool-fs-search 的 grep / glob 直接调 rg，它的测试需要真实二进制；ubuntu-latest 不预装。
+        run: sudo apt-get install -y --no-install-recommends ripgrep
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
