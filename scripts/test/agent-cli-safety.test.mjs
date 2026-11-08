@@ -72,12 +72,18 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
       assert.equal(next.length, 1);
       assert.equal(next[0].result.status, "completed");
       assert.equal(next[0].result.sessionId, result.sessionId);
-      assert.equal(recoveredProvider.requests.length, 1, "resume must issue only the fresh task request");
+      // Reopening the session reconciles the task the killed process left running: it settles as `lost` and the
+      // model is told before it takes the fresh task (agent-background-tasks.md「重启」). The old command is never
+      // re-run; the two requests are the lost notice and the fresh task.
+      assert.equal(recoveredProvider.requests.length, 2, "resume must issue the lost-task notice and the fresh task request");
+      assert.match(recoveredProvider.requests[0].content, /<task_notification>[\s\S]*<status>lost<\/status>/, "the first resumed request must carry the lost-task notice");
+      assert.ok(recoveredProvider.requests[1].content.includes("fresh recovery task"), "the second resumed request must be the fresh human task");
       assert.ok(resumedInputSeen, "the resumed provider request must contain the fresh human task");
       assert.equal(await readFile(join(root, "starts.txt"), "utf8"), "start\n", "old background command was replayed");
       const after = (await readFile(journalPath, "utf8")).trim().split("\n").map(JSON.parse);
-      assert.equal(after.filter(event => event.type === "user/message").length, 2);
-      assert.deepEqual(after.filter(event => event.type === "plugin/actspace.agent-service/run" && event.data.op === "finish").map(event => event.data.outcome), ["cancelled", "completed"]);
+      assert.equal(after.filter(event => event.type === "user/message").length, 2, "the lost-task notice must not be written as a user message");
+      assert.deepEqual(after.filter(event => event.type === "plugin/actspace.agent-service/run" && event.data.op === "finish").map(event => event.data.outcome), ["cancelled", "completed", "completed"],
+        "resume runs the lost-task notice and the fresh task as two completed runs");
     } finally {
       for (const owned of [run, resumed]) if (owned?.child.exitCode === null && owned.child.signalCode === null) owned.child.kill("SIGKILL");
       for (const pid of pids) if (alive(pid)) process.kill(pid, "SIGKILL");
