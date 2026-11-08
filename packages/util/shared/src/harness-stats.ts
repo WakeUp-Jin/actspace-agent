@@ -1,16 +1,15 @@
 /**
  * Harness 统计的共享契约：设置页「Harness 统计」、Desktop 主进程汇总 Worker，
  * 以及第二期 Agent 查询工具共用同一套类型、规则阈值和分档。
- * 设计见 docs/design-docs/自进化的方案设计/11-Harness统计设计.md。
+ * 设计见 docs/design-docs/自进化的方案设计/11-Harness统计设计.md；页面口径见 docs/design-docs/frontend/front-统计页规范.md。
  *
  * 单位约定：名字以 Rate / Share 结尾的字段，以及上下文窗口占比（window.p50 / p95、triggerWindowP50）都是 0–1 的小数，
  * 没有样本时为 null；*Ms 是毫秒；*Tokens 是估算 token。
  */
 
-export const HARNESS_STATS_TABS = ["overview", "plugins", "tools", "context", "disclosure", "runtime", "versions"] as const;
-export type HarnessStatsTab = (typeof HARNESS_STATS_TABS)[number];
-/** 顶部指标卡与筛选选项也走按需查询，但不是 tab。 */
-export type HarnessStatsQueryKind = HarnessStatsTab | "summary" | "options";
+/** 页面按卡片需要并行取的几块数据。 */
+export const HARNESS_STATS_QUERY_KINDS = ["options", "overview", "usage-vs", "context", "disclosure", "plugins", "versions"] as const;
+export type HarnessStatsQueryKind = (typeof HARNESS_STATS_QUERY_KINDS)[number];
 
 export type HarnessStatsRange = "day" | "week" | "month" | "total";
 export type HarnessStatsSessionKind = "main" | "child" | "side" | "all";
@@ -23,7 +22,6 @@ export type HarnessStatsFilter = {
   readonly range: HarnessStatsRange;
   readonly mode?: string;
   readonly model?: string;
-  readonly workspaceRoot?: string;
   readonly sessionKind: HarnessStatsSessionKind;
   readonly revision?: HarnessRevisionKey;
 };
@@ -61,30 +59,19 @@ export type HarnessStatsQueryResult = {
 };
 
 export type HarnessStatsData =
-  | { readonly kind: "summary"; readonly value: HarnessStatsSummary }
   | { readonly kind: "options"; readonly value: HarnessStatsOptions }
   | { readonly kind: "overview"; readonly value: HarnessStatsOverview }
-  | { readonly kind: "plugins"; readonly value: HarnessStatsPlugins }
-  | { readonly kind: "tools"; readonly value: HarnessStatsTools }
+  | { readonly kind: "usage-vs"; readonly value: HarnessStatsUsageVs }
   | { readonly kind: "context"; readonly value: HarnessStatsContext }
   | { readonly kind: "disclosure"; readonly value: HarnessStatsDisclosure }
-  | { readonly kind: "runtime"; readonly value: HarnessStatsRuntime }
+  | { readonly kind: "plugins"; readonly value: HarnessStatsPlugins }
   | { readonly kind: "versions"; readonly value: HarnessStatsVersions };
 
 export type HarnessPluginSource = "builtin" | "user" | "evolved" | "unknown";
 
-export type HarnessStatsSummary = {
-  readonly plugins: { readonly loaded: number; readonly withTools: number; readonly evolved: number; readonly user: number };
-  readonly toolCalls: { readonly calls: number; readonly failureRate: number | null; readonly tools: number };
-  readonly context: { readonly avgEstimatedTokens: number | null; readonly toolsShare: number | null };
-  readonly compaction: { readonly count: number; readonly activeHitRate: number | null };
-  readonly requests: number;
-};
-
 export type HarnessStatsOptions = {
   readonly modes: readonly string[];
   readonly models: readonly string[];
-  readonly workspaces: readonly string[];
   readonly revisions: readonly HarnessRevisionInfo[];
   readonly currentRevision: HarnessRevisionKey | null;
 };
@@ -97,6 +84,7 @@ export type HarnessRevisionInfo = {
   /** 首次 / 最后一次出现在数据里的时间（ISO）。 */
   readonly firstSeenAt: string | null;
   readonly lastSeenAt: string | null;
+  /** 当前时间范围与筛选下的请求数。 */
   readonly requests: number;
 };
 
@@ -111,85 +99,58 @@ export type HarnessFlagRuleId =
   | "skill-never-read"
   | "compaction-reread"
   | "mis-sleep"
-  | "background-unread"
-  | "step-limit"
   | "context-churn";
+
+/** 点击后跳到哪张卡片（或底部明细），切到哪个 tab，定位哪一行。 */
+export type HarnessStatsTarget = {
+  readonly card: "usage-vs" | "sources" | "compaction" | "disclosure" | "runtime" | "detail";
+  readonly tab?: string;
+  readonly key?: string;
+};
 
 export type HarnessFlag = {
   readonly rule: HarnessFlagRuleId;
   readonly level: HarnessFlagLevel;
   readonly title: string;
   readonly detail: string;
-  /** 卡片右侧的分类说明，例如「工具 · 成本 vs 使用」。 */
+  /** 卡片右侧的分类说明，例如「占用 vs 使用」。 */
   readonly category: string;
-  /**
-   * 点击后跳到哪个 tab、定位哪一行。key 按 tab 取：tools → 工具名；plugins → pluginId；
-   * context → 上下文来源的 entry key 或 Skill id；没有 key 表示只跳 tab（例如合并后的多条同类提醒）。
-   */
-  readonly target: { readonly tab: HarnessStatsTab; readonly key?: string };
+  readonly target: HarnessStatsTarget;
 };
 
-export type HarnessDailyCount = { readonly day: string; readonly value: number };
 export type HarnessBucketAverage = { readonly bucket: string; readonly avgTokens: number };
+
+/** 一个版本（或全部数据）的指标卡与版本对比用数。比例是 0–1，没有样本为 null。 */
+export type HarnessRevisionMetrics = {
+  readonly requests: number;
+  readonly avgContextTokens: number | null;
+  /** 系统提示词 + 工具定义 + 规则 + Skills 目录的每次请求平均。 */
+  readonly fixedOverheadTokens: number | null;
+  readonly avgContextWindow: number | null;
+  readonly cacheBrokenRate: number | null;
+  /** 被打断的请求 / 其他请求的实际缓存命中率。 */
+  readonly cacheHitBroken: number | null;
+  readonly cacheHitOther: number | null;
+  readonly toolCalls: number;
+  readonly toolFailureRate: number | null;
+  readonly topFailedTool: { readonly name: string; readonly failed: number } | null;
+  readonly repeatRate: number | null;
+  readonly truncateRate: number | null;
+  readonly compactions: number;
+  readonly rereadRate: number | null;
+  readonly foldedTokens: number;
+  readonly activeHitRate: number | null;
+  /** 该版本加载的插件数（运行时统计）。 */
+  readonly plugins: number | null;
+};
 
 export type HarnessStatsOverview = {
   readonly flags: readonly HarnessFlag[];
-  readonly dailyToolCalls: readonly HarnessDailyCount[];
-  readonly buckets: readonly HarnessBucketAverage[];
-  readonly avgEstimatedTokens: number | null;
-  readonly harness: {
-    readonly currentRevision: HarnessRevisionKey | null;
-    readonly currentSince: string | null;
-    readonly plugins: number;
-    readonly toolPlugins: number;
-    readonly tools: number;
-    readonly statsFileBytes: number;
-    readonly statsWriteFailures: number;
-    readonly lastRebuildAt: string | null;
-  };
-};
-
-export type HarnessPluginRow = {
-  readonly pluginId: string;
-  readonly source: HarnessPluginSource;
-  readonly tools: number;
-  readonly toolCalls: number;
-  readonly toolFailures: number;
-  /** 这个插件的工具定义平均每次请求占多少 token。 */
-  readonly contextTokens: number | null;
-  readonly services: number;
-  readonly serviceCalls: number;
-  readonly listeners: number;
-  readonly listenerCalls: number;
-  readonly listenerErrors: number;
-  /** 这个插件写入会话日志的事件数（source.ownerPluginId）。 */
-  readonly journalEvents: number;
-  readonly loads: number;
-  readonly loadFailures: number;
-  readonly loadP50Ms: number | null;
-  readonly lastLoadError: string | null;
-};
-export type HarnessServiceRow = {
-  readonly providerPluginId: string | null;
-  readonly service: string;
-  readonly method: string;
-  readonly calls: number;
-  readonly errors: number;
-  readonly avgMs: number | null;
-  readonly p95Ms: number | null;
-};
-export type HarnessDependencyRow = { readonly caller: string; readonly callee: string; readonly service: string; readonly calls: number };
-export type HarnessListenerRow = { readonly pluginId: string; readonly event: string; readonly calls: number; readonly errors: number; readonly avgMs: number | null };
-
-export type HarnessStatsPlugins = {
-  readonly rows: readonly HarnessPluginRow[];
-  readonly services: readonly HarnessServiceRow[];
-  readonly dependencies: readonly HarnessDependencyRow[];
-  readonly listeners: readonly HarnessListenerRow[];
-  /** 选了模式、模型、工作区或会话类型时为 true：服务、监听、加载只按时间和版本统计。 */
-  readonly runtimeFilterLimited: boolean;
-  /** 统计文件里还没有任何运行时数据（例如统计刚开启或被关闭）。 */
-  readonly runtimeEmpty: boolean;
+  /** 指标卡看的版本：筛选选中的版本，未选时是有数据的最新版本。 */
+  readonly current: HarnessRevisionKey | null;
+  readonly previous: HarnessRevisionKey | null;
+  readonly metrics: HarnessRevisionMetrics | null;
+  readonly previousMetrics: HarnessRevisionMetrics | null;
 };
 
 export type HarnessToolRow = {
@@ -198,90 +159,82 @@ export type HarnessToolRow = {
   /** 出现在多少次模型请求里。 */
   readonly exposures: number;
   readonly calls: number;
-  readonly completed: number;
   readonly failed: number;
-  readonly denied: number;
-  readonly aborted: number;
-  readonly unknownOutcome: number;
   readonly failureCodes: readonly { readonly code: string; readonly count: number }[];
   /** 工具定义平均 token。 */
   readonly schemaTokens: number | null;
-  readonly outputTokensAvg: number | null;
-  readonly outputTokensP95: number | null;
-  readonly durationP50Ms: number | null;
-  readonly durationP95Ms: number | null;
   readonly truncated: number;
-  readonly repeatedSameArgs: number;
-  readonly retryAfterFailure: number;
-  readonly foldedOutputs: number;
-  readonly foldedTokens: number;
-  readonly lastUsedAt: string | null;
+  readonly repeated: number;
 };
-
-export type HarnessStatsTools = {
-  readonly rows: readonly HarnessToolRow[];
-  readonly approvals: {
-    readonly asked: number;
-    readonly userApproved: number;
-    readonly userDenied: number;
-    readonly timedOut: number;
-    readonly autoApproved: number;
-    readonly autoDeclined: number;
-    readonly sessionGrantUsed: number;
-    readonly scopeDenied: number;
-    readonly avgWaitMs: number | null;
-  };
-  readonly bash: { readonly sandboxed: number; readonly unsandboxed: number; readonly unknownEnvironment: number; readonly escalations: number; readonly foreground: number; readonly background: number };
-  readonly waste: { readonly repeatedSameArgs: number; readonly retryAfterFailure: number; readonly truncated: number; readonly foldedOutputs: number; readonly foldedTokens: number };
-};
-
-export type HarnessSourceRow = {
-  readonly key: string;
-  readonly kind: "tools" | "skills" | "section" | "supplement" | "model-facts" | "other";
-  readonly owner: string | null;
-  readonly id: string;
-  readonly appearances: number;
-  readonly avgTokens: number;
-  readonly maxTokens: number;
-  /** 与同一会话上一次请求相比内容（token 数）变了的比例。 */
-  readonly changeRate: number | null;
+export type HarnessUsagePluginRow = {
+  readonly pluginId: string;
+  readonly source: HarnessPluginSource;
+  readonly tools: readonly string[];
+  readonly calls: number;
+  readonly failed: number;
+  /** 这个插件的工具定义平均每次请求合计多少 token。 */
+  readonly schemaTokens: number | null;
+  /** 插件工具里最多的一次曝光数（≈ 带着这个插件的请求数）。 */
+  readonly exposures: number;
 };
 export type HarnessSkillRow = {
   readonly id: string;
   readonly source: string | null;
+  /** 出现在多少次请求的 Skills 目录里。 */
   readonly listed: number;
-  readonly selected: number;
+  /** 目录里这一条的平均 token。 */
+  readonly catalogTokens: number | null;
   readonly skillReads: number;
   readonly assetReads: number;
   readonly lastReadAt: string | null;
 };
 
+export type HarnessStatsUsageVs = {
+  readonly requests: number;
+  readonly tools: readonly HarnessToolRow[];
+  readonly plugins: readonly HarnessUsagePluginRow[];
+  readonly skills: readonly HarnessSkillRow[];
+};
+
+export type HarnessSourceRow = {
+  readonly key: string;
+  readonly kind: "tools" | "skills" | "section" | "supplement" | "model-facts" | "other";
+  /** 上下文 6 类之一（systemPrompt / tools / rules / skills / summarizedConversation / conversation）。 */
+  readonly bucket: string;
+  readonly owner: string | null;
+  readonly id: string;
+  readonly appearances: number;
+  readonly avgTokens: number;
+  /** 与同一会话上一次请求相比内容（token 数）变了的比例。 */
+  readonly changeRate: number | null;
+};
+
 export type HarnessStatsContext = {
   readonly requests: number;
-  readonly incompleteRequests: number;
   readonly buckets: readonly HarnessBucketAverage[];
   readonly avgEstimatedTokens: number | null;
-  readonly window: { readonly p50: number | null; readonly p95: number | null; readonly overThreshold: number };
-  readonly estimate: { readonly deltaRate: number | null; readonly worstModel: string | null; readonly worstDeltaRate: number | null; readonly samples: number };
-  readonly cache: { readonly hitRate: number | null; readonly systemChanges: number; readonly runtimeChanges: number };
   readonly sources: readonly HarnessSourceRow[];
-  readonly skills: readonly HarnessSkillRow[];
-  readonly skillsCatalogTokens: number | null;
+};
+
+export type HarnessCompactionRecord = {
+  readonly id: string;
+  readonly time: string | null;
+  readonly trigger: string;
+  readonly ok: boolean;
+  readonly failureCode: string | null;
+  readonly beforeTokens: number | null;
+  readonly afterTokens: number | null;
+  readonly durationMs: number | null;
+  readonly rereads: number;
 };
 
 export type HarnessStatsDisclosure = {
   readonly cycles: number;
   readonly activeHitRate: number | null;
-  readonly sleepingReads: number;
-  readonly wakeShare: number | null;
-  readonly avgSleepCycles: number | null;
   readonly misSleepRate: number | null;
-  readonly sleepingPaths: number;
-  readonly indexTokensAvg: number | null;
-  readonly indexReads: number;
-  readonly indexConversions: number;
+  readonly indexConversionRate: number | null;
   readonly capHits: number;
-  /** 11 档：0–9、10–19 … 90–99、100。 */
+  /** 11 档：0–9、10–19 … 90–99、100 条活跃路径。 */
   readonly activeHistogram: readonly number[];
   /** 6 档：睡 1、2、3、4、5、6+ 个周期后被唤醒。 */
   readonly sleepHistogram: readonly number[];
@@ -296,51 +249,49 @@ export type HarnessStatsDisclosure = {
     readonly avgDurationMs: number | null;
     readonly rereadRate: number | null;
     readonly triggerWindowP50: number | null;
-    /** 9 档：<10、10–19 … 70–79、80+ 步。 */
-    readonly stepsBetweenHistogram: readonly number[];
+    readonly avgStepsBetween: number | null;
     readonly foldedOutputs: number;
     readonly foldedTokens: number;
-    readonly failureReasons: readonly { readonly code: string; readonly count: number }[];
   };
+  /** 时间倒序，最多 200 条。 */
+  readonly records: readonly HarnessCompactionRecord[];
 };
 
-export type HarnessStatsRuntime = {
-  readonly turns: number;
-  readonly avgSteps: number | null;
-  readonly stepLimitHits: number;
-  /** 11 档：1、2–3、4–5、6–8、9–12、13–16、17–24、25–32、33–48、49–64、65+。 */
-  readonly stepsHistogram: readonly number[];
-  readonly endReasons: { readonly completed: number; readonly aborted: number; readonly failed: number; readonly stepLimit: number; readonly other: number };
-  readonly retries: { readonly total: number; readonly byCode: readonly { readonly code: string; readonly count: number }[] };
-  readonly interventions: { readonly aborted: number; readonly steering: number; readonly queued: number };
-  /** 子智能体：新会话每次激活一行（`subagent/activation`，presetId 为 `actspace.subagent.<preset>`），老会话每次委托一行（`delegation/*`）。 */
-  readonly delegations: { readonly byPreset: readonly { readonly presetId: string; readonly count: number; readonly avgDurationMs: number | null }[]; readonly failed: number; readonly avgSteps: number | null; readonly avgDurationMs: number | null; readonly avgReturnTokens: number | null };
-  readonly background: { readonly byKind: readonly { readonly kind: string; readonly count: number }[]; readonly completed: number; readonly failed: number; readonly stopped: number; readonly avgDurationMs: number | null; readonly unread: number };
-  readonly sideChats: { readonly sessions: number; readonly avgTurns: number | null };
-  readonly modeSwitches: number;
-  readonly modeShare: readonly { readonly mode: string; readonly requests: number }[];
-  readonly auxiliary: readonly { readonly purpose: string; readonly calls: number; readonly failed: number; readonly avgMs: number | null }[];
+export type HarnessServiceRow = {
+  readonly providerPluginId: string | null;
+  readonly service: string;
+  readonly method: string;
+  readonly calls: number;
+  readonly errors: number;
+  readonly p95Ms: number | null;
+};
+export type HarnessListenerRow = { readonly pluginId: string; readonly event: string; readonly calls: number; readonly errors: number };
+export type HarnessPluginRow = {
+  readonly pluginId: string;
+  readonly source: HarnessPluginSource;
+  readonly tools: number;
+  readonly toolCalls: number;
+  readonly contextTokens: number | null;
+  readonly loads: number;
+  readonly loadFailures: number;
+  readonly lastLoadError: string | null;
 };
 
-export type HarnessCompareFormat = "count" | "rate" | "tokens" | "number" | "ms";
-export type HarnessCompareRow = {
-  readonly id: string;
-  readonly label: string;
-  readonly from: number | null;
-  readonly to: number | null;
-  readonly better: "lower" | "higher";
-  readonly format: HarnessCompareFormat;
+export type HarnessStatsPlugins = {
+  readonly rows: readonly HarnessPluginRow[];
+  readonly services: readonly HarnessServiceRow[];
+  readonly listeners: readonly HarnessListenerRow[];
+  readonly loadP50Ms: number | null;
+  /** 统计文件里还没有任何运行时数据（例如统计刚开启）。 */
+  readonly runtimeEmpty: boolean;
 };
 
 export type HarnessStatsVersions = {
   readonly revisions: readonly HarnessRevisionInfo[];
   readonly from: HarnessRevisionKey | null;
   readonly to: HarnessRevisionKey | null;
-  readonly compare: readonly HarnessCompareRow[];
-  /** 对比的任一版本样本少于 HARNESS_COMPARE_MIN_REQUESTS 时为 true。 */
-  readonly lowSample: boolean;
-  readonly evolutionOps: readonly { readonly action: string; readonly count: number; readonly failed: number }[];
-  readonly evolvedPlugins: readonly { readonly pluginId: string; readonly calls: number; readonly failures: number; readonly sessions: number }[];
+  readonly fromMetrics: HarnessRevisionMetrics | null;
+  readonly toMetrics: HarnessRevisionMetrics | null;
 };
 
 /* ---------------------------- 分档与规则 ---------------------------- */
@@ -386,8 +337,6 @@ export const HARNESS_FLAG_RULES = {
   skillNeverRead: { minListed: 200 },
   compactionReread: { minRate: 0.2, minCompactions: 10 },
   misSleep: { minRate: 0.1, minSleepingPaths: 50 },
-  backgroundUnread: { minUnread: 1 },
-  stepLimit: { minRate: 0.02, minTurns: 50 },
   contextChurn: { minChangeRate: 0.2, minAppearances: 200 },
 } as const;
 
@@ -408,12 +357,12 @@ export type HarnessRuntimeStatLine = {
   /** 小时起点 ISO，例如 2026-11-01T09:00:00.000Z。 */
   readonly hour: string;
   readonly revision: HarnessRevisionKey;
-  readonly kind: "service" | "listener" | "dependency";
-  /** service / listener：插件 entry id（调用方或监听方）；dependency：调用方。 */
+  readonly kind: "service" | "listener";
+  /** 插件 entry id（调用方或监听方）。旧文件里的 `dependency` 行读取时忽略。 */
   readonly plugin: string;
-  /** service：服务名；listener：事件名；dependency：被调用方插件。 */
+  /** service：服务名；listener：事件名。 */
   readonly name: string;
-  /** service：方法名；dependency：服务名；listener：空串。 */
+  /** service：方法名；listener：空串。 */
   readonly method: string;
   /** service：提供该服务的插件；其他为 null。 */
   readonly provider: string | null;
@@ -447,9 +396,8 @@ export type HarnessToolOwnerLine = {
   readonly toolPluginId: string | null;
   readonly tool: string;
 };
-/** writeFailures 是增量：自上一条 health 行以来新增的写入失败次数，读取方直接累加。 */
-export type HarnessHealthLine = { readonly v: 1; readonly t: "health"; readonly at: string; readonly writeFailures: number };
-export type HarnessStatsFileLine = HarnessRuntimeStatLine | HarnessInventoryLine | HarnessToolOwnerLine | HarnessHealthLine;
+/** 旧文件里还有 `health` / `dependency` 行，读取时忽略。 */
+export type HarnessStatsFileLine = HarnessRuntimeStatLine | HarnessInventoryLine | HarnessToolOwnerLine;
 
 export function harnessRevisionKey(harnessId: string | null | undefined, revision: number | null | undefined): HarnessRevisionKey {
   return typeof harnessId === "string" && harnessId && typeof revision === "number" && Number.isFinite(revision) ? `${harnessId}@${revision}` : HARNESS_UNKNOWN_REVISION;

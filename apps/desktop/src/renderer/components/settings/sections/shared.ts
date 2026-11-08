@@ -1,4 +1,5 @@
-import type { AppSettings, SecretProviderId, SetProviderKeyResult, SettingsV4NamespacePatch, SettingsV4Snapshot, SettingsUpdateInput, UsageStatisticsSnapshot, UsageActivitySnapshot, WorkspaceEntry } from "@actspace/shared";
+import type { AppSettings, SecretProviderId, SetProviderKeyResult, SettingsV4NamespacePatch, SettingsV4Snapshot, SettingsUpdateInput, UsageActivitySnapshot, WorkspaceEntry } from "@actspace/shared";
+import type { UsageQuery } from "../../usage/usage-query";
 import type { SettingsSectionId } from "../SettingsNav";
 
 export type SectionProps = {
@@ -11,14 +12,12 @@ export type SectionProps = {
   onArchivedSessionsChange?: () => void;
   onRefresh: () => Promise<void>;
   onReplaceSettings: (settings: AppSettings) => void;
-  usageSnapshot?: UsageStatisticsSnapshot | null;
   usageActivitySnapshot?: UsageActivitySnapshot | null;
   usageProgress?: import("@actspace/shared").UsageQueryProgress | null;
   onUsageCancel?: () => void;
   usageLoading?: boolean;
   usageError?: string | null;
-  onUsageRefresh?: (range: UsageStatisticsSnapshot["range"], requestRowsPage?: number, status?: SettingsV4Snapshot["settings"]["activity"]["usage"]["status"], search?: string, kind?: import("@actspace/shared").UsageActivityKind) => void;
-  onUsageRequestPageChange?: (page: number, range: UsageStatisticsSnapshot["range"], status?: SettingsV4Snapshot["settings"]["activity"]["usage"]["status"], search?: string, kind?: import("@actspace/shared").UsageActivityKind) => void;
+  onUsageQuery?: (query: UsageQuery) => void;
   workspaces?: WorkspaceEntry[];
   settingsV4?: SettingsV4Snapshot | null;
   onUpdateNamespace: (input: SettingsV4NamespacePatch) => Promise<SettingsV4Snapshot | null>;

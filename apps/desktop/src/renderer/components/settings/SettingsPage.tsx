@@ -4,7 +4,6 @@ import type {
   SecretProviderId,
   SettingsV4Snapshot,
   UsageActivitySnapshot,
-  UsageStatisticsSnapshot,
   WorkspaceEntry,
 } from "@actspace/shared";
 import { SettingsNav, type SettingsSectionId } from "./SettingsNav";
@@ -31,8 +30,8 @@ import { SubagentSection } from "./sections/SubagentSection";
 import { TaskModelDefaultsSection } from "./sections/TaskModelDefaultsSection";
 import { ToolsSection } from "./sections/ToolsSection";
 import { UsageStatisticsPage } from "../UsageStatisticsPage";
+import type { UsageQuery } from "../usage/usage-query";
 import { HarnessStatsPage } from "../harness-stats/HarnessStatsPage";
-import { devHarnessStatsTab } from "../harness-stats/dev-start";
 
 // 设置页入口：左侧导航 + 右侧按 section 渲染。数据加载与保存在 use-settings，各 section 在 sections/ 下。
 // 测试从这里 import TaskModelDefaultsSection 单独渲染，保留再导出。
@@ -46,14 +45,12 @@ export function SettingsPage({
   onSectionChange,
   onSettingsChange,
   onArchivedSessionsChange,
-  usageSnapshot,
   usageActivitySnapshot,
   usageProgress,
   onUsageCancel,
   usageLoading,
   usageError,
-  onUsageRefresh,
-  onUsageRequestPageChange,
+  onUsageQuery,
   workspaces,
 }: {
   onBack: () => void;
@@ -65,14 +62,12 @@ export function SettingsPage({
   onSettingsChange?: (settings: AppSettings) => void;
   /** 归档会话恢复后通知上层刷新普通会话列表。 */
   onArchivedSessionsChange?: () => void;
-  usageSnapshot?: UsageStatisticsSnapshot | null;
   usageActivitySnapshot?: UsageActivitySnapshot | null;
   usageProgress?: import("@actspace/shared").UsageQueryProgress | null;
   onUsageCancel?: () => void;
   usageLoading?: boolean;
   usageError?: string | null;
-  onUsageRefresh?: (range: UsageStatisticsSnapshot["range"], requestRowsPage?: number, status?: SettingsV4Snapshot["settings"]["activity"]["usage"]["status"], search?: string, kind?: import("@actspace/shared").UsageActivityKind) => void;
-  onUsageRequestPageChange?: (page: number, range: UsageStatisticsSnapshot["range"], status?: SettingsV4Snapshot["settings"]["activity"]["usage"]["status"], search?: string, kind?: import("@actspace/shared").UsageActivityKind) => void;
+  onUsageQuery?: (query: UsageQuery) => void;
   workspaces?: WorkspaceEntry[];
 }) {
   const [section, setSection] = useState<SettingsSectionId>(initialSection);
@@ -127,7 +122,7 @@ export function SettingsPage({
         <main
           ref={mainRef}
           aria-label="设置内容"
-          className={`mt-[var(--window-chrome-strip-height)] min-h-0 flex-1 bg-app-bg max-[820px]:mt-0 ${section === "usage" ? "overflow-hidden" : "overflow-y-auto"}`}
+          className={`mt-[var(--window-chrome-strip-height)] min-h-0 flex-1 bg-app-bg max-[820px]:mt-0 overflow-y-auto`}
         >
           {settings ? (
             <SettingsContent
@@ -143,14 +138,12 @@ export function SettingsPage({
               settingsV4={settingsV4}
               onUpdateNamespace={updateNamespace}
               onReplaceSettings={replaceSettings}
-              usageSnapshot={usageSnapshot}
               usageActivitySnapshot={usageActivitySnapshot}
               usageProgress={usageProgress}
               onUsageCancel={onUsageCancel}
               usageLoading={usageLoading}
               usageError={usageError}
-              onUsageRefresh={onUsageRefresh}
-              onUsageRequestPageChange={onUsageRequestPageChange}
+              onUsageQuery={onUsageQuery}
               workspaces={workspaces}
             />
           ) : settingsError ? (
@@ -227,21 +220,19 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
     case "usage":
       return (
         <UsageStatisticsPage
-          snapshot={rest.usageSnapshot ?? null}
           activitySnapshot={rest.usageActivitySnapshot ?? null}
           progress={rest.usageProgress}
           onCancel={rest.onUsageCancel}
           isLoading={rest.usageLoading}
           error={rest.usageError}
-          onRefresh={rest.onUsageRefresh}
-          onRequestPageChange={rest.onUsageRequestPageChange}
+          onQuery={rest.onUsageQuery}
           workspaces={rest.workspaces}
           settingsV4={rest.settingsV4}
           onUpdateNamespace={rest.onUpdateNamespace}
         />
       );
     case "harnessStats":
-      return <HarnessStatsPage initialTab={devHarnessStatsTab()} />;
+      return <HarnessStatsPage />;
     case "update":
       return <PageShell title="更新"><LocalUpdateSection /></PageShell>;
     default:

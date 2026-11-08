@@ -33,7 +33,6 @@ export function createPluginObservation(info: HarnessMountPluginInfo, all: reado
     const done = (error: boolean) => {
       try {
         hooks.record({ revision, kind, plugin, name, method, provider, ms: performance.now() - started, error });
-        if (kind === "service" && provider !== null && provider !== plugin) hooks.record({ revision, kind: "dependency", plugin, name: provider, method: name, provider: null, ms: performance.now() - started, error });
         if (!error) onSuccess?.();
       } catch { /* statistics never affect the call */ }
     };

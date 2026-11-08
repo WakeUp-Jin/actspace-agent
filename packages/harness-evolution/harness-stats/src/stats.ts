@@ -58,7 +58,7 @@ export class HarnessStats {
 
   constructor(options: HarnessStatsOptions) {
     this.#now = options.now ?? Date.now;
-    this.#sink = new HarnessStatsSink({ dataRoot: options.dataRoot, now: this.#now, ...(options.fileSystem ? { fileSystem: options.fileSystem } : {}) });
+    this.#sink = new HarnessStatsSink({ dataRoot: options.dataRoot, ...(options.fileSystem ? { fileSystem: options.fileSystem } : {}) });
     this.#recorder = new HarnessStatsRecorder({ now: this.#now, ...(options.maxKeys === undefined ? {} : { maxKeys: options.maxKeys }), onFull: () => this.#flushSoon() });
     this.#timer = setInterval(() => { if (this.#recorder.size || this.#pending.length) void this.flush(); }, options.flushIntervalMs ?? HARNESS_STATS_FLUSH_INTERVAL_MS);
     this.#timer.unref?.();

@@ -28,7 +28,6 @@ export function ingestHarnessRuntimeFiles(db: DatabaseSync, root: string): Harne
     if (reset) {
       for (const table of ["harness_runtime_hourly", "harness_plugin_inventory", "harness_tool_owner"]) db.exec(`DELETE FROM ${table}`);
       prepare(db, "DELETE FROM index_state WHERE key LIKE ?").run(`${CURSOR_PREFIX}%`);
-      prepare(db, "UPDATE harness_stats_health SET write_failures=0").run();
     }
     for (const name of names) {
       const offset = reset ? 0 : Number((cursor.get(CURSOR_PREFIX + name) as { value: string } | undefined)?.value ?? 0);
@@ -44,7 +43,6 @@ export function ingestHarnessRuntimeFiles(db: DatabaseSync, root: string): Harne
       prepare(db, "INSERT INTO index_state(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(CURSOR_PREFIX + name, String(offset + consumed));
     }
     const bytes = [...sizes.values()].reduce((sum, value) => sum + value, 0);
-    prepare(db, "INSERT INTO harness_stats_health(id,file_bytes) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET file_bytes=excluded.file_bytes").run(bytes);
     ingestSelections(db, root);
     db.exec("COMMIT");
     return { files: names.length, lines, bytes, reset };
@@ -67,6 +65,8 @@ function readComplete(path: string, offset: number, length: number): { text: str
 function applyLine(db: DatabaseSync, line: HarnessStatsFileLine): boolean {
   if (!line || typeof line !== "object" || line.v !== 1) return false;
   if (line.t === "runtime") {
+    // 旧文件里的 dependency 行（v18 起不再记）直接跳过。
+    if (line.kind !== "service" && line.kind !== "listener") return false;
     if (typeof line.hour !== "string" || typeof line.plugin !== "string" || typeof line.name !== "string") return false;
     const hour = line.hour.slice(0, 13);
     const key = [hour, String(line.revision ?? "unknown"), line.kind, line.plugin, line.name, String(line.method ?? "")];
@@ -89,10 +89,6 @@ function applyLine(db: DatabaseSync, line: HarnessStatsFileLine): boolean {
   if (line.t === "tool-owner") {
     if (typeof line.tool !== "string" || typeof line.plugin !== "string") return false;
     prepare(db, "INSERT INTO harness_tool_owner(revision,tool,plugin,tool_plugin_id,last_seen) VALUES(?,?,?,?,?) ON CONFLICT(revision,tool) DO UPDATE SET plugin=excluded.plugin,tool_plugin_id=excluded.tool_plugin_id,last_seen=excluded.last_seen").run(line.revision, line.tool, line.plugin, line.toolPluginId ?? null, line.at);
-    return true;
-  }
-  if (line.t === "health") {
-    prepare(db, "INSERT INTO harness_stats_health(id,write_failures) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET write_failures=write_failures+excluded.write_failures").run(Number(line.writeFailures ?? 0));
     return true;
   }
   return false;

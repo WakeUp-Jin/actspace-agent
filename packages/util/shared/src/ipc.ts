@@ -722,89 +722,10 @@ export type UsageStatisticsGetInput = {
   scope?: UsageStatisticsScope;
   /** 底部会话明细表分页；默认第一页，每页 10 条。 */
   requestRowsPage?: UsageStatisticsRequestRowsPageInput;
-};
-
-export type UsageStatisticsSummary = {
-  totalTokens: number;
-  promptTokens: number;
-  completionTokens: number;
-  cacheHitTokens: number;
-  cacheMissTokens: number;
-  reasoningTokens: number;
-  toolCallCount: number;
-  conversationCount: number;
-  costUsd: number;
-  cacheEfficiencyPercent: number;
-};
-
-export type UsageStatisticsModelEntry = {
-  name: string;
-  provider?: string;
-  totalTokens: number;
-  percent: number;
-  callCount: number;
-  costUsd: number;
-};
-
-export type UsageStatisticsToolEntry = {
-  name: string;
-  callCount: number;
-  percent: number;
-  failedCount: number;
-  averageDurationMs?: number;
-};
-
-/**
- * 单日单模型的明细，仅用于 UI 热力图 hover tooltip 的 "MODEL BREAKDOWN" 区。
- * 不进入主统计区——主区按"整段时间窗"展示模型分布。
- */
-export type UsageStatisticsDailyModelBreakdown = {
-  name: string;
-  totalTokens: number;
-  percent: number;
-};
-
-export type UsageStatisticsDailyRow = {
-  date: string;
-  totalTokens: number;
-  promptTokens: number;
-  completionTokens: number;
-  cacheHitTokens: number;
-  reasoningTokens: number;
-  conversationCount: number;
-  toolCallCount: number;
-  costUsd: number;
-  /**
-   * 当日按 model 拆分的 token 明细，按 totalTokens 降序。
-   * - `percent` 是"在该日 totalTokens 内的占比"，不是全段时间窗内的占比；
-   * - 没有 llm_usage 事件的日期会得到空数组。
-   */
-  modelBreakdown: UsageStatisticsDailyModelBreakdown[];
-};
-
-export type UsageStatisticsRequestRow = {
-  /** Latest llm_usage timestamp in this Agent Run. */
-  timestamp: string;
-  sessionId: string;
-  agentRunId: string;
-  workspaceId?: string;
+  /** 只看这个工作区（worktree 归到来源工作区）；不进 rollup，走会话集合 + 明细。 */
   workspaceRoot?: string;
-  /** Primary model in this Agent Run, chosen by largest token share. */
-  model: string;
-  /** 旧 usage 兼容字段。 */
-  modelId?: string;
-  /** 新 usage 的 provider-qualified 模型身份。 */
-  modelKey?: ModelKey;
-  provider?: string;
-  /** Number of llm_usage calls folded into this turn row. */
-  modelCallCount: number;
-  totalTokens: number;
-  promptTokens: number;
-  completionTokens: number;
-  cacheHitTokens: number;
-  cacheMissTokens: number;
-  reasoningTokens: number;
-  costUsd: number;
+  /** 本机时区相对 UTC 的分钟数（东八区 = 480），用于用量趋势与活跃度分桶。 */
+  utcOffsetMinutes?: number;
 };
 
 export type UsageStatisticsRequestRowsPageInput = {
@@ -813,14 +734,6 @@ export type UsageStatisticsRequestRowsPageInput = {
   limit?: number;
   /** Opaque cursor returned by the previous page. */
   cursor?: string;
-};
-
-export type UsageStatisticsRequestRowsPage = {
-  page: number;
-  pageSize: number;
-  totalRows: number;
-  totalPages: number;
-  nextCursor?: string | null;
 };
 
 export type UsageQueryProgress = {
@@ -838,31 +751,8 @@ export type UsageReadModelInfo = {
   readonly reason?: string;
 };
 
-export type UsageStatisticsSnapshot = {
-  readModel?: UsageReadModelInfo;
-  /** "session"=单会话；"global"=跨所有 session 的全部历史。 */
-  scope: UsageStatisticsScope;
-  /** 仅 scope==="session" 时为对应 session id；global 时为 null。 */
-  sessionId: string | null;
-  /** 仅 scope==="session" 时为对应 session 标题；global 时通常为 "全部数据"。 */
-  title: string;
-  range: UsageStatisticsRange;
-  generatedAt: string;
-  periodStart?: string;
-  periodEnd?: string;
-  /** 参与聚合的数据源条数（global 时是 session 个数；session 时固定为 1）。 */
-  sourceCount?: number;
-  summary: UsageStatisticsSummary;
-  modelDistribution: UsageStatisticsModelEntry[];
-  toolDistribution: UsageStatisticsToolEntry[];
-  dailyRows: UsageStatisticsDailyRow[];
-  /** 当前页会话明细。完整账本仍参与 summary / distribution / daily 聚合。 */
-  requestRows: UsageStatisticsRequestRow[];
-  requestRowsPage: UsageStatisticsRequestRowsPage;
-};
-
 /** Journal-derived activity granularity used by the Maka-style Usage page. */
-export type UsageActivityKind = "llm_request" | "tool_invocation";
+export type UsageActivityKind = "llm_request";
 
 export type UsageActivityStatus = "running" | "success" | "error" | "aborted" | "unknown";
 
@@ -889,7 +779,7 @@ export type UsageActivityRow = {
   requestId?: string;
   callId?: string;
   /** Auxiliary attempts remain separate from main Agent requests. */
-  purpose?: "image-inspection" | "auto-review" | "session-title" | "compaction";
+  purpose?: UsageAuxiliaryPurpose;
   logicalRequestId?: string;
   routeId?: string;
   retryId?: string;
@@ -899,11 +789,14 @@ export type UsageActivityRow = {
   connectionId?: string;
   modelKey?: ModelKey;
   model?: string;
-  toolName?: string;
   workspaceRoot?: string;
   startedAt: string;
   endedAt?: string;
   durationMs?: number;
+  /** 发出请求到第一个 token；老日志没有首字时间时缺省。 */
+  ttftMs?: number;
+  /** 第一个 token 到请求结束（思考与回复合在一起）。 */
+  decodeMs?: number;
   attempt?: number;
   tokens: UsageActivityTokens;
   costUsd: number | null;
@@ -918,10 +811,15 @@ export type UsageActivityRow = {
   relatedEventSeqs: number[];
 };
 
+export type UsageAuxiliaryPurpose = "image-inspection" | "auto-review" | "session-title" | "compaction" | "evaluation";
+
 export type UsageActivitySummary = {
   activityCount: number;
   requestCount: number;
-  toolCount: number;
+  /** 状态为失败的请求。 */
+  failedRequestCount: number;
+  /** 作为前一次失败请求的重试而发出的请求。 */
+  retryCount: number;
   successCount: number;
   errorCount: number;
   abortedCount: number;
@@ -973,17 +871,114 @@ export type UsageActivityAggregate = {
   count: number;
   errorCount: number;
   totalTokens: number;
-  /** LLM requests in this provider/model group with unknown total token usage. Always zero for tools. */
+  /** LLM requests in this provider/model group with unknown total token usage. */
   unknownTokenRequestCount: number;
   durationMs: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  reasoningTokens: number;
+  /** Σ 首字等待与有首字记录的请求数；平均首字 = ttftMs / ttftSamples。 */
+  ttftMs: number;
+  ttftSamples: number;
+  /** Σ 输出时间与对应输出 token；速度 = decodeTokens / decodeMs。 */
+  decodeMs: number;
+  decodeTokens: number;
   costSummary: UsageCostSummary;
+};
+
+/** 耗时环形图「按阶段」：各段耗时合计与次数。 */
+export type UsageTiming = {
+  ttftMs: number;
+  ttftSamples: number;
+  decodeMs: number;
+  decodeTokens: number;
+  /** 已结束、但没有首字记录的主请求数（老会话），不进前两段。 */
+  untimedRequests: number;
+  toolMs: number;
+  toolSamples: number;
+  approvalWaitMs: number;
+  approvalSamples: number;
+  auxiliaryMs: number;
+  auxiliaryCount: number;
+};
+
+export type UsageSeries = {
+  unit: "hour" | "day" | "week";
+  /** `start` 是本机时区的桶起点（`YYYY-MM-DD` 或 `YYYY-MM-DD HH:00`）。 */
+  buckets: { start: string; tokens: number; costUsd: number; requests: number }[];
+  /** 范围内（含筛选）最早一条请求的时间，「全部」的日均按它到现在的天数算；没有请求为 null。 */
+  firstAt: string | null;
+};
+
+/** 最近 98 天（本机时区），只列有数据的日期。 */
+export type UsageHeatmap = { days: { date: string; sessions: number; tokens: number }[] };
+
+export type UsageToolRow = {
+  name: string;
+  pluginId?: string;
+  calls: number;
+  failed: number;
+  failureCodes: Record<string, number>;
+  durationMs: number;
+  durationSamples: number;
+  p95Ms: number | null;
+  outputTokens: number;
+  outputSamples: number;
+};
+
+export type UsageCommandRow = {
+  program: string;
+  calls: number;
+  failed: number;
+  durationMs: number;
+  durationSamples: number;
+  /** 只有 git / pnpm / npm / yarn / cargo / go / gh / docker 记子命令，按次数倒序。 */
+  subcommands: { name: string; calls: number }[];
+};
+
+export type UsageSkillRow = {
+  skillId: string;
+  skillReads: number;
+  assetReads: number;
+  lastReadAt: string | null;
+  /** 读过的文件（相对 Skill 目录），最多 6 个，按次数倒序。 */
+  files: string[];
+};
+
+export type UsageSubagentRow = {
+  preset: string;
+  calls: number;
+  failed: number;
+  durationMs: number;
+  durationSamples: number;
+  totalTokens: number;
+  costUsd: number;
+};
+
+export type UsageAuxiliaryRow = {
+  purpose: UsageAuxiliaryPurpose;
+  calls: number;
+  durationMs: number;
+  totalTokens: number;
+  costUsd: number;
 };
 export type UsageActivitySnapshot = {
   readModel?: UsageReadModelInfo;
-  /** Counts for the selected time window before text/status filtering. */
-  tabCounts?: { requests: number; providers: number; models: number; tools: number };
   costSummary?: UsageCostSummary;
-  aggregates?: { providers: UsageActivityAggregate[]; models: UsageActivityAggregate[]; tools: UsageActivityAggregate[] };
+  aggregates?: { providers: UsageActivityAggregate[]; models: UsageActivityAggregate[] };
+  timing?: UsageTiming;
+  series?: UsageSeries;
+  heatmap?: UsageHeatmap;
+  /** 以下四组来自 Harness 统计表，不受模型 / 提供商筛选影响；回退时缺省并置 `harnessUnavailable`。 */
+  tools?: UsageToolRow[];
+  commands?: UsageCommandRow[];
+  skills?: UsageSkillRow[];
+  subagents?: UsageSubagentRow[];
+  auxiliary?: UsageAuxiliaryRow[];
+  filterOptions?: { models: string[]; providers: string[]; workspaces: string[] };
+  harnessUnavailable?: true;
 
   schemaVersion: 1;
   scope: UsageStatisticsScope;

@@ -15,9 +15,6 @@
   "apps/desktop/src/main/runtime-v2/runtime-registry.ts": {
     "inspect-events": 3
   },
-  "apps/desktop/src/main/runtime-v2/usage-source-cache.ts": {
-    "inspect-events": 1
-  },
   "apps/desktop/src/main/settings/utils.ts": {
     "json-roundtrip": 1
   },

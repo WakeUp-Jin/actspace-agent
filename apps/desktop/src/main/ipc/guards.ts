@@ -1,5 +1,6 @@
 import { desktopBridgeContract as contract, type InvokeSpec } from "@actspace/shared/desktop-bridge";
 import { HOST_METHODS, isRecord } from "@actspace/shared/host-protocol";
+import { HARNESS_STATS_QUERY_KINDS } from "@actspace/shared";
 
 /**
  * IPC 入参 guard：只校验类型和形状，不校验业务规则（路径是否注册、会话是否存在等仍由 handler 负责）。
@@ -44,10 +45,12 @@ const usageRequestId: IpcGuard = input => !isRecord(input) || typeof input.reque
 const usageInput: IpcGuard = input => {
   if (!isRecord(input)) return "Invalid Usage query";
   if (input.requestId !== undefined && usageRequestId(input)) return "Invalid Usage request id";
-  for (const [field, values] of Object.entries({ range: ["day","week","month","total"], scope: ["global","session"], kind: ["llm_request","tool_invocation"], status: ["all","success","error","aborted","running","unknown"] })) if (input[field] !== undefined && (typeof input[field] !== "string" || !values.includes(input[field] as string))) return `Invalid Usage ${field}`;
+  for (const [field, values] of Object.entries({ range: ["day","week","month","total"], scope: ["global","session"], kind: ["llm_request"], status: ["all","success","error","aborted","running","unknown"] })) if (input[field] !== undefined && (typeof input[field] !== "string" || !values.includes(input[field] as string))) return `Invalid Usage ${field}`;
   if (input.sessionId !== undefined && (typeof input.sessionId !== "string" || input.sessionId.length > 128)) return "Invalid Usage Session";
   if (input.search !== undefined && (typeof input.search !== "string" || input.search.length > 300)) return "Usage search exceeds 300 characters";
   for (const field of ["model", "providerId"]) if (input[field] !== undefined && (typeof input[field] !== "string" || (input[field] as string).length > 300)) return `Invalid Usage ${field}`;
+  if (input.workspaceRoot !== undefined && (typeof input.workspaceRoot !== "string" || input.workspaceRoot.length > 4096)) return "Invalid Usage workspaceRoot";
+  if (input.utcOffsetMinutes !== undefined && (typeof input.utcOffsetMinutes !== "number" || !Number.isInteger(input.utcOffsetMinutes) || Math.abs(input.utcOffsetMinutes) > 14 * 60)) return "Invalid Usage utcOffsetMinutes";
   if (input.requestRowsPage !== undefined) {
     if (!isRecord(input.requestRowsPage)) return "Invalid Usage page";
     const page = input.requestRowsPage;
@@ -56,7 +59,7 @@ const usageInput: IpcGuard = input => {
   }
   return null;
 };
-const HARNESS_STATS_KINDS: readonly string[] = ["summary", "options", "overview", "plugins", "tools", "context", "disclosure", "runtime", "versions"];
+const HARNESS_STATS_KINDS: readonly string[] = HARNESS_STATS_QUERY_KINDS;
 const harnessStatsInput: IpcGuard = input => {
   if (!isRecord(input) || usageRequestId(input)) return "Invalid Harness stats request id";
   if (typeof input.kind !== "string" || !HARNESS_STATS_KINDS.includes(input.kind)) return "Invalid Harness stats kind";
@@ -64,7 +67,7 @@ const harnessStatsInput: IpcGuard = input => {
   if (!isRecord(filter)) return "Invalid Harness stats filter";
   if (typeof filter.range !== "string" || !["day", "week", "month", "total"].includes(filter.range)) return "Invalid Harness stats range";
   if (typeof filter.sessionKind !== "string" || !["main", "child", "side", "all"].includes(filter.sessionKind)) return "Invalid Harness stats session kind";
-  for (const field of ["mode", "model", "workspaceRoot", "revision"]) if (filter[field] !== undefined && filter[field] !== null && (typeof filter[field] !== "string" || (filter[field] as string).length > 1024)) return `Invalid Harness stats ${field}`;
+  for (const field of ["mode", "model", "revision"]) if (filter[field] !== undefined && filter[field] !== null && (typeof filter[field] !== "string" || (filter[field] as string).length > 1024)) return `Invalid Harness stats ${field}`;
   if (input.compare !== undefined && input.compare !== null) {
     const compare = input.compare;
     if (!isRecord(compare) || typeof compare.from !== "string" || typeof compare.to !== "string" || compare.from.length > 256 || compare.to.length > 256) return "Invalid Harness stats compare";
@@ -82,7 +85,6 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
     return null;
   }],
   [contract.usage.getActivity, usageInput],
-  [contract.usage.getStatistics, usageInput],
   [contract.usage.getStatus, usageRequestId],
   [contract.usage.cancel, usageRequestId],
   [contract.harnessStats.query, harnessStatsInput],

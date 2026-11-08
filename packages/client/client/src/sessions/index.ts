@@ -6,5 +6,4 @@ export * from "./trajectory.js";
 export * from "./chat.js";
 export * from "./subagent-list.js";
 export * from "./tool-card.js";
-export * from "./usage-aggregates.js";
 export * from "./indexed-usage.js";

@@ -96,7 +96,7 @@ export function mockSettingsV4(): SettingsV4Snapshot {
       },
       skills: { disabled: [] },
       subagents: { routes: {} },
-      activity: { usage: { range: "30d", status: "all", modelFilter: "", showDetails: true, activeTab: "requests" } },
+      activity: { usage: { range: "30d", activeTab: "requests", tokenView: "type", timeView: "phase", trendMetric: "tokens", heatMetric: "sessions" } },
     },
   };
 }

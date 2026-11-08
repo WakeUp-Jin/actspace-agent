@@ -138,7 +138,6 @@ export const desktopBridgeContract = {
   usage: {
     getStatus: invoke<{ requestId: string }, S.UsageQueryProgress | null>(CH.getUsageQueryStatus),
     cancel: invoke<{ requestId: string }, void>(CH.cancelUsageQuery),
-    getStatistics: invoke<S.UsageStatisticsGetInput, S.UsageStatisticsSnapshot | null>(CH.getUsageStatistics),
     getActivity: invoke<S.UsageStatisticsGetInput, S.UsageActivitySnapshot | null>(CH.getUsageActivity),
   },
   /** 设置 →「Harness 统计」：按 tab 按需查询；同步在后台进行，进度见 getStatus。 */

@@ -4,7 +4,7 @@ import type { ContextHistoryState } from "./context-history-projection";
 import { CONTEXT_PROJECTOR_VERSION } from "./context-history-version";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { ReadModelScheduler } from "./read-model-scheduler";
-import type { HarnessStatsData, HarnessStatsQueryInput, HarnessStatsQueryResult, HarnessStatsSyncStatus, UsageQueryProgress, SessionListPage, SessionListPageInput, UsageActivitySnapshot, UsageStatisticsGetInput, UsageStatisticsSnapshot } from "@actspace/shared";
+import type { HarnessStatsData, HarnessStatsQueryInput, HarnessStatsQueryResult, HarnessStatsSyncStatus, UsageQueryProgress, SessionListPage, SessionListPageInput, UsageActivitySnapshot, UsageStatisticsGetInput } from "@actspace/shared";
 import { Worker } from "node:worker_threads";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -42,7 +42,7 @@ type CatalogRow = {
 };
 type QueryScope = { requestId?: string; foreground: boolean; summaries?: readonly Summary[]; syncTotal?: number; lightweightSources: boolean; partialInventory: boolean; failedSessionIds: Set<string>; cancelled?: boolean };
 type SourceState = { building?: boolean; revision: number | null; cursor?: string; stamp?: string; codecSetDigest?: string };
-type WorkerResult = ContextHistoryResult | ContextHistoryState | UsageActivitySnapshot | UsageStatisticsSnapshot | SessionListPage | SourceState | null;
+type WorkerResult = ContextHistoryResult | ContextHistoryState | UsageActivitySnapshot | SessionListPage | SourceState | null;
 type WorkerReply = { id: string; heartbeat: true } | { id: string; ok: true; result?: WorkerResult } | { id: string; ok: false; error: string };
 type Pending = { timer: ReturnType<typeof setTimeout>; resolve: (result: WorkerResult) => void; reject: (error: Error) => void };
 
@@ -175,10 +175,6 @@ export class UsageReadModelService {
     return this.#runQuery("activity", input) as Promise<UsageActivitySnapshot | null>;
   }
 
-  getStatistics(input: UsageStatisticsGetInput): Promise<UsageStatisticsSnapshot | null> {
-    return this.#runQuery("statistics", input) as Promise<UsageStatisticsSnapshot | null>;
-  }
-
   getStatus(requestId: string): UsageQueryProgress | null { return this.#requests.get(requestId) ?? null; }
 
   /**
@@ -251,7 +247,7 @@ export class UsageReadModelService {
     status.completedSessions += completed;
     status.totalSessions = this.#syncTotal ?? this.#summaries?.length ?? 0;
   }
-  #runQuery(kind: "activity" | "statistics", input: UsageStatisticsGetInput): Promise<WorkerResult> {
+  #runQuery(kind: "activity", input: UsageStatisticsGetInput): Promise<WorkerResult> {
     if (this.#requests.size >= 8) return Promise.reject(new Error("Usage query queue is full; retry shortly."));
     const requestId = input.requestId ?? randomUUID();
     if (this.#requests.has(requestId)) return Promise.reject(new Error("Duplicate Usage request id."));
@@ -365,7 +361,7 @@ export class UsageReadModelService {
     this.#worker = undefined;
   }
 
-  async #query(message: { kind: "activity" | "statistics"; input: UsageStatisticsGetInput }): Promise<WorkerResult> {
+  async #query(message: { kind: "activity"; input: UsageStatisticsGetInput }): Promise<WorkerResult> {
     const sessionId = (message.input.scope ?? (message.input.sessionId ? "session" : "global")) === "session" ? message.input.sessionId ?? "" : undefined;
     this.#summaries = await this.#readSummaries(sessionId);
     if (this.#reader.sessionQuerySources && !this.#lightweightSources) throw new Error("Session provider does not support bounded Usage queries. Session history and details remain available.");
@@ -393,10 +389,10 @@ export class UsageReadModelService {
     }
   }
 
-  #fallback(message: { kind: "activity" | "statistics"; input: UsageStatisticsGetInput }, reason: unknown): Promise<WorkerResult> {
+  #fallback(message: { kind: "activity"; input: UsageStatisticsGetInput }, reason: unknown): Promise<WorkerResult> {
     return this.#withFallback(() => this.#fallbackLocked(message, reason));
   }
-  async #fallbackLocked(message: { kind: "activity" | "statistics"; input: UsageStatisticsGetInput }, reason: unknown): Promise<WorkerResult> {
+  async #fallbackLocked(message: { kind: "activity"; input: UsageStatisticsGetInput }, reason: unknown): Promise<WorkerResult> {
     const summaries = (this.#summaries ?? []).filter(row => message.input.scope === "session" || (message.input.scope === undefined && message.input.sessionId) ? row.sessionId === message.input.sessionId : true);
     if (summaries.length > 1_000) throw new Error("Usage index unavailable; Session fallback exceeds 1,000 sessions. Retry rebuilding the index.");
     if (summaries.reduce((count, row) => count + row.throughJournalSeq + 1, 0) > 5_000) throw new Error("Usage index unavailable; Session fallback exceeds 5,000 events. Retry rebuilding the index.");
@@ -416,7 +412,7 @@ export class UsageReadModelService {
         }
       }
       this.#progress("querying");
-      const result = await this.#send({ type: "fallback-query", request: message.kind, input: message.input }) as UsageActivitySnapshot | UsageStatisticsSnapshot | null;
+      const result = await this.#send({ type: "fallback-query", request: message.kind, input: message.input }) as UsageActivitySnapshot | null;
       if (result) result.readModel = { source: "session", status: "fallback", reason: reason instanceof Error ? reason.message : String(reason) };
       return result;
     } finally { await this.#send({ type: "fallback-end" }).catch(() => undefined); }

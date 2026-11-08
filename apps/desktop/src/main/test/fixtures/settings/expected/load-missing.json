@@ -158,10 +158,11 @@
       "activity": {
         "usage": {
           "range": "30d",
-          "status": "all",
-          "modelFilter": "",
-          "showDetails": false,
-          "activeTab": "requests"
+          "activeTab": "requests",
+          "tokenView": "type",
+          "timeView": "phase",
+          "trendMetric": "tokens",
+          "heatMetric": "sessions"
         }
       }
     }

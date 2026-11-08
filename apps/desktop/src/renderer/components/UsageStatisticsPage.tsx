@@ -1,175 +1,423 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BookOpen, Bot, ChartColumn, Clock, Code, Database, Gauge, RefreshCw, Terminal } from "lucide-react";
+import type {
+  SettingsV4NamespacePatch,
+  SettingsV4Snapshot,
+  SettingsV4UsagePreferences,
+  UsageActivityAggregate,
+  UsageActivityRow,
+  UsageActivitySnapshot,
+  UsageCommandRow,
+  UsageQueryProgress,
+  UsageSkillRow,
+  UsageStatisticsRange,
+  UsageToolRow,
+  WorkspaceEntry,
+} from "@actspace/shared";
+import { PageShell, SegmentedControl, SettingsSelect } from "./settings/SettingsPrimitives";
 import { Button } from "./ui/Button";
-import { useEffect, useState } from "react";
-import { RefreshCw, Search } from "lucide-react";
-import type { SettingsV4NamespacePatch, SettingsV4Snapshot, UsageActivityAggregate, UsageActivityKind, UsageActivitySnapshot, UsageCostSummary, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
-import { PageShell, SettingsSelect, StatusDot, Toggle } from "./settings/SettingsPrimitives";
+import { IconButton } from "./ui/IconButton";
+import { UnderlineTabs } from "./ui/UnderlineTabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/Tooltip";
-import { UsageHoverCard } from "./usage/UsageHoverCard";
-import { formatUsageAmount } from "../usage-format";
-import { billedInputTokens, formatCacheHitPercent } from "./composer/composer-stats";
+import {
+  BarChart, CardGrid, DataTable, DetailSection, Donut, Heatmap, HoverValue, MetricCard, MetricRow, Pager, Pill, RankList, SmallTabs, StatsCard, StatsScroll, SubHeading,
+  type RankRow, type TableColumn, type TableSort, useStatsJump,
+} from "./stats/stats-ui";
+import { DASH, average, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelativeDay, fmtTokens, fmtUsd, ratio } from "./stats/stats-format";
+import { USAGE_REQUEST_PAGE_SIZE, type UsageQuery } from "./usage/usage-query";
+import {
+  PURPOSE_LABEL, SUBCOMMAND_PROGRAMS, cacheHitRate, costDetail, fmtCacheHit, failureLabel, fmtTrend, gapNote, modelCostDetail, modelSpeed, modelTokenDetail, modelsWithLabels,
+  phaseSegments, priceDetail, rangeDays, timeDetail, tokenDetail, tokenModelSegments, tokenTypeSegments, toolTimeSegments, trendModel,
+} from "./usage/usage-stats-model";
 
-type Tab = "requests" | "providers" | "models" | "tools";
-type Status = "all" | "success" | "error" | "aborted" | "unknown";
-type Range = UsageStatisticsSnapshot["range"];
+/* 使用统计（front-统计页规范.md §2）：用了多少。数据来自 usage.getActivity，筛选不持久化，tab / 视图存 activity.usage。 */
+
+type Prefs = SettingsV4UsagePreferences;
+type DetailTab = Prefs["activeTab"];
 type Props = {
-  snapshot: UsageStatisticsSnapshot | null;
   activitySnapshot?: UsageActivitySnapshot | null;
   isLoading?: boolean;
-  progress?: import("@actspace/shared").UsageQueryProgress | null;
+  progress?: UsageQueryProgress | null;
   onCancel?: () => void;
   error?: string | null;
-  onRefresh?: (range: Range, page?: number, status?: Status, search?: string, kind?: UsageActivityKind) => void;
-  onRequestPageChange?: (page: number, range: Range, status?: Status, search?: string, kind?: UsageActivityKind) => void;
-  onBackToChat?: () => void;
+  onQuery?: (query: UsageQuery) => void;
   workspaces?: WorkspaceEntry[];
   settingsV4?: SettingsV4Snapshot | null;
   onUpdateNamespace?: (input: SettingsV4NamespacePatch) => Promise<SettingsV4Snapshot | null>;
 };
-const ranges: Array<[Range, string]> = [["day", "24 小时"], ["week", "7 天"], ["month", "30 天"], ["total", "全部"]];
-const tabs: Array<[Tab, string]> = [["requests", "请求日志"], ["providers", "服务商"], ["models", "模型"], ["tools", "工具"]];
-const statusOptions: Array<{ value: Status; label: string }> = [{ value: "all", label: "全部状态" }, { value: "success", label: "成功" }, { value: "error", label: "失败" }, { value: "aborted", label: "已中止" }, { value: "unknown", label: "未知" }];
-const button = "inline-flex h-8 items-center justify-center gap-2 rounded-act-md px-2.5 text-act-xs font-medium text-text-muted hover:bg-hover-overlay active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-40";
-const cell = "h-[38px] px-3 py-1.5 align-middle";
-const tableFrame = "min-w-0 overflow-x-auto rounded-act-group border border-line bg-surface";
-const tableHead = "border-b border-line bg-surface-subtle text-left text-act-xs font-medium text-text-muted [&_th]:h-[34px] [&_th]:font-medium";
-const numberCell = `${cell} text-right tabular-nums whitespace-nowrap`;
-const labels: Record<string, string> = { success: "成功", error: "失败", aborted: "已中止", running: "进行中", unknown: "未知" };
-const number = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString("zh-CN");
-const summaryCostFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const money = (summary?: UsageCostSummary) => !summary || summary.knownCostRequestCount === 0 ? "费用未知" : Number.isFinite(summary.costUsd) ? summaryCostFormatter.format(summary.costUsd) : "—";
 
-export function UsageStatisticsPage({ activitySnapshot: data, isLoading, error, progress, onCancel, onRefresh, onRequestPageChange, settingsV4, onUpdateNamespace }: Props) {
-  const errorSummary = error?.startsWith("Error invoking remote method ") ? "使用统计读取失败，请重试。" : error;
+const RANGE_OPTIONS: { value: UsageStatisticsRange; label: string }[] = [{ value: "day", label: "24 小时" }, { value: "week", label: "7 天" }, { value: "month", label: "30 天" }, { value: "total", label: "全部" }];
+const RANGE_TO_PREF: Record<UsageStatisticsRange, Prefs["range"]> = { day: "24h", week: "7d", month: "30d", total: "all" };
+const PREF_TO_RANGE: Record<Prefs["range"], UsageStatisticsRange> = { "24h": "day", "7d": "week", "30d": "month", all: "total" };
+const DEFAULT_PREFS: Prefs = { range: "30d", activeTab: "requests", tokenView: "type", timeView: "phase", trendMetric: "tokens", heatMetric: "sessions" };
+const ALL = "__all";
+const PROGRESS_LABEL: Record<UsageQueryProgress["phase"], string> = { queued: "等待查询", checking: "检查使用记录", syncing: "正在同步使用记录", rebuilding: "正在重建统计索引", querying: "正在查询", fallback: "正在从会话记录读取", cancelled: "正在取消" };
+const STATUS_PILL: Record<UsageActivityRow["status"], { tone: "ok" | "err" | "warn" | "info" | "neutral"; label: string }> = {
+  success: { tone: "ok", label: "成功" }, error: { tone: "err", label: "失败" }, aborted: { tone: "warn", label: "已中止" }, running: { tone: "info", label: "进行中" }, unknown: { tone: "neutral", label: "未知" },
+};
+
+const DETAIL_TABS: readonly DetailTab[] = ["requests", "models", "providers", "tools", "commands", "skills"];
+/** 主进程已清洗过；这里再兜一次旧值（如 `pricing`），避免 tab 落空。 */
+function normalizePrefs(saved: Prefs | undefined): Prefs {
+  const merged = { ...DEFAULT_PREFS, ...saved };
+  return DETAIL_TABS.includes(merged.activeTab) ? merged : { ...merged, activeTab: "requests" };
+}
+
+export function UsageStatisticsPage({ activitySnapshot: data = null, isLoading, progress, onCancel, error, onQuery, workspaces = [], settingsV4, onUpdateNamespace }: Props) {
   const saved = settingsV4?.settings.activity.usage;
-  const [range, setRange] = useState<Range>(saved?.range === "24h" ? "day" : saved?.range === "7d" ? "week" : saved?.range === "all" ? "total" : "month");
-  const [tab, setTab] = useState<Tab>(saved?.activeTab === "pricing" ? "requests" : saved?.activeTab ?? "requests");
-  const [status, setStatus] = useState<Status>(saved?.status ?? "all");
-  const [search, setSearch] = useState(saved?.modelFilter ?? "");
-  const [details, setDetails] = useState(saved?.showDetails ?? true);
-  const kind: UsageActivityKind | undefined = undefined;
-  const queryStatus = tab === "requests" ? status : "all";
+  const [prefs, setPrefs] = useState<Prefs>(() => normalizePrefs(saved));
+  const [model, setModel] = useState("");
+  const [providerId, setProviderId] = useState("");
+  const [workspaceRoot, setWorkspaceRoot] = useState("");
+  const [modelSort, setModelSort] = useState<TableSort>({ key: "tokens", dir: "desc" });
+  const [toolSort, setToolSort] = useState<TableSort>({ key: "calls", dir: "desc" });
+  const { flashId, jump } = useStatsJump();
+  const range = PREF_TO_RANGE[prefs.range];
+  const update = (patch: Partial<Prefs>) => setPrefs((current) => ({ ...current, ...patch }));
+
+  // 筛选或范围变化就从第一页重新查；首次挂载也走这里。
+  const filters = useMemo(() => ({ range, ...(model ? { model } : {}), ...(providerId ? { providerId } : {}), ...(workspaceRoot ? { workspaceRoot } : {}) }), [range, model, providerId, workspaceRoot]);
+  const onQueryRef = useRef(onQuery);
+  onQueryRef.current = onQuery;
+  useEffect(() => { onQueryRef.current?.({ ...filters, page: 1 }); }, [filters]);
+  const query = (page: number) => onQuery?.({ ...filters, page });
+
+  // 设置晚于页面到达时先用已存值，不能拿默认值去覆盖。
+  const hydrated = useRef(Boolean(saved));
   useEffect(() => {
-    const timer = setTimeout(() => onRefresh?.(range, 1, queryStatus, search, kind), 200);
-    return () => clearTimeout(timer);
-  }, [range, queryStatus, search, tab]);
+    if (hydrated.current || !saved) return;
+    hydrated.current = true;
+    setPrefs(normalizePrefs(saved));
+  }, [saved]);
+
+  // 偏好防抖写回；和已存值相同就不写。
   useEffect(() => {
-    if (!saved || !onUpdateNamespace) return;
-    const next = { ...saved, range: range === "day" ? "24h" as const : range === "week" ? "7d" as const : range === "total" ? "all" as const : "30d" as const, status, activeTab: tab, modelFilter: search, showDetails: details };
-    if (JSON.stringify(next) === JSON.stringify(saved)) return;
-    const timer = setTimeout(() => { void onUpdateNamespace({ namespace: "activity", patch: { usage: next } }).catch(() => undefined); }, 300);
+    if (!saved || !onUpdateNamespace || !hydrated.current) return;
+    if ((Object.keys(prefs) as (keyof Prefs)[]).every((key) => saved[key] === prefs[key])) return;
+    const timer = setTimeout(() => { void onUpdateNamespace({ namespace: "activity", patch: { usage: prefs } }).catch(() => undefined); }, 300);
     return () => clearTimeout(timer);
-  }, [range, status, tab, search, details, saved, onUpdateNamespace]);
+  }, [prefs, saved, onUpdateNamespace]);
+
+  const errorSummary = error?.startsWith("Error invoking remote method ") ? "使用统计读取失败，请重试。" : error;
+  const modelFiltered = Boolean(model || providerId);
+  const anyFilter = modelFiltered || Boolean(workspaceRoot);
+  const harnessNote = modelFiltered ? "不受模型、提供商筛选影响" : undefined;
+
+  const options = data?.filterOptions;
+  const workspaceLabel = (path: string) => workspaces.find((entry) => entry.path === path)?.label ?? path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+  const select = (label: string, value: string, values: readonly string[], allLabel: string, onChange: (value: string) => void, format: (value: string) => string = (value) => value) => (
+    <SettingsSelect size="sm" ariaLabel={label} value={value || ALL} onChange={(next) => onChange(next === ALL ? "" : next)}
+      options={[{ value: ALL, label: allLabel }, ...[...new Set([...values, ...(value ? [value] : [])])].map((item) => ({ value: item, label: format(item) }))]} />
+  );
+
   const summary = data?.summary;
   const cost = data?.costSummary;
-  const unknownTokens = summary?.unknownTokenRequestCounts;
-  const requestCount = summary?.requestCount ?? 0;
-  // 没有任何用量的请求（失败或未完成）单独成「请求失败或未完成」；缓存字段缺口只看已上报用量的请求。
-  const failedRequests = unknownTokens?.total ?? 0;
-  const unpricedRequests = cost?.unknownCostRequestCount ?? 0;
-  const partialCache = Math.max(0, (unknownTokens?.cacheRead ?? 0) - failedRequests);
-  // 命中率与会话胶囊同一算法：缓存读 ÷（未缓存输入 + 缓存读 + 缓存写），按已知部分的合计计算；
-  // 缺失用量的请求和未上报缓存字段的请求不参与（cacheWrite 未上报按 0）。只有没有任何已知输入依据时才显示「—」。
-  const hit = formatCacheHitPercent(summary?.cacheReadTokens ?? 0, summary ? billedInputTokens(summary) : 0, 1);
-  const hitRate = hit === null ? "—" : `${hit}%`;
-  const totalDetail = [
-    tokenPart("输入", summary?.inputTokens, unknownTokens?.input ?? 0, requestCount),
-    tokenPart("输出", summary?.outputTokens, unknownTokens?.output ?? 0, requestCount),
-  ].join(" · ");
-  const gapReasons = [
-    failedRequests > 0 ? `请求失败或未完成：${failedRequests} 次` : "",
-    unpricedRequests > 0 ? `模型未配置价格：${unpricedRequests} 次` : "",
-    partialCache > 0 ? `服务商未返回缓存字段：${partialCache} 次` : "",
-  ].filter(Boolean);
-  const gapRequests = failedRequests + unpricedRequests;
-  const gapNote = gapReasons.length === 0 ? "" : gapRequests > 0 ? `有 ${gapRequests} 次请求缺少用量或定价，数值为已知部分的合计` : "部分请求的服务商未返回缓存字段，数值为已知部分的合计";
-  const rows = data?.rows ?? [];
-  const counts = { requests: data?.tabCounts?.requests ?? data?.rowsPage.totalRows ?? 0, providers: data?.tabCounts?.providers ?? data?.aggregates?.providers.length ?? 0, models: data?.tabCounts?.models ?? data?.aggregates?.models.length ?? 0, tools: data?.tabCounts?.tools ?? data?.aggregates?.tools.length ?? 0 };
-  const page = data?.rowsPage;
-  const updatePage = (next: number) => onRequestPageChange?.(next, range, queryStatus, search, kind);
-  return <main className="h-full min-w-0 overflow-auto bg-app-bg text-text-main">
-    <PageShell width="wide" title="使用统计">
-      <div className="flex items-center justify-between gap-3">
-        <div className="inline-flex rounded-act-md border border-line/60 bg-surface-subtle p-0.5" role="tablist" aria-label="统计时间范围">{ranges.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={range === value} className={`h-6 rounded-act-sm px-3 text-act-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/30 ${range === value ? "bg-surface font-medium text-text-main shadow-act-xs" : "text-text-muted hover:text-text-main"}`} onClick={() => setRange(value)}>{label}</button>)}</div>
-        <Tooltip><TooltipTrigger asChild><button type="button" className={button} aria-label="刷新使用统计" disabled={isLoading} onClick={() => onRefresh?.(range, page?.page ?? 1, queryStatus, search, kind)}><RefreshCw size={15} className={isLoading ? "animate-spin motion-reduce:animate-none" : ""} /></button></TooltipTrigger><TooltipContent>刷新使用统计</TooltipContent></Tooltip>
-      </div>
-      {isLoading && progress ? <div className="flex items-center justify-between gap-3 text-act-xs text-text-muted" role="status"><span>{({ queued: "等待查询", checking: "检查使用记录", syncing: "正在同步使用记录", rebuilding: "正在重建统计索引", querying: "正在查询", fallback: "正在从会话记录读取", cancelled: "正在取消" } as const)[progress.phase]} · {progress.completedSessions}/{progress.totalSessions} 个会话 · 已读取 {number(progress.eventsRead)} 条记录</span><Button size="sm" variant="ghost" onClick={onCancel} disabled={progress.phase === "cancelled"}>取消查询</Button></div> : null}
-      {data?.readModel?.failedSources ? <p role="status" className="text-act-sm text-warning">有 {number(data.readModel.failedSources)} 个会话暂时无法读取，当前统计不包含这些会话。可刷新重试。</p> : null}
-      {data?.readModel?.status === "fallback" ? <p role="status" className="text-act-sm text-warning">统计索引暂不可用，当前结果从会话记录读取。可刷新重试。</p> : null}
-      {error ? <div role="alert" className="flex items-start gap-2 rounded-act-md bg-danger-soft px-3 py-2 text-act-xs text-on-danger">
-        <div className="min-w-0 flex-1">
-          <p className="m-0 whitespace-pre-wrap break-all">{errorSummary}</p>
-          {error !== errorSummary ? <details className="mt-1">
-            <summary className="cursor-pointer focus-visible:outline-2 focus-visible:outline-focus-ring">错误详情</summary>
-            <p className="m-0 mt-1 whitespace-pre-wrap break-all">{error}</p>
-          </details> : null}
-        </div>
-        <button className={`${button} shrink-0 whitespace-nowrap`} onClick={() => onRefresh?.(range, 1, queryStatus, search, kind)}>重试</button>
-      </div> : null}
-      {isLoading && !data ? <div role="status" className="rounded-act-md bg-surface-subtle p-5 text-act-sm text-text-faint">正在读取使用记录…</div> : <section aria-label="使用概览" className="-mt-5 grid grid-cols-4 gap-2.5 max-[800px]:grid-cols-2 max-[400px]:grid-cols-1">
-        <Metric label="请求数" value={number(summary?.requestCount)} />
-        <Metric label="Token 用量" value={aggregateTokenValue(summary?.totalTokens, failedRequests, requestCount)} detail={totalDetail} />
-        <Metric label="费用" value={summary?.requestCount === 0 ? "—" : money(cost)} detail={cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : undefined} />
-        <Metric label="缓存命中率" value={hitRate} detail={tokenPart("缓存", summary?.cacheReadTokens, unknownTokens?.cacheRead ?? 0, requestCount)} />
-      </section>}
-      {gapNote && !(isLoading && !data) ? <Tooltip><TooltipTrigger asChild><span tabIndex={0} className="-mt-3 w-fit max-w-full rounded-sm text-left text-act-xxs text-text-faint hover:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">{gapNote}</span></TooltipTrigger><TooltipContent className="max-w-[340px]"><ul className="m-0 list-none p-0">{gapReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></TooltipContent></Tooltip> : null}
-      <section className="flex min-w-0 flex-col gap-3">
-        <div className="mt-1 flex gap-5 overflow-x-auto border-b border-line" role="tablist" aria-label="统计分类">{tabs.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} className={`-mb-px shrink-0 border-b-2 px-0.5 pb-2.5 text-act-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${tab === value ? "border-text-main text-text-main" : "border-transparent text-text-faint hover:text-text-main"}`} onClick={() => { setTab(value); setSearch(""); }}>{label} <span className="ml-1 text-act-xs font-normal tabular-nums text-text-subtle">{counts[value] ?? "—"}</span></button>)}</div>
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="日志筛选">
-          <span className="relative flex min-w-0 flex-[0_1_280px] max-[600px]:flex-[1_1_100%]"><Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle" /><input aria-label="搜索使用记录" placeholder={tab === "requests" ? "按模型或工具筛选" : tab === "tools" ? "搜索工具" : "搜索模型或服务商"} value={search} onChange={(event) => setSearch(event.target.value)} className="h-[30px] w-full min-w-0 rounded-act-sm border border-line bg-surface pl-8 pr-2.5 text-act-sm text-text-main outline-none placeholder:text-text-subtle hover:border-line-strong focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/15" /></span>
-          {tab === "requests" ? <>
-            <SettingsSelect size="sm" ariaLabel="筛选状态" value={status} options={statusOptions} onChange={(value) => setStatus(value as Status)} />
-          </> : null}
-          {search || queryStatus !== "all" ? <button className={button} onClick={() => { setSearch(""); setStatus("all"); }}>清除筛选</button> : null}
-          {tab === "requests" ? <label className="ml-auto flex h-[30px] shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-act-xs text-text-muted">显示明细<Toggle ariaLabel="显示明细" checked={details} onChange={setDetails} /></label> : null}
-        </div>
-        {tab === "providers" || tab === "models" || tab === "tools" ? <AggregateTable rows={data?.aggregates?.[tab] ?? []} tools={tab === "tools"} search={search} pending={Boolean(isLoading || error)} /> : !details ? <div className="flex items-center justify-between gap-3 rounded-act-md border border-line px-4 py-4 text-act-sm text-text-muted"><span>明细已隐藏</span><button className={button} onClick={() => setDetails(true)}>显示记录</button></div> : <>
-          <div className={tableFrame} onFocusCapture={(event) => {
-            // Native focus scrolling may leave a partially visible trigger
-            // clipped when Shift+Tab moves back across a narrow table.
-            (event.target as HTMLElement).closest("td")?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-          }}>
-            <table aria-label="请求日志" className="w-full min-w-[800px] table-fixed text-act-sm leading-5">
-              <colgroup><col className="w-[125px]" /><col className="w-[55px]" /><col /><col className="w-[130px]" /><col className="w-[80px]" /><col className="w-[95px]" /><col className="w-[75px]" /><col className="w-[65px]" /></colgroup>
-              <thead className={tableHead}><tr><th className={cell}>时间</th><th className={cell}>类型</th><th className={cell}>对象</th><th className={cell}>会话</th><th className={numberCell}>Token</th><th className={numberCell}>费用</th><th className={numberCell}>耗时</th><th className={cell}>状态</th></tr></thead>
-              <tbody className="divide-y divide-line/60">{rows.map((row) => <tr key={row.activityId} className="hover:bg-hover-overlay">
-                <td className={cell}><CellHint text={new Date(row.startedAt).toLocaleString("zh-CN")}><span className="block truncate tabular-nums text-text-muted">{new Date(row.startedAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span></CellHint></td>
-                <td className={`${cell} text-act-xs text-text-muted`}>{row.kind === "llm_request" ? "模型" : "工具"}</td>
-                <td className={cell}>{row.kind === "llm_request" ? <UsageHoverCard row={row} view="model"><span className="block truncate font-mono text-act-xs">{row.model?.replace(/^[^:]+:/, "") ?? "未知模型"}</span></UsageHoverCard> : <CellHint text={row.toolName ?? "未知工具"}><span className="block truncate">{row.toolName ?? "未知工具"}</span></CellHint>}</td>
-                <td className={cell}><CellHint text={row.sessionTitle ?? row.sessionId}><span className="block truncate text-text-muted">{row.sessionTitle ?? `未命名会话 · ${row.sessionId.slice(0, 8)}`}</span></CellHint></td>
-                <td className={numberCell}>{row.kind === "tool_invocation" ? <span className="text-text-subtle">—</span> : <UsageHoverCard row={row} view="tokens">{number(row.tokens.totalTokens)}</UsageHoverCard>}</td>
-                <td className={numberCell}>{row.kind === "tool_invocation" ? <span className="text-text-subtle">—</span> : row.costAmount == null || row.costCurrency !== "USD" ? (row.costProvenance?.reason === "model-price-unavailable" && row.tokens.totalTokens != null ? <CellHint text="该模型未配置价格"><span className="text-text-subtle">未知</span></CellHint> : <span className="text-text-subtle">未知</span>) : formatUsageAmount(row.costAmount, "USD")}</td>
-                <td className={numberCell}>{row.durationMs == null ? "—" : row.durationMs < 1000 ? `${Math.round(row.durationMs)}ms` : `${(row.durationMs / 1000).toFixed(2)}s`}</td>
-                <td className={`${cell} whitespace-nowrap`}><StatusDot tone={row.status === "error" ? "error" : row.status === "running" ? "ok" : row.status === "aborted" || row.status === "unknown" ? "warn" : "neutral"}>{labels[row.status]}</StatusDot></td>
-              </tr>)}</tbody>
-            </table>
-            {!rows.length && !isLoading && !error ? <Empty search={search || (status !== "all" ? status : "")} /> : null}
+  const costKnown = Boolean(cost && cost.knownCostRequestCount > 0);
+  const days = rangeDays(range, data?.series?.firstAt);
+  const perRequest = costKnown ? fmtUsd(average(cost!.costUsd, cost!.knownCostRequestCount), true) : DASH;
+  const costDetailText = !summary || summary.requestCount === 0 ? undefined
+    : range === "day" ? `每次请求 ${perRequest}`
+      : `日均 ${costKnown && days ? fmtUsd(cost!.costUsd / days) : DASH} · 每次请求 ${perRequest}`;
+  const toolCalls = data?.tools?.reduce((sum, tool) => sum + tool.calls, 0);
+  const bashCalls = data?.commands?.reduce((sum, command) => sum + command.calls, 0);
+  const gap = gapNote(data);
+  // 每次请求都没有用量时写「—」；显式的 0 照常显示。
+  const tokensAllUnknown = Boolean(summary && summary.requestCount > 0 && summary.unknownTokenRequestCounts.total >= summary.requestCount);
+  const loadingFirst = Boolean(isLoading && !data);
+  const timeUntimed = data?.timing?.untimedRequests ?? 0;
+
+  const tokenSegments = summary ? (prefs.tokenView === "type" ? tokenTypeSegments(summary) : tokenModelSegments(data?.aggregates?.models ?? [])) : [];
+  const timeSegments = data ? (prefs.timeView === "phase" ? phaseSegments(data) : toolTimeSegments(data)) : [];
+  const timeTotal = timeSegments.reduce((sum, segment) => sum + segment.value, 0);
+  const trend = data?.series ? trendModel(data.series, prefs.trendMetric) : null;
+  const heatValues = useMemo(() => new Map((data?.heatmap?.days ?? []).map((day) => [day.date, prefs.heatMetric === "sessions" ? day.sessions : day.tokens])), [data?.heatmap, prefs.heatMetric]);
+
+  const openDetail = (tab: DetailTab, sort?: () => void) => { update({ activeTab: tab }); sort?.(); jump("detail"); };
+
+  return (
+    <div className="min-w-0 text-text-main">
+      <PageShell width="wide" title="使用统计">
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="统计筛选">
+            <SegmentedControl size="sm" ariaLabel="统计时间范围" value={range} options={RANGE_OPTIONS} onChange={(value) => update({ range: RANGE_TO_PREF[value] })} />
+            {select("筛选模型", model, options?.models ?? [], "全部模型", setModel)}
+            {select("筛选提供商", providerId, options?.providers ?? [], "全部提供商", setProviderId)}
+            {select("筛选工作区", workspaceRoot, options?.workspaces ?? [], "全部工作区", setWorkspaceRoot, workspaceLabel)}
+            <IconButton label="刷新使用统计" variant="ghost" className="ml-auto" disabled={isLoading} onClick={() => query(data?.rowsPage.page ?? 1)}>
+              <RefreshCw size={15} aria-hidden="true" className={isLoading ? "animate-spin motion-reduce:animate-none" : undefined} />
+            </IconButton>
           </div>
-          {page && page.totalRows > 0 ? <div className="flex items-center justify-between text-act-xs text-text-faint"><span>{(page.page - 1) * page.pageSize + 1}–{Math.min(page.page * page.pageSize, page.totalRows)} / {page.totalRows}</span><div className="flex items-center gap-1"><button className={button} disabled={page.page <= 1 || isLoading} onClick={() => updatePage(page.page - 1)}>上一页</button><span>{page.page} / {page.totalPages}</span><button className={button} disabled={page.page >= page.totalPages || isLoading} onClick={() => updatePage(page.page + 1)}>下一页</button></div></div> : null}
-        </>}
-        {isLoading && data ? <p role="status" className="text-act-xs text-text-faint">正在刷新…</p> : null}
-      </section>
-    </PageShell>
-  </main>;
+
+          {isLoading && progress ? (
+            <div className="flex items-center justify-between gap-3 text-act-xs text-text-muted" role="status">
+              <span>{PROGRESS_LABEL[progress.phase]} · {progress.completedSessions}/{progress.totalSessions} 个会话 · 已读取 {fmtInt(progress.eventsRead)} 条记录</span>
+              <Button size="sm" variant="ghost" onClick={onCancel} disabled={progress.phase === "cancelled"}>取消查询</Button>
+            </div>
+          ) : null}
+          {data?.readModel?.failedSources ? <p role="status" className="text-act-sm text-warning">有 {fmtInt(data.readModel.failedSources)} 个会话暂时无法读取，当前统计不包含这些会话。可刷新重试。</p> : null}
+          {data?.readModel?.status === "fallback" ? <p role="status" className="text-act-sm text-warning">统计索引暂不可用，当前结果从会话记录读取。可刷新重试。</p> : null}
+          {data?.harnessUnavailable ? <p role="status" className="text-act-sm text-warning">工具、命令、Skills 与子 Agent 统计暂不可用，刷新后重试。</p> : null}
+          {error ? (
+            <div role="alert" className="flex items-start gap-2 rounded-act-md bg-danger-soft px-3 py-2 text-act-xs text-on-danger">
+              <div className="min-w-0 flex-1">
+                <p className="m-0 whitespace-pre-wrap break-all">{errorSummary}</p>
+                {error !== errorSummary ? (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer focus-visible:outline-2 focus-visible:outline-focus-ring">错误详情</summary>
+                    <p className="m-0 mt-1 whitespace-pre-wrap break-all">{error}</p>
+                  </details>
+                ) : null}
+              </div>
+              <Button size="xs" variant="ghost" className="shrink-0" onClick={() => query(1)}>重试</Button>
+            </div>
+          ) : null}
+
+          {loadingFirst ? <div role="status" className="rounded-act-md bg-surface-subtle p-5 text-act-sm text-text-faint">正在读取使用记录…</div> : (
+            <>
+              <MetricRow label="使用概览">
+                <MetricCard label="Token 用量" value={summary && !tokensAllUnknown ? fmtTokens(summary.totalTokens) : DASH} detail={summary ? `输入 ${fmtTokens(summary.inputTokens + summary.cacheReadTokens + summary.cacheWriteTokens)} · 输出 ${fmtTokens(summary.outputTokens)}` : undefined} onClick={() => jump("tokens")} />
+                <MetricCard label="费用" value={!summary || summary.requestCount === 0 ? DASH : costKnown ? fmtUsd(cost!.costUsd) : "费用未知"} detail={costDetailText}
+                  tip={cost?.unverifiedHistoricalRequestCount ? "包含来源未验证的历史记录" : undefined} onClick={() => { update({ trendMetric: "cost" }); jump("trend"); }} />
+                <MetricCard label="缓存命中率" value={summary ? fmtCacheHit(summary) : DASH} detail={summary ? `缓存读取 ${fmtTokens(summary.cacheReadTokens)}` : undefined} onClick={() => jump("tokens")} />
+                <MetricCard label="模型请求" value={fmtInt(summary?.requestCount)} detail={summary ? `失败 ${fmtInt(summary.failedRequestCount)} · 重试 ${fmtInt(summary.retryCount)}` : undefined} onClick={() => openDetail("models")} />
+                <MetricCard label="工具调用" value={fmtInt(toolCalls)} detail={bashCalls == null ? undefined : `Bash 命令 ${fmtInt(bashCalls)} 次`} onClick={() => jump("tools")} />
+              </MetricRow>
+              {gap ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0} className="-mt-2 w-fit max-w-full rounded-act-xs text-act-xxs text-text-faint hover:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">{gap.text}</span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[340px]"><ul className="m-0 list-none p-0">{gap.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></TooltipContent>
+                </Tooltip>
+              ) : null}
+
+              <CardGrid>
+                <StatsCard id="tokens" title="Token 统计" icon={Database} span={6} flash={flashId === "tokens"}
+                  aside={<SmallTabs ariaLabel="Token 统计视图" value={prefs.tokenView} onChange={(tokenView) => update({ tokenView })} options={[{ value: "type", label: "按类型" }, { value: "model", label: "按模型" }]} />}>
+                  <Donut ariaLabel="Token 构成" segments={tokenSegments} centerValue={fmtTokens(summary?.totalTokens)} centerLabel="总用量" />
+                </StatsCard>
+                <StatsCard id="time" title="耗时统计" icon={Clock} span={6} flash={flashId === "time"}
+                  aside={<SmallTabs ariaLabel="耗时统计视图" value={prefs.timeView} onChange={(timeView) => update({ timeView })} options={[{ value: "phase", label: "按阶段" }, { value: "tool", label: "按工具" }]} />}
+                  note={prefs.timeView === "tool" ? harnessNote : undefined}
+                  footer={prefs.timeView === "phase"
+                    ? `首字等待 = 发出请求到第一个 token；模型输出 = 第一个 token 到结束（思考与回复合在一起）。${timeUntimed > 0 ? `${fmtInt(timeUntimed)} 次请求没有首字记录，未计入。` : ""}`
+                    : "各工具从开始执行到出结果的时间，不含等待审批。"}>
+                  <Donut ariaLabel="耗时构成" segments={timeSegments} centerValue={fmtDuration(timeTotal)} centerLabel={prefs.timeView === "phase" ? "合计" : "工具合计"} />
+                </StatsCard>
+
+                <StatsCard id="trend" title="用量趋势" icon={ChartColumn} span={8} flash={flashId === "trend"}
+                  aside={<SmallTabs ariaLabel="用量趋势指标" value={prefs.trendMetric} onChange={(trendMetric) => update({ trendMetric })} options={[{ value: "tokens", label: "Token" }, { value: "cost", label: "费用" }, { value: "requests", label: "请求" }]} />}>
+                  {trend ? (
+                    <>
+                      <div className="mb-2 flex flex-col gap-0.5 text-act-xxs text-text-faint">
+                        <span>{trend.unitWord}最高 {fmtTrend(prefs.trendMetric, trend.max)}</span>
+                        <span>{trend.unitWord}平均 {fmtTrend(prefs.trendMetric, trend.average)}</span>
+                      </div>
+                      <BarChart ariaLabel="用量趋势" data={trend.bars} xLabels={trend.xLabels} />
+                    </>
+                  ) : null}
+                </StatsCard>
+                <StatsCard id="heat" title="活跃度" icon={Gauge} span={4} flash={flashId === "heat"} note={anyFilter ? "不受筛选影响" : undefined}
+                  aside={<SmallTabs ariaLabel="活跃度指标" value={prefs.heatMetric} onChange={(heatMetric) => update({ heatMetric })} options={[{ value: "sessions", label: "会话" }, { value: "tokens", label: "Token" }]} />}>
+                  <Heatmap ariaLabel="最近 14 周活跃度" values={heatValues} unit={prefs.heatMetric === "sessions" ? "个会话" : "token"} formatValue={prefs.heatMetric === "sessions" ? fmtInt : fmtTokens} />
+                </StatsCard>
+
+                <StatsCard id="skills" title="技能加载" icon={BookOpen} span={3} flash={flashId === "skills"} note={harnessNote}
+                  aside={data?.skills ? `${fmtInt(data.skills.reduce((sum, skill) => sum + skill.skillReads, 0))} 次` : undefined}>
+                  <RankList ariaLabel="技能加载" color="var(--act-context-skills)" rows={(data?.skills ?? []).map(skillRank)} empty="这段时间没有读过 Skill" />
+                </StatsCard>
+                <StatsCard id="tools" title="工具调用" icon={Code} span={3} flash={flashId === "tools"} note={harnessNote}
+                  aside={toolCalls == null ? undefined : `${fmtInt(toolCalls)} 次`}>
+                  <RankList ariaLabel="工具调用" color="var(--act-context-tools)" rows={(data?.tools ?? []).map(toolRank)} />
+                </StatsCard>
+                <StatsCard id="commands" title="命令执行" icon={Terminal} span={3} flash={flashId === "commands"} note={harnessNote}
+                  aside={bashCalls == null ? undefined : `${fmtInt(bashCalls)} 次`}>
+                  <RankList ariaLabel="命令执行" color="var(--act-context-rules)" rows={(data?.commands ?? []).map(commandRank)} />
+                </StatsCard>
+                <StatsCard id="agents" title="子 Agent 与辅助模型" icon={Bot} span={3} flash={flashId === "agents"} note={harnessNote}>
+                  <StatsScroll>
+                    <SubHeading aside={fmtUsd(data?.subagents?.reduce((sum, row) => sum + row.costUsd, 0))}>子 Agent</SubHeading>
+                    <RankList scroll={false} ariaLabel="子 Agent" color="var(--act-context-summarized)" empty="没有调用子 Agent" rows={(data?.subagents ?? []).map((row) => ({
+                      key: row.preset, name: row.preset, value: row.calls,
+                      sub: `平均 ${fmtDuration(average(row.durationMs, row.durationSamples))} · ${fmtTokens(row.totalTokens)} · ${fmtUsd(row.costUsd)}`,
+                      detail: { title: row.preset, mono: true, rows: [["失败", `${fmtInt(row.failed)} 次`], ["平均耗时", fmtDuration(average(row.durationMs, row.durationSamples))], ["Token / 费用", `${fmtTokens(row.totalTokens)} / ${fmtUsd(row.costUsd)}`]] },
+                    }))} />
+                    <div className="h-3" />
+                    <SubHeading aside={fmtUsd(data?.auxiliary?.reduce((sum, row) => sum + row.costUsd, 0))}>辅助模型</SubHeading>
+                    <RankList scroll={false} mono={false} ariaLabel="辅助模型" color="var(--act-context-system)" empty="没有辅助模型请求" rows={(data?.auxiliary ?? []).map((row) => ({
+                      key: row.purpose, name: PURPOSE_LABEL[row.purpose] ?? row.purpose, value: row.calls, sub: fmtUsd(row.costUsd),
+                      detail: { title: PURPOSE_LABEL[row.purpose] ?? row.purpose, rows: [["调用", `${fmtInt(row.calls)} 次`], ["费用", fmtUsd(row.costUsd)], ["平均每次", fmtUsd(average(row.costUsd, row.calls), true)]] },
+                    }))} />
+                  </StatsScroll>
+                </StatsCard>
+              </CardGrid>
+
+              <DetailSection id="detail" flash={flashId === "detail"}>
+                <UnderlineTabs ariaLabel="明细分类" idPrefix="usage-detail" value={prefs.activeTab} onChange={(activeTab) => update({ activeTab })} tabs={[
+                  { value: "requests", label: "请求明细", count: fmtInt(data?.rowsPage.totalRows) },
+                  { value: "models", label: "模型", count: fmtInt(data?.aggregates?.models.length) },
+                  { value: "providers", label: "提供商", count: fmtInt(data?.aggregates?.providers.length) },
+                  { value: "tools", label: "工具", count: fmtInt(data?.tools?.length) },
+                  { value: "commands", label: "命令", count: fmtInt(data?.commands?.length) },
+                  { value: "skills", label: "Skills", count: fmtInt(data?.skills?.length) },
+                ]} />
+                <div role="tabpanel" aria-labelledby={`usage-detail-tab-${prefs.activeTab}`} className="flex min-w-0 flex-col gap-2.5">
+                  {prefs.activeTab === "requests" ? (
+                    <DataTable ariaLabel="请求明细" columns={REQUEST_COLUMNS} rows={data?.rows ?? []} rowKey={(row) => row.activityId} empty="所选范围内暂无请求"
+                      footer={data ? <Pager page={data.rowsPage.page} totalPages={data.rowsPage.totalPages} totalRows={data.rowsPage.totalRows} busy={isLoading} onPageChange={query} /> : null} />
+                  ) : prefs.activeTab === "models" ? (
+                    <DataTable ariaLabel="模型" columns={MODEL_COLUMNS} rows={modelsWithLabels(data?.aggregates?.models ?? [])} rowKey={(row) => row.key} sort={modelSort} onSortChange={setModelSort} />
+                  ) : prefs.activeTab === "providers" ? (
+                    <DataTable ariaLabel="提供商" columns={PROVIDER_COLUMNS} rows={providerRows(data)} rowKey={(row) => row.key} defaultSort={{ key: "cost", dir: "desc" }} />
+                  ) : prefs.activeTab === "tools" ? (
+                    <DataTable ariaLabel="工具" columns={TOOL_COLUMNS} rows={data?.tools ?? []} rowKey={(row) => row.name} sort={toolSort} onSortChange={setToolSort} />
+                  ) : prefs.activeTab === "commands" ? (
+                    <DataTable ariaLabel="命令" columns={COMMAND_COLUMNS} rows={data?.commands ?? []} rowKey={(row) => row.program} defaultSort={{ key: "calls", dir: "desc" }} />
+                  ) : (
+                    <DataTable ariaLabel="Skills" columns={SKILL_COLUMNS} rows={data?.skills ?? []} rowKey={(row) => row.skillId} defaultSort={{ key: "reads", dir: "desc" }} />
+                  )}
+                </div>
+                {isLoading && data ? <p role="status" className="text-act-xs text-text-faint">正在刷新…</p> : null}
+              </DetailSection>
+            </>
+          )}
+        </div>
+      </PageShell>
+    </div>
+  );
 }
 
-function Metric({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return <div className="min-w-0 rounded-act-group border border-line bg-surface px-3.5 py-3"><div className="text-act-xs text-text-muted">{label}</div><div className="mb-0.5 mt-1 break-words text-act-xl font-semibold leading-tight tracking-tight tabular-nums">{value}</div>{detail ? <div className="text-act-xxs leading-relaxed text-text-faint">{detail}</div> : null}</div>;
-}
-function aggregateTokenValue(value: number | undefined, unknownCount: number, requestCount: number) {
-  return unknownCount > 0 && requestCount > 0 && unknownCount >= requestCount ? "—" : number(value);
-}
-function tokenPart(label: string, value: number | undefined, unknownCount: number, requestCount: number) {
-  return `${label} ${aggregateTokenValue(value, unknownCount, requestCount)}`;
-}
-function Empty({ search }: { search?: string }) { return <p className="py-12 text-center text-act-sm text-text-faint">{search ? "没有符合筛选条件的记录" : "所选时间范围内暂无使用记录"}</p>; }
-function AggregateTable({ rows, tools, search, pending }: { rows: UsageActivityAggregate[]; tools: boolean; search: string; pending: boolean }) {
-  return <div className={tableFrame}><table className="w-full text-act-sm"><thead className={tableHead}><tr><th className={cell}>{tools ? "工具" : "名称"}</th><th className={numberCell}>调用数</th><th className={numberCell}>{tools ? "失败数" : "Token"}</th><th className={numberCell}>{tools ? "耗时" : "费用"}</th></tr></thead><tbody className="divide-y divide-line/60">{rows.map((row) => {
-    const unknownTokenCount = tools ? 0 : row.unknownTokenRequestCount;
-    const tokenValue = tools ? row.errorCount : aggregateTokenValue(row.totalTokens, unknownTokenCount, row.count);
-    return <tr key={row.key} className="hover:bg-hover-overlay"><td className={cell}><div tabIndex={0} className="max-w-[230px] truncate font-medium" title={row.label}>{row.label}</div><div className="text-text-faint">{row.connectionId ?? row.providerId ?? ""}{row.costSummary.unknownCostRequestCount ? ` · ${row.costSummary.unknownCostRequestCount} 次费用未知` : ""}</div></td><td className={numberCell}>{number(row.count)}</td><td className={numberCell}>{tools ? number(row.errorCount) : <><div>{tokenValue}</div>{unknownTokenCount ? <div className="text-act-xxs text-text-faint">{unknownTokenCount} 次请求用量未知</div> : null}</>}</td><td className={numberCell}>{tools ? `${(row.durationMs / 1000).toFixed(1)} 秒` : money(row.costSummary)}</td></tr>;
-  })}</tbody></table>{!rows.length && !pending ? <Empty search={search} /> : null}</div>;
+// ---------------------------------------------------------------- 排行行
+
+function skillRank(skill: UsageSkillRow): RankRow {
+  return {
+    key: skill.skillId, name: skill.skillId, value: skill.skillReads,
+    sub: `读 SKILL.md ${fmtInt(skill.skillReads)}${skill.assetReads ? ` · 附属文件 ${fmtInt(skill.assetReads)}` : ""}`,
+    detail: { title: skill.skillId, mono: true, rows: [["最近一次", fmtRelativeDay(skill.lastReadAt)], ...skill.files.map((file) => ["读过", file] as const)] },
+  };
 }
 
-function CellHint({ text, children }: { text: string; children: React.ReactNode }) {
-  return <Tooltip><TooltipTrigger asChild><span tabIndex={0} className="block min-w-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">{children}</span></TooltipTrigger><TooltipContent className="max-w-[340px] whitespace-pre-line">{text}</TooltipContent></Tooltip>;
+function failureRows(codes: Record<string, number>): (readonly [string, string])[] {
+  const entries = Object.entries(codes).sort((a, b) => b[1] - a[1]);
+  return entries.length ? entries.map(([code, count]) => [`失败：${failureLabel(code)}`, `${fmtInt(count)} 次`] as const) : [["失败", "0"] as const];
 }
+
+function toolRank(tool: UsageToolRow): RankRow {
+  const rate = ratio(tool.failed, tool.calls) ?? 0;
+  const avg = average(tool.durationMs, tool.durationSamples);
+  return {
+    key: tool.name, name: tool.name, value: tool.calls,
+    sub: `平均 ${fmtDuration(avg)}${tool.failed ? ` · 失败 ${fmtInt(tool.failed)}` : ""}`,
+    tag: rate > 0.05 ? <Pill tone="err">{fmtPct(rate)}</Pill> : undefined,
+    detail: { title: tool.name, mono: true, rows: [
+      ["平均 / P95 耗时", `${fmtDuration(avg)} / ${tool.p95Ms == null ? DASH : `约 ${fmtDuration(tool.p95Ms)}`}`],
+      ["平均输出", tool.outputSamples ? `≈${fmtTokens(average(tool.outputTokens, tool.outputSamples))} token` : DASH],
+      ...failureRows(tool.failureCodes),
+    ] },
+  };
+}
+
+function commandRank(command: UsageCommandRow): RankRow {
+  const rate = ratio(command.failed, command.calls) ?? 0;
+  const avg = fmtDuration(average(command.durationMs, command.durationSamples));
+  const subs = SUBCOMMAND_PROGRAMS.has(command.program) && command.subcommands.length > 0;
+  return {
+    key: command.program, name: command.program, value: command.calls,
+    sub: subs ? command.subcommands.slice(0, 4).map((sub) => `${sub.name} ${fmtInt(sub.calls)}`).join(" · ") : `平均 ${avg}${command.failed ? ` · 失败 ${fmtInt(command.failed)}` : ""}`,
+    tag: rate > 0.1 ? <Pill tone="err">失败 {fmtInt(command.failed)}</Pill> : undefined,
+    detail: { title: command.program, mono: true, rows: [
+      ["失败", `${fmtInt(command.failed)} 次（${fmtPct(rate)}）`],
+      ["平均耗时", avg],
+      ...command.subcommands.map((sub) => [`${command.program} ${sub.name}`, `${fmtInt(sub.calls)} 次`] as const),
+    ] },
+  };
+}
+
+// ---------------------------------------------------------------- 明细表列
+
+const mono = "font-mono";
+const faint = (text: string) => <span className="text-text-subtle">{text}</span>;
+
+const REQUEST_COLUMNS: TableColumn<UsageActivityRow>[] = [
+  { key: "time", label: "时间", render: (row) => <span className="tabular-nums text-text-muted">{fmtDateTime(row.startedAt)}</span> },
+  { key: "session", label: "会话", className: "max-w-[200px]", render: (row) => <span className="text-text-muted" title={row.sessionTitle ?? row.sessionId}>{row.sessionTitle ?? `未命名会话 · ${row.sessionId.slice(0, 8)}`}</span> },
+  { key: "model", label: "模型", render: (row) => (
+    <span className="inline-flex items-center gap-1.5">
+      <HoverValue label={`${row.model ?? "未知模型"} 单价`} align="start" detail={priceDetail(row)}><span className={mono}>{row.model?.replace(/^[^:]+:/, "") ?? "未知模型"}</span></HoverValue>
+      {row.purpose ? <Pill>{PURPOSE_LABEL[row.purpose] ?? row.purpose}</Pill> : null}
+    </span>
+  ) },
+  { key: "ttft", label: "首字", align: "right", render: (row) => (row.ttftMs == null ? faint(DASH) : fmtDuration(row.ttftMs)) },
+  { key: "duration", label: "耗时", align: "right", render: (row) => {
+    const detail = timeDetail(row);
+    return detail ? <HoverValue label="耗时明细" detail={detail}>{fmtDuration(row.durationMs)}</HoverValue> : faint(DASH);
+  } },
+  { key: "tokens", label: "Token", align: "right", render: (row) => {
+    const detail = tokenDetail(row.tokens);
+    return detail ? <HoverValue label="Token 明细" detail={detail}>{fmtInt(row.tokens.totalTokens)}</HoverValue> : faint(DASH);
+  } },
+  { key: "cost", label: "费用", align: "right", render: (row) => {
+    const detail = costDetail(row);
+    if (detail) return <HoverValue label="费用明细" detail={detail}>{fmtUsd(row.costAmount, true)}</HoverValue>;
+    return row.costProvenance?.reason === "model-price-unavailable" && row.tokens.totalTokens != null
+      ? <span className="text-text-subtle" title="该模型未配置价格">未知</span>
+      : faint("未知");
+  } },
+  { key: "status", label: "状态", render: (row) => <Pill tone={STATUS_PILL[row.status].tone}>{STATUS_PILL[row.status].label}</Pill> },
+];
+
+type ModelRow = UsageActivityAggregate & { displayLabel: string };
+const MODEL_COLUMNS: TableColumn<ModelRow>[] = [
+  { key: "model", label: "模型", mono: true, render: (row) => row.label, sortValue: (row) => row.label },
+  { key: "provider", label: "提供商", render: (row) => <span className="text-text-muted">{row.providerId ?? DASH}</span>, sortValue: (row) => row.providerId ?? "" },
+  { key: "requests", label: "请求", align: "right", render: (row) => fmtInt(row.count), sortValue: (row) => row.count },
+  { key: "tokens", label: "Token", align: "right", render: (row) => <HoverValue label="Token 明细" detail={modelTokenDetail(row)}>{fmtTokens(row.totalTokens)}</HoverValue>, sortValue: (row) => row.totalTokens },
+  { key: "cache", label: "缓存命中", align: "right", render: (row) => fmtCacheHit(row), sortValue: (row) => cacheHitRate(row) },
+  { key: "ttft", label: "首字", align: "right", render: (row) => fmtDuration(average(row.ttftMs, row.ttftSamples)), sortValue: (row) => average(row.ttftMs, row.ttftSamples) },
+  { key: "speed", label: "速度", align: "right", render: (row) => { const speed = modelSpeed(row); return speed == null ? DASH : `${Math.round(speed)} tok/s`; }, sortValue: modelSpeed },
+  { key: "cost", label: "费用", align: "right", render: (row) => {
+    const detail = modelCostDetail(row);
+    return detail ? <HoverValue label="费用明细" detail={detail}>{fmtUsd(row.costSummary.costUsd)}</HoverValue> : faint("费用未知");
+  }, sortValue: (row) => (row.costSummary.knownCostRequestCount ? row.costSummary.costUsd : null) },
+];
+
+type ProviderRow = UsageActivityAggregate & { modelCount: number };
+function providerRows(data: UsageActivitySnapshot | null): ProviderRow[] {
+  const models = data?.aggregates?.models ?? [];
+  return (data?.aggregates?.providers ?? []).map((provider) => ({ ...provider, modelCount: models.filter((model) => model.key.startsWith(`${provider.key}/`)).length }));
+}
+const PROVIDER_COLUMNS: TableColumn<ProviderRow>[] = [
+  { key: "provider", label: "提供商", mono: true, render: (row) => row.label, sortValue: (row) => row.label },
+  { key: "models", label: "模型数", align: "right", render: (row) => fmtInt(row.modelCount), sortValue: (row) => row.modelCount },
+  { key: "requests", label: "请求", align: "right", render: (row) => fmtInt(row.count), sortValue: (row) => row.count },
+  { key: "failed", label: "失败", align: "right", render: (row) => fmtInt(row.errorCount), sortValue: (row) => row.errorCount },
+  { key: "tokens", label: "Token", align: "right", render: (row) => fmtTokens(row.totalTokens), sortValue: (row) => row.totalTokens },
+  { key: "cost", label: "费用", align: "right", render: (row) => (row.costSummary.knownCostRequestCount ? fmtUsd(row.costSummary.costUsd) : faint("费用未知")), sortValue: (row) => (row.costSummary.knownCostRequestCount ? row.costSummary.costUsd : null) },
+];
+
+const failRate = (row: { failed: number; calls: number }) => ratio(row.failed, row.calls);
+const TOOL_COLUMNS: TableColumn<UsageToolRow>[] = [
+  { key: "tool", label: "工具", mono: true, render: (row) => row.name, sortValue: (row) => row.name },
+  { key: "calls", label: "调用", align: "right", render: (row) => fmtInt(row.calls), sortValue: (row) => row.calls },
+  { key: "failed", label: "失败", align: "right", render: (row) => fmtInt(row.failed), sortValue: (row) => row.failed },
+  { key: "rate", label: "失败率", align: "right", render: (row) => fmtPct(failRate(row)), sortValue: failRate },
+  { key: "avg", label: "平均耗时", align: "right", render: (row) => fmtDuration(average(row.durationMs, row.durationSamples)), sortValue: (row) => average(row.durationMs, row.durationSamples) },
+  { key: "p95", label: "P95", align: "right", render: (row) => (row.p95Ms == null ? DASH : `约 ${fmtDuration(row.p95Ms)}`), sortValue: (row) => row.p95Ms },
+  { key: "output", label: "平均输出", align: "right", render: (row) => (row.outputSamples ? `≈${fmtTokens(average(row.outputTokens, row.outputSamples))}` : DASH), sortValue: (row) => average(row.outputTokens, row.outputSamples) },
+];
+
+const COMMAND_COLUMNS: TableColumn<UsageCommandRow>[] = [
+  { key: "program", label: "程序", mono: true, render: (row) => row.program, sortValue: (row) => row.program },
+  { key: "calls", label: "次数", align: "right", render: (row) => fmtInt(row.calls), sortValue: (row) => row.calls },
+  { key: "failed", label: "失败", align: "right", render: (row) => fmtInt(row.failed), sortValue: (row) => row.failed },
+  { key: "rate", label: "失败率", align: "right", render: (row) => fmtPct(failRate(row)), sortValue: failRate },
+  { key: "avg", label: "平均耗时", align: "right", render: (row) => fmtDuration(average(row.durationMs, row.durationSamples)), sortValue: (row) => average(row.durationMs, row.durationSamples) },
+  { key: "subs", label: "子命令", className: "max-w-[260px]", render: (row) => (row.subcommands.length ? <span className="text-text-muted">{row.subcommands.map((sub) => `${sub.name} ${fmtInt(sub.calls)}`).join(" · ")}</span> : faint(DASH)) },
+];
+
+const SKILL_COLUMNS: TableColumn<UsageSkillRow>[] = [
+  { key: "skill", label: "Skill", mono: true, render: (row) => row.skillId, sortValue: (row) => row.skillId },
+  { key: "reads", label: "读 SKILL.md", align: "right", render: (row) => fmtInt(row.skillReads), sortValue: (row) => row.skillReads },
+  { key: "assets", label: "读附属文件", align: "right", render: (row) => fmtInt(row.assetReads), sortValue: (row) => row.assetReads },
+  { key: "last", label: "最近一次", align: "right", render: (row) => fmtRelativeDay(row.lastReadAt), sortValue: (row) => row.lastReadAt },
+];

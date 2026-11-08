@@ -766,7 +766,7 @@ Usage UI
 - [`UsageStatisticsPage.tsx`](../../../../../apps/desktop/src/renderer/components/UsageStatisticsPage.tsx)
 - [`packages/util/shared/src/settings.ts`](../../../../../packages/util/shared/src/settings.ts)
 - [`packages/util/shared/src/ipc.ts`](../../../../../packages/util/shared/src/ipc.ts)
-- [`durable-session.ts`](../../../../../packages/core/runtime/src/projection/durable-session.ts) 与 [`usage-aggregates.ts`](../../../../../packages/client/client/src/sessions/usage-aggregates.ts)
+- [`durable-session.ts`](../../../../../packages/core/runtime/src/projection/durable-session.ts) 与 `usage-aggregates.ts`（2026-11-07 统计页重做时删除）
 
 ### Maka 参考实现
 

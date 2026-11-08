@@ -1,7 +1,8 @@
 import { localExecutionRoot } from "../target/run-target";
 import { PerformancePanel } from "./PerformancePanel";
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
-import type { AppSettings, SessionListItem, SettingsV4Snapshot, UsageActivitySnapshot, UsageStatisticsSnapshot, WorkspaceEntry } from "@actspace/shared";
+import type { AppSettings, SessionListItem, UsageActivitySnapshot, WorkspaceEntry } from "@actspace/shared";
+import { USAGE_REQUEST_PAGE_SIZE, type UsageQuery } from "./usage/usage-query";
 import { Suspense, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useActiveSession } from "../session/active-session-context";
 import { sameStringList, useTranscriptSelect } from "../session/transcript-context";
@@ -110,7 +111,6 @@ export const WorkbenchLayout = memo(function WorkbenchLayout({
   const [sessionMainView, setSessionMainView] = useState<SessionMainView>("chat");
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>(() => devStartSettingsSection() ?? "general");
   const [focusSpeech, setFocusSpeech] = useState(false);
-  const [usageSnapshot, setUsageSnapshot] = useState<UsageStatisticsSnapshot | null>(null);
   const [usageActivitySnapshot, setUsageActivitySnapshot] = useState<UsageActivitySnapshot | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
@@ -196,18 +196,13 @@ export const WorkbenchLayout = memo(function WorkbenchLayout({
       if (requestId) void usageApi.cancel({ requestId }).catch(error => console.warn("Usage cancellation during page cleanup failed", error));
     };
   }, [view, settingsSection, cancelUsage]);
-  const loadUsageStatistics = useCallback(async (
-    range: UsageStatisticsSnapshot["range"] = "month",
-    requestRowsPage = 1,
-    status: SettingsV4Snapshot["settings"]["activity"]["usage"]["status"] = "all",
-    search = "",
-    kind?: import("@actspace/shared").UsageActivityKind,
-  ) => {
+  const loadUsageStatistics = useCallback(async (query: UsageQuery) => {
     if (usageRequest.current) void usageApi.cancel({ requestId: usageRequest.current }).catch(error => console.warn("Superseded Usage cancellation failed", error));
     const requestId = crypto.randomUUID();
     usageRequest.current = requestId;
     const sequence = ++usageLoadSequence.current;
-    const cursorKey = JSON.stringify([range, status, search, kind, requestRowsPage]);
+    const { page, ...filters } = query;
+    const cursorKey = JSON.stringify([filters, page]);
     let polling = false;
     const poll = setInterval(() => {
       if (polling) return;
@@ -222,19 +217,17 @@ export const WorkbenchLayout = memo(function WorkbenchLayout({
       // 不传 sessionId 即走 main 的 global 路径，聚合所有 Session 历史。
       const input = {
         requestId,
-        range,
-        search,
-        kind,
         scope: "global",
-        ...(status === "all" ? {} : { status }),
-        requestRowsPage: { page: requestRowsPage, cursor: usageCursors.current.get(cursorKey) },
+        ...filters,
+        utcOffsetMinutes: -new Date().getTimezoneOffset(),
+        requestRowsPage: { page, limit: USAGE_REQUEST_PAGE_SIZE, cursor: usageCursors.current.get(cursorKey) },
       } as const;
       const activitySnapshot = await usageApi.getActivity(input);
       if (sequence !== usageLoadSequence.current) return;
       setUsageActivitySnapshot(activitySnapshot);
       if (activitySnapshot?.rowsPage.nextCursor) {
         if (usageCursors.current.size >= 64) usageCursors.current.clear();
-        usageCursors.current.set(JSON.stringify([range, status, search, kind, requestRowsPage + 1]), activitySnapshot.rowsPage.nextCursor);
+        usageCursors.current.set(JSON.stringify([filters, page + 1]), activitySnapshot.rowsPage.nextCursor);
       }
     } catch (error) {
       if (sequence !== usageLoadSequence.current) return;
@@ -331,18 +324,12 @@ export const WorkbenchLayout = memo(function WorkbenchLayout({
         onSectionChange={setSettingsSection}
         onSettingsChange={onSettingsChange}
         onArchivedSessionsChange={onArchivedSessionsChange}
-        usageSnapshot={usageSnapshot}
         usageActivitySnapshot={usageActivitySnapshot}
         usageProgress={usageProgress}
         onUsageCancel={cancelUsage}
         usageLoading={usageLoading}
         usageError={usageError}
-        onUsageRefresh={(nextRange, requestRowsPage, status, search, kind) => {
-          void loadUsageStatistics(nextRange, requestRowsPage, status, search, kind);
-        }}
-        onUsageRequestPageChange={(page, nextRange, status, search, kind) => {
-          void loadUsageStatistics(nextRange, page, status, search, kind);
-        }}
+        onUsageQuery={(query) => { void loadUsageStatistics(query); }}
         workspaces={workspaces}
       />
       </Suspense>

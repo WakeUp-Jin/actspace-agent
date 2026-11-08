@@ -27,7 +27,6 @@ import {
   type SessionRecord,
   type SelectWorkspaceDirectoryResult,
   type UsageStatisticsGetInput,
-  type UsageStatisticsSnapshot,
   type UsageActivitySnapshot,
   type SettingsV4ChangedNotification,
   type SettingsV4Snapshot,
@@ -659,7 +658,6 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   ipc.handle(contract.sessions.listContextPaths, input => contextPanel.listPaths(input));
   ipc.handle(contract.sessions.listContextEntries, input => contextPanel.listEntries(input));
   ipc.handle(contract.sessions.readContextEntry, input => contextPanel.readEntry(input));
-  ipc.handle(contract.usage.getStatistics, (input) => createUsageStatistics(options.registry, options.roots.dataRoot, input));
   ipc.handle(contract.usage.getActivity, (input) => createUsageActivity(options.registry, options.roots.dataRoot, input));
   ipc.handle(contract.sessions.getSubagents, async (input) => {
     const journal = await options.registry.inspectSessionEvents(input.sessionId);
@@ -794,16 +792,6 @@ async function toRunContent(
     throw error;
   }
   return { content: blocks, importedArtifactIds };
-}
-
-async function createUsageStatistics(
-  registry: DesktopRuntimeV2Registry,
-  dataRoot: string,
-  input: UsageStatisticsGetInput,
-): Promise<UsageStatisticsSnapshot | null> {
-  const service = usageReadModels.get(registry) ?? new UsageReadModelService(registry, dataRoot);
-  usageReadModels.set(registry, service);
-  return service.getStatistics(input);
 }
 
 const usageReadModels = new WeakMap<DesktopRuntimeV2Registry, UsageReadModelService>();

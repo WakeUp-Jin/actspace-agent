@@ -20,7 +20,8 @@
 | 窗口布局、分栏、折叠、右侧面板外壳与文件打开 | 工作台布局与面板交互；右侧面板与文件渲染 | 文档面板 |
 | Context 面板 | Context 面板 | 会话状态与数据流 |
 | 子 Agent、后台任务、侧边对话 | 子 Agent 与后台任务 | 右侧面板与文件渲染 |
-| 设置页、模型连接、使用统计、Harness 统计 | 设置页 | 组件与交互模式 §6 |
+| 设置页、模型连接 | 设置页 | 组件与交互模式 §6 |
+| 使用统计、Harness 统计 | 统计页 | 设置页 |
 | 会话数据、store、live 事件 | 会话状态与数据流 | Preload bridge 与 Mock |
 | 新增 IPC、写 mock、写测试 | Preload bridge 与 Mock | 前端验证约定 |
 | web / 手机端 | Web / PWA 客户端 | 视觉 token |
@@ -50,7 +51,8 @@
 - [Context 面板](front-Context面板规范.md)：当前上下文、会话统计、Bash 统计、路径卡片、契约字段。
 - [子 Agent 与后台任务](front-子Agent与后台任务规范.md)：子 Agent 列表与详情顶栏、后台任务、侧边对话。
 - [轨迹视图](front-轨迹视图规范.md)：轨迹页的结构、小字号白名单与交互。
-- [设置页](front-设置页规范.md)：设置信息架构、模型连接、使用统计、外观。
+- [设置页](front-设置页规范.md)：设置信息架构、模型连接、外观。
+- [统计页](front-统计页规范.md)：使用统计与 Harness 统计的共同骨架、指标口径、卡片、明细表与存储改动。
 - [会话状态与数据流](front-会话状态与数据流规范.md)：cell / live run / 本地状态、合并规则、evict。
 - [Preload bridge 与 Mock](front-preload-bridge与mock规范.md)：`window.actspace` 契约、`api/<域>`、新增 IPC 步骤、mock 与测试打桩。
 - [Web / PWA 客户端](front-web-pwa客户端规范.md)：`apps/web` 响应式客户端与视觉。
@@ -58,4 +60,4 @@
 
 ## 资产与 demo
 
-- 规范和 token 为准；demo 只用于选方向，选定后结论写进区域规范、demo 删除。保留的 demo（待 Electron 复验）：`context-bash-demo.html`、`subagent-style-demo.html`、`md-render-demo/`。
+- 规范和 token 为准；demo 只用于选方向，选定后结论写进区域规范、demo 删除。保留的 demo（待 Electron 复验）：`context-bash-demo.html`、`subagent-style-demo.html`、`md-render-demo/`、`stats-redesign-demo.html`。

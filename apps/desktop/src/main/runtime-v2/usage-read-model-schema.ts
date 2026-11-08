@@ -11,11 +11,14 @@ import type { DatabaseSync } from "node:sqlite";
  * v13 adds indexed unknown-token dimensions to activity and aggregate rollups;
  * v14 excludes Session-owned auxiliary usage from derived Run counts;
  * v15 adds Harness statistics tables (projected from the same journal pass);
- * v16 stops counting the parent prefix a fork / side chat copied (rebuild drops the old double counts). */
+ * v16 stops counting the parent prefix a fork / side chat copied (rebuild drops the old double counts);
+ * v17 adds context-history Bash tables;
+ * v18 statistics redesign: request TTFT / decode time, auxiliary purpose dimension, retries,
+ *     no tool rows in usage_activity, slimmed Harness tables (see front-统计页规范.md §5). */
 export function createReadModelSchema(db: DatabaseSync): void {
   db.exec(`
     PRAGMA application_id = 0x41555332;
-    PRAGMA user_version = 17;
+    PRAGMA user_version = 18;
     CREATE TABLE IF NOT EXISTS usage_write_mode(batching INTEGER NOT NULL) STRICT;
     INSERT INTO usage_write_mode SELECT 0 WHERE NOT EXISTS(SELECT 1 FROM usage_write_mode);
     CREATE TABLE IF NOT EXISTS session_catalog (
@@ -51,7 +54,7 @@ export function createReadModelSchema(db: DatabaseSync): void {
       model_key TEXT,
       provider_id TEXT,
       connection_id TEXT,
-      tool_name TEXT,
+      purpose TEXT,
       agent_run_id TEXT NOT NULL,
       turn_id TEXT,
       step_id TEXT,
@@ -61,6 +64,8 @@ export function createReadModelSchema(db: DatabaseSync): void {
       source_event_seq INTEGER NOT NULL,
       workspace_root TEXT,
       duration_ms REAL,
+      ttft_ms REAL,
+      decode_ms REAL,
       input_tokens INTEGER,
       output_tokens INTEGER,
       cache_read_tokens INTEGER,
@@ -73,6 +78,9 @@ export function createReadModelSchema(db: DatabaseSync): void {
       cache_write_tokens_unknown INTEGER GENERATED ALWAYS AS (cache_write_tokens IS NULL) STORED,
       reasoning_tokens_unknown INTEGER GENERATED ALWAYS AS (reasoning_tokens IS NULL) STORED,
       total_tokens_unknown INTEGER GENERATED ALWAYS AS (total_tokens IS NULL) STORED,
+      ttft_samples INTEGER GENERATED ALWAYS AS (ttft_ms IS NOT NULL) STORED,
+      decode_tokens INTEGER GENERATED ALWAYS AS (CASE WHEN decode_ms IS NOT NULL THEN output_tokens END) STORED,
+      retries INTEGER GENERATED ALWAYS AS (retry_of_request_id IS NOT NULL) STORED,
       cost_usd REAL,
       cost_amount REAL,
       cost_currency TEXT,
@@ -97,7 +105,7 @@ export function createReadModelSchema(db: DatabaseSync): void {
       DELETE FROM search_documents WHERE rowid=old.rowid;
     END;
     CREATE TRIGGER IF NOT EXISTS usage_dimensions_insert AFTER INSERT ON usage_activity WHEN (SELECT batching FROM usage_write_mode)=0 BEGIN
-      INSERT INTO usage_search_dimensions VALUES(new.search_key,COALESCE(new.model,'')||' '||COALESCE(new.provider_id,'')||' '||COALESCE(new.connection_id,'')||' '||COALESCE(new.tool_name,''),1) ON CONFLICT(search_key) DO UPDATE SET ref_count=ref_count+1;
+      INSERT INTO usage_search_dimensions VALUES(new.search_key,COALESCE(new.model,'')||' '||COALESCE(new.provider_id,'')||' '||COALESCE(new.connection_id,'')||' '||COALESCE(new.purpose,''),1) ON CONFLICT(search_key) DO UPDATE SET ref_count=ref_count+1;
     END;
     CREATE TRIGGER IF NOT EXISTS usage_dimensions_delete AFTER DELETE ON usage_activity BEGIN
       UPDATE usage_search_dimensions SET ref_count=ref_count-1 WHERE search_key=old.search_key;

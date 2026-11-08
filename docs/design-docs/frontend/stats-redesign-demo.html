@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>统计页样式 Demo</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "PingFang SC", monospace;
+  /* 照 tokens.css --act-color-* */
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --selected: #e4e4e1; --hover: #f3f3f0;
+  --line: #deded9; --line-soft: #ebebe7; --track: #ececE8;
+  --text: #20201e; --muted: #676762; --faint: #72726b; --subtle: #85857e;
+  --operational: #087a4b; --operational-soft: #e5f2ea;
+  --info: #3978b8; --info-soft: #e8f1f9;
+  --warning: #91600e; --warning-soft: #f7eedb;
+  --danger: #c74747; --danger-soft: #f8e9e9; --on-danger: #a93a3a;
+  /* 照 --act-context-* */
+  --k-system: #7d858b; --k-tools: #7a68ad; --k-rules: #087a4b; --k-skills: #91600e; --k-sum: #a84f7a; --k-conv: #b96831;
+  --heat: #087a4b;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+  --pop-shadow: 0 2px 6px rgba(0,0,0,.08), 0 12px 32px rgba(0,0,0,.12);
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #2b2c28; --selected: #34352f; --hover: #2a2b27;
+  --line: #353630; --line-soft: #2e2f2a; --track: #33342f;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #787870;
+  --operational: #36c783; --operational-soft: #193a2b;
+  --info: #6ca6da; --info-soft: #1e3345;
+  --warning: #e2ba6b; --warning-soft: #3d3220;
+  --danger: #e06b6b; --danger-soft: #452525; --on-danger: #f08a8a;
+  --k-system: #a2aaa9; --k-tools: #aa96d7; --k-rules: #55d99a; --k-skills: #e2ba6b; --k-sum: #dc8db4; --k-conv: #dfa06a;
+  --heat: #36c783;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.2);
+  --pop-shadow: 0 2px 6px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.45);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 13px/1.55 var(--font-ui); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; border-radius: 4px; }
+svg { flex-shrink: 0; display: block; }
+.mono { font-family: var(--font-mono); font-size: 12.5px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- demo 控制条 ---------- */
+.bar { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar h1 { margin: 0 4px 0 0; font-size: 13px; font-weight: 600; }
+.grp { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.seg button { padding: 2px 10px; border-radius: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; height: 22px; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--selected); }
+.why { max-width: 1120px; margin: 18px auto 0; padding: 0 20px; color: var(--faint); font-size: 12px; line-height: 1.75; }
+.why b { color: var(--text); font-weight: 600; }
+
+.src { display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 4px; font-size: 10.5px; font-weight: 500; white-space: nowrap; }
+.src.ok { background: var(--operational-soft); color: var(--operational); }
+.src.new { background: var(--warning-soft); color: var(--warning); }
+.src.chk { background: var(--info-soft); color: var(--info); }
+body.nosrc .src { display: none; }
+
+/* ---------- 页面外框 ---------- */
+.win { max-width: 1120px; margin: 14px auto 56px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.win-top { height: 40px; display: flex; align-items: center; gap: 7px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--surface-subtle); border-radius: 12px 12px 0 0; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--selected); }
+.win-top span { margin-left: 8px; font-size: 12px; color: var(--faint); }
+.page { padding: 28px 32px 36px; display: flex; flex-direction: column; gap: 14px; }
+@media (max-width: 720px) { .page { padding: 20px 14px 28px; } }
+.page-title h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+.page-sub { margin: -8px 0 0; color: var(--faint); font-size: 12.5px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.toolbar .sp { flex: 1; }
+.rseg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--surface-subtle); border: 1px solid var(--line-soft); }
+.rseg button { height: 24px; display: inline-flex; align-items: center; padding: 0 10px; font-size: 12px; color: var(--muted); border-radius: 6px; white-space: nowrap; }
+.rseg button:hover { color: var(--text); }
+.rseg button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .rseg button.on { background: var(--selected); }
+.dd { position: relative; }
+.chip { height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; font-size: 12px; color: var(--muted); background: var(--surface); white-space: nowrap; }
+.chip:hover { border-color: var(--subtle); color: var(--text); }
+.chip.set { color: var(--text); border-color: var(--subtle); }
+.menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; min-width: 170px; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--pop-shadow); }
+.menu button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 8px; border-radius: 6px; font-size: 12.5px; white-space: nowrap; }
+.menu button:hover { background: var(--hover); }
+.menu button.on::after { content: "✓"; color: var(--muted); }
+.menu .mh { padding: 4px 8px 2px; font-size: 11px; color: var(--faint); }
+.ib { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 7px; color: var(--muted); }
+.ib:hover { background: var(--hover); color: var(--text); }
+.spin svg { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- 指标卡 ---------- */
+.mgrid { display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 900px) { .mgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .mgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.metric { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 13px; min-width: 0; width: 100%; }
+button.metric:hover { border-color: var(--subtle); }
+.metric .l { font-size: 12px; color: var(--faint); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.metric .v { margin-top: 4px; font-size: 22px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.2; white-space: nowrap; }
+.metric .d { margin-top: 3px; font-size: 11.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- 卡片 ---------- */
+.cgrid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px; }
+.c3 { grid-column: span 3; } .c4 { grid-column: span 4; } .c5 { grid-column: span 5; } .c6 { grid-column: span 6; } .c7 { grid-column: span 7; } .c8 { grid-column: span 8; } .c12 { grid-column: span 12; }
+@media (max-width: 980px) { .c3 { grid-column: span 6; } .c4, .c5, .c7, .c8 { grid-column: span 12; } }
+@media (max-width: 760px) { .c3, .c6 { grid-column: span 12; } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 16px; min-width: 0; display: flex; flex-direction: column; transition: box-shadow .3s, border-color .3s; scroll-margin-top: 70px; }
+.detail-sec { display: flex; flex-direction: column; gap: 10px; border-radius: 12px; scroll-margin-top: 70px; transition: box-shadow .3s; }
+.flash { border-color: var(--warning); box-shadow: 0 0 0 3px var(--warning-soft); }
+.card-h { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; min-height: 24px; }
+.card-h > svg { color: var(--faint); }
+.card-h h3 { margin: 0; font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.card-h .aside { margin-left: auto; font-size: 12px; color: var(--faint); display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; }
+.card-f { margin-top: auto; padding-top: 10px; font-size: 11.5px; color: var(--faint); display: flex; gap: 6px; align-items: center; }
+.link { color: var(--muted); display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; margin-left: auto; }
+.link:hover { color: var(--text); }
+
+.tabs-s { display: inline-flex; gap: 2px; }
+.tabs-s button { padding: 1px 8px; border-radius: 5px; font-size: 12px; color: var(--faint); white-space: nowrap; height: 22px; }
+.tabs-s button:hover { color: var(--text); }
+.tabs-s button.on { background: var(--selected); color: var(--text); }
+
+/* 环图 */
+.donut-wrap { display: flex; align-items: center; gap: 20px; }
+@media (max-width: 520px) { .donut-wrap { flex-direction: column; align-items: stretch; } .donut { align-self: center; } }
+.donut { position: relative; width: 136px; height: 136px; flex: none; }
+.donut svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.donut circle { fill: none; stroke-width: 15; transition: opacity .12s, stroke-width .12s; cursor: pointer; }
+.donut .ctr { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; }
+.donut .ctr b { font-size: 18px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.donut .ctr span { font-size: 11px; color: var(--faint); max-width: 90px; }
+[data-hl] .donut circle.seg:not(.hl) { opacity: .28; }
+[data-hl] .donut circle.seg.hl { stroke-width: 18; }
+[data-hl] .lg:not(.hl) { opacity: .45; }
+.legend { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lg { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 50px; align-items: center; gap: 0 9px; padding: 5px 4px; margin: 0 -4px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; border-radius: 4px; transition: opacity .12s; width: calc(100% + 8px); }
+.lg:last-child { border-bottom: 0; }
+button.lg:hover { background: var(--hover); }
+.lg.sel { background: var(--hover); }
+.lg i { width: 8px; height: 8px; border-radius: 2px; display: block; }
+.lg .n { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg .val { color: var(--faint); font-size: 12px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lg .p { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* 榜单 */
+.rank { display: flex; flex-direction: column; gap: 2px; }
+.rk { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; align-items: baseline; font-size: 12.5px; padding: 4px 6px 5px; margin: 0 -6px; border-radius: 6px; width: calc(100% + 12px); }
+button.rk:hover { background: var(--hover); }
+.rk.open { background: var(--hover); }
+.rk .nm { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.rk .nm > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk .ct { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rk .sub { grid-column: 1 / -1; font-size: 11px; color: var(--faint); margin-top: -2px; }
+.rk .tr { grid-column: 1 / -1; height: 3px; border-radius: 2px; background: var(--track); overflow: hidden; }
+.rk .tr b { display: block; height: 100%; border-radius: 2px; background: var(--bar, var(--k-tools)); opacity: .85; }
+.rk-detail { grid-column: 1 / -1; margin-top: 6px; padding: 8px 10px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line-soft); font-size: 11.5px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+.rk-detail .row { display: flex; justify-content: space-between; gap: 10px; }
+.rk-detail .row span:last-child { font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap; }
+.pill { display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 4px; font-size: 10.5px; font-weight: 500; background: var(--surface-subtle); color: var(--muted); white-space: nowrap; flex: none; }
+.pill.warn { background: var(--warning-soft); color: var(--warning); }
+.pill.err { background: var(--danger-soft); color: var(--on-danger); }
+.pill.info { background: var(--info-soft); color: var(--info); }
+.pill.ok { background: var(--operational-soft); color: var(--operational); }
+/* 固定高度滚动框 + 细滚动条 + 底部渐隐 */
+.scroll-wrap { position: relative; margin-right: -10px; }
+.scroll { height: 336px; overflow-y: auto; padding: 0 10px 18px 0; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: transparent transparent; transition: scrollbar-color .2s;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent); }
+.card:hover .scroll { scrollbar-color: color-mix(in srgb, var(--text) 22%, transparent) transparent; }
+.scroll::-webkit-scrollbar { width: 6px; }
+.scroll::-webkit-scrollbar-track { background: transparent; margin: 2px 0 18px; }
+.scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+.card:hover .scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 18%, transparent); }
+.scroll::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text) 34%, transparent) !important; }
+.rk.has-hc { cursor: default; }
+.rk.has-hc:hover, .rk.has-hc:focus-visible { background: var(--hover); }
+
+/* 悬停详情卡（同现有 UsageHoverCard） */
+.hc-trigger { cursor: help; border-radius: 3px; text-decoration: underline dotted color-mix(in srgb, var(--text) 30%, transparent); text-underline-offset: 3px; }
+.hc-trigger:hover { text-decoration-color: var(--text); }
+#hc { position: fixed; z-index: 60; width: 216px; padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--pop-shadow); font-size: 12px; line-height: 1.5; opacity: 0; pointer-events: none; transform: translateY(-2px); transition: opacity .1s, transform .1s; }
+#hc.on { opacity: 1; pointer-events: auto; transform: none; }
+#hc .hc-t { font-weight: 600; font-size: 12px; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hc dl { margin: 0; display: flex; flex-direction: column; gap: 3px; }
+#hc dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; }
+#hc dt { color: var(--muted); white-space: nowrap; }
+#hc dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#hc .hc-sum { margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--line); font-weight: 500; }
+#hc .hc-note { margin-top: 7px; color: var(--faint); font-size: 11px; white-space: normal; }
+
+/* 指标卡里的版本变化 */
+.metric .qi { color: var(--subtle); display: inline-flex; cursor: help; }
+.metric .qi:hover { color: var(--text); }
+.metric .dv { margin-top: 5px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+.metric .dv.good { color: var(--operational); } .metric .dv.bad { color: var(--on-danger); } .metric .dv.flat { color: var(--faint); }
+
+.kv { display: flex; flex-direction: column; }
+.kv > div { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-size: 12.5px; }
+.kv > div:last-child { border-bottom: 0; }
+.kv span:first-child { color: var(--muted); min-width: 0; }
+.kv span:last-child { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.kv .warn { color: var(--warning); } .kv .bad { color: var(--on-danger); } .kv .good { color: var(--operational); }
+.stats3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.stats3 > div { background: var(--surface-subtle); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.stats3 b { display: block; font-size: 17px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stats3 span { font-size: 11px; color: var(--faint); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sbar { display: flex; gap: 2px; height: 10px; border-radius: 3px; overflow: hidden; }
+.sbar b { display: block; min-width: 3px; }
+.slegend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 7px; font-size: 11.5px; color: var(--muted); }
+.slegend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.slegend i { width: 7px; height: 7px; border-radius: 2px; display: block; }
+.slegend em { font-style: normal; color: var(--faint); font-variant-numeric: tabular-nums; }
+.sub-h { font-size: 11.5px; color: var(--faint); margin: 12px 0 6px; display: flex; justify-content: space-between; gap: 10px; }
+.sub-h:first-child { margin-top: 0; }
+.limit { font-size: 11.5px; color: var(--faint); background: var(--surface-subtle); border-radius: 6px; padding: 5px 8px; margin-bottom: 10px; }
+.empty { padding: 18px 0; text-align: center; font-size: 12px; color: var(--faint); }
+
+/* 柱状图 */
+.bars { display: flex; align-items: flex-end; gap: 3px; height: 128px; padding-bottom: 1px; border-bottom: 1px solid var(--line); }
+.bars b { flex: 1; display: block; border-radius: 2px 2px 0 0; background: var(--bar, var(--info)); opacity: .8; min-height: 1px; }
+.bars b:hover { opacity: 1; }
+.bars.sm { height: 70px; gap: 4px; }
+.bars-x { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); margin-top: 5px; }
+.bars-x.even { gap: 4px; }
+.bars-x.even span { flex: 1; text-align: center; white-space: nowrap; }
+.yhint { font-size: 11px; color: var(--faint); margin-bottom: 4px; display: flex; justify-content: space-between; }
+
+/* 热力图 */
+.heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; }
+.heat i { aspect-ratio: 1; border-radius: 3px; background: var(--surface-subtle); min-width: 0; display: block; }
+.heat i[data-l="1"] { background: color-mix(in srgb, var(--heat) 22%, var(--surface-subtle)); }
+.heat i[data-l="2"] { background: color-mix(in srgb, var(--heat) 42%, var(--surface-subtle)); }
+.heat i[data-l="3"] { background: color-mix(in srgb, var(--heat) 66%, var(--surface-subtle)); }
+.heat i[data-l="4"] { background: var(--heat); }
+.heat i:hover { outline: 1.5px solid var(--text); outline-offset: 1px; }
+.hmonths { display: grid; margin-top: 5px; font-size: 11px; color: var(--faint); }
+.hmonths span { white-space: nowrap; }
+.hlegend { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--faint); justify-content: flex-end; margin-top: 8px; }
+.hlegend i { width: 10px; height: 10px; border-radius: 2px; display: block; }
+
+/* 占用 vs 使用：A 两边对比 */
+.vs-head { display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1fr) 132px; gap: 0 12px; font-size: 11.5px; color: var(--faint); padding: 0 6px 6px; border-bottom: 1px solid var(--line-soft); }
+.vs-head span:nth-child(2) { text-align: right; }
+.vs-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1fr) 132px; gap: 0 12px; align-items: center; padding: 6px 6px; margin: 0; border-radius: 6px; width: 100%; font-size: 12.5px; }
+.vs-row:hover, .vs-row.open { background: var(--hover); }
+.vs-row .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vs-l, .vs-r { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vs-l { justify-content: flex-end; }
+.vs-l b, .vs-r b { display: block; height: 10px; border-radius: 2px; }
+.vs-l b { background: var(--k-conv); opacity: .75; }
+.vs-r b { background: var(--k-rules); opacity: .75; }
+.vs-l span, .vs-r span { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vs-axis { width: 1px; }
+.vs-verdict { display: flex; justify-content: flex-end; }
+.vs-detail { grid-column: 1 / -1; margin: 6px 0 2px; }
+@media (max-width: 760px) { .vs-head, .vs-row { grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr); } .vs-head span:last-child, .vs-verdict { display: none; } }
+
+/* 占用 vs 使用：B 账单 */
+.bill { display: flex; flex-direction: column; }
+.bill-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 9px 6px; border-bottom: 1px solid var(--line-soft); width: 100%; border-radius: 6px; }
+.bill-row:hover, .bill-row.open { background: var(--hover); }
+.bill-row .no { font-size: 12px; color: var(--subtle); font-variant-numeric: tabular-nums; text-align: right; }
+.bill-row .ttl { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bill-row .ttl .mono { font-size: 13px; font-weight: 500; }
+.bill-row .eq { grid-column: 2; font-size: 12px; color: var(--muted); }
+.bill-row .eq b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+.bill-row .per { grid-row: 1 / span 2; grid-column: 3; text-align: right; }
+.bill-row .per b { display: block; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.bill-row .per span { font-size: 11px; color: var(--faint); }
+.bill-row .per.hot b { color: var(--warning); }
+.bill-row .per.dead b { color: var(--on-danger); }
+.bill-row .vs-detail { grid-column: 2 / -1; }
+
+/* 值得关注 */
+.flags { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.flags-h { display: flex; align-items: center; gap: 8px; padding: 10px 14px 8px; font-size: 13.5px; font-weight: 600; }
+.flags-h .aside { margin-left: auto; font-weight: 400; font-size: 12px; color: var(--faint); }
+.flag { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 9px 14px; border-top: 1px solid var(--line-soft); width: 100%; }
+.flag:hover { background: var(--hover); }
+.flag .t { display: block; font-size: 13px; font-weight: 500; }
+.flag .d { display: block; font-size: 12px; color: var(--faint); margin-top: 1px; }
+.flag .cat { font-size: 11.5px; color: var(--subtle); white-space: nowrap; display: flex; align-items: center; gap: 2px; margin-top: 2px; }
+.flag svg.lv { margin-top: 2px; }
+.flag.error svg.lv { color: var(--danger); } .flag.warn svg.lv { color: var(--warning); } .flag.info svg.lv { color: var(--info); }
+
+/* 对比 */
+.cmp { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 0 14px; font-size: 12.5px; }
+.cmp > span { padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cmp > span.h { color: var(--faint); font-size: 11.5px; padding-top: 0; }
+.cmp .r { text-align: right; }
+.cmp .lab { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.delta { font-size: 11.5px; font-weight: 500; }
+.delta.good { color: var(--operational); } .delta.bad { color: var(--on-danger); } .delta.flat { color: var(--faint); }
+
+/* 明细 */
+.utabs { display: flex; gap: 20px; border-bottom: 1px solid var(--line); overflow-x: auto; margin-top: 6px; }
+.utab { padding: 7px 0; margin-bottom: -1px; border-bottom: 2px solid transparent; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.utab:hover { color: var(--text); }
+.utab.on { color: var(--text); border-color: var(--text); font-weight: 500; }
+.utab em { font-style: normal; color: var(--subtle); margin-left: 4px; font-size: 12px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.tbl th { text-align: left; font-weight: 500; color: var(--faint); padding: 0; border-bottom: 1px solid var(--line); font-size: 12px; white-space: nowrap; }
+.tbl th button { padding: 7px 12px; width: 100%; text-align: inherit; display: inline-flex; gap: 3px; align-items: center; }
+.tbl th.r button { justify-content: flex-end; }
+.tbl th button:hover { color: var(--text); }
+.tbl th.sorted button { color: var(--text); }
+.tbl td { padding: 8px 12px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+.tbl th.r, .tbl td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl tbody tr:hover td { background: var(--hover); }
+.tblf { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: auto; }
+.tblf .tbl tbody tr:last-child td { border-bottom: 0; }
+.pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 12px; color: var(--faint); }
+.pager button { height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); }
+.pager button:disabled { opacity: .45; cursor: default; }
+.tblnote { font-size: 11.5px; color: var(--faint); }
+
+/* 悬停提示 */
+#tip { position: fixed; z-index: 50; pointer-events: none; padding: 6px 9px; border-radius: 7px; background: var(--text); color: var(--bg); font-size: 11.5px; line-height: 1.5; max-width: 280px; box-shadow: var(--pop-shadow); opacity: 0; transition: opacity .08s; white-space: pre-line; }
+#tip.on { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <h1>统计页样式 Demo</h1>
+  <div class="grp">页面<div class="seg" data-ctl="page"><button data-v="usage">使用统计</button><button data-v="harness">Harness 统计</button></div></div>
+  <div class="grp" id="grp-vs">占用 vs 使用<div class="seg" data-ctl="vsStyle"><button data-v="bill">A 每用一次花多少</button><button data-v="bars">B 两边对比</button></div></div>
+  <div class="grp">主题<div class="seg" data-ctl="theme"><button data-v="light">浅色</button><button data-v="dark">深色</button></div></div>
+  <div class="grp">数据来源标注<div class="seg" data-ctl="src"><button data-v="on">显示</button><button data-v="off">隐藏</button></div></div>
+  <div class="grp" style="margin-left:auto"><span class="src ok">现成数据</span><span class="src new">需新增汇总</span><span class="src chk">待核实</span></div>
+</div>
+
+<div class="why" id="why"></div>
+<div class="win">
+  <div class="win-top"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span id="win-title"></span></div>
+  <div class="page" id="page"></div>
+</div>
+<div id="tip" role="tooltip"></div>
+<div id="hc" role="dialog"></div>
+
+<script>
+/* =====================================================================
+   图标
+   ===================================================================== */
+const I = {
+  refresh: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>',
+  db: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  gauge: '<path d="M12 14l4-4"/><path d="M3.3 19a10 10 0 1 1 17.4 0"/>',
+  book: '<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M8 7h8"/>',
+  code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+  term: '<path d="m4 17 6-6-6-6"/><path d="M12 19h8"/>',
+  cpu: '<rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/>',
+  layers: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+  tri: '<path d="m12 3 10 18H2z"/><path d="M12 10v5M12 18h.01"/>',
+  x: '<circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  chev: '<path d="m9 6 6 6-6 6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  up: '<path d="m6 15 6-6 6 6"/>',
+  chart: '<path d="M3 3v18h18"/><path d="M7 15v3M11 10v8M15 12v6M19 6v12"/>',
+  bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/>',
+  zap: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  plug: '<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/>',
+  shrink: '<path d="m4 14 6 0 0 6"/><path d="m20 10-6 0 0-6"/><path d="m14 10 7-7M3 21l7-7"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  loop: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
+  branch: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 4-6 3-11 5.5"/>',
+  diff: '<path d="M12 3v14M5 10h14"/><path d="M5 21h14"/>',
+  scale: '<path d="M12 3v18M7 21h10"/><path d="M5 7h14"/><path d="m5 7-3 7a4 4 0 0 0 6 0z"/><path d="m19 7-3 7a4 4 0 0 0 6 0z"/>'
+};
+const ic = (n, s = 15, w = 1.8, cls = '') => `<svg class="${cls}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
+
+/* =====================================================================
+   状态
+   ===================================================================== */
+const S = {
+  page: 'usage', theme: 'light', src: 'on', vsStyle: 'bill',
+  range: 'month', menu: null,
+  filters: { model: null, provider: null, workspace: null, mode: null, kind: '主会话', revision: '默认@12' },
+  // 使用统计
+  tokenView: 'type', timeView: 'phase', dailyMetric: 'tokens', heatMetric: 'sessions', modelSort: 'tokens',
+  // Harness
+  vsTab: 'tools', ctxCat: null, discView: 'active', loopView: 'steps', agentTab: 'sub', rtTab: 'service', cmpFrom: '默认@11', cmpTo: '默认@12', compView: 'summary',
+  // 共用
+  open: {}, all: {}, hl: {},
+  usageTab: 'requests', harnessTab: 'tools', sort: {}, pageNo: 1, refreshing: false
+};
+new URLSearchParams(location.hash.slice(1)).forEach((v, k) => { if (k in S && typeof S[k] === 'string') S[k] = v; });
+
+const RANGE = { day: ['24 小时', 0.04], week: ['7 天', 0.24], month: ['30 天', 1], total: ['全部', 2.7] };
+const F = () => RANGE[S.range][1] * (S.filters.model ? 0.55 : 1) * (S.filters.workspace ? 0.6 : 1) * (S.filters.mode ? 0.5 : 1);
+const sc = n => Math.max(0, Math.round(n * F()));
+const scf = n => n * F();
+const rangeWord = () => ({ day: '近 24 小时', week: '近 7 天', month: '近 30 天', total: '全部时间' })[S.range];
+
+/* =====================================================================
+   通用部件
+   ===================================================================== */
+const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e4 ? (n / 1e3).toFixed(1) + 'k' : Math.round(n).toLocaleString('en-US');
+const fmtK = n => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(Math.round(n));
+const money = n => '$' + (n >= 100 ? n.toFixed(2) : n >= 1 ? n.toFixed(2) : n.toFixed(3));
+const pct = (v, t, d = 1) => t ? (v / t * 100).toFixed(d) + '%' : '—';
+const dur = s => s >= 3600 ? `${Math.floor(s / 3600)}h${String(Math.round(s % 3600 / 60)).padStart(2, '0')}m` : s >= 60 ? `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, '0')}s` : s >= 10 ? Math.round(s) + 's' : s >= 1 ? s.toFixed(1) + 's' : s >= 0.1 ? s.toFixed(1) + 's' : '<0.1s';
+const SRC = { ok: '<span class="src ok">现成数据</span>', new: '<span class="src new">需新增汇总</span>', chk: '<span class="src chk">待核实</span>' };
+const esc = s => String(s).replace(/"/g, '&quot;');
+
+function tabsS(key, items) { return `<span class="tabs-s" role="tablist">${items.map(([v, l]) => `<button role="tab" aria-selected="${S[key] === v}" class="${S[key] === v ? 'on' : ''}" data-set="${key}" data-v="${v}">${l}</button>`).join('')}</span>`; }
+function card(id, title, icon, aside, body, span, src = '', foot = '') {
+  return `<section class="card ${span}" id="card-${id}"><div class="card-h">${ic(icon)}<h3>${title}</h3>${src}<span class="aside">${aside || ''}</span></div>${body}${foot ? `<div class="card-f">${foot}</div>` : ''}</section>`;
+}
+function metric(l, v, d, src = '', target, set, dv, tipText) {
+  const inner = `<div class="l">${l}${src}${tipText ? `<span class="qi" data-tip="${esc(tipText)}">${ic('info', 12, 2)}</span>` : ''}</div><div class="v">${v}</div>${d ? `<div class="d">${d}</div>` : ''}${dv ? `<div class="dv ${dv[0]}">${dv[1]}</div>` : ''}`;
+  return target ? `<button class="metric" data-go="${target}" ${set ? `data-goset="${esc(JSON.stringify(set))}"` : ''}>${inner}</button>` : `<div class="metric">${inner}</div>`;
+}
+function donut(id, segs, big, small, valFmt) {
+  const total = segs.reduce((s, x) => s + x.v, 0) || 1, R = 54, C = 2 * Math.PI * R, gap = segs.length > 1 ? 2.2 : 0;
+  const hl = S.hl[id];
+  let off = 0;
+  const arcs = segs.map((s, i) => {
+    const len = s.v / total * C, dash = Math.max(len - gap, 0.6);
+    const el = `<circle class="seg ${hl === i ? 'hl' : ''}" cx="68" cy="68" r="${R}" stroke="${s.c}" stroke-dasharray="${dash} ${C - dash}" stroke-dashoffset="${-off}" data-hl="${id}" data-i="${i}" data-tip="${esc(`${s.n}\n${valFmt(s)} · ${pct(s.v, total)}`)}"></circle>`;
+    off += len; return el;
+  }).join('');
+  const lg = segs.map((s, i) => `<button class="lg ${hl === i ? 'hl' : ''}" data-hl="${id}" data-i="${i}"><i style="background:${s.c}"></i><span class="n">${s.n}</span><span class="val">${valFmt(s)}</span><span class="p">${pct(s.v, total)}</span></button>`).join('');
+  const center = hl != null && segs[hl] ? `<b>${pct(segs[hl].v, total)}</b><span>${segs[hl].n}</span>` : `<b>${big}</b><span>${small}</span>`;
+  return `<div class="donut-wrap" ${hl != null ? 'data-hl' : ''}><div class="donut"><svg viewBox="0 0 136 136"><circle cx="68" cy="68" r="${R}" stroke="var(--track)" fill="none" stroke-width="15"/>${arcs}</svg><div class="ctr">${center}</div></div><div class="legend">${lg}</div></div>`;
+}
+function sbar(segs) {
+  const total = segs.reduce((s, x) => s + x.v, 0) || 1;
+  return `<div class="sbar">${segs.map(s => `<b style="flex:${s.v / total};background:${s.c}" data-tip="${esc(`${s.n}：${s.label ?? fmt(s.v)}（${pct(s.v, total)}）`)}"></b>`).join('')}</div>
+  <div class="slegend">${segs.map(s => `<span><i style="background:${s.c}"></i>${s.n}<em>${s.label ?? fmt(s.v)}</em></span>`).join('')}</div>`;
+}
+const kv = rows => `<div class="kv">${rows.map(([a, b, cls]) => `<div><span>${a}</span><span class="${cls || ''}">${b}</span></div>`).join('')}</div>`;
+const stats3 = rows => `<div class="stats3">${rows.map(([v, l, tip]) => `<div ${tip ? `data-tip="${esc(tip)}"` : ''}><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
+const detail = rows => `<div class="rk-detail">${rows.map(([a, b]) => `<div class="row"><span>${a}</span><span>${b}</span></div>`).join('')}</div>`;
+/* 可展开榜单：rows = [{id, n, v, label, sub, tag, c, detail:[[k,v]]}] */
+/* 榜单：全部显示，外面套固定高度滚动框；有 detail 的行悬停出详情卡 */
+function rank(key, rows, color, opt = {}) {
+  const max = Math.max(...rows.map(r => r.v), 1);
+  const html = rows.map(r => {
+    const hc = r.detail ? `data-hc="${esc(hcCard(r.n, r.detail, opt.mono !== false))}" tabindex="0"` : '';
+    return `<div class="rk ${r.detail ? 'has-hc' : ''}" ${hc}><span class="nm"><span class="${opt.mono === false ? '' : 'mono'}">${r.n}</span>${r.tag || ''}</span><span class="ct">${r.label ?? '×' + fmt(r.v)}</span>${r.sub ? `<span class="sub">${r.sub}</span>` : ''}<span class="tr"><b style="width:${r.v / max * 100}%;--bar:${r.c || color}"></b></span></div>`;
+  }).join('');
+  return `<div class="rank">${html || '<div class="empty">这段时间没有数据</div>'}</div>`;
+}
+/* 悬停详情卡（对应现有 UsageHoverCard 的样子） */
+function hcCard(title, rows, mono = false, total) {
+  return `<div class="hc-t ${mono ? 'mono' : ''}">${title}</div><dl>${rows.map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join('')}</dl>${total ? `<dl class="hc-sum"><div><dt>${total[0]}</dt><dd>${total[1]}</dd></div></dl>` : ''}`;
+}
+const hcWrap = (inner, card) => `<span class="hc-trigger" tabindex="0" data-hc="${esc(card)}">${inner}</span>`;
+const scrollBox = inner => `<div class="scroll-wrap"><div class="scroll">${inner}</div></div>`;
+const allLink = (key, total, noun) => total > 6 ? `<button class="link" data-all="${key}">${S.all[key] ? '收起' : `全部 ${total} 个${noun || ''}`}${ic(S.all[key] ? 'up' : 'chev', 12, 2)}</button>` : '';
+function bars(vals, color, opt = {}) {
+  const max = Math.max(...vals, 1);
+  return `<div class="bars ${opt.cls || ''}">${vals.map((v, i) => `<b style="height:${v / max * 100}%;--bar:${Array.isArray(color) ? color[i] : color}" data-tip="${esc(opt.tip ? opt.tip(i, v) : v)}"></b>`).join('')}</div>`;
+}
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* 筛选下拉 */
+function dropdown(key, label, options, allLabel) {
+  const cur = S.filters[key], open = S.menu === key;
+  return `<div class="dd"><button class="chip ${cur ? 'set' : ''}" data-menu="${key}" aria-expanded="${open}">${cur ? `${label} ${cur}` : allLabel}${ic('down', 12)}</button>
+    ${open ? `<div class="menu" role="menu">${allLabel ? `<button class="${!cur ? 'on' : ''}" data-filter="${key}" data-v="">${allLabel}</button>` : ''}${options.map(o => `<button class="${cur === o ? 'on' : ''}" data-filter="${key}" data-v="${esc(o)}">${o}</button>`).join('')}</div>` : ''}</div>`;
+}
+const rangeSeg = () => `<div class="rseg" role="tablist" aria-label="时间范围">${Object.entries(RANGE).map(([k, [l]]) => `<button class="${S.range === k ? 'on' : ''}" data-set="range" data-v="${k}">${l}</button>`).join('')}</div>`;
+const refreshBtn = () => `<button class="ib ${S.refreshing ? 'spin' : ''}" data-act="refresh" aria-label="刷新" data-tip="刷新">${ic('refresh')}</button>`;
+
+/* 可排序表格：cols = [{k, l, r, fmt}] */
+function table(id, cols, rows, opt = {}) {
+  const sort = S.sort[id] || opt.defaultSort || {};
+  let data = [...rows];
+  if (sort.k) data.sort((a, b) => { const x = a[sort.k], y = b[sort.k]; return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y))) * (sort.dir === 'asc' ? 1 : -1); });
+  const per = opt.pageSize, total = data.length, pages = per ? Math.max(1, Math.ceil(total / per)) : 1;
+  const pageNo = Math.min(S.pageNo, pages);
+  if (per) data = data.slice((pageNo - 1) * per, pageNo * per);
+  const th = cols.map(c => `<th class="${c.r ? 'r' : ''} ${sort.k === c.k ? 'sorted' : ''}"><button data-sort="${id}" data-k="${c.k}">${c.l}${sort.k === c.k ? ic(sort.dir === 'asc' ? 'up' : 'down', 11, 2) : ''}</button></th>`).join('');
+  const tb = data.map(r => `<tr>${cols.map(c => `<td class="${c.r ? 'r' : ''} ${c.mono ? 'mono' : ''}">${c.fmt ? c.fmt(r[c.k], r) : r[c.k]}</td>`).join('')}</tr>`).join('');
+  return `<div class="tblf"><table class="tbl"><thead><tr>${th}</tr></thead><tbody>${tb || `<tr><td colspan="${cols.length}" class="empty">没有数据</td></tr>`}</tbody></table></div>
+  ${per && pages > 1 ? `<div class="pager"><span>第 ${pageNo} / ${pages} 页 · 共 ${fmt(total)} 条</span><button data-page="-1" ${pageNo <= 1 ? 'disabled' : ''}>上一页</button><button data-page="1" ${pageNo >= pages ? 'disabled' : ''}>下一页</button></div>` : ''}`;
+}
+
+/* =====================================================================
+   使用统计 数据
+   ===================================================================== */
+const PRICE = { 'claude-opus-5-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 }, 'claude-sonnet-5-5': { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 }, 'deepseek-v4': { input: 0.6, output: 2.2, cacheRead: 0.06, cacheWrite: null }, 'claude-haiku-5-5': { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 } };
+const TB = [['缓存读取', 'cr', 'cacheRead'], ['缓存写入', 'cw', 'cacheWrite'], ['输入', 'in', 'input'], ['输出', 'out', 'output']];
+const per1M = v => v == null ? '—' : '$' + (v < 1 ? v.toFixed(2) : v.toFixed(2)) + ' / 1M';
+function hcPrice(m) { const p = PRICE[m]; return hcCard(m, TB.filter(([, , k]) => k !== 'cacheWrite' || p[k] != null).map(([l, , k]) => [l, per1M(p[k])]), true) + '<div class="hc-note">单价来自模型配置；费用按请求发生时的单价算。</div>'; }
+function hcTokens(r) { return hcCard('Token 明细', TB.filter(([, k]) => k !== 'cw' || r[k]).map(([l, k]) => [l, r[k].toLocaleString()]).concat(r.think ? [['其中思考', r.think.toLocaleString()]] : []), false, ['合计', r.tok.toLocaleString()]); }
+function hcCost(r) { const p = PRICE[r.m]; return hcCard('费用明细', TB.filter(([, k, pk]) => r[k] && p[pk] != null).map(([l, k, pk]) => [l, '$' + (r[k] / 1e6 * p[pk]).toFixed(4)]), false, ['合计', '$' + r.cost.toFixed(4)]); }
+function hcTime(r) { return hcCard('耗时明细', [['首字等待', r.ttft + 's'], ['模型输出', (r.d - r.ttft).toFixed(1) + 's'], ['输出速度', Math.round(r.outTok / Math.max(r.d - r.ttft, 0.1)) + ' tok/s']], false, ['合计', r.d + 's']); }
+const MODELS = [
+  { n: 'claude-opus-5-5', p: 'anthropic', tok: 214.6e6, inp: 203.8e6, out: 10.8e6, cr: 171.2e6, cw: 14.1e6, think: 3.9e6, cost: 131.2, calls: 1902, fail: 11, ttft: 2.4, tps: 58, c: 'var(--k-tools)' },
+  { n: 'claude-sonnet-5-5', p: 'anthropic', tok: 118.3e6, inp: 112.4e6, out: 5.9e6, cr: 96.6e6, cw: 7.2e6, think: 1.6e6, cost: 41.05, calls: 1398, fail: 7, ttft: 1.6, tps: 71, c: 'var(--info)' },
+  { n: 'deepseek-v4', p: 'deepseek', tok: 29.1e6, inp: 27.6e6, out: 1.5e6, cr: 18.9e6, cw: 2.4e6, think: 0.6e6, cost: 8.9, calls: 390, fail: 4, ttft: 2.9, tps: 44, c: 'var(--k-conv)' },
+  { n: 'claude-haiku-5-5', p: 'custom-relay', tok: 10.9e6, inp: 10.5e6, out: 0.4e6, cr: 5.6e6, cw: 0.9e6, think: 0.1e6, cost: 3.17, calls: 152, fail: 1, ttft: 0.9, tps: 112, c: 'var(--k-rules)' }
+];
+const PROVIDERS = [{ n: 'anthropic', models: 2, tok: 332.9e6, cost: 172.25, calls: 3300, fail: 18 }, { n: 'deepseek', models: 1, tok: 29.1e6, cost: 8.9, calls: 390, fail: 4 }, { n: 'custom-relay', models: 1, tok: 10.9e6, cost: 3.17, calls: 152, fail: 1 }];
+const TOOLS = [
+  { n: 'bash', calls: 3214, fail: 171, avg: 6.9, p95: 41, out: 1.2e3, fails: [['退出码非 0', 142], ['超时', 21], ['被拒绝', 8]] },
+  { n: 'read_file', calls: 463, fail: 6, avg: 0.1, p95: 0.3, out: 2.1e3, fails: [['文件不存在', 6]] },
+  { n: 'edit_file', calls: 235, fail: 9, avg: 0.2, p95: 0.5, out: 180, fails: [['找不到要替换的文本', 7], ['文本不唯一', 2]] },
+  { n: 'write_file', calls: 67, fail: 0, avg: 0.1, p95: 0.2, out: 40, fails: [] },
+  { n: 'read_image', calls: 56, fail: 0, avg: 3.4, p95: 7.9, out: 620, fails: [] },
+  { n: 'spawn_agent', calls: 42, fail: 2, avg: 151, p95: 420, out: 2.1e3, fails: [['子 Agent 失败', 2]] },
+  { n: 'list_agents', calls: 34, fail: 0, avg: 0.05, p95: 0.1, out: 210, fails: [] },
+  { n: 'todo_write', calls: 33, fail: 0, avg: 0.05, p95: 0.1, out: 60, fails: [] },
+  { n: 'grep', calls: 28, fail: 1, avg: 0.4, p95: 1.1, out: 900, fails: [['正则无效', 1]] },
+  { n: 'task_output', calls: 18, fail: 0, avg: 0.1, p95: 0.2, out: 1.4e3, fails: [] },
+  { n: 'web_fetch', calls: 12, fail: 3, avg: 2.1, p95: 6.4, out: 3.8e3, fails: [['网络错误', 2], ['超时', 1]] },
+  { n: 'glob', calls: 9, fail: 0, avg: 0.1, p95: 0.2, out: 300, fails: [] },
+  { n: 'web_search', calls: 4, fail: 0, avg: 1.8, p95: 2.4, out: 1.1e3, fails: [] },
+  { n: 'plugin_manager', calls: 2, fail: 1, avg: 4.2, p95: 6, out: 340, fails: [['插件加载失败', 1]] }
+];
+const CMDS = [
+  { n: 'grep', calls: 622, fail: 41, avg: 0.3, subs: [] },
+  { n: 'python3', calls: 471, fail: 38, avg: 4.8, subs: [] },
+  { n: 'ls', calls: 413, fail: 3, avg: 0.05, subs: [] },
+  { n: 'echo', calls: 368, fail: 0, avg: 0.01, subs: [] },
+  { n: 'sed', calls: 339, fail: 7, avg: 0.05, subs: [] },
+  { n: 'git', calls: 214, fail: 6, avg: 0.4, subs: [['status', 88], ['diff', 61], ['log', 33], ['commit', 18], ['其他', 14]] },
+  { n: 'pnpm', calls: 196, fail: 39, avg: 38, subs: [['test', 97], ['build', 54], ['install', 21], ['其他', 24]] },
+  { n: 'cat', calls: 145, fail: 2, avg: 0.02, subs: [] },
+  { n: 'node', calls: 85, fail: 9, avg: 2.2, subs: [] },
+  { n: 'find', calls: 72, fail: 4, avg: 0.6, subs: [] },
+  { n: 'curl', calls: 41, fail: 6, avg: 1.9, subs: [] },
+  { n: 'gh', calls: 23, fail: 2, avg: 1.4, subs: [['pr', 15], ['api', 6], ['其他', 2]] }
+];
+const SKILLS = [
+  { n: 'baoyu-design', reads: 3, files: 7, last: '11-06 21:14', list: ['SKILL.md', 'references/palette.md', 'templates/deck.html'] },
+  { n: 'meeting-task-agent', reads: 1, files: 2, last: '11-02 10:40', list: ['SKILL.md', 'prompts/summary.md'] },
+  { n: 'office-pptx', reads: 1, files: 4, last: '10-29 16:02', list: ['SKILL.md', 'scripts/build.py'] },
+  { n: 'office-xlsx', reads: 1, files: 0, last: '10-21 09:33', list: ['SKILL.md'] },
+  { n: 'office-docx', reads: 1, files: 0, last: '10-18 14:55', list: ['SKILL.md'] }
+];
+const SUBAGENTS = [{ n: 'explore', calls: 28, fail: 1, avg: 102, tok: 11.4e6, cost: 5.9 }, { n: 'general', calls: 14, fail: 1, avg: 250, tok: 6.8e6, cost: 3.9 }];
+const AUX = [{ n: '会话标题', calls: 126, cost: 0.21 }, { n: '自动审批', calls: 88, cost: 0.52 }, { n: '压缩摘要', calls: 14, cost: 0.31 }, { n: '图片识别', calls: 12, cost: 0.08 }];
+
+function usageTotals() {
+  const ms = S.filters.model ? MODELS.filter(m => m.n === S.filters.model) : S.filters.provider ? MODELS.filter(m => m.p === S.filters.provider) : MODELS;
+  const sum = k => ms.reduce((s, m) => s + m[k], 0);
+  const f = RANGE[S.range][1] * (S.filters.workspace ? 0.6 : 1);
+  return { ms, f, tok: sum('tok') * f, inp: sum('inp') * f, out: sum('out') * f, cr: sum('cr') * f, cw: sum('cw') * f, think: sum('think') * f, cost: sum('cost') * f, calls: Math.round(sum('calls') * f), fail: Math.round(sum('fail') * f) };
+}
+
+function usagePage() {
+  const T = usageTotals(), f = T.f;
+  const uncached = T.inp - T.cr - T.cw, reply = T.out - T.think;
+  const toolCalls = TOOLS.reduce((s, t) => s + t.calls, 0) * f * (T.ms.length / 4 || 0);
+
+  /* Token 统计 */
+  const tokenSegs = S.tokenView === 'type'
+    ? [{ n: '缓存读取', v: T.cr, c: 'var(--k-rules)' }, { n: '缓存写入', v: T.cw, c: 'var(--k-skills)' }, { n: '未缓存输入', v: uncached, c: 'var(--info)' }, { n: '模型思考', v: T.think, c: 'var(--k-tools)' }, { n: '模型回复', v: reply, c: 'var(--k-conv)' }]
+    : T.ms.map(m => ({ n: m.n, v: m.tok * f, c: m.c }));
+  /* 耗时统计 */
+  const phase = [
+    { n: '模型首字等待', v: 8880 * f, c: 'var(--info)', cnt: T.calls },
+    { n: '模型输出', v: 16860 * f, c: 'var(--k-tools)', cnt: T.calls },
+    { n: '工具执行', v: 22320 * f, c: 'var(--k-rules)', cnt: sc(4400) },
+    { n: '等待审批', v: 2460 * f, c: 'var(--k-skills)', cnt: sc(312) },
+    { n: '辅助模型', v: 1080 * f, c: 'var(--k-system)', cnt: sc(240) }
+  ];
+  const toolTime = TOOLS.slice(0, 7).map((t, i) => ({ n: t.n, v: t.calls * t.avg * f, c: ['var(--k-tools)', 'var(--info)', 'var(--k-rules)', 'var(--k-skills)', 'var(--k-conv)', 'var(--k-sum)', 'var(--k-system)'][i], cnt: Math.round(t.calls * f) }));
+  const timeSegs = S.timeView === 'phase' ? phase : toolTime;
+  const timeTot = timeSegs.reduce((s, x) => s + x.v, 0);
+
+  /* 每天用量 */
+  const r = rng(7 + S.range.length);
+  const n = { day: 24, week: 7, month: 30, total: 14 }[S.range];
+  const daily = Array.from({ length: n }, (_, i) => { const w = S.range === 'day' ? (i >= 9 && i <= 23 ? 1 : 0.15) : (i % 7 === 5 || i % 7 === 6 ? 0.35 : 1); return (0.35 + r() * 0.9) * w * (0.7 + i / (n * 2)); });
+  const dsum = daily.reduce((a, b) => a + b, 0);
+  const dTotal = S.dailyMetric === 'tokens' ? T.tok : S.dailyMetric === 'cost' ? T.cost : T.calls;
+  const dVals = daily.map(x => x / dsum * dTotal);
+  const dFmt = v => S.dailyMetric === 'tokens' ? fmt(v) : S.dailyMetric === 'cost' ? money(v) : fmt(v) + ' 次';
+  const unitName = { day: '每小时', week: '每天', month: '每天', total: '每周' }[S.range];
+  const dLabel = i => S.range === 'day' ? `${i}:00` : S.range === 'total' ? `第 ${i + 1} 周` : (() => { const d = new Date(2026, 10, 7 - (n - 1 - i)); return `${d.getMonth() + 1}月${d.getDate()}日`; })();
+  const xLabels = S.range === 'day' ? ['0:00', '12:00', '23:00'] : [dLabel(0), dLabel(Math.floor(n / 2)), dLabel(n - 1)];
+
+  /* 热力图 */
+  const hr = rng(11), heatVals = [];
+  for (let i = 0; i < 98; i++) { const dow = i % 7, ramp = .35 + .65 * i / 97, p = (dow === 0 || dow === 6 ? .45 : .82) * ramp + .08; heatVals.push(hr() < p ? Math.round((hr() ** 1.6) * 40 * ramp) + 1 : 0); }
+  const heatUnit = S.heatMetric === 'sessions' ? '个会话' : 'M token';
+  const heatShown = heatVals.map(v => S.heatMetric === 'sessions' ? v : +(v * 0.31).toFixed(1));
+
+  /* 榜单 */
+  const tf = f * (T.ms.length / 4);
+  const toolRows = TOOLS.map(t => ({ n: t.n, v: t.calls * tf, label: '×' + fmt(t.calls * tf), sub: `平均 ${dur(t.avg)}${t.fail ? ` · 失败 ${Math.round(t.fail * tf)}` : ''}`, tag: t.fail / t.calls > 0.05 ? `<span class="pill err">${pct(t.fail, t.calls)}</span>` : '', detail: [['平均 / P95 耗时', `${dur(t.avg)} / 约 ${dur(t.p95)}`], ['平均输出', `≈${fmtK(t.out)} token`], ...(t.fails.length ? t.fails.map(([k, v]) => ['失败：' + k, Math.round(v * tf) + ' 次']) : [['失败', '0']])] })).filter(t => t.v >= 0.5);
+  const cmdRows = CMDS.map(c => ({ n: c.n, v: c.calls * tf, label: '×' + fmt(c.calls * tf), sub: c.subs.length ? c.subs.slice(0, 4).map(([s, v]) => `${s} ${Math.round(v * tf)}`).join(' · ') : `平均 ${dur(c.avg)}${c.fail ? ` · 失败 ${Math.round(c.fail * tf)}` : ''}`, tag: c.fail / c.calls > 0.1 ? `<span class="pill err">失败 ${Math.round(c.fail * tf)}</span>` : '', detail: [['失败', `${Math.round(c.fail * tf)} 次（${pct(c.fail, c.calls)}）`], ['平均耗时', dur(c.avg)], ...c.subs.map(([s, v]) => [`${c.n} ${s}`, Math.round(v * tf) + ' 次'])] })).filter(t => t.v >= 0.5);
+  const skillRows = SKILLS.map(s => ({ n: s.n, v: Math.max(s.reads * tf, 0.0001), label: '×' + Math.max(1, Math.round(s.reads * tf)), sub: `读 SKILL.md ${Math.max(1, Math.round(s.reads * tf))}${s.files ? ` · 附属文件 ${Math.round(s.files * tf)}` : ''}`, detail: [['最近一次', s.last], ...s.list.map(p => ['读过', `<span class="mono">${p}</span>`])] })).slice(0, S.range === 'day' ? 1 : 5);
+  const subRows = SUBAGENTS.map(a => ({ n: a.n, v: a.calls * tf, label: '×' + Math.max(0, Math.round(a.calls * tf)), sub: `平均 ${dur(a.avg)} · ${fmt(a.tok * tf)} · ${money(a.cost * tf)}`, c: 'var(--k-sum)', detail: [['失败', Math.round(a.fail * tf) + ' 次'], ['平均耗时', dur(a.avg)], ['Token / 费用', `${fmt(a.tok * tf)} / ${money(a.cost * tf)}`]] }));
+  const auxRows = AUX.map(a => ({ n: a.n, v: a.calls * tf, label: '×' + Math.round(a.calls * tf), sub: money(a.cost * tf), c: 'var(--k-system)', detail: [['调用', Math.round(a.calls * tf) + ' 次'], ['费用', money(a.cost * tf)], ['平均每次', money(a.cost / a.calls)]] }));
+
+  /* 明细 */
+  const reqs = (() => { const rr = rng(3), out = []; for (let i = 0; i < Math.max(3, Math.round(40 * Math.min(1, f))); i++) { const m = T.ms[Math.floor(rr() * T.ms.length)] || MODELS[0]; const tok = Math.round(18000 + rr() * 42000); const cr = i % 9 === 0 ? 0 : Math.round(tok * (0.7 + rr() * 0.15)), cw = i % 9 === 0 ? Math.round(tok * 0.82) : (i % 4 === 0 ? Math.round(tok * 0.06) : 0), outTok = Math.round(400 + rr() * 2600), inT = Math.max(0, tok - cr - cw - outTok), think = Math.round(outTok * rr() * 0.4), p = PRICE[m.n];
+      const cost = (cr * p.cacheRead + (p.cacheWrite ?? p.input) * cw + inT * p.input + outTok * p.output) / 1e6, ttft = +(m.ttft * (0.6 + rr() * 0.8)).toFixed(1);
+      out.push({ t: `11-07 ${String(13 - Math.floor(i / 6)).padStart(2, '0')}:${String(59 - (i * 7) % 60).padStart(2, '0')}`, s: ['重构统计页', '侧边对话', 'Bug 批次 1104', '性能第三轮'][Math.floor(rr() * 4)], m: m.n, ttft, d: +(ttft + outTok / m.tps).toFixed(1), tok, cr, cw, in: inT, out: outTok, outTok, think, cost, st: rr() < 0.04 ? '失败' : '成功' }); } return out; })();
+  const tabsDef = [['requests', '请求明细', reqs.length], ['models', '模型', T.ms.length], ['providers', '提供商', PROVIDERS.length], ['tools', '工具', toolRows.length], ['cmds', '命令', cmdRows.length], ['skills', 'Skills', skillRows.length]];
+  const tabBody = {
+    requests: () => table('req', [{ k: 't', l: '时间' }, { k: 's', l: '会话' }, { k: 'm', l: '模型', fmt: (v, r) => hcWrap(`<span class="mono">${v}</span>`, hcPrice(v)) }, { k: 'ttft', l: '首字', r: true, fmt: v => v + 's' }, { k: 'd', l: '耗时', r: true, fmt: (v, r) => hcWrap(v + 's', hcTime(r)) }, { k: 'tok', l: 'Token', r: true, fmt: (v, r) => hcWrap(v.toLocaleString(), hcTokens(r)) }, { k: 'cost', l: '费用', r: true, fmt: (v, r) => hcWrap('$' + v.toFixed(3), hcCost(r)) }, { k: 'st', l: '状态', fmt: v => v === '失败' ? '<span class="pill err">失败</span>' : '<span class="pill ok">成功</span>' }], reqs, { pageSize: 8 }),
+    models: () => table('mdl', [{ k: 'n', l: '模型', mono: true }, { k: 'p', l: '提供商' }, { k: 'calls', l: '请求', r: true, fmt: v => fmt(v * f) }, { k: 'tok', l: 'Token', r: true, fmt: (v, m) => hcWrap(fmt(v * f), hcCard('Token 明细', [['缓存读取', fmt(m.cr * f)], ['缓存写入', fmt(m.cw * f)], ['输入', fmt((m.inp - m.cr - m.cw) * f)], ['输出', fmt(m.out * f)], ['其中思考', fmt(m.think * f)]], false, ['合计', fmt(v * f)])) }, { k: 'cr', l: '缓存命中', r: true, fmt: (v, r) => pct(r.cr, r.inp) }, { k: 'ttft', l: '首字', r: true, fmt: v => v + 's' }, { k: 'tps', l: '速度', r: true, fmt: v => v + ' tok/s' }, { k: 'cost', l: '费用', r: true, fmt: (v, m) => { const p = PRICE[m.n]; return hcWrap(money(v * f), hcCard('费用明细', [['缓存读取', money(m.cr * f / 1e6 * p.cacheRead)], ...(p.cacheWrite != null ? [['缓存写入', money(m.cw * f / 1e6 * p.cacheWrite)]] : []), ['输入', money((m.inp - m.cr - m.cw) * f / 1e6 * p.input)], ['输出', money(m.out * f / 1e6 * p.output)]], false, ['合计', money(v * f)]) + '<div class="hc-note">按当前单价估算，合计以每次请求实际记录为准。</div>'); } }], T.ms, { defaultSort: { k: 'tok', dir: 'desc' } }),
+    providers: () => table('prv', [{ k: 'n', l: '提供商', mono: true }, { k: 'models', l: '模型数', r: true }, { k: 'calls', l: '请求', r: true, fmt: v => fmt(v * f) }, { k: 'fail', l: '失败', r: true, fmt: v => fmt(v * f) }, { k: 'tok', l: 'Token', r: true, fmt: v => fmt(v * f) }, { k: 'cost', l: '费用', r: true, fmt: v => money(v * f) }], PROVIDERS, { defaultSort: { k: 'cost', dir: 'desc' } }),
+    tools: () => table('tl', [{ k: 'n', l: '工具', mono: true }, { k: 'calls', l: '调用', r: true, fmt: v => fmt(v * tf) }, { k: 'fail', l: '失败', r: true, fmt: v => fmt(v * tf) }, { k: 'rate', l: '失败率', r: true, fmt: v => (v * 100).toFixed(1) + '%' }, { k: 'avg', l: '平均耗时', r: true, fmt: v => dur(v) }, { k: 'p95', l: 'P95', r: true, fmt: v => '约 ' + dur(v) }, { k: 'out', l: '平均输出', r: true, fmt: v => '≈' + fmtK(v) }], TOOLS.map(t => ({ ...t, rate: t.fail / t.calls })), { defaultSort: { k: 'calls', dir: 'desc' } }),
+    cmds: () => table('cmd', [{ k: 'n', l: '程序', mono: true }, { k: 'calls', l: '次数', r: true, fmt: v => fmt(v * tf) }, { k: 'fail', l: '失败', r: true, fmt: v => fmt(v * tf) }, { k: 'rate', l: '失败率', r: true, fmt: v => (v * 100).toFixed(1) + '%' }, { k: 'avg', l: '平均耗时', r: true, fmt: v => dur(v) }, { k: 'subs', l: '子命令', fmt: v => v.length ? v.map(([s, c]) => `${s} ${Math.round(c * tf)}`).join(' · ') : '<span style="color:var(--faint)">—</span>' }], CMDS.map(c => ({ ...c, rate: c.fail / c.calls })), { defaultSort: { k: 'calls', dir: 'desc' } }),
+    skills: () => table('sk', [{ k: 'n', l: 'Skill', mono: true }, { k: 'reads', l: '读 SKILL.md', r: true }, { k: 'files', l: '读附属文件', r: true }, { k: 'last', l: '最近一次', r: true }], SKILLS, { defaultSort: { k: 'reads', dir: 'desc' } })
+  };
+
+  const fModel = dropdown('model', '模型', MODELS.map(m => m.n), '全部模型');
+  const fProv = dropdown('provider', '提供商', PROVIDERS.map(p => p.n), '全部提供商');
+  const fWs = dropdown('workspace', '工作区', ['actspace-agent', 'site', 'notes'], '全部工作区');
+
+  return `<div class="page-title"><h2>使用统计</h2></div>
+  <p class="page-sub">Token、费用和耗时，以及模型、工具、命令、Skills 用了多少。</p>
+  <div class="toolbar">${rangeSeg()}${fModel}${fProv}${fWs}<span class="sp"></span>${refreshBtn()}</div>
+
+  <div class="mgrid" style="--n:5">
+    ${metric('Token 用量', fmt(T.tok), `输入 ${fmt(T.inp)} · 输出 ${fmt(T.out)}`, SRC.ok, 'tokens')}
+    ${metric('费用', money(T.cost), S.range === 'day' ? `每次请求 ${money(T.cost / Math.max(T.calls, 1))}` : `日均 ${money(T.cost / ({ week: 7, month: 30, total: 81 }[S.range]))} · 每次请求 ${money(T.cost / Math.max(T.calls, 1))}`, SRC.ok, 'daily')}
+    ${metric('缓存命中率', pct(T.cr, T.inp), `缓存读取 ${fmt(T.cr)}`, SRC.ok, 'tokens')}
+    ${metric('模型请求', fmt(T.calls), `失败 ${T.fail} · 重试 ${sc(41)}`, SRC.ok, 'detail', { usageTab: 'models' })}
+    ${metric('工具调用', fmt(toolCalls), `Bash 命令 ${fmt(CMDS.reduce((s, c) => s + c.calls, 0) * tf)} 次`, SRC.ok, 'tools')}
+  </div>
+
+  <div class="cgrid">
+    ${card('tokens', 'Token 统计', 'db', tabsS('tokenView', [['type', '按类型'], ['model', '按模型']]), donut('tok', tokenSegs, fmt(T.tok), '总用量', s => fmt(s.v)), 'c6', SRC.ok)}
+    ${card('time', '耗时统计', 'clock', tabsS('timeView', [['phase', '按阶段'], ['tool', '按工具']]), donut('time', timeSegs, dur(timeTot), S.timeView === 'phase' ? '合计' : '工具合计', s => `${dur(s.v)} · ${fmt(s.cnt)} 次`), 'c6', SRC.chk,
+      S.timeView === 'phase' ? '首字等待 = 发出请求到第一个 token；模型输出 = 第一个 token 到结束（思考与回复合在一起）。' : '各工具从开始执行到出结果的时间，不含等待审批。')}
+
+    ${card('daily', '用量趋势', 'chart', tabsS('dailyMetric', [['tokens', 'Token'], ['cost', '费用'], ['calls', '请求']]), `<div class="yhint"><span>${unitName}最高 ${dFmt(Math.max(...dVals))}</span><span>${unitName}平均 ${dFmt(dTotal / n)}</span></div>${bars(dVals, 'var(--info)', { tip: (i, v) => `${dLabel(i)}\n${dFmt(v)}` })}<div class="bars-x">${xLabels.map(l => `<span>${l}</span>`).join('')}</div>`, 'c8', SRC.ok)}
+    ${card('heat', '活跃度', 'gauge', tabsS('heatMetric', [['sessions', '会话'], ['tokens', 'Token']]), heatMap(heatShown, heatUnit), 'c4', SRC.ok)}
+
+    ${card('skills', '技能加载', 'book', `${Math.round(SKILLS.reduce((s, x) => s + x.reads, 0) * tf) || 1} 次`, scrollBox(rank('skills', skillRows, 'var(--k-skills)')), 'c3', SRC.ok)}
+    ${card('tools', '工具调用', 'code', `${fmt(toolCalls)} 次`, scrollBox(rank('tools', toolRows, 'var(--k-tools)')), 'c3', SRC.ok)}
+    ${card('cmds', '命令执行', 'term', `${fmt(CMDS.reduce((s, c) => s + c.calls, 0) * tf)} 次`, scrollBox(rank('cmds', cmdRows, 'var(--k-rules)')), 'c3', SRC.new)}
+    ${card('agents', '子 Agent 与辅助模型', 'bot', '', scrollBox(`<div class="sub-h"><span>子 Agent</span><span>${money(SUBAGENTS.reduce((s, a) => s + a.cost, 0) * tf)}</span></div>${rank('sub', subRows, 'var(--k-sum)')}<div class="sub-h"><span>辅助模型</span><span>${money(AUX.reduce((s, a) => s + a.cost, 0) * tf)}</span></div>${rank('aux', auxRows, 'var(--k-system)', { mono: false })}`), 'c3', SRC.ok)}
+  </div>
+
+  <div id="card-detail" class="detail-sec"><div class="utabs" role="tablist">${tabsDef.map(([v, l, c]) => `<button class="utab ${S.usageTab === v ? 'on' : ''}" data-set="usageTab" data-v="${v}">${l}<em>${fmt(c)}</em></button>`).join('')}</div>
+  ${tabBody[S.usageTab]()}</div>`;
+}
+
+function heatMap(data, unit) {
+  const max = Math.max(...data, 1), start = new Date(2026, 7, 2);
+  const cells = data.map((v, i) => { const d = new Date(start.getTime() + i * 864e5), l = v === 0 ? 0 : Math.min(4, Math.ceil(v / max * 4)); return `<i data-l="${l}" data-tip="${d.getMonth() + 1}月${d.getDate()}日\n${v} ${unit}"></i>`; }).join('');
+  const labels = []; let prev = -1;
+  for (let w = 0; w < 14; w++) { const d = new Date(start.getTime() + w * 7 * 864e5), m = d.getMonth(); labels.push(m !== prev ? `${m + 1}月` : ''); prev = m; }
+  const lv = [0, 22, 42, 66, 100].map(p => `<i style="background:${p ? `color-mix(in srgb,var(--heat) ${p}%,var(--surface-subtle))` : 'var(--surface-subtle)'}"></i>`).join('');
+  return `<div class="heat" style="grid-template-columns:repeat(14,1fr)">${cells}</div><div class="hmonths" style="grid-template-columns:repeat(14,1fr)">${labels.map(l => `<span>${l}</span>`).join('')}</div><div class="hlegend">少${lv}多</div>`;
+}
+
+/* =====================================================================
+   Harness 统计 数据
+   ===================================================================== */
+const REQ = 3842;
+// [工具, 插件, 调用, 定义 token, 失败率]
+const HT = [
+  ['bash', 'shell', 3214, 1100, 0.053], ['read_file', 'filesystem-read', 463, 420, 0.013], ['edit_file', 'filesystem-write', 235, 610, 0.038],
+  ['write_file', 'filesystem-write', 67, 380, 0], ['read_image', 'filesystem-read', 56, 240, 0], ['spawn_agent', 'subagent', 42, 890, 0.048],
+  ['list_agents', 'subagent', 34, 220, 0], ['todo_write', 'todo', 33, 770, 0], ['grep', 'filesystem-read', 28, 450, 0.036],
+  ['task_output', 'background', 18, 260, 0], ['web_fetch', 'web', 12, 520, 0.25], ['glob', 'filesystem-read', 9, 300, 0],
+  ['web_search', 'web', 4, 480, 0], ['plugin_manager', 'plugin-manager', 2, 1350, 0.5], ['notebook_edit', 'notebook', 0, 650, 0]
+];
+const PLUGIN_SRC = { shell: '内置', 'filesystem-read': '内置', 'filesystem-write': '内置', subagent: '内置', todo: '内置', background: '内置', web: '内置', 'plugin-manager': '内置', notebook: '用户', 'review-helper': '自进化' };
+const HSKILLS = [['baoyu-design', 320, 3, 7], ['meeting-task-agent', 280, 1, 2], ['office-pptx', 310, 1, 4], ['office-docx', 300, 1, 0], ['office-xlsx', 300, 1, 0], ['pdf-reader', 290, 0, 0]];
+const CTX = [
+  { n: '系统提示词', v: 4.1, c: 'var(--k-system)', src: [['core/system-prompt', 3.6, 0], ['core/model-facts', 0.5, 4]] },
+  { n: '工具定义', v: 9.8, c: 'var(--k-tools)', src: [['tools · shell', 1.4, 0], ['tools · filesystem-write', 1.6, 0], ['tools · plugin-manager', 1.4, 0], ['tools · subagent', 1.4, 2], ['tools · filesystem-read', 1.2, 0], ['tools · 其他 6 个插件', 2.8, 1]] },
+  { n: '规则与注入', v: 2.6, c: 'var(--k-rules)', src: [['AGENTS.md', 1.8, 1], ['environment', 0.3, 61], ['context/active-paths', 0.5, 34]] },
+  { n: 'Skills 目录', v: 1.9, c: 'var(--k-skills)', src: [['core/skills-catalog', 1.9, 3]] },
+  { n: '压缩摘要', v: 3.2, c: 'var(--k-sum)', src: [['compaction/summary', 3.2, 9]] },
+  { n: '对话', v: 26.6, c: 'var(--k-conv)', src: [['用户消息', 2.1, 100], ['模型回复', 6.4, 100], ['工具结果', 18.1, 100]] }
+];
+const VERSIONS = {
+  '默认@10': { req: 1904, ctx: 53.9, over: 22.6, toolShare: 0.241, fail: 0.052, dup: 0.047, trunc: 0.081, brk: 0.142, brkTok: 2.9e6, reread: 0.21, discHit: 0.64, plugins: 16 },
+  '默认@11': { req: 2638, ctx: 51.3, over: 20.9, toolShare: 0.231, fail: 0.048, dup: 0.041, trunc: 0.074, brk: 0.131, brkTok: 2.6e6, reread: 0.18, discHit: 0.67, plugins: 17 },
+  '默认@12': { req: 1204, ctx: 48.2, over: 18.4, toolShare: 0.203, fail: 0.041, dup: 0.032, trunc: 0.066, brk: 0.098, brkTok: 1.9e6, reread: 0.12, discHit: 0.71, plugins: 18 } };
+const VKEYS = Object.keys(VERSIONS);
+
+function verdict(calls, req, tok) {
+  if (calls === 0) return { k: 'dead', pill: '<span class="pill err">从未调用</span>', tip: '一直占着上下文，一次没用' };
+  if (calls / req < 0.01 && tok >= 300) return { k: 'hot', pill: '<span class="pill warn">占用高 · 少用</span>', tip: '可以删掉，或改成需要时再加载' };
+  return { k: 'ok', pill: '<span class="pill ok">值得</span>', tip: '' };
+}
+
+function vsItems() {
+  const req = sc(REQ);
+  if (S.vsTab === 'tools') return HT.map(([n, p, calls, tok, fr]) => ({ n, sub: p, calls: sc(calls), tok, req, extra: [['所属插件', `<span class="mono">${p}</span>`], ['失败率', (fr * 100).toFixed(1) + '%'], ['调用率', pct(sc(calls), req, 2)]] }));
+  if (S.vsTab === 'plugins') {
+    const g = {};
+    HT.forEach(([n, p, calls, tok]) => { g[p] ??= { n: p, calls: 0, tok: 0, tools: [] }; g[p].calls += calls; g[p].tok += tok; g[p].tools.push(n); });
+    g['review-helper'] = { n: 'review-helper', calls: 12, tok: 380, tools: ['review_diff'] };
+    return Object.values(g).map(x => ({ n: x.n, sub: PLUGIN_SRC[x.n] || '内置', calls: sc(x.calls), tok: x.tok, req, extra: [['来源', PLUGIN_SRC[x.n] || '内置'], ['工具', x.tools.map(t => `<span class="mono">${t}</span>`).join('、')]] }));
+  }
+  return HSKILLS.map(([n, tok, reads, files]) => ({ n, sub: 'Skill', calls: sc(reads) || (reads ? 1 : 0), tok, req, extra: [['读附属文件', files + ' 次'], ['目录里的描述', `≈${tok} token`]] }));
+}
+
+function vsBill(items) {
+  const rows = items.map(x => ({ ...x, total: x.tok * x.req, per: x.calls ? x.tok * x.req / x.calls : Infinity, v: verdict(x.calls, x.req, x.tok) })).sort((a, b) => b.per - a.per);
+  const noun = S.vsTab === 'skills' ? '读取' : '调用';
+  const shown = S.all.vs ? rows : rows.slice(0, 7);
+  return `<div class="bill">${shown.map((r, i) => {
+    const key = 'vs:' + r.n, open = S.open[key];
+    return `<button class="bill-row ${open ? 'open' : ''}" data-open="${key}" aria-expanded="${!!open}">
+      <span class="no">${i + 1}</span>
+      <span class="ttl"><span class="mono">${r.n}</span><span class="pill">${r.sub}</span>${r.v.k !== 'ok' ? r.v.pill : ''}</span>
+      <span class="per ${r.v.k}"><b>${r.calls ? '≈' + fmtK(r.per) : '—'}</b><span>${r.calls ? `token / 每${noun}一次` : `一次没${noun}`}</span></span>
+      <span class="eq">每次请求带着 <b>${r.tok}</b> token × <b>${fmt(r.req)}</b> 次请求 = <b>${fmtK(r.total)}</b>，${noun}了 <b>${fmt(r.calls)}</b> 次</span>
+      ${open ? `<span class="vs-detail">${detail([...r.extra, ['建议', r.v.tip || '保持']])}</span>` : ''}
+    </button>`;
+  }).join('')}</div>`;
+}
+
+function vsBars(items) {
+  const rows = items.map(x => ({ ...x, v: verdict(x.calls, x.req, x.tok) })).sort((a, b) => (a.v.k === 'ok') - (b.v.k === 'ok') || b.tok - a.tok);
+  const maxTok = Math.max(...rows.map(r => r.tok)), maxCalls = Math.max(...rows.map(r => r.calls), 1);
+  const noun = S.vsTab === 'skills' ? '读取' : '调用';
+  const shown = S.all.vs ? rows : rows.slice(0, 8);
+  return `<div class="vs-head"><span>${{ tools: '工具', plugins: '插件', skills: 'Skill' }[S.vsTab]}</span><span>← 每次请求占用（token）</span><span>${noun}次数 →</span><span style="text-align:right">判断</span></div>
+  ${shown.map(r => {
+    const key = 'vs:' + r.n, open = S.open[key];
+    const lw = r.tok / maxTok * 100, rw = Math.sqrt(r.calls / maxCalls) * 100;
+    return `<button class="vs-row ${open ? 'open' : ''}" data-open="${key}" aria-expanded="${!!open}">
+      <span class="nm mono">${r.n}</span>
+      <span class="vs-l"><span>${r.tok}</span><b style="width:${lw}%"></b></span>
+      <span class="vs-r"><b style="width:${Math.max(rw, r.calls ? 1.5 : 0)}%"></b><span>${r.calls ? fmt(r.calls) : '0'}</span></span>
+      <span class="vs-verdict">${r.v.pill}</span>
+      ${open ? `<span class="vs-detail">${detail([...r.extra, ['调用率', pct(r.calls, r.req, 2)], ['建议', r.v.tip || '保持']])}</span>` : ''}
+    </button>`;
+  }).join('')}`;
+}
+
+function harnessPage() {
+  const req = sc(REQ), vk = S.filters.revision || '默认@12', V = VERSIONS[vk];
+  const prevK = VKEYS[VKEYS.indexOf(vk) - 1], P = prevK && VERSIONS[prevK];
+  const dv = (k, f, k2) => { if (!P) return ['flat', '没有上一个版本可比']; const d = V[k] - P[k] + (k2 ? V[k2] - P[k2] : 0); return [Math.abs(d) < 1e-9 ? 'flat' : d < 0 ? 'good' : 'bad', `比 ${prevK.replace('默认', '')} ${f(d)}`]; };
+  const items = vsItems();
+  const flagged = items.filter(x => verdict(x.calls, x.req, x.tok).k !== 'ok');
+  const wasteTok = flagged.reduce((s, x) => s + x.tok, 0);
+  const vsCount = items.length;
+
+  const FLAGS = [
+    { lv: 'warn', ico: 'tri', t: `${flagged.length} 个${{ tools: '工具', plugins: '插件', skills: 'Skill' }[S.vsTab]}占着上下文却很少用`, d: `合计每次请求 ${fmtK(wasteTok)} token，${rangeWord()}一共 ${fmtK(wasteTok * req)}。`, cat: '占用 vs 使用', go: 'vs' },
+    { lv: 'error', ico: 'x', t: '插件加载失败：review-helper', d: '自进化插件，最近一次失败：缺少服务 actspace.review。', cat: '插件运行时', go: 'runtime', set: { rtTab: 'load' } },
+    { lv: 'error', ico: 'x', t: '工具失败率高：bash 5.3%', d: '3,214 次调用里失败 171 次，大多是退出码非 0（142 次）和超时（21 次）。', cat: '工具明细', go: 'detail', set: { harnessTab: 'tools', sort: { ht: { k: 'fr', dir: 'desc' } } } },
+    { lv: 'info', ico: 'info', t: '上下文来源变化频繁：environment', d: '61% 的请求里内容和上一次不同，会让缓存失效。', cat: '上下文', go: 'ctx', set: { ctxCat: '2' } }
+  ];
+
+  /* 上下文 */
+  const ctxTot = CTX.reduce((s, x) => s + x.v, 0) * (V.ctx / 48.2);
+  const ctxSegs = CTX.map(x => ({ ...x, v: x.v * (V.ctx / 48.2) }));
+  const catIdx = S.hl.ctx != null ? S.hl.ctx : (S.ctxCat != null ? +S.ctxCat : null);
+  const srcList = catIdx != null ? CTX[catIdx].src.map(s => [...s, CTX[catIdx]]) : CTX.flatMap(c => c.src.map(s => [...s, c])).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const srcMax = Math.max(...srcList.map(s => s[1]));
+
+  /* 披露 */
+  const disc = {
+    active: () => `<div class="sub-h"><span>每个周期有多少活跃路径</span><span>上限 100 · 触顶 3 次</span></div>${bars([4, 9, 18, 31, 44, 39, 27, 15, 8, 5, 3].map(sc), 'var(--k-rules)', { cls: 'sm', tip: (i, v) => `${i * 10}–${i === 10 ? 100 : i * 10 + 9} 条：${v} 个周期` })}<div class="bars-x"><span>0</span><span>50</span><span>100</span></div>`,
+    sleep: () => `<div class="sub-h"><span>睡了几个周期后被叫醒</span><span>误睡 = 睡下后下一个周期就被读</span></div>${bars([41, 22, 14, 8, 5, 11].map(sc), ['var(--warning)', 'var(--k-system)', 'var(--k-system)', 'var(--k-system)', 'var(--k-system)', 'var(--k-system)'], { cls: 'sm', tip: (i, v) => `${i === 5 ? '6+' : i + 1} 个周期：${v} 次` })}<div class="bars-x even">${['1', '2', '3', '4', '5', '6+'].map(x => `<span>${x}</span>`).join('')}</div>`,
+    paths: () => kv([['<span class="mono">packages/util/shared/src/harness-stats.ts</span>', sc(84) + ' 次'], ['<span class="mono">apps/desktop/…/HarnessStatsPage.tsx</span>', sc(61) + ' 次'], ['<span class="mono">docs/design-docs/…/11-Harness统计设计.md</span>', sc(47) + ' 次'], ['<span class="mono">AGENTS.md</span>', sc(32) + ' 次']])
+  };
+
+  /* 运行时 */
+  const rt = {
+    service: () => `<div class="sub-h"><span>调用最多的服务</span><span>次数 · P95</span></div>${kv([['<span class="mono">session.append</span>', `${fmt(sc(41200))} · 2ms`], ['<span class="mono">tools.runtime.execute</span>', `${fmt(sc(4400))} · 8.1s`], ['<span class="mono">context.estimate</span>', `${fmt(sc(3800))} · 16ms`], ['<span class="mono">sandbox.exec</span>', `${fmt(sc(3200))} · 7.6s`], ['从未被调用的服务', '3 个', 'warn']])}`,
+    listener: () => `<div class="sub-h"><span>触发最多的监听</span><span>次数 · 报错</span></div>${kv([['<span class="mono">context-engine · request/before</span>', `${fmt(sc(3842))} · 0`], ['<span class="mono">auto-review · tool/call</span>', `${fmt(sc(4400))} · 0`], ['<span class="mono">harness-stats · *</span>', `${fmt(sc(52000))} · 0`]])}`,
+    load: () => `<div class="sub-h"><span>插件加载</span><span>次数 · 失败</span></div>${kv([['加载耗时 P50', '约 32ms'], ['<span class="mono">review-helper</span>（自进化）', `${sc(14)} 次 · 失败 1`, 'bad'], ['<span class="mono">notebook</span>（用户）', `${sc(14)} 次 · 0`], ['其余 16 个内置插件', '全部成功']])}<div class="sub-h" style="margin-top:10px"><span>最近一次失败</span></div><div class="limit mono" style="margin:0">review-helper: 缺少服务 actspace.review</div>`
+  };
+
+  /* 版本对比 */
+  const A = VERSIONS[S.cmpFrom], B = VERSIONS[S.cmpTo];
+  const cmpRows = [
+    ['每次请求的上下文', A.ctx + 'k', B.ctx + 'k', B.ctx - A.ctx, 'lower', v => (v > 0 ? '+' : '') + (v / A.ctx * 100).toFixed(1) + '%'],
+    ['Harness 固定开销', A.over + 'k', B.over + 'k', B.over - A.over, 'lower', v => (v > 0 ? '+' : '') + (v / A.over * 100).toFixed(1) + '%'],
+    ['缓存被打断', (A.brk * 100).toFixed(1) + '%', (B.brk * 100).toFixed(1) + '%', B.brk - A.brk, 'lower', v => (v > 0 ? '+' : '') + (v * 100).toFixed(1) + ' 点'],
+    ['工具失败率', (A.fail * 100).toFixed(1) + '%', (B.fail * 100).toFixed(1) + '%', B.fail - A.fail, 'lower', v => (v > 0 ? '+' : '') + (v * 100).toFixed(1) + ' 点'],
+    ['重复调用', (A.dup * 100).toFixed(1) + '%', (B.dup * 100).toFixed(1) + '%', B.dup - A.dup, 'lower', v => (v > 0 ? '+' : '') + (v * 100).toFixed(1) + ' 点'],
+    ['压缩后重读率', (A.reread * 100).toFixed(0) + '%', (B.reread * 100).toFixed(0) + '%', B.reread - A.reread, 'lower', v => (v > 0 ? '+' : '') + (v * 100).toFixed(0) + ' 点'],
+    ['读取命中活跃', (A.discHit * 100).toFixed(0) + '%', (B.discHit * 100).toFixed(0) + '%', B.discHit - A.discHit, 'higher', v => (v > 0 ? '+' : '') + (v * 100).toFixed(0) + ' 点'],
+    ['插件数', A.plugins, B.plugins, B.plugins - A.plugins, 'none', v => (v > 0 ? '+' : '') + v]
+  ];
+  const verDD = (key) => { const open = S.menu === key; return `<div class="dd"><button class="chip set" data-menu="${key}">${S[key]}${ic('down', 12)}</button>${open ? `<div class="menu">${Object.keys(VERSIONS).map(v => `<button class="${S[key] === v ? 'on' : ''}" data-setmenu="${key}" data-v="${v}">${v}<span style="color:var(--faint);font-size:11px">${VERSIONS[v].req} 次请求</span></button>`).join('')}</div>` : ''}</div>`; };
+
+  /* 明细 */
+  const htabs = [['tools', '工具', HT.length], ['plugins', '插件', 10], ['sources', '上下文来源', CTX.reduce((s, c) => s + c.src.length, 0)], ['skills', 'Skills', HSKILLS.length], ['compactions', '压缩记录', sc(14)]];
+  const hBody = {
+    tools: () => table('ht', [{ k: 'n', l: '工具', mono: true }, { k: 'p', l: '插件', mono: true }, { k: 'calls', l: '调用', r: true, fmt: v => fmt(sc(v)) }, { k: 'rate', l: '调用率', r: true, fmt: v => (v * 100).toFixed(2) + '%' }, { k: 'tok', l: '定义', r: true }, { k: 'fr', l: '失败率', r: true, fmt: v => (v * 100).toFixed(1) + '%' }, { k: 'trunc', l: '输出截断', r: true }, { k: 'rep', l: '同参数重复', r: true }], HT.map(([n, p, calls, tok, fr], i) => ({ n, p, calls, rate: calls / REQ, tok, fr, trunc: [212, 38, 0, 0, 0, 0, 0, 0, 4, 0, 3, 0, 0, 0, 0][i], rep: [96, 11, 3, 0, 0, 1, 6, 0, 2, 4, 0, 0, 0, 0, 0][i] })), { defaultSort: { k: 'calls', dir: 'desc' } }),
+    plugins: () => table('hp', [{ k: 'n', l: '插件', mono: true }, { k: 'src', l: '来源' }, { k: 'tools', l: '工具', r: true }, { k: 'calls', l: '工具调用', r: true }, { k: 'tok', l: '占上下文', r: true }, { k: 'loads', l: '加载', r: true }, { k: 'lf', l: '加载失败', r: true, fmt: v => v ? `<span style="color:var(--on-danger)">${v}</span>` : '0' }], [['shell', 3, 3249, 1400], ['filesystem-read', 4, 556, 1410], ['filesystem-write', 2, 302, 990], ['subagent', 2, 76, 1110], ['todo', 1, 33, 770], ['background', 1, 18, 260], ['web', 2, 16, 1000], ['plugin-manager', 1, 2, 1350], ['notebook', 1, 0, 650], ['review-helper', 1, 12, 380]].map(([n, tools, calls, tok]) => ({ n, src: PLUGIN_SRC[n], tools, calls: sc(calls), tok, loads: sc(14), lf: n === 'review-helper' ? 1 : 0 })), { defaultSort: { k: 'tok', dir: 'desc' } }),
+    sources: () => table('hs', [{ k: 'n', l: '来源', mono: true }, { k: 'cat', l: '类别' }, { k: 'v', l: '平均大小', r: true, fmt: v => '≈' + v + 'k' }, { k: 'ch', l: '变化率', r: true, fmt: v => v >= 20 && v < 100 ? `<span style="color:var(--warning)">${v}%</span>` : v + '%' }], CTX.flatMap(c => c.src.map(([n, v, ch]) => ({ n, cat: c.n, v, ch }))), { defaultSort: { k: 'v', dir: 'desc' } }),
+    skills: () => table('hk', [{ k: 'n', l: 'Skill', mono: true }, { k: 'tok', l: '目录里占用', r: true }, { k: 'listed', l: '出现在请求里', r: true, fmt: v => fmt(sc(v)) }, { k: 'reads', l: '读 SKILL.md', r: true }, { k: 'files', l: '读附属文件', r: true }], HSKILLS.map(([n, tok, reads, files]) => ({ n, tok, listed: REQ, reads, files })), { defaultSort: { k: 'reads', dir: 'desc' } }),
+    compactions: () => table('hc', [{ k: 't', l: '时间' }, { k: 'tr', l: '触发' }, { k: 'b', l: '压缩前', r: true, fmt: v => v + 'k' }, { k: 'a', l: '压缩后', r: true, fmt: v => v + 'k' }, { k: 'd', l: '耗时', r: true, fmt: v => v + 's' }, { k: 'rr', l: '之后重读', r: true }], Array.from({ length: Math.max(1, sc(14)) }, (_, i) => ({ t: `11-0${7 - Math.floor(i / 3)} ${String(20 - i).padStart(2, '0')}:1${i % 10}`, tr: i % 6 === 5 ? '手动' : '自动', b: 170 + (i * 13) % 40, a: 28 + (i * 7) % 9, d: 30 + (i * 11) % 20, rr: (i * 3) % 4 })), { defaultSort: { k: 't', dir: 'desc' } })
+  };
+
+  return `<div class="page-title"><h2>Harness 统计</h2></div>
+  <p class="page-sub">Harness 本身好不好用：每次请求先付多少固定开销、哪些工具白占上下文、工具好不好用、压缩和披露有没有用、改版之后变好还是变坏。</p>
+  <div class="toolbar">${rangeSeg()}${dropdown('mode', '模式', ['默认', 'Plan', '自动'], '全部模式')}${dropdown('model', '模型', MODELS.map(m => m.n), '全部模型')}${dropdown('kind', '', ['主会话', '子 Agent', '侧边对话', '全部会话'])}${dropdown('revision', '版本', Object.keys(VERSIONS))}<span class="sp"></span>${refreshBtn()}</div>
+
+  <div class="flags"><div class="flags-h">值得关注${SRC.ok}<span class="aside">${FLAGS.length} 项 · 点击跳到对应卡片</span></div>
+    ${FLAGS.map((f, i) => `<button class="flag ${f.lv}" data-flag="${i}">${ic(f.ico, 15, 1.9, 'lv')}<span><span class="t">${f.t}</span><span class="d">${f.d}</span></span><span class="cat">${f.cat}${ic('chev', 13, 1.9)}</span></button>`).join('')}
+  </div>
+
+  <div class="mgrid" style="--n:5">
+    ${metric('Harness 固定开销', V.over + 'k', `每次请求 · 占窗口 ${(V.over / 200 * 100).toFixed(1)}%`, SRC.ok, 'ctx', null, dv('over', v => (v > 0 ? '+' : '') + v.toFixed(1) + 'k'), '系统提示词 + 工具定义 + 规则 + Skills 目录，不含对话。\n每次请求都要先付这一笔。')}
+    ${metric('缓存被打断', (V.brk * 100).toFixed(1) + '%', `的请求 · 这些请求缓存命中 41%，其他 89%`, SRC.new, 'sources', null, dv('brk', v => (v > 0 ? '+' : '') + (v * 100).toFixed(1) + ' 点'), 'Harness 自己的内容（规则、环境信息、工具列表…）和同一会话上一次请求不一样的请求占比。\n后面的数字对比这些请求和其他请求的实际缓存命中率，差得越多，说明打断越伤。')}
+    ${metric('工具失败率', (V.fail * 100).toFixed(1) + '%', `最多：bash ${fmt(sc(171))} 次`, SRC.ok, 'detail', { harnessTab: 'tools', sort: { ht: { k: 'fr', dir: 'desc' } } }, dv('fail', v => (v > 0 ? '+' : '') + (v * 100).toFixed(1) + ' 点'), '工具调用里返回失败的比例。\n点开看每个工具的失败率。')}
+    ${metric('白费的工具调用', ((V.dup + V.trunc) * 100).toFixed(1) + '%', `重复 ${(V.dup * 100).toFixed(1)}% · 截断 ${(V.trunc * 100).toFixed(1)}%`, SRC.ok, 'detail', { harnessTab: 'tools', sort: { ht: { k: 'rep', dir: 'desc' } } }, dv('dup', v => (v > 0 ? '+' : '') + (v * 100).toFixed(1) + ' 点', 'trunc'), '同参数重复：同一轮里用一模一样的参数又调了一次。\n输出截断：结果太长被截掉，模型往往要再读一次。\n两者多说明工具描述或输出设计有问题。')}
+    ${metric('压缩后重读率', (V.reread * 100).toFixed(0) + '%', `压缩 ${sc(14)} 次 · 拿掉 ${fmtK(sc(3.1e6))}`, SRC.ok, 'compact', null, dv('reread', v => (v > 0 ? '+' : '') + (v * 100).toFixed(0) + ' 点'), '压缩后 5 步内又去读压缩前读过的文件。\n越高说明摘要丢了模型还需要的东西。')}
+  </div>
+
+  <div class="cgrid">
+    ${card('vs', '占用 vs 使用', 'scale', tabsS('vsTab', [['tools', '工具'], ['plugins', '插件'], ['skills', 'Skills']]),
+      `<div class="limit" style="margin-bottom:8px">${S.vsStyle === 'bill'
+        ? `每个${{ tools: '工具', plugins: '插件', skills: 'Skill' }[S.vsTab]}的说明每次请求都要带上。把${rangeWord()}带的 token 加起来，除以真正${S.vsTab === 'skills' ? '读取' : '调用'}的次数，就是<b style="color:var(--text);font-weight:500">每用一次花了多少 token</b>。数字越大越不划算。`
+        : `左边是每次请求都要带上的说明有多长，右边是${rangeWord()}真正${S.vsTab === 'skills' ? '读取' : '调用'}了几次。<b style="color:var(--text);font-weight:500">左长右短</b>就是白占上下文。`}</div>
+      ${S.vsStyle === 'bill' ? vsBill(items) : vsBars(items)}`, 'c12', SRC.ok,
+      `点一行看详情。${allLink('vs', vsCount)}`)}
+
+    ${card('ctx', '每次请求里放了什么', 'db', `平均 ${V.ctx}k token`, donut('ctx', ctxSegs, V.ctx + 'k', '平均每次请求', s => '≈' + s.v.toFixed(1) + 'k'), 'c6', SRC.ok, '点一个类别，右边只看这一类的来源。')}
+    ${card('sources', catIdx != null ? `来源 · ${CTX[catIdx].n}` : '最大的上下文来源', 'layers', catIdx != null ? `<button class="link" data-act="clearCat">看全部${ic('x', 12, 2)}</button>` : '平均大小 · 变化率',
+      `<div class="rank">${srcList.map(([n, v, ch, cat]) => `<div class="rk"><span class="nm"><span class="mono">${n}</span>${ch >= 20 && ch < 100 ? '<span class="pill warn">常变 · 打断缓存</span>' : ''}</span><span class="ct">≈${v}k${ch < 100 ? ` · 变化 ${ch}%` : ''}</span><span class="tr"><b style="width:${v / srcMax * 100}%;--bar:${ch >= 20 && ch < 100 ? 'var(--warning)' : cat.c}"></b></span></div>`).join('')}</div>`, 'c6', SRC.ok,
+      '变化率 = 和上一次请求相比内容变了的比例；越高越容易让缓存失效。')}
+
+    ${card('compact', '压缩', 'shrink', tabsS('compView', [['summary', '概览'], ['recent', '最近']]),
+      S.compView === 'summary'
+        ? `${stats3([[sc(14) + ' 次', '压缩次数'], ['182k→31k', '平均前后'], [(V.reread * 100).toFixed(0) + '%', '压缩后又重读', '压缩后 5 步内重新读了压缩前读过的文件']])}${kv([['自动 / 手动 / 失败', `${sc(12)} / ${sc(2)} / 0`], ['触发时窗口占用', '78%'], ['平均耗时', '38s'], ['压缩拿掉的工具输出', `${fmt(sc(1204))} 条 · ${fmtK(sc(3.1e6))}`], ['两次压缩间隔', '平均 31 步']])}`
+        : kv(Array.from({ length: Math.min(5, Math.max(1, sc(14))) }, (_, i) => [`11-0${7 - i} ${20 - i}:1${i} · ${i === 2 ? '手动' : '自动'}`, `${180 - i * 9}k → ${30 + i}k${i === 1 ? ' · 重读 3' : ''}`, i === 1 ? 'warn' : ''])),
+      'c6', SRC.ok)}
+    ${card('disc', '渐进式披露', 'eye', tabsS('discView', [['active', '活跃'], ['sleep', '睡眠'], ['paths', '常读']]),
+      `${stats3([['71%', '读取命中活跃', '模型读的文件里，有多少本来就在活跃列表里'], ['4.1%', '误睡率', '刚睡下，下一个周期就被读'], ['62%', '查索引后读到', '查了睡眠索引后 5 步内读了里面的文件']])}${disc[S.discView]()}`, 'c6', SRC.ok)}
+    ${card('runtime', '插件运行时', 'zap', tabsS('rtTab', [['service', '服务'], ['listener', '监听'], ['load', '加载']]), `<div class="limit">只按时间和版本统计，不受模式、模型、会话类型筛选影响。</div>${rt[S.rtTab]()}`, 'c6', SRC.ok)}
+    ${card('versions', '版本对比', 'diff', `${verDD('cmpFrom')}<span>→</span>${verDD('cmpTo')}`, `<div class="cmp">
+      <span class="h">指标</span><span class="h r">${S.cmpFrom.replace('默认', '')}</span><span class="h r">${S.cmpTo.replace('默认', '')}</span><span class="h r">变化</span>
+      ${cmpRows.map(([l, a, b, d, better, f]) => { const cls = better === 'none' || Math.abs(d) < 1e-9 ? 'flat' : (d < 0) === (better === 'lower') ? 'good' : 'bad'; return `<span class="lab">${l}</span><span class="r">${a}</span><span class="r">${b}</span><span class="r delta ${cls}">${Math.abs(d) < 1e-9 ? '—' : f(d)}</span>`; }).join('')}
+      </div>`, 'c6', SRC.ok, `${S.cmpFrom}：${fmt(A.req)} 次请求 · ${S.cmpTo}：${fmt(B.req)} 次请求${Math.min(A.req, B.req) < 200 ? ' · 样本偏少' : ''}`)}
+  </div>
+
+  <div id="card-detail" class="detail-sec"><div class="utabs" role="tablist">${htabs.map(([v, l, c]) => `<button class="utab ${S.harnessTab === v ? 'on' : ''}" data-set="harnessTab" data-v="${v}">${l}<em>${c}</em></button>`).join('')}</div>
+  ${hBody[S.harnessTab]()}</div>`;
+}
+
+/* =====================================================================
+   渲染与交互
+   ===================================================================== */
+const WHY = {
+  usage: '<b>使用统计 = 用了多少。</b>去掉了单独的「模型」卡（底部「模型」tab 已有）。四个榜单全部列出，固定高度滚动，鼠标移到卡片上才出现细滚动条；悬停一行出详情卡。底部请求明细里，悬停 <b>模型 / 耗时 / Token / 费用</b>（虚线下划线）出详情卡，和现在的实现一样；「模型」tab 的 Token、费用也能悬停。',
+  harness: '<b>Harness 统计 = Harness 好不好。</b>去掉了「Agent 循环」和「子 Agent 与后台」。顶部 5 个指标换成能直接指导改 Harness 的数：固定开销、缓存被打断、工具失败率、白费的工具调用、压缩后重读率；每个都带「比上一版本」的变化（绿 = 变好，红 = 变坏），悬停 ⓘ 看口径，点击跳到对应卡片或明细并排好序。顶部控制条可切「占用 vs 使用」A / B 两种画法。'
+};
+let flashId = null;
+function render() {
+  document.documentElement.dataset.theme = S.theme;
+  document.body.classList.toggle('nosrc', S.src === 'off');
+  document.getElementById('grp-vs').style.display = S.page === 'harness' ? '' : 'none';
+  document.querySelectorAll('[data-ctl]').forEach(g => g.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(S[g.dataset.ctl] === b.dataset.v))));
+  document.getElementById('why').innerHTML = WHY[S.page];
+  document.getElementById('win-title').textContent = '设置 › 活动 › ' + (S.page === 'usage' ? '使用统计' : 'Harness 统计');
+  document.getElementById('page').innerHTML = S.page === 'usage' ? usagePage() : harnessPage();
+  if (flashId) { const el = document.getElementById('card-' + flashId); if (el) { el.classList.add('flash'); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => el.classList.remove('flash'), 1400); } flashId = null; }
+}
+function go(id, set) { if (set) { const { sort, ...rest } = set; Object.assign(S, rest); if (sort) Object.assign(S.sort, sort); S.pageNo = 1; } flashId = id; S.menu = null; render(); }
+
+document.querySelector('.bar').addEventListener('click', e => {
+  const b = e.target.closest('[data-ctl] button'); if (!b) return;
+  const key = b.closest('[data-ctl]').dataset.ctl; S[key] = b.dataset.v;
+  if (key === 'page') { S.open = {}; S.all = {}; S.hl = {}; S.pageNo = 1; S.filters = { ...S.filters, model: null, provider: null, workspace: null, mode: null }; }
+  render();
+});
+document.getElementById('page').addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) { if (S.menu) { S.menu = null; render(); } return; }
+  const d = t.dataset;
+  if (d.menu) { S.menu = S.menu === d.menu ? null : d.menu; return render(); }
+  if (d.filter) { S.filters[d.filter] = d.v || null; if (d.filter === 'model' && d.v) S.filters.provider = null; if (d.filter === 'provider' && d.v) S.filters.model = null; S.menu = null; S.pageNo = 1; return render(); }
+  if (d.setmenu) { S[d.setmenu] = d.v; S.menu = null; return render(); }
+  S.menu = null;
+  if (d.set) { S[d.set] = d.v; if (d.set === 'usageTab' || d.set === 'harnessTab') S.pageNo = 1; if (d.set === 'vsTab') { S.all.vs = false; } if (d.set === 'tokenView' || d.set === 'timeView') S.hl = {}; return render(); }
+  if (d.hl != null && d.i != null) { const i = +d.i; S.hl[d.hl] = S.hl[d.hl] === i ? undefined : i; if (d.hl === 'ctx') S.ctxCat = S.hl.ctx != null ? String(S.hl.ctx) : null; return render(); }
+  if (d.open) { S.open[d.open] = !S.open[d.open]; return render(); }
+  if (d.all) { S.all[d.all] = !S.all[d.all]; return render(); }
+  if (d.sort) { const cur = S.sort[d.sort] || {}; S.sort[d.sort] = { k: d.k, dir: cur.k === d.k && cur.dir === 'desc' ? 'asc' : 'desc' }; return render(); }
+  if (d.page) { S.pageNo = Math.max(1, S.pageNo + +d.page); return render(); }
+  if (d.go) return go(d.go, d.goset ? JSON.parse(d.goset) : null);
+  if (d.flag != null) { const f = harnessFlags()[+d.flag]; return go(f.go, f.set); }
+  if (d.act === 'clearCat') { S.ctxCat = null; S.hl.ctx = undefined; return render(); }
+  if (d.act === 'refresh') { S.refreshing = true; render(); setTimeout(() => { S.refreshing = false; render(); }, 900); }
+});
+document.getElementById('page').addEventListener('click', e => { const c = e.target.closest('circle[data-hl]'); if (!c) return; const i = +c.dataset.i, id = c.dataset.hl; S.hl[id] = S.hl[id] === i ? undefined : i; if (id === 'ctx') S.ctxCat = S.hl.ctx != null ? String(S.hl.ctx) : null; render(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.menu) { S.menu = null; render(); } });
+function harnessFlags() { return [{ go: 'vs' }, { go: 'runtime', set: { rtTab: 'load' } }, { go: 'detail', set: { harnessTab: 'tools', sort: { ht: { k: 'fr', dir: 'desc' } } } }, { go: 'sources', set: { ctxCat: '2' } }]; }
+
+/* 悬停提示 */
+const tip = document.getElementById('tip');
+document.addEventListener('mousemove', e => {
+  const el = e.target.closest('[data-tip]');
+  if (!el) { tip.classList.remove('on'); return; }
+  tip.textContent = el.dataset.tip; tip.classList.add('on');
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = e.clientX + 12, y = e.clientY + 14;
+  if (x + w > innerWidth - 8) x = e.clientX - w - 12;
+  if (y + h > innerHeight - 8) y = e.clientY - h - 12;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+});
+/* 悬停详情卡：250ms 打开，150ms 关闭，可以移进卡片里 */
+const hc = document.getElementById('hc'); let hcOpenT, hcCloseT, hcFor = null;
+function hcShow(el) {
+  hc.innerHTML = el.dataset.hc; hc.classList.add('on'); hcFor = el;
+  const r = el.getBoundingClientRect(), w = hc.offsetWidth, h = hc.offsetHeight;
+  let x = el.classList.contains('rk') ? r.right + 8 : r.right - w, y = r.bottom + 6;
+  if (x + w > innerWidth - 8) x = r.left - w - 8; if (x < 8) x = Math.min(r.left, innerWidth - w - 8);
+  if (el.classList.contains('rk')) y = r.top - 4;
+  if (y + h > innerHeight - 8) y = r.top - h - 6;
+  hc.style.left = x + 'px'; hc.style.top = Math.max(8, y) + 'px';
+}
+function hcHide() { hc.classList.remove('on'); hcFor = null; }
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest('[data-hc]');
+  if (e.target.closest('#hc')) { clearTimeout(hcCloseT); return; }
+  if (el) { clearTimeout(hcCloseT); if (el !== hcFor) { clearTimeout(hcOpenT); hcOpenT = setTimeout(() => hcShow(el), hcFor ? 0 : 250); } }
+  else { clearTimeout(hcOpenT); if (hcFor) { clearTimeout(hcCloseT); hcCloseT = setTimeout(hcHide, 150); } }
+});
+document.addEventListener('focusin', e => { const el = e.target.closest('[data-hc]'); if (el) hcShow(el); });
+document.addEventListener('focusout', e => { if (e.target.closest('[data-hc]')) hcHide(); });
+document.addEventListener('scroll', () => hcFor && hcHide(), true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hcHide(); });
+render();
+</script>
+</body>
+</html>

@@ -10,8 +10,7 @@ const CASES: Record<string, Case> = {
   "sessions.listContextEntries": { spec: contract.sessions.listContextEntries, valid: [{ sessionId: "s", revision: "r", limit: 200 }], invalid: [{ sessionId: "s" }, { sessionId: "s", revision: "r", limit: Infinity }] },
   "sessions.readContextEntry": { spec: contract.sessions.readContextEntry, valid: [{ sessionId: "s", revision: "r", key: "k", offset: 0 }], invalid: [{ sessionId: "s", revision: "r", path: "/etc/passwd" }, { sessionId: "s", revision: "r", key: "k", offset: "1" }] },
   "sessions.listPage": { spec: contract.sessions.listPage, valid: [undefined, {}, { search: "hello", limit: 50 }], invalid: [{ search: "x".repeat(301) }, { limit: 501 }, { pinned: "true" }] },
-  "usage.getActivity": { spec: contract.usage.getActivity, valid: [{}, { model: "alpha", providerId: "provider" }, { range: "total", requestRowsPage: { page: 1, limit: 500, cursor: "abc" } }], invalid: [null, { model: ["alpha"] }, { providerId: "x".repeat(301) }, { search: "x".repeat(301) }, { requestRowsPage: { page: -1 } }, { requestId: "../x" }] },
-  "usage.getStatistics": { spec: contract.usage.getStatistics, valid: [{}, { scope: "global", status: "error" }], invalid: [[], { range: "year" }, { requestRowsPage: { limit: Infinity } }] },
+  "usage.getActivity": { spec: contract.usage.getActivity, valid: [{}, { model: "alpha", providerId: "provider" }, { range: "total", requestRowsPage: { page: 1, limit: 500, cursor: "abc" } }, { workspaceRoot: "/w", utcOffsetMinutes: 330 }], invalid: [null, { kind: "tool_invocation" }, { utcOffsetMinutes: 1.5 }, { utcOffsetMinutes: 2000 }, { workspaceRoot: 1 }, { model: ["alpha"] }, { providerId: "x".repeat(301) }, { search: "x".repeat(301) }, { requestRowsPage: { page: -1 } }, { requestId: "../x" }] },
   "usage.getStatus": { spec: contract.usage.getStatus, valid: [{ requestId: "q-123" }], invalid: [{}, { requestId: "" }, { requestId: 1 }] },
   "usage.cancel": { spec: contract.usage.cancel, valid: [{ requestId: "q-123" }], invalid: [undefined, { requestId: "a b" }] },
   "harnessStats.query": {
@@ -23,7 +22,8 @@ const CASES: Record<string, Case> = {
     invalid: [
       undefined,
       { requestId: "h-1", kind: "everything", filter: { range: "week", sessionKind: "all" } },
-      { requestId: "h-1", kind: "tools", filter: { range: "year", sessionKind: "all" } },
+      { requestId: "h-1", kind: "usage-vs", filter: { range: "year", sessionKind: "all" } },
+      { requestId: "h-1", kind: "tools", filter: { range: "week", sessionKind: "all" } },
       { requestId: "h-1", kind: "tools", filter: { range: "week", sessionKind: "robot" } },
       { requestId: "h-1", kind: "tools", filter: { range: "week", sessionKind: "all", model: "x".repeat(2000) } },
     ],

@@ -1,0 +1,58 @@
+/* 统计页（使用统计 + Harness 统计）里 Tailwind 不好表达的几处：排行列表的滚动框、热力图色阶、跳转高亮。
+   规范见 docs/design-docs/frontend/front-统计页规范.md §1。颜色只用主题 token。 */
+
+/* 固定高度滚动框：细滚动条只在鼠标在卡片上时出现，底部渐隐。 */
+.stats-scroll {
+  height: 336px;
+  overflow-y: auto;
+  padding: 0 10px 18px 0;
+  margin-right: -10px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent);
+}
+.stats-card:hover .stats-scroll,
+.stats-card:focus-within .stats-scroll {
+  scrollbar-color: var(--act-scrollbar-thumb-subtle) transparent;
+}
+.stats-scroll::-webkit-scrollbar { width: 6px; }
+.stats-scroll::-webkit-scrollbar-track { background: transparent; margin: 2px 0 18px; }
+.stats-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+.stats-card:hover .stats-scroll::-webkit-scrollbar-thumb { background: var(--act-scrollbar-thumb-subtle); }
+.stats-scroll::-webkit-scrollbar-thumb:hover { background: var(--act-scrollbar-thumb-subtle-hover); }
+
+/* 跳转后的短暂高亮。 */
+.stats-flash {
+  border-color: var(--act-color-warning);
+  box-shadow: 0 0 0 3px var(--act-color-warning-soft);
+}
+.stats-jump-target {
+  scroll-margin-top: 24px;
+  transition: box-shadow var(--motion-slow), border-color var(--motion-slow);
+}
+
+/* 热力图 5 档：surface-subtle 到 operational 的混色。 */
+.stats-heat-0 { background: var(--act-color-surface-subtle); }
+.stats-heat-1 { background: color-mix(in srgb, var(--act-color-operational) 22%, var(--act-color-surface-subtle)); }
+.stats-heat-2 { background: color-mix(in srgb, var(--act-color-operational) 42%, var(--act-color-surface-subtle)); }
+.stats-heat-3 { background: color-mix(in srgb, var(--act-color-operational) 66%, var(--act-color-surface-subtle)); }
+.stats-heat-4 { background: var(--act-color-operational); }
+
+/* 可悬停的值：虚线下划线。 */
+.stats-hover-value {
+  cursor: help;
+  text-decoration: underline dotted color-mix(in srgb, var(--act-color-text) 30%, transparent);
+  text-underline-offset: 3px;
+}
+.stats-hover-value:hover { text-decoration-color: var(--act-color-text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .stats-jump-target { transition: none; }
+}
+
+/* 1–3px 的小圆角跟随元素尺寸（图例色块、柱子顶端、热力图格子），不属于组件圆角档位。 */
+.stats-swatch { border-radius: 2px; }
+.stats-bar { border-radius: 2px 2px 0 0; }
+.stats-cell { border-radius: 3px; }

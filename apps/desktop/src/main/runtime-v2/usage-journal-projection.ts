@@ -75,10 +75,7 @@ export async function projectUsageJournalBatch(db: ProjectionDatabase, source: U
       remember(requests, data.requestId, groupKey);
       prepare(db, "UPDATE usage_projection_events SET group_key=? WHERE session_id=? AND group_key=?").run(groupKey, source.sessionId, `request:${data.requestId}`);
     } else if (event.type === "step/end" && typeof data.stepId === "string") groupKey = `step:${data.stepId}`;
-    else if (event.type.startsWith("tool/")) {
-      const callId = data.callId ?? data.toolCallId;
-      if (typeof callId === "string") groupKey = `call:${callId}`;
-    } else if (typeof data.requestId === "string") {
+    else if (typeof data.requestId === "string") {
       groupKey = requests.get(data.requestId) ?? (prepare(db, "SELECT group_key FROM usage_projection_requests WHERE session_id=? AND request_id=?").get(source.sessionId, data.requestId) as { group_key: string } | undefined)?.group_key ?? `request:${data.requestId}`;
       remember(requests, data.requestId, groupKey);
     }
@@ -132,15 +129,12 @@ export function compactUsageEvent(event: SessionEventEnvelopeV1): SessionEventEn
   const fields: Record<string, readonly string[]> = {
     "request/header": ["requestId", "turnId", "stepId", "routeId", "model", "attempt"],
     "request/context": ["requestId"],
-    "assistant/message": ["requestId", "finishReason", "reason", "usage"],
+    "assistant/message": ["requestId", "finishReason", "reason", "usage", "firstTokenAt"],
     "llm/retry": ["requestId", "nextAttempt", "retryId", "usage"],
     "llm/retry-started": ["requestId"],
     "llm/auxiliary-start": ["sessionId", "agentRunId", "turnId", "stepId", "callId", "logicalRequestId", "attemptId", "attempt", "purpose", "routeId", "model", "startedAt"],
     "llm/auxiliary-end": ["sessionId", "agentRunId", "turnId", "stepId", "callId", "logicalRequestId", "attemptId", "attempt", "purpose", "routeId", "model", "startedAt", "finishedAt", "status", "usage"],
     "step/end": ["stepId", "finishReason", "reason", "usage"],
-    "tool/call": ["callId", "toolCallId", "turnId", "stepId", "agentRunId", "name"],
-    "tool/result": ["callId", "toolCallId", "status"],
-    "tool/recovery-outcome": ["callId", "toolCallId", "status"],
   };
   const selected = fields[event.type];
   if (!selected) return undefined;

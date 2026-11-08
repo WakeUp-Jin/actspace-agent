@@ -390,7 +390,6 @@ export function projectSessionUsageActivities(snapshot: UsageSession, journal: r
   const requestsByStep = new Map<string, ActivityRequestState[]>();
   const retries = new Map<string, SessionEventEnvelopeV1>();
   const retryStarted = new Map<string, SessionEventEnvelopeV1>();
-  const tools = new Map<string, { call: SessionEventEnvelopeV1; terminal?: SessionEventEnvelopeV1 }>();
   const auxiliary = new Map<string, { start: SessionEventEnvelopeV1; end?: SessionEventEnvelopeV1 }>();
 
   for (const event of journal) {
@@ -463,16 +462,6 @@ export function projectSessionUsageActivities(snapshot: UsageSession, journal: r
       if (candidate && candidate.stepEnd === undefined) candidate.stepEnd = event;
       continue;
     }
-    if (event.type === "tool/call") {
-      const callId = string(data.callId) ?? string(data.toolCallId);
-      if (callId) tools.set(callId, { call: event });
-      continue;
-    }
-    if (event.type === "tool/result" || event.type === "tool/recovery-outcome") {
-      const callId = string(data.callId) ?? string(data.toolCallId);
-      const entry = callId ? tools.get(callId) : undefined;
-      if (entry && entry.terminal === undefined) entry.terminal = event;
-    }
   }
 
   for (const state of requests.values()) {
@@ -496,7 +485,6 @@ export function projectSessionUsageActivities(snapshot: UsageSession, journal: r
     previousAttempts.set(row.logicalRequestId!, row.requestId!);
     rows.push(row);
   }
-  for (const { call, terminal } of tools.values()) rows.push(activityRowForTool(snapshot, call, terminal, runByTurn));
   for (const row of rows) row.sessionTitle = snapshot.metadata.title ?? undefined;
   activityRowsCache.set(journal, { revision: snapshot.throughJournalSeq, sessionId: snapshot.sessionId, rows });
   return rows;
@@ -541,6 +529,10 @@ function activityRowForRequest(snapshot: UsageSession, state: ActivityRequestSta
   const cost = activityCost(usage);
   const relatedEventSeqs = [state.header.seq, state.context?.seq, state.retry?.seq, state.retryStarted?.seq, state.assistant?.seq, state.stepEnd?.seq].filter((seq): seq is number => typeof seq === "number");
   const endedAt = terminal?.time ?? state.retry?.time;
+  // 首字时间只在新日志里有；老会话缺失时两段都不记（页面算「没有首字记录」）。
+  const firstTokenAt = string(record(state.assistant?.data).firstTokenAt);
+  const ttftMs = firstTokenAt ? nonNegativeSpan(state.header.time, firstTokenAt) : undefined;
+  const decodeMs = firstTokenAt && endedAt && ttftMs !== undefined ? nonNegativeSpan(firstTokenAt, endedAt) : undefined;
   return {
     activityId: `${snapshot.sessionId}:request:${state.requestId}`,
     kind: "llm_request",
@@ -558,6 +550,8 @@ function activityRowForRequest(snapshot: UsageSession, state: ActivityRequestSta
     startedAt: state.header.time,
     ...(endedAt ? { endedAt } : {}),
     ...(endedAt ? { durationMs: duration(state.header.time, endedAt) } : {}),
+    ...(ttftMs === undefined ? {} : { ttftMs }),
+    ...(decodeMs === undefined ? {} : { decodeMs }),
     ...(state.attempt === undefined ? {} : { attempt: state.attempt }),
     tokens: activityTokens(usage),
     ...cost,
@@ -568,33 +562,9 @@ function activityRowForRequest(snapshot: UsageSession, state: ActivityRequestSta
   };
 }
 
-function activityRowForTool(snapshot: UsageSession, call: SessionEventEnvelopeV1, terminal: SessionEventEnvelopeV1 | undefined, runByTurn: Map<string, string>): UsageActivityRow {
-  const callData = record(call.data);
-  const terminalData = terminal ? record(terminal.data) : {};
-  const callId = string(callData.callId) ?? string(callData.toolCallId) ?? `call-${call.seq}`;
-  const turnId = string(callData.turnId) ?? undefined;
-  const status = terminal ? toolActivityStatus(string(terminalData.status)) : "running";
-  const endedAt = terminal?.time;
-  return {
-    activityId: `${snapshot.sessionId}:tool:${callId}`,
-    kind: "tool_invocation",
-    sessionId: snapshot.sessionId,
-    agentRunId: string(callData.agentRunId) ?? (turnId ? runByTurn.get(turnId) : undefined) ?? "system",
-    ...(turnId ? { turnId } : {}),
-    ...(string(callData.stepId) ? { stepId: string(callData.stepId)! } : {}),
-    callId,
-    ...(string(callData.name) ? { toolName: string(callData.name)! } : {}),
-    ...(snapshot.workspaceRoot ? { workspaceRoot: snapshot.workspaceRoot } : {}),
-    startedAt: call.time,
-    ...(endedAt ? { endedAt } : {}),
-    ...(endedAt ? { durationMs: duration(call.time, endedAt) } : {}),
-    tokens: emptyActivityTokens(),
-    costUsd: null,
-    costBasis: "unavailable",
-    status,
-    sourceEventSeq: call.seq,
-    relatedEventSeqs: [call.seq, ...(terminal ? [terminal.seq] : [])],
-  };
+function nonNegativeSpan(from: string, to: string): number | undefined {
+  const ms = Date.parse(to) - Date.parse(from);
+  return Number.isFinite(ms) && ms >= 0 ? ms : undefined;
 }
 
 function modelKeyFor(provider: string | undefined, model: string | undefined): UsageActivityRow["modelKey"] {
@@ -612,7 +582,6 @@ function activityTokens(usage: EventRecord): UsageActivityTokens {
   return { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, reasoningTokens, totalTokens: known.every((value) => value === null) ? null : known.reduce<number>((sum, value) => sum + (value ?? 0), 0) };
 }
 
-function emptyActivityTokens(): UsageActivityTokens { return { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null, totalTokens: null }; }
 
 function activityCost(usage: EventRecord): Pick<UsageActivityRow, "costUsd" | "costBasis" | "costAmount" | "costCurrency" | "costProvenance" | "historicalUnverified"> {
   const cost = nullableNonNegative(usage.cost);
@@ -630,13 +599,6 @@ function requestActivityStatus(reason: string | null): UsageActivityStatus {
   if (reason === "aborted") return "aborted";
   if (reason === "failed" || reason === "error") return "error";
   if (reason === "completed" || reason === "stop" || reason === "tool-use" || reason === "tool-calls" || reason === "success") return "success";
-  return "unknown";
-}
-
-function toolActivityStatus(status: string | null): UsageActivityStatus {
-  if (status === "aborted" || status === "cancelled") return "aborted";
-  if (status === "completed" || status === "success" || status === "ok") return "success";
-  if (status === "failed" || status === "denied" || status === "error") return "error";
   return "unknown";
 }
 

@@ -85,7 +85,7 @@ function stubToolsV4(tools: Partial<SettingsV4Snapshot["settings"]["tools"]> = {
       media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" }, imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" as const } },
       skills: { disabled: [] },
       subagents: { routes: {} },
-      activity: { usage: { range: "30d" as const, status: "all" as const, modelFilter: "", showDetails: false, activeTab: "requests" as const } },
+      activity: { usage: { range: "30d" as const, activeTab: "requests" as const, tokenView: "type" as const, timeView: "phase" as const, trendMetric: "tokens" as const, heatMetric: "sessions" as const } },
     },
   } as SettingsV4Snapshot;
   let current = snapshot;
@@ -319,7 +319,7 @@ describe("SettingsPage", () => {
         media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" } },
         skills: { disabled: [] },
         subagents: { routes: {} },
-        activity: { usage: { range: "30d", status: "all", modelFilter: "", showDetails: false, activeTab: "requests" } },
+        activity: { usage: { range: "30d", activeTab: "requests", tokenView: "type", timeView: "phase", trendMetric: "tokens", heatMetric: "sessions" } },
       },
     };
     const getSettingsV4 = vi.fn(async () => snapshot);
@@ -360,7 +360,7 @@ describe("SettingsPage", () => {
         media: { imageGeneration: { baseUrl: "https://www.duckcoding.ai/v1", model: "gpt-image-2" }, imageInspection: { modelKey: "openrouter:openai/gpt-5.6-luna" as const } },
         skills: { disabled: [] },
         subagents: { routes: {} },
-        activity: { usage: { range: "30d" as const, status: "all" as const, modelFilter: "", showDetails: false, activeTab: "requests" as const } },
+        activity: { usage: { range: "30d" as const, activeTab: "requests" as const, tokenView: "type" as const, timeView: "phase" as const, trendMetric: "tokens" as const, heatMetric: "sessions" as const } },
       },
     } as SettingsV4Snapshot;
     const updateSettingsV4 = vi.fn(async () => ({ ok: true as const, snapshot: { ...snapshot, revision: "revision-2" } }));

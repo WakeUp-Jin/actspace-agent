@@ -1,26 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   HarnessRevisionKey,
+  HarnessStatsContext,
   HarnessStatsData,
+  HarnessStatsDisclosure,
   HarnessStatsFilter,
   HarnessStatsOptions,
+  HarnessStatsOverview,
+  HarnessStatsPlugins,
   HarnessStatsQueryKind,
   HarnessStatsQueryResult,
-  HarnessStatsSummary,
   HarnessStatsSyncStatus,
-  HarnessStatsTab,
+  HarnessStatsUsageVs,
+  HarnessStatsVersions,
 } from "@actspace/shared";
+import { HARNESS_STATS_QUERY_KINDS } from "@actspace/shared";
 import { harnessStatsApi } from "../../api/harness-stats";
 import { liveEvents } from "../../api/live-events";
 
-/** 会话日志有新事件后等多久再刷新当前 tab。 */
+/** 会话日志有新事件后等多久再刷新。 */
 export const HARNESS_STATS_JOURNAL_DEBOUNCE_MS = 2000;
 /** 正在补历史数据时轮询同步进度的间隔。 */
 export const HARNESS_STATS_POLL_MS = 1000;
 /** 同一种数据拿到的 dataVersion 比已知的旧时，最多连续再查几次（防止主进程提交与查询错位时死循环）。 */
 const MAX_STALE_RETRIES = 2;
 
-/** 选项（模式、模型、工作区、版本）与筛选无关，永远查「全部」。 */
+/** 选项（模式、模型、版本）与筛选无关，永远查「全部」。 */
 const OPTIONS_FILTER: HarnessStatsFilter = { range: "total", sessionKind: "all" };
 const QUERY_FAILED = "没有取到统计结果，请重试。";
 
@@ -34,15 +39,23 @@ export type StatsView<T> = {
   readonly refreshing: boolean;
 };
 
+type ValueOf<K extends HarnessStatsQueryKind> = Extract<HarnessStatsData, { kind: K }>["value"];
+
 type Entry = { key: string; result: HarnessStatsQueryResult | null; error: string | null; loading: boolean };
 type Inflight = { requestId: string; key: string };
 
 export type HarnessStatsController = {
-  readonly summary: StatsView<HarnessStatsSummary>;
   readonly options: StatsView<HarnessStatsOptions>;
-  readonly tab: StatsView<HarnessStatsData>;
+  readonly overview: StatsView<HarnessStatsOverview>;
+  readonly usageVs: StatsView<HarnessStatsUsageVs>;
+  readonly context: StatsView<HarnessStatsContext>;
+  readonly disclosure: StatsView<HarnessStatsDisclosure>;
+  readonly plugins: StatsView<HarnessStatsPlugins>;
+  readonly versions: StatsView<HarnessStatsVersions>;
   readonly sync: HarnessStatsSyncStatus | null;
-  /** 手动刷新：当前 tab、指标卡和选项重新查询，其他 tab 的缓存作废。 */
+  /** 任何一块正在后台刷新。 */
+  readonly refreshing: boolean;
+  /** 手动刷新：7 块全部重新查询。 */
   readonly refresh: () => void;
 };
 
@@ -58,31 +71,26 @@ function errorMessage(error: unknown): string {
   return text.startsWith("Error invoking remote method") ? "Harness 统计读取失败，请重试。" : text;
 }
 
+function keyOf(kind: HarnessStatsQueryKind, filterKey: string, compareKey: string): string {
+  if (kind === "options") return "options";
+  return kind === "versions" ? `${filterKey}|${compareKey}` : filterKey;
+}
+
 /**
- * 「Harness 统计」页的数据来源。首屏只查 summary、options 和当前 tab，切 tab 才查对应的 tab。
+ * 「Harness 统计」页的数据来源：打开页面时 7 块（options / overview / usage-vs / context / disclosure / plugins / versions）并行查询。
  *
- * 缓存：每种数据（kind）保留一份结果，键 = 筛选（versions 还包括对比的两个版本）；结果带 dataVersion，
- * 比已知的最新 dataVersion 旧就当过期、重新查。改筛选时其他 tab 的缓存直接丢弃。
- * 刷新：会话日志更新（流式文本增量除外）后 2 秒防抖，只刷新当前 tab 和指标卡；
- * 同步在补历史（`phase === "syncing"`）时每秒轮询 getStatus，dataVersion 变了就刷新当前 tab。
+ * 缓存：每块保留一份结果，键 = kind + 筛选（versions 还包括对比的两个版本）；结果带 dataVersion，
+ * 比已知的最新 dataVersion 旧就当过期、重新查。
+ * 刷新：会话日志更新（流式文本增量除外）后 2 秒防抖，全部重查；
+ * 同步在补历史（`phase === "syncing"`）时每秒轮询 getStatus，dataVersion 变了就把过期的块重查。
  */
-export function useHarnessStatsTab({
-  filter,
-  tab,
-  compare,
-}: {
-  filter: HarnessStatsFilter;
-  tab: HarnessStatsTab;
-  compare?: HarnessStatsCompare;
-}): HarnessStatsController {
+export function useHarnessStats({ filter, compare }: { filter: HarnessStatsFilter; compare?: HarnessStatsCompare }): HarnessStatsController {
   const filterKey = JSON.stringify(filter);
   const compareKey = compare ? `${compare.from}>${compare.to}` : "";
   const filterRef = useRef(filter);
   const compareRef = useRef(compare);
-  const tabRef = useRef(tab);
   filterRef.current = filter;
   compareRef.current = compare;
-  tabRef.current = tab;
 
   const entriesRef = useRef<Partial<Record<HarnessStatsQueryKind, Entry>>>({});
   const inflightRef = useRef<Partial<Record<HarnessStatsQueryKind, Inflight>>>({});
@@ -100,8 +108,8 @@ export function useHarnessStatsTab({
   }, []);
 
   const keyFor = useCallback((kind: HarnessStatsQueryKind): string => {
-    if (kind === "options") return "options";
-    return kind === "versions" ? `${JSON.stringify(filterRef.current)}|${compareRef.current ? `${compareRef.current.from}>${compareRef.current.to}` : ""}` : JSON.stringify(filterRef.current);
+    const c = compareRef.current;
+    return keyOf(kind, JSON.stringify(filterRef.current), c ? `${c.from}>${c.to}` : "");
   }, []);
 
   const abandon = useCallback((kind: HarnessStatsQueryKind) => {
@@ -114,19 +122,14 @@ export function useHarnessStatsTab({
 
   const ensureRef = useRef<(kind: HarnessStatsQueryKind, force?: boolean) => void>(() => undefined);
 
-  /** 已知有更新的 dataVersion：把当前页面用到的、结果已经过期的数据重新查一遍。 */
-  const revalidateActive = useCallback(() => {
-    for (const kind of ["summary", "options", tabRef.current] as const) ensureRef.current(kind);
-  }, []);
-
   const noteVersion = useCallback((version: number) => {
     const known = latestVersionRef.current;
     if (known !== null && version <= known) return;
     latestVersionRef.current = version;
     staleRetriesRef.current = {};
-    // 第一份结果只是「知道版本号」，正在飞的其他请求不算过期；之后任何变大（包括 0→1）都要重查。
-    if (known !== null) revalidateActive();
-  }, [revalidateActive]);
+    // 第一份结果只是「知道版本号」，正在飞的其他请求不算过期；之后任何变大（包括 0→1）都要把过期的块重查。
+    if (known !== null) for (const kind of HARNESS_STATS_QUERY_KINDS) ensureRef.current(kind);
+  }, []);
 
   const ensure = useCallback((kind: HarnessStatsQueryKind, force = false) => {
     const key = keyFor(kind);
@@ -138,7 +141,8 @@ export function useHarnessStatsTab({
     abandon(kind);
     const requestId = nextRequestId();
     inflightRef.current[kind] = { requestId, key };
-    commit(kind, { key, result: current?.key === key ? current.result : null, error: null, loading: true });
+    const previous = current?.key === key ? current.result : null;
+    commit(kind, { key, result: previous, error: null, loading: true });
     const superseded = () => inflightRef.current[kind]?.requestId !== requestId;
     const queryFilter = kind === "options" ? OPTIONS_FILTER : filterRef.current;
     const queryCompare = kind === "versions" ? compareRef.current : undefined;
@@ -147,7 +151,7 @@ export function useHarnessStatsTab({
         if (superseded()) return;
         delete inflightRef.current[kind];
         if (!result || result.data.kind !== kind) {
-          commit(kind, { key, result: current?.key === key ? current.result : null, error: QUERY_FAILED, loading: false });
+          commit(kind, { key, result: previous, error: QUERY_FAILED, loading: false });
           return;
         }
         commit(kind, { key, result, error: null, loading: false });
@@ -165,13 +169,13 @@ export function useHarnessStatsTab({
       (error: unknown) => {
         if (superseded()) return;
         delete inflightRef.current[kind];
-        commit(kind, { key, result: current?.key === key ? current.result : null, error: errorMessage(error), loading: false });
+        commit(kind, { key, result: previous, error: errorMessage(error), loading: false });
       },
     );
   }, [abandon, commit, keyFor, noteVersion]);
   ensureRef.current = ensure;
 
-  // 首屏与切换：筛选 / 对比变了先丢掉对应缓存，再查指标卡和当前 tab；选项只查一次。
+  // 首屏与筛选 / 对比变化：键变了的块丢掉缓存，7 块并行查（键没变且新鲜的跳过）。
   useEffect(() => {
     for (const kind of Object.keys(entriesRef.current) as HarnessStatsQueryKind[]) {
       const entry = entriesRef.current[kind];
@@ -180,17 +184,15 @@ export function useHarnessStatsTab({
         commit(kind, null);
       }
     }
-    ensure("options");
-    ensure("summary");
-    ensure(tab);
-  }, [filterKey, compareKey, tab, ensure, abandon, commit, keyFor]);
+    for (const kind of HARNESS_STATS_QUERY_KINDS) ensure(kind);
+  }, [filterKey, compareKey, ensure, abandon, commit, keyFor]);
 
   // 离开页面：取消还在飞的请求。
   useEffect(() => () => {
     for (const kind of Object.keys(inflightRef.current) as HarnessStatsQueryKind[]) abandon(kind);
   }, [abandon]);
 
-  // 会话日志更新：流式文本增量（assistant-delta 等）不算，只看 journal-update；2 秒防抖。
+  // 会话日志更新：流式文本增量（assistant-delta 等）不算，只看 journal-update；2 秒防抖后除选项外全部重查。
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unsubscribe = liveEvents.subscribe((envelope) => {
@@ -198,8 +200,7 @@ export function useHarnessStatsTab({
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        ensureRef.current(tabRef.current, true);
-        ensureRef.current("summary", true);
+        for (const kind of HARNESS_STATS_QUERY_KINDS) if (kind !== "options") ensureRef.current(kind, true);
       }, HARNESS_STATS_JOURNAL_DEBOUNCE_MS);
     });
     return () => {
@@ -231,32 +232,28 @@ export function useHarnessStatsTab({
   }, [syncing, noteVersion]);
 
   const refresh = useCallback(() => {
-    const active = new Set<HarnessStatsQueryKind>(["summary", "options", tabRef.current]);
-    for (const kind of Object.keys(entriesRef.current) as HarnessStatsQueryKind[]) {
-      if (!active.has(kind)) {
-        abandon(kind);
-        commit(kind, null);
-      }
-    }
     staleRetriesRef.current = {};
-    for (const kind of active) ensureRef.current(kind, true);
-  }, [abandon, commit]);
+    for (const kind of HARNESS_STATS_QUERY_KINDS) ensureRef.current(kind, true);
+  }, []);
 
-  const view = useCallback(<T,>(kind: HarnessStatsQueryKind, pick: (data: HarnessStatsData) => T): StatsView<T> => {
-    const entry = entries[kind];
-    const matches = entry && entry.key === (kind === "options" ? "options" : kind === "versions" ? `${filterKey}|${compareKey}` : filterKey);
-    if (!entry || !matches) return { status: "loading", data: null, error: null, refreshing: false };
-    const data = entry.result ? pick(entry.result.data) : null;
-    if (entry.error && !data) return { status: "error", data: null, error: entry.error, refreshing: false };
-    if (!data) return { status: "loading", data: null, error: null, refreshing: false };
-    return { status: "ready", data, error: entry.error, refreshing: entry.loading };
-  }, [entries, filterKey, compareKey]);
-
-  return useMemo(() => ({
-    summary: view("summary", (data) => (data as Extract<HarnessStatsData, { kind: "summary" }>).value),
-    options: view("options", (data) => (data as Extract<HarnessStatsData, { kind: "options" }>).value),
-    tab: view<HarnessStatsData>(tab, (data) => data),
-    sync,
-    refresh,
-  }), [view, tab, sync, refresh]);
+  return useMemo(() => {
+    const view = <K extends HarnessStatsQueryKind>(kind: K): StatsView<ValueOf<K>> => {
+      const entry = entries[kind];
+      if (!entry || entry.key !== keyOf(kind, filterKey, compareKey)) return { status: "loading", data: null, error: null, refreshing: false };
+      const data = entry.result?.data.kind === kind ? (entry.result.data.value as ValueOf<K>) : null;
+      if (entry.error && !data) return { status: "error", data: null, error: entry.error, refreshing: false };
+      if (!data) return { status: "loading", data: null, error: null, refreshing: false };
+      return { status: "ready", data, error: entry.error, refreshing: entry.loading };
+    };
+    const views = {
+      options: view("options"),
+      overview: view("overview"),
+      usageVs: view("usage-vs"),
+      context: view("context"),
+      disclosure: view("disclosure"),
+      plugins: view("plugins"),
+      versions: view("versions"),
+    };
+    return { ...views, sync, refreshing: Object.values(views).some((item) => item.refreshing), refresh };
+  }, [entries, filterKey, compareKey, sync, refresh]);
 }

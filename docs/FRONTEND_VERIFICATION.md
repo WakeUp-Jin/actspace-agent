@@ -61,7 +61,8 @@ pnpm build
 | `subagent-trajectory` | 父会话含一次 `agent` 委派；`getSubagents` 返回五个子 Agent（已完成 Explore、运行中、后台运行中、失败、已停止） | 父轨迹只留 `agent` 一行、右侧子 Agent 面板分组卡与详情顶栏、「查看轨迹」、窄面板。`getSubAgentTranscript` 返回空，运行中的实时轨迹需真实运行 |
 | `compaction` | 三个会话：已提交压缩、压缩进行中、压缩失败 | 压缩分隔线三态、「在轨迹中查看」、轨迹概述。不覆盖手动 `/compact` 与真实压缩 |
 | `background-tasks` | 一个会话三轮：后台 `pnpm test`、后台 `agent`、完成通知唤醒（无用户消息）、仍在运行的 `pnpm dev` | Bash / 子 Agent 卡片的「后台」标签与状态、唤醒分隔行、右侧后台任务面板。不覆盖真实唤醒调度与 `task_*` 输出 |
-| `harness-stats` | 直接打开 设置 → Harness 统计；数据来自 `mock/harness-stats-fixture.ts`。`&hsTab=<overview\|plugins\|tools\|context\|disclosure\|runtime\|versions>` 选页签，`&theme=dark` 强制深色 | 7 个页签的布局、指标卡、表格排序与展开、图表 hover、筛选、版本对比。真实汇总 Worker 与日志同步由 main 单测和 Electron 覆盖 |
+| `harness-stats` | 直接打开 设置 → Harness 统计；数据来自 `mock/harness-stats-fixture.ts`。`&theme=dark` 强制深色 | 值得关注、5 张指标卡与版本对比行、卡片网格（占用 vs 使用、上下文、压缩、披露、运行时、版本对比）、悬停卡、跳转高亮、底部明细排序。真实汇总 Worker 与日志同步由 main 单测和 Electron 覆盖 |
+| `usage-stats` | 直接打开 设置 → 使用统计；数据来自 `mock/usage-stats-fixture.ts`（demo v4 的 30 天口径，范围按比例缩放）。`&theme=dark` 强制深色 | 工具条筛选、5 张指标卡与跳转、Token / 耗时环形图、用量趋势、活跃度热力图、四个排行卡、底部 6 个明细 tab、请求明细悬停卡与分页。不覆盖真实统计库重建与时区分桶（main 单测覆盖） |
 
 #### 轨迹页 fixture
 
