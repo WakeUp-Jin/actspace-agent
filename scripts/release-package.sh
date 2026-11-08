@@ -38,6 +38,12 @@ require_env() {
 }
 
 platform="$(uname -s | tr '[:upper:]' '[:lower:]')"
+case "${platform}" in
+  mingw* | msys* | cygwin*)
+    # Git Bash on Windows (also what GitHub's windows runners use for `shell: bash`).
+    platform="windows"
+    ;;
+esac
 arch="$(uname -m)"
 case "${arch}" in
   arm64 | aarch64)
@@ -51,8 +57,14 @@ case "${arch}" in
     ;;
 esac
 
-artifact_name="actspace-desktop-${platform}-${artifact_arch}.tar.gz"
+# Windows users expect a zip; macOS and Linux keep the tar.gz.
+artifact_extension="tar.gz"
+if [[ "${platform}" == "windows" ]]; then
+  artifact_extension="zip"
+fi
+artifact_name="actspace-desktop-${platform}-${artifact_arch}.${artifact_extension}"
 artifact_path="${dist_dir}/${artifact_name}"
+manifest_name="release-manifest-${platform}-${artifact_arch}.json"
 dmg_name=""
 dmg_path=""
 dmg_manifest_value=null
@@ -186,16 +198,37 @@ case "${platform}" in
     mkdir -p "${artifact_root}/resources"
     cp -R "${deploy_dir}" "${artifact_root}/resources/app"
     ;;
+  windows)
+    if [[ ! -f "${electron_runtime_dir}/electron.exe" ]]; then
+      echo "electron.exe not found at ${electron_runtime_dir}" >&2
+      exit 1
+    fi
+    cp -R "${electron_runtime_dir}/." "${artifact_root}/"
+    # Portable layout: <app>.exe next to Electron's DLLs, app code under resources/app. No installer, no icon
+    # patching and no Authenticode signature yet; SmartScreen will warn on first launch.
+    mv "${artifact_root}/electron.exe" "${artifact_root}/${app_executable_name}.exe"
+    mkdir -p "${artifact_root}/resources"
+    cp -R "${deploy_dir}" "${artifact_root}/resources/app"
+    node "${repo_root}/scripts/verify-browser-components.mjs" "${artifact_root}/resources/app/browser-components"
+    ;;
   *)
     echo "Unsupported release packaging platform: ${platform}" >&2
     exit 1
     ;;
 esac
 
-tar -czf "${artifact_path}" -C "${artifact_root}" .
+if [[ "${artifact_extension}" == "zip" ]]; then
+  if command -v 7z >/dev/null 2>&1; then
+    (cd "${artifact_root}" && 7z a -tzip -r -bso0 -bsp0 "${artifact_path}" .)
+  else
+    powershell.exe -NoProfile -Command "Compress-Archive -Path '$(cygpath -w "${artifact_root}")\*' -DestinationPath '$(cygpath -w "${artifact_path}")' -Force"
+  fi
+else
+  tar -czf "${artifact_path}" -C "${artifact_root}" .
+fi
 
 artifact_size_bytes="$(wc -c < "${artifact_path}" | tr -d '[:space:]')"
-cat > "${dist_dir}/release-manifest.json" <<EOF
+cat > "${dist_dir}/${manifest_name}" <<EOF
 {
   "repository": "${GITHUB_REPOSITORY:-local}",
   "git_sha": "${git_sha}",

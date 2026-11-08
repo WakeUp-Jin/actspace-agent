@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { verifyBrowserComponents } from "./verify-browser-components.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const destination = resolve(process.argv[2] ?? join(root, "dist", "browser-components"));
-if (destination !== resolve(root, "dist", "browser-components") && !/^browser-components(-[a-z0-9]+)?$/.test(destination.split("/").at(-1) ?? "") ||
-    !destination.startsWith(resolve(root, "dist") + "/")) {
+const underDist = relative(resolve(root, "dist"), destination);
+if (!underDist || underDist.startsWith("..") || isAbsolute(underDist) || !/^browser-components(-[a-z0-9]+)?$/.test(basename(destination))) {
   throw new Error("Browser component output must be a dedicated browser-components directory under dist.");
 }
 const hostSource = join(root, "browser-bridge", "apps", "cli");
@@ -50,7 +50,8 @@ async function walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) result.push(...await walk(path));
-    else result.push(relative(destination, path));
+    // Manifest keys are always POSIX so the same verifier reads them on every platform.
+    else result.push(relative(destination, path).split(sep).join("/"));
   }
   return result.sort();
 }
