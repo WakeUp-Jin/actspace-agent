@@ -250,8 +250,6 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
     },
     models: {
       listUsable: async () => ({ models: mockUsableModels() }),
-      getPricingCatalog: async () => null,
-      refreshPricingCatalog: async () => null,
     },
     modelConnections: createModelConnectionsMock(),
     englishLearning: { getState: async () => mockEnglishLearningState() },

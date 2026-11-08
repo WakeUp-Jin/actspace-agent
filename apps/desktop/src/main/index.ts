@@ -2,14 +2,13 @@ import { RemoteDesktopAdapter } from "./remote-hosts/desktop-adapter";
 import { RemoteHostRegistry } from "./remote-hosts/registry";
 import { registerRemoteHostIpc } from "./remote-hosts/ipc";
 import { registerPerformanceIpc } from "./performance-ipc";
-import { ModelCatalogService } from "./model-catalog-service";
 import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
 import { BROWSER_PLUGIN_ID, disabledPluginIds, ENGLISH_LEARNING_PLUGIN_ID, resolvePluginSettings, resolvePluginSwitches } from "./plugins/plugin-switches";
 import { registerPluginsIpc } from "./plugins/plugins-ipc";
 import { registerDisabledEnglishLearningIpc } from "./plugins/optional-plugin-stubs";
 import { loadRuntimeV2Module } from "./runtime-v2/runtime-loader";
-import { app, BrowserWindow, globalShortcut, safeStorage, net, screen } from "electron";
+import { app, BrowserWindow, globalShortcut, safeStorage, screen } from "electron";
 import { presentQuickOpenWindow } from "./quick-open-window";
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -51,7 +50,6 @@ let remoteHosts: RemoteHostRegistry | undefined;
 let disposeRemoteHostIpc: (() => void) | undefined;
 let fixedRendererIpc: FixedRendererIpcRegistration | undefined;
 let settingsService: SettingsService | undefined;
-let pricingCatalog: ModelCatalogService | undefined;
 let modelRuntimeService: ModelRuntimeService | undefined;
 let providerNetworkService: ProviderNetworkService | undefined;
 let quickOpenShortcutController: QuickOpenShortcutController | undefined;
@@ -168,10 +166,8 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   settingsService = new SettingsService({ dataRoot: roots.dataRoot, crypto: electronSecretCrypto });
   await settingsService.load();
   providerNetworkService = new ProviderNetworkService();
-  pricingCatalog = new ModelCatalogService({ dataRoot: roots.dataRoot, fetch: net.fetch.bind(net) as typeof fetch });
-  await pricingCatalog.load();
-  const modelStore = new ModelStoreService({ settings: settingsService, catalog: () => pricingCatalog!.snapshot() });
-  modelRuntimeService = new ModelRuntimeService(settingsService, modelStore, () => pricingCatalog!.snapshot());
+  const modelStore = new ModelStoreService({ settings: settingsService });
+  modelRuntimeService = new ModelRuntimeService(settingsService, modelStore);
   const quickOpenSettings = settingsService.getV2().shortcuts.quickOpen;
   quickOpenShortcutController = new QuickOpenShortcutController(globalShortcut, () => {
     const window = getMainWindow();
@@ -268,7 +264,6 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     settings: settingsService,
     models: modelStore,
     modelRuntime: modelRuntimeService,
-    pricingCatalog,
     providerNetwork: providerNetworkService,
     approvals: approvalRegistry,
     browserBridge: browserBridgeService,
@@ -315,7 +310,6 @@ app.on("before-quit", (event) => {
       await remoteHosts?.dispose();
       disposeRemoteHostIpc?.();
       await runtimeV2Registry?.dispose();
-      pricingCatalog?.dispose();
       await providerNetworkService?.dispose();
       quickOpenShortcutController?.dispose();
     } catch (error) {

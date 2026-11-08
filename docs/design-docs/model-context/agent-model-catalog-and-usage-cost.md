@@ -1,10 +1,10 @@
 # 本地模型目录与使用费用设计
 
-> 执行入口：[使用统计更新计划](../../exec-plans/completed/20260906-actspace-usage-statistics/README.md)。页面设计：[使用统计页面更新](../../exec-plans/completed/design-archive/frontend/front-usage-statistics-refresh.md)。
+> 执行入口：[使用统计更新计划](../../exec-plans/completed/20260906-actspace-usage-statistics/README.md)；2026-11-08 目录生成规则与删除运行时刷新见[目录价格锁定计划](../../exec-plans/active/20261108-catalog-price-lock.md)。页面设计：[使用统计页面更新](../../exec-plans/completed/design-archive/frontend/front-usage-statistics-refresh.md)。
 
 ## 目标与已有证据
 
-费用能够解释来源；没有价格或完整用量时显示未知；模型目录在断网时仍可使用；目录更新不阻塞启动、请求发送或统计页面。
+费用能够解释来源；没有价格或完整用量时显示未知；模型目录随包交付，断网时仍可使用，运行时不联网拉取价目。
 
 现状与约束：
 
@@ -14,23 +14,20 @@
 
 ## 参考 pi，明确移植边界
 
-参考上游 main；本仓库安装的 pi-ai 为 0.82.1，不能假定它自动包含上游 coding-agent 的目录刷新能力。
-
 - [pi 生成脚本](https://github.com/earendil-works/pi/blob/main/packages/ai/scripts/generate-models.ts)：提取 models.dev、OpenRouter 等来源，生成随包交付的模型数据。
-- [pi 远端目录实现](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/remote-catalog-provider.ts)：恢复本地数据，检查 4 小时 TTL，使用条件请求，刷新失败保留旧数据。
-- [pi Model Runtime](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/model-runtime.ts) 与 [交互刷新协调](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/modes/interactive/model-catalog-refresh.ts)：网络由宿主允许，并合并并发刷新。
 
-ActSpace 采用“随包目录 + 本地缓存 + 按需后台刷新”。pi 运行时连接的是其托管的 provider 目录；ActSpace 首版直接读取两个公共数据源，不依赖 pi.dev，也不建设新服务器。上游经验用于机制设计，不复制 coding-agent 或升级整个 SDK。
+ActSpace 只采用“随包目录”：维护者运行生成脚本，直接读取两个公共数据源，结果提交进仓库；不依赖 pi.dev，也不建设新服务器。
+
+> 2026-11-08 改：删掉 Desktop 运行时的目录后台刷新（`ModelCatalogService`、worker、本地缓存和 `getPricingCatalog` / `refreshPricingCatalog` IPC）。它自 2026-10-21 起已没有界面入口；保留它会让“仓库里定下的价格”被公共数据源的新价格绕过。用户数据目录里旧的 `model-catalog/` 缓存文件不再读取，也不删除。
 
 ## 数据流与所有权
 
 ```text
 models.dev / OpenRouter public API
-       |                         |
-生成脚本（维护时）          Desktop 后台 worker（按需）
-       |                         |
-随包生成目录              校验 -> 原子替换本地缓存
-       +------------+------------+
+                    |
+        生成脚本（维护时，按下文规则合并）
+                    |
+        随包生成目录（提交进仓库）
                     v
            Host 解析实际模型与价格
                     |
@@ -49,8 +46,8 @@ models.dev / OpenRouter public API
 
 - `packages/util/shared`：JSON-safe 目录、价格和 IPC 契约，以及生成的静态模型数据；不放网络、文件系统或 Electron 代码。
 - `packages/llm/llm-service`：规范化计费用量和纯费用计算；不读取用户目录，不负责刷新。
-- Desktop Host：目录缓存、后台 worker、更新状态、连接身份匹配、请求价格解析与生命周期。扩展现有 OpenRouter 目录接入，避免形成两个独立价格事实源。
-- CLI Host：按现有连接端点及最终模型使用随包目录离线计价；首版未新增 CLI 自定义费率配置入口。首版不启动刷新服务，也不依赖桌面进程或读取其内存缓存。
+- Desktop Host：连接身份匹配、请求价格解析与生命周期；目录直接读随包数据。
+- CLI Host：按现有连接端点及最终模型使用随包目录离线计价；首版未新增 CLI 自定义费率配置入口。
 - Journal：保存当次请求实际使用的价格依据；目录变化只能影响后续请求。
 - Renderer：使用统计仅消费投影和请求价格快照，不加载价目目录；只格式化单价与金额，不重算历史总费用。
 
@@ -63,7 +60,7 @@ models.dev / OpenRouter public API
 | schemaVersion | 首版固定为 1；未知版本拒绝加载并回退 |
 | source / sourceProviderId / apiModel | 保留原始来源和精确模型身份；不能只按显示名称匹配 |
 | 请求 providerId / connectionId / modelKey | 请求快照补充配置身份；区域通过 HTTPS 端点的显式映射识别 |
-| fetchedAt / generatedAt / contentHash | 获取、生成时间与内容摘要；获取时间不声称是价格生效时间 |
+| fetchedAt / generatedAt / contentHash | 获取、生成时间与内容摘要；`generatedAt` 是最近一次内容有变化的生成时间，不声称是价格生效时间 |
 | currency / rates | 币种、每百万 token 的输入、输出、缓存读写单价；缺失为 null，推理已包含于输出 |
 | unsupportedBilling | 检测到阶梯或非 token 收费时标记 true，首版不保存或计算阶梯详情 |
 | contextWindow / maxOutput / input / reasoning | 来源能力元数据；不覆盖现有用户模型配置 |
@@ -105,7 +102,7 @@ models.dev / OpenRouter public API
 
 依据 [DeepSeek 官方价格](https://api-docs.deepseek.com/quick_start/pricing/) 和 [V4.1 公告](https://api-docs.deepseek.com/zh-cn/news/news260910)，核验于 2026-09-10。缓存写入单价保持 null；图片按返回的输入 token 计价，不另收一次图片费用。官方实际空闲时段价格为高峰一半，估算不是实际账单。
 
-`model-pricing.ts` 保存 source=deepseek-official、strategy=fixed-peak；连接倍率只应用一次。Pro 已从可选模型和目录中移除，旧配置引用归一到 Flash，不保留 9 月 14 日定时切换；仅 Flash 价目生效日期影响费率，目录刷新不会覆盖官方档案。只匹配明确官方端点；同名 OpenRouter 或自定义端点不套用直连价格。每次请求冻结价格快照，已保存的历史费用不重算。
+`model-pricing.ts` 保存 source=deepseek-official、strategy=fixed-peak；连接倍率只应用一次。Pro 已从可选模型和目录中移除，旧配置引用归一到 Flash，不保留 9 月 14 日定时切换；仅 Flash 价目生效日期影响费率，目录重新生成不会覆盖官方档案。只匹配明确官方端点；同名 OpenRouter 或自定义端点不套用直连价格。每次请求冻结价格快照，已保存的历史费用不重算。
 
 ## 费用与来源契约
 
@@ -145,39 +142,36 @@ Token 的已知性按字段保存：没有 usage、空对象、缺失字段和�
 
 Session 与全局统计保留全部辅助请求的请求数、Token 与费用；标题和压缩不增加 Run 数，轮尾仅聚合属于实际 Run 的用量。SQL 明细、小时/日/总量汇总、批量写入与降级投影必须保持相同规则。派生 SQLite schema14 升级时同时废弃旧行、触发器和游标，从 Journal 重放；旧 Journal 没有辅助事实时不按工具或标题次数猜算。图像调用的完整生命周期见[图片分析工具](../tool-system/agent-image-inspection-tool.md)。
 
-## 本地更新与性能
+## 目录生成规则（2026-11-08）
 
-| 时机 | 行为 |
+`pnpm models:generate`（`scripts/generate-model-catalog.mjs`）不再整份重写目录，而是把公共数据源的新结果合并进仓库里已有的目录。合并是纯函数 `mergeModelCatalog`（`packages/util/shared/src/model-catalog-merge.ts`），生成脚本只负责读写文件和联网。
+
+模型身份是 `source + sourceProviderId + apiModel`。同名模型在不同服务商下是不同条目，价格各自独立，不互相替代（见上文规则 4）。
+
+| 情况 | 处理 |
 | --- | --- |
-| 应用启动、发送消息 | 只读取已准备的本地目录；没有缓存立即使用随包目录 |
-| 打开使用统计、刷新统计 | 只读取 Journal 投影；零价格网络请求 |
-| 打开模型设置 | 先呈现本地数据；目录距上次成功校验超过 4 小时才后台刷新 |
-| 应用退出 | 中止网络和 worker；未验证临时文件不可替换有效缓存 |
+| 已有条目 | 整条锁定：价格、上下文、显示名称等都不随上游变化 |
+| 上游新出现的条目 | 新增 |
+| 已有条目在上游消失 | 保留，不删除；旧会话和旧配置仍能查到价格 |
+| 改价清单里的条目 | 用清单里的价格覆盖，每次生成都重新应用 |
 
-没有固定轮询计时器。4 小时是按需检查的过期阈值，不是每 4 小时必然下载。
-
-- 缓存位于 `<dataRoot>/model-catalog/`，按来源存储，包含 schema、来源、hash、ETag、Last-Modified、checkedAt、有效模型正文；失败冷却时间仅保存在当前进程内存。
-- checkedAt 仅在成功或有正文支持的 304 时推进；失败保留有效缓存，并设置 5 分钟自动重试冷却。强制刷新可越过 TTL 和冷却，但合并同一来源正在执行的请求。
-- 支持的源使用 If-None-Match / If-Modified-Since；不支持条件请求则正常下载。没有缓存正文时不能携带 validator。
-- 每源一次刷新单飞；单次网络尝试超时 4 秒，最多重试一次，仅重试网络失败与 5xx，单轮刷新总等待上限 15 秒。超时保留旧目录并显示“更新失败，仍使用本地价目”。
-- worker 承担远端 JSON 解析、归一化、筛选与 hash，主进程只接收已筛选结果并序列化小型本地缓存；每源响应上限 16 MiB，超限取消并保留旧缓存。缓存加载验证 schema/hash；每源单飞避免同源新旧响应竞争，取消后不发布结果。
-- 新版随包目录优于获取时间更早的缓存；异常未来时间戳不进入覆盖选择。来源没有价格生效时间时只承诺这是最近成功获取的价目，不能承诺实时账单一致。
-- 公共目录请求不带用户 API key、聊天正文、自定义连接地址或模型使用记录；使用 Electron net.fetch 的默认网络会话与系统代理；公共价目不继承用户私有连接的认证代理配置。provider 私有模型发现与公共价格目录职责分开。
-- 复用现有 OpenRouter 目录对外接口；旧缓存只有可验证身份、单位和 schema 时迁入，否则保留旧文件并使用新随包目录，不删除用户数据。
+- **改价清单**：`packages/util/shared/src/model-catalog-overrides.ts`，每行写服务商（`source` + `sourceProviderId`）、模型、四个单价（USD / 百万 token，缺失写 `null`）、价格来源链接和核对日期。需要改已有模型的价格时只改这里，不手改生成文件。清单指向目录里不存在的模型时生成失败，避免留下过期条目。测试会核对生成文件与清单一致。
+- **报告**：每次生成在终端打印新增、保留、上游价格变了但被锁定、上游已下架、清单覆盖的条数；被锁定的价格变化逐条列出（服务商、模型、旧价 → 上游新价），维护者据此决定要不要写进改价清单。
+- **离线模式**：`pnpm models:generate --offline` 不联网，只重新应用改价清单并重写文件，用于单独改价。
+- **文件格式**：生成文件一行一个模型，diff 能直接看出加了哪些模型、改了哪些价格。内容没有变化时不重写文件，`generatedAt` 和 `contentHash` 保持不变。
+- **新增服务商**：把 models.dev 的服务商 id 加进 `CATALOG_PROVIDERS`（`model-catalog-normalize.ts`），运行 `pnpm models:generate`；结果应只多出这个服务商的条目，以及其他服务商上游新出的模型，不会改动已有价格或删除模型。
 
 本方案假设公共目录能覆盖部分实际模型。若精确模型、区域或计费规则不匹配，费用显示未知，其他统计与消息能力继续工作。没有第三方服务可用时仍可完整离线运行。
 
 ## 取舍与范围
 
-推荐按四阶段交付。最小可交付是随包目录与费用修复，后台更新可独立后续交付。采用新目录宿主服务和多个跨包契约，预计超过 8 个代码文件；这不是单个页面 CSS 调整。
-
-不采用启动时下载全量目录：增加网络依赖与首屏延迟。不仅依赖当前 SDK 内置价格：存在目录版本、实际连接、价格来源与历史快照要求。不新增账单同步、余额、预算、图表库、货币转换服务或全局语言设置。
+不采用启动时下载全量目录：增加网络依赖与首屏延迟。不采用运行时后台刷新：会绕过仓库里锁定和改过的价格，2026-11-08 已删除。不仅依赖当前 SDK 内置价格：存在目录版本、实际连接、价格来源与历史快照要求。不新增账单同步、余额、预算、图表库、货币转换服务或全局语言设置。
 
 外部依赖仅为已核验的两个公共 HTTPS API，无新账号/API key/MCP/CLI 要求。费用真实性的最终验收需要现有可用 Provider；离线自动化只能证明计价逻辑，不能证明供应商实际扣款。
 
 ## 实现入口与验证边界
 
-目录归一化、端点匹配位于 `packages/util/shared/src/model-catalog-normalize.ts`、`model-pricing.ts`；费用计算器位于 `packages/llm/llm-service/src/usage-cost.ts`。目录宿主在 `apps/desktop/src/main/model-catalog-service.ts`，worker 随 Electron main 产物构建。
+目录归一化、端点匹配位于 `packages/util/shared/src/model-catalog-normalize.ts`、`model-pricing.ts`；费用计算器位于 `packages/llm/llm-service/src/usage-cost.ts`。目录合并规则位于 `model-catalog-merge.ts`，改价清单位于 `model-catalog-overrides.ts`，生成脚本为 `scripts/generate-model-catalog.mjs`。
 
 桌面统计通过 `UsageReadModelService` 和 SQLite Worker 分批投影 Journal，收到宿主 durable 通知后失效；未变更时筛选和分页不会重读 Journal。活动行保存完整历史，时间窗只在查询时过滤。SQLite schema 10 通过现有派生库重建机制淘汰旧的截断索引及其游标，回放 Journal 补回历史；此过程会重建同库的目录与 Context 派生数据，不修改 Session 原始事实。旧 JSON `UsageSourceCache` 同步升级到版本 2，拒绝复用版本 1 的截断结果。首次升级需承担重建成本，之后沿用增量读取，不承诺即时完成。
 
