@@ -26,6 +26,7 @@
   - `browser-bridge/apps/cli/main.go` 的 `ensureDevHostWrapper` 也把 `GOCACHE` 默认写死成 `/private/tmp/abb-go-cache`，`go test` 里 `TestEnsureDevHostWrapperUsesBuiltBinary` 在 ubuntu 上 `mkdir /private` 失败。改为 `filepath.Join(os.TempDir(), "abb-go-cache")`。
   - 「供应链安全」的 `osv-scan` 报 29 个依赖共 107 个已知漏洞，是依赖升级任务，不在本轮范围。
   - `apps/web` 的 `output-download.test.ts` 第一个用例要把 256 KiB 走 base64 + jsdom `FileReader`，本机约 0.9s，runner 上 `pnpm -r test` 并行时超过 vitest 默认 5s 超时。给该用例单独设 20s。
+  - `tool-fs-search` 的 `node-ports.test.ts` 两个 grep 用例在 runner 上报「No matches found」：`typecheck-test` job 没装 ripgrep（只有 `repository-checks` 装了），`spawn("rg")` ENOENT 后 `exitCode` 为 null、stdout 为空，被 `exitCode === 1 || !stdout.trim()` 当成无匹配吞掉。两处修：job 加 `Install ripgrep` 步骤；`node-ports.ts` 的 grep/glob 先判 `exitCode === null` 返回 `SEARCH_FAILED`，让找不到 rg、超时、中止在产品里也是显式失败而不是假阴性。
 
 ### 🧠 Design Intent (Why)
 
@@ -41,3 +42,4 @@
 - `browser-bridge/apps/cli/main.go`
 - `docs/CICD.md`
 - `apps/web/src/sessions/test/output-download.test.ts`
+- `packages/fs/tool-fs-search/src/node-ports.ts`

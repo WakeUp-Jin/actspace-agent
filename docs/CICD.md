@@ -73,7 +73,7 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
   - GitHub Actions pinning
   - shell 脚本语法检查
 - `.github/workflows/ci.yml` 中的工程 job（`typecheck-test`、`build`、`site`、`browser-bridge`）都从 `pnpm install --frozen-lockfile` 开始，然后各自执行：
-  - `typecheck-test`：`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`，再构建 `@actspace/agent-cli...`（`test:agent-host:process` 以子进程启动 `apps/cli/dist/cli.js`），最后 `pnpm test`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
+  - `typecheck-test`：先 `apt-get install ripgrep`（`tool-fs-search` 的 grep/glob 测试以子进程调 `rg`，镜像不预装），然后 `pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`，再构建 `@actspace/agent-cli...`（`test:agent-host:process` 以子进程启动 `apps/cli/dist/cli.js`），最后 `pnpm test`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
   - `build`：`pnpm build`（`agent-cli...` 带依赖闭包，runner 上没有现成的 `dist/`，要先按拓扑顺序构建 workspace 依赖）；在 `main` 上再装 Go 并执行 `./scripts/release-package.sh` 作为打包冒烟，产物不上传。
   - `site`：`check:site`、`test:site` 和 `build:site`，并使用 Netlify 的 `/` base path 验证生产构建；CI 中的 `https://example.com` 仅用于构建检查，不是官网地址。
   - `browser-bridge`：`pnpm check:browser` 与 `go test`。

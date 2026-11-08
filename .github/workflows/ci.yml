@@ -59,6 +59,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Install ripgrep
+        # tool-fs-search 的 grep/glob 工具测试以子进程调用 rg；ubuntu-latest 镜像不预装。
+        run: sudo apt-get install -y --no-install-recommends ripgrep
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
