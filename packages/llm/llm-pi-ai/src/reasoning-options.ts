@@ -23,14 +23,18 @@ export function reasoningPayload(route: string, provider: string, options: LlmRe
 
 /** Remove SDK inferred defaults for generic connections before applying explicit choices. */
 export function withReasoningPayload(payload: Record<string, unknown>, route: string, provider: string, options: LlmRequestOptions): Record<string, unknown> {
-  const result = { ...payload };
-  if (provider === "custom") {
-    delete result.reasoning; delete result.reasoning_effort; delete result.thinking;
-    if (result.output_config && typeof result.output_config === "object") {
-      const output = { ...result.output_config as Record<string, unknown> }; delete output.effort;
-      if (Object.keys(output).length) result.output_config = output; else delete result.output_config;
-    }
-  }
+  const result = provider === "custom" ? withoutReasoningPayload(payload) : { ...payload };
   const patch = reasoningPayload(route, provider, options);
   return { ...result, ...patch, ...(patch.output_config ? { output_config: { ...(result.output_config as Record<string, unknown> | undefined), ...(patch.output_config as Record<string, unknown>) } } : {}) };
+}
+
+/** Payload without SDK-inferred thinking fields, so the provider applies its own default. */
+export function withoutReasoningPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...payload };
+  delete result.reasoning; delete result.reasoning_effort; delete result.thinking; delete result.enable_thinking;
+  if (result.output_config && typeof result.output_config === "object") {
+    const output = { ...result.output_config as Record<string, unknown> }; delete output.effort;
+    if (Object.keys(output).length) result.output_config = output; else delete result.output_config;
+  }
+  return result;
 }

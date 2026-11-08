@@ -35,9 +35,9 @@
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/llm-service": "workspace:*",
     "@actspace/shared": "workspace:*",
-    "@anthropic-ai/sdk": "0.91.1",
-    "@earendil-works/pi-ai": "0.82.1",
-    "openai": "6.26.0"
+    "@anthropic-ai/sdk": "0.129.0",
+    "@earendil-works/pi-ai": "1.5.0",
+    "openai": "7.19.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

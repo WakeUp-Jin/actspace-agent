@@ -10,14 +10,14 @@ export type PiAiAdapterOptions = {
 
 /** The sole backend selection boundary; no fallback after Provider I/O. */
 export class PiAiAdapter implements LlmAdapter {
-  constructor(private readonly options: PiAiAdapterOptions, readonly adapterVersion = "pi-ai-0.82.1") {}
+  constructor(private readonly options: PiAiAdapterOptions, readonly adapterVersion = "pi-ai-1.5.0") {}
 
   async dispatch(input: LlmAdapterDispatchInput): Promise<LlmStreamSource> {
     const wire = this.options.wire;
     const hasImage = input.request.messages.some((message) => typeof message.content !== "string" && message.content.some((block) => block.type === "image"));
     const endpoint = input.credential.baseUrl ?? wire.baseUrl ?? "";
-    const needsLegacy = input.credential.proxyUrl !== undefined
-      || (catalogProviderForEndpoint(endpoint) === "openrouter" && wire.route !== "anthropic-messages")
+    // A proxy alone no longer needs the compatibility backend: pi-ai takes a request-scoped fetch.
+    const needsLegacy = (catalogProviderForEndpoint(endpoint) === "openrouter" && wire.route !== "anthropic-messages")
       || (hasImage && wire.providerId === "deepseek" && wire.route === "openai-completions" && wire.deepSeekFiles !== undefined);
     // Host routing may bind credentials after PreparedLlmCall has resolved them.
     // Sanitize with the actual wire credential before failures leave this adapter.
