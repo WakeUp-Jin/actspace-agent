@@ -71,6 +71,10 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # test:agent-host:process 等进程级测试直接 spawn apps/cli/dist/cli.js，runner 上没有现成的 dist。
+      - name: Build Agent CLI for process tests
+        run: pnpm --filter '@actspace/agent-cli...' build
+
       - name: Test
         run: pnpm test
 

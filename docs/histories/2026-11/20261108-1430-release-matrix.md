@@ -21,6 +21,7 @@
 - **`package-browser-components.mjs`**：输出目录「必须在 dist 下」的检查改用 `path.relative`（原先按 `/` 前缀匹配在 Windows 上必失败）；manifest 文件键统一 `/` 分隔符，让 `verify-browser-components.mjs` 要求的 `bin/abb` 在 Windows 上也能匹配。
 - **浏览器桥 CLI 的 Windows 编译**：PR 首轮四平台 dry-run 里 Windows 在 `go build` 失败（`syscall.Stat_t` Unix-only）；`ownedByCurrentUser` 拆成 `_unix.go` / `_windows.go`，并在 `ci.yml` 的 `browser-bridge` job 加交叉编译步骤。
 - **dry-run 暴露的 runner 问题**：macOS `hdiutil create` 偶发 `Resource busy`，加重试；Windows 压缩阶段静默卡 36 分钟——根因是 pnpm deploy 目录里 2249 个 junction，7z 跟着走在循环依赖里无限递归；Windows 改用 `node-linker=hoisted` 平铺 node_modules 并加「发现链接就失败」守卫，压缩改为显式 7z / bsdtar 并打印输出；脚本按阶段打时间戳，package job 加 45 分钟超时。
+- **CI 基线**：`typecheck-test` 在 `pnpm test` 前先构建 `@actspace/agent-cli...`，进程级 host 测试需要 `apps/cli/dist/cli.js`。
 - **文档**：`docs/CICD.md` 新增「桌面发布」节（怎么发版本、产物清单、runner 选择），工作流表更新；exec plan P4 勾掉并补四条决策；tech-debt 表把「release.yml 没装 Go」标完成，新增 Windows 图标 / 签名、Windows 未实机运行、artifact 中转三条；exec-runs 过程与摘要补 P4 步骤和人工验证项。
 
 ### 🧠 Design Intent (Why)
