@@ -37,7 +37,7 @@ import { devStartSettingsSection, devStartView } from "./harness-stats/dev-start
 import { OpenFileFallbackProvider } from "./files/open-file-fallback-context";
 import { ChatMarkdownHostProvider } from "./conversation/ChatMarkdownHostProvider";
 
-/** 「文档」标签的右栏默认宽度；窗口放不下时由 rightMaxWidth 截断。 */
+/** 「MD 文档」标签的右栏默认宽度；窗口放不下时由 rightMaxWidth 截断。 */
 const DOCS_RIGHT_DEFAULT_WIDTH = 720;
 
 export const WorkbenchLayout = memo(function WorkbenchLayout({
@@ -76,7 +76,7 @@ export const WorkbenchLayout = memo(function WorkbenchLayout({
     activeTab: activeRightTab,
     docsExpanded,
   } = useRightPanel();
-  // 「文档」标签自己记一个宽度：正文 + 260px 文件树放不进默认的 390px 右栏，拖宽它不该改掉其他标签的宽度。
+  // 「MD 文档」标签自己记一个宽度：正文 + 260px 文件树放不进默认的 390px 右栏，拖宽它不该改掉其他标签的宽度。
   const [docsRightWidth, setDocsRightWidth] = useState(DOCS_RIGHT_DEFAULT_WIDTH);
   const [view, setView] = useState<SidebarView>(() => devStartView() ?? "chat");
   const [returnFocusRequest, setReturnFocusRequest] = useState(0);
@@ -370,7 +370,7 @@ export const WorkbenchLayout = memo(function WorkbenchLayout({
   const docsTabActive = view === "chat" && activeRightTab?.kind === "docs";
   const effectiveRightWidth = docsTabActive ? Math.min(Math.max(docsRightWidth, RIGHT_MIN_WIDTH), rightMaxWidth) : rightWidth;
 
-  /** 「文档」面板展开到中间栏：SplitView 隐藏中间栏，chrome 的中间标题也要退场。 */
+  /** 「MD 文档」面板展开到中间栏：SplitView 隐藏中间栏，chrome 的中间标题也要退场。 */
   const rightExpanded = docsExpanded && activeRightTab?.kind === "docs" && rightPanelShown && !isCompactLayout;
 
   return (

@@ -5,7 +5,7 @@ import type { RightPanelTab } from "../right-panel/RightPanelContext";
 
 /**
  * 「点一个工作区文件」的统一路由（本机会话；远端 Host 会话走 `hooks/remoteArtifact.ts`，不经过这里）。
- * Markdown 打开右侧「文档」面板并在树里选中、展开到该文件；图片开预览标签；
+ * Markdown 打开右侧「MD 文档」面板并在树里选中、展开到该文件；图片开预览标签；
  * 其余全部交给系统：`.html` / `.htm` 进默认浏览器，其他进默认应用。
  * 设计见 `docs/design-docs/架构优化/01-功能减法设计.md` 第 2 节和 `front-文档面板规范.md`。
  */
@@ -57,7 +57,7 @@ export async function openWorkspacePath({ workspaceRoot, relativePath, line, ope
       if (stat.error === "not_found" || stat.error === "escapes_root" || stat.error === "not_a_file") {
         return { ok: false, reason: "error", message: READ_ERROR_TEXT[stat.error] };
       }
-      openTab({ id: "docs", kind: "docs", title: "文档", select: stat.relativePath || relativePath, ...(line !== undefined ? { line } : {}) });
+      openTab({ id: "docs", kind: "docs", title: "MD 文档", select: stat.relativePath || relativePath, ...(line !== undefined ? { line } : {}) });
       return { ok: true };
     }
     const result = await workspacesApi.readFile({ workspaceRoot, relativePath });

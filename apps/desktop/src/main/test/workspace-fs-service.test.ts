@@ -145,6 +145,31 @@ describe("listWorkspaceMarkdownFiles", () => {
     expect(walked.ok && walked.files).toHaveLength(MARKDOWN_LIST_MAX_FILES);
   });
 
+  it("lists nested git repos with git ls-files inside a non-git walk", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    await put(workspaceRoot, "top.md");
+    await put(workspaceRoot, "plain/p.md");
+    await put(workspaceRoot, "repo/README.md");
+    await put(workspaceRoot, "repo/ignored/i.md");
+    await put(workspaceRoot, "repo/node_modules/dep/README.md");
+    await put(workspaceRoot, "repo/.gitignore", "ignored/\nnode_modules/\n");
+    execFileSync("git", ["init", "-q"], { cwd: join(workspaceRoot, "repo") });
+    // 根目录不是仓库：根上的 git 调用失败，嵌套仓库里的调用走真实 git。
+    const runGit: GitRunner = async (args, options) => options.cwd === workspaceRoot ? notRepo(args, options) : (await import("../git/run-git")).runGitCommand(args, options);
+    expect(await listWorkspaceMarkdownFiles(workspaceRoot, { runGit })).toEqual({ ok: true, source: "walk", truncated: false, files: ["plain/p.md", "repo/README.md", "top.md"] });
+  });
+
+  it("reports the directories a truncated walk did not finish, and expanded raises the caps", async () => {
+    const { workspaceRoot } = await makeWorkspace();
+    const names = Array.from({ length: MARKDOWN_LIST_MAX_FILES + 2 }, (_, index) => `b/${String(index).padStart(5, "0")}.md`);
+    await Promise.all([...names.map((name) => put(workspaceRoot, name)), put(workspaceRoot, "a/x.md"), put(workspaceRoot, "c/z.md")]);
+    const walked = await listWorkspaceMarkdownFiles(workspaceRoot, { runGit: notRepo });
+    expect(walked).toMatchObject({ ok: true, source: "walk", truncated: true, incompleteDirs: ["b", "c"] });
+    const expanded = await listWorkspaceMarkdownFiles(workspaceRoot, { runGit: notRepo }, { expanded: true });
+    expect(expanded).toMatchObject({ ok: true, source: "walk", truncated: false });
+    expect(expanded.ok && expanded.files).toHaveLength(MARKDOWN_LIST_MAX_FILES + 4);
+  });
+
   it("keeps the visited-entry cap at 50000 and reports an untruncated small walk", async () => {
     expect(MARKDOWN_WALK_MAX_ENTRIES).toBe(50_000);
     const { workspaceRoot } = await makeWorkspace();

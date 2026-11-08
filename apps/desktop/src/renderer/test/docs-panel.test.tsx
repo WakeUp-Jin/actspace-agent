@@ -18,7 +18,7 @@ const README = "docs/design-docs/自进化的方案设计/README.md";
 function OpenDocs({ select }: { select?: string }) {
   const { openTab } = useRightPanel();
   return (
-    <button type="button" onClick={() => openTab({ id: "docs", kind: "docs", title: "文档", select })}>
+    <button type="button" onClick={() => openTab({ id: "docs", kind: "docs", title: "MD 文档", select })}>
       probe-open-docs
     </button>
   );
@@ -27,7 +27,7 @@ function OpenDocs({ select }: { select?: string }) {
 async function renderDocs({ workspaceRoot = "/ws", edited, select }: { workspaceRoot?: string | null; edited?: string[]; select?: string } = {}) {
   const view = render(
     <TooltipProvider delayDuration={0}>
-      <RightPanelProvider initialOpen initialTabs={[{ id: "docs", kind: "docs", title: "文档" }]}>
+      <RightPanelProvider initialOpen initialTabs={[{ id: "docs", kind: "docs", title: "MD 文档" }]}>
         <OpenDocs select={select} />
         <RightPanel workspaceRoot={workspaceRoot ?? undefined} agentEditedPaths={edited} />
       </RightPanelProvider>
@@ -63,7 +63,28 @@ describe("文档面板", () => {
     expect(await within(tree()).findByRole("treeitem", { name: /AGENTS\.md/ })).toBeInTheDocument();
     const docsDir = within(tree()).getByRole("treeitem", { name: /^docs/ });
     expect(docsDir).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByText("绿点 = 本会话 Agent 写过或改过")).toBeInTheDocument();
+    expect(screen.queryByText("绿点 = 本会话 Agent 写过或改过")).toBeNull();
+  });
+
+  it("清单被截断时写明没列全的目录，点「继续加载」用放大的上限重取", async () => {
+    const user = userEvent.setup();
+    const calls: unknown[] = [];
+    setupBridge({
+      "workspaces.listMarkdownFiles": async (input: unknown) => {
+        calls.push(input);
+        const expanded = (input as { expanded?: boolean }).expanded === true;
+        return expanded
+          ? { ok: true, files: ["a/one.md", "opencode/x.md", "pi-mono/y.md"], truncated: false, source: "walk" }
+          : { ok: true, files: ["a/one.md"], truncated: true, incompleteDirs: ["opencode", "pi-mono"], source: "walk" };
+      },
+    });
+    await renderDocs();
+    expect(await screen.findByText("工作区太大，opencode、pi-mono没有列全。")).toBeInTheDocument();
+    expect(screen.getByText("1+ 篇")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "继续加载" }));
+    expect(await within(tree()).findByRole("treeitem", { name: /^pi-mono/ })).toBeInTheDocument();
+    expect(screen.queryByText(/没有列全/)).toBeNull();
+    expect(calls.at(-1)).toMatchObject({ workspaceRoot: "/ws", expanded: true });
   });
 
   it("没有工作区、没有 Markdown 时各有空状态", async () => {
@@ -137,7 +158,7 @@ describe("文档面板", () => {
     // 同一个 Provider 下换根：用同一棵树的 props 变化，而不是重新挂载。
     view.rerender(
       <TooltipProvider delayDuration={0}>
-        <RightPanelProvider initialOpen initialTabs={[{ id: "docs", kind: "docs", title: "文档" }]}>
+        <RightPanelProvider initialOpen initialTabs={[{ id: "docs", kind: "docs", title: "MD 文档" }]}>
           <OpenDocs />
           <RightPanel workspaceRoot="/other" />
         </RightPanelProvider>
@@ -147,7 +168,7 @@ describe("文档面板", () => {
 
     view.rerender(
       <TooltipProvider delayDuration={0}>
-        <RightPanelProvider initialOpen initialTabs={[{ id: "docs", kind: "docs", title: "文档" }]}>
+        <RightPanelProvider initialOpen initialTabs={[{ id: "docs", kind: "docs", title: "MD 文档" }]}>
           <OpenDocs />
           <RightPanel workspaceRoot="/ws" />
         </RightPanelProvider>

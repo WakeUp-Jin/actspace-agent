@@ -99,7 +99,13 @@ export function isDocsDocDirty(doc: DocsDocState | null | undefined): boolean {
 }
 
 /** 最近一次取回的 Markdown 清单（属于 `root`）。 */
-export type DocsListing = { root: string; files: readonly string[]; truncated: boolean; source: "git" | "walk" };
+export type DocsListing = {
+  root: string; files: readonly string[]; truncated: boolean; source: "git" | "walk";
+  /** 截断时没走完的顶层目录。 */
+  incompleteDirs?: readonly string[];
+  /** 这份清单是用户点「继续加载」后用放大的上限取的；之后的刷新沿用。 */
+  expanded?: boolean;
+};
 
 type RightPanelContextValue = {
   isOpen: boolean;

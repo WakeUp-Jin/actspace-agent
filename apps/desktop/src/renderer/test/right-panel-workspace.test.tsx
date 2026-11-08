@@ -50,8 +50,8 @@ describe("RightPanel 对象与文件标签", () => {
     expect(screen.queryByRole("button", { name: /^文件/ })).toBeNull();
     expect(screen.getByRole("button", { name: /^改动/ })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^文档/ }));
-    expect(screen.getByRole("tab", { name: "文档" })).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("button", { name: /^MD 文档/ }));
+    expect(screen.getByRole("tab", { name: "MD 文档" })).toHaveAttribute("aria-selected", "true");
     // 没有工作区时只给空状态，不渲染目录树。
     expect(screen.getByText("请先在顶部选择工作区。")).toBeInTheDocument();
     expect(screen.queryByRole("tree")).toBeNull();

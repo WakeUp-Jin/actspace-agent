@@ -7,7 +7,7 @@ import { buildDocsTree, nameMatchRange, pruneDocsTree, type DocsNode } from "./d
 import type { DocsListingStatus } from "./use-docs-listing";
 
 /**
- * 「文档」面板的目录树（最右侧一栏，宽 260px，可收起）。
+ * 「MD 文档」面板的目录树（最右侧一栏，宽 260px，可收起）。
  * 只列 Markdown，没有 Markdown 的文件夹整个隐藏；文件夹右侧是其中的篇数；
  * 搜索只匹配文件名，命中项所在的文件夹自动展开；筛选只有「全部 / 本会话改过」。
  * 展开层级在 `RightPanelContext`（树会随收起、切标签反复挂载）。
@@ -47,6 +47,8 @@ export function DocsTree({
   workspaceLabel,
   files,
   truncated,
+  incompleteDirs = [],
+  onLoadMore,
   status,
   error,
   editedPaths,
@@ -54,6 +56,10 @@ export function DocsTree({
   workspaceLabel: string;
   files: readonly string[] | null;
   truncated: boolean;
+  /** 截断时没走完的顶层目录（`.` 表示根目录本身）。 */
+  incompleteDirs?: readonly string[];
+  /** 用放大的上限重新取；没有时不显示「继续加载」。 */
+  onLoadMore?: () => void;
   status: DocsListingStatus;
   error: string | null;
   /** 当前会话里 Agent 写过 / 改过的 Markdown（相对路径）。 */
@@ -89,7 +95,7 @@ export function DocsTree({
         <div className="flex items-center gap-1.5 px-1 text-act-sm font-semibold text-text-main">
           <Folder size={14} strokeWidth={1.8} className="shrink-0 text-text-faint" aria-hidden="true" />
           <span className="min-w-0 truncate" title={workspaceLabel}>{workspaceLabel}</span>
-          <span className="ml-auto shrink-0 text-act-xs font-normal text-text-faint">{files ? `${total} 篇` : ""}</span>
+          <span className="ml-auto shrink-0 text-act-xs font-normal text-text-faint">{files ? `${total}${truncated ? "+" : ""} 篇` : ""}</span>
           <IconButton label="刷新文档列表" tooltip="刷新" size="xs" onClick={refreshDocs} disabled={status === "loading"}>
             {status === "loading" ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={13} strokeWidth={1.9} aria-hidden="true" />}
           </IconButton>
@@ -164,13 +170,29 @@ export function DocsTree({
             </button>
           );
         })}
-        {truncated ? <div className="px-3 py-2 text-act-xxs text-text-faint">{`文件过多，仅显示前 ${total} 篇。`}</div> : null}
       </div>
 
-      <div className="flex shrink-0 items-center gap-1.5 border-t border-line px-3 py-2 text-act-xs text-text-faint">
-        <span className="size-1.5 shrink-0 rounded-full bg-operational" aria-hidden="true" />
-        绿点 = 本会话 Agent 写过或改过
-      </div>
+      {truncated ? <TruncatedNotice dirs={incompleteDirs} onLoadMore={onLoadMore} /> : null}
     </nav>
+  );
+}
+
+/**
+ * 清单被截断：固定在树底，写明哪些目录没列全（原因是工作区太大，遍历到上限就停了），
+ * 第一次给「继续加载」（放大上限重取），放大后仍截断就只留说明。
+ */
+function TruncatedNotice({ dirs, onLoadMore }: { dirs: readonly string[]; onLoadMore?: () => void }) {
+  const names = dirs.map((dir) => (dir === "." ? "根目录" : dir));
+  const shown = names.slice(0, 3).join("、");
+  const label = names.length === 0 ? "工作区太大，部分目录没有列出。" : `工作区太大，${shown}${names.length > 3 ? ` 等 ${names.length} 个目录` : ""}没有列全。`;
+  return (
+    <div role="status" className="flex shrink-0 flex-col gap-1.5 border-t border-line bg-warning-soft px-3 py-2 text-act-xs text-warning">
+      <span title={names.join("、") || undefined}>{label}</span>
+      {onLoadMore ? (
+        <Button size="xs" variant="secondary" className="self-start" onClick={onLoadMore}>继续加载</Button>
+      ) : (
+        <span className="text-act-xxs">已到加载上限，可以把这些目录单独加成工作区。</span>
+      )}
+    </div>
   );
 }

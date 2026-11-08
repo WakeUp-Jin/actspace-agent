@@ -44,6 +44,10 @@ const IGNORED_DIR_NAMES = new Set([
 /** Markdown 清单最多返回多少篇、非 git 遍历最多访问多少个目录项；超过就停止并标 truncated。 */
 export const MARKDOWN_LIST_MAX_FILES = 5000;
 export const MARKDOWN_WALK_MAX_ENTRIES = 50_000;
+/** 用户点「继续加载」后两个上限都放大这么多倍。 */
+export const MARKDOWN_LIST_EXPANDED_FACTOR = 4;
+/** 截断时最多报告多少个没走完的目录。 */
+const MARKDOWN_INCOMPLETE_DIRS_MAX = 20;
 const GIT_LIST_TIMEOUT_MS = 15_000;
 const GIT_LIST_MAX_OUTPUT_CHARS = 8 * 1024 * 1024;
 
@@ -217,16 +221,29 @@ function byPath(a: string, b: string): number {
 const GIT_MARKDOWN_PATHSPECS = [":(icase)*.md", ":(icase)*.markdown"];
 const GIT_LIST_OPTIONS = { timeoutMs: GIT_LIST_TIMEOUT_MS, maxOutputChars: GIT_LIST_MAX_OUTPUT_CHARS, env: { LC_ALL: "C" } };
 
-async function listMarkdownViaGit(root: string, runGit: GitRunner): Promise<{ files: string[]; truncated: boolean } | null> {
+type MarkdownLimits = { maxFiles: number; maxEntries: number };
+type MarkdownListing = { files: string[]; truncated: boolean; incompleteDirs?: string[] };
+
+/** 截断时报告没走完的顶层目录：取路径第一段去重（根目录本身记作 `.`），保持遍历顺序。 */
+function topLevelDirs(paths: Iterable<string>): string[] {
+  const seen = new Set<string>();
+  for (const path of paths) {
+    seen.add(path.split("/")[0] || ".");
+    if (seen.size >= MARKDOWN_INCOMPLETE_DIRS_MAX) break;
+  }
+  return [...seen];
+}
+
+/** 在 `cwd` 里用 `git ls-files` 列 Markdown；不是仓库、没有 git、超时返回 null。路径相对 `cwd`。 */
+async function gitMarkdownNames(cwd: string, runGit: GitRunner): Promise<{ names: string[]; outputTruncated: boolean } | null> {
   const result = await runGit(
     ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...GIT_MARKDOWN_PATHSPECS],
-    { cwd: root, ...GIT_LIST_OPTIONS },
+    { cwd, ...GIT_LIST_OPTIONS },
   );
-  // 不是仓库、没有 git、超时：都退回遍历。
   if (result.startError || result.timedOut || result.exitCode !== 0) return null;
   // 已被 git 跟踪、但磁盘上已经删掉的文件仍在 `--cached` 里，要排除掉（点开只会读取失败）。
   const deleted = new Set<string>();
-  const deletedResult = await runGit(["ls-files", "-z", "--deleted", "--", ...GIT_MARKDOWN_PATHSPECS], { cwd: root, ...GIT_LIST_OPTIONS });
+  const deletedResult = await runGit(["ls-files", "-z", "--deleted", "--", ...GIT_MARKDOWN_PATHSPECS], { cwd, ...GIT_LIST_OPTIONS });
   if (!deletedResult.startError && !deletedResult.timedOut && deletedResult.exitCode === 0) {
     for (const name of deletedResult.stdout.split("\0")) if (name.length > 0) deleted.add(name);
   }
@@ -234,15 +251,31 @@ async function listMarkdownViaGit(root: string, runGit: GitRunner): Promise<{ fi
   // 输出被截断时最后一项可能只有半截路径，丢掉。
   if (result.truncated) names.pop();
   // 再按扩展名核对一次，保证两种来源的判定口径一致（都不区分大小写）。
-  const unique = [...new Set(names.filter((name) => name.length > 0 && MARKDOWN_NAME.test(name)))].sort(byPath);
-  const overLimit = unique.length > MARKDOWN_LIST_MAX_FILES;
-  return { files: overLimit ? unique.slice(0, MARKDOWN_LIST_MAX_FILES) : unique, truncated: overLimit || result.truncated };
+  return { names: [...new Set(names.filter((name) => name.length > 0 && MARKDOWN_NAME.test(name)))], outputTruncated: result.truncated };
 }
 
-async function walkMarkdown(root: string): Promise<{ files: string[]; truncated: boolean }> {
+async function listMarkdownViaGit(root: string, runGit: GitRunner, limits: MarkdownLimits): Promise<MarkdownListing | null> {
+  const listed = await gitMarkdownNames(root, runGit);
+  if (!listed) return null;
+  const unique = listed.names.sort(byPath);
+  const overLimit = unique.length > limits.maxFiles;
+  const truncated = overLimit || listed.outputTruncated;
+  if (!truncated) return { files: unique, truncated: false };
+  const kept = unique.slice(0, limits.maxFiles);
+  // 截断点所在目录和它之后的目录都不完整；输出被截断时只能确定最后一项所在目录。
+  const cut = overLimit ? unique.slice(limits.maxFiles - 1) : kept.slice(-1);
+  return { files: kept, truncated: true, incompleteDirs: topLevelDirs(cut) };
+}
+
+/**
+ * 非 git 根目录的有上限遍历。遇到本身是 git 仓库的子目录（含 `.git`）改用 `git ls-files` 整块列出，
+ * 不再逐项遍历：既遵守它自己的 `.gitignore`，也不会因为一两个大仓库把访问项数用光。
+ */
+async function walkMarkdown(root: string, runGit: GitRunner, limits: MarkdownLimits): Promise<MarkdownListing> {
   const files: string[] = [];
   let visited = 0;
   let truncated = false;
+  let incomplete: string[] = [];
   // 显式栈 + 按名字排序，截断时保留的是稳定的「前一部分」。不跟随 symlink：Dirent 对 symlink 既不是目录也不是文件。
   const stack: string[] = [""];
   while (stack.length > 0 && !truncated) {
@@ -253,11 +286,25 @@ async function walkMarkdown(root: string): Promise<{ files: string[]; truncated:
     } catch {
       continue;
     }
+    if (rel && entries.some((entry) => entry.name === ".git")) {
+      const nested = await gitMarkdownNames(resolve(root, rel), runGit);
+      if (nested) {
+        visited += 1;
+        const names = nested.names.sort(byPath);
+        const room = limits.maxFiles - files.length;
+        for (const name of names.slice(0, Math.max(0, room))) files.push(`${rel}/${name}`);
+        if (names.length > room || nested.outputTruncated) {
+          truncated = true;
+          incomplete = [rel, ...stack.slice().reverse()];
+        }
+        continue;
+      }
+    }
     entries.sort((a, b) => byPath(a.name, b.name));
     const subdirs: string[] = [];
     for (const entry of entries) {
       visited += 1;
-      if (visited > MARKDOWN_WALK_MAX_ENTRIES) {
+      if (visited > limits.maxEntries) {
         truncated = true;
         break;
       }
@@ -266,27 +313,35 @@ async function walkMarkdown(root: string): Promise<{ files: string[]; truncated:
         if (IGNORED_DIR_NAMES.has(entry.name) || entry.name.startsWith(".")) continue;
         subdirs.push(childRel);
       } else if (entry.isFile() && MARKDOWN_NAME.test(entry.name)) {
-        if (files.length >= MARKDOWN_LIST_MAX_FILES) {
+        if (files.length >= limits.maxFiles) {
           truncated = true;
           break;
         }
         files.push(childRel);
       }
     }
+    if (truncated && incomplete.length === 0) {
+      // 当前目录走到一半；它已收进栈的子目录和栈里剩下的目录都没走。栈顶是下一个要走的，倒过来就是遍历顺序。
+      incomplete = [rel, ...stack.slice().reverse()];
+      break;
+    }
     for (let index = subdirs.length - 1; index >= 0; index -= 1) stack.push(subdirs[index]);
   }
-  return { files: files.sort(byPath), truncated };
+  files.sort(byPath);
+  return truncated ? { files, truncated, incompleteDirs: topLevelDirs(incomplete) } : { files, truncated };
 }
 
 /**
  * 一次取回工作区里全部 Markdown 的相对路径（不读内容）。
  * git 仓库：`git ls-files --cached --others --exclude-standard`，遵守 `.gitignore` 且包含未跟踪的新文件；
- * 否则退回有上限的递归遍历（跳过忽略名单和所有 `.` 开头的目录，不跟随 symlink）。
+ * 否则退回有上限的递归遍历（跳过忽略名单和所有 `.` 开头的目录，不跟随 symlink；本身是 git 仓库的子目录改用 `git ls-files`）。
+ * 截断时给出没走完的顶层目录；`expanded` 是用户点了「继续加载」，上限放大 `MARKDOWN_LIST_EXPANDED_FACTOR` 倍。
  * `workspaceRoot` 必须是绝对路径，其访问权限由调用方（IPC handler）先校验。
  */
 export async function listWorkspaceMarkdownFiles(
   workspaceRoot: string,
   deps: { runGit: GitRunner } = { runGit: runGitCommand },
+  options: { expanded?: boolean } = {},
 ): Promise<WorkspaceListMarkdownFilesResult> {
   if (!isAbsolute(workspaceRoot)) return { ok: false, error: "escapes_root" };
   const root = resolve(workspaceRoot);
@@ -295,9 +350,11 @@ export async function listWorkspaceMarkdownFiles(
   } catch {
     return { ok: false, error: "not_found" };
   }
-  const viaGit = await listMarkdownViaGit(root, deps.runGit);
+  const factor = options.expanded ? MARKDOWN_LIST_EXPANDED_FACTOR : 1;
+  const limits = { maxFiles: MARKDOWN_LIST_MAX_FILES * factor, maxEntries: MARKDOWN_WALK_MAX_ENTRIES * factor };
+  const viaGit = await listMarkdownViaGit(root, deps.runGit, limits);
   if (viaGit) return { ok: true, ...viaGit, source: "git" };
-  return { ok: true, ...(await walkMarkdown(root)), source: "walk" };
+  return { ok: true, ...(await walkMarkdown(root, deps.runGit, limits)), source: "walk" };
 }
 
 /**

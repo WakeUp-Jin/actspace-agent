@@ -12,7 +12,7 @@ import { DocsOutline } from "./DocsOutline";
 import type { DocsListingStatus } from "./use-docs-listing";
 
 /**
- * 「文档」面板的正文区（树的左侧）：操作栏 + 提示条 + Markdown 编辑器 + 空状态。
+ * 「MD 文档」面板的正文区（树的左侧）：操作栏 + 提示条 + Markdown 编辑器 + 空状态。
  * 预览和源码是同一个编辑器（`markdown-editor/`，懒加载）的两种模式，切换只重新配置，光标和撤销历史都保留。
  * 路径（工作区名弱化、文件名主色，未保存时文件名旁有圆点）在左，操作在右：
  * 预览 / 源码、大纲、在 Finder 中显示、用默认应用打开、复制路径、展开面板、收起文件树。
@@ -100,7 +100,7 @@ export function DocsReader({
               <span className="min-w-0 truncate font-medium text-text-main" title={path}>{fileName}</span>
             </>
           ) : (
-            <span>文档</span>
+            <span>MD 文档</span>
           )}
         </div>
         {path && dirty ? <span className="size-1.5 shrink-0 rounded-full bg-warning" role="img" aria-label="有未保存的改动" /> : null}
