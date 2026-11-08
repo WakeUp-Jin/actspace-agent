@@ -182,14 +182,18 @@ export class UsageReadModelService {
    * 同步期间每 3 秒、结束时比对数据指纹，变了才递增 dataVersion，页面据此刷新，不会无限循环。
    */
   async queryHarnessStats(input: HarnessStatsQueryInput): Promise<HarnessStatsQueryResult> {
-    if (this.#harnessQueries.size >= 8) throw new Error("Harness stats queue is full; retry shortly.");
     if (this.#harnessQueries.has(input.requestId)) throw new Error("Duplicate Harness stats request id.");
+    // 只数没取消的：页面卸载再挂载（开发模式 StrictMode、快速切页）时，上一批刚取消的 7 个还没走完，不能挤掉新的一批。
+    let active = 0;
+    for (const cancelled of this.#harnessQueries.values()) if (!cancelled) active++;
+    if (active >= 8) throw new Error("Harness stats queue is full; retry shortly.");
     this.#harnessQueries.set(input.requestId, false);
     try {
+      // 不占通用查询队列的名额：页面一次并行 7 块，占了会把使用统计、会话列表挤满。上面已有自己的上限。
       const reply = await this.#serialize(async () => {
         if (this.#harnessQueries.get(input.requestId)) throw new Error("Harness stats query cancelled.");
         return await this.#send({ type: "harness-query", input }) as unknown as { data: HarnessStatsData; fingerprint: string };
-      }, true);
+      }, true, false);
       this.#harnessFingerprint ??= reply.fingerprint;
       this.#startHarnessSync();
       return { requestId: input.requestId, kind: input.kind, generatedAt: new Date().toISOString(), dataVersion: this.#harnessStatus.dataVersion, sync: this.getHarnessStatus(), data: reply.data };
@@ -329,15 +333,15 @@ export class UsageReadModelService {
     } finally { await this.#send({ type: "catalog-fallback-end" }).catch(() => undefined); }
   }
 
-  #serialize<T>(operation: () => Promise<T>, foreground = false): Promise<T> {
-    if (this.#queued >= 8) return Promise.reject(new Error("Usage query queue is full; retry shortly."));
-    this.#queued++;
+  #serialize<T>(operation: () => Promise<T>, foreground = false, counted = true): Promise<T> {
+    if (counted && this.#queued >= 8) return Promise.reject(new Error("Usage query queue is full; retry shortly."));
+    if (counted) this.#queued++;
     const scope: QueryScope = { foreground, lightweightSources: false, partialInventory: false, failedSessionIds: new Set() };
     return this.#scope.run(scope, async () => {
       if (this.#disposed) throw new Error("Usage read model disposed.");
       try { await this.#ensureDatabase().catch(error => { if (error instanceof WorkerTimeoutError || this.#disposed) throw error; }); return await operation(); }
       finally { scope.cancelled = true; }
-    }).finally(() => { this.#queued--; });
+    }).finally(() => { if (counted) this.#queued--; });
   }
 
   #ensureDatabase(): Promise<void> {
