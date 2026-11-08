@@ -21,7 +21,7 @@ const settings: AppSettings = {
   agent: { systemPromptPath: "/tmp/actspace/prompts/main-agent.md", temperature: null, maxTokens: null, disabledTools: [], bashAlwaysAsk: false },
   skills: { disabled: [] },
   shortcuts: { quickOpen: { enabled: true, accelerator: "Alt+Space", target: { kind: "session", sessionId: "s-2" } } },
-} as AppSettings;
+} as unknown as AppSettings;
 
 function listItem(id: string, title: string): SessionListItem {
   return { id, title, updatedAt: NOW, agentRunCount: 1, workspaceRoot: "/tmp/workspace" };

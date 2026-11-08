@@ -17,8 +17,8 @@ export type DesktopRuntimeV2ApprovalRequest = {
   readonly riskLevel?: "low" | "medium" | "high";
   readonly approvalScope?: "browser_session";
   readonly executionEnvironment?: "sandbox" | "real";
-  readonly sessionId?: string;
-  readonly agentRunId?: string;
+  readonly sessionId: string;
+  readonly agentRunId: string;
   readonly createdAt: number;
   readonly grantSuggestions?: readonly import("@actspace/shared/runtime-v2").GrantSuggestion[];
   readonly supportedLifetimes?: readonly import("@actspace/shared/runtime-v2").GrantLifetime[];

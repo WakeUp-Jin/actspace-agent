@@ -34,8 +34,13 @@ async function scanFile(path) {
   if (!label.endsWith("scripts/check-package-cutover.mjs") && !label.endsWith("scripts/check-v2-legacy-removal.mjs") && !label.endsWith("scripts/check-package-boundaries.mjs")) {
     if (source.includes("@actspace/agent-runtime")) findings.monolith.push(label);
     if (/packages\/agent-runtime\/src\//.test(source) || /@actspace\/[^"']+\/src\//.test(source)) findings.deepImports.push(label);
-    if (/(?:^|[\\/])plugins(?:[\\/]|['"])/.test(source) && !source.includes("browser-bridge")) findings.genericPlugins.push(label);
-    for (const token of retired) if (token === "/eval" ? /\/eval(?=[\s/\x22\x27`]|$)/u.test(source) : source.includes(token)) findings.retiredPaths.push(`${label}: ${token}`);
+    // Relative imports (`../plugins/plugin-switches`, `../api/plugins`) point at modules inside the
+    // current package, not at the retired workspace `plugins/` directory.
+    const withoutRelativeImports = source.replace(/["'`]\.{1,2}\/[^"'`]*["'`]/g, "");
+    if (/(?:^|[\\/])plugins(?:[\\/]|['"])/.test(withoutRelativeImports) && !source.includes("browser-bridge")) findings.genericPlugins.push(label);
+    // Tests may use retired names as plain fixture data (for example "/eval" as a sandbox path).
+    const isTest = /(?:^|[\\/])test[\\/]|\.test\.[cm]?[jt]sx?$/.test(label);
+    if (!isTest) for (const token of retired) if (token === "/eval" ? /\/eval(?=[\s/\x22\x27`]|$)/u.test(source) : source.includes(token)) findings.retiredPaths.push(`${label}: ${token}`);
   }
 }
 

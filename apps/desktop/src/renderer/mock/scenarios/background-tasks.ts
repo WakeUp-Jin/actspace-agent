@@ -55,7 +55,7 @@ export function backgroundTasksScenario({ db }: MockClock): MockHandlers {
   appendTool(db, session, first, "agent", { description: "调研 Kimi Code 的后台任务工具", prompt: "调研 Kimi Code 的后台任务工具", agent_preset: "general", background: true }, {
     status: "completed", summary: "agent",
     modelOutput: [{ type: "text", text: `Started subagent mock-child-session (调研 Kimi Code 的后台任务工具) in the background.\ntranscript: ${transcriptPath}` }],
-  }, (callId) => [
+  }, (callId): MockRawEvent[] => [
     { type: "subagent/spawned", data: { agentId: "mock-child-session", callId, kind: "local", preset: "general", description: "调研 Kimi Code 的后台任务工具", transcriptPath, createdAt: new Date().toISOString() } },
     { type: "subagent/activation", data: { op: "start", agentId: "mock-child-session", activationId: "act-1", callId, trigger: "spawn", background: true, startedAt: new Date().toISOString() } },
   ]);

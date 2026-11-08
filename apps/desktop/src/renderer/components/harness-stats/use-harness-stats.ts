@@ -39,7 +39,8 @@ export type StatsView<T> = {
   readonly refreshing: boolean;
 };
 
-type ValueOf<K extends HarnessStatsQueryKind> = Extract<HarnessStatsData, { kind: K }>["value"];
+type ValueMap = { [D in HarnessStatsData as D["kind"]]: D["value"] };
+type ValueOf<K extends HarnessStatsQueryKind> = ValueMap[K];
 
 type Entry = { key: string; result: HarnessStatsQueryResult | null; error: string | null; loading: boolean };
 type Inflight = { requestId: string; key: string };

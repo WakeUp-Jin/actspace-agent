@@ -146,6 +146,10 @@ function getMainWindow(): BrowserWindow | undefined {
   return mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
 }
 
+function getMainWindowOrNull(): BrowserWindow | null {
+  return getMainWindow() ?? null;
+}
+
 async function createMainWindow(): Promise<BrowserWindow> {
   const indexHtmlPath = join(__dirname, "..", "..", "dist", "index.html");
   const win = new BrowserWindow(createMainWindowOptions({
@@ -248,14 +252,14 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     }
   };
   if (browserBridgeService) scheduleBrowserSync(1_000);
-  disposePerformanceIpc = registerPerformanceIpc(getMainWindow);
+  disposePerformanceIpc = registerPerformanceIpc(getMainWindowOrNull);
   disposeEnglishLearningIpc = englishLearningEnabled
-    ? registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow })
-    : registerDisabledEnglishLearningIpc({ getMainWindow: () => getMainWindow() ?? null });
+    ? registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow: getMainWindowOrNull })
+    : registerDisabledEnglishLearningIpc({ getMainWindow: getMainWindowOrNull });
   disposePluginsIpc = registerPluginsIpc({ getMainWindow, catalog: runtimeModule.PLUGIN_CATALOG, startupSwitches, startupPluginSettings, settings: settingsService });
   remoteHosts = new RemoteHostRegistry(roots.dataRoot);
   await remoteHosts.open();
-  disposeRemoteHostIpc = registerRemoteHostIpc(remoteHosts, getMainWindow, async sessionId => { await remoteDesktop?.activate(sessionId); });
+  disposeRemoteHostIpc = registerRemoteHostIpc(remoteHosts, getMainWindowOrNull, async sessionId => { await remoteDesktop?.activate(sessionId); });
   remoteDesktop = new RemoteDesktopAdapter(remoteHosts, getMainWindow, roots.dataRoot);
   fixedRendererIpc = registerFixedRendererIpc({
     remote: remoteDesktop,

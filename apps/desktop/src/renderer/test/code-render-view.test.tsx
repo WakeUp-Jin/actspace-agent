@@ -18,7 +18,7 @@ describe("CodeRenderView", () => {
   const scrollToDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollTo");
   beforeEach(() => {
     // jsdom has no layout. Supply viewport and wrapped-row measurements to the real virtualizer.
-    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function () { return this.hasAttribute("data-index") ? 20 : 600; });
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) { return this.hasAttribute("data-index") ? 20 : 600; });
     vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(400);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(600);
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);

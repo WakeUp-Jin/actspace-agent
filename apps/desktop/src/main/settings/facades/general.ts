@@ -158,7 +158,7 @@ export async function updateModelStorage(store: SettingsStore, input: ModelStora
         const key = normalizeModelKey(rawKey);
         if (!key) continue;
         if (value === null) delete store.settings.installedModels[key];
-        else store.settings.installedModels[key] = sanitizeInstalledModel(value, value);
+        else if (value !== undefined) store.settings.installedModels[key] = sanitizeInstalledModel(value, value);
       }
       for (const [rawKey, value] of Object.entries(input.customModels ?? {})) {
         const key = normalizeModelKey(rawKey);

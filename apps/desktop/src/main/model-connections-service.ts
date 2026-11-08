@@ -614,15 +614,16 @@ function sameUrl(left: string, right: string | undefined): boolean {
 function removeKeysPatch(models: SettingsV4Models, keys: ModelKey[]): Partial<SettingsV4Models> {
   if (keys.length === 0) return {};
   const removed = new Set<string>(keys);
+  // 合并时 null 表示删除该 key；SettingsV4Models 的字段类型没有表达这一点，只能经 unknown 断言。
   const nulls = Object.fromEntries(keys.map((key) => [key, null]));
   const bindings = models.taskBindings;
   const cleared = Object.fromEntries((["defaultChat", "utility", "autoReview", "subagentDefaultModel", "vision"] as const)
     .filter((field) => bindings[field] && removed.has(bindings[field]!))
     .map((field) => [field, null]));
   return {
-    definitions: Object.fromEntries(keys.filter((key) => models.definitions[key]?.source !== "builtin" && models.definitions[key]?.source !== "curated").map((key) => [key, null])) as SettingsV4Models["definitions"],
-    installed: nulls as SettingsV4Models["installed"],
-    overrides: nulls as SettingsV4Models["overrides"],
-    ...(Object.keys(cleared).length > 0 ? { taskBindings: cleared as SettingsV4Models["taskBindings"] } : {}),
+    definitions: Object.fromEntries(keys.filter((key) => models.definitions[key]?.source !== "builtin" && models.definitions[key]?.source !== "curated").map((key) => [key, null])) as unknown as SettingsV4Models["definitions"],
+    installed: nulls as unknown as SettingsV4Models["installed"],
+    overrides: nulls as unknown as SettingsV4Models["overrides"],
+    ...(Object.keys(cleared).length > 0 ? { taskBindings: cleared as unknown as SettingsV4Models["taskBindings"] } : {}),
   };
 }

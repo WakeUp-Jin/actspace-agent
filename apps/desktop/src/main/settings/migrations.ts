@@ -119,7 +119,7 @@ export function toSettingsV4(settings: PersistedSettingsV3, metadata: SettingsV4
       definitions: cloneJson(settings.customModels),
       installed: Object.fromEntries(Object.entries(settings.installedModels).map(([modelKey, model]) => [
         modelKey,
-        { connectionId: `${modelKey.split(":")[0]}:default`, ...cloneJson(model) },
+        { connectionId: `${modelKey.split(":")[0]}:default`, ...cloneJson(model!) },
       ])),
       taskBindings: taskBindingsFromTaskModels(settings.taskModels),
       overrides: cloneJson(settings.modelOverrides),

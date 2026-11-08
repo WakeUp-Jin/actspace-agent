@@ -5,7 +5,7 @@ export type ComposerDraftOptions = {
   readonly draftKey?: string;
   readonly readDraft?: ComposerDraftReader;
   readonly writeDraft?: ComposerDraftWriter;
-  readonly draftRestore?: ComposerDraftRestore;
+  readonly draftRestore?: ComposerDraftRestore | null;
   readonly focusRequestId: number;
   readonly inputRef: RefObject<HTMLTextAreaElement | null>;
   /** 换会话、换入新草稿之后：收起上一个会话的错误、历史游标、斜杠菜单和多行状态。 */

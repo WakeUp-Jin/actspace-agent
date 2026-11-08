@@ -95,7 +95,7 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       stopBackground: async ({ taskId }) => { throw new Error(`Background task ${taskId} was not found.`); },
     },
     approvals: {
-      listPending: async ({ sessionId }) =>
+      listPending: async ({ sessionId } = {}) =>
         sessionId ? [...(db.pendingApprovals.get(sessionId) ?? [])] : [...db.pendingApprovals.values()].flat(),
       submit: async ({ requestId, decision }) => {
         for (const [sessionId, pending] of db.pendingApprovals) {
@@ -158,8 +158,8 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       refreshSnapshot: async () => ({ ok: false, code: "not_a_repository", message: "浏览器 mock 模式没有 Git 仓库。" }),
     },
     sessions: {
-      listPage: (input) => listPage(clock, input),
-      list: async ({ archived }) => listMockSessions(db, archived ?? false),
+      listPage: (input = {}) => listPage(clock, input),
+      list: async ({ archived } = {}) => listMockSessions(db, archived ?? false),
       get: async ({ sessionId }) => {
         const session = db.sessions.get(sessionId);
         return session ? sessionProjection(session) : null;

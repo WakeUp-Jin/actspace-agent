@@ -120,7 +120,7 @@ describe("buildInterimPanelView", () => {
     });
     expect(interim.model).toBeNull();
     expect(interim.stats).toMatchObject({ turnCount: 3, stepCount: 9, compactionCount: 1, costUsd: null });
-    expect(interim.stats.cumulativeUsage).toEqual({ inputTokens: 10, outputTokens: 5, cacheReadTokens: 90, cacheWriteTokens: 0 });
+    expect(interim.stats?.cumulativeUsage).toEqual({ inputTokens: 10, outputTokens: 5, cacheReadTokens: 90, cacheWriteTokens: 0 });
   });
 
   it("reports an unavailable context without an estimate", () => {

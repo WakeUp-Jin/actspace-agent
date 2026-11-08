@@ -180,23 +180,24 @@ export function SplitView({
     if (!dragState) {
       return;
     }
+    const drag = dragState;
 
     function handlePointerMove(event: PointerEvent) {
-      if (event.pointerId !== dragState.pointerId) {
+      if (event.pointerId !== drag.pointerId) {
         return;
       }
 
-      const delta = event.clientX - dragState.startX;
-      const nextWidth = dragState.side === "left" ? dragState.startWidth + delta : dragState.startWidth - delta;
-      resizeSide(dragState.side, nextWidth);
+      const delta = event.clientX - drag.startX;
+      const nextWidth = drag.side === "left" ? drag.startWidth + delta : drag.startWidth - delta;
+      resizeSide(drag.side, nextWidth);
     }
 
     function endDrag(event?: PointerEvent) {
-      if (event && event.pointerId !== dragState.pointerId) {
+      if (event && event.pointerId !== drag.pointerId) {
         return;
       }
 
-      if (dragState.side === "left") {
+      if (drag.side === "left") {
         onLeftResizeEnd?.();
       } else {
         onRightResizeEnd?.();
@@ -205,16 +206,19 @@ export function SplitView({
       setDragState(null);
     }
 
+    // 窗口失焦没有 pointerId，直接结束拖拽。
+    const handleBlur = () => endDrag();
+
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", endDrag);
     window.addEventListener("pointercancel", endDrag);
-    window.addEventListener("blur", endDrag);
+    window.addEventListener("blur", handleBlur);
 
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", endDrag);
       window.removeEventListener("pointercancel", endDrag);
-      window.removeEventListener("blur", endDrag);
+      window.removeEventListener("blur", handleBlur);
     };
   }, [
     dragState,

@@ -95,7 +95,7 @@ describe("Review diff virtualization", () => {
     let viewportWidth = 390;
     let publishViewport = () => {};
     const originalBounds = Element.prototype.getBoundingClientRect;
-    const bounds = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function () {
+    const bounds = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
       return this.matches("[data-review-horizontal-scroll='canvas']")
         ? new DOMRect(0, 0, viewportWidth, 800)
         : originalBounds.call(this);

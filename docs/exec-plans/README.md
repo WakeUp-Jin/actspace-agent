@@ -16,6 +16,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [CI 重新上线与桌面发布流水线](active/20261108-ci-pipelines.md) | 2026-11-08 P1–P3 已实现（分支 `cursor/ci-free-tier-pipelines-3568`）：CI 必红问题修掉、工作流分层并加缓存、Dependabot / CodeQL 就位；合并后要在 Actions 页手动 Enable `CI` / `供应链安全` / `发布`。下一步 P4 tag 触发的三平台 release，再 P5 Electron 升级。 |
 | [上下文面板整理](active/20261108-context-panel-polish.md) | 2026-11-08 B1–B8、F1–F6 已实现（分支 `fix/context-panel-polish`）；测试与浏览器 mock 截图已过；剩 Electron 实机检查。 |
 | [pi-ai 1.5.0 与复用内置服务商](active/20261108-pi-ai-builtin-providers.md) | 2026-11-08 T1–T10 已实现（分支 `feat/pi-ai-builtin-providers`）；自动化全过；剩真实 Key 与 Electron 实机检查。 |
 | [统计页重做（使用统计 + Harness 统计）](active/20261107-stats-redesign.md) | 2026-11-08 T1–T14 已实现并提交（分支 `feat/harness-stats-redesign`，PR #38）；测试与浏览器 mock 截图已过；剩 Electron 真实数据走查。 |

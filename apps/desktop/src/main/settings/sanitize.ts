@@ -55,7 +55,7 @@ export function sanitizeUsagePreferences(value: Record<string, unknown>): Settin
 
 export function normalizeModelKeyOrNull(value: unknown): ModelKey | null {
   if (typeof value !== "string") return null;
-  return normalizeModelKey(value);
+  return normalizeModelKey(value) ?? null;
 }
 
 export function sanitizeNullableNumber(value: unknown, min: number, max: number): number | null {
