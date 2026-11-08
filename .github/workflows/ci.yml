@@ -71,6 +71,10 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # test:agent-host:process 以子进程启动 apps/cli/dist/cli.js，runner 上没有现成产物。
+      - name: Build Agent CLI for Host process tests
+        run: pnpm --filter '@actspace/agent-cli...' build
+
       - name: Test
         run: pnpm test
 
