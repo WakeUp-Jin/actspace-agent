@@ -1,11 +1,13 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, Copy, FolderOpen, Loader2, Square } from "lucide-react";
 import { subagentKindLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
 import { IconButton } from "../ui/IconButton";
 import { Button } from "../ui/Button";
 import { ActivityLine, AgentAvatar, SubagentStatus, agentModelLabel, formatAgentDuration } from "../messages/AgentIdentity";
 import { MarkdownProse } from "../messages/MarkdownProse";
-import { renderMessageList } from "../conversation/render-message";
+import { TurnView } from "../conversation/TurnView";
+import { groupMessagesIntoTurns } from "../conversation/turns";
+import { SessionActionsContext } from "../../session/session-actions-context";
 import { sessionsApi } from "../../api/sessions";
 import { formatTokenCount } from "../../context-format";
 import { SessionViewToggle, type SessionMainView } from "../SessionViewToggle";
@@ -203,6 +205,8 @@ function SubagentDetail({ sessionId, item, view, onToggleView, onBack, stopping,
   </section>;
 }
 
+const noop = () => undefined;
+
 /** 本地 / Fork：子会话的对话记录（Fork 去掉了复制来的前缀，见 `projectSubagentTranscript`）。 */
 const TranscriptDetail = memo(function TranscriptDetail({ sessionId, item }: { sessionId: string; item: SubagentListItem }) {
   const [messages, setMessages] = useState<MessageBlock[]>([]);
@@ -240,10 +244,21 @@ const TranscriptDetail = memo(function TranscriptDetail({ sessionId, item }: { s
     return () => { disposed = true; clearTimeout(timer); };
   }, [sessionId, item.agentId, item.transcriptPath, running]);
   const conclusion = item.result ?? item.summary;
+  const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
+  // 子会话不能从这里分叉：沿用主会话的其他操作，只去掉分叉。
+  const actions = useContext(SessionActionsContext);
+  const childActions = useMemo(() => (actions ? { ...actions, onForkSession: undefined } : null), [actions]);
   return <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4" aria-label="子 Agent 执行内容">
     {transcriptError ? <p role="status" className="text-act-xs text-text-muted">{transcriptError}</p> : null}
-    {/* 与主会话同一套消息流：过程 / 正文之间的间距由 message-flow 统一给。 */}
-    {messages.length ? <div className="message-flow flex min-w-0 flex-col">{renderMessageList(messages, undefined, !running)}</div> : null}
+    {/* 与主会话同一套轮次渲染：运行中过程平铺，结束后收进「Worked for」，最终回复留在折叠外。 */}
+    {turns.length ? <SessionActionsContext.Provider value={childActions}>
+      <div className="flex min-w-0 flex-col">
+        {turns.map((turn, index) => (
+          <TurnView key={turn.id} turn={turn} isActive={running && index === turns.length - 1} isLatest={index === turns.length - 1}
+            sessionId={item.agentId} setTurnElement={noop} />
+        ))}
+      </div>
+    </SessionActionsContext.Provider> : null}
     {!messages.length && (running || !settled) ? <p className="text-act-sm text-text-muted">{running ? "等待执行…" : "正在加载执行记录…"}</p> : null}
     {/* 重试完仍拿不到记录时，退回子智能体最近一次的结论，按 Markdown 渲染。 */}
     {!messages.length && !running && settled

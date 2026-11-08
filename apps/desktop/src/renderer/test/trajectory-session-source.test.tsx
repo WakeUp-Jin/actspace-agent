@@ -88,3 +88,27 @@ function NavigationProbe() {
     <span data-testid="pending">{navigation?.pending?.seq ?? "none"}</span>
   </>;
 }
+
+describe("TrajectoryView child session arriving late", () => {
+  it("re-renders when the child session loads after the idle parent", async () => {
+    let releaseChild: (() => void) | null = null;
+    const childReady = new Promise<void>((resolve) => { releaseChild = resolve; });
+    setupBridge({
+      "sessions.getProjectionSnapshot": async ({ sessionId }: { sessionId: string }) => {
+        if (sessionId === "child") await childReady;
+        return projectionFixture(sessionId, 2, sessionEvents(sessionId === "child" ? "grep" : "agent"));
+      },
+      "events.sessionLive": () => () => undefined,
+    });
+    render(<TooltipProvider>
+      <SessionProjectionProvider sessionId="parent">
+        <TrajectoryView sessionId="child" variant="panel" />
+      </SessionProjectionProvider>
+    </TooltipProvider>);
+    // 父会话先就绪：子会话还没到时是加载中，不是「暂无轨迹」。
+    expect(await screen.findByText("正在加载轨迹…")).toBeInTheDocument();
+    expect(screen.queryByText("当前会话暂无可展示的 Agent 轨迹。")).toBeNull();
+    releaseChild!();
+    expect(await screen.findByRole("row", { name: /工具，grep/ })).toBeInTheDocument();
+  });
+});

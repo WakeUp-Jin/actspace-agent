@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { selectTrajectory } from '@actspace/client/sessions';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { selectTrajectory, type ClientSessionCell, type ClientSessionStore } from '@actspace/client/sessions';
 import type { RuntimeV2TrajectorySnapshot } from '@actspace/shared/runtime-v2';
 import type { RequestLiveOutput } from '@actspace/client/live';
 import { useOptionalSessionProjection } from '../../session';
@@ -41,8 +41,9 @@ export function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | 
   const projection = useOptionalSessionProjection();
   const bridge = projection?.bridge;
   useEffect(() => sessionId && bridge ? bridge.watch(sessionId) : undefined, [sessionId, bridge]);
-  // `peek`, not `get`: `get` fabricates a new empty cell on every call until the Session loads.
-  const target = sessionId === undefined ? projection?.cell ?? null : projection?.store.peek(sessionId) ?? null;
+  // 子会话要自己订阅 store：投影 context 只跟着当前（父）会话的 cell 换新，子会话的数据到了不会让这里重渲染。
+  const watched = useWatchedCell(projection?.store ?? null, sessionId);
+  const target = sessionId === undefined ? projection?.cell ?? null : watched;
   const cell = useFrameCoalesced(target, (committed, next) => committed === null || next === null || committed.sessionId !== next.sessionId);
   const projected = cell ? selectTrajectory(cell) : null;
   const [fixture, setFixture] = useState<RuntimeV2TrajectorySnapshot | null>(null);
@@ -79,5 +80,16 @@ export function useTrajectorySource(input: RuntimeV2TrajectorySnapshot | null | 
     });
     return () => { cancelled = true; if (timer !== null) clearInterval(timer); restoreTheme?.(); };
   }, [sessionId]);
-  return { snapshot: fixture ?? (input !== undefined ? input : projected), isFixture: fixture !== null, fixtureLive, projection, cell };
+  /** 轨迹实际读的那个会话的 cell（右栏子会话时是子会话的）：加载中 / 出错的空状态看它，不看父会话。 */
+  const sourceCell = sessionId === undefined ? projection?.cell ?? null : watched;
+  return { snapshot: fixture ?? (input !== undefined ? input : projected), isFixture: fixture !== null, fixtureLive, projection, cell, sourceCell };
+}
+
+const subscribeNothing = () => () => undefined;
+
+/** 订阅 store 里某个会话的 cell；`peek` 不是 `get`：`get` 在会话加载前每次都会造一个新的空 cell。 */
+function useWatchedCell(store: ClientSessionStore | null, sessionId: string | undefined): ClientSessionCell | null {
+  const subscribe = useCallback((onChange: () => void) => (store && sessionId !== undefined ? store.subscribe(onChange) : subscribeNothing()), [store, sessionId]);
+  const getSnapshot = useCallback(() => (store && sessionId !== undefined ? store.peek(sessionId) : null), [store, sessionId]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
