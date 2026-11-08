@@ -107,7 +107,7 @@
 
 ## P5 修复后定向复验
 
-# P5 Computer Use 第三轮：修复定向复验
+## P5 Computer Use 第三轮：修复定向复验
 
 2026-10-04，`gpt-6.1-sol` 子智能体执行真实 Electron Computer Use。**R1–R3 通过，无新增产品 Bug。** 原 U1–U9 逐子项覆盖沿用第一、第二轮，不在本轮重新宣称全套执行。没有产品代码修改、commit 或 push。
 

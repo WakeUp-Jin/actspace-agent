@@ -1,0 +1,56 @@
+# 依赖更新每周一批、按组合并成少量 PR，避免几十个单独 PR 各自触发一轮 CI。
+# Dependabot 自身的运行不计入 Actions 额度。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    groups:
+      # 构建、测试、lint 工具链：不进安装包，合成一个 PR。
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      # 运行时依赖的小版本和补丁：合成一个 PR；major 仍然单独开 PR 逐个评估。
+      runtime-minor-patch:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # 由 pnpm.overrides 统一钉死，升级要连 overrides 一起改。
+      - dependency-name: "@deepseek-ai/cordis*"
+      # 带 patches/ 补丁，版本一动补丁就失效，必须手动升级。
+      - dependency-name: "@earendil-works/pi-ai"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gomod
+    directories:
+      - /browser-bridge/apps/cli
+      - /browser-bridge/packages/protocol
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    groups:
+      go:
+        patterns:
+          - "*"

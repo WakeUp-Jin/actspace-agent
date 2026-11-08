@@ -72,8 +72,8 @@
 |---|---|
 | 主会话 preset | `actspace.main`、`actspace.chat` |
 | 旧 Session 缺 preset | 解释为 `actspace.main` |
-| 产品形态类型 | `MainAgentForm = "agent" | "chat"` |
-| Agent 单轮模式 | `AgentTurnMode = "agent" | "plan"` |
+| 产品形态类型 | `MainAgentForm = "agent" \| "chat"` |
+| Agent 单轮模式 | `AgentTurnMode = "agent" \| "plan"` |
 | Chat 工具 | `web`、`generate_image` |
 | Web action | `search`、`open` |
 | Settings 字段 | `general.taskDefaults.chatCompactionTriggerRatio` |

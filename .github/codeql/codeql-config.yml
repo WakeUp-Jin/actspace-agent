@@ -1,0 +1,17 @@
+name: actspace CodeQL config
+
+queries:
+  - uses: security-and-quality
+
+paths-ignore:
+  - '**/node_modules/**'
+  - '**/dist/**'
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.test.mjs'
+  - '**/test/**'
+  - '**/tests/**'
+  - '**/fixtures/**'
+  - '**/*.generated.ts'
+  - 'docs/**'
+  - 'tmp/**'

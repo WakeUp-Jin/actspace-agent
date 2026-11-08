@@ -10,6 +10,9 @@
  *
  * 测试里把旧格式按规范 §4.2 转成新格式，用现在的代码读一遍，与 expected 深度相等。
  */
+// expected.json 里的转写时间戳是在 +08:00 生成的；renderTranscript 用本地时区，这里固定住以免在 UTC 机器上失败。
+process.env.TZ = "Asia/Shanghai";
+
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";

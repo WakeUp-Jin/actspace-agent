@@ -63,6 +63,17 @@
 | 2026-07-04 | Bash 沙盒 / 违规归因 | 违规标注只有输出模式匹配一条腿（EPERM / Operation not permitted 等），无 `log stream` 精确归因；程序吞掉错误输出时模型可能拿不到升级证据。 | log stream 监听（按 Seatbelt `with message` tag 过滤 + 降噪）约 200+ 行，不阻塞升级闭环，第一期裁掉。 | 参照 srt `startMacOSSandboxLogMonitor` 补第二条腿。 |
 | 2026-07-04 | Bash 沙盒 / 跨平台 | Linux 无 bwrap 沙盒实现：非 darwin 一律真实环境执行且权限层不放宽（回到 allowlist ask）。 | 桌面产品当前只发 macOS。 | Linux 发布前按设计文档 bwrap 路线补齐。 |
 
+## CI 与工程化遗留
+
+2026-11-08 CI 重新上线（`active/20261108-ci-pipelines.md`）时发现、但不在那一轮处理的事项：
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-11-08 | Desktop main / git | `runGitCommand` 用 `execFile` 跑 git 并等 stdio 关闭；用户全局 `core.fsmonitor=true` 时，git 会为仓库拉起 fsmonitor 守护进程并继承管道，一次 `git status` 要等 20–30 秒才返回。测试侧已用 `GIT_CONFIG_GLOBAL=/dev/null` 隔离，产品侧没动。 | 在产品的 git 调用里加 `-c core.fsmonitor=false`（或改为 `spawn` + 只等 exit），用开启 fsmonitor 的真实仓库复验。 |
+| 2026-11-08 | 依赖 | `katex` 钉在 0.16.x，`pnpm audit` 报一条 low；0.x minor 可能有破坏性改动，没随本轮升。 | 等 Dependabot 的 `runtime-minor-patch` 分组 PR 带上来，对照 Markdown 公式渲染测试后合并。 |
+| 2026-11-08 | 测试环境 | `runtime-v2-output-reference-flow.test.ts` 对 `bash -lc` 的输出按行数断言；shell 启动时若有 nvm 等打印告警（如 `npm_config_prefix`），多出的行会让它失败。GitHub runner 上没这个问题，只在装了 nvm 的开发机上出现。 | 断言改成只看目标行，或给测试用的 shell 传 `--noprofile --norc`。 |
+| 2026-11-08 | Release | `release.yml` 还是手动触发、单平台，且没装 Go（`release-package.sh` 要 `go build` 浏览器桥 CLI，runner 预装的 Go 版本低于 `go.mod` 要求的 1.26）。 | 计划 P4：tag 触发的三平台矩阵 + `actions/setup-go` + 草稿 Release。 |
+
 ## Web / PWA 客户端遗留
 
 2026-10-17 `apps/web` 首版（`completed/20261017-web-pwa-client.md`）留下的事项，结果见 `docs/exec-runs/20261017-web-pwa-client/execution-summary.md`：

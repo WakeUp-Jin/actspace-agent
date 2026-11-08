@@ -11,9 +11,14 @@ on:
       - scripts/test/agent-cli-process.test.mjs
       - package.json
       - pnpm-lock.yaml
+      - .github/workflows/agent-cli-binaries.yml
 
 permissions:
   contents: read
+
+concurrency:
+  group: agent-cli-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   managed-esm:
@@ -23,14 +28,12 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      # 固定在 CLI 支持的最低 Node 大版本上验证 managed package。
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: 22.22.2
-          package-manager-cache: false
-      - name: Enable pnpm
-        run: |
-          corepack enable
-          corepack prepare "$(node -p "require('./package.json').packageManager")" --activate
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm package:agent-cli
       - run: pnpm test:agent-cli:process
@@ -40,4 +43,5 @@ jobs:
           name: actspace-agent-managed-${{ runner.arch }}
           path: artifacts/agent-cli-managed/
           if-no-files-found: error
-          retention-days: 14
+          # 只是给评审下载看一眼；正式产物走 release，不占 Actions 存储额度。
+          retention-days: 3
