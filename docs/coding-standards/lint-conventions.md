@@ -5,7 +5,7 @@
 ## 命令
 
 | 命令 | 做什么 | 什么时候跑 |
-|---|---|---|
+| --- | --- | --- |
 | `pnpm lint` | 全库 lint，只输出并只在 error 级诊断上失败 | 提交前；CI `workspace-checks` 会跑 |
 | `pnpm lint:report` | 按规则汇总所有 error / warning / info 的数量 | 想看存量债务，或清零某条规则准备升级为 error 时 |
 | `pnpm exec biome lint --write <path>` | 应用安全自动修复；加 `--unsafe` 才会删未使用 import 之类 | 修自己改动的文件 |
