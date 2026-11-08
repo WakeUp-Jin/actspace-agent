@@ -25,12 +25,12 @@ jobs:
     name: managed ESM package
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       # 固定在 CLI 支持的最低 Node 大版本上验证 managed package。
-      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22.22.2
           cache: pnpm
@@ -38,7 +38,7 @@ jobs:
       - run: pnpm package:agent-cli
       - run: pnpm test:agent-cli:process
       - run: pnpm test:agent-cli:package
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: actspace-agent-managed-${{ runner.arch }}
           path: artifacts/agent-cli-managed/

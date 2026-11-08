@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
 
       - name: Install, build, and upload site
-        uses: withastro/action@e84f40bd8d2caa9e768ec82ad30dd81f0b280853 # v6
+        uses: withastro/action@a8b97df764791eb61fbf3338ef713b0e61ae05c5 # v6
         env:
           SITE_URL: https://wakeup-jin.github.io
           SITE_BASE: /actspace-agent
@@ -44,4 +44,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
