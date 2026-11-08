@@ -18,6 +18,7 @@
 
 - **改名**：右侧面板标签、菜单、启动列表、空状态都改成「MD 文档」。
 - **去图例**：删掉树底常驻的绿点说明，文件名后的绿点和「本会话改过」筛选保留。
+- **收起文件树图标**：`PanelRight` 换成方向箭头（展开时 `ChevronsRight`，收起后 `ChevronsLeft`），避免和窗口右上角「收起右侧面板」重复。
 - **清单截断**：非 git 工作区遍历时，子目录本身是 git 仓库就改用 `git ls-files`；截断时返回没走完的顶层目录 `incompleteDirs`，树顶写「N+ 篇」，树底 warning 提示具体目录并给「继续加载」（`expanded: true`，上限 ×4）。
 
 ### 🧠 Design Intent (Why)

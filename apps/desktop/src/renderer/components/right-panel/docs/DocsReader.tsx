@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useRef, useState } from "react";
-import { Copy, FolderOpen, Loader2, Maximize2, Minimize2, PanelRight, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Copy, FolderOpen, Loader2, Maximize2, Minimize2, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
 import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
 import { workspacesApi } from "../../../api/workspaces";
 import { Button } from "../../ui/Button";
@@ -125,8 +125,11 @@ export function DocsReader({
         <IconButton label={expandLabel} aria-pressed={docsExpanded} onClick={toggleDocsExpanded}>
           {docsExpanded ? <Minimize2 size={15} strokeWidth={1.8} aria-hidden="true" /> : <Maximize2 size={15} strokeWidth={1.8} aria-hidden="true" />}
         </IconButton>
+        {/* 用方向箭头而不是 PanelRight：PanelRight 已是窗口右上角「收起右侧面板」的图标，并排会认错。 */}
         <IconButton label={treeLabel} aria-expanded={!docsTreeCollapsed} onClick={toggleDocsTreeCollapsed}>
-          <PanelRight size={15} strokeWidth={1.8} aria-hidden="true" />
+          {docsTreeCollapsed
+            ? <ChevronsLeft size={15} strokeWidth={1.8} aria-hidden="true" />
+            : <ChevronsRight size={15} strokeWidth={1.8} aria-hidden="true" />}
         </IconButton>
       </div>
 
