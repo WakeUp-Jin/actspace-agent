@@ -5,7 +5,7 @@
 - **关联计划**：`docs/exec-plans/active/20261108-ci-pipelines.md`
 - **执行模式**：交互
 - **开始时间**：2026-11-08 10:30
-- **结束时间**：2026-11-08 13:40（P1–P3；P4、P5 另开 PR）
+- **结束时间**：P1–P3 2026-11-08 13:40（PR #48）；P4 2026-11-08 14:30（第二个 PR）；P5 另开 PR
 
 ## 执行时间线
 
@@ -68,6 +68,14 @@
 - **影响文件**：`.github/workflows/ci.yml`、`docs.yml`、`scripts/test/agent-cli-safety.test.mjs`、`docs/CICD.md`。
 - **验证**：`pnpm test:agent-cli:process` 19/19；`pnpm lint` 通过；CodeQL 在 PR 上 JS/TS 1 分 41 秒、Actions 50 秒。
 
+### 步骤 8：桌面发布矩阵（P4，第二个 PR）
+
+- **操作**：`release.yml` 重写：`push` 到 `v*` tag、`workflow_dispatch`（可选 `tag`）、改到打包脚本的 `pull_request` 三种触发；`package` job 四平台矩阵（`macos-latest` arm64、`macos-15-intel` x64、`ubuntu-latest`、`windows-latest`，`shell: bash`），先校验 tag 等于 `v` + `apps/desktop/package.json` 版本，再 `setup-go`（`go-version-file`）+ pnpm 缓存 + `release-package.sh`，非 PR 时生成 attestation 并上传完整产物（tag 时保留 1 天），PR 只传 manifest；`release` job 下载全部、`anchore/sbom-action` 出 SBOM、`node -e` 把四份 manifest 合成 `release-manifest.json`，`softprops/action-gh-release` 建草稿。
+- **操作**：`release-package.sh` 把 `uname -s` 的 `MINGW*/MSYS*/CYGWIN*` 映射为 `windows`；新增 `windows)` 分支（复制 Electron runtime、`electron.exe` → `ActSpace.exe`、应用放 `resources/app`）；Windows 产物用 `7z` 打 zip，没有 7z 时退回 PowerShell `Compress-Archive`；manifest 改名 `release-manifest-<platform>-<arch>.json` 以便四个平台不互相覆盖。
+- **操作**：`package-browser-components.mjs` 的「必须在 dist 下」检查改用 `path.relative`，manifest 文件键统一 `/` 分隔符，否则 Windows 上 `verify-browser-components.mjs` 要求的 `bin/abb` 键匹配不上。
+- **影响文件**：`.github/workflows/release.yml`、`scripts/release-package.sh`、`scripts/package-browser-components.mjs`、`docs/CICD.md`、计划、技术债表。
+- **验证**：`actionlint` 与 `check-action-pinning.sh` 通过；Linux 本机 `GOTOOLCHAIN=go1.26.10 ./scripts/release-package.sh` 生成 `actspace-desktop-linux-x64.tar.gz` 与 `release-manifest-linux-x64.json`；macOS / Windows 分支靠 PR 上的四平台 dry-run 验证，结果补记在 PR。
+
 ## 遇到的问题
 
 - **问题**：`apps/desktop/src/main/test/runtime-v2-output-reference-flow.test.ts` 在本机失败。
@@ -79,7 +87,6 @@
 
 ## 跳过或推迟的事项
 
-- P4 `release.yml` 三平台矩阵、Windows 打包分支、草稿 Release：单独 PR。
 - P5 Electron 39 → 当前稳定版：单独 PR。
 - CodeQL 加 Go：先看 JS/TS 分析耗时。
 - `katex` 升级：留给 Dependabot。

@@ -6,7 +6,7 @@
 
 ## 状态
 
-2026-11-08 立项。P1–P3 已随本计划的第一个 PR 完成；下一步 P4（release matrix），再 P5（Electron 大版本升级）。
+2026-11-08 立项。P1–P3 已随本计划的第一个 PR（#48）完成；P4（release matrix）在第二个 PR 中实现，等它的 PR dry-run 四平台跑绿并合并后，再做 P5（Electron 大版本升级）。
 
 ## 范围
 
@@ -39,7 +39,7 @@
 
 - 风险：`paths-ignore` 让纯文档 PR 不产生 `typecheck-test` 等检查，若分支保护把它们设成必需会卡死。缓解：`docs/CICD.md` 写明只把 `repository-checks` / `docs-checks` 设为必需。
 - 风险：CodeQL 耗时。实测 PR 上 JS/TS 分析 1 分 41 秒、Actions 50 秒，可以保留 `pull_request` 触发；若后续单次超过 20 分钟，把 `pull_request` 触发去掉只留 `main` 与定时。
-- 风险：Windows 打包路径没人实机跑过。缓解：P4 先在 `workflow_dispatch` 下跑通一次再切 tag 触发；Windows 产物先按 portable zip 发。
+- 风险：Windows 打包路径没人实机跑过。缓解：`release.yml` 对改到打包脚本的 PR 在四个 runner 上做 dry-run（只传 manifest），P4 的 PR 本身就会把 Windows 跑一遍；Windows 产物先按 portable zip 发。
 - 风险：Electron 大版本升级带来 Node / Chromium 行为变化。缓解：P5 单独 PR，跑完整 desktop 测试与 Electron 实机走查。
 
 ## 里程碑
@@ -52,7 +52,7 @@
 
 - 命令：`./scripts/ci.sh`、`pnpm test:package-cutover`、`actionlint .github/workflows/*.yml`、`pnpm audit --prod`、在 `apps/desktop` 下 `TZ=UTC npx vitest run`。
 - 手工检查：合并后在 GitHub Actions 页启用 `CI`、`供应链安全`、`发布`；看一次 `main` push 五个 job 全绿、`build` job 的打包冒烟通过；Security › Code scanning 出现 CodeQL 结果；下周一 Dependabot 开出分组 PR。
-- P4 验收：`workflow_dispatch` 跑一次 release，四个平台产物都挂到草稿 Release，`release-manifest.json` 与 provenance 覆盖每个产物。
+- P4 验收：P4 的 PR 上 `发布` 工作流四个平台 dry-run 全绿；合并后推一个 `v*` tag，四个平台产物都挂到草稿 Release，合成的 `release-manifest.json` 与 provenance 覆盖每个产物。
 
 ## 进度记录
 
@@ -64,7 +64,7 @@
 - [x] P2 `ci.yml` 五个并行 job、`docs.yml`、`concurrency`、pnpm 缓存、`main` 上打包冒烟；`agent-cli-binaries.yml` 加缓存并把 artifact 保留期缩到 3 天；`supply-chain-security.yml` 只在依赖变更时跑。
 - [x] P2 markdownlint 收敛到能绿：`.markdownlint-cli2.jsonc` 排除第三方 skill、history、fixture；`.markdownlint.json` 关掉纯排版规则；修掉剩余 45 处真实问题（表格列数、标题层级、图片 alt、末尾换行等）。
 - [x] P3 `dompurify` 3.4.17、`undici` 7.30.x；`.github/dependabot.yml`；`codeql.yml` + `codeql-config.yml`。
-- [ ] P4 `release.yml` 矩阵 + 草稿 Release；`release-package.sh` Windows 分支；`release.yml` 显式 `setup-go`。
+- [x] P4 `release.yml` 矩阵 + 草稿 Release；`release-package.sh` Windows 分支；`release.yml` 显式 `setup-go`。（第二个 PR；tag 实发由用户在合并后做）
 - [ ] P5 Electron 升级。
 
 ## 决策记录
@@ -72,6 +72,10 @@
 - 2026-11-08：用 `paths-ignore` / `paths` 互补的两份工作流（`ci.yml` / `docs.yml`）而不是在一个工作流里用第三方 paths-filter action 做 job 级过滤——GitHub 原生、不引入新依赖；代价是混合 PR 上 `scripts/ci.sh` 跑两次（约 1 分钟）。
 - 2026-11-08：CodeQL 用仓库内 workflow（advanced setup）而不是 UI 的 default setup，为了把 `paths-ignore` 和查询集版本化在仓库里；两者不能同时开。
 - 2026-11-08：git 相关测试的超时根因是开发机全局 `core.fsmonitor=true`——git 为每个临时仓库拉起 fsmonitor 守护进程并继承 stdio 管道，`execFile` 要等它退出才返回。修在测试 setup 里隔离全局配置，而不是改产品代码里的 `runGitCommand`；产品侧是否也要对用户仓库加 `-c core.fsmonitor=false` 记入技术债。
+- 2026-11-08（P4）：`release.yml` 保留 `pull_request` 触发，但只在改到打包脚本时跑、只上传各平台 manifest——因为 `gh` 对 Agent 只读、不能手动 `workflow_dispatch`，要在 PR 内验证 Windows / Intel macOS 打包只能靠这个；完整产物只在 tag / 手动运行时经 artifact（保留 1 天）中转到 Release。
+- 2026-11-08（P4）：Release 先建草稿，由人检查后发布；tag 必须等于 `v` + `apps/desktop/package.json` 版本，否则第一步就失败，避免 tag 和包内版本不一致。
+- 2026-11-08（P4）：Windows 先发 portable zip（`ActSpace.exe` + `resources/app`），不做安装器、图标替换与 Authenticode；manifest 的路径键统一 POSIX 分隔符，让同一份 verifier 在 Windows 上也能读。
+- 2026-11-08（P4）：macOS x64 用 `macos-15-intel`（public 仓库免费的 Intel 标准 runner），不用付费的 `macos-*-large`。
 - 2026-11-08：`katex` 0.16 → 0.18 的 low 级告警不在本轮处理：它是精确钉死的版本，0.x 的 minor 可能有破坏性改动，留给 Dependabot 单独开 PR 评估。
 
 ## 执行模式
