@@ -29,7 +29,6 @@ import {
   type ModelDefinition,
   type ModelFacts,
   type ModelKey,
-  type ModelOverrides,
   type ModelPreviewInput,
   type ModelPreviewResult,
   type ProbedModel,

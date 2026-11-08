@@ -1,5 +1,4 @@
 /** Explicit visual fixture. No IPC, model requests, or persistent settings. */
-import React from "react";
 import { createRoot } from "react-dom/client";
 import { Composer } from "../../components/Composer";
 import { TestSidebar } from "../helpers/workbench";

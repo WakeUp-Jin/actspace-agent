@@ -4,7 +4,6 @@ import { insertUsageActivities } from "./usage-activity-write";
 import { createReadModelSchema } from "./usage-read-model-schema";
 import { UsageCatalogFallback } from "./usage-catalog-fallback";
 import { prepare } from "./usage-sql";
-import { projectQueryCatalog } from "./usage-catalog-projection";
 import { enableUsageBatchWrites } from "./usage-batch-write";
 import { clearSearchMetricsCache } from "./usage-rollups";
 import { boundedInteger, boundedRows, queryUsageActivity, toFtsQuery } from "./usage-activity-query";

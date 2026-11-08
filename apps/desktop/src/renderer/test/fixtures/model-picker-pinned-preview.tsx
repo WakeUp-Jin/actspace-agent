@@ -1,5 +1,5 @@
 /** Explicit component acceptance fixture. No IPC, credentials, or persisted state. */
-import React, { useState } from "react";
+import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ModelPickerMenu } from "../../components/composer/ModelPicker";
 import { Button } from "../../components/ui/Button";

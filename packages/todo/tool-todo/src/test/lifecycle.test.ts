@@ -1,4 +1,3 @@
-import { CordisContextClass } from "@actspace/cordis-adapter";
 import { expect, it } from "vitest";
 import { createCoreCodecRegistry, createSessionHeader } from "@actspace/session-journal";
 import { createSessionProjectionService } from "@actspace/session-projection";

@@ -4,7 +4,7 @@
 
 ## 当前包含的内容
 
-- `ci.yml`：常驻 CI，覆盖 docs、repo hygiene、GitHub Actions pinning、Markdown、shell 脚本校验，以及 workspace 的依赖安装、类型检查、测试和构建。
+- `ci.yml`：常驻 CI，覆盖 docs、repo hygiene、GitHub Actions pinning、Markdown、shell 脚本校验，以及 workspace 的依赖安装、Biome lint、类型检查、测试和构建。
 - `supply-chain-security.yml`：在 PR 上做依赖变更检查，并在 PR、定时任务和手动触发时运行 OSV 扫描。
 - `release.yml`：手动触发的 release 流水线，用来打包 unsigned portable 桌面制品、生成 SBOM/provenance，并创建 GitHub Release。
 - `netlify.toml`：官网默认部署配置；在 Netlify 连接 GitHub 后，由 Netlify 构建并发布 `apps/site`。
@@ -14,6 +14,7 @@
 
 - `pnpm dev`
 - `pnpm build`
+- `pnpm lint`
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm package:desktop`
@@ -45,7 +46,7 @@
 - `.github/workflows/ci.yml` 中的 `workspace-checks` job 会：
   - 用 Corepack 读取根 `package.json` 的 `packageManager` 字段并启用对应 pnpm 版本。
   - 执行 `pnpm install --frozen-lockfile`。
-  - 执行 `pnpm typecheck`、`pnpm test`、`pnpm build`。
+  - 执行 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
   - 显式执行站点的 `check:site`、`test:site` 和 `build:site`，并使用 Netlify 的 `/` base path 验证生产构建；CI 中的 `https://example.com` 仅用于构建检查，不是官网地址。
 - 浏览器客户端 `apps/web` 没有单独的 workflow：`pnpm typecheck`、`pnpm test`（`pnpm -r`）覆盖它的类型检查和 vitest，根 `pnpm build` 在 desktop 之后执行 `@actspace/web build`（依赖 desktop 构建先产出的 `@actspace/client` dist）。`pnpm check:frontend-tokens` 和 `pnpm check:frontend-theme` 同时检查 desktop 与 web 两套前端。web 产物 `apps/web/dist` 目前不打进任何发布包，由用户在 Host 配置的 `webRoot` 指向它。
 - workspace 依赖当前允许 `electron` 和 `esbuild` 执行构建脚本；否则 Electron 开发启动无法正确安装运行时。

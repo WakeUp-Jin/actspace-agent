@@ -1,0 +1,89 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.6/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "defaultBranch": "main"
+  },
+  "files": {
+    // 只检查产品与脚本代码；docs/ 下的 demo、各类 fixture 和 html 不是 lint 对象。
+    "includes": [
+      "apps/**",
+      "packages/**",
+      "scripts/**",
+      "browser-bridge/**",
+      "!**/test-fixtures",
+      "!**/generated",
+      "!**/*.html",
+      // Biome 看不到 .astro 模板里的引用，会把模板用到的 import 误报为未使用。
+      "!**/*.astro"
+    ]
+  },
+  // 格式化只配置、不强制：CI 只跑 lint；`pnpm format` 只格式化相对 main 改过的文件。
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "lineWidth": 120
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always"
+    }
+  },
+  "css": {
+    // 样式由 check:frontend-tokens / check:frontend-theme 守，Tailwind 语法 Biome 也不认。
+    "linter": { "enabled": false },
+    "formatter": { "enabled": false }
+  },
+  "json": {
+    "formatter": { "enabled": false }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      // 桌面端 a11y 是独立专题，先不进门禁。
+      "a11y": { "preset": "none" },
+      "correctness": {
+        "noUnusedImports": "error",
+        // 存量命中较多，先以 warning 暴露、不阻塞 CI；清零后再升 error。
+        "useExhaustiveDependencies": "warn",
+        // `case x: return this.handle();` 在 void 方法里是仓库惯用写法，tsc 已经约束返回类型。
+        "noVoidTypeReturn": "off",
+        // `useSourceExtension` 这类 use* 命名的普通 API 会被误判为 React hook。
+        "useHookAtTopLevel": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn",
+        // 存量命中较多，先以 warning 暴露、不阻塞 CI。
+        "useIterableCallbackReturn": "warn",
+        "noAssignInExpressions": "warn",
+        "noArrayIndexKey": "warn",
+        // 终端 / ANSI 清洗代码里的控制字符正则是有意为之。
+        "noControlCharactersInRegex": "off",
+        // `let x; try { x = await ... } catch {}` 依赖 tsc 控制流推断，不是 implicit any。
+        "noImplicitAnyLet": "off",
+        "noExportsInTest": "off"
+      },
+      "nursery": {
+        "noFloatingPromises": "warn"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/test/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            // 测试里在 it() 内定义 Fixture 组件、用只 throw 的 generator 模拟流失败都是常规写法。
+            "noComponentHookFactories": "off",
+            "useYield": "off"
+          }
+        }
+      }
+    }
+  ]
+}

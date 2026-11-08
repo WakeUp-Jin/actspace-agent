@@ -5,7 +5,6 @@ import type { MessageBlock } from "@actspace/shared";
 import { TestConversationView } from "./helpers/workbench";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
-import { setupBridge } from "./helpers/bridge";
 
 const messages: MessageBlock[] = [
   {

@@ -12,7 +12,6 @@ import type {
   TrajectoryRecordState,
   TrajectoryRequestDetail,
   TrajectoryRuntimeSnapshot,
-  TrajectorySourceBlock,
   TrajectorySystemChangeKind,
   TrajectoryTurn,
   TrajectoryUsage,

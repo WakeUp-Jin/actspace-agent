@@ -168,8 +168,9 @@ export function apply(ctx: CordisContext): void {
   const host = ctx.get?.("actspace.host.agent") as { contextDisclosure?: DisclosureHost } | undefined;
   if (!host?.contextDisclosure) { ctx.provide?.("context.disclosure", undefined); return; }
   const disclosure = new ProgressiveDisclosure(host.contextDisclosure);
-  const coordinator = (ctx.get?.("context.engine") as { compaction: ContextCompactionCoordinator }).compaction;
-  const remove = coordinator.registerDisclosure(disclosure); ctx.effect?.(() => remove);
+  const engine = ctx.get?.("context.engine") as { compaction: ContextCompactionCoordinator } | undefined;
+  if (!engine) throw new Error("Context disclosure requires context.engine.");
+  const remove = engine.compaction.registerDisclosure(disclosure); ctx.effect?.(() => remove);
   ctx.provide?.("context.disclosure", disclosure);
 }
 function record(value: unknown): Readonly<Record<string, RuntimeV2JsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {}; }

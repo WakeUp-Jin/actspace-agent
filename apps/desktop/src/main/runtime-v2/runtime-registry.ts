@@ -17,7 +17,6 @@ import type {
   RuntimeV2RequestRestartInput,
   RuntimeV2UpdateSessionMetadataInput,
   RuntimeV2ReadArtifactResult,
-  RuntimeV2RunTurnRequest,
   RuntimeV2AttachmentRef,
   RuntimeV2JsonValue,
   SessionEventEnvelopeV1,

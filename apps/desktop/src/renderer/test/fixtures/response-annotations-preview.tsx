@@ -1,5 +1,4 @@
 /** Explicit visual fixture: no IPC, provider requests, or persisted sessions. `?theme=dark` 切深色，`?drafts=0` 不预置草稿批注，`?mode=chat` 验证 Chat 输入框。 */
-import React from "react";
 import { createRoot } from "react-dom/client";
 import type { MessageBlock, ResponseAnnotationReference } from "@actspace/shared";
 import { TestConversationView } from "../helpers/workbench";

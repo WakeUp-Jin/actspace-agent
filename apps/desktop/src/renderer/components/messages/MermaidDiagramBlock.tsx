@@ -145,7 +145,7 @@ export function MermaidDiagramBlock({ source, themeId, sourceView }: {
           style={{ background: theme.canvas, "--mermaid-min-width": `${Math.round(state.result.width * MIN_INLINE_SCALE)}px` } as CSSProperties}
           role="img"
           aria-label={`Mermaid 图表：${state.result.diagramType}`}
-          // SVG is produced by the strict Mermaid config and sanitized again in mermaid-renderer.
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG is produced by the strict Mermaid config and sanitized again in mermaid-renderer.
           dangerouslySetInnerHTML={{ __html: instantiateMermaidSvg(state.result, instanceId) }}
         />
       ) : (

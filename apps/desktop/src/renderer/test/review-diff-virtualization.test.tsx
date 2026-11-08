@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ReviewCapabilities, ReviewFileDiff, ReviewFileSummary, ReviewLine } from "@actspace/shared";
 import { ReviewDiffCanvas } from "../components/review/ReviewDiffCanvas";

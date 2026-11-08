@@ -94,7 +94,7 @@ const LineRow = memo(function LineRow({ lineNumber, html }: { lineNumber: number
       <code
         className={LINE_CLASS}
         data-line-index={lineNumber - 1}
-        // html 来自 highlight.js，自带转义，不含外部原始 HTML。
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: html 来自 highlight.js，自带转义，不含外部原始 HTML。
         dangerouslySetInnerHTML={{ __html: html || "\u200b" }}
       />
     </>

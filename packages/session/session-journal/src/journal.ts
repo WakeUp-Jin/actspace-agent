@@ -3,7 +3,7 @@ import type { EventCodecRegistry } from "./codec-registry.js";
 import { defaultSessionProvenance, snapshotSessionJson, type SessionEventCandidateV1, type SessionEventEnvelopeV1 } from "./event-envelope.js";
 import { SessionError } from "./errors.js";
 import { SessionEventValidator, type SessionValidationResult } from "./invariant-validator.js";
-import { SessionSurface, type SessionSurfaceView } from "./surface.js";
+import { SessionSurface } from "./surface.js";
 import { trustSurfaceView, type TrustedSurfaceView } from "./surface-trust.js";
 
 export type SessionJournalOptions = {

@@ -19,6 +19,7 @@ vi.mock("@testing-library/react", async (importOriginal) => {
 
         return React.createElement(
           TooltipProvider,
+          // biome-ignore lint/correctness/noChildrenProp: TooltipProviderProps 把 children 声明为必填，走第三个参数过不了 tsc
           { delayDuration: 0, skipDelayDuration: 0, children: wrappedChildren },
         );
       }

@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { describe, expect, it, vi } from "vitest";
+import { expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ handlers: new Map<string, Function>(), metrics: vi.fn(() => [{ pid: 1, type: "Browser", cpu: { percentCPUUsage: 2 }, memory: { workingSetSize: 4096 } }]), enable: vi.fn(), disable: vi.fn(), reset: vi.fn() }));
 vi.mock("electron", () => ({ app: { getAppMetrics: mocks.metrics }, ipcMain: { handle: (key: string, fn: Function) => mocks.handlers.set(key, fn), removeHandler: (key: string) => mocks.handlers.delete(key) } }));
 vi.mock("node:perf_hooks", () => {

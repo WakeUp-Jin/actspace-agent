@@ -1,5 +1,5 @@
 import { ProviderProxyPool } from "@actspace/llm-service";
-import { customConnectionRequestUrl, isEmptyFacts, normalizeProviderModelFacts } from "@actspace/shared";
+import { isEmptyFacts, normalizeProviderModelFacts } from "@actspace/shared";
 import type {
   BalanceProviderId,
   CustomConnectionAuthMode,

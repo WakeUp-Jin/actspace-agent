@@ -1,5 +1,5 @@
 /** Explicit visual fixture: no IPC, provider requests, or persisted sessions. */
-import React, { useState } from "react";
+import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { MessageBlock, WorkspaceGitContext } from "@actspace/shared";
 import { TestConversationView } from "../helpers/workbench";

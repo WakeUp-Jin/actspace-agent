@@ -189,6 +189,7 @@ export function MermaidPreviewDialog({ result, theme, onClose, onDownload }: {
             style={{ width: width + 48, height: height + 48 }}
             role="img"
             aria-label={`Mermaid 图表：${result.diagramType}`}
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG 由严格 Mermaid 配置生成并在 mermaid-renderer 里二次净化
             dangerouslySetInnerHTML={{ __html: instantiateMermaidSvg(result, instanceId) }}
           />
         </div>

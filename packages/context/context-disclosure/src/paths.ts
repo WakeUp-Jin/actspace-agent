@@ -1,5 +1,5 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { ContextPathState, DisclosureArtifact, PathReference } from "@actspace/context-engine";
+import type { ContextPathState, DisclosureArtifact } from "@actspace/context-engine";
 
 export type { DisclosureArtifact, PathReference } from "@actspace/context-engine";
 export interface DisclosureHost {

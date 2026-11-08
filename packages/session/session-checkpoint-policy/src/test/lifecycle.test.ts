@@ -1,4 +1,3 @@
-import { CordisContextClass } from "@actspace/cordis-adapter";
 import { describe, expect, it } from "vitest";
 import { apply } from "../plugin.js";
 

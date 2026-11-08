@@ -6,7 +6,7 @@ import { MAIN_AGENT_DESCRIPTOR, type AgentHandle } from "@actspace/agent";
 import { RequestAssembler, PromptExtensionRegistry, contextFromCandidate } from "@actspace/prompt";
 import { DEFAULT_SPEECH_SETTINGS } from "@actspace/shared";
 import { EnglishLearningService } from "../service.js";
-import { injectEnglishLearning, PROMPT_ID } from "../prompt.js";
+import { PROMPT_ID } from "../prompt.js";
 import { manifest } from "../manifest.js";
 import { apply } from "../plugin.js";
 import type { SpeechHostPort } from "../host-port.js";

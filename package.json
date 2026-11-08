@@ -43,6 +43,9 @@
     "test:ipc-channels": "node --test scripts/test/ipc-channels.test.mjs",
     "test:renderer-bridge": "node --test scripts/test/renderer-bridge-access.test.mjs",
     "test:site": "pnpm --filter @actspace/site test",
+    "lint": "biome lint --diagnostic-level=error .",
+    "lint:report": "biome lint --reporter=summary .",
+    "format": "biome format --write --changed",
     "typecheck": "pnpm run typecheck:contracts && pnpm -r typecheck",
     "typecheck:contracts": "pnpm --filter @actspace/runtime... --filter @actspace/client... build",
     "check:site": "pnpm --filter @actspace/site check",
@@ -89,6 +92,7 @@
     "@actspace/side-chat": "workspace:*"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.6",
     "esbuild": "0.21.5"
   }
 }

@@ -1,4 +1,4 @@
-import type { FixtureRunInput, FixtureCompactionInput, FixtureCompactionResult } from "./task-host-fixture";
+import type { FixtureRunInput } from "./task-host-fixture";
 import { taskHostFixture } from "./task-host-fixture";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";

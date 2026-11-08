@@ -3,7 +3,6 @@ import { chmod, readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import type {
-  LlmProviderId,
   SettingsV4,
   SettingsV4ChangedNotification,
   SettingsV4Namespace,

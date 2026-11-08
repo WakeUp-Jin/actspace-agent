@@ -1,6 +1,5 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ComposerSendOptions } from "../components/Composer";
 import { MessageQueueTray, type MessageQueueControls } from "../components/composer/MessageQueueTray";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { EMPTY_MESSAGE_QUEUE, projectTaskQueue, takeSteering, type SessionMessageQueue } from "../session/message-queue";
