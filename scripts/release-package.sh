@@ -90,10 +90,17 @@ mkdir -p "${artifact_root}"
 phase "build desktop"
 pnpm --filter @actspace/desktop build
 phase "deploy production dependencies"
-if ! pnpm --filter @actspace/desktop --prod deploy --legacy --offline "${deploy_dir}"; then
+deploy_args=(--filter @actspace/desktop --prod deploy --legacy)
+if [[ "${platform}" == "windows" ]]; then
+  # pnpm's default layout links every package into node_modules/.pnpm (junctions on Windows). A zip cannot
+  # carry those, and archivers that follow them recurse forever through circular dependencies, so Windows
+  # gets a flat hoisted node_modules instead (bigger, but plain files only).
+  deploy_args+=(--config.node-linker=hoisted)
+fi
+if ! pnpm "${deploy_args[@]}" --offline "${deploy_dir}"; then
   echo "Offline deploy failed; retrying with registry access so local packaging can hydrate the pnpm store." >&2
   rm -rf "${deploy_dir}"
-  pnpm --filter @actspace/desktop --prod deploy --legacy "${deploy_dir}"
+  pnpm "${deploy_args[@]}" "${deploy_dir}"
 fi
 
 phase "check provider proxy package"
@@ -232,6 +239,11 @@ case "${platform}" in
     mkdir -p "${artifact_root}/resources"
     cp -R "${deploy_dir}" "${artifact_root}/resources/app"
     node "${repo_root}/scripts/verify-browser-components.mjs" "${artifact_root}/resources/app/browser-components"
+    # Fail fast instead of letting the archiver chase links; .bin shims are plain .cmd files on Windows.
+    if leftover_link="$(find "${artifact_root}" -type l -print -quit)" && [[ -n "${leftover_link}" ]]; then
+      echo "Windows package must not contain symlinks or junctions, found: ${leftover_link}" >&2
+      exit 1
+    fi
     ;;
   *)
     echo "Unsupported release packaging platform: ${platform}" >&2

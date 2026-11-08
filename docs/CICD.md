@@ -201,7 +201,7 @@ SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 
 - `actspace-desktop-darwin-arm64.tar.gz` / `.dmg`、`actspace-desktop-darwin-x64.tar.gz` / `.dmg`：macOS，`.dmg` 里拖 `ActSpace.app` 到 Applications。
 - `actspace-desktop-linux-x64.tar.gz`：解压后运行 `./actspace`。
-- `actspace-desktop-windows-x64.zip`：解压后运行 `ActSpace.exe`。portable 布局，没有安装器、没有图标和 Authenticode 签名，首次运行 SmartScreen 会提示；Windows 上没有 nono 沙盒。
+- `actspace-desktop-windows-x64.zip`：解压后运行 `ActSpace.exe`。portable 布局，没有安装器、没有图标和 Authenticode 签名，首次运行 SmartScreen 会提示；Windows 上没有 nono 沙盒。`resources/app/node_modules` 用 pnpm 的 `node-linker=hoisted` 平铺（zip 装不下 pnpm 默认布局里的 junction，归档工具跟着 junction 走还会在循环依赖里无限递归），所以 zip 比 tar.gz 大一些。
 - `release-manifest.json`：四个平台的 manifest 合成一份，每个平台标明 archive / dmg 大小、`signed`、`notarized`、`signature`、`packaging`。`signature: "ad-hoc"` 代表本地临时签名，不是 Developer ID 分发签名。
 - `sbom.spdx.json`：源码树的 SPDX SBOM。
 - 每个 archive / dmg / zip 还有一份 GitHub artifact attestation（build provenance），在 Release 页或 `gh attestation verify` 里看。
