@@ -25,6 +25,7 @@ import { mockContextPathsPage } from "./context-paths-fixture";
 import { createModelConnectionsMock } from "./model-connections-fixture";
 import { MOCK_HARNESS_STATS_SYNC, mockHarnessStats } from "./harness-stats-fixture";
 import { mockPluginList } from "./plugins-fixture";
+import { mockUsageActivity } from "./usage-stats-fixture";
 import { mockListMarkdownFiles, mockReadMarkdown, mockStatMarkdown, mockWriteMarkdown } from "./docs-fixture";
 
 /** 按域覆盖 mock 实现；未覆盖的成员用默认实现，默认也没有的成员调用时 reject。 */
@@ -199,7 +200,7 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
       },
       describeContextPanel: async ({ sessionId, release }) => release ? null : mockContextPanelView(sessionId, db.sessions.get(sessionId)),
     },
-    usage: { getStatus: async () => null, cancel: async () => undefined, getStatistics: async () => null, getActivity: async () => null },
+    usage: { getStatus: async () => null, cancel: async () => undefined, getActivity: async input => mockUsageActivity(input) },
     harnessStats: { query: async input => mockHarnessStats(input), getStatus: async () => MOCK_HARNESS_STATS_SYNC, cancel: async () => undefined },
     // 浏览器里没有 pty：列表为空，其余操作在 UI 上不会出现（终端入口只在开发功能开启时显示）。
     settings: {

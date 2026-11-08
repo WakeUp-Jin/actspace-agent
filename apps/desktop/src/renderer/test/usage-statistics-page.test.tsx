@@ -1,167 +1,152 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import type { SettingsV4Snapshot, UsageActivityRow, UsageActivitySnapshot } from "@actspace/shared";
 import { UsageStatisticsPage } from "../components/UsageStatisticsPage";
-import { mockUsageActivity } from "./fixtures/usageStatisticsFixture";
-import type { SettingsV4Snapshot, UsageActivitySnapshot } from "@actspace/shared";
-import { overrideBridge } from "./helpers/bridge";
+import { mockUsageActivity } from "../mock/usage-stats-fixture";
+import { gapNote, rangeDays, tokenTypeSegments } from "../components/usage/usage-stats-model";
 
-const data: UsageActivitySnapshot = { ...mockUsageActivity, costSummary: { costUsd: 0.123456, knownCostRequestCount: 2, unknownCostRequestCount: 1, unverifiedHistoricalRequestCount: 0 }, rows: mockUsageActivity.rows.map((row) => row.costUsd === null ? row : { ...row, costAmount: row.costUsd, costCurrency: "USD", costBasis: "estimated" }) };
+const NOW = new Date("2026-11-07T12:00:00.000Z");
+const data = mockUsageActivity({ range: "month" }, NOW);
+const metric = (label: string) => within(screen.getByRole("region", { name: "使用概览" })).getByText(label).closest("button, div")!.parentElement!;
+const card = (label: string) => screen.getByRole("region", { name: label });
+const withSummary = (patch: Partial<UsageActivitySnapshot["summary"]>, extra: Partial<UsageActivitySnapshot> = {}): UsageActivitySnapshot => ({ ...data, ...extra, summary: { ...data.summary, ...patch } });
+const known = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, total: 0 };
+
 describe("使用统计", () => {
-  it("uses settings title, keeps the cards clean and merges every gap into one footnote", async () => {
-    render(<UsageStatisticsPage snapshot={null} activitySnapshot={data} />);
+  it("五张指标卡、八张卡片和六个明细 tab", () => {
+    render(<UsageStatisticsPage activitySnapshot={data} />);
     expect(screen.getByRole("heading", { name: "使用统计" })).toBeInTheDocument();
     const overview = screen.getByRole("region", { name: "使用概览" });
-    expect(within(overview).getAllByText(/^(请求数|Token 用量|费用|缓存命中率)$/).map((node) => node.textContent)).toEqual(["请求数", "Token 用量", "费用", "缓存命中率"]);
-    expect(overview).not.toHaveTextContent(/已知|缺少|未知/);
-    expect(overview.querySelector(".text-warning")).toBeNull();
-    const footnote = screen.getByText("有 2 次请求缺少用量或定价，数值为已知部分的合计");
-    await userEvent.hover(footnote);
-    const reasons = await screen.findByRole("tooltip");
-    expect(reasons).toHaveTextContent("请求失败或未完成：1 次");
-    expect(reasons).toHaveTextContent("模型未配置价格：1 次");
-    expect(reasons).toHaveTextContent("服务商未返回缓存字段：1 次");
-    await userEvent.unhover(footnote);
-    expect(within(screen.getByRole("region", { name: "使用概览" })).getByText("$0.12")).toBeInTheDocument();
-    expect(screen.queryByText("活动分析")).not.toBeInTheDocument();
-    const table = screen.getByRole("table", { name: "请求日志" });
-    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["时间", "类型", "对象", "会话", "Token", "费用", "耗时", "状态"]);
-    expect(within(table).getByText("read_file")).toBeInTheDocument();
-    expect(within(table).getAllByRole("row")).toHaveLength(4);
-    expect(within(table).queryByRole("button", { name: /费用明细/ })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("switch", { name: "显示明细" }));
-    expect(screen.queryByRole("table", { name: "请求日志" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "显示记录" }));
-    expect(screen.getByRole("table", { name: "请求日志" })).toBeInTheDocument();
+    for (const label of ["Token 用量", "费用", "缓存命中率", "模型请求", "工具调用"]) expect(within(overview).getByText(label)).toBeInTheDocument();
+    for (const title of ["Token 统计", "耗时统计", "用量趋势", "活跃度", "技能加载", "工具调用", "命令执行", "子 Agent 与辅助模型"]) expect(card(title)).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent?.replace(/[\d,—]+$/, ""))).toEqual(expect.arrayContaining(["请求明细", "模型", "提供商", "工具", "命令", "Skills"]));
+    expect(within(screen.getByRole("table", { name: "请求明细" })).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["时间", "会话", "模型", "首字", "耗时", "Token", "费用", "状态"]);
+    // 去掉的旧控件。
+    expect(screen.queryByLabelText("搜索使用记录")).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "显示明细" })).not.toBeInTheDocument();
   });
-  it("explains an unpriced row cost on hover only when the price is the reason", async () => {
-    const unpriced = {
-      ...data,
-      rows: [
-        { ...data.rows[0]!, costUsd: null, costAmount: null, costCurrency: null, costBasis: "unavailable", costProvenance: { version: 1, basis: "unknown", reason: "model-price-unavailable", pricingSnapshot: null } },
-        data.rows[1]!,
-      ],
-    } as unknown as UsageActivitySnapshot;
-    render(<UsageStatisticsPage snapshot={null} activitySnapshot={unpriced} />);
-    const table = screen.getByRole("table", { name: "请求日志" });
-    const unknownCells = within(table).getAllByText("未知");
-    expect(unknownCells).toHaveLength(2);
-    await userEvent.hover(unknownCells[0]!);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("该模型未配置价格");
-    await userEvent.unhover(unknownCells[0]!);
-    expect(unknownCells[1]!.closest("[tabindex]")).toBeNull();
-  });
-  it("shows unknown token usage as unknown while keeping an explicit zero visible", async () => {
-    const allUnknown = {
-      ...data,
-      summary: { ...data.summary, requestCount: 1, totalTokens: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, unknownTokenRequestCounts: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1, reasoning: 1, total: 1 } },
-      aggregates: { providers: [{ key: "deepseek", label: "DeepSeek", providerId: "deepseek", count: 1, errorCount: 0, totalTokens: 0, unknownTokenRequestCount: 1, durationMs: 0, costSummary: data.costSummary! }], models: [], tools: [] },
-    } as unknown as UsageActivitySnapshot;
-    const view = render(<UsageStatisticsPage snapshot={null} activitySnapshot={allUnknown} />);
-    const metric = screen.getByText("Token 用量").parentElement;
-    expect(metric).toHaveTextContent("—");
-    expect(screen.getByText(/有 2 次请求缺少用量或定价/)).toBeInTheDocument();
-    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("—");
 
-    await userEvent.click(screen.getByRole("tab", { name: /服务商/ }));
-    const providerRow = within(screen.getByRole("table")).getByRole("row", { name: /DeepSeek/ });
-    expect(providerRow).toHaveTextContent("—");
-    expect(providerRow).toHaveTextContent("1 次请求用量未知");
-
-    const knownZero = { ...allUnknown, summary: { ...allUnknown.summary, unknownTokenRequestCounts: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, total: 0 } }, aggregates: { ...allUnknown.aggregates, providers: [{ ...allUnknown.aggregates!.providers[0]!, unknownTokenRequestCount: 0 }] } } as unknown as UsageActivitySnapshot;
-    view.rerender(<UsageStatisticsPage snapshot={null} activitySnapshot={knownZero} />);
-    expect(screen.getByText("Token 用量").parentElement).toHaveTextContent("0");
-    expect(within(screen.getByRole("table")).getByRole("row", { name: /DeepSeek/ })).toHaveTextContent("0");
+  it("费用副行：24 小时只给每次请求，其他范围加日均；「全部」按第一条记录算天数", () => {
+    const day = mockUsageActivity({ range: "day" }, NOW);
+    const view = render(<UsageStatisticsPage activitySnapshot={day} settingsV4={prefs({ range: "24h" })} />);
+    expect(metric("费用")).toHaveTextContent(/每次请求 \$/);
+    expect(metric("费用")).not.toHaveTextContent("日均");
     view.unmount();
+    render(<UsageStatisticsPage activitySnapshot={data} settingsV4={prefs({ range: "30d" })} />);
+    expect(metric("费用")).toHaveTextContent(`日均 $${(data.costSummary!.costUsd / 30).toFixed(2)}`);
+    expect(rangeDays("total", "2026-08-18T12:00:00.000Z", NOW)).toBe(81);
+    expect(rangeDays("total", null, NOW)).toBeNull();
+    expect(rangeDays("week", null, NOW)).toBe(7);
   });
-  it("keeps the Token card label for mixed totals and shows the known part", () => {
-    const mixed = {
-      ...data,
-      summary: { ...data.summary, requestCount: 2, totalTokens: 12, inputTokens: 4, outputTokens: 8, cacheReadTokens: 0, cacheWriteTokens: 0, unknownTokenRequestCounts: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1, reasoning: 1, total: 1 } },
-      aggregates: { providers: [{ key: "deepseek", label: "DeepSeek", providerId: "deepseek", count: 2, errorCount: 0, totalTokens: 12, unknownTokenRequestCount: 1, durationMs: 0, costSummary: data.costSummary! }], models: [], tools: [] },
-    } as unknown as UsageActivitySnapshot;
-    render(<UsageStatisticsPage snapshot={null} activitySnapshot={mixed} />);
-    const totalMetric = screen.getByText("Token 用量").parentElement;
-    expect(totalMetric).toHaveTextContent("12");
-    expect(totalMetric).not.toHaveTextContent("未知");
-    expect(screen.getByText(/有 2 次请求缺少用量或定价/)).toBeInTheDocument();
+
+  it("一个费用都不知道时写「费用未知」；全部请求缺用量时 Token 写「—」，显式 0 照常显示", () => {
+    const unknownCost = { ...data, costSummary: { costUsd: 0, knownCostRequestCount: 0, unknownCostRequestCount: 4, unverifiedHistoricalRequestCount: 0 } };
+    const view = render(<UsageStatisticsPage activitySnapshot={unknownCost} />);
+    expect(metric("费用")).toHaveTextContent("费用未知");
+    const allUnknown = withSummary({ requestCount: 1, totalTokens: 0, unknownTokenRequestCounts: { ...known, total: 1 } });
+    view.rerender(<UsageStatisticsPage activitySnapshot={allUnknown} />);
+    expect(metric("Token 用量")).toHaveTextContent("—");
+    view.rerender(<UsageStatisticsPage activitySnapshot={withSummary({ requestCount: 1, totalTokens: 0, unknownTokenRequestCounts: known })} />);
+    expect(metric("Token 用量")).not.toHaveTextContent("—");
   });
-  it("computes the cache rate from the known part when some requests lack usage or omit the cache-read field", () => {
-    // 复现 24 小时范围的真实形状：192 次请求，4 次缺用量/定价，另有请求只上报 input/output 而缺缓存读取字段。
-    const base = { ...data.summary, requestCount: 192, totalTokens: 2_892_225, inputTokens: 247_519, outputTokens: 137_826, cacheReadTokens: 2_506_880, cacheWriteTokens: 0 };
-    const failedOnly = { ...data, summary: { ...base, unknownTokenRequestCounts: { input: 4, output: 4, cacheRead: 4, cacheWrite: 192, reasoning: 4, total: 4 } } } as unknown as UsageActivitySnapshot;
-    const view = render(<UsageStatisticsPage snapshot={null} activitySnapshot={failedOnly} />);
-    // 2,506,880 ÷ (247,519 + 2,506,880) = 91.0%
-    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("91%");
-    const omitsCacheRead = { ...failedOnly, summary: { ...base, unknownTokenRequestCounts: { input: 4, output: 4, cacheRead: 9, cacheWrite: 192, reasoning: 4, total: 4 } } } as unknown as UsageActivitySnapshot;
-    view.rerender(<UsageStatisticsPage snapshot={null} activitySnapshot={omitsCacheRead} />);
-    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("91%");
-    const partialInput = { ...failedOnly, summary: { ...base, unknownTokenRequestCounts: { input: 9, output: 4, cacheRead: 4, cacheWrite: 192, reasoning: 4, total: 4 } } } as unknown as UsageActivitySnapshot;
-    view.rerender(<UsageStatisticsPage snapshot={null} activitySnapshot={partialInput} />);
-    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("91%");
+
+  it("缓存命中率与会话胶囊同一算法", () => {
+    const summary = { requestCount: 2, inputTokens: 100, cacheReadTokens: 800, cacheWriteTokens: 100, unknownTokenRequestCounts: known };
+    const view = render(<UsageStatisticsPage activitySnapshot={withSummary(summary)} />);
+    expect(metric("缓存命中率")).toHaveTextContent("80%");
+    // 差一点全命中不会舍成 100%。
+    view.rerender(<UsageStatisticsPage activitySnapshot={withSummary({ ...summary, inputTokens: 1, cacheReadTokens: 99_999, cacheWriteTokens: 0 })} />);
+    expect(metric("缓存命中率")).toHaveTextContent("99.999%");
   });
-  it("keeps the cache rate in line with the session pill algorithm", () => {
-    const summary = { ...data.summary, requestCount: 2, totalTokens: 1_100, inputTokens: 100, outputTokens: 0, cacheReadTokens: 800, cacheWriteTokens: 100, unknownTokenRequestCounts: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, total: 0 } };
-    render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, summary } as unknown as UsageActivitySnapshot} />);
-    // 缓存读 ÷（未缓存输入 + 缓存读 + 缓存写）= 800 / 1000
-    expect(screen.getByText("缓存命中率").parentElement).toHaveTextContent("80%");
+
+  it("缺口提示合成一行，悬停给原因", async () => {
+    const gapped = { ...withSummary({ unknownTokenRequestCounts: { ...known, cacheRead: 2, total: 1 } }), costSummary: { ...data.costSummary!, unknownCostRequestCount: 1 } };
+    render(<UsageStatisticsPage activitySnapshot={gapped} />);
+    const note = screen.getByText("有 2 次请求缺少用量或定价，数值为已知部分的合计");
+    await userEvent.hover(note);
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("请求失败或未完成：1 次");
+    expect(tip).toHaveTextContent("模型未配置价格：1 次");
+    expect(tip).toHaveTextContent("服务商未返回缓存字段：1 次");
+    expect(gapNote({ ...data, summary: { ...data.summary, unknownTokenRequestCounts: { ...known, cacheWrite: 3 } }, costSummary: { ...data.costSummary!, unknownCostRequestCount: 0 } })).toBeNull();
   });
-  it("shows no footnote when every request has usage and a price", () => {
-    const complete = { ...data, costSummary: { ...data.costSummary!, unknownCostRequestCount: 0 }, summary: { ...data.summary, unknownTokenRequestCounts: { input: 0, output: 0, cacheRead: 0, cacheWrite: 2, reasoning: 0, total: 0 } } } as unknown as UsageActivitySnapshot;
-    render(<UsageStatisticsPage snapshot={null} activitySnapshot={complete} />);
-    expect(screen.queryByText(/缺少用量或定价|未返回缓存字段/)).not.toBeInTheDocument();
+
+  it("Token 按类型：模型回复 = 输出 − 思考", () => {
+    const segments = tokenTypeSegments({ ...data.summary, outputTokens: 1000, reasoningTokens: 300 });
+    expect(segments.map((segment) => segment.label)).toEqual(["缓存读取", "缓存写入", "未缓存输入", "模型思考", "模型回复"]);
+    expect(segments.at(-1)!.value).toBe(700);
   });
-  it("shows the cache hit rate when only cache write is unreported", () => {
-    const openAiCompatible = {
-      ...data,
-      summary: { ...data.summary, requestCount: 2, totalTokens: 1100, inputTokens: 100, outputTokens: 0, cacheReadTokens: 900, cacheWriteTokens: 0, unknownTokenRequestCounts: { input: 0, output: 0, cacheRead: 0, cacheWrite: 2, reasoning: 0, total: 0 } },
-    } as unknown as UsageActivitySnapshot;
-    render(<UsageStatisticsPage snapshot={null} activitySnapshot={openAiCompatible} />);
-    const cacheMetric = screen.getByText("缓存命中率").parentElement;
-    expect(cacheMetric).toHaveTextContent("90%");
-  });
-  it("sends search to the full query and preserves status and search on pagination", async () => {
-    const refresh = vi.fn(); const next = vi.fn();
-    render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, rowsPage: { page: 1, pageSize: 10, totalRows: 21, totalPages: 3 } }} onRefresh={refresh} onRequestPageChange={next} />);
-    await userEvent.click(screen.getByRole("combobox", { name: "筛选状态" }));
-    await userEvent.click(screen.getByRole("option", { name: "失败" }));
-    await userEvent.type(screen.getByLabelText("搜索使用记录"), "deepseek");
-    await waitFor(() => expect(refresh).toHaveBeenLastCalledWith("month", 1, "error", "deepseek", undefined));
+
+  it("筛选变化从第一页重新查，翻页带上筛选；挂载时查一次", async () => {
+    const onQuery = vi.fn();
+    render(<UsageStatisticsPage activitySnapshot={{ ...data, rowsPage: { page: 1, pageSize: 20, totalRows: 45, totalPages: 3 } }} onQuery={onQuery} />);
+    expect(onQuery).toHaveBeenCalledWith({ range: "month", page: 1 });
+    await userEvent.click(screen.getByRole("combobox", { name: "筛选模型" }));
+    await userEvent.click(screen.getByRole("option", { name: "deepseek-v4" }));
+    await waitFor(() => expect(onQuery).toHaveBeenLastCalledWith({ range: "month", model: "deepseek-v4", page: 1 }));
     await userEvent.click(screen.getByRole("button", { name: "下一页" }));
-    expect(next).toHaveBeenCalledWith(2, "month", "error", "deepseek", undefined);
+    expect(onQuery).toHaveBeenLastCalledWith({ range: "month", model: "deepseek-v4", page: 2 });
+    // 选了模型后，Harness 来源的卡片标明不受影响。
+    expect(card("工具调用")).toHaveTextContent("不受模型、提供商筛选影响");
+    expect(card("活跃度")).toHaveTextContent("不受筛选影响");
   });
-  it("distinguishes loading and failures from an empty result", () => {
-    const view = render(<UsageStatisticsPage snapshot={null} isLoading />);
-    expect(screen.getByRole("status")).toHaveTextContent("正在读取");
-    view.rerender(<UsageStatisticsPage snapshot={null} error="读取失败" />);
-    expect(screen.getByRole("alert")).toHaveTextContent("读取失败");
-    expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
+
+  it("偏好防抖写回 activity.usage，旧值 pricing 回落请求明细", async () => {
+    const update = vi.fn(async () => null);
+    render(<UsageStatisticsPage activitySnapshot={data} settingsV4={prefs({ activeTab: "pricing" as never })} onUpdateNamespace={update} />);
+    expect(screen.getByRole("tab", { name: /请求明细/ })).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(screen.getByRole("tab", { name: /^工具/ }));
+    await userEvent.click(within(card("用量趋势")).getByRole("tab", { name: "费用" }));
+    await waitFor(() => expect(update).toHaveBeenLastCalledWith({ namespace: "activity", patch: { usage: expect.objectContaining({ activeTab: "tools", trendMetric: "cost" }) } }));
   });
-  it("shows Session fallback separately from an empty result", () => {
-    render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, readModel: { source: "session", status: "fallback" } }} />);
-    expect(screen.getByRole("status")).toHaveTextContent("当前结果从会话记录读取");
-    expect(screen.getByRole("table", { name: "请求日志" })).toBeInTheDocument();
+
+  it("点「模型请求」跳到底部模型 tab", async () => {
+    render(<UsageStatisticsPage activitySnapshot={data} />);
+    await userEvent.click(within(screen.getByRole("region", { name: "使用概览" })).getByText("模型请求"));
+    expect(screen.getByRole("tab", { name: /^模型/ })).toHaveAttribute("aria-selected", "true");
+    expect(within(screen.getByRole("table", { name: "模型" })).getByText("claude-opus-5-5")).toBeInTheDocument();
   });
-  it("makes incomplete statistics explicit when some Sessions cannot be read", () => {
-    render(<UsageStatisticsPage snapshot={null} activitySnapshot={{ ...data, readModel: { source: "sqlite", status: "ready", failedSources: 2 } }} />);
-    expect(screen.getByRole("status")).toHaveTextContent("2 个会话暂时无法读取");
-    expect(screen.getByRole("status")).toHaveTextContent("当前统计不包含这些会话");
+
+  it("请求明细悬停给单价、耗时、Token、费用；未配置价格的费用写「未知」", async () => {
+    const row = data.rows.find((item) => item.status === "success")!;
+    const unpriced: UsageActivityRow = { ...row, activityId: "x", costUsd: null, costAmount: null, costCurrency: null, costBasis: "unavailable", costProvenance: { version: 1, basis: "unknown", reason: "model-price-unavailable", pricingSnapshot: null } };
+    render(<UsageStatisticsPage activitySnapshot={{ ...data, rows: [row, unpriced] }} />);
+    const table = screen.getByRole("table", { name: "请求明细" });
+    await userEvent.hover(within(table).getAllByRole("button", { name: "Token 明细" })[0]!);
+    const tokens = await screen.findByRole("region", { name: "Token 明细" });
+    expect(tokens).toHaveTextContent("缓存读取");
+    expect(tokens).toHaveTextContent(row.tokens.totalTokens!.toLocaleString("zh-CN"));
+    await userEvent.unhover(within(table).getAllByRole("button", { name: "Token 明细" })[0]!);
+    await userEvent.hover(within(table).getAllByRole("button", { name: /单价/ })[1]!);
+    expect(await screen.findByRole("region", { name: row.model! })).toHaveTextContent("暂无单价");
+    expect(within(table).getByText("未知")).toHaveAttribute("title", "该模型未配置价格");
   });
-  it("shows synchronization progress and cancels the active query", async () => {
+
+  it("工具失败率超过 5% 显示红色胶囊", () => {
+    render(<UsageStatisticsPage activitySnapshot={data} />);
+    const tools = within(card("工具调用")).getByRole("list", { name: "工具调用" });
+    expect(within(tools).getByText("web_fetch").parentElement).toHaveTextContent("25.0%");
+    expect(within(tools).getByText("read_file").parentElement).not.toHaveTextContent("%");
+  });
+
+  it("加载、失败、回退、部分会话不可读、Harness 不可用分别提示", async () => {
     const cancel = vi.fn();
-    render(<UsageStatisticsPage snapshot={null} isLoading progress={{ requestId: "q", phase: "syncing", completedSessions: 2, totalSessions: 8, eventsRead: 256 }} onCancel={cancel} />);
+    const view = render(<UsageStatisticsPage isLoading progress={{ requestId: "q", phase: "syncing", completedSessions: 2, totalSessions: 8, eventsRead: 256 }} onCancel={cancel} />);
     expect(screen.getAllByRole("status")[0]).toHaveTextContent("256");
     await userEvent.click(screen.getByRole("button", { name: "取消查询" }));
     expect(cancel).toHaveBeenCalledOnce();
-  });
-  it("removes pricing UI and never reads or refreshes the catalog on entry", () => {
-    const get = vi.fn(); const refresh = vi.fn();
-    overrideBridge({ "models.getPricingCatalog": get, "models.refreshPricingCatalog": refresh });
-    const saved = { settings: { activity: { usage: { range: "30d", status: "all", modelFilter: "", showDetails: true, activeTab: "pricing" } } } } as unknown as SettingsV4Snapshot;
-    render(<UsageStatisticsPage snapshot={null} activitySnapshot={data} settingsV4={saved} />);
-    expect(screen.getByRole("tab", { name: /请求日志/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByRole("tab", { name: /价目/ })).not.toBeInTheDocument();
-    expect(get).not.toHaveBeenCalled();
-    expect(refresh).not.toHaveBeenCalled();
+    view.rerender(<UsageStatisticsPage error="读取失败" />);
+    expect(screen.getByRole("alert")).toHaveTextContent("读取失败");
+    view.rerender(<UsageStatisticsPage activitySnapshot={{ ...data, readModel: { source: "session", status: "fallback" } }} />);
+    expect(screen.getByText(/当前结果从会话记录读取/)).toBeInTheDocument();
+    view.rerender(<UsageStatisticsPage activitySnapshot={{ ...data, readModel: { source: "sqlite", status: "ready", failedSources: 2 } }} />);
+    expect(screen.getByText(/2 个会话暂时无法读取/)).toBeInTheDocument();
+    view.rerender(<UsageStatisticsPage activitySnapshot={{ ...data, harnessUnavailable: true, tools: undefined }} />);
+    expect(screen.getByText(/工具、命令、Skills 与子 Agent 统计暂不可用/)).toBeInTheDocument();
   });
 });
+
+function prefs(patch: Partial<SettingsV4Snapshot["settings"]["activity"]["usage"]>): SettingsV4Snapshot {
+  return { settings: { activity: { usage: { range: "30d", activeTab: "requests", tokenView: "type", timeView: "phase", trendMetric: "tokens", heatMetric: "sessions", ...patch } } } } as unknown as SettingsV4Snapshot;
+}

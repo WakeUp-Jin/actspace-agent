@@ -38,16 +38,18 @@ export function normalizeProxyUrl(rawUrl: string): string {
   return url.toString().replace(/\/$/, "");
 }
 
+const USAGE_TABS = ["requests", "models", "providers", "tools", "commands", "skills"] as const;
+const oneOf = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T => (allowed as readonly unknown[]).includes(value) ? value as T : fallback;
+
+/** 旧字段 status / modelFilter / showDetails 丢弃；旧 activeTab「pricing」回落 requests。 */
 export function sanitizeUsagePreferences(value: Record<string, unknown>): SettingsV4UsagePreferences {
-  const range = value.range === "24h" || value.range === "7d" || value.range === "30d" || value.range === "all" ? value.range : "30d";
-  const status = value.status === "success" || value.status === "error" || value.status === "aborted" || value.status === "unknown" ? value.status : "all";
-  const activeTab = value.activeTab === "providers" || value.activeTab === "models" || value.activeTab === "tools" || value.activeTab === "pricing" ? value.activeTab : "requests";
   return {
-    range,
-    status,
-    modelFilter: typeof value.modelFilter === "string" ? value.modelFilter.slice(0, 200) : "",
-    showDetails: value.showDetails === true,
-    activeTab,
+    range: oneOf(value.range, ["24h", "7d", "30d", "all"] as const, "30d"),
+    activeTab: oneOf(value.activeTab, USAGE_TABS, "requests"),
+    tokenView: oneOf(value.tokenView, ["type", "model"] as const, "type"),
+    timeView: oneOf(value.timeView, ["phase", "tool"] as const, "phase"),
+    trendMetric: oneOf(value.trendMetric, ["tokens", "cost", "requests"] as const, "tokens"),
+    heatMetric: oneOf(value.heatMetric, ["sessions", "tokens"] as const, "sessions"),
   };
 }
 

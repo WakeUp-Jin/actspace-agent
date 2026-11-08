@@ -4,7 +4,7 @@ import { prepare, type ProjectionDatabase } from "./usage-sql";
 /**
  * Harness 统计的会话级表。每张表的前五列固定是 session_id、hour、revision、mode、model，
  * 查询层据此统一做时间 / 版本 / 模式 / 模型筛选；工作区与会话类型通过 harness_session_meta 关联。
- * 设计见 docs/design-docs/自进化的方案设计/11-Harness统计设计.md §4。
+ * 设计见 docs/design-docs/自进化的方案设计/11-Harness统计设计.md §4；v18 瘦身见 docs/design-docs/frontend/front-统计页规范.md §5.2。
  */
 export type HarnessColumnKind = "sum" | "max" | "last" | "hist" | "sleep-hist" | "counts";
 export type HarnessTableSpec = {
@@ -24,13 +24,14 @@ export const HARNESS_TABLES = {
   tool: {
     name: "harness_tool_rollup", keys: dims("tool"), archive: true,
     columns: {
-      plugin_id: "last", exposures: "sum", calls: "sum", completed: "sum", failed: "sum", denied: "sum", aborted: "sum", unknown_outcome: "sum",
-      failure_codes: "counts", schema_tokens: "sum", schema_samples: "sum",
-      approval_asked: "sum", approval_user_approved: "sum", approval_user_denied: "sum", approval_timed_out: "sum", approval_auto_approved: "sum",
-      approval_auto_declined: "sum", approval_session_grant: "sum", approval_scope_denied: "sum", approval_wait_ms: "sum", approval_wait_samples: "sum",
-      duration_hist: "hist", output_tokens: "sum", output_samples: "sum", output_hist: "hist", truncated: "sum", repeated: "sum", retried: "sum",
-      sandboxed: "sum", unsandboxed: "sum", unknown_env: "sum", escalations: "sum", background: "sum", folded: "sum", folded_tokens: "sum", last_used_at: "max",
+      plugin_id: "last", exposures: "sum", calls: "sum", failed: "sum", failure_codes: "counts", schema_tokens: "sum", schema_samples: "sum",
+      approval_wait_ms: "sum", approval_wait_samples: "sum", duration_ms: "sum", duration_samples: "sum", duration_hist: "hist",
+      output_tokens: "sum", output_samples: "sum", output_hist: "hist", truncated: "sum", repeated: "sum",
     },
+  },
+  bash: {
+    name: "harness_bash_rollup", keys: dims("program", "subcommand"), archive: true,
+    columns: { calls: "sum", failed: "sum", duration_ms: "sum", duration_samples: "sum" },
   },
   entry: {
     name: "harness_entry_rollup", keys: dims("entry_key"), archive: true,
@@ -41,63 +42,44 @@ export const HARNESS_TABLES = {
     columns: {
       hour: "last", revision: "last", mode: "last", model: "last", time: "last", estimated: "last", b_system: "last", b_tools: "last", b_rules: "last", b_skills: "last",
       b_summarized: "last", b_conversation: "last", context_window: "last", input_tokens: "last", cache_read: "last", cache_write: "last", has_manifest: "last",
+      harness_changed: "last",
     },
   },
   skill: {
     name: "harness_skill_rollup", keys: dims("skill_id"), archive: true,
-    columns: { source: "last", listed: "sum", selected: "sum", skill_reads: "sum", asset_reads: "sum", last_read_at: "max" },
+    columns: { source: "last", listed: "sum", skill_reads: "sum", asset_reads: "sum", last_read_at: "max" },
+  },
+  skillFile: {
+    name: "harness_skill_file", keys: dims("skill_id", "file"), archive: true,
+    columns: { reads: "sum", last_read_at: "max" },
   },
   compaction: {
     name: "harness_compaction", keys: ["compaction_id"], archive: true,
     columns: {
       hour: "last", revision: "last", mode: "last", model: "last", time: "last", trigger: "last", ok: "last", failure_code: "last", duration_ms: "last",
-      before_tokens: "last", after_tokens: "last", steps_since: "last", turns_since: "last", window_ratio: "last", folded: "sum", folded_tokens: "sum",
-      read_before: "last", reread: "sum",
+      before_tokens: "last", after_tokens: "last", steps_since: "last", window_ratio: "last", folded: "sum", folded_tokens: "sum", reread: "sum",
     },
   },
   cycle: {
     name: "harness_disclosure_cycle", keys: ["cycle"], integerKeys: ["cycle"], archive: true,
-    columns: { hour: "last", revision: "last", mode: "last", model: "last", time: "last", active: "last", sleeping: "last", cap_hit: "last", index_tokens: "last", active_read: "last" },
+    columns: { hour: "last", revision: "last", mode: "last", model: "last", active: "last", cap_hit: "last", active_read: "last" },
   },
   disclosure: {
     name: "harness_disclosure_rollup", keys: dims(), archive: true,
-    columns: { reads: "sum", sleeping_reads: "sum", wakes: "sum", wake_cycles: "sum", mis_sleeps: "sum", slept_paths: "sum", index_reads: "sum", index_conversions: "sum", sleep_hist: "sleep-hist" },
+    columns: { mis_sleeps: "sum", slept_paths: "sum", index_reads: "sum", index_conversions: "sum", sleep_hist: "sleep-hist" },
   },
   path: {
     name: "harness_path_reads", keys: dims("path"), archive: true,
     columns: { reads: "sum", last_read_at: "max" },
   },
-  turn: {
-    name: "harness_turn", keys: ["turn_id"], archive: true,
-    columns: { hour: "last", revision: "last", mode: "last", model: "last", time: "last", steps: "sum", reason: "last" },
-  },
-  session: {
-    name: "harness_session_rollup", keys: dims(), archive: true,
-    columns: { mode_switches: "sum", retries: "sum", retry_codes: "counts", steering: "sum", queued: "sum", requests: "sum" },
-  },
-  aux: {
-    name: "harness_aux_rollup", keys: dims("purpose"), archive: true,
-    columns: { calls: "sum", failed: "sum", total_ms: "sum" },
-  },
-  owner: {
-    name: "harness_owner_rollup", keys: dims("owner"), archive: true,
-    columns: { events: "sum" },
-  },
   delegation: {
     name: "harness_delegation", keys: ["invocation_id"], archive: true,
-    columns: { hour: "last", revision: "last", mode: "last", model: "last", time: "last", preset_id: "last", status: "last", child_session_id: "last", duration_ms: "last", tool_uses: "last", return_tokens: "last" },
+    columns: { hour: "last", revision: "last", mode: "last", model: "last", time: "last", preset_id: "last", status: "last", child_session_id: "last", duration_ms: "last" },
   },
-  background: {
-    name: "harness_background_task", keys: ["task_id"], archive: true,
-    columns: { hour: "last", revision: "last", mode: "last", model: "last", time: "last", kind: "last", status: "last", duration_ms: "last", delivery: "last", read: "max" },
-  },
-  evolution: {
-    name: "harness_evolution_op", keys: ["call_id"], archive: true,
-    columns: { hour: "last", revision: "last", mode: "last", model: "last", time: "last", action: "last", target: "last", status: "last" },
-  },
+  /** 工具输出的 token 数，等压缩折叠时算「拿掉的工具输出」；不归档。 */
   output: {
     name: "harness_tool_output", keys: ["seq"], integerKeys: ["seq"], archive: false,
-    columns: { hour: "last", revision: "last", mode: "last", model: "last", tool: "last", tokens: "last", compaction_id: "last" },
+    columns: { tokens: "last" },
   },
 } as const satisfies Record<string, HarnessTableSpec>;
 export type HarnessTableId = keyof typeof HARNESS_TABLES;
@@ -127,7 +109,6 @@ export function createHarnessStatsSchema(db: ProjectionDatabase): void {
   sql.push("CREATE TABLE IF NOT EXISTS harness_plugin_inventory(revision TEXT NOT NULL,plugin TEXT NOT NULL,source TEXT NOT NULL,provides TEXT NOT NULL,loads INTEGER NOT NULL,failures INTEGER NOT NULL,last_error TEXT,load_hist TEXT NOT NULL,first_seen TEXT NOT NULL,last_seen TEXT NOT NULL,PRIMARY KEY(revision,plugin)) STRICT;");
   sql.push("CREATE TABLE IF NOT EXISTS harness_tool_owner(revision TEXT NOT NULL,tool TEXT NOT NULL,plugin TEXT NOT NULL,tool_plugin_id TEXT,last_seen TEXT NOT NULL,PRIMARY KEY(revision,tool)) STRICT;");
   sql.push("CREATE TABLE IF NOT EXISTS harness_revision_info(revision TEXT PRIMARY KEY,harness_id TEXT,number INTEGER,description TEXT,selected_at TEXT,selection_seq INTEGER) STRICT;");
-  sql.push("CREATE TABLE IF NOT EXISTS harness_stats_health(id INTEGER PRIMARY KEY CHECK(id=1),write_failures REAL NOT NULL DEFAULT 0,file_bytes REAL NOT NULL DEFAULT 0,last_rebuild_at TEXT) STRICT;");
   db.exec(sql.join("\n"));
 }
 

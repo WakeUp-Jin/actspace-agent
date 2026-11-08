@@ -64,7 +64,6 @@ export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   archiveSession: "runtime-v2:fixed-renderer:archive-session",
   archiveSessions: "runtime-v2:fixed-renderer:archive-sessions",
   setObservedSessions: "runtime-v2:fixed-renderer:set-observed-sessions",
-  getUsageStatistics: "runtime-v2:fixed-renderer:get-usage-statistics",
   getUsageQueryStatus: "runtime-v2:fixed-renderer:get-usage-query-status",
   cancelUsageQuery: "runtime-v2:fixed-renderer:cancel-usage-query",
   getUsageActivity: "runtime-v2:fixed-renderer:get-usage-activity",

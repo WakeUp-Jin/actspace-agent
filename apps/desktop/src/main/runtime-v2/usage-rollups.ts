@@ -3,8 +3,8 @@ import { prepare } from "./usage-sql";
 
 // Hourly global aggregates keep the normal Usage overview independent of the
 // number of activity rows. Session/text searches keep the exact detail path.
-const dimensions = ["kind", "status", "model", "provider_id", "connection_id", "tool_name", "cost_currency", "historical_unverified", "input_tokens_unknown", "output_tokens_unknown", "cache_read_tokens_unknown", "cache_write_tokens_unknown", "reasoning_tokens_unknown", "total_tokens_unknown"];
-const measures = ["input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens", "total_tokens", "duration_ms", "cost_usd", "cost_amount"];
+const dimensions = ["kind", "status", "model", "provider_id", "connection_id", "purpose", "cost_currency", "historical_unverified", "input_tokens_unknown", "output_tokens_unknown", "cache_read_tokens_unknown", "cache_write_tokens_unknown", "reasoning_tokens_unknown", "total_tokens_unknown"];
+const measures = ["input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "reasoning_tokens", "total_tokens", "duration_ms", "cost_usd", "cost_amount", "ttft_ms", "ttft_samples", "decode_ms", "decode_tokens", "retries"];
 const fields = ["group_key", "started_at", ...dimensions, ...measures, "metric_count"];
 const hour = (alias: string) => `substr(${alias}.started_at,1,13)||':00:00.000Z'`;
 const key = (alias: string) => `json_array(${hour(alias)},${dimensions.map(name => `${alias}.${name}`).join(",")},${alias}.cost_amount IS NULL,${alias}.cost_usd IS NULL)`;
@@ -13,9 +13,9 @@ const searchCache = new WeakMap<DatabaseSync, { key: string; changes: number }>(
 export function clearSearchMetricsCache(db: DatabaseSync): void { searchCache.delete(db); }
 
 /** Background requests are billable Session facts, not synthetic Agent Runs.
- * Keep legacy rows without a purpose and tool-owned auxiliary requests. */
+ * Keep main requests (no purpose) and tool-owned auxiliary requests. */
 export function countableRunSql(alias: string): string {
-  return `COALESCE(json_extract(${alias}.row_json,'$.purpose'),'') NOT IN ('session-title','compaction')`;
+  return `COALESCE(${alias}.purpose,'') NOT IN ('session-title','compaction')`;
 }
 
 export function createUsageRollups(db: DatabaseSync): void {
@@ -40,7 +40,7 @@ export function createUsageRollups(db: DatabaseSync): void {
     db.exec(`
       CREATE TABLE IF NOT EXISTS ${table} (
         group_key TEXT PRIMARY KEY,started_at TEXT NOT NULL,kind TEXT NOT NULL,status TEXT NOT NULL,
-        model TEXT,provider_id TEXT,connection_id TEXT,tool_name TEXT,cost_currency TEXT,historical_unverified INTEGER NOT NULL,
+        model TEXT,provider_id TEXT,connection_id TEXT,purpose TEXT,cost_currency TEXT,historical_unverified INTEGER NOT NULL,
         input_tokens_unknown INTEGER NOT NULL,output_tokens_unknown INTEGER NOT NULL,cache_read_tokens_unknown INTEGER NOT NULL,
         cache_write_tokens_unknown INTEGER NOT NULL,reasoning_tokens_unknown INTEGER NOT NULL,total_tokens_unknown INTEGER NOT NULL,
         ${measures.map(name => `${name} REAL`).join(",")},metric_count INTEGER NOT NULL
@@ -48,7 +48,7 @@ export function createUsageRollups(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS ${table}_time_idx ON ${table}(started_at);
       CREATE VIRTUAL TABLE IF NOT EXISTS ${table}_search USING fts5(group_key UNINDEXED,content);
       CREATE TRIGGER IF NOT EXISTS ${table}_search_insert AFTER INSERT ON ${table} BEGIN
-        INSERT INTO ${table}_search(rowid,group_key,content) VALUES(new.rowid,new.group_key,COALESCE(new.model,'')||' '||COALESCE(new.provider_id,'')||' '||COALESCE(new.connection_id,'')||' '||COALESCE(new.tool_name,''));
+        INSERT INTO ${table}_search(rowid,group_key,content) VALUES(new.rowid,new.group_key,COALESCE(new.model,'')||' '||COALESCE(new.provider_id,'')||' '||COALESCE(new.connection_id,'')||' '||COALESCE(new.purpose,''));
       END;
       CREATE TRIGGER IF NOT EXISTS ${table}_search_delete AFTER DELETE ON ${table} BEGIN
         DELETE FROM ${table}_search WHERE rowid=old.rowid;
@@ -114,7 +114,7 @@ export function metricSql(sql: string, source?: string): string {
     .replace(/SUM\((kind='llm_request'[^\n]+?)\),0\) AS (known|unknown|unverified)/g, "SUM(($1)*a.metric_count),0) AS $2");
 }
 
-/** A title can select arbitrary Sessions, so global rollups cannot answer it.
+/** A title or workspace can select arbitrary Sessions, so global rollups cannot answer it.
  * Scan matching detail once, then reuse compact SQL groups for every summary.
  * TEMP storage stays in SQLite; no matching-row array crosses into JS. */
 export function searchMetricsSource(db: DatabaseSync, where: string, args: (string | number)[]): string {
@@ -126,7 +126,8 @@ export function searchMetricsSource(db: DatabaseSync, where: string, args: (stri
   // Force the two indexed candidate sets before aggregation. SQLite otherwise
   // may choose a full activity scan for the OR across dimension/title matches.
   const candidates = where.replace("(a.search_key IN (SELECT search_key FROM search_documents WHERE search_documents MATCH ?) OR a.session_id IN (SELECT session_id FROM session_search WHERE session_search MATCH ?))", "(a.rowid IN (SELECT rowid FROM usage_activity INDEXED BY usage_activity_search_idx WHERE search_key IN (SELECT search_key FROM search_documents WHERE search_documents MATCH ?) UNION SELECT rowid FROM usage_activity INDEXED BY usage_activity_session_idx WHERE session_id IN (SELECT session_id FROM session_search WHERE session_search MATCH ?)))");
-  prepare(db, `CREATE TEMP TABLE usage_query_rollups AS SELECT a.session_id,a.search_key,'' AS group_key,MAX(a.started_at) AS started_at,${dimensions.map(name => `a.${name}`).join(",")},${measures.map(name => `SUM(a.${name}) AS ${name}`).join(",")},COUNT(*) AS metric_count FROM usage_activity a ${candidates} GROUP BY a.session_id,a.search_key,${dimensions.map(name => `a.${name}`).join(",")},a.cost_amount IS NULL,a.cost_usd IS NULL`).run(...args);
+  // 按小时分组、保留组内最晚时间：查询再套同样的时间条件仍成立，用量趋势按小时分桶也不跨桶。
+  prepare(db, `CREATE TEMP TABLE usage_query_rollups AS SELECT a.session_id,a.search_key,'' AS group_key,MAX(a.started_at) AS started_at,${dimensions.map(name => `a.${name}`).join(",")},${measures.map(name => `SUM(a.${name}) AS ${name}`).join(",")},COUNT(*) AS metric_count FROM usage_activity a ${candidates} GROUP BY a.session_id,a.search_key,${hour("a")},${dimensions.map(name => `a.${name}`).join(",")},a.cost_amount IS NULL,a.cost_usd IS NULL`).run(...args);
   searchCache.set(db, { key, changes: Number((prepare(db, "SELECT total_changes() AS n").get() as { n: number }).n) });
   return "usage_query_rollups";
 }

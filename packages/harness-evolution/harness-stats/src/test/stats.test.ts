@@ -87,19 +87,19 @@ describe("recorder", () => {
 describe("sink", () => {
   it("splits lines by the month of their own time and ends every line with a newline", async () => {
     const root = await tempRoot();
-    const sink = new HarnessStatsSink({ dataRoot: root, now: () => T0 });
+    const sink = new HarnessStatsSink({ dataRoot: root });
     const runtime = (hour: string): HarnessRuntimeStatLine => ({ v: 1, t: "runtime", hour, revision: "main@1", kind: "listener", plugin: "p", name: "e", method: "", provider: null, calls: 1, errors: 0, totalMs: 1, histogram: new Array(16).fill(0) });
-    const failed = await sink.append([runtime("2026-10-31T23:00:00.000Z"), runtime("2026-11-01T00:00:00.000Z"), { v: 1, t: "health", at: "2026-11-02T00:00:00.000Z", writeFailures: 0 }]);
+    const failed = await sink.append([runtime("2026-10-31T23:00:00.000Z"), runtime("2026-11-01T00:00:00.000Z")]);
     expect(failed).toEqual([]);
     expect((await readdir(join(root, "harness-stats"))).sort()).toEqual(["2026-10.jsonl", "2026-11.jsonl"]);
     expect(await readLines(root, "2026-10.jsonl")).toHaveLength(1);
-    expect(await readLines(root)).toHaveLength(2);
+    expect(await readLines(root)).toHaveLength(1);
   });
 
-  it("counts a failed write, returns its lines and reports the failures once the next write succeeds", async () => {
+  it("counts a failed write and returns its lines so the caller can retry them", async () => {
     const root = await tempRoot();
     let broken = true;
-    const sink = new HarnessStatsSink({ dataRoot: root, now: () => T0, fileSystem: {
+    const sink = new HarnessStatsSink({ dataRoot: root, fileSystem: {
       mkdir: async () => undefined,
       appendFile: async (path, data) => { if (broken) throw new Error("disk full"); await writeFile(path, data, { flag: "a" }); },
     } });
@@ -110,18 +110,11 @@ describe("sink", () => {
     expect(sink.writeFailures).toBe(1);
     broken = false;
     expect(await sink.append([line])).toEqual([]);
-    const lines = await readLines(root);
-    expect(lines.map(item => item.t)).toEqual(["health", "runtime"]);
-    expect(lines[0]).toMatchObject({ t: "health", writeFailures: 1 });
-    expect(await sink.append([line])).toEqual([]);
-    expect((await readLines(root)).map(item => item.t)).toEqual(["health", "runtime", "runtime"]);
-    // 再失败两次：下一条 health 只带新增的 2 次（增量），读取方累加得到总数 3。
+    // 不再写健康行：文件里只有数据行。
+    expect((await readLines(root)).map(item => item.t)).toEqual(["runtime"]);
     broken = true;
     await sink.append([line]); await sink.append([line]);
-    broken = false;
-    expect(await sink.append([line])).toEqual([]);
-    const health = (await readLines(root)).filter(item => item.t === "health");
-    expect(health.map(item => (item as { writeFailures: number }).writeFailures)).toEqual([1, 2]);
+    expect(sink.writeFailures).toBe(3);
   });
 });
 
@@ -157,7 +150,8 @@ describe("HarnessStats", () => {
     const lines = await readLines(root);
     const service = lines.find((line): line is HarnessRuntimeStatLine => line.t === "runtime" && line.kind === "service" && line.method === "bump")!;
     expect(service).toMatchObject({ plugin: "consumer", name: "svc", provider: "provider", calls: 1, errors: 0, revision: "main@3" });
-    expect(lines.find((line): line is HarnessRuntimeStatLine => line.t === "runtime" && line.kind === "dependency")).toMatchObject({ plugin: "consumer", name: "provider", method: "svc" });
+    // 依赖行不再记。
+    expect(lines.filter(line => line.t === "runtime").every(line => (line as HarnessRuntimeStatLine).kind === "service" || (line as HarnessRuntimeStatLine).kind === "listener")).toBe(true);
   });
 
   it("does not wrap the plugin's own provided service and does not break frozen services", async () => {
@@ -280,7 +274,7 @@ describe("HarnessStats", () => {
       await stats.flush();
     } finally { await mounted.close(); await stats.dispose(); }
     const lines = written.join("").trimEnd().split("\n").map(line => JSON.parse(line) as HarnessStatsFileLine);
-    expect(lines[0]).toMatchObject({ t: "health", writeFailures: 1 });
+    expect(lines.some(line => (line as { t: string }).t === "health")).toBe(false);
     expect(lines.filter(line => line.t === "inventory").length).toBeGreaterThanOrEqual(2);
     const bump = lines.filter((line): line is HarnessRuntimeStatLine => line.t === "runtime" && line.method === "bump");
     expect(bump.reduce((sum, line) => sum + line.calls, 0)).toBe(2);
@@ -290,9 +284,9 @@ describe("HarnessStats", () => {
     const root = await tempRoot();
     const stats = new HarnessStats({ dataRoot: root, now: () => T0, flushIntervalMs: 3_600_000, maxKeys: 3 });
     const service = { a: () => 1, b: () => 2, c: () => 3, d: () => 4 };
-    const mounted = await mountPair(stats, { service, consumer: ctx => { const svc = ctx.get("svc"); svc.a(); svc.b(); } });
+    const mounted = await mountPair(stats, { service, consumer: ctx => { const svc = ctx.get("svc"); svc.a(); svc.b(); svc.c(); } });
     try {
-      // Each method is one service key plus the shared dependency key: the limit of 3 is hit on the second method.
+      // Each method is one service key: the limit of 3 is hit on the third method.
       await new Promise(resolve => setTimeout(resolve, 50));
       expect((await readLines(root)).some(line => line.t === "runtime")).toBe(true);
     } finally { await mounted.close(); await stats.dispose(); }

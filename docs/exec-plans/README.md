@@ -16,6 +16,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [统计页重做（使用统计 + Harness 统计）](active/20261107-stats-redesign.md) | 2026-11-08 T1–T14 已实现并提交（分支 `feat/harness-stats-redesign`，PR #38）；测试与浏览器 mock 截图已过；剩 Electron 真实数据走查。 |
 | [子智能体单行卡片与来信卡片](active/20261108-subagent-compact-cards.md) | 2026-11-08 K1 方案 1–9 已实现并提交（分支 `fix/subagent-list-return-style`）；测试与浏览器 mock 截图已过；剩 Electron 实机检查。 |
 | [编辑提问重发与空闲发送不进队列](active/20261107-edit-resend-rewind.md) | 2026-11-07 demo 与后端方案一已确认，规范已写；下一步按 B1–B6、F1–F5 实施。 |
 | [性能第三轮：高频路径不再整份读日志](active/20261108-perf-round3.md) | 2026-11-07 立项，R1–R4 方案已拍板（自动审查、压缩摘要、子 Agent 面板、读旧事件深拷贝）；下一步按 spec → 代码执行。性能任务总表见 [性能待办](perf-backlog.md)。 |

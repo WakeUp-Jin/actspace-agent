@@ -118,10 +118,11 @@ export function defaultSettingsV4Metadata(): SettingsV4Metadata {
     activity: {
       usage: {
         range: "30d",
-        status: "all",
-        modelFilter: "",
-        showDetails: false,
         activeTab: "requests",
+        tokenView: "type",
+        timeView: "phase",
+        trendMetric: "tokens",
+        heatMetric: "sessions",
       },
     },
   };

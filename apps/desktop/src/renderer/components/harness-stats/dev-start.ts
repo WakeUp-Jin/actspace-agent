@@ -1,19 +1,19 @@
-import { HARNESS_STATS_TABS, type HarnessStatsTab } from "@actspace/shared";
 import type { SettingsSectionId } from "../settings/SettingsNav";
 import type { SidebarView } from "../Sidebar";
 
-// 不从 HarnessStatsPage 引：这个模块在 WorkbenchLayout 里静态引入，会把整个统计页带进首屏 chunk。
-const isHarnessStatsTab = (value: string | null | undefined): value is HarnessStatsTab => HARNESS_STATS_TABS.includes(value as HarnessStatsTab);
+// 不从统计页引：这个模块在 WorkbenchLayout 里静态引入，会把整个统计页带进首屏 chunk。
 
 /**
  * 浏览器 mock 的起始位置：`?mock=harness-stats` 直接打开「设置 → Harness 统计」，
- * `&hsTab=<tab>` 选中某个 tab（overview / plugins / tools / context / disclosure / runtime / versions）。
+ * `?mock=usage-stats` 直接打开「设置 → 使用统计」（数据来自 mock/usage-stats-fixture.ts）。
  * 只在开发构建里生效（`import.meta.env.DEV` 在打包版是常量 false），Electron 与打包版永远从聊天页开始。
  */
+const START_SECTION: Record<string, SettingsSectionId> = { "harness-stats": "harnessStats", "usage-stats": "usage" };
+
 function params(): URLSearchParams | null {
   if (!import.meta.env.DEV || typeof window === "undefined") return null;
   const search = new URLSearchParams(window.location.search);
-  return search.get("mock") === "harness-stats" ? search : null;
+  return START_SECTION[search.get("mock") ?? ""] ? search : null;
 }
 
 export function devStartView(): SidebarView | null {
@@ -21,12 +21,8 @@ export function devStartView(): SidebarView | null {
 }
 
 export function devStartSettingsSection(): SettingsSectionId | null {
-  return params() ? "harnessStats" : null;
-}
-
-export function devHarnessStatsTab(): HarnessStatsTab {
-  const value = params()?.get("hsTab");
-  return isHarnessStatsTab(value) ? value : "overview";
+  const mock = params()?.get("mock");
+  return mock ? START_SECTION[mock] ?? null : null;
 }
 
 /**

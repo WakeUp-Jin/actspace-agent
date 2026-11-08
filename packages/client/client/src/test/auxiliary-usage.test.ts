@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { SessionEventEnvelopeV1 } from "@actspace/shared/runtime-v2";
 import { projectSessionUsageActivities } from "../sessions/chat.js";
 import { projectTrajectoryWindow } from "../sessions/trajectory.js";
-import { projectIndexedUsageStatistics } from "../sessions/indexed-usage.js";
 
 const snapshot = { sessionId: "s", throughJournalSeq: 100, workspaceRoot: "/workspace", metadata: { title: "Vision", pinned: false, archived: false } };
 const usage = { inputTokens: 90, outputTokens: 10, cacheReadTokens: 20, cacheWriteTokens: 0, reasoningTokens: null, cost: null, costCurrency: null, source: "provider-reported" };
@@ -22,9 +21,7 @@ describe("auxiliary request activity and raw trajectory", () => {
     const rows = projectSessionUsageActivities(snapshot, starts.flatMap((start, index) => [start, end(start, index * 2 + 1)]));
     expect(rows.map(row => row.purpose)).toEqual(["session-title", "compaction"]);
     expect(rows.every(row => row.turnId === undefined && row.stepId === undefined && row.callId === undefined)).toBe(true);
-    const stats = projectIndexedUsageStatistics([{ sessionId: "s", title: "Utility", throughJournalSeq: 3, rows }], { range: "all" });
-    expect(stats?.summary).toMatchObject({ totalTokens: 240, conversationCount: 0 });
-    expect(stats?.dailyRows[0]).toMatchObject({ totalTokens: 240, conversationCount: 0 });
+    expect(rows.reduce((sum, row) => sum + (row.tokens.totalTokens ?? 0), 0)).toBe(240);
   });
 
   it("keeps vision attempts separate from their main step and traces them to the owning tool", () => {

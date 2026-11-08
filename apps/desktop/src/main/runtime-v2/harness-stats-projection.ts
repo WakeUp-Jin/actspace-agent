@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import {
   HARNESS_ACTIVE_PATH_LIMIT, HARNESS_DURATION_BASE_MS, HARNESS_INDEX_CONVERSION_STEPS, HARNESS_REREAD_WINDOW_STEPS, HARNESS_TOKEN_BASE,
@@ -8,6 +8,7 @@ import {
 } from "@actspace/shared";
 import { prepare, type ProjectionDatabase } from "./usage-sql";
 import { HarnessAccumulator, harnessHistogramPoint, HARNESS_SLEEP_BUCKETS, HARNESS_STATE_TABLE, HARNESS_TABLES } from "./harness-stats-schema";
+import { parseBashPrograms, type BashProgramOccurrence } from "./bash-programs";
 
 /**
  * 把会话日志投影成 Harness 统计。只读事件的元数据（名字、状态、时间、token 估算、路径），
@@ -20,30 +21,28 @@ const num = (value: unknown): number | undefined => typeof value === "number" &&
 const list = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
 type Dims = { hour: string; revision: string; mode: string; model: string };
-type PendingCall = Dims & { tool: string; pluginId: string | null; turnId: string | null; at: string; runStartAt?: string; requestedAt?: string; escalation: boolean; ranged?: boolean };
+type PendingCall = Dims & { tool: string; pluginId: string | null; turnId: string | null; at: string; runStartAt?: string; ranged?: boolean; bash?: BashProgramOccurrence[] };
 type DisclosurePath = { v: "a" | "s"; sleptAt?: number; reads: number; woke?: boolean };
 type State = {
-  v: 1;
-  steps: number; turns: number;
+  v: 2;
+  steps: number;
   revision: string; mode: string; model: string;
   runs: Record<string, string>;
-  activeRuns: string[];
-  turns_: Record<string, { rev: string; mode: string; steps: number }>;
-  turnOfRun: Record<string, string>;
+  turns_: Record<string, { rev: string; mode: string }>;
   requests: Record<string, Dims>;
   requestOrder: string[];
   calls: Record<string, PendingCall>;
-  recentCalls: Record<string, Dims & { tool: string }>;
-  recentOrder: string[];
   turnDigests: Record<string, string[]>;
-  turnFailed: Record<string, string | null>;
   permissionCalls: Record<string, { callId: string; requestedAt: string }>;
   entries: Record<string, number>;
+  /** 上一次请求里 Harness 自己内容（非对话条目 key:tokens）的摘要，判断「缓存被打断」。 */
+  harnessDigest?: string;
   skills: Record<string, { location: string; source: string | null }>;
   disclosure: { cycle: number; paths: Record<string, DisclosurePath>; indexPaths: string[]; conversionSteps: number; converted: boolean };
-  compaction: { lastStep: number; lastTurn: number; windowRatio: number | null; readSince: string[]; pending: { id: string; before: string[]; found: string[]; steps: number } | null; open: Record<string, Dims & { time: string }> };
+  compaction: { lastStep: number; windowRatio: number | null; readSince: string[]; pending: { id: string; before: string[]; found: string[]; steps: number } | null; open: Record<string, Dims & { time: string }> };
+  /** 子 Agent 激活的开始时间（`activation:<id>`）。 */
   tasks: Record<string, string>;
-  /** Preset of each subagent (`subagent/spawned`), for its activations' rows. Absent in states saved before subagents. */
+  /** Preset of each subagent (`subagent/spawned`), for its activations' rows. */
   subagents?: Record<string, string>;
   /** 与会话投影 `contextEstimate` 同一个折叠（agent-spec-request-record.md §6.4）；只含非对话项与两个对话合计。 */
   estimate: ContextEstimateState;
@@ -53,11 +52,11 @@ type State = {
 
 function emptyState(): State {
   return {
-    v: 1, steps: 0, turns: 0, revision: HARNESS_UNKNOWN_REVISION, mode: "", model: "",
-    runs: {}, activeRuns: [], turns_: {}, turnOfRun: {}, requests: {}, requestOrder: [], calls: {}, recentCalls: {}, recentOrder: [],
-    turnDigests: {}, turnFailed: {}, permissionCalls: {}, entries: {}, skills: {},
+    v: 2, steps: 0, revision: HARNESS_UNKNOWN_REVISION, mode: "", model: "",
+    runs: {}, turns_: {}, requests: {}, requestOrder: [], calls: {},
+    turnDigests: {}, permissionCalls: {}, entries: {}, skills: {},
     disclosure: { cycle: 0, paths: {}, indexPaths: [], conversionSteps: 0, converted: false },
-    compaction: { lastStep: 0, lastTurn: 0, windowRatio: null, readSince: [], pending: null, open: {} },
+    compaction: { lastStep: 0, windowRatio: null, readSince: [], pending: null, open: {} },
     tasks: {},
     estimate: initialContextEstimate(), toolNames: [],
   };
@@ -86,6 +85,7 @@ export function projectHarnessJournalBatch(db: ProjectionDatabase, sessionId: st
   const saved = prepare(db, `SELECT last_seq,state_json FROM ${HARNESS_STATE_TABLE} WHERE session_id=?`).get(sessionId) as { last_seq: number; state_json: string } | undefined;
   let state: State;
   try { state = saved ? { ...emptyState(), ...JSON.parse(saved.state_json) as State } : emptyState(); } catch { state = emptyState(); }
+  if (state.v !== 2) state = emptyState();
   let lastSeq = saved?.last_seq ?? -1;
   const fresh = events.filter(event => event.seq > lastSeq);
   if (!fresh.length) return;
@@ -113,31 +113,23 @@ class HarnessReplay {
   apply(event: SessionEventEnvelopeV1): void {
     const data = record(event.data);
     this.s.estimate = applyContextEstimate(this.s.estimate, event);
-    const owner = text(event.source?.ownerPluginId);
-    if (owner) this.add("owner", this.dims(event), { owner }, { events: 1 });
     switch (event.type) {
-      case "plugin/actspace.agent-service/run": return this.run(event, data);
-      case "plugin/actspace.agent-service/task": return this.task(event, data);
-      case "plugin/actspace.agent-service/queue-return": if (data.op === "return-steering") this.add("session", this.dims(event), {}, { steering: 1 }); return;
-      case "agent/inbox/spliced": if (data.operation === "enqueue" && (data.source === "steer" || record(data.source).kind === "steer")) this.add("session", this.dims(event), {}, { steering: 1 }); return;
-      case "agent/mode-set": { const mode = text(data.mode); if (mode) this.s.mode = mode; this.add("session", this.dims(event), {}, { mode_switches: 1 }); return; }
+      case "plugin/actspace.agent-service/run": return this.run(data);
+      case "agent/mode-set": { const mode = text(data.mode); if (mode) this.s.mode = mode; return; }
       case "turn/start": return this.turnStart(data);
-      case "turn/end": return this.turnEnd(event, data);
+      case "turn/end": { const turnId = text(data.turnId); if (turnId) { delete this.s.turns_[turnId]; delete this.s.turnDigests[turnId]; } return; }
       case "step/start": return this.step();
       case "request/header": return this.requestHeader(event, data);
       case "request/system-prompt": return this.systemPrompt(data);
       case "request/tools": { this.s.toolNames = list(data.tools).flatMap(tool => { const name = text(record(tool).name); return name ? [name] : []; }); return; }
       case "request/context": return this.requestContext(event, data);
       case "assistant/message": return this.assistant(data);
-      case "llm/retry": { const code = text(record(data.failure).code) ?? "unknown"; this.add("session", this.dims(event, text(data.requestId)), {}, { retries: 1, retry_codes: { [code]: 1 } }); return; }
       case "llm/auxiliary-end": return this.auxiliary(event, data);
       case "tool/call": return this.toolCall(event, data);
       case "tool-workflow/run-start": { const call = this.s.calls[text(data.callId) ?? ""]; if (call) call.runStartAt = event.time; return; }
       case "tool/result": return this.toolResult(event, data);
       case "permission/asked": return this.permissionAsked(event, data);
       case "permission/decided": return this.permissionDecided(event, data);
-      case "permission/grant-used": return this.callMetric(text(data.callId), { approval_session_grant: 1 });
-      case "permission/scope-denied": return this.callMetric(text(data.callId), { approval_scope_denied: 1 });
       case "plugin/actspace.context/state": return this.disclosure(event, data);
       case "compaction/start": { const id = text(data.compactionId); if (id) this.s.compaction.open[id] = { ...this.dims(event), time: event.time }; return; }
       case "surface/replaced": return this.folded(data);
@@ -146,7 +138,6 @@ class HarnessReplay {
       case "delegation/requested": case "delegation/completed": case "delegation/child-terminal": return this.delegation(event, data);
       case "subagent/spawned": { const agentId = text(data.agentId); if (agentId) { (this.s.subagents ??= {})[agentId] = `actspace.subagent.${text(data.preset) ?? text(data.kind) ?? "unknown"}`; trim(this.s.subagents, 200); } return; }
       case "subagent/activation": return this.subagentActivation(event, data);
-      case "background/task": return this.background(event, data);
     }
   }
 
@@ -162,22 +153,13 @@ class HarnessReplay {
 
   /* ----------------------------- Agent 循环 ----------------------------- */
 
-  private run(_event: SessionEventEnvelopeV1, data: Json): void {
-    const runId = text(data.runId); if (!runId) return;
-    if (data.op === "start") {
-      const harness = record(data.harness);
-      const revision = harnessRevisionKey(text(harness.harnessId), num(harness.revision));
-      this.s.runs[runId] = revision; this.s.revision = revision;
-      if (!this.s.activeRuns.includes(runId)) this.s.activeRuns.push(runId);
-      const configuration = record(data.configuration);
-      const model = text(configuration.model); if (model && !this.s.model) this.s.model = model;
-      for (const skillId of list(configuration.selectedSkillIds)) if (typeof skillId === "string") this.add("skill", this.dims(_event), { skill_id: skillId }, { selected: 1 });
-      trim(this.s.runs, 200);
-    }
-    if (data.op === "finish") this.s.activeRuns = this.s.activeRuns.filter(id => id !== runId);
-  }
-  private task(event: SessionEventEnvelopeV1, data: Json): void {
-    if (data.op === "accept" && this.s.activeRuns.length) this.add("session", this.dims(event), {}, { queued: 1 });
+  private run(data: Json): void {
+    const runId = text(data.runId); if (!runId || data.op !== "start") return;
+    const harness = record(data.harness);
+    const revision = harnessRevisionKey(text(harness.harnessId), num(harness.revision));
+    this.s.runs[runId] = revision; this.s.revision = revision;
+    const model = text(record(data.configuration).model); if (model && !this.s.model) this.s.model = model;
+    trim(this.s.runs, 200);
   }
   private turnStart(data: Json): void {
     const turnId = text(data.turnId); if (!turnId) return;
@@ -185,20 +167,11 @@ class HarnessReplay {
     const rev = runId ? this.s.runs[runId] ?? this.s.revision : this.s.revision;
     const mode = text(data.mode) ?? this.s.mode;
     if (mode) this.s.mode = mode;
-    this.s.turns_[turnId] = { rev, mode, steps: 0 };
-    this.s.turns++;
+    this.s.turns_[turnId] = { rev, mode };
     trim(this.s.turns_, 50);
-  }
-  private turnEnd(event: SessionEventEnvelopeV1, data: Json): void {
-    const turnId = text(data.turnId); if (!turnId) return;
-    const turn = this.s.turns_[turnId];
-    const reason = normalizeReason(text(data.reason));
-    this.add("turn", { hour: hourOf(event.time), revision: turn?.rev ?? this.s.revision, mode: turn?.mode ?? this.s.mode, model: this.s.model }, { turn_id: turnId }, { time: event.time, steps: turn?.steps ?? 0, reason });
-    delete this.s.turns_[turnId]; delete this.s.turnDigests[turnId]; delete this.s.turnFailed[turnId];
   }
   private step(): void {
     this.s.steps++;
-    for (const turn of Object.values(this.s.turns_)) turn.steps++;
     const d = this.s.disclosure;
     if (d.conversionSteps > 0) d.conversionSteps--;
     const pending = this.s.compaction.pending;
@@ -223,7 +196,6 @@ class HarnessReplay {
     this.s.requestOrder.push(requestId);
     while (this.s.requestOrder.length > 64) delete this.s.requests[this.s.requestOrder.shift()!];
     this.add("request", dims, { request_id: requestId }, { ...dims, time: event.time, context_window: num(data.contextWindow) ?? null });
-    this.add("session", dims, {}, { requests: 1 });
   }
   /** 技能目录（位置用于判断「读了 SKILL.md / 附属文件」）只在提示词变化时写一次。 */
   private systemPrompt(data: Json): void {
@@ -244,8 +216,13 @@ class HarnessReplay {
     const buckets = view.buckets;
     const window = num(record(record(data.snapshot).contextModel).contextWindow) ?? view.contextWindow ?? undefined;
     const estimated = view.totalEstimatedTokens;
+    // 缓存被打断：Harness 自己的条目（不含对话）新增、消失或 token 数变化，与同一会话上一次请求比。
+    const harnessParts = view.entries.filter(entry => !CONVERSATION_KINDS.has(entryKind(entry.key))).map(entry => `${entry.key}:${entry.estimatedTokens}`).sort();
+    const digest = comparable ? createHash("sha1").update(harnessParts.join("\n")).digest("base64").slice(0, 16) : undefined;
+    const changed = digest === undefined || this.s.harnessDigest === undefined ? null : digest === this.s.harnessDigest ? 0 : 1;
+    if (digest !== undefined) this.s.harnessDigest = digest;
     this.add("request", dims, { request_id: requestId }, {
-      estimated, has_manifest: comparable ? 1 : 0, ...(window ? { context_window: window } : {}),
+      estimated, has_manifest: comparable ? 1 : 0, ...(window ? { context_window: window } : {}), harness_changed: changed,
       b_system: buckets.systemPrompt, b_tools: buckets.tools, b_rules: buckets.rules, b_skills: buckets.skills,
       b_summarized: buckets.summarizedConversation, b_conversation: buckets.conversation,
     });
@@ -278,15 +255,11 @@ class HarnessReplay {
     const usage = record(data.usage);
     this.add("request", dims, { request_id: requestId }, { input_tokens: num(usage.inputTokens) ?? null, cache_read: num(usage.cacheReadTokens) ?? null, cache_write: num(usage.cacheWriteTokens) ?? null });
   }
+  /** 辅助模型的用量在使用统计里；这里只记压缩失败（压缩卡的「失败」）。 */
   private auxiliary(event: SessionEventEnvelopeV1, data: Json): void {
-    const purpose = text(data.purpose) ?? "unknown";
-    const started = Date.parse(text(data.startedAt) ?? ""); const finished = Date.parse(text(data.finishedAt) ?? "");
-    const failed = data.status !== "completed";
-    this.add("aux", this.dims(event), { purpose }, { calls: 1, failed: failed ? 1 : 0, total_ms: Number.isFinite(started) && Number.isFinite(finished) ? Math.max(0, finished - started) : 0 });
-    if (purpose === "compaction" && failed) {
-      const id = text(data.logicalRequestId) ?? text(data.attemptId) ?? `aux-${event.seq}`;
-      this.add("compaction", this.dims(event), { compaction_id: `failed:${id}` }, { time: event.time, ok: 0, failure_code: text(record(data.failure).code) ?? String(data.status ?? "failed"), trigger: "unknown" });
-    }
+    if (data.purpose !== "compaction" || data.status === "completed") return;
+    const id = text(data.logicalRequestId) ?? text(data.attemptId) ?? `aux-${event.seq}`;
+    this.add("compaction", this.dims(event), { compaction_id: `failed:${id}` }, { time: event.time, ok: 0, failure_code: text(record(data.failure).code) ?? String(data.status ?? "failed"), trigger: "unknown" });
   }
 
   /* -------------------------------- 工具 -------------------------------- */
@@ -296,25 +269,18 @@ class HarnessReplay {
     const dims = this.dims(event, text(data.requestId));
     const turnId = text(data.turnId) ?? null;
     const args = record(data.args);
-    const escalation = args.sandbox_permissions === "require_escalated";
     // 模型自己给了 offset/limit 的分段读取不算截断。
     const ranged = args.offset !== undefined || args.limit !== undefined;
-    this.s.calls[callId] = { ...dims, tool, pluginId: text(data.pluginId) ?? null, turnId, at: event.time, escalation, ...(ranged ? { ranged } : {}) };
+    const bash = tool === "bash" && typeof args.command === "string" ? uniquePrograms(parseBashPrograms(args.command)) : undefined;
+    this.s.calls[callId] = { ...dims, tool, pluginId: text(data.pluginId) ?? null, turnId, at: event.time, ...(ranged ? { ranged } : {}), ...(bash?.length ? { bash } : {}) };
     trim(this.s.calls, 200);
-    const values: Record<string, unknown> = { calls: 1, last_used_at: event.time, plugin_id: text(data.pluginId) ?? null, escalations: escalation ? 1 : 0 };
+    const values: Record<string, unknown> = { calls: 1, plugin_id: text(data.pluginId) ?? null };
     if (turnId) {
       const digest = createHash("sha1").update(tool).update("\0").update(stableJson(args)).digest("base64").slice(0, 16);
       const seen = this.s.turnDigests[turnId] ??= [];
       if (seen.includes(digest)) values.repeated = 1; else if (seen.length < 500) seen.push(digest);
-      if (this.s.turnFailed[turnId] === tool) values.retried = 1;
-      this.s.turnFailed[turnId] = null;
     }
     this.add("tool", dims, { tool }, values);
-    if (tool === "plugin_manager") this.add("evolution", dims, { call_id: callId }, { time: event.time, action: text(args.action) ?? "unknown", target: text(args.pluginId) ?? text(args.id) ?? text(args.name) ?? null, status: "running" });
-    if (tool === "task_output" || tool === "task_wait") {
-      const taskId = text(args.taskId);
-      if (taskId) this.acc.add("background", this.sessionId, { task_id: taskId }, { read: 1 });
-    }
   }
   private toolResult(event: SessionEventEnvelopeV1, data: Json): void {
     const callId = text(data.callId); if (!callId) return;
@@ -325,54 +291,41 @@ class HarnessReplay {
     const failure = record(data.failure);
     const output = list(data.modelOutput).map(record).filter(part => part.type === "text").map(part => String(part.text ?? "")).join("");
     const outputTokens = estimateCharCount(output.length);
+    // 执行耗时从开始执行算（不含等待审批）；被拒绝的调用没有执行。
     const startAt = Date.parse(call?.runStartAt ?? call?.at ?? ""); const endAt = Date.parse(event.time);
-    const duration = Number.isFinite(startAt) && Number.isFinite(endAt) ? Math.max(0, endAt - startAt) : undefined;
+    const duration = status !== "denied" && Number.isFinite(startAt) && Number.isFinite(endAt) ? Math.max(0, endAt - startAt) : undefined;
     const values: Record<string, unknown> = {
-      completed: status === "completed" ? 1 : 0, failed: status === "failed" ? 1 : 0, denied: status === "denied" ? 1 : 0,
-      aborted: status === "aborted" || status === "cancelled" ? 1 : 0, unknown_outcome: ["completed", "failed", "denied", "aborted", "cancelled"].includes(status) ? 0 : 1,
+      failed: status === "failed" ? 1 : 0,
       output_tokens: outputTokens, output_samples: 1, output_hist: harnessHistogramPoint(harnessHistogramIndex(outputTokens, HARNESS_TOKEN_BASE)),
       truncated: !call?.ranged && TRUNCATION_MARKERS.some(marker => output.includes(marker)) ? 1 : 0, plugin_id: text(data.pluginId) ?? call?.pluginId ?? null,
     };
-    if (duration !== undefined) values.duration_hist = harnessHistogramPoint(harnessHistogramIndex(duration, HARNESS_DURATION_BASE_MS));
+    if (duration !== undefined) Object.assign(values, { duration_ms: duration, duration_samples: 1, duration_hist: harnessHistogramPoint(harnessHistogramIndex(duration, HARNESS_DURATION_BASE_MS)) });
     if (status === "failed" || status === "denied") values.failure_codes = { [text(failure.code) ?? status]: 1 };
-    const approvalMode = text(data.approvalMode); const approvalReason = text(data.approvalReason) ?? "";
-    if (approvalMode === "auto") values.approval_auto_approved = 1;
-    if (approvalMode === "manual" && approvalReason.startsWith("自动审批未允许")) values.approval_auto_declined = 1;
     for (const detail of list(data.detail).map(record)) {
       const value = record(detail.value);
-      if (detail.label === "environment" && typeof value.sandboxed === "boolean") values[value.sandboxed ? "sandboxed" : "unsandboxed"] = 1;
       if (detail.label === "actspace.context.file" && value.kind === "file" && value.operation === "read" && typeof value.path === "string") this.fileRead(event, dims, value.path);
     }
-    if (tool === "bash" && values.sandboxed === undefined && values.unsandboxed === undefined) values.unknown_env = 1;
-    if (status === "failed" && call?.turnId) this.s.turnFailed[call.turnId] = tool;
     this.add("tool", dims, { tool }, values);
-    this.acc.add("output", this.sessionId, { seq: event.seq }, { ...dims, tool, tokens: outputTokens });
-    if (tool === "plugin_manager") this.add("evolution", dims, { call_id: callId }, { status });
+    // 管道里的每个程序都记整条命令的结果与耗时。
+    if (status !== "denied") for (const { program, subcommand } of call?.bash ?? []) {
+      this.add("bash", dims, { program, subcommand }, { calls: 1, failed: status === "failed" ? 1 : 0, ...(duration === undefined ? {} : { duration_ms: duration, duration_samples: 1 }) });
+    }
+    this.acc.add("output", this.sessionId, { seq: event.seq }, { tokens: outputTokens });
     delete this.s.calls[callId];
-    this.s.recentCalls[callId] = { ...dims, tool }; this.s.recentOrder.push(callId);
-    while (this.s.recentOrder.length > 200) delete this.s.recentCalls[this.s.recentOrder.shift()!];
-  }
-  private callMetric(callId: string | undefined, values: Record<string, unknown>): void {
-    const call = callId ? this.s.calls[callId] ?? this.s.recentCalls[callId] : undefined;
-    if (!call) return;
-    this.add("tool", { hour: call.hour, revision: call.revision, mode: call.mode, model: call.model }, { tool: call.tool }, values);
   }
   private permissionAsked(event: SessionEventEnvelopeV1, data: Json): void {
     const requestId = text(data.requestId); const callId = text(data.callId); if (!requestId || !callId) return;
     this.s.permissionCalls[requestId] = { callId, requestedAt: text(data.requestedAt) ?? event.time };
     trim(this.s.permissionCalls, 100);
-    this.callMetric(callId, { approval_asked: 1 });
   }
+  /** 只记等待时长（耗时环形图的「等待审批」）。 */
   private permissionDecided(event: SessionEventEnvelopeV1, data: Json): void {
     const requestId = text(data.requestId); const asked = requestId ? this.s.permissionCalls[requestId] : undefined; if (!asked || !requestId) return;
     delete this.s.permissionCalls[requestId];
-    const kind = text(data.kind); const code = text(data.code) ?? "";
+    const call = this.s.calls[asked.callId];
     const wait = Date.parse(text(data.decidedAt) ?? event.time) - Date.parse(asked.requestedAt);
-    const values: Record<string, unknown> = Number.isFinite(wait) && wait >= 0 ? { approval_wait_ms: wait, approval_wait_samples: 1 } : {};
-    if (kind === "once" || kind === "session") values.approval_user_approved = 1;
-    else if (/timeout|timed[-_]?out|expired/i.test(code)) values.approval_timed_out = 1;
-    else values.approval_user_denied = 1;
-    this.callMetric(asked.callId, values);
+    if (!call || !Number.isFinite(wait) || wait < 0) return;
+    this.add("tool", { hour: call.hour, revision: call.revision, mode: call.mode, model: call.model }, { tool: call.tool }, { approval_wait_ms: wait, approval_wait_samples: 1 });
   }
 
   /* --------------------------- 披露、Skills、压缩 --------------------------- */
@@ -384,8 +337,12 @@ class HarnessReplay {
       d.conversionSteps = HARNESS_INDEX_CONVERSION_STEPS + 1; d.converted = false;
     }
     for (const [id, skill] of Object.entries(this.s.skills)) {
-      if (path === skill.location) { this.add("skill", dims, { skill_id: id }, { skill_reads: 1, last_read_at: event.time, source: skill.source }); break; }
-      if (path.startsWith(`${dirname(skill.location)}/`)) { this.add("skill", dims, { skill_id: id }, { asset_reads: 1, last_read_at: event.time, source: skill.source }); break; }
+      const root = `${dirname(skill.location)}/`;
+      const isSkill = path === skill.location;
+      if (!isSkill && !path.startsWith(root)) continue;
+      this.add("skill", dims, { skill_id: id }, { [isSkill ? "skill_reads" : "asset_reads"]: 1, last_read_at: event.time, source: skill.source });
+      this.add("skillFile", dims, { skill_id: id, file: isSkill ? basename(path) : path.slice(root.length) }, { reads: 1, last_read_at: event.time });
+      break;
     }
   }
   private disclosure(event: SessionEventEnvelopeV1, data: Json): void {
@@ -401,14 +358,13 @@ class HarnessReplay {
         }
         if (item.read !== true) continue;
         entry.reads++;
-        this.add("disclosure", dims, {}, { reads: 1 });
         this.add("path", dims, { path }, { reads: 1, last_read_at: event.time });
         if (entry.v === "s" && !entry.woke) {
           entry.woke = true;
           const slept = Math.max(1, d.cycle - (entry.sleptAt ?? d.cycle));
-          this.add("disclosure", dims, {}, { sleeping_reads: 1, wakes: 1, wake_cycles: slept, mis_sleeps: slept === 1 ? 1 : 0, sleep_hist: harnessHistogramPoint(slept - 1, HARNESS_SLEEP_BUCKETS) });
+          this.add("disclosure", dims, {}, { mis_sleeps: slept === 1 ? 1 : 0, sleep_hist: harnessHistogramPoint(slept - 1, HARNESS_SLEEP_BUCKETS) });
           if (d.conversionSteps > 0 && !d.converted) { d.converted = true; this.add("disclosure", dims, {}, { index_conversions: 1 }); }
-        } else if (entry.v === "s") this.add("disclosure", dims, {}, { sleeping_reads: 1 });
+        }
         const since = this.s.compaction.readSince;
         if (!since.includes(path) && since.length < MAX_TRACKED) since.push(path);
         const pending = this.s.compaction.pending;
@@ -429,9 +385,7 @@ class HarnessReplay {
         else { if (value.v === "a") slept++; d.paths[id] = { v: "s", sleptAt: value.v === "a" ? d.cycle + 1 : value.sleptAt ?? d.cycle, reads: 0, woke: value.v === "a" ? false : value.woke }; }
       }
       d.cycle++;
-      const sleeping = Object.values(d.paths).filter(value => value.v === "s").length;
-      const index = record(data.index);
-      this.add("cycle", dims, { cycle: d.cycle - 1 }, { time: event.time, active: active.size, sleeping, cap_hit: active.size >= HARNESS_ACTIVE_PATH_LIMIT ? 1 : 0, index_tokens: num(index.size) === undefined ? null : estimateCharCount(num(index.size)!) });
+      this.add("cycle", dims, { cycle: d.cycle - 1 }, { active: active.size, cap_hit: active.size >= HARNESS_ACTIVE_PATH_LIMIT ? 1 : 0 });
       if (slept) this.add("disclosure", dims, {}, { slept_paths: slept });
     }
   }
@@ -439,17 +393,16 @@ class HarnessReplay {
     const compactionId = text(data.compactionId);
     const seqs = list(data.sourceEventSeqs).filter((seq): seq is number => typeof seq === "number");
     if (!seqs.length || !this.counting) return;
-    const select = prepare(this.db, "SELECT hour,revision,mode,model,tool,tokens FROM harness_tool_output WHERE session_id=? AND seq=?");
+    const select = prepare(this.db, "SELECT tokens FROM harness_tool_output WHERE session_id=? AND seq=?");
     const remove = prepare(this.db, "DELETE FROM harness_tool_output WHERE session_id=? AND seq=?");
     let count = 0; let tokens = 0;
     // 同一批次里刚写入的输出还在累加器里：先落盘再查。
     this.acc.flush(this.db);
     for (const seq of seqs) {
-      const row = select.get(this.sessionId, seq) as { hour: string; revision: string; mode: string; model: string; tool: string; tokens: number } | undefined;
+      const row = select.get(this.sessionId, seq) as { tokens: number } | undefined;
       if (!row) continue;
       remove.run(this.sessionId, seq);
       count++; tokens += Number(row.tokens ?? 0);
-      this.add("tool", { hour: row.hour, revision: row.revision, mode: row.mode, model: row.model }, { tool: row.tool }, { folded: 1, folded_tokens: Number(row.tokens ?? 0) });
     }
     if (compactionId && count) {
       const open = this.s.compaction.open[compactionId];
@@ -465,14 +418,14 @@ class HarnessReplay {
     this.add("compaction", dims, { compaction_id: id }, {
       time: event.time, ok: 1, trigger: text(data.trigger) ?? "unknown", duration_ms: num(data.durationMs) ?? null,
       before_tokens: num(data.beforeTokens) ?? null, after_tokens: num(data.afterTokens) ?? null,
-      steps_since: this.s.steps - c.lastStep, turns_since: this.s.turns - c.lastTurn, window_ratio: c.windowRatio, read_before: c.readSince.length, reread: 0,
+      steps_since: this.s.steps - c.lastStep, window_ratio: c.windowRatio, reread: 0,
     });
     c.pending = { id, before: c.readSince, found: [], steps: HARNESS_REREAD_WINDOW_STEPS };
-    c.readSince = []; c.lastStep = this.s.steps; c.lastTurn = this.s.turns;
+    c.readSince = []; c.lastStep = this.s.steps;
     trim(c.open, 20);
   }
 
-  /* ------------------------ 子 Agent 与后台任务 ------------------------ */
+  /* ------------------------------ 子 Agent ------------------------------ */
 
   private delegation(event: SessionEventEnvelopeV1, data: Json): void {
     const invocationId = text(data.invocationId); if (!invocationId) return;
@@ -480,7 +433,7 @@ class HarnessReplay {
     const values: Record<string, unknown> = { preset_id: text(data.presetId) ?? null, child_session_id: text(data.childSessionId) ?? null };
     if (event.type === "delegation/requested") Object.assign(values, { ...dims, time: event.time, status: "running" });
     else Object.assign(values, { status: text(data.status) ?? null });
-    if (event.type === "delegation/child-terminal") Object.assign(values, { duration_ms: num(data.durationMs) ?? null, tool_uses: num(data.toolUseCount) ?? null, return_tokens: typeof data.text === "string" ? estimateCharCount(data.text.length) : null });
+    if (event.type === "delegation/child-terminal") Object.assign(values, { duration_ms: num(data.durationMs) ?? null });
     this.acc.add("delegation", this.sessionId, { invocation_id: invocationId }, values);
   }
   private subagentActivation(event: SessionEventEnvelopeV1, data: Json): void {
@@ -489,7 +442,7 @@ class HarnessReplay {
     const started = `activation:${activationId}`;
     if (data.op === "start") {
       const callId = text(data.callId);
-      const call = callId ? this.s.calls[callId] ?? this.s.recentCalls[callId] : undefined;
+      const call = callId ? this.s.calls[callId] : undefined;
       const dims: Dims = call ? { hour: hourOf(event.time), revision: call.revision, mode: call.mode, model: call.model } : this.dims(event);
       this.s.tasks[started] = text(data.startedAt) ?? event.time; trim(this.s.tasks, 200);
       Object.assign(values, { ...dims, time: event.time, status: "running" });
@@ -500,34 +453,23 @@ class HarnessReplay {
       Object.assign(values, {
         status: status === "completed" ? "completed" : status === "interrupted" ? "aborted" : "failed",
         duration_ms: Number.isFinite(duration) ? Math.max(0, duration) : null,
-        return_tokens: typeof data.result === "string" ? estimateCharCount(data.result.length) : null,
       });
     } else return;
     this.acc.add("delegation", this.sessionId, { invocation_id: activationId }, values);
   }
-  private background(event: SessionEventEnvelopeV1, data: Json): void {
-    const taskId = text(data.taskId); if (!taskId) return;
-    if (data.op === "start") {
-      const callId = text(data.callId);
-      const call = callId ? this.s.calls[callId] ?? this.s.recentCalls[callId] : undefined;
-      const dims: Dims = call ? { hour: hourOf(event.time), revision: call.revision, mode: call.mode, model: call.model } : this.dims(event);
-      this.s.tasks[taskId] = text(data.startedAt) ?? event.time; trim(this.s.tasks, 200);
-      this.acc.add("background", this.sessionId, { task_id: taskId }, { ...dims, time: event.time, kind: text(data.kind) ?? "unknown", status: "running" });
-      if (call) this.add("tool", { hour: call.hour, revision: call.revision, mode: call.mode, model: call.model }, { tool: call.tool }, { background: 1 });
-    }
-    if (data.op === "settle") {
-      const started = Date.parse(this.s.tasks[taskId] ?? ""); const ended = Date.parse(text(data.endedAt) ?? event.time);
-      delete this.s.tasks[taskId];
-      this.acc.add("background", this.sessionId, { task_id: taskId }, { status: text(data.status) ?? "unknown", delivery: text(data.delivery) ?? null, duration_ms: Number.isFinite(started) && Number.isFinite(ended) ? Math.max(0, ended - started) : null });
-    }
-  }
 }
 
-function normalizeReason(reason: string | undefined): string {
-  if (!reason) return "other";
-  if (reason === "completed" || reason === "aborted" || reason === "failed") return reason;
-  if (/step[-_ ]?limit|max[-_ ]?steps/i.test(reason)) return "step-limit";
-  return "other";
+/** 同一条命令里重复出现的「程序 + 子命令」只记一次；名字不合法的段不记。 */
+function uniquePrograms(occurrences: BashProgramOccurrence[]): BashProgramOccurrence[] {
+  const seen = new Set<string>();
+  return occurrences.filter(({ program, subcommand }) => {
+    const key = `${program}\0${subcommand}`;
+    if (!program || seen.has(key) || seen.size >= 16) return false;
+    seen.add(key); return true;
+  });
+}
+function entryKind(key: string): string {
+  try { return String((JSON.parse(key) as unknown[])[0] ?? ""); } catch { return ""; }
 }
 function trim<T>(map: Record<string, T>, limit: number): void {
   const keys = Object.keys(map);

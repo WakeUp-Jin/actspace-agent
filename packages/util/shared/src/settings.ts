@@ -348,12 +348,14 @@ export interface SettingsV4SubagentRoute {
   model: ModelKey | null;
 }
 
+/** 使用统计页的偏好（front-统计页规范.md §2.5）；模型 / 提供商 / 工作区筛选不持久化。 */
 export interface SettingsV4UsagePreferences {
   range: "24h" | "7d" | "30d" | "all";
-  status: "all" | "success" | "error" | "aborted" | "unknown";
-  modelFilter: string;
-  showDetails: boolean;
-  activeTab: "requests" | "providers" | "models" | "tools" | "pricing";
+  activeTab: "requests" | "models" | "providers" | "tools" | "commands" | "skills";
+  tokenView: "type" | "model";
+  timeView: "phase" | "tool";
+  trendMetric: "tokens" | "cost" | "requests";
+  heatMetric: "sessions" | "tokens";
 }
 
 export interface SettingsV4 {

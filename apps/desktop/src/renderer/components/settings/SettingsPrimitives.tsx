@@ -624,7 +624,7 @@ export function SettingsSelect({
       disabled={disabled}
       ariaLabel={ariaLabel}
       placeholder={placeholder}
-      className={cx(size === "sm" ? "min-w-[140px]" : "min-w-[216px]", "max-w-[300px] max-[600px]:w-full")}
+      className={cx(size === "sm" ? "min-w-30" : "min-w-[216px]", "max-w-[300px] max-[600px]:w-full")}
     />
   );
 }

@@ -90,8 +90,6 @@
   "components/turn-tail/OpenWithButton.tsx": 1,
   "components/turn-tail/TurnChangesCard.tsx": 3,
   "components/turn-tail/TurnDeliverables.tsx": 2,
-  "components/usage/UsageHoverCard.tsx": 1,
-  "components/UsageStatisticsPage.tsx": 8,
   "components/WindowChromeBar.tsx": 5,
   "components/workbench/PermissionModeControl.tsx": 1,
   "components/WorkbenchLayout.tsx": 2,

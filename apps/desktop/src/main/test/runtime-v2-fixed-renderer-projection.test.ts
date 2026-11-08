@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { RuntimeV2JsonValue, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
-import { projectSubagentItems, subagentChildrenWithoutModel, latestRequestModel, projectSubagentTranscript, projectChatEvents, projectChatSession, projectSessionUsageActivities, projectIndexedUsageActivity } from "@actspace/client/sessions";
+import { projectSubagentItems, subagentChildrenWithoutModel, latestRequestModel, projectSubagentTranscript, projectChatEvents, projectChatSession, projectSessionUsageActivities } from "@actspace/client/sessions";
 
 it("restores a durable failed turn as an error block, including old failures without details", () => {
   for (const failure of [undefined, { kind: "invalid-request", message: "Cannot send tool image", retryable: false }]) {
@@ -199,19 +199,30 @@ describe("fixed renderer v2 projection", () => {
       eventAt(10, "tool/call", { callId: "call-1", name: "read_file", agentRunId: "run-1", turnId: "turn-1", stepId: "step-1" }, "2026-08-23T00:00:01.200Z"),
       eventAt(11, "tool/result", { callId: "call-1", name: "read_file", status: "completed" }, "2026-08-23T00:00:01.500Z"),
     ];
-    const snapshot = baseSnapshot({ throughJournalSeq: 11 });
+    const rows = projectSessionUsageActivities(baseSnapshot({ throughJournalSeq: 11 }), journal);
 
-    const result = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
-    const requests = result.rows.filter((row) => row.kind === "llm_request");
-    const tool = result.rows.find((row) => row.kind === "tool_invocation");
+    // 工具调用不再写进使用统计（工具相关的数来自 Harness 表）。
+    expect(rows.map((row) => row.kind)).toEqual(["llm_request", "llm_request"]);
+    expect(rows.find((row) => row.requestId === "request-1")).toMatchObject({ status: "error", retryId: "retry-1", costUsd: null, costBasis: "unavailable" });
+    expect(rows.find((row) => row.requestId === "request-2")).toMatchObject({ status: "success", attempt: 2, retryOfRequestId: "request-1", modelKey: "deepseek:deepseek-chat", tokens: { reasoningTokens: 3, totalTokens: 30 }, costUsd: 0.2, costBasis: "estimated", historicalUnverified: true });
+    expect(projectSessionUsageActivities(baseSnapshot({ throughJournalSeq: 11 }), journal)).toEqual(rows);
+  });
 
-    expect(requests).toHaveLength(2);
-    expect(requests.find((row) => row.requestId === "request-1")).toMatchObject({ status: "error", retryId: "retry-1", costUsd: null, costBasis: "unavailable" });
-    expect(requests.find((row) => row.requestId === "request-2")).toMatchObject({ status: "success", attempt: 2, retryOfRequestId: "request-1", modelKey: "deepseek:deepseek-chat", tokens: { reasoningTokens: 3, totalTokens: 30 }, costUsd: 0.2, costBasis: "estimated", historicalUnverified: true });
-    expect(tool).toMatchObject({ status: "success", callId: "call-1", durationMs: 300, costUsd: null, costBasis: "unavailable" });
-    expect(result.summary).toMatchObject({ activityCount: 3, requestCount: 2, toolCount: 1, successCount: 2, errorCount: 1 });
-    expect(projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!.rows).toEqual(result.rows);
-    expect(projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", status: "success", requestRowsPage: { page: 1 } })!.rows.every((row) => row.status === "success")).toBe(true);
+  it("splits request time at the first token; old journals without it stay untimed", () => {
+    const journal = [
+      eventAt(0, "request/header", { requestId: "r1", turnId: "t", stepId: "s1", model: "m" }, "2026-08-23T00:00:00.000Z"),
+      eventAt(1, "assistant/message", { requestId: "r1", finishReason: "stop", firstTokenAt: "2026-08-23T00:00:00.400Z", usage: { inputTokens: 10, outputTokens: 20 } }, "2026-08-23T00:00:02.400Z"),
+      eventAt(2, "request/header", { requestId: "r2", turnId: "t", stepId: "s2", model: "m" }, "2026-08-23T00:00:03.000Z"),
+      eventAt(3, "assistant/message", { requestId: "r2", finishReason: "stop", usage: { inputTokens: 10, outputTokens: 20 } }, "2026-08-23T00:00:04.000Z"),
+      // 时钟回拨导致负值时不记。
+      eventAt(4, "request/header", { requestId: "r3", turnId: "t", stepId: "s3", model: "m" }, "2026-08-23T00:00:05.000Z"),
+      eventAt(5, "assistant/message", { requestId: "r3", finishReason: "stop", firstTokenAt: "2026-08-23T00:00:04.000Z", usage: { inputTokens: 1, outputTokens: 1 } }, "2026-08-23T00:00:06.000Z"),
+    ];
+    const rows = projectSessionUsageActivities(baseSnapshot({ throughJournalSeq: 5 }), journal);
+    expect(rows.find((row) => row.requestId === "r1")).toMatchObject({ ttftMs: 400, decodeMs: 2_000 });
+    expect(rows.find((row) => row.requestId === "r2")?.ttftMs).toBeUndefined();
+    expect(rows.find((row) => row.requestId === "r2")?.decodeMs).toBeUndefined();
+    expect(rows.find((row) => row.requestId === "r3")?.ttftMs).toBeUndefined();
   });
 });
 
@@ -294,61 +305,16 @@ describe("live subagent projection", () => {
   });
 });
 
-it("keeps unknown and free requests separate across full-query pagination", () => {
-  const costs = [
-    { cost: 0, costCurrency: "USD", source: "provider-reported" },
-    { cost: 0, costCurrency: "USD", costProvenance: { version: 1, basis: "estimated", reason: null, pricingSnapshot: null } },
-    { cost: 2, costCurrency: "CNY", costProvenance: { version: 1, basis: "estimated", reason: null, pricingSnapshot: null } },
-  ];
-  const journal = costs.flatMap((usage, index) => [event(index * 2, "request/header", { requestId: `r${index}`, turnId: "t", stepId: `s${index}`, model: `m${index}`, routeId: "deepseek" }), event(index * 2 + 1, "assistant/message", { requestId: `r${index}`, finishReason: "stop", usage: { ...usage, inputTokens: 10, outputTokens: 5 } } as unknown as RuntimeV2JsonValue)]);
-  const snapshot = baseSnapshot({ throughJournalSeq: 6 });
-  const result = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
-  expect(result.costSummary).toEqual({ costUsd: 2 / 7.2, knownCostRequestCount: 2, unknownCostRequestCount: 1, unverifiedHistoricalRequestCount: 0 });
-  expect(result.summary.costUsd).toBe(2 / 7.2);
-  expect(result.aggregates?.models).toHaveLength(3);
-  const filtered = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 }, search: "m2", status: "success" })!;
-  expect(filtered.rowsPage.totalRows).toBe(1);
-  expect(filtered.costSummary?.costUsd).toBe(2 / 7.2);
-});
-
-it("reuses immutable journal projections for 10,000 requests and invalidates on revision", () => {
-  const journal = Array.from({ length: 10_000 }, (_, i) => [event(i * 2, "request/header", { requestId: `perf-r${i}`, turnId: "t", stepId: `perf-s${i}`, model: i % 2 ? "m-a" : "m-b", routeId: "deepseek" }), event(i * 2 + 1, "assistant/message", { requestId: `perf-r${i}`, finishReason: "stop", usage: { inputTokens: 10, outputTokens: 5 } })]).flat();
-  const snapshot = baseSnapshot({ throughJournalSeq: 20_000 });
-  const start = performance.now();
-  const first = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
-  const coldMs = performance.now() - start;
-  const warmStart = performance.now();
-  const second = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 2 } })!;
-  const warmMs = performance.now() - warmStart;
-  expect(first.rowsPage.totalRows).toBe(10_000);
-  expect(second.summary).toEqual(first.summary);
-  expect(second.rows).toHaveLength(10);
-  const filtered = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 2 }, search: "m-a" })!;
-  expect(filtered.rowsPage.totalRows).toBe(5_000);
-  expect(filtered.summary.totalTokens).toBe(75_000);
-  const changed = [...journal, event(20_000, "request/header", { requestId: "new", turnId: "t", stepId: "new", model: "m-a" }), event(20_001, "assistant/message", { requestId: "new", finishReason: "stop", usage: { inputTokens: 2, outputTokens: 1 } })];
-  const updated = projectIndexedUsageActivity([{ snapshot: baseSnapshot({ throughJournalSeq: 20_001 }), journal: changed }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
-  expect(updated.rowsPage.totalRows).toBe(10_001);
-  expect(updated.summary.totalTokens).toBe(150_003);
-  console.info(JSON.stringify({ usageBenchmark: { requests: 10_000, coldMs, warmMs, heapMiB: process.memoryUsage().heapUsed / 1024 / 1024 } }));
-});
-
-it("labels tool-call requests as successful and keeps tab counts independent of log filters", () => {
+it("labels tool-call requests as successful and writes no tool rows", () => {
   const journal = [
     event(0, "request/header", { requestId: "r", turnId: "t", stepId: "s", model: "deepseek-v4-flash", routeId: "deepseek" }),
     event(1, "assistant/message", { requestId: "r", finishReason: "tool-calls", usage: { inputTokens: 10, outputTokens: 2 } }),
     event(2, "tool/call", { callId: "c", name: "Bash", turnId: "t", stepId: "s" }),
     event(3, "tool/result", { callId: "c", name: "Bash", status: "completed" }),
   ];
-  const snapshot = baseSnapshot({ throughJournalSeq: 3, metadata: { title: "会话标题", pinned: false, archived: false } });
-  const result = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
-  expect(result.rows.find((row) => row.kind === "llm_request")?.status).toBe("success");
-  expect(result.rows.every((row) => row.sessionTitle === "会话标题")).toBe(true);
-  expect(result.tabCounts).toEqual({ requests: 2, providers: 1, models: 1, tools: 1 });
-  const filtered = projectIndexedUsageActivity([{ snapshot, journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 }, search: "Bash", status: "success" })!;
-  expect(filtered.rows).toHaveLength(1);
-  expect(filtered.rows[0].kind).toBe("tool_invocation");
-  expect(filtered.tabCounts).toEqual(result.tabCounts);
+  const rows = projectSessionUsageActivities(baseSnapshot({ throughJournalSeq: 3, metadata: { title: "会话标题", pinned: false, archived: false } }), journal);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ kind: "llm_request", status: "success", sessionTitle: "会话标题" });
 });
 
 it("uses step usage when the assistant message has none without counting the request twice", () => {
@@ -357,12 +323,7 @@ it("uses step usage when the assistant message has none without counting the req
     event(1, "assistant/message", { requestId: "r", finishReason: "tool-calls" }),
     event(2, "step/end", { stepId: "s", finishReason: "tool-calls", usage: { inputTokens: 10, outputTokens: 2, cost: 0.001, costCurrency: "USD", costProvenance: { version: 1, basis: "estimated", reason: null, pricingSnapshot: null } } }),
   ];
-  const result = projectIndexedUsageActivity([{ snapshot: baseSnapshot({ throughJournalSeq: 2 }), journal }].map(usageSource), { scope: "global", range: "total", requestRowsPage: { page: 1 } })!;
-  expect(result.rows).toHaveLength(1);
-  expect(result.rows[0]).toMatchObject({ status: "success", costAmount: 0.001, tokens: { totalTokens: 12 } });
-  expect(result.costSummary?.knownCostRequestCount).toBe(1);
+  const rows = projectSessionUsageActivities(baseSnapshot({ throughJournalSeq: 2 }), journal);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ status: "success", costAmount: 0.001, tokens: { totalTokens: 12 } });
 });
-
-function usageSource({ snapshot, journal }: { snapshot: RuntimeV2SessionSnapshot; journal: readonly SessionEventEnvelopeV1[] }) {
-  return { sessionId: snapshot.sessionId, title: snapshot.metadata.title, throughJournalSeq: snapshot.throughJournalSeq, rows: projectSessionUsageActivities(snapshot, journal) };
-}
