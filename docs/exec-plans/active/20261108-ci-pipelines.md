@@ -38,7 +38,7 @@
 ## 风险
 
 - 风险：`paths-ignore` 让纯文档 PR 不产生 `typecheck-test` 等检查，若分支保护把它们设成必需会卡死。缓解：`docs/CICD.md` 写明只把 `repository-checks` / `docs-checks` 设为必需。
-- 风险：CodeQL 首次在 23 万行 TS 上跑的耗时未知。缓解：只分析非测试源码，PR 上带 `cancel-in-progress`；若单次超过 20 分钟，把 `pull_request` 触发去掉只留 `main` 与定时。
+- 风险：CodeQL 耗时。实测 PR 上 JS/TS 分析 1 分 41 秒、Actions 50 秒，可以保留 `pull_request` 触发；若后续单次超过 20 分钟，把 `pull_request` 触发去掉只留 `main` 与定时。
 - 风险：Windows 打包路径没人实机跑过。缓解：P4 先在 `workflow_dispatch` 下跑通一次再切 tag 触发；Windows 产物先按 portable zip 发。
 - 风险：Electron 大版本升级带来 Node / Chromium 行为变化。缓解：P5 单独 PR，跑完整 desktop 测试与 Electron 实机走查。
 
@@ -59,6 +59,8 @@
 - [x] P1 `scripts/package-agent-cli.mjs` 重试前清空 deploy 目录。
 - [x] P1 desktop 测试与开发机解耦：`safeStorage.getSelectedStorageBackend` mock、转写 golden 固定 `TZ`、docs 标签文案、`GIT_CONFIG_GLOBAL` / `GIT_CONFIG_NOSYSTEM` 隔离。
 - [x] P1 `check-package-cutover.mjs` 忽略相对导入与测试文件中的退役名。
+- [x] P1 `agent-cli-safety.test.mjs` 跟上后台任务 S2 的重启语义：resume 先交付 `lost` 通知再跑新任务，两个 Run。
+- [x] P2 `repository-checks` / `docs-checks` 安装 ripgrep（`check-secrets.sh` 依赖，runner 不预装）。
 - [x] P2 `ci.yml` 五个并行 job、`docs.yml`、`concurrency`、pnpm 缓存、`main` 上打包冒烟；`agent-cli-binaries.yml` 加缓存并把 artifact 保留期缩到 3 天；`supply-chain-security.yml` 只在依赖变更时跑。
 - [x] P2 markdownlint 收敛到能绿：`.markdownlint-cli2.jsonc` 排除第三方 skill、history、fixture；`.markdownlint.json` 关掉纯排版规则；修掉剩余 45 处真实问题（表格列数、标题层级、图片 alt、末尾换行等）。
 - [x] P3 `dompurify` 3.4.17、`undici` 7.30.x；`.github/dependabot.yml`；`codeql.yml` + `codeql-config.yml`。

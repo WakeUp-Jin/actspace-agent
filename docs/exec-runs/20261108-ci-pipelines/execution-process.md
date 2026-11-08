@@ -60,6 +60,14 @@
 
 - **操作**：`docs/CICD.md` 重写工作流表、费用前提、并发与缓存说明、分支保护提醒、markdownlint 范围、Dependabot、重新启用步骤；`docs/exec-plans/README.md` 加进行中条目；`tech-debt-tracker.md` 加「CI 与工程化遗留」；写本执行文档与 history。
 
+### 步骤 7：PR 首次在 GitHub 上跑出的问题
+
+- **操作**：推送后 PR 上没有任何 Actions 运行；查 `mergeable` 是 `CONFLICTING`——期间 `main` 合入了 Biome lint（改了 `ci.yml`、`docs/CICD.md`、`package.json`、lockfile）。GitHub 对无法生成 merge ref 的 PR 不触发 `pull_request` 工作流。rebase 到最新 `main`，把 `pnpm lint` 放进 `typecheck-test` job。
+- **操作**：rebase 后 `文档` 工作流在 `scripts/ci.sh` 失败：`check-secrets.sh` 需要 `rg`，`ubuntu-latest` 不预装。`repository-checks` / `docs-checks` 加一步 `apt-get install ripgrep`。
+- **操作**：`Agent CLI managed package` 过了打包（证明 P1 的 deploy 目录修复有效），但 `agent-cli-safety.test.mjs` 的两个 resume 用例失败：断言 resume 只发一次模型请求，而 2026-11-03 后台任务 S2 的设计是重开会话时把遗留任务补成 `lost` 并提醒模型，于是 resume 先跑一个交付 `lost` 通知的 Run，再跑新任务。在 `main` 上同样失败，只是之前被打包失败挡住。按设计更新断言（两次请求、三个 finish、`user/message` 仍是 2），本地连跑三次稳定。
+- **影响文件**：`.github/workflows/ci.yml`、`docs.yml`、`scripts/test/agent-cli-safety.test.mjs`、`docs/CICD.md`。
+- **验证**：`pnpm test:agent-cli:process` 19/19；`pnpm lint` 通过；CodeQL 在 PR 上 JS/TS 1 分 41 秒、Actions 50 秒。
+
 ## 遇到的问题
 
 - **问题**：`apps/desktop/src/main/test/runtime-v2-output-reference-flow.test.ts` 在本机失败。

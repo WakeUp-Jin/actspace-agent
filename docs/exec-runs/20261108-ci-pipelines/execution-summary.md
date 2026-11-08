@@ -13,6 +13,7 @@
 |------|----------|------|
 | managed CLI 打包重试前清空 deploy 目录 | `scripts/package-agent-cli.mjs` | 离线 deploy 失败会留半成品目录，pnpm 拒绝往非空目录 deploy，重试必败。 |
 | desktop 测试与开发机解耦 | `apps/desktop/src/main/test/remote-host-registry.test.ts`、`surface-derived-equivalence.test.ts`、`apps/desktop/src/renderer/test/turn-tail.test.tsx`、`setup.ts` | 补 `safeStorage` mock、固定时区、更新文案、隔离全局 git 配置（`core.fsmonitor` 会让 git 调用等 20–30 秒）。 |
+| `agent-cli-safety` 跟上后台任务重启语义 | `scripts/test/agent-cli-safety.test.mjs` | resume 先交付 `lost` 通知的 Run 再跑新任务；旧命令仍不重放。`main` 上同样失败，之前被打包失败挡住。 |
 | `check-package-cutover` 去误报 | `scripts/check-package-cutover.mjs` | 相对导入里的 `plugins/` 与测试文件里的退役名不再算 finding，`--strict` 在干净 `main` 上 0 findings。 |
 | 工作流分层 + 并发 + 缓存 | `.github/workflows/ci.yml`、`docs.yml`、`agent-cli-binaries.yml`、`supply-chain-security.yml` | PR 几分钟内拿到五个并行 job 的结果；纯文档 PR 只跑 `docs.yml`；`main` 上额外做 Linux 打包冒烟；同一 PR 连续推送只保留最后一次。 |
 | markdownlint 可用 | `.markdownlint.json`、`.markdownlint-cli2.jsonc`、13 份 Markdown | 排除第三方 skill / history / fixture，关掉纯排版规则，修掉 45 处真实问题。 |
@@ -55,12 +56,13 @@
 - desktop 测试：2800 通过；1 个既有失败是开发机 nvm 告警导致（见遗留）。
 - `GOTOOLCHAIN=go1.26.10 ./scripts/release-package.sh`（Linux）：生成 tar.gz，`DONE-0`。
 - `pnpm audit --prod`：只剩 `katex` 一条 low。
+- `pnpm test:agent-cli:process`：19/19，safety 用例连跑三次稳定。
+- PR 上 GitHub 实际运行：CodeQL 两种语言均通过（JS/TS 1 分 41 秒），`文档`、`Agent CLI managed package` 在补 ripgrep 与更新 safety 断言后复跑。
 
 ## 已知风险和遗留事项
 
 - 产品侧 `runGitCommand` 对开启 `core.fsmonitor` 的用户仓库可能等 20–30 秒，本轮只修了测试侧；见 `tech-debt-tracker.md`「CI 与工程化遗留」。
 - `runtime-v2-output-reference-flow.test.ts` 在装了 nvm 的开发机上会失败（行数断言被 shell 告警撑多两行），runner 上不受影响。
-- CodeQL 首次在 23 万行 TS 上的耗时未知。
 
 ## 后续建议
 
