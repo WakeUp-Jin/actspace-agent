@@ -78,14 +78,14 @@ describe("chat projection without journaled chunks", () => {
     await bridge.open("s");
     const { result, unmount } = renderHook(() => useChatSessionRecord(bridge.store, "s", "/w"));
     const first = result.current.sessionRecord;
-    expect(first?.messageBlocks.some((block) => block.kind === "assistant")).toBe(false);
+    expect(first?.messageBlocks?.some((block) => block.kind === "assistant")).toBe(false);
 
     act(() => {
       const event = journalUpdate(2, "assistant/chunk");
-      if (event.kind !== "journal-update") throw new Error("expected Journal update");
+      if (event.kind !== "journal-update" || !event.update) throw new Error("expected Journal update");
       emit({ ...event, update: { ...event.update, event: chunk(2, "late chunk\n") } });
     });
-    expect(result.current.sessionRecord?.messageBlocks.some((block) => block.kind === "assistant")).toBe(false);
+    expect(result.current.sessionRecord?.messageBlocks?.some((block) => block.kind === "assistant")).toBe(false);
     unmount();
     bridge.dispose();
   });

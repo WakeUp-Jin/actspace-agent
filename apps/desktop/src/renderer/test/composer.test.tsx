@@ -453,7 +453,7 @@ describe("Composer follow-up bar", () => {
     const body = panel.querySelector(".composer-body") as HTMLElement;
     const input = screen.getByLabelText("消息输入框") as HTMLTextAreaElement;
 
-    vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockImplementation(function () {
+    vi.spyOn(HTMLTextAreaElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLTextAreaElement) {
       // 同一个固定 inline 网格决定折行，不能随真实布局的判定结果变化。
       const measuredBody = this.parentElement!;
       if (this.style.width) return body.dataset.layout === "stacked" ? 34 : 74;

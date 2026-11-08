@@ -190,7 +190,7 @@ function resolvedAuthField(runtime: CustomConnectionProbeRuntime, scheme: Custom
 
 /** 两种认证方式互斥：走 Bearer 时不能同时带 x-api-key，否则部分中转站会按 x-api-key 校验失败。 */
 function customConnectionHeaders(runtime: CustomConnectionProbeRuntime, scheme: CustomConnectionResolvedAuth): Record<string, string> {
-  const auth = scheme === "bearer" ? { Authorization: `Bearer ${runtime.apiKey}` } : { "x-api-key": runtime.apiKey };
+  const auth: Record<string, string> = scheme === "bearer" ? { Authorization: `Bearer ${runtime.apiKey}` } : { "x-api-key": runtime.apiKey };
   return { Accept: "application/json", ...auth, ...(runtime.protocol === "anthropic-messages" ? { "anthropic-version": "2023-06-01" } : {}) };
 }
 

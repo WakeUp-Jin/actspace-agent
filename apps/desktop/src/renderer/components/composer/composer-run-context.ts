@@ -46,7 +46,7 @@ export function composerGitFacts(executionContext: ComposerExecutionContext | un
 
 export type ComposerLocalRunTargetOptions = {
   readonly workspaceOptions: readonly ComposerWorkspaceOption[];
-  readonly selectedWorkspaceRoot?: string;
+  readonly selectedWorkspaceRoot?: string | null;
   readonly onSelectWorkspace?: (root: string) => void;
   readonly executionContext?: ComposerExecutionContext;
   readonly newWorktree: RunTargetRowProps["local"]["newWorktree"];

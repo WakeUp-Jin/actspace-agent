@@ -13,12 +13,15 @@ type MemberAt<P extends BridgePath> = P extends `${infer D extends Domain}.${inf
 
 type ParamsOf<F> = F extends (...args: infer A) => unknown ? A : never;
 
+/** 方法签名的参数按双变检查：stub 可以把事件监听器的 payload 写得更宽松、把可选入参写成必填。 */
+type Stub<A extends unknown[]> = { bivariant(...args: A): unknown }["bivariant"];
+
 /**
  * 测试覆盖表，键是契约路径。用扁平键而不是嵌套域对象，是为了让测试照常用对象展开组合 stub
  * （`{ ...baseStubs, "sessions.get": … }`），不会因为浅合并丢掉同域的其他成员。
- * 参数按契约签名推断；返回值放宽，测试 stub 通常只返回用到的字段。
+ * 参数按契约签名推断（双变）；返回值放宽，测试 stub 通常只返回用到的字段。
  */
-export type BridgeOverrides = { [P in BridgePath]?: (...args: ParamsOf<MemberAt<P>>) => unknown };
+export type BridgeOverrides = { [P in BridgePath]?: Stub<ParamsOf<MemberAt<P>>> };
 
 let current: MockBridgeHandle | null = null;
 

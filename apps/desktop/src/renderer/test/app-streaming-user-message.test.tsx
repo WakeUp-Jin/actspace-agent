@@ -1,4 +1,4 @@
-import type { FixtureRunInput, FixtureCompactionInput, FixtureCompactionResult } from "./task-host-fixture";
+import type { FixtureRunInput, FixtureRunResult, FixtureCompactionInput, FixtureCompactionResult } from "./task-host-fixture";
 import { taskHostFixture } from "./task-host-fixture";
 import { FixedRendererStreamAdapter } from "../../main/runtime-v2/fixed-renderer-stream-adapter";
 import { runToolStreamFixture } from "@actspace/agent-loop/testing";
@@ -7,7 +7,7 @@ import { recordProjectionFixture } from "./projection-fixture";
 import { projectChatSession } from "@actspace/client/sessions";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AgentRunResult, AppSettings, BootstrapState,  ReviewGetSnapshotResult,  RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
+import type { AppSettings, BootstrapState,  ReviewGetSnapshotResult,  RuntimeStreamEvent, SessionEvent, SessionListItem, SessionRecord, WorkspaceListResult } from "@actspace/shared";
 import { createMessageBlocks } from "@actspace/shared";
 import { App } from "../App";
 import { ToolLogLine } from "../components/messages/ToolLogLine";
@@ -431,7 +431,7 @@ describe("App streaming user message", () => {
     ];
     let reviewAdditions = 7;
     let reviewDeletions = 2;
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
     // 缓存读取故意一直返回旧数字：只有强制刷新（refreshSnapshot）才会读到最新值。
     const getReviewSnapshot = vi.fn(async () => createReviewChanges(7, 2));
@@ -566,7 +566,7 @@ describe("App streaming user message", () => {
 
   it("keeps New chat as a placeholder and refreshes a background generated title", async () => {
     let record = createEmptySessionRecord("title-session");
-    type LiveListener = (envelope: { event: { kind: string; sessionId: string; message: string } }) => void;
+    type LiveListener = (envelope: { event: unknown }) => void;
     const listeners = new Set<LiveListener>();
     const createSession = vi.fn(async () => record);
     setupBridge(taskHostFixture({
@@ -610,7 +610,7 @@ describe("App streaming user message", () => {
       value: scrollIntoViewMock,
     });
 
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
 
     setupBridge(taskHostFixture({
@@ -672,7 +672,7 @@ describe("App streaming user message", () => {
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
 
     setupBridge(taskHostFixture({
@@ -789,7 +789,7 @@ describe("App streaming user message", () => {
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     let activeAgentRunId = "";
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
 
     setupBridge(taskHostFixture({
@@ -1101,7 +1101,7 @@ sessionId: alphaSessionId,
     ];
     let currentRecord = record;
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
     let resolveFinalSessionList: ((value: SessionListItem[]) => void) | null = null;
     let listSessionsCallCount = 0;
@@ -1378,7 +1378,7 @@ sessionId,
     const compact = vi.fn(async (value: FixtureCompactionInput) => compactedResult(value, "skipped"));
     const execute = vi.fn((value: FixtureRunInput) => {
       input = value;
-      return new Promise<AgentRunResult>(resolve => { finish = () => resolve({ ...compactedResult({ sessionId: value.sessionId, agentRunId: value.agentRunId }, "skipped"), status: "completed" }); });
+      return new Promise<FixtureRunResult>(resolve => { finish = () => resolve({ ...compactedResult({ sessionId: value.sessionId, agentRunId: value.agentRunId }, "skipped"), status: "completed" }); });
     });
     installCompactBridge("auto-failed", compact, execute, { onStream: callback => { emit = callback; } });
     renderApp();
@@ -1407,7 +1407,7 @@ sessionId,
     const abort = vi.fn(async () => { finish(); return true; });
     const execute = vi.fn((value: FixtureRunInput) => {
       input = value;
-      return new Promise<AgentRunResult>(resolve => { finish = () => resolve({ ...compactedResult({ sessionId: value.sessionId, agentRunId: value.agentRunId }, "skipped"), status: "aborted" }); });
+      return new Promise<FixtureRunResult>(resolve => { finish = () => resolve({ ...compactedResult({ sessionId: value.sessionId, agentRunId: value.agentRunId }, "skipped"), status: "aborted" }); });
     });
     installCompactBridge("auto-abort", vi.fn(), execute, { onStream: callback => { emit = callback; }, abort });
     renderApp();
@@ -1525,7 +1525,7 @@ sessionId,
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     let activeAgentRunId = "";
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
 
     setupBridge(taskHostFixture({
@@ -1658,7 +1658,7 @@ sessionId,
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     let activeAgentRunId = "";
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
 
     setupBridge(taskHostFixture({
@@ -1835,7 +1835,7 @@ sessionId,
     const getReviewSnapshot = vi.fn(async () => createReviewChanges(7, 2));
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
 
     setupBridge(taskHostFixture({
@@ -2123,7 +2123,7 @@ sessionId: input.sessionId,
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
     let capturedInput: FixtureRunInput | null = null;
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
 
     setupBridge(taskHostFixture({
@@ -2236,7 +2236,7 @@ sessionId: input.sessionId,
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
 
     setupBridge(taskHostFixture({
@@ -2321,7 +2321,7 @@ sessionId: input.sessionId,
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
 
     setupBridge(taskHostFixture({
@@ -2424,7 +2424,7 @@ sessionId: input.sessionId,
     let approvalPending = false;
     let activeAgentRunId = "";
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
 
     setupBridge(taskHostFixture({
@@ -2564,7 +2564,7 @@ sessionId,
     let approvalPending = false;
     let activeAgentRunId = "";
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
     const submitApproval = vi.fn(async () => ({ ok: true }));
 
@@ -2709,7 +2709,7 @@ sessionId,
     ];
 
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
     const submitApproval = vi.fn(async () => ({ ok: true }));
 
@@ -2934,7 +2934,7 @@ sessionId: input.sessionId,
 
     const abortAgentRunMock = vi.fn(async () => true);
     let streamHandler: ((event: RuntimeStreamEvent) => void) | null = null;
-    let resolveExecution: ((value: AgentRunResult) => void) | null =
+    let resolveExecution: ((value: FixtureRunResult) => void) | null =
       null;
 
     setupBridge(taskHostFixture({
@@ -3105,7 +3105,7 @@ sessionId: input.sessionId,
       return [id, record] as const;
     }));
     let emit!: (event: RuntimeStreamEvent) => void;
-    const pending = new Map<string, { input: FixtureRunInput; resolve: (result: AgentRunResult) => void; reject: (error: Error) => void }>();
+    const pending = new Map<string, { input: FixtureRunInput; resolve: (result: FixtureRunResult) => void; reject: (error: Error) => void }>();
     const abort = vi.fn(async () => true);
     setupBridge(taskHostFixture({
       ...settingsApiStub,
@@ -3115,7 +3115,7 @@ sessionId: input.sessionId,
       "sessions.create": projectRecord(async () => createEmptySessionRecord('background-new')),
       "tasks.abort": abort, "approvals.listPending": async () => [],
       "events.agentStream": (callback: typeof emit) => { emit = callback; return () => {}; },
-      execute: (input: FixtureRunInput) => new Promise<AgentRunResult>((resolve, reject) => {
+      execute: (input: FixtureRunInput) => new Promise<FixtureRunResult>((resolve, reject) => {
         pending.set(input.sessionId, { input, resolve, reject });
         emit({ type: 'agent_run_started', sessionId: input.sessionId, agentRunId: input.agentRunId });
       }),

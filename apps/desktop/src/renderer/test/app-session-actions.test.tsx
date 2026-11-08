@@ -29,7 +29,7 @@ describe("App session copy and fork actions", () => {
     createMockSession(bridge.db);
     render(<App />);
 
-    let sourceRow: HTMLElement | null = null;
+    let sourceRow = null as HTMLElement | null;
     await waitFor(() => {
       sourceRow = document.querySelector<HTMLElement>('.session-row[data-session-id^="mock-session-"]');
       expect(sourceRow).not.toBeNull();
@@ -56,7 +56,7 @@ describe("App session copy and fork actions", () => {
     fireEvent.contextMenu(sourceRow as HTMLElement, { clientX: 120, clientY: 80 });
     await user.click(screen.getByRole("menuitem", { name: "分叉" }));
 
-    let forkRow: HTMLElement | null = null;
+    let forkRow = null as HTMLElement | null;
     await waitFor(() => {
       forkRow = Array.from(document.querySelectorAll<HTMLElement>(".session-row"))
         .find((row) => row.textContent?.includes("New chat (fork)")) ?? null;

@@ -27,7 +27,7 @@ export function useMergedMessages(sessionRecord: SessionRecord | null, live: Liv
   return useMemo<MessageBlock[]>(() => mergeTranscript(
     { blocks: sessionRecord?.messageBlocks, events: persistedEvents },
     { blocks, runId, recovered },
-    { compactionFailure, isStreaming, rewindFromSeq },
+    { compactionFailure: compactionFailure ?? undefined, isStreaming, rewindFromSeq },
   ), [sessionRecord?.messageBlocks, persistedEvents, blocks, runId, recovered, compactionFailure, isStreaming, rewindFromSeq]);
 }
 

@@ -34,8 +34,14 @@ export type FixtureCompactionResult = {
 };
 
 
+/** 用例只需提供 fixture 读到的字段；contextSnapshot / contextState 允许写 null。 */
+export type FixtureRunResult = Omit<AgentRunResult, "contextSnapshot" | "contextState"> & {
+  contextSnapshot: AgentRunResult["contextSnapshot"] | null;
+  contextState?: AgentRunResult["contextState"] | null;
+};
+
 type FixtureOptions = {
-  execute?: (input: FixtureRunInput) => Promise<AgentRunResult>;
+  execute?: (input: FixtureRunInput) => Promise<FixtureRunResult>;
   executeCompaction?: (input: { sessionId: string; agentRunId: string }) => Promise<FixtureCompactionResult | undefined> | FixtureCompactionResult | undefined;
   // 用例常把同一个回调既当 execute 又当 prepare，入参保持宽松。
   prepare?: (input: any) => unknown;
@@ -47,7 +53,7 @@ type FixtureOptions = {
  * Renderer fixture: submission receipt and Host execution have independent lifetimes.
  * 其余键是 `setupBridge` 的契约路径覆盖，原样透传。
  */
-export function taskHostFixture(bridge: FixtureOptions & Record<string, any>): BridgeOverrides {
+export function taskHostFixture(bridge: FixtureOptions & BridgeOverrides): BridgeOverrides {
   const { execute, executeCompaction, prepare, getRecord, ...api } = bridge;
   const states = new Map<string, TaskSnapshot>();
   const configs = new Map<string, TaskConfiguration>();
@@ -60,8 +66,8 @@ export function taskHostFixture(bridge: FixtureOptions & Record<string, any>): B
   return {
     ...(getRecord ? { "sessions.get": projectRecord(getRecord), "sessions.getPage": projectRecord(getRecord) } : {}),
     ...api,
-    "events.agentStream": (fn: (event: RuntimeStreamEvent) => void) => { streams.add(fn); const unsub = api["events.agentStream"]?.(fn); return () => { streams.delete(fn); unsub?.(); }; },
-    "events.sessionLive": (fn: (event: any) => void) => { live.add(fn); const unsub = api["events.sessionLive"]?.(fn); return () => { live.delete(fn); unsub?.(); }; },
+    "events.agentStream": (fn: (event: RuntimeStreamEvent) => void) => { streams.add(fn); const unsub = api["events.agentStream"]?.(fn) as (() => void) | undefined; return () => { streams.delete(fn); unsub?.(); }; },
+    "events.sessionLive": (fn: (event: any) => void) => { live.add(fn); const unsub = api["events.sessionLive"]?.(fn) as (() => void) | undefined; return () => { live.delete(fn); unsub?.(); }; },
     "tasks.command": async (input: TaskCommand) => {
       if (input.op === "resume") {
         publish({ ...state(input.sessionId), paused: false });

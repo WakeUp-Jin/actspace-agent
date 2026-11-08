@@ -41,7 +41,7 @@ interface AbbCommandResult {
 
 interface DoctorJson {
   summary?: string;
-  checks?: BrowserBridgeDoctorCheck[];
+  checks: BrowserBridgeDoctorCheck[];
 }
 
 type ConnectionConfig = { schemaVersion: 1; enabled: boolean; selectedInstanceId?: string; sourceRoot?: string; selectionRequested?: boolean };
@@ -722,7 +722,7 @@ function renderManagedSkill(abbPath: string): string {
 
 function parseDoctor(stdout: string): DoctorJson {
   try {
-    const parsed = JSON.parse(stdout) as DoctorJson;
+    const parsed = JSON.parse(stdout) as Partial<DoctorJson>;
     return {
       summary: typeof parsed.summary === "string" ? parsed.summary : undefined,
       checks: Array.isArray(parsed.checks) ? parsed.checks.filter(isDoctorCheck) : [],
