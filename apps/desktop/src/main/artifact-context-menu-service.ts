@@ -1,4 +1,4 @@
-import { clipboard, Menu, nativeImage, shell, type BrowserWindow, type MenuItemConstructorOptions } from "electron";
+import { clipboard, ClipboardItem, Menu, nativeImage, shell, type BrowserWindow, type MenuItemConstructorOptions } from "electron";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { ArtifactContextMenuInput, ArtifactContextMenuResult } from "@actspace/shared";
@@ -56,9 +56,10 @@ export function createArtifactContextMenuTemplate(
   const copyArtifact = target.kind === "session_image"
     ? {
         label: "Copy image",
-        click: () => runMenuAction("copy image", () => {
+        click: () => runMenuAction("copy image", async () => {
           const image = nativeImage.createFromDataURL(target.sessionImageDataUrl ?? "");
-          if (!image.isEmpty()) clipboard.writeImage(image);
+          if (image.isEmpty()) return;
+          await clipboard.write([new ClipboardItem({ "image/png": new Blob([new Uint8Array(image.toPNG())]) })]);
         }),
       }
     : {
@@ -67,7 +68,7 @@ export function createArtifactContextMenuTemplate(
         click: () => runMenuAction("copy file contents", async () => {
           const bytes = await readFile(target.path);
           if (bytes.includes(0)) throw new Error("binary files cannot be copied as text");
-          clipboard.writeText(bytes.toString("utf8"));
+          await clipboard.writeText(bytes.toString("utf8"));
         }),
       };
 
@@ -86,7 +87,7 @@ export function createArtifactContextMenuTemplate(
     { type: "separator" },
     {
       label: "Copy path",
-      click: () => clipboard.writeText(target.path),
+      click: () => runMenuAction("copy path", () => clipboard.writeText(target.path)),
     },
     copyArtifact,
     {
