@@ -101,7 +101,7 @@ describe("turn tail", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "打开 docs/report.md" }));
     expect(statFile).toHaveBeenCalledWith({ workspaceRoot: "/workspace", relativePath: "docs/report.md" });
-    expect(screen.getByTestId("active-tab")).toHaveTextContent("docs:文档");
+    expect(screen.getByTestId("active-tab")).toHaveTextContent("docs:MD 文档");
 
     statFile.mockResolvedValueOnce({ relativePath: "docs/report.md", size: 0, mtimeMs: 0, error: "not_found" } as never);
     await userEvent.click(screen.getByRole("button", { name: "打开 docs/report.md" }));
