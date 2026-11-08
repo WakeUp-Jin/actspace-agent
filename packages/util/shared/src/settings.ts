@@ -373,10 +373,19 @@ export interface SettingsV4 {
   };
 }
 
+/** models 的补丁：connections 和三张模型表按「null = 删除」合并，taskBindings 按字段覆盖。 */
+export type SettingsV4ModelsPatch = Omit<Partial<SettingsV4Models>, "connections" | "definitions" | "installed" | "overrides" | "taskBindings"> & {
+  connections?: Partial<Record<string, SettingsV4ConnectionSettings | null>>;
+  definitions?: Partial<Record<ModelKey, ModelDefinition | null>>;
+  installed?: Partial<Record<ModelKey, SettingsV4InstalledModelSettings | null>>;
+  overrides?: Partial<Record<ModelKey, import("./model-layers").ModelOverrides | null>>;
+  taskBindings?: Partial<SettingsV4Models["taskBindings"]>;
+};
+
 export type SettingsV4NamespacePatch = {
   [N in SettingsV4Namespace]: {
     namespace: N;
-    patch: Partial<SettingsV4[N]>;
+    patch: N extends "models" ? SettingsV4ModelsPatch : Partial<SettingsV4[N]>;
   };
 }[SettingsV4Namespace];
 

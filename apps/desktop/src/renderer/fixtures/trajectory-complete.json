@@ -1792,7 +1792,7 @@
       "sessionId": "mock-trajectory-session",
       "eventSeq": 89,
       "eventType": "assistant/message",
-      "time": null,
+      "time": "2026-09-03T10:24:04.400Z",
       "kind": "assistant",
       "state": "completed",
       "callId": null,
@@ -1804,7 +1804,7 @@
         "content": [
           {
             "type": "text",
-            "text": "这条旧消息没有首 token、完成时间和 token 统计。"
+            "text": "这条旧消息没有首 token 和 token 统计。"
           }
         ]
       }

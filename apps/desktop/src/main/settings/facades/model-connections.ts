@@ -1,5 +1,5 @@
 /** 设置 › 模型 的连接写入：Key 和 models 补丁在同一次排队写入里完成，失败时一起回滚。 */
-import type { LlmProviderId, SettingsV4Models } from "@actspace/shared";
+import type { LlmProviderId, SettingsV4Models, SettingsV4ModelsPatch } from "@actspace/shared";
 import type { SettingsStore } from "../store";
 import { ProviderSettingsError } from "../types";
 import { cloneJson } from "../utils";
@@ -27,7 +27,7 @@ export function hasManagementKey(store: SettingsStore): boolean {
 /** build 拿到当前的 models，返回要合并的补丁；connections 里的 null 表示删除。 */
 export async function applyModelsChange(
   store: SettingsStore,
-  build: (models: SettingsV4Models) => Partial<SettingsV4Models>,
+  build: (models: SettingsV4Models) => SettingsV4ModelsPatch,
   secret?: ConnectionSecretChange,
 ): Promise<void> {
   await store.enqueueMutation(async () => {

@@ -40,6 +40,7 @@ import {
   type PurposesView,
   type SettingsV4ConnectionSettings,
   type SettingsV4Models,
+  type SettingsV4ModelsPatch,
   type TaskModelSettings,
 } from "@actspace/shared";
 import type { ModelStoreService } from "./model-store-service";
@@ -247,7 +248,7 @@ export class ModelConnectionsService {
       }
       const managementKey = input.managementKey === undefined || !(legacy && current.providerId === "openrouter") ? undefined : input.managementKey;
       await this.settings.applyModelsChange((models) => {
-        const patch: Partial<SettingsV4Models> = { connections: { [current.connectionId]: next } };
+        const patch: SettingsV4ModelsPatch = { connections: { [current.connectionId]: next } };
         // 协议变了：这个连接下自定义模型的协议跟着变。
         if (next.protocol !== current.protocol && next.protocol) {
           patch.definitions = Object.fromEntries(this.#keysOf(models, current.connectionId)
@@ -270,11 +271,11 @@ export class ModelConnectionsService {
       const legacy = isDefaultConnection(current);
       await this.settings.applyModelsChange((models) => {
         const keys = this.#keysOf(models, current.connectionId);
-        const patch: Partial<SettingsV4Models> = {
+        const patch: SettingsV4ModelsPatch = {
           // 内置连接不能真的删掉，只清空 Key 和设置；它的模型一并移出。
           connections: { [current.connectionId]: legacy
             ? { ...current, enabled: true, baseUrl: null, proxy: { enabled: false, url: null }, defaultPricingMultiplier: 1, lastConnection: { status: "untested" } }
-            : null as unknown as SettingsV4ConnectionSettings },
+            : null },
           ...removeKeysPatch(models, keys),
         };
         return patch;
@@ -296,10 +297,10 @@ export class ModelConnectionsService {
     return this.#run(async () => {
       const key = this.#installedKey(input?.key);
       await this.settings.applyModelsChange((models) => {
-        const patch: Partial<SettingsV4Models> = {};
+        const patch: SettingsV4ModelsPatch = {};
         if (input.overrides !== undefined) {
           const overrides = input.overrides === null ? {} : sanitizeModelOverrides(input.overrides);
-          patch.overrides = { [key]: Object.keys(overrides).length > 0 ? overrides : null } as SettingsV4Models["overrides"];
+          patch.overrides = { [key]: Object.keys(overrides).length > 0 ? overrides : null };
         }
         return patch;
       });
@@ -432,7 +433,7 @@ export class ModelConnectionsService {
   }
 
   /** 往连接里加模型。内置服务商的旧连接沿用 `<p>:<apiModel>` 键（内置模型直接装上）；其他连接用连接内的键。 */
-  #modelsPatch(models: SettingsV4Models, connectionId: string, inputs: ConnectionModelInput[]): Partial<SettingsV4Models> {
+  #modelsPatch(models: SettingsV4Models, connectionId: string, inputs: ConnectionModelInput[]): SettingsV4ModelsPatch {
     const connection = models.connections[connectionId];
     if (!connection) throw new ModelConnectionsError("connection_missing", "连接不存在。");
     const template = templateForConnection(connection);
@@ -611,19 +612,18 @@ function sameUrl(left: string, right: string | undefined): boolean {
 }
 
 /** 移除一批模型：定义、安装、用户修改一起删；用到它们的用途改回「跟随」。 */
-function removeKeysPatch(models: SettingsV4Models, keys: ModelKey[]): Partial<SettingsV4Models> {
+function removeKeysPatch(models: SettingsV4Models, keys: ModelKey[]): SettingsV4ModelsPatch {
   if (keys.length === 0) return {};
   const removed = new Set<string>(keys);
-  // 合并时 null 表示删除该 key；SettingsV4Models 的字段类型没有表达这一点，只能经 unknown 断言。
-  const nulls = Object.fromEntries(keys.map((key) => [key, null]));
+  const nulls: Partial<Record<ModelKey, null>> = Object.fromEntries(keys.map((key) => [key, null]));
   const bindings = models.taskBindings;
-  const cleared = Object.fromEntries((["defaultChat", "utility", "autoReview", "subagentDefaultModel", "vision"] as const)
+  const cleared: SettingsV4ModelsPatch["taskBindings"] = Object.fromEntries((["defaultChat", "utility", "autoReview", "subagentDefaultModel", "vision"] as const)
     .filter((field) => bindings[field] && removed.has(bindings[field]!))
     .map((field) => [field, null]));
   return {
-    definitions: Object.fromEntries(keys.filter((key) => models.definitions[key]?.source !== "builtin" && models.definitions[key]?.source !== "curated").map((key) => [key, null])) as unknown as SettingsV4Models["definitions"],
-    installed: nulls as unknown as SettingsV4Models["installed"],
-    overrides: nulls as unknown as SettingsV4Models["overrides"],
-    ...(Object.keys(cleared).length > 0 ? { taskBindings: cleared as unknown as SettingsV4Models["taskBindings"] } : {}),
+    definitions: Object.fromEntries(keys.filter((key) => models.definitions[key]?.source !== "builtin" && models.definitions[key]?.source !== "curated").map((key) => [key, null])),
+    installed: nulls,
+    overrides: nulls,
+    ...(Object.keys(cleared).length > 0 ? { taskBindings: cleared } : {}),
   };
 }

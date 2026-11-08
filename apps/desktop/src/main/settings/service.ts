@@ -12,6 +12,7 @@ import type {
   SettingsUpdateInput,
   SettingsV2UpdateInput,
   SettingsV4Models,
+  SettingsV4ModelsPatch,
   SettingsV4Snapshot,
   SettingsV4UpdateInput,
   SpeechSettings,
@@ -106,7 +107,7 @@ export class SettingsService {
   }
 
   /** 设置 › 模型 的连接写入：Key 与 models 补丁一起提交。 */
-  applyModelsChange(build: (models: SettingsV4Models) => Partial<SettingsV4Models>, secret?: modelConnections.ConnectionSecretChange): Promise<void> {
+  applyModelsChange(build: (models: SettingsV4Models) => SettingsV4ModelsPatch, secret?: modelConnections.ConnectionSecretChange): Promise<void> {
     return modelConnections.applyModelsChange(this.store, build, secret);
   }
 
