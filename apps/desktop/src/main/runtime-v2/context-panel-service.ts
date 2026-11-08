@@ -1,7 +1,7 @@
 import { disclosurePaths, disclosureSummary, contextPathsPage } from "./context-paths";
 import type { ContextPathsInput, ContextPathsPage } from "@actspace/shared";
 import { createHash } from "node:crypto";
-import type { ContextEntriesInput, ContextEntriesPage, ContextEntryInput, ContextEntryText, ContextEstimateView, ContextPanelEntry, ContextPanelHistory, ContextPanelResponse, ContextPanelView, ContextSurfaceNodeInput, DescribeContextPanelInput, ManagedContextProjection } from "@actspace/shared";
+import type { ContextEntriesInput, ContextEntriesPage, ContextEntryInput, ContextEntryText, ContextEstimateView, ContextPanelBucketKey, ContextPanelEntry, ContextPanelHistory, ContextPanelResponse, ContextPanelView, ContextSurfaceNodeInput, DescribeContextPanelInput, ManagedContextProjection } from "@actspace/shared";
 import { contextEstimateSummaryKeys, describeConversationNode } from "@actspace/shared";
 import type { UsageReadModelService } from "./usage-read-model";
 import type { DesktopRuntimeV2Registry } from "./runtime-registry";
@@ -65,7 +65,7 @@ export class ContextPanelService {
     // Default page keeps the latest messages; totals were computed before paging.
     let limit = 200;
     let page = this.#page(current, { sessionId, revision: entriesVersion, limit });
-    const assign = () => { view.current.entries = page.entries; if (view.previous) view.previous.entries = page.previous; view.entriesPage = { revision: entriesVersion, total: page.total, truncated: !!page.nextCursor, ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) }; };
+    const assign = () => { view.current.entries = page.entries; if (view.previous) view.previous.entries = page.previous; view.entriesPage = { revision: entriesVersion, total: page.total, truncated: !!page.nextCursor, ...(page.bucketCounts ? { bucketCounts: page.bucketCounts } : {}), ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) }; };
     assign();
     if (Buffer.byteLength(JSON.stringify(view)) > 200 * 1024) { for (const entry of view.current.entries) delete entry.preview; }
     while (Buffer.byteLength(JSON.stringify(view)) > 200 * 1024 && limit > 1) { limit = Math.max(1, Math.floor(limit / 2)); page = this.#page(current, { sessionId, revision: entriesVersion, limit }); assign(); for (const entry of view.current.entries) delete entry.preview; }
@@ -148,14 +148,23 @@ export class ContextPanelService {
     const entries = current.entries.filter(entry => !input.bucket || entry.bucket === input.bucket);
     const previous = current.previous.filter(entry => !input.bucket || entry.bucket === input.bucket);
     const byKey = new Map(entries.map(entry => [entry.key, entry])); const oldKeys = new Map(previous.map(entry => [entry.key, entry]));
-    const keys = [...new Set([...entries.map(entry => entry.key).reverse(), ...previous.map(entry => entry.key).reverse()])];
+    // 非对话条目（含上次请求有、这次没有的）全部放在首页；对话条目按新到旧往后翻，游标偏移只数对话条目（规范 §3）。
+    const paged = (entry: { bucket: string }) => entry.bucket === "conversation";
+    const fixed = [...new Set([...entries.filter(entry => !paged(entry)).map(entry => entry.key), ...previous.filter(entry => !paged(entry)).map(entry => entry.key)])];
+    const keys = [...new Set([...entries.filter(paged).map(entry => entry.key).reverse(), ...previous.filter(paged).map(entry => entry.key).reverse()])];
+    const bucketCounts: Partial<Record<ContextPanelBucketKey, number>> = {};
+    for (const entry of entries) bucketCounts[entry.bucket] = (bucketCounts[entry.bucket] ?? 0) + 1;
     if (offset > keys.length) throw new Error("Context cursor invalid; reload the panel.");
     if (input.limit !== undefined && (!Number.isSafeInteger(input.limit) || input.limit < 1)) throw new Error("Invalid Context page limit.");
-    const limit = Math.min(500, input.limit ?? 200);
-    let selected = keys.slice(offset, offset + limit).reverse();
-    const materialize = (): ContextEntriesPage => { const end = offset + selected.length; return { revision: input.revision, total: keys.length, entries: selected.flatMap(key => { const entry = byKey.get(key); return entry ? [{ ...entry, title: entry.title.slice(0, 80), ...(entry.preview ? { preview: entry.preview.slice(0, 600) } : {}) }] : []; }), previous: selected.flatMap(key => { const entry = oldKeys.get(key); return entry ? [entry] : []; }), ...(end < keys.length ? { nextCursor: Buffer.from(JSON.stringify({ query, offset: end })).toString("base64url") } : {}) }; };
+    let take = Math.min(500, input.limit ?? 200);
+    const materialize = (): ContextEntriesPage => {
+      const end = Math.min(keys.length, offset + take);
+      // 页内按上下文顺序（旧在前）：前端把下一页拼在已有条目前面。
+      const selected = [...(offset === 0 ? fixed : []), ...keys.slice(offset, end).reverse()];
+      return { revision: input.revision, total: fixed.length + keys.length, bucketCounts, entries: selected.flatMap(key => { const entry = byKey.get(key); return entry ? [{ ...entry, title: entry.title.slice(0, 80), ...(entry.preview ? { preview: entry.preview.slice(0, 600) } : {}) }] : []; }), previous: selected.flatMap(key => { const entry = oldKeys.get(key); return entry ? [entry] : []; }), ...(end < keys.length ? { nextCursor: Buffer.from(JSON.stringify({ query, offset: end })).toString("base64url") } : {}) };
+    };
     let page = materialize();
-    while (Buffer.byteLength(JSON.stringify(page)) > 200 * 1024 && selected.length > 1) { selected = selected.slice(Math.ceil(selected.length / 2)); page = materialize(); }
+    while (Buffer.byteLength(JSON.stringify(page)) > 200 * 1024 && take > 1) { take = Math.ceil(take / 2); page = materialize(); }
     if (Buffer.byteLength(JSON.stringify(page)) > 1024 * 1024) throw new Error("Context page exceeds 1 MiB.");
     return page;
   }

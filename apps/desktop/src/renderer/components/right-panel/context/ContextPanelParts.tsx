@@ -4,8 +4,9 @@ import { Button } from "../../ui/Button";
 
 /** Context 面板各区块共用的外观；规则见 `docs/design-docs/frontend/front-Context面板规范.md`。 */
 
-export const CARD_CLASS = "rounded-act-group border border-line bg-surface";
-export const CARD_HEAD_CLASS = "flex items-center gap-2 px-3 pt-2.5";
+/** 区块不画边框，之间一条横线；第一块不画（规范 §2）。各区块都是 `<section>`，所以用 first-of-type。 */
+export const CARD_CLASS = "min-w-0 border-t border-line pb-1.5 first-of-type:border-t-0";
+export const CARD_HEAD_CLASS = "flex items-center gap-2 px-3 pt-3";
 export const CARD_TITLE_CLASS = "text-act-sm font-semibold text-text-main";
 export const CARD_META_CLASS = "ml-auto min-w-0 truncate text-act-xxs text-text-faint";
 /** 原生列表行按钮的焦点框：画在行内侧，避免被卡片裁掉。 */
@@ -57,11 +58,12 @@ export function Gauge({ share, colorVar, label }: { share: number; colorVar: str
   );
 }
 
-export function ShowMoreButton({ hidden, total, onClick }: { hidden: number; total: number; onClick: () => void }) {
-  if (hidden <= 0) return null;
+/** `busy`：正在向后端要下一页，按钮写「正在读取…」并禁用。 */
+export function ShowMoreButton({ hidden, total, onClick, busy = false }: { hidden: number; total: number; onClick: () => void; busy?: boolean }) {
+  if (hidden <= 0 && !busy) return null;
   return (
-    <Button variant="ghost" size="xs" className="ml-6 mt-1" onClick={onClick}>
-      再显示 {Math.min(ROW_LIMIT_STEP, hidden)} 项（共 {total}）
+    <Button variant="ghost" size="xs" className="ml-6 mt-1" disabled={busy} onClick={onClick}>
+      {busy ? "正在读取…" : `再显示 ${Math.min(ROW_LIMIT_STEP, hidden)} 项（共 ${total}）`}
     </Button>
   );
 }

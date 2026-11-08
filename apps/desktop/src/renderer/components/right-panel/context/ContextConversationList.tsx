@@ -29,7 +29,14 @@ function revealTargetOf(entry: CategoryEntry): TrajectoryRevealTarget | null {
  * 整行点击跳到轨迹里的对应记录，chip 行右侧「在轨迹中打开」跳到最新一条（只选一个类型时是该类型最新一条）。
  * 过渡数据没有子类型时不显示 chip，没有轨迹身份的行不可点。
  */
-export function ContextConversationList({ category }: { category: ContextCategory }) {
+export function ContextConversationList({ category, total, paging = false, onLoadMore }: {
+  category: ContextCategory;
+  /** 本类总数（含后端还没给的页）；缺省时等于本地条目数。 */
+  total?: number;
+  paging?: boolean;
+  /** 后端还有下一页时才有。 */
+  onLoadMore?: () => Promise<void>;
+}) {
   const navigation = useTrajectoryNavigation();
   const [filters, setFilters] = useState<readonly ConversationFilter[]>([]);
   const [limit, setLimit] = useState(INITIAL_ROW_LIMIT);
@@ -85,7 +92,16 @@ export function ContextConversationList({ category }: { category: ContextCategor
           </button>
         );
       })}
-      <ShowMoreButton hidden={rows.length - shown.length} total={rows.length} onClick={() => setLimit((value) => value + ROW_LIMIT_STEP)} />
+      {filters.length === 0 ? (
+        // 不筛选时总数是后端给的全部条数；本地读完了就先要下一页再展开（规范 §3）。
+        <ShowMoreButton hidden={Math.max(total ?? rows.length, rows.length) - shown.length} total={Math.max(total ?? rows.length, rows.length)} busy={paging}
+          onClick={() => {
+            if (rows.length - shown.length < ROW_LIMIT_STEP && onLoadMore) void onLoadMore();
+            setLimit((value) => value + ROW_LIMIT_STEP);
+          }} />
+      ) : (
+        <ShowMoreButton hidden={rows.length - shown.length} total={rows.length} onClick={() => setLimit((value) => value + ROW_LIMIT_STEP)} />
+      )}
     </div>
   );
 }

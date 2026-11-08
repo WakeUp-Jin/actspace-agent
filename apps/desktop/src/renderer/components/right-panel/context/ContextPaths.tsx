@@ -5,7 +5,7 @@ import { Button } from "../../ui/Button";
 import { cn } from "../../ui/cn";
 import { PATH_INITIAL_ROWS, PATH_ROW_STEP, type ContextPathVisibility } from "./context-paths-model";
 import { ContextPathList } from "./ContextPathList";
-import { CARD_CLASS, CARD_HEAD_CLASS, CARD_META_CLASS, CARD_TITLE_CLASS, FILTER_CHIP_CLASS, ROW_FOCUS_CLASS, TRACK_CLASS } from "./ContextPanelParts";
+import { CARD_CLASS, CARD_HEAD_CLASS, CARD_META_CLASS, CARD_TITLE_CLASS, ROW_FOCUS_CLASS, TRACK_CLASS } from "./ContextPanelParts";
 import { useContextPaths } from "./use-context-paths";
 
 const LABEL: Record<ContextPathVisibility, string> = { active: "活跃", sleeping: "睡眠" };
@@ -22,7 +22,6 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
 }) {
   const [visibility, setVisibility] = useState<ContextPathVisibility>("active");
   const [expanded, setExpanded] = useState(false);
-  const [grouped, setGrouped] = useState(true);
   const [rows, setRows] = useState<Record<ContextPathVisibility, number>>({ active: PATH_INITIAL_ROWS, sleeping: PATH_INITIAL_ROWS });
   const ready = disclosure?.status === "ready" ? disclosure : null;
   const { list, loadMore, retry } = useContextPaths({ sessionId, disclosure, visibility, enabled: expanded && ready !== null, onStale });
@@ -53,7 +52,7 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
         <span className={CARD_TITLE_CLASS}>路径</span>
         <span className={CARD_META_CLASS}>第 {ready.cycle} 压缩周期</span>
       </div>
-      <div className="mx-3 mt-2 grid grid-cols-2 gap-px overflow-hidden rounded-act-md border border-line bg-line">
+      <div className="mx-3 mt-2 grid grid-cols-2 gap-1.5">
         <SummaryCell selected={visibility === "active"} onSelect={() => setVisibility("active")} label="活跃"
           value={<>{ready.activeCount}<small className="ml-0.5 text-act-xxs font-normal text-text-faint">/ {ready.activeLimit}</small></>}>
           <span className={cn("mt-1.5 block h-1 overflow-hidden rounded-full", TRACK_CLASS)}>
@@ -75,13 +74,6 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
               <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" className={cn("shrink-0 text-text-faint transition-transform duration-(--motion-fast)", expanded && "rotate-90")} />
               <span className="tabular-nums">{expanded ? `${LABEL[visibility]} · 已显示 ${shown.length} / ${total.toLocaleString()}` : `显示${LABEL[visibility]}路径 · ${count.toLocaleString()} 条`}</span>
             </button>
-            {expanded ? (
-              <span className="ml-auto flex gap-1" role="group" aria-label="列表样式">
-                {/* 和「对话轮次」筛选同一种小胶囊。 */}
-                <button type="button" aria-pressed={grouped} onClick={() => setGrouped(true)} className={cn(FILTER_CHIP_CLASS, ROW_FOCUS_CLASS)}>按目录</button>
-                <button type="button" aria-pressed={!grouped} onClick={() => setGrouped(false)} className={cn(FILTER_CHIP_CLASS, ROW_FOCUS_CLASS)}>平铺</button>
-              </span>
-            ) : null}
           </div>
           {expanded ? (
             <div className="pb-2">
@@ -91,7 +83,7 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
                   <Button variant="secondary" size="xs" onClick={retry}>重试</Button>
                 </div>
               ) : null}
-              {shown.length ? <ContextPathList paths={shown} cycle={ready.cycle} grouped={grouped} workspaceRoot={workspaceRoot} /> : null}
+              {shown.length ? <ContextPathList paths={shown} cycle={ready.cycle} workspaceRoot={workspaceRoot} /> : null}
               {!list?.loaded && !list?.error ? <p className="m-0 px-3 py-1.5 text-act-xs text-text-faint">正在读取{LABEL[visibility]}路径…</p> : null}
               {list?.loaded && !list.paths.length && !list.error ? <p className="m-0 px-3 py-1.5 text-act-xs text-text-faint">没有{LABEL[visibility]}路径。</p> : null}
               {list?.loaded && hidden > 0 && !list.error ? (
@@ -116,11 +108,11 @@ function SummaryCell({ selected, onSelect, label, value, sleeping, children }: {
   children?: ReactNode;
 }) {
   return (
-    // 两格统计兼当列表切换，整格可点，Button 原语的尺寸和底色不适合。
+    // 两格统计兼当列表切换，整格可点，Button 原语的尺寸和底色不适合。浅底色块，选中的换成面板底色加一圈深色细线（规范 §4）。
     <button type="button" aria-pressed={selected} onClick={onSelect}
       className={cn(
-        "relative flex flex-col justify-start border-0 bg-surface px-2.5 py-2 text-left [cursor:pointer] hover:bg-hover-overlay",
-        "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 aria-pressed:bg-surface-subtle aria-pressed:after:bg-text-main",
+        "flex flex-col justify-start rounded-act-md border-0 bg-surface-subtle px-2.5 pb-2 pt-[7px] text-left [cursor:pointer] hover:bg-hover-overlay",
+        "aria-pressed:bg-surface aria-pressed:shadow-[inset_0_0_0_1px_var(--act-color-border-strong)]",
         ROW_FOCUS_CLASS,
       )}>
       <span className="flex items-center gap-1.5 text-act-xxs text-text-faint">

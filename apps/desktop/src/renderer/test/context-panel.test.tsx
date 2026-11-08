@@ -127,6 +127,60 @@ describe("ContextPanel", () => {
     expect(screen.getByTestId("pending")).toHaveTextContent(JSON.stringify({ callId: expected!.callId }));
   });
 
+  it("draws blocks without card borders, separated by one top line", async () => {
+    setupBridge();
+    renderPanel();
+    const stats = await screen.findByRole("region", { name: "会话统计" });
+    const overview = screen.getByRole("region", { name: "当前上下文" });
+    for (const block of [overview, stats, screen.getByRole("region", { name: "上下文事件" })]) {
+      expect(block.className).not.toMatch(/(^|\s)border(\s|$)/);
+      expect(block.className).not.toMatch(/rounded-act-group/);
+      expect(block).toHaveClass("border-t");
+    }
+    expect(stats.className).not.toMatch(/gap-px|bg-line/);
+  });
+
+  it("lists events with a kind tag, title, detail, delta and position", async () => {
+    setupBridge();
+    renderPanel();
+    const events = await screen.findByRole("region", { name: "上下文事件" });
+    const rows = Array.from(events.querySelectorAll<HTMLElement>("[data-context-event]"));
+    expect(rows.map(row => row.dataset.contextEvent)).toEqual(["files", "runtime", "files", "subagents", "background", "tools-changed", "compact", "model-switch", "inject"]);
+    expect(rows[0]).toHaveTextContent("文件活跃文件清单更新新增 context-history-projection.ts 等 2 个，共 14 个+410第 9 轮 · 步 3");
+    // 合并行：标题带 ×N，位置只写轮。
+    expect(rows[2]).toHaveTextContent("活跃文件清单更新 ×6");
+    expect(rows[2]).toHaveTextContent(/第 8 轮$/);
+    // 0 写「±0」用弱色；未知留空；推导的只在悬停说明里写。
+    expect(within(rows[1]!).getByText("±0")).toHaveClass("text-text-faint");
+    expect(rows[7]).toHaveTextContent("模型切换Sonnet 5.5 → Opus 5.5第 3 轮 · 步 1");
+    expect(rows[7]).not.toHaveTextContent("推导");
+    expect(rows[7]!.title).toContain("根据请求推导");
+  });
+
+  it("has no separate load-more button; 再显示 fetches the next page when the local rows run out", async () => {
+    const view = mockContextPanelView(SESSION);
+    const conversation = view.current.entries.filter(entry => entry.bucket === "conversation");
+    const older = Array.from({ length: 30 }, (_, i) => ({ key: `older-${i}`, bucket: "conversation" as const, kind: "tool-call" as const, title: `更早 ${i}`, estimatedTokens: 1 }));
+    const counts = { ...Object.fromEntries(Object.entries(Object.groupBy(view.current.entries, entry => entry.bucket)).map(([key, list]) => [key, list!.length])), conversation: conversation.length + older.length };
+    const listContextEntries = vi.fn(async () => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+      return { revision: "rev", total: view.current.entries.length + older.length, bucketCounts: counts, entries: older, previous: [] };
+    });
+    setupBridge({
+      "sessions.describeContextPanel": async () => ({ ...view, previous: null, entriesPage: { revision: "rev", total: view.current.entries.length + older.length, truncated: true, nextCursor: "c1", bucketCounts: counts } }),
+      "sessions.listContextEntries": listContextEntries,
+    });
+    renderPanel();
+    const browser = await screen.findByRole("region", { name: "上下文明细" });
+    expect(screen.queryByRole("button", { name: /加载更多明细/ })).not.toBeInTheDocument();
+    const section = browser.querySelector<HTMLElement>('[data-category="conversation"]')!;
+    expect(section.querySelector("button")).toHaveTextContent(`${conversation.length + older.length} 项`);
+    const more = () => within(section).getByRole("button", { name: /再显示|正在读取/ });
+    while (more().textContent?.startsWith("再显示") && listContextEntries.mock.calls.length === 0) await userEvent.click(more());
+    expect(listContextEntries).toHaveBeenCalledWith(expect.objectContaining({ revision: "rev", cursor: "c1" }));
+    expect(await within(section).findByText("更早 29")).toBeInTheDocument();
+  });
+
   it("hides the cost cell when costUsd is null", async () => {
     const view = mockContextPanelView(SESSION);
     setupBridge({ "sessions.describeContextPanel": async () => ({ ...view, stats: { ...view.stats, costUsd: null } }) });

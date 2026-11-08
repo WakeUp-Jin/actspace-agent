@@ -93,7 +93,7 @@ const SHARE_BEFORE: [ContextPanelBucketKey, number][] = [["systemPrompt", 0.05],
 const SHARE_AFTER: [ContextPanelBucketKey, number][] = [["systemPrompt", 0.05], ["tools", 0.15], ["rules", 0.04], ["skills", 0.03], ["summarizedConversation", 0.06], ["conversation", 0.67]];
 const COMPACTED_AT = 16;
 
-/** 「Bash 命令」卡片：数字与 `docs/design-docs/frontend/context-bash-demo.html` 一致。 */
+/** 「Bash 命令」卡片：数字取自旧版 `docs/design-docs/frontend/context-bash-demo.html`。 */
 const bashCount = (name: string, count: number, failed = 0) => ({ name, count, failed });
 export const MOCK_CONTEXT_BASH: ContextPanelBashStats = {
   calls: 38,
@@ -168,12 +168,16 @@ export function mockContextPanelView(sessionId: string, session?: MockSession): 
       };
     }),
     events: [
-      { id: "ev-6", kind: "inject", label: "Skill 调用 · /ui", source: "ui", tokenDelta: 1180, turnIndex: 8, stepIndex: 44, at: "2026-10-11T10:56:00.000Z" },
-      { id: "ev-5", kind: "inject", label: "规则 · front-新功能开发清单.md", tokenDelta: 440, turnIndex: 8, stepIndex: 41, at: "2026-10-11T10:52:00.000Z" },
-      { id: "ev-4", kind: "tools-changed", label: "工具集变更 · 移除 notebook_edit", tokenDelta: -540, turnIndex: 8, stepIndex: 40, at: "2026-10-11T10:50:00.000Z" },
-      { id: "ev-3", kind: "compact", label: "自动压缩 · 第 1–7 轮 → 摘要", tokenDelta: -118_000, turnIndex: 7, stepIndex: null, at: "2026-10-11T10:42:00.000Z" },
-      { id: "ev-2", kind: "model-switch", label: "切换模型 · Sonnet 5.5 → Opus 5.5", tokenDelta: null, turnIndex: 3, stepIndex: null, at: "2026-10-11T10:12:00.000Z" },
-      { id: "ev-1", kind: "inject", label: "规则 · AGENTS.md / CLAUDE.md", tokenDelta: 2660, turnIndex: 1, stepIndex: 1, at: "2026-10-11T10:00:00.000Z" },
+      // 覆盖各类标签、同轮合并（×N）、±0 和未知增减（规范 §2 第 6 块）。
+      { id: "ev-9", kind: "files", label: "活跃文件清单更新", detail: "新增 context-history-projection.ts 等 2 个，共 14 个", source: "actspace.context-disclosure", tokenDelta: 410, turnIndex: 9, stepIndex: 3, at: "2026-10-11T11:02:00.000Z" },
+      { id: "ev-8", kind: "runtime", label: "运行状态更新", detail: "模式 agent → plan", source: "actspace.context-runtime", tokenDelta: 0, turnIndex: 9, stepIndex: 1, at: "2026-10-11T11:00:00.000Z" },
+      { id: "ev-7", kind: "files", label: "活跃文件清单更新", detail: "本轮连续 6 次，合并显示；共 12 个", source: "actspace.context-disclosure", count: 6, tokenDelta: 1240, turnIndex: 8, stepIndex: null, at: "2026-10-11T10:58:00.000Z" },
+      { id: "ev-6", kind: "subagents", label: "子 Agent 清单更新", detail: "2 个运行中：review-ui、test-runner", source: "actspace.context-subagents", tokenDelta: 180, turnIndex: 8, stepIndex: 44, at: "2026-10-11T10:56:00.000Z" },
+      { id: "ev-5", kind: "background", label: "后台任务清单更新", detail: "全部结束", source: "actspace.context-background-tasks", tokenDelta: -60, turnIndex: 8, stepIndex: 41, at: "2026-10-11T10:52:00.000Z" },
+      { id: "ev-4", kind: "tools-changed", label: "工具清单变化", detail: "移除 1 个：notebook_edit", tokenDelta: -540, turnIndex: 8, stepIndex: 40, at: "2026-10-11T10:50:00.000Z", inferred: true },
+      { id: "ev-3", kind: "compact", label: "上下文已压缩", detail: "旧对话换成摘要", tokenDelta: -118_000, turnIndex: 7, stepIndex: 12, at: "2026-10-11T10:42:00.000Z" },
+      { id: "ev-2", kind: "model-switch", label: "模型切换", detail: "Sonnet 5.5 → Opus 5.5", tokenDelta: null, turnIndex: 3, stepIndex: 1, at: "2026-10-11T10:12:00.000Z", inferred: true },
+      { id: "ev-1", kind: "inject", label: "上下文补充 · notes", detail: "some.plugin", source: "some.plugin", tokenDelta: 320, turnIndex: 1, stepIndex: 1, at: "2026-10-11T10:00:00.000Z" },
     ],
   };
 }

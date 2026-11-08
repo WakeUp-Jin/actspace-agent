@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>上下文面板 Demo</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "PingFang SC", monospace;
+  /* 照 tokens.css --act-color-* / --act-context-* */
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --hover: #eaeae7; --selected: #e4e4e1;
+  --line: #deded9; --line-strong: #8c8c85; --track: #e9e9e5;
+  --text: #20201e; --muted: #676762; --faint: #72726b; --subtle: #85857e;
+  --success: #087a4b; --success-soft: #e5f2ea; --info: #3978b8; --info-soft: #e8f1f9;
+  --warning: #91600e; --warning-soft: #f7eedb; --danger: #c74747; --danger-soft: #f8e9e9;
+  --k-system: #7d858b; --k-tools: #7a68ad; --k-rules: #087a4b; --k-skills: #91600e; --k-sum: #a84f7a; --k-conv: #b96831;
+  --series3: #3978b8;
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --hover: #2a2b27; --selected: #30312d;
+  --line: #353630; --line-strong: #787870; --track: #3a3b35;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #96968f; --subtle: #787870;
+  --success: #36c783; --success-soft: #193a2b; --info: #6ca6da; --info-soft: #1e3345;
+  --warning: #d2a14d; --warning-soft: #3e321c; --danger: #e06b6b; --danger-soft: #452525;
+  --k-system: #a2aaa9; --k-tools: #aa96d7; --k-rules: #55d99a; --k-skills: #e2ba6b; --k-sum: #dc8db4; --k-conv: #dfa06a;
+  --series3: #6ca6da;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 13px/1.5 var(--font-ui); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); }
+
+/* ---------- 控制条 ---------- */
+.bar { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar h1 { margin: 0 4px 0 0; font-size: 13px; font-weight: 600; }
+.grp { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.seg button { padding: 2px 10px; border-radius: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; height: 22px; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--selected); }
+.why { max-width: 1200px; margin: 14px auto 0; padding: 0 20px; color: var(--faint); font-size: 12px; line-height: 1.75; }
+.why b { color: var(--text); font-weight: 600; }
+
+/* ---------- 三栏并排 ---------- */
+.cols { display: flex; gap: 22px; justify-content: center; align-items: flex-start; padding: 16px 20px 60px; flex-wrap: wrap; }
+.col { width: 372px; }
+.col-title { font-size: 12px; color: var(--muted); margin: 0 0 6px 2px; }
+.col-title b { color: var(--text); font-weight: 600; margin-right: 6px; }
+
+/* 右侧面板外壳：左边一条线 + 白底，和应用里一样 */
+.panel { background: var(--surface); border-left: 1px solid var(--line); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.tabs { display: flex; gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.tab { padding: 3px 9px; border-radius: 6px; font-size: 12px; color: var(--muted); }
+.tab.on { background: var(--surface-subtle); color: var(--text); font-weight: 500; }
+.body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
+/* 卡片：三种边框方案 */
+.card { min-width: 0; }
+.head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 0; }
+.title { font-size: 13px; font-weight: 600; }
+.meta { margin-left: auto; font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.v-a .body { padding: 12px; gap: 10px; }
+.v-a .card { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+
+.v-b .body { padding: 0; gap: 0; }
+.v-b .card { border-top: 1px solid var(--line); padding: 4px 4px 6px; }
+.v-b .card:first-child { border-top: 0; }
+.v-b .head { padding-top: 12px; }
+
+.v-c .body { padding: 10px; gap: 8px; }
+.v-c .card { background: var(--surface-subtle); border-radius: 10px; }
+
+/* 格子统计：A 有格线，B 无线，C 白色小块 */
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); }
+.grid3 > div { padding: 8px 10px; }
+.grid3 .k { font-size: 11px; color: var(--faint); }
+.grid3 .v { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 1px; }
+.grid3 .v small { font-size: 11px; color: var(--faint); font-weight: 400; margin-left: 2px; }
+.v-a .grid3 { gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.v-a .grid3 > div { background: var(--surface); }
+.v-a .card .grid3 { border-radius: 8px; }
+.v-b .grid3 { gap: 0; }
+.v-b .grid3 > div { padding: 6px 12px; }
+.v-c .grid3 { gap: 6px; }
+.v-c .grid3 > div { background: var(--surface); border-radius: 8px; }
+.stats-wrap { padding: 0; }
+.v-b .stats-wrap { padding: 8px 0 6px; }
+.v-c .stats-wrap { background: var(--surface-subtle); border-radius: 10px; padding: 6px; }
+.in-card { margin: 8px 12px 0; }
+.v-b .in-card { margin: 8px 0 0; }
+
+/* ① 当前上下文 */
+.ov { padding: 8px 12px 12px; }
+.big { font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+.segbar { display: flex; height: 10px; border-radius: 4px; overflow: hidden; background: var(--track); margin: 8px 0 4px; position: relative; }
+.segbar span { height: 100%; box-shadow: inset 1px 0 0 var(--surface); }
+.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 14px; margin-top: 8px; }
+.legend div { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.sw { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.legend .n { margin-left: auto; color: var(--muted); }
+.legend .p { width: 32px; text-align: right; color: var(--faint); }
+
+/* 路径 */
+.paths { padding: 8px 12px 12px; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+.meter { flex: 1; height: 4px; border-radius: 9px; background: var(--track); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--success); }
+
+/* 明细 */
+.sub { display: flex; align-items: center; gap: 6px; padding: 4px 12px 8px; font-size: 11px; color: var(--faint); }
+.sub b { color: var(--text); font-weight: 500; }
+.cat { border-top: 1px solid var(--line); }
+.v-c .cat { border-top-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.cat-h { display: flex; align-items: center; gap: 7px; padding: 8px 12px; font-size: 13px; }
+.chev { width: 10px; color: var(--faint); font-size: 10px; }
+.cat-h .cnt { font-size: 11px; color: var(--faint); }
+.cat-h .t { margin-left: auto; width: 50px; text-align: right; font-size: 12px; color: var(--muted); }
+.cat-h .s { width: 32px; text-align: right; font-size: 11px; color: var(--faint); }
+.row { display: flex; align-items: center; gap: 7px; margin: 0 8px 0 23px; padding: 5px 6px; border-radius: 6px; font-size: 12px; }
+.chip { flex-shrink: 0; border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; font-size: 11px; line-height: 16px; color: var(--muted); white-space: nowrap; }
+.row .ti { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gauge { width: 36px; height: 3px; border-radius: 9px; background: var(--track); overflow: hidden; flex-shrink: 0; }
+.gauge i { display: block; height: 100%; }
+.row .tk { width: 44px; text-align: right; color: var(--muted); flex-shrink: 0; }
+.more { margin: 4px 0 8px 24px; padding: 3px 8px; border-radius: 6px; font-size: 12px; color: var(--muted); }
+.more:hover { background: var(--hover); color: var(--text); }
+.more .spin { display: inline-block; width: 9px; height: 9px; border: 1.5px solid var(--line-strong); border-top-color: transparent; border-radius: 50%; vertical-align: -1px; margin-right: 5px; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.oldbtn { margin: 0 0 0; width: 100%; padding: 5px; border: 1px solid var(--line); border-radius: 7px; text-align: center; font-size: 12px; color: var(--text); background: var(--surface); }
+.v-b .oldbtn { width: auto; margin: 0 12px; }
+
+/* 趋势 */
+.trend { padding: 8px 12px 12px; }
+.trend .cap { font-size: 11px; color: var(--muted); padding-bottom: 6px; }
+.bars { display: flex; align-items: flex-end; gap: 3px; height: 80px; border-bottom: 1px solid var(--line); }
+.bars > div { flex: 1; display: flex; flex-direction: column-reverse; border-radius: 2px 2px 0 0; overflow: hidden; }
+.bars .cut { flex: 0 0 0; height: 100%; border-left: 1px dashed var(--danger); }
+.axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); margin-top: 3px; }
+
+/* ---------- 事件 ---------- */
+.ev-list { list-style: none; margin: 0; padding: 4px 12px 10px; }
+.ev-list li { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 12px; }
+.ev-list li:last-child { border-bottom: 0; }
+.kchip { flex-shrink: 0; margin-top: 1px; border-radius: 4px; padding: 0 6px; font-size: 11px; line-height: 17px; font-weight: 500; white-space: nowrap; }
+.ev-main { flex: 1; min-width: 0; }
+.ev-main .l { color: var(--text); }
+.ev-main .d { color: var(--faint); font-size: 11px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-side { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; }
+.ev-side .ev-delta { width: auto; }
+.ev-pos { font-size: 11px; color: var(--faint); white-space: nowrap; margin-top: 1px; }
+.ev-delta { flex-shrink: 0; width: 50px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.up { color: var(--success); } .down { color: var(--danger); } .zero { color: var(--faint); font-weight: 400; }
+.k-file { background: var(--success-soft); color: var(--success); }
+.k-run { background: var(--info-soft); color: var(--info); }
+.k-cut { background: var(--danger-soft); color: var(--danger); }
+.k-agent { background: var(--warning-soft); color: var(--warning); }
+.k-neutral { background: var(--surface-subtle); color: var(--muted); border: 1px solid var(--line); line-height: 15px; }
+.v-c .k-neutral { background: var(--surface); }
+
+.tl { padding: 2px 12px 10px; }
+.tl-turn { font-size: 11px; color: var(--faint); padding: 8px 0 2px; display: flex; align-items: center; gap: 8px; }
+.tl-turn::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.tl-row { display: flex; align-items: flex-start; gap: 9px; padding: 4px 0; font-size: 12px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+.d-file { background: var(--success); } .d-run { background: var(--info); } .d-cut { background: var(--danger); } .d-agent { background: var(--warning); } .d-neutral { background: var(--line-strong); }
+
+/* ---------- Bash ---------- */
+.bash-empty { padding: 8px 12px 14px; font-size: 12px; color: var(--faint); }
+/* 方案 1 现状 */
+.notable { padding: 10px 12px 0; }
+.nh { display: flex; align-items: center; gap: 8px; padding-bottom: 6px; font-size: 11px; color: var(--faint); }
+.nh::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.nr { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 6px; background: var(--surface-subtle); font-size: 12px; margin-bottom: 4px; }
+.v-c .nr { background: var(--surface); }
+.nr .lab { width: 4em; color: var(--muted); flex-shrink: 0; }
+.nr .cmd { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 11.5px; }
+.prog { padding: 0 6px 10px; }
+.ph { display: flex; padding: 10px 6px 2px; font-size: 11px; color: var(--faint); }
+.ph span:last-child { margin-left: auto; }
+.pr { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; font-size: 12px; }
+.pr .nm { width: 92px; flex-shrink: 0; font-family: var(--font-mono); }
+.pbar { flex: 1; height: 4px; border-radius: 9px; background: var(--track); overflow: hidden; }
+.pbar i { display: block; height: 100%; background: var(--k-tools); border-radius: 9px; }
+.pr .c { width: 34px; text-align: right; }
+.pr .pc { width: 34px; text-align: right; font-size: 11px; color: var(--faint); }
+.pr .f { width: 44px; text-align: right; font-size: 11px; color: var(--danger); }
+
+/* 方案 2 一行总览 + 简单清单 */
+.b2-sum { display: flex; align-items: baseline; gap: 14px; padding: 6px 12px 2px; font-size: 12px; color: var(--muted); }
+.b2-sum b { font-size: 17px; font-weight: 600; color: var(--text); margin-right: 3px; font-variant-numeric: tabular-nums; }
+.b2-sum b.bad { color: var(--danger); }
+.b2-sec { font-size: 11px; color: var(--faint); padding: 12px 12px 4px; }
+.b2-n { display: flex; align-items: baseline; gap: 10px; padding: 3px 12px; font-size: 12px; }
+.b2-n .lab { width: 4.2em; color: var(--faint); flex-shrink: 0; }
+.b2-n .cmd { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 11.5px; }
+.b2-n .val { flex-shrink: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+.b2-n .val.warn { color: var(--warning); } .b2-n .val.bad { color: var(--danger); }
+.b2-p { display: flex; align-items: center; gap: 8px; padding: 4px 12px; font-size: 12px; }
+.b2-p .nm { font-family: var(--font-mono); flex-shrink: 0; min-width: 64px; }
+.b2-p .subs { flex: 1; min-width: 0; color: var(--faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b2-p .c { flex-shrink: 0; font-variant-numeric: tabular-nums; width: 28px; text-align: right; }
+.b2-p .f { flex-shrink: 0; font-size: 11px; color: var(--danger); }
+.b2-p .fx { width: 8px; flex-shrink: 0; }
+.b2-p .fd { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); flex-shrink: 0; }
+
+/* 方案 3 条形当底色 */
+.b3-sum { display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 12px 0; }
+.b3-sum .k { font-size: 11px; color: var(--faint); }
+.b3-sum .v { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.b3-sum .v small { font-size: 11px; color: var(--faint); font-weight: 400; margin-left: 2px; }
+.b3-list { padding: 10px 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.b3-r { position: relative; display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 6px; font-size: 12px; overflow: hidden; }
+.b3-r .fill { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--k-tools) 14%, transparent); border-radius: 6px; }
+.b3-r > :not(.fill) { position: relative; }
+.b3-r .nm { font-family: var(--font-mono); }
+.b3-r .subs { color: var(--faint); font-size: 11px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b3-r .c { font-variant-numeric: tabular-nums; }
+.b3-r .f { font-size: 11px; color: var(--danger); }
+.b3-note { margin: 0 12px; padding: 7px 10px; border-radius: 8px; background: var(--surface-subtle); font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.v-c .b3-note { background: var(--surface); }
+.b3-note .mono { font-size: 11.5px; color: var(--text); }
+.b3-note .w { color: var(--warning); } .b3-note .x { color: var(--danger); }
+
+.foot { text-align: center; font-size: 11px; color: var(--faint); padding: 10px 0 14px; }
+
+/* ---------- 路径（照现有卡片） ---------- */
+.p-cells { display: grid; grid-template-columns: 1fr 1fr; margin: 8px 12px 0; gap: 6px; }
+.p-cell { position: relative; padding: 7px 10px 8px; border-radius: 8px; background: var(--surface-subtle); }
+.p-cell[aria-pressed="true"] { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.p-cell .k { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--faint); }
+.p-cell .v { font-size: 16px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.p-cell .v small { font-size: 11px; color: var(--faint); font-weight: 400; margin-left: 2px; }
+.dotA { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+.dotS { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--line-strong); }
+.p-tool { display: flex; align-items: center; gap: 6px; padding: 8px 12px 2px; }
+.p-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); padding: 2px 6px 2px 4px; margin-left: -6px; border-radius: 6px; }
+.p-toggle:hover { background: var(--hover); color: var(--text); }
+.chips { margin-left: auto; display: flex; gap: 4px; }
+.fchip { border: 1px solid var(--line); border-radius: 99px; padding: 0 8px; font-size: 11px; line-height: 18px; color: var(--muted); }
+.fchip[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--surface); }
+.p-dir { display: flex; font-family: var(--font-mono); font-size: 11px; color: var(--faint); padding: 8px 12px 2px; }
+.p-dir span:last-child { margin-left: auto; font-family: var(--font-ui); }
+.p-row { display: flex; align-items: center; gap: 7px; margin: 0 6px; padding: 4px 6px 4px 8px; border-radius: 6px; font-size: 12px; }
+.p-row:hover { background: var(--hover); }
+.p-row .fi { color: var(--faint); font-size: 11px; width: 13px; text-align: center; }
+.p-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-row .nm .dir { font-family: var(--font-mono); font-size: 11px; color: var(--faint); margin-left: 6px; }
+.tag { flex-shrink: 0; border-radius: 4px; padding: 0 6px; font-size: 11px; line-height: 17px; white-space: nowrap; }
+.tag.new { background: var(--info-soft); color: var(--info); }
+.tag.wake { background: var(--success-soft); color: var(--success); font-weight: 500; }
+.tag.sleep { border: 1px solid var(--line); color: var(--faint); line-height: 15px; }
+.p-row .rd { width: 30px; text-align: right; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.p-row .ago { width: 54px; text-align: right; font-size: 11px; color: var(--faint); flex-shrink: 0; }
+.sleeping .nm { color: var(--muted); }
+.p2-seg { display: flex; margin: 8px 12px 0; border-bottom: 1px solid var(--line); }
+.p2-seg button { position: relative; display: flex; align-items: baseline; gap: 6px; padding: 4px 2px 7px; margin-right: 18px; font-size: 12px; color: var(--muted); }
+.p2-seg button b { font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.p2-seg button small { font-size: 11px; color: var(--faint); }
+.p2-seg button[aria-pressed="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--text); border-radius: 2px; }
+.p2-cap { display: flex; align-items: center; gap: 8px; padding: 8px 12px 0; font-size: 11px; color: var(--faint); }
+.p2-cap .meter { height: 3px; }
+
+/* ---------- Bash 交互 ---------- */
+.b2-p { cursor: default; border-radius: 6px; margin: 0 6px; padding: 4px 6px; }
+.b2-p.can { cursor: pointer; }
+.b2-p.can:hover { background: var(--hover); }
+.b2-p.open { background: var(--surface-subtle); border-radius: 6px 6px 0 0; }
+.b2-p .car { width: 10px; color: var(--faint); font-size: 9px; flex-shrink: 0; transition: transform .12s; }
+.b2-p.open .car { transform: rotate(90deg); }
+.nest { margin: 0 6px 4px; padding: 2px 0 6px; background: var(--surface-subtle); border-radius: 0 0 6px 6px; }
+.n-sub { display: flex; align-items: center; gap: 8px; padding: 3px 12px 3px 24px; font-size: 12px; position: relative; }
+.n-sub::before { content: ""; position: absolute; left: 14px; top: 0; bottom: 0; border-left: 1px solid var(--line); }
+.n-sub .nm { font-family: var(--font-mono); color: var(--muted); min-width: 52px; }
+.n-sub .sbar { flex: 1; height: 3px; border-radius: 9px; background: var(--track); overflow: hidden; }
+.n-sub .sbar i { display: block; height: 100%; background: var(--k-tools); opacity: .7; }
+.n-sub .c { width: 24px; text-align: right; font-variant-numeric: tabular-nums; }
+.n-sub .f { font-size: 11px; color: var(--danger); }
+.n-sub.can { cursor: pointer; }
+.n-sub.can:hover { background: var(--hover); }
+.n-sub .car { width: 10px; color: var(--faint); font-size: 9px; transition: transform .12s; }
+.n-sub.open .car { transform: rotate(90deg); }
+.n-cmd { display: flex; align-items: center; gap: 8px; padding: 2px 12px 2px 40px; font-size: 11.5px; position: relative; }
+.n-cmd::before { content: ""; position: absolute; left: 14px; top: 0; bottom: 0; border-left: 1px solid var(--line); }
+.n-cmd .cmd { flex: 1; min-width: 0; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.n-cmd .c { color: var(--faint); font-variant-numeric: tabular-nums; }
+.n-cmd .x { color: var(--danger); font-size: 11px; }
+.jump { opacity: 0; color: var(--faint); font-size: 11px; flex-shrink: 0; }
+.n-cmd:hover .jump, .b2-n:hover .jump { opacity: 1; }
+.n-cmd:hover, .b2-n.can:hover { background: var(--hover); cursor: pointer; }
+.b2-n { border-radius: 6px; margin: 0 6px; padding: 3px 6px; }
+.b-filter { display: flex; align-items: center; gap: 6px; padding: 12px 12px 4px; }
+.b-filter .sec { font-size: 11px; color: var(--faint); }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--surface); font-size: 12px; padding: 6px 12px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>上下文面板 Demo · 第 2 版</h1>
+  <div class="grp">路径 <div class="seg" data-key="paths"><button data-v="1" aria-pressed="true">1 原样搬过来</button><button data-v="2">2 标签页 + 直接列出</button></div></div>
+  <div class="grp">Bash 交互 <div class="seg" data-key="bash"><button data-v="1" aria-pressed="true">1 展开子命令</button><button data-v="2">2 再展开到原命令</button></div></div>
+  <div class="grp">主题 <div class="seg" data-key="theme"><button data-v="light" aria-pressed="true">浅色</button><button data-v="dark">深色</button></div></div>
+</div>
+<p class="why">
+  边框已定 <b>B</b>（卡片去边框，横线分隔），Bash 卡片已定「一行总览」。下面只比较两处，<b>都可以点</b>。<br>
+  <b>路径</b>：「1」把现在应用里的路径卡片原样搬到 B 风格里：两格统计兼作切换，列表按目录分组，每行带标签、读取次数和上次读取时间。「2」把两格改成标签页，展开后直接列出前几条，不用再多点一次。<br>
+  <b>Bash 交互</b>：「1」点程序（如 git、pnpm）展开子命令，带次数、条形和失败数。「2」在 1 的基础上，再点子命令能看到具体跑过哪些命令和各跑了几次；鼠标移到命令上出现「轨迹 ↗」，点了跳到轨迹里那次调用。「值得注意」里的命令两种方案都能点着跳轨迹。<br>
+  右边是同一块面板的完整样子，左右两栏只是两种状态：左边是刚打开时，右边是点开以后。
+</p>
+<div class="cols" id="cols"></div>
+<div class="toast" id="toast"></div>
+<script>
+const state = { paths: "1", bash: "1" };
+const cats = [["系统提示词","--k-system",6.1],["工具","--k-tools",14.3],["规则","--k-rules",2.4],["技能","--k-skills",1.8],["已压缩对话","--k-sum",3.2],["对话","--k-conv",20.4]];
+const total = cats.reduce((s, c) => s + c[2], 0);
+const k = (n) => n >= 1 ? `≈${n.toFixed(1)}k` : `≈${Math.round(n * 1000)}`;
+const pct = (n, t) => `${Math.round(n / t * 100)}%`;
+function toast(t) { const el = document.getElementById("toast"); el.textContent = t; el.classList.add("on"); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("on"), 1400); }
+
+function overview() {
+  const segs = cats.map(c => `<span style="width:${c[2] / 200 * 100}%;background:var(${c[1]})"></span>`).join("");
+  const leg = cats.map(c => `<div><span class="sw" style="background:var(${c[1]})"></span><span>${c[0]}</span><span class="n num">${k(c[2])}</span><span class="p num">${pct(c[2], total)}</span></div>`).join("");
+  return `<section class="card"><div class="head"><span class="title">当前上下文</span><span class="meta">Claude Opus 5.5</span></div>
+  <div class="ov"><div style="display:flex;justify-content:space-between;align-items:baseline" class="num"><span><span class="big">${k(total)}</span><span style="font-size:12px;color:var(--faint)"> / 200k tokens</span></span><span style="font-size:16px;font-weight:600">${pct(total, 200)}<small style="font-size:11px;color:var(--faint);font-weight:400;margin-left:4px">已用</small></span></div>
+  <div class="segbar">${segs}</div><div class="legend">${leg}</div></div></section>`;
+}
+function stats() {
+  const cells = [["轮次","12"],["步数","87"],["压缩","1","次"],["缓存命中","92.4%"],["累计 Token","3.1M"],["费用","$4.82"]];
+  return `<section class="card stats-wrap"><div class="grid3">${cells.map(c => `<div><div class="k">${c[0]}</div><div class="v">${c[1]}${c[2] ? `<small>${c[2]}</small>` : ""}</div></div>`).join("")}</div></section>`;
+}
+
+/* ---------- 路径 ---------- */
+const P = {
+  active: [
+    ["apps/desktop/src/main/runtime-v2/", "context-history-projection.ts", "new", 4, "2 分钟前"],
+    ["apps/desktop/src/main/runtime-v2/", "context-panel-service.ts", "", 2, "6 分钟前"],
+    ["apps/desktop/src/renderer/components/right-panel/context/", "ContextBash.tsx", "", 3, "刚刚"],
+    ["apps/desktop/src/renderer/components/right-panel/context/", "ContextEvents.tsx", "new", 1, "刚刚"],
+    ["apps/desktop/src/renderer/components/right-panel/context/", "ContextPanel.tsx", "", 5, "1 分钟前"],
+    ["apps/desktop/src/renderer/components/right-panel/context/", "ContextPaths.tsx", "", 0, "未读过"],
+    ["docs/design-docs/frontend/", "front-Context面板规范.md", "wake", 2, "12 分钟前"],
+    ["packages/util/shared/src/", "context-panel.ts", "", 1, "20 分钟前"],
+  ],
+  sleeping: [
+    ["apps/desktop/src/renderer/components/", "RightPanel.tsx", "sleepTag", 0, "1 小时前"],
+    ["apps/desktop/src/renderer/styles/", "tokens.css", "", 0, "2 小时前"],
+    ["packages/context/context-engine/src/", "codec.ts", "", 0, "3 小时前"],
+  ],
+};
+const tagHtml = (t) => t === "new" ? '<span class="tag new">新</span>' : t === "wake" ? '<span class="tag wake">待唤醒</span>' : t === "sleepTag" ? '<span class="tag sleep">将睡眠</span>' : "";
+function pathRows(vis, grouped, limit) {
+  const list = P[vis].slice(0, limit);
+  const row = (p) => `<div class="p-row ${vis === "sleeping" ? "sleeping" : ""}"><span class="fi">▤</span><span class="nm">${p[1]}${grouped ? "" : `<span class="dir">${p[0]}</span>`}</span>${tagHtml(p[2])}<span class="rd num">${p[3] ? "读 " + p[3] : "—"}</span><span class="ago num">${p[4]}</span></div>`;
+  if (!grouped) return list.map(row).join("");
+  const groups = []; for (const p of list) { const g = groups.at(-1); if (g && g.dir === p[0]) g.items.push(p); else groups.push({ dir: p[0], items: [p] }); }
+  return groups.map(g => `<div class="p-dir"><span>${g.dir}</span><span class="num">${g.items.length}</span></div>${g.items.map(row).join("")}`).join("");
+}
+function pathsCard(ps) {
+  const head = `<div class="head"><span class="title">路径</span><span class="meta">第 2 压缩周期</span></div>`;
+  const counts = { active: 14, sleeping: 9 };
+  const listBlock = ps.open ? `<div style="padding-bottom:8px">${pathRows(ps.vis, ps.grouped, ps.vis === "active" ? 8 : 3)}<button class="more">再显示 ${counts[ps.vis] - (ps.vis === "active" ? 8 : 3)} 项（共 ${counts[ps.vis]}）</button></div>` : `<div style="height:8px"></div>`;
+  const chips = `<span class="chips"><button class="fchip" aria-pressed="${ps.grouped}" data-pgroup="1">按目录</button><button class="fchip" aria-pressed="${!ps.grouped}" data-pgroup="0">平铺</button></span>`;
+  if (state.paths === "1") {
+    return `<section class="card">${head}
+    <div class="p-cells">
+      <button class="p-cell" aria-pressed="${ps.vis === "active"}" data-pvis="active"><div class="k"><span class="dotA"></span>活跃</div><div class="v">14<small>/ 30</small></div><div class="meter" style="margin-top:6px"><i style="width:47%"></i></div></button>
+      <button class="p-cell" aria-pressed="${ps.vis === "sleeping"}" data-pvis="sleeping"><div class="k"><span class="dotS"></span>睡眠</div><div class="v">9</div></button>
+    </div>
+    <div class="p-tool"><button class="p-toggle" data-popen><span class="car" style="display:inline-block;transform:rotate(${ps.open ? 90 : 0}deg);font-size:9px;color:var(--faint)">▶</span>${ps.open ? `${ps.vis === "active" ? "活跃" : "睡眠"} · 已显示 ${ps.vis === "active" ? 8 : 3} / ${counts[ps.vis]}` : `显示${ps.vis === "active" ? "活跃" : "睡眠"}路径 · ${counts[ps.vis]} 条`}</button>${ps.open ? chips : ""}</div>
+    ${listBlock}</section>`;
+  }
+  // 方案 2：标签页，默认直接列 5 条
+  const limit = ps.open ? (ps.vis === "active" ? 8 : 3) : (ps.vis === "active" ? 5 : 3);
+  return `<section class="card">${head}
+    <div class="p2-seg">
+      <button aria-pressed="${ps.vis === "active"}" data-pvis="active"><span class="dotA" style="align-self:center"></span>活跃 <b>14</b><small>/ 30</small></button>
+      <button aria-pressed="${ps.vis === "sleeping"}" data-pvis="sleeping"><span class="dotS" style="align-self:center"></span>睡眠 <b>9</b></button>
+      ${chips.replace('class="chips"', 'class="chips" style="align-self:center;margin-bottom:4px"')}
+    </div>
+    ${ps.vis === "active" ? `<div class="p2-cap"><span>容量</span><span class="meter"><i style="width:47%"></i></span><span class="num">还能放 16 条</span></div>` : `<div class="p2-cap">睡眠的路径只留在索引里，模型需要时会自己去读。</div>`}
+    <div style="padding:2px 0 8px">${pathRows(ps.vis, ps.grouped, limit)}<button class="more" data-popen>${ps.open ? `再显示 ${counts[ps.vis] - limit} 项（共 ${counts[ps.vis]}）` : `再显示 ${counts[ps.vis] - limit} 项（共 ${counts[ps.vis]}）`}</button></div></section>`;
+}
+
+function browser() {
+  const rows = [["工具结果","read_file · ContextPanel.tsx",1.9],["工具调用","read_file",0.08],["助手","模型回复",0.6],["工具结果","bash · pnpm test",2.4],["工具调用","bash",0.12],["用户","上下文面板还要调整…",0.3]];
+  const conv = rows.map(r => `<div class="row"><span class="chip">${r[0]}</span><span class="ti">${r[1]}</span><span class="gauge"><i style="width:${Math.max(4, r[2] / 2.4 * 100)}%;background:var(--k-conv)"></i></span><span class="tk num">${k(r[2])}</span></div>`).join("");
+  const closed = cats.filter(c => c[0] !== "对话").map((c, i) => `<div class="cat"><div class="cat-h"><span class="chev">▸</span><span class="sw" style="background:var(${c[1]})"></span><span style="font-weight:500">${c[0]}</span><span class="cnt">${[3,41,2,6,1][i]} 项</span><span class="t num">${k(c[2])}</span><span class="s num">${pct(c[2], total)}</span></div></div>`).join("");
+  const mini = cats.map(c => `<span style="width:${c[2] / total * 100}%;background:var(${c[1]})"></span>`).join("");
+  return `<section class="card"><div class="head" style="padding-bottom:8px"><span class="title">上下文明细</span><span class="meta">对比：最近请求输入（第 12 轮 · 步 3）</span></div>
+  <div class="sub"><span><b class="num">${k(total)}</b> 估算 · 最近请求实际 <b class="num">47,630</b></span><span style="margin-left:auto" class="num">258 项</span></div>
+  <div class="segbar" style="height:4px;margin:0 12px 10px;border-radius:9px">${mini}</div>${closed}
+  <div class="cat"><div class="cat-h"><span class="chev">▾</span><span class="sw" style="background:var(--k-conv)"></span><span style="font-weight:500">对话</span><span class="cnt">205 项</span><span class="t num">${k(20.4)}</span><span class="s num">${pct(20.4, total)}</span></div>${conv}
+  <button class="more" data-more>再显示 20 项（共 205）</button></div></section>`;
+}
+function trend() {
+  const h = [18,22,27,31,36,40,46,52,58,63,70,76,81,88,94,26,29,33,37,41,45,49,53,57];
+  const bars = h.map((v, i) => `${i === 15 ? '<span class="cut"></span>' : ""}<div style="height:${v}%"><i style="height:30%;background:var(--k-conv)"></i><i style="height:12%;background:var(--k-sum)"></i><i style="height:34%;background:var(--k-tools)"></i><i style="height:24%;background:var(--k-system)"></i></div>`).join("");
+  return `<section class="card"><div class="head"><span class="title">上下文趋势</span><span class="meta">每根柱 = 一次请求</span></div><div class="trend"><div class="cap num">第 12 轮 · 步 3 · ≈48.2k · 实际输入 47,630</div><div class="bars">${bars}</div><div class="axis num"><span>#1</span><span style="color:var(--danger)">✂ 压缩 −86.4k</span><span>#24 最新</span></div></div></section>`;
+}
+const events = [
+  { turn: 12, step: 3, kind: "file", chip: "文件", label: "活跃文件清单更新", detail: "新增 context-history-projection.ts 等 2 个，共 14 个", delta: 410 },
+  { turn: 12, step: 1, kind: "run", chip: "运行", label: "运行状态更新", detail: "模式 agent → plan", delta: 0 },
+  { turn: 11, step: null, kind: "file", chip: "文件", label: "活跃文件清单更新 ×6", detail: "本轮连续 6 次，合并显示；共 12 个", delta: 1240 },
+  { turn: 9, step: 4, kind: "cut", chip: "压缩", label: "上下文已压缩", detail: "旧对话换成摘要", delta: -86400 },
+  { turn: 8, step: 2, kind: "agent", chip: "子 Agent", label: "子 Agent 清单更新", detail: "2 个运行中：review-ui、test-runner", delta: 180 },
+  { turn: 5, step: 1, kind: "neutral", chip: "工具", label: "工具清单变化", detail: "新增 2 个：pencil.batch_get、pencil.snapshot", delta: 3100 },
+];
+const fmtDelta = (d) => d === null ? "" : d === 0 ? "±0" : `${d > 0 ? "+" : "−"}${Math.abs(d) >= 1000 ? (Math.abs(d) / 1000).toFixed(1) + "k" : Math.abs(d)}`;
+const deltaCls = (d) => d === null || d === 0 ? "zero" : d > 0 ? "up" : "down";
+const pos = (e) => e.step === null ? `第 ${e.turn} 轮` : `第 ${e.turn} 轮 · 步 ${e.step}`;
+function eventsCard() {
+  return `<section class="card"><div class="head"><span class="title">上下文事件</span><span class="meta">${events.length} 个 · 新的在上</span></div><ul class="ev-list">${events.map(e => `<li><span class="kchip k-${e.kind}">${e.chip}</span><div class="ev-main"><div class="l">${e.label}</div><div class="d">${e.detail}</div></div><div class="ev-side"><span class="ev-delta ${deltaCls(e.delta)}">${fmtDelta(e.delta)}</span><span class="ev-pos num">${pos(e)}</span></div></li>`).join("")}</ul></section>`;
+}
+
+/* ---------- Bash ---------- */
+const progs = [
+  { name: "git", count: 22, failed: 0, subs: [["status", 9, 0, [["git status --short", 9, 0]]], ["diff", 7, 0, [["git diff --stat", 4, 0], ["git diff apps/desktop", 3, 0]]], ["log", 4, 0, [["git log --oneline -5", 4, 0]]], ["add", 2, 0, [["git add apps docs", 2, 0]]]] },
+  { name: "pnpm", count: 14, failed: 4, subs: [["test", 6, 1, [["pnpm test --filter desktop", 4, 1], ["pnpm test context", 2, 0]]], ["tsc", 5, 3, [["pnpm tsc -b", 5, 3]]], ["lint", 3, 0, [["pnpm lint", 3, 0]]]] },
+  { name: "rg", count: 10, failed: 0, subs: [] }, { name: "sed", count: 7, failed: 0, subs: [] }, { name: "ls", count: 5, failed: 0, subs: [] },
+  { name: "cat", count: 3, failed: 0, subs: [] }, { name: "node", count: 2, failed: 1, subs: [] }, { name: "python3", count: 1, failed: 0, subs: [] },
+];
+function bashCard(bs) {
+  const notable = [["最慢", "pnpm test --filter desktop", "48.2s", "warn"], ["失败最多", "pnpm tsc -b", "3 次", "bad"], ["重复最多", "git status --short", "×9", ""], ["后台", "pnpm dev", "2 次", ""]];
+  const nrows = notable.map(n => `<div class="b2-n can" data-jump="${n[1]}"><span class="lab">${n[0]}</span><span class="cmd">${n[1]}</span><span class="jump">轨迹 ↗</span><span class="val ${n[3]}">${n[2]}</span></div>`).join("");
+  const max = 22;
+  const list = progs.filter(p => !bs.failOnly || p.failed).map(p => {
+    const can = p.subs.length > 0; const open = bs.open.has(p.name);
+    const row = `<div class="b2-p ${can ? "can" : ""} ${open ? "open" : ""}" ${can ? `data-prog="${p.name}"` : ""}><span class="car">${can ? "▶" : ""}</span><span class="nm">${p.name}</span><span class="subs">${open ? "" : p.subs.map(s => `${s[0]} ${s[1]}`).join(" · ")}</span>${p.failed ? `<span class="f num">${p.failed} 失败</span>` : ""}<span class="c num">${p.count}</span></div>`;
+    if (!open) return row;
+    const subs = p.subs.map(s => {
+      const key = p.name + " " + s[0]; const sOpen = state.bash === "2" && bs.subOpen.has(key);
+      const sRow = `<div class="n-sub ${state.bash === "2" ? "can" : ""} ${sOpen ? "open" : ""}" ${state.bash === "2" ? `data-sub="${key}"` : ""}>${state.bash === "2" ? '<span class="car">▶</span>' : ""}<span class="nm">${s[0]}</span><span class="sbar"><i style="width:${s[1] / p.count * 100}%"></i></span>${s[2] ? `<span class="f num">${s[2]} 失败</span>` : ""}<span class="c num">${s[1]}</span></div>`;
+      if (!sOpen) return sRow;
+      return sRow + s[3].map(c => `<div class="n-cmd" data-jump="${c[0]}"><span class="cmd">${c[0]}</span>${c[2] ? `<span class="x">${c[2]} 失败</span>` : ""}<span class="jump">轨迹 ↗</span><span class="c">×${c[1]}</span></div>`).join("");
+    }).join("");
+    return row + `<div class="nest">${subs}</div>`;
+  }).join("");
+  return `<section class="card"><div class="head"><span class="title">Bash 命令</span><span class="meta num">8 个程序</span></div>
+    <div class="b2-sum"><span><b>64</b>次调用</span><span><b class="bad">5</b>次失败</span><span><b>3分12秒</b>合计</span></div>
+    <div class="b2-sec">值得注意</div>${nrows}
+    <div class="b-filter"><span class="sec">按程序</span><span class="chips"><button class="fchip" aria-pressed="${bs.failOnly}" data-failonly>只看失败</button></span></div>
+    ${list}<div style="height:8px"></div></section>`;
+}
+
+/* 两栏：左 = 刚打开；右 = 点开以后。两栏状态各自独立，可以继续点 */
+const cols = [
+  { name: "刚打开", ps: { vis: "active", open: false, grouped: true }, bs: { open: new Set(), subOpen: new Set(), failOnly: false } },
+  { name: "点开以后", ps: { vis: "active", open: true, grouped: true }, bs: { open: new Set(["git", "pnpm"]), subOpen: new Set(["pnpm tsc", "git diff"]), failOnly: false } },
+];
+function panel(c, i) {
+  return `<div class="col"><div class="col-title"><b>${i ? "右" : "左"}</b>${c.name}</div><aside class="panel v-b" data-col="${i}"><div class="tabs"><span class="tab">MD 文档</span><span class="tab on">上下文</span><span class="tab">子 Agent</span><span class="tab">后台任务</span></div>
+  <div class="body">${overview()}${stats()}${pathsCard(c.ps)}${browser()}${trend()}${eventsCard()}${bashCard(c.bs)}<div class="foot">≈ 为本地估算</div></div></aside></div>`;
+}
+function render() { document.getElementById("cols").innerHTML = cols.map(panel).join(""); }
+document.getElementById("cols").addEventListener("click", (e) => {
+  const aside = e.target.closest("[data-col]"); if (!aside) return; const c = cols[Number(aside.dataset.col)];
+  const t = (sel) => e.target.closest(sel);
+  let el;
+  if ((el = t("[data-pvis]"))) { c.ps.vis = el.dataset.pvis; }
+  else if ((el = t("[data-popen]"))) { c.ps.open = !c.ps.open; }
+  else if ((el = t("[data-pgroup]"))) { c.ps.grouped = el.dataset.pgroup === "1"; }
+  else if ((el = t("[data-failonly]"))) { c.bs.failOnly = !c.bs.failOnly; }
+  else if ((el = t("[data-jump]"))) { toast(`跳到轨迹：${el.dataset.jump}`); return; }
+  else if ((el = t("[data-sub]"))) { const s = c.bs.subOpen; s.has(el.dataset.sub) ? s.delete(el.dataset.sub) : s.add(el.dataset.sub); }
+  else if ((el = t("[data-prog]"))) { const s = c.bs.open; s.has(el.dataset.prog) ? s.delete(el.dataset.prog) : s.add(el.dataset.prog); }
+  else if ((el = t("[data-more]"))) { el.innerHTML = '<span class="spin"></span>正在读取…'; setTimeout(() => { el.textContent = "再显示 20 项（共 205）"; }, 900); return; }
+  else return;
+  render();
+});
+document.querySelectorAll(".bar .seg").forEach(seg => seg.addEventListener("click", (e) => {
+  const btn = e.target.closest("button"); if (!btn) return;
+  seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === btn)));
+  const key = seg.dataset.key;
+  if (key === "theme") document.documentElement.dataset.theme = btn.dataset.v; else { state[key] = btn.dataset.v; render(); }
+}));
+render();
+</script>
+</body>
+</html>

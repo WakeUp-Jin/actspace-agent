@@ -35,7 +35,7 @@ export type ContextPanelView = {
   history?: ContextPanelHistory;
   /** Live disclosure only; absence means an older backend. */
   disclosure?: ContextDisclosureSummary;
-  entriesPage?: { revision?: string; total: number; nextCursor?: string; truncated: boolean };
+  entriesPage?: { revision?: string; total: number; nextCursor?: string; truncated: boolean; bucketCounts?: Partial<Record<ContextPanelBucketKey, number>> };
   limits?: { trend: ContextPanelTruncation; events: ContextPanelTruncation };
   /** 对比基准：最近已持久化的请求输入；还没发过请求时为 null。 */
   previous: ContextPanelManifest | null;
@@ -156,13 +156,24 @@ export type ContextPanelTrendPoint = {
   compactedBefore?: { compactionId: string; reclaimedTokens: number | null };
 };
 
+/**
+ * 上下文事件（规范 §2 第 6 块）。补充上下文按来源分成文件、运行、子 Agent、后台，其他补充是 `inject`。
+ * 同一轮同一来源连续更新合成一行：`count` 是合并的次数，`stepIndex` 为 null，`tokenDelta` 是增减之和。
+ */
+export type ContextPanelEventKind = "files" | "runtime" | "subagents" | "background" | "inject" | "compact" | "tools-changed" | "model-switch" | "mode-switch";
 export type ContextPanelEvent = {
+  /** 由相邻请求推导（工具、模型）。 */
   inferred?: boolean;
   id: string;
-  kind: "inject" | "compact" | "tools-changed" | "model-switch" | "mode-switch";
+  kind: ContextPanelEventKind;
+  /** 标题，不含「×N」。 */
   label: string;
+  /** 说明：变了什么。 */
+  detail?: string;
   source?: string;
-  /** 净增减；没有意义时为 null。 */
+  /** 合并的次数；不合并时省略。 */
+  count?: number;
+  /** 净增减；未知时为 null，没变时为 0。 */
   tokenDelta: number | null;
   turnIndex: number | null;
   stepIndex: number | null;
@@ -173,7 +184,8 @@ export type ContextPanelHistory = { status: "ready" | "syncing" | "rebuilding" |
 export type ContextPanelTruncation = { truncated: boolean; returnedCount: number; total: number; fromSeq: number | null; throughSeq: number | null };
 export type ContextPanelResponse = ContextPanelView | { notModified: true; versionToken: string; history: ContextPanelHistory };
 export type ContextEntriesInput = { sessionId: string; revision: string; cursor?: string; bucket?: ContextPanelBucketKey; limit?: number };
-export type ContextEntriesPage = { revision: string; entries: ContextPanelEntry[]; previous: ContextPanelManifest["entries"]; total: number; nextCursor?: string };
+/** `bucketCounts`：每类条目总数（含未读到的页），分类行的「N 项」用它。 */
+export type ContextEntriesPage = { revision: string; entries: ContextPanelEntry[]; previous: ContextPanelManifest["entries"]; total: number; nextCursor?: string; bucketCounts?: Partial<Record<ContextPanelBucketKey, number>> };
 export type ContextEntryInput = { sessionId: string; revision: string; key: string; offset?: number };
 export type ContextEntryText = { revision: string; key: string; text: string; nextOffset?: number };
 /** Persisted request metadata. Contains identities/estimates, never body text. */
