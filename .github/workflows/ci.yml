@@ -1,16 +1,30 @@
 name: CI
 
+# 代码变更的常驻门禁。纯文档变更走 docs.yml；两边的 paths 过滤互补。
+# 仓库是 public，标准 GitHub 托管 runner 不计费；这里的拆分只为缩短反馈时间。
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# 同一个 PR 连续推送只保留最后一次；main 上的每个 push 都完整跑完。
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   repository-checks:
+    name: 仓库基础检查
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -26,18 +40,82 @@ jobs:
           globs: |
             **/*.md
 
-  workspace-checks:
+  typecheck-test:
+    name: 类型检查与测试
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Enable pnpm
-        run: |
-          corepack enable
-          corepack prepare "$(node -p "require('./package.json').packageManager")" --activate
-          pnpm --version
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check Agent contract matrix
+        run: pnpm run gen:contract-matrix --check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+  build:
+    name: 构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      # 打包脚本会 go build 浏览器桥 CLI（scripts/package-browser-components.mjs）。
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        if: github.event_name != 'pull_request'
+        with:
+          go-version-file: browser-bridge/apps/cli/go.mod
+          cache-dependency-path: |
+            browser-bridge/apps/cli/go.mod
+            browser-bridge/packages/protocol/go.mod
+
+      # 只在 main 上验证打包脚本还能跑通，不上传产物；正式产物由 release.yml 负责。
+      - name: Package desktop (smoke)
+        if: github.event_name != 'pull_request'
+        run: ./scripts/release-package.sh
+
+  site:
+    name: 官网
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -51,25 +129,36 @@ jobs:
       - name: Test site
         run: pnpm test:site
 
-      - name: Check Agent contract matrix
-        run: pnpm run gen:contract-matrix --check
-
       - name: Build site
         env:
           SITE_URL: https://example.com
           SITE_BASE: /
         run: pnpm build:site
 
-      - name: Set up Go for Browser Bridge
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+  browser-bridge:
+    name: Browser Bridge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: browser-bridge/apps/cli/go.mod
           cache-dependency-path: |
             browser-bridge/apps/cli/go.mod
             browser-bridge/packages/protocol/go.mod
 
-      - name: Typecheck
-        run: pnpm typecheck
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Browser Bridge contract checks
         run: pnpm check:browser
@@ -77,9 +166,3 @@ jobs:
       - name: Browser Bridge Go tests
         working-directory: browser-bridge
         run: go test ./packages/protocol/... ./apps/cli/...
-
-      - name: Test
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
