@@ -29,7 +29,8 @@ it("reads bounded chunks of a session-owned snapshot and verifies the complete f
     { method: "artifacts.read", params: { sessionId: "session-1", artifactId: "artifact-1", offset: 0, length: HOST_LIMITS.chunkBytes } },
     { method: "artifacts.read", params: { sessionId: "session-1", artifactId: "artifact-1", offset: HOST_LIMITS.chunkBytes, length: 3 } },
   ]);
-});
+// 文件里第一个用例要冷启动 webcrypto + FileReader；CI 上 29 个文件并行跑时偶尔超过默认 5s。
+}, 20_000);
 
 it("downloads an empty file without requesting an invalid zero-byte chunk", async () => {
   const client = fixture(new Uint8Array());
