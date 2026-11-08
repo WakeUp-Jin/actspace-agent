@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { Heading, List, ListItem, Paragraph, Root } from "mdast";
-import { toString } from "mdast-util-to-string";
+import { toString as mdastToString } from "mdast-util-to-string";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
@@ -58,7 +58,7 @@ function parseListItem(item: ListItem, sourcePath: string, month: string, releas
   }
 
   const paragraph = item.children[0] as Paragraph;
-  if (!toString(paragraph).trim()) {
+  if (!mdastToString(paragraph).trim()) {
     throw new ReleaseParseError(`${location(sourcePath, month, line)}：更新条目不能为空。`);
   }
   return renderInlineMarkdown(paragraph.children);
@@ -101,7 +101,7 @@ export function parseReleaseNotes(markdown: string, sourcePath = releaseSourceLa
   for (const node of root.children) {
     if (node.type === "heading") {
       const heading = node as Heading;
-      const text = toString(heading).trim();
+      const text = mdastToString(heading).trim();
 
       if (heading.depth === 2) {
         finishRelease();

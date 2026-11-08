@@ -17,6 +17,7 @@ export function CodeFileIcon({ type, size = 20, className }: { readonly type: Co
       viewBox="0 0 20 20"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: 静态图标表，测试已校验不含不安全标记
       dangerouslySetInnerHTML={{ __html: artwork }}
     />
   )

@@ -276,7 +276,7 @@ it.each(["candidate-flush", "applied-append"])("recovers %s failure at the durab
       return base.append(event);
     },
     flush: async () => {
-      if (fault === "candidate-flush" && !failed && (base.journal.events.at(-1)?.data as {op?:string}).op === "candidate") { failed = true; throw Error("injected"); }
+      if (fault === "candidate-flush" && !failed && (base.journal.events.at(-1)?.data as {op?:string} | undefined)?.op === "candidate") { failed = true; throw Error("injected"); }
     },
   };
   const { value, summarize } = coordinator(disclosure);

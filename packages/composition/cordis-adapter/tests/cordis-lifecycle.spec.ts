@@ -122,6 +122,7 @@ class FakeContext {
 class FakeFiber implements PromiseLike<void> {
   state = 0; readonly inject: Record<string, unknown>; #effect: (() => void | Promise<void>) | undefined; #started: Promise<void> | undefined;
   constructor(private readonly plugin: { inject?: readonly string[]; apply(context: { provide(name: string, value: unknown): void }): unknown }, private readonly services: Map<string, unknown>) { this.inject = Object.fromEntries((plugin.inject ?? []).map((name) => [name, {}])); }
+  // biome-ignore lint/suspicious/noThenProperty: 模拟 Cordis Fiber 的 thenable 行为
   then<TResult1 = void, TResult2 = never>(onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null, onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null): PromiseLike<TResult1 | TResult2> { return (this.#started ??= this.start()).then(onfulfilled, onrejected); }
   async start() { try { if (Object.keys(this.inject).some((name) => !this.services.has(name))) return; const effect = await this.plugin.apply({ provide: (name, value) => { this.services.set(name, value); } }); if (typeof effect === "function") this.#effect = effect as () => void | Promise<void>; this.state = 2; } catch (error) { this.state = 3; throw error; } }
   async dispose() { if (this.state === 4) return; this.state = 4; await this.#effect?.(); }

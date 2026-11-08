@@ -37,6 +37,7 @@ export type AgentSubjectPayload = CordisEventPayload & { readonly agent: AgentSu
 export type AgentWaterfallEventHandler<T = AgentSubjectPayload, R = T> = (this: object, payload: T, next: () => R | Promise<R>) => R | Promise<R>;
 
 /** Domain packages extend this interface without introducing adapter dependencies. */
+// biome-ignore lint/suspicious/noEmptyInterface: declaration-merging extension point
 export interface DomainEvents {}
 
 /** Declaration surface consumed by Cordis' typed Context methods. */

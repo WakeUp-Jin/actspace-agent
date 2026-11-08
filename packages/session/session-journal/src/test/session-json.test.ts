@@ -9,7 +9,8 @@ const nest = (depth: number) => { let value: unknown = "leaf"; for (let i = 0; i
 class Custom { x = 1; }
 const withGetter = { get value() { return 1; } };
 const nullProto = Object.assign(Object.create(null), { a: 1 });
-const sparse = [1, , 3]; // eslint-disable-line no-sparse-arrays
+// biome-ignore lint/suspicious/noSparseArray: 测试对象就是稀疏数组
+const sparse = [1, , 3];
 const MiB = 1024 * 1024;
 
 const cases: ReadonlyArray<readonly [string, unknown]> = [

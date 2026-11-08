@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { Heading, List, ListItem, Paragraph, Root } from "mdast";
-import { toString } from "mdast-util-to-string";
+import { toString as mdastToString } from "mdast-util-to-string";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
@@ -49,7 +49,7 @@ function parseTask(item: ListItem, sourcePath: string): RoadmapItem {
     throw new RoadmapParseError(`${location(sourcePath, line)}：开发计划条目必须是单段、无嵌套的列表项。`);
   }
 
-  const text = toString(item.children[0] as Paragraph).trim();
+  const text = mdastToString(item.children[0] as Paragraph).trim();
   if (!text) {
     throw new RoadmapParseError(`${location(sourcePath, line)}：开发计划标题不能为空。`);
   }
@@ -80,7 +80,7 @@ function parseTask(item: ListItem, sourcePath: string): RoadmapItem {
 export function parseRoadmap(markdown: string, sourcePath = roadmapSourceLabel()): RoadmapItem[] {
   const root = unified().use(remarkParse).use(remarkGfm).parse(markdown) as Root;
   const headingIndex = root.children.findIndex(
-    (node) => node.type === "heading" && (node as Heading).depth === 2 && toString(node).trim() === LIST_HEADING,
+    (node) => node.type === "heading" && (node as Heading).depth === 2 && mdastToString(node).trim() === LIST_HEADING,
   );
   if (headingIndex === -1) {
     throw new RoadmapParseError(`${sourcePath}：缺少“## ${LIST_HEADING}”标题。`);
