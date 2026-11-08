@@ -3,19 +3,18 @@ import { Check, Copy, FileText } from "lucide-react";
 import type { ContextPathEntry } from "@actspace/shared";
 import { cn } from "../../ui/cn";
 import { IconButton } from "../../ui/IconButton";
-import { formatPathReadAgo, groupContextPaths, splitContextPath } from "./context-paths-model";
+import { formatPathReadAgo, splitContextPath } from "./context-paths-model";
 import { ROW_FOCUS_CLASS } from "./ContextPanelParts";
 
 const TAG_CLASS = "shrink-0 whitespace-nowrap rounded-act-xs px-1.5 text-act-xxs leading-[17px]";
 
 /**
- * 「路径」卡片展开后的列表：按目录分组或平铺。点一行展开完整路径和元数据；
+ * 「路径」卡片展开后的列表：只平铺，行内带目录。点一行展开完整路径和元数据；
  * 复制只写剪贴板，查看和复制都不读文件、不改变活跃 / 睡眠。
  */
-export function ContextPathList({ paths, cycle, grouped, workspaceRoot }: {
+export function ContextPathList({ paths, cycle, workspaceRoot }: {
   paths: readonly ContextPathEntry[];
   cycle: number;
-  grouped: boolean;
   workspaceRoot?: string;
 }) {
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
@@ -24,29 +23,16 @@ export function ContextPathList({ paths, cycle, grouped, workspaceRoot }: {
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  const row = (path: ContextPathEntry) => (
-    <ContextPathRow key={path.id} path={path} cycle={cycle} showDir={!grouped} workspaceRoot={workspaceRoot} open={open.has(path.id)} onToggle={() => toggle(path.id)} />
-  );
-  if (!grouped) return <ul className="m-0 list-none px-1.5 py-0">{paths.map(row)}</ul>;
   return (
-    <div>
-      {groupContextPaths(paths, workspaceRoot).map(group => (
-        <section key={group.dir} aria-label={group.dir || "根目录"}>
-          <div className="flex items-center gap-1.5 px-3 pb-0.5 pt-2 font-mono text-act-xxs text-text-faint">
-            <span className="min-w-0 truncate" title={group.dir}>{group.dir || "/"}</span>
-            <span className="ml-auto font-sans tabular-nums">{group.paths.length}</span>
-          </div>
-          <ul className="m-0 list-none px-1.5 py-0">{group.paths.map(row)}</ul>
-        </section>
-      ))}
-    </div>
+    <ul className="m-0 list-none px-1.5 py-0">
+      {paths.map(path => <ContextPathRow key={path.id} path={path} cycle={cycle} workspaceRoot={workspaceRoot} open={open.has(path.id)} onToggle={() => toggle(path.id)} />)}
+    </ul>
   );
 }
 
-function ContextPathRow({ path, cycle, showDir, workspaceRoot, open, onToggle }: {
+function ContextPathRow({ path, cycle, workspaceRoot, open, onToggle }: {
   path: ContextPathEntry;
   cycle: number;
-  showDir: boolean;
   workspaceRoot?: string;
   open: boolean;
   onToggle: () => void;
@@ -64,8 +50,7 @@ function ContextPathRow({ path, cycle, showDir, workspaceRoot, open, onToggle }:
           <FileText size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-text-faint" />
           <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
             <span className={cn("shrink truncate text-act-xs", sleeping ? "text-text-muted" : "text-text-main")}>{name}</span>
-            {showDir && dir ? <span className="min-w-0 flex-1 truncate font-mono text-act-xxs text-text-faint">{dir}</span> : null}
-            {!showDir && path.description ? <span className="min-w-0 flex-1 truncate text-act-xxs text-text-faint">{path.description}</span> : null}
+            {dir ? <span className="min-w-0 flex-1 truncate font-mono text-act-xxs text-text-faint">{dir}</span> : null}
           </span>
           {fresh ? <span className={cn(TAG_CLASS, "bg-info-soft text-info")} title="本周期新加入">新</span> : null}
           {path.nextCompaction === "wake" ? <span className={cn(TAG_CLASS, "bg-success-soft font-medium text-success")}>待唤醒</span> : null}

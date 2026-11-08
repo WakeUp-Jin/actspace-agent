@@ -67,3 +67,22 @@ it("forecasts the next compaction with the same rule the engine applies", async 
   const forecast = Object.fromEntries([...active.paths, ...sleeping.paths].map(entry => [entry.id, entry.nextCompaction ?? null]));
   expect(forecast).toEqual({ kept: null, unread: "sleep", fresh: null, reread: "wake", idle: null });
 });
+
+it("puts every non-conversation entry on the first page and pages conversation newest first, with per-bucket counts", async () => {
+  const f = fixture();
+  const conversation = Array.from({ length: 250 }, (_, i) => ({ key: `c${i}`, bucket: "conversation" as const, title: `m${i}`, estimatedTokens: 1 }));
+  const fixed = [{ key: "tool", bucket: "tools" as const, title: "read", estimatedTokens: 5 }, { key: "sys", bucket: "systemPrompt" as const, title: "core", estimatedTokens: 5 }];
+  f.set({ ...f.current(), manifest: { ...f.current().manifest, entries: [...fixed.slice(0, 1), ...conversation, ...fixed.slice(1)] } });
+  f.runtime.readSessionProjectionValue.mockImplementation(async (_: string, key: string) => key === "contextEstimate"
+    ? { schemaVersion: 1, estimatorVersion: "1", totalEstimatedTokens: 260, buckets: { tools: 5, systemPrompt: 5, conversation: 250 }, contextWindow: null, model: null, percentUsed: 0, entries: fixed, summaries: [], requestId: null, throughJournalSeq: 10, updatedAt: null }
+    : undefined);
+  const view = await f.service.describe({ sessionId: "s" }) as ContextPanelView;
+  expect(view.entriesPage).toMatchObject({ total: 252, truncated: true, bucketCounts: { tools: 1, systemPrompt: 1, conversation: 250 } });
+  expect(view.current.entries.filter(entry => entry.bucket !== "conversation").map(entry => entry.key)).toEqual(["tool", "sys"]);
+  const firstConversation = view.current.entries.filter(entry => entry.bucket === "conversation");
+  expect(firstConversation).toHaveLength(200);
+  expect(firstConversation.at(-1)!.key).toBe("c249");
+  const next = await f.service.listEntries({ sessionId: "s", revision: view.entriesPage!.revision!, cursor: view.entriesPage!.nextCursor });
+  expect(next.entries.map(entry => entry.key)).toEqual(conversation.slice(0, 50).map(entry => entry.key));
+  expect(next.nextCursor).toBeUndefined();
+});

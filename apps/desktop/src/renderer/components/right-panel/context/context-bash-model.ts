@@ -22,27 +22,24 @@ export type BashCountRow = {
   other: boolean;
   count: number;
   failed: number;
-  /** 条形宽度：占出现次数最多的程序的比例。 */
+  /** 子命令条形宽度：占所属程序次数的比例。程序行没有条形，恒为 1。 */
   share: number;
 };
 export type BashProgramRow = BashCountRow & {
-  /** 占所有程序出现次数的百分比，取整。 */
-  percent: number;
   subcommands: BashCountRow[];
+  /** 收起时的子命令摘要「status 9 · diff 7」；没有子命令时为空。 */
+  summary: string;
 };
 
 /** 后端已排好序（count 降序、「其他」最后），这里只换算比例与文案。 */
 export function bashProgramRows(stats: ContextPanelBashStats): BashProgramRow[] {
-  const total = stats.programs.reduce((sum, program) => sum + program.count, 0);
-  const max = Math.max(0, ...stats.programs.map(program => program.count));
-  const countRow = (item: ContextPanelBashCount, key: string): BashCountRow => ({
-    key, label: item.name || BASH_OTHER_LABEL, other: item.name === "", count: item.count, failed: item.failed, share: max > 0 ? item.count / max : 0,
+  const countRow = (item: ContextPanelBashCount, key: string, share: number): BashCountRow => ({
+    key, label: item.name || BASH_OTHER_LABEL, other: item.name === "", count: item.count, failed: item.failed, share,
   });
-  return stats.programs.map((program) => ({
-    ...countRow(program, program.name),
-    percent: total > 0 ? Math.round((program.count / total) * 100) : 0,
-    subcommands: program.subcommands.map(sub => countRow(sub, `${program.name} ${sub.name}`)),
-  }));
+  return stats.programs.map((program) => {
+    const subcommands = program.subcommands.map(sub => countRow(sub, `${program.name} ${sub.name}`, program.count > 0 ? sub.count / program.count : 0));
+    return { ...countRow(program, program.name, 1), subcommands, summary: subcommands.map(sub => `${sub.label} ${sub.count}`).join(" · ") };
+  });
 }
 
 /** 标题右侧「N 个程序」：不含「其他」。 */

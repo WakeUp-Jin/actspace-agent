@@ -88,7 +88,7 @@ export function useContextPanel({ sessionId, revision, fallbackState }: {
       const next = await sessionsApi.listContextEntries({ sessionId, revision: page.revision, cursor: page.nextCursor });
       setData(current => {
         if (!current || current.view.sessionId !== sessionId || current.view.entriesPage?.revision !== next.revision || current.view.entriesPage.nextCursor !== page.nextCursor) return current;
-        const merged = { ...current, view: { ...current.view, current: { ...current.view.current, entries: [...next.entries, ...current.view.current.entries] }, previous: current.view.previous ? { ...current.view.previous, entries: [...next.previous, ...current.view.previous.entries] } : null, entriesPage: { revision: next.revision, total: next.total, truncated: !!next.nextCursor, nextCursor: next.nextCursor } } };
+        const merged = { ...current, view: { ...current.view, current: { ...current.view.current, entries: [...next.entries, ...current.view.current.entries] }, previous: current.view.previous ? { ...current.view.previous, entries: [...next.previous, ...current.view.previous.entries] } : null, entriesPage: { revision: next.revision, total: next.total, truncated: !!next.nextCursor, nextCursor: next.nextCursor, bucketCounts: next.bucketCounts ?? current.view.entriesPage.bucketCounts } } };
         dataRef.current = merged; return merged;
       });
     } catch (reason) { if (dataRef.current?.view.sessionId === sessionId) setError(reason instanceof Error ? reason.message : "读取更多条目失败"); }

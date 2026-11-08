@@ -18,18 +18,26 @@ const DEFAULT_OPEN = ["tools", "conversation"];
  * ③ 上下文明细：对比开关、估算 / 实际总量、迷你色条，以及按 registry 顺序的分类。
  * 对比基准是最近一次已发送的请求；还没有请求时开关禁用。
  */
-export function ContextBrowser({ view, categories, compare, onCompareChange, focus }: {
+export function ContextBrowser({ view, categories, compare, onCompareChange, focus, paging = false, onLoadMore }: {
   view: ContextPanelView;
   categories: readonly ContextCategory[];
   compare: boolean;
   onCompareChange: (compare: boolean) => void;
   focus: string | null;
+  /** 正在向后端要下一页明细。 */
+  paging?: boolean;
+  /** 还有下一页时才有：「再显示」点到本地读完时调用。 */
+  onLoadMore?: () => Promise<void>;
 }) {
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set(DEFAULT_OPEN));
   const total = view.current.totalEstimatedTokens;
   const previous = view.previous?.comparable === false ? null : view.previous;
   const actual = previousActualInput(view);
-  const entryCount = categories.reduce((sum, category) => sum + category.entries.length, 0);
+  // 「N 项」用后端给的每类总数（含还没读到的页），旧后端没有时数本地条目。
+  const counts = view.entriesPage?.bucketCounts;
+  const countOf = (category: ContextCategory) => counts?.[category.key as keyof typeof counts] ?? category.entries.length;
+  const entryCount = categories.reduce((sum, category) => sum + countOf(category), 0);
+  const loadMore = view.entriesPage?.nextCursor ? onLoadMore : undefined;
   const compareOptions = [
     { value: "previous", label: previous ? `最近请求输入（第 ${previous.turnIndex} 轮 · 步 ${previous.stepIndex}）` : "最近请求输入" },
     { value: "none", label: "不对比" },
@@ -61,19 +69,22 @@ export function ContextBrowser({ view, categories, compare, onCompareChange, foc
         ))}
       </div>
       {categories.map((category) => (
-        <CategorySection key={category.key} category={category} grandTotal={total} open={open.has(category.key)}
-          dimmed={focus !== null && focus !== category.key} onToggle={() => toggle(category.key)} />
+        <CategorySection key={category.key} category={category} count={countOf(category)} grandTotal={total} open={open.has(category.key)}
+          dimmed={focus !== null && focus !== category.key} onToggle={() => toggle(category.key)} paging={paging} onLoadMore={loadMore} />
       ))}
     </section></ContextEntryTextScope.Provider>
   );
 }
 
-function CategorySection({ category, grandTotal, open, dimmed, onToggle }: {
+function CategorySection({ category, count, grandTotal, open, dimmed, onToggle, paging, onLoadMore }: {
   category: ContextCategory;
+  count: number;
   grandTotal: number;
   open: boolean;
   dimmed: boolean;
   onToggle: () => void;
+  paging: boolean;
+  onLoadMore?: () => Promise<void>;
 }) {
   return (
     <div className="border-t border-line" data-category={category.key}>
@@ -87,7 +98,7 @@ function CategorySection({ category, grandTotal, open, dimmed, onToggle }: {
           className={cn("shrink-0 text-text-faint transition-transform duration-(--motion-fast)", open && "rotate-90")} />
         <Swatch colorVar={category.colorVar} />
         <span className="font-medium">{contextBucketLabel(category.key)}</span>
-        <span className="text-act-xxs tabular-nums text-text-faint">{category.entries.length} 项</span>
+        <span className="text-act-xxs tabular-nums text-text-faint">{count} 项</span>
         {category.itemDelta !== 0 ? (
           <DeltaBadge tone={category.itemDelta > 0 ? "up" : "down"}>{category.itemDelta > 0 ? "+" : "−"}{Math.abs(category.itemDelta)}</DeltaBadge>
         ) : null}
@@ -100,7 +111,7 @@ function CategorySection({ category, grandTotal, open, dimmed, onToggle }: {
       </button>
       {open ? (
         category.key === "conversation"
-          ? <ContextConversationList category={category} />
+          ? <ContextConversationList category={category} total={count} paging={paging} onLoadMore={onLoadMore} />
           : <ContextEntryList category={category} grandTotal={grandTotal} />
       ) : null}
     </div>

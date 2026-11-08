@@ -1,9 +1,15 @@
-import type { ContextPanelView } from "@actspace/shared";
+import type { ContextPanelBucketKey, ContextPanelEntry, ContextPanelView } from "@actspace/shared";
 import type { MockClock } from "../clock";
 import type { MockHandlers } from "../handlers";
 import { mockContextPanelView } from "../context-panel-fixture";
 import { mockContextPaths, mockContextPathsPage, mockDisclosureSummary } from "../context-paths-fixture";
 import { longSessionScenario } from "./long-session";
+
+function bucketCounts(entries: readonly ContextPanelEntry[]): Partial<Record<ContextPanelBucketKey, number>> {
+  const counts: Partial<Record<ContextPanelBucketKey, number>> = {};
+  for (const entry of entries) counts[entry.bucket] = (counts[entry.bucket] ?? 0) + 1;
+  return counts;
+}
 
 /** Explicit browser-only fixture for conditional reads, catch-up and pagination. */
 export function contextPaginationScenario(clock: MockClock): MockHandlers {
@@ -13,8 +19,11 @@ export function contextPaginationScenario(clock: MockClock): MockHandlers {
   const paths = mockContextPaths(100, 1284, 9);
   const full = (sessionId: string): ContextPanelView => {
     const view = mockContextPanelView(sessionId, clock.db.sessions.get(sessionId));
-    const extra = Array.from({ length: 620 }, (_, i) => ({ key: `demo-tool-${i}`, bucket: "tools" as const, title: `演示工具 ${i}`, estimatedTokens: 10, preview: `显式分页样例 ${i}`, fullTextAvailable: true }));
-    view.current.entries.push(...extra); view.current.buckets.tools = (view.current.buckets.tools ?? 0) + 6200; view.current.totalEstimatedTokens += 6200;
+    // 30 个演示工具（可读原文）都在首页；620 条更早的会话内容按页往后翻（规范 §3）。
+    const tools = Array.from({ length: 30 }, (_, i) => ({ key: `demo-tool-${i}`, bucket: "tools" as const, title: `演示工具 ${i}`, estimatedTokens: 10, preview: `显式分页样例 ${i}`, fullTextAvailable: true }));
+    const older = Array.from({ length: 620 }, (_, i) => ({ key: `demo-conversation-${i}`, bucket: "conversation" as const, kind: i % 2 ? "tool-result" as const : "tool-call" as const, title: `更早的工具记录 ${i}`, estimatedTokens: 10 }));
+    view.current.entries.unshift(...older); view.current.entries.push(...tools);
+    view.current.buckets.tools = (view.current.buckets.tools ?? 0) + 300; view.current.buckets.conversation = (view.current.buckets.conversation ?? 0) + 6200; view.current.totalEstimatedTokens += 6500;
     view.current.basis = "current-context"; view.currentVersion = "mock-current"; view.disclosure = mockDisclosureSummary(paths, "mock-current");
     view.history = { status: failed ? "unavailable" : reads < 3 ? "syncing" : "ready", indexedThroughSeq: failed ? -1 : reads < 3 ? 10 : 100, targetThroughSeq: 100, indexGeneration: "mock-generation", ...(failed ? { error: "演示：历史索引暂不可用，请重试。" } : {}) };
     if (view.history.status !== "ready") view.stats = null;
@@ -28,17 +37,20 @@ export function contextPaginationScenario(clock: MockClock): MockHandlers {
       reads++;
       const view = full(input.sessionId);
       if (input.versionToken === view.versionToken) return { notModified: true, versionToken: view.versionToken!, history: view.history! };
-      const total = view.current.entries.length;
-      view.current.entries = view.current.entries.slice(-100);
+      const all = view.current.entries;
+      const conversation = all.filter(entry => entry.bucket === "conversation");
+      view.current.entries = [...all.filter(entry => entry.bucket !== "conversation"), ...conversation.slice(-100)];
       view.previous = null;
-      view.entriesPage = { revision: "mock-pages", total, truncated: true, nextCursor: "100" };
+      view.entriesPage = { revision: "mock-pages", total: all.length, truncated: true, nextCursor: "100", bucketCounts: bucketCounts(all) };
       return view;
     },
     listContextEntries: async input => {
       if (input.revision !== "mock-pages") throw new Error("明细版本过期，请刷新。");
-      const entries = full(input.sessionId).current.entries;
+      await new Promise(resolve => setTimeout(resolve, 400));
+      const all = full(input.sessionId).current.entries;
+      const entries = all.filter(entry => entry.bucket === "conversation");
       const start = Number(input.cursor ?? "0"), end = Math.min(entries.length, start + 200);
-      return { revision: input.revision, total: entries.length, entries: entries.slice(Math.max(0, entries.length - end), entries.length - start), previous: [], ...(end < entries.length ? { nextCursor: String(end) } : {}) };
+      return { revision: input.revision, total: all.length, bucketCounts: bucketCounts(all), entries: entries.slice(Math.max(0, entries.length - end), entries.length - start), previous: [], ...(end < entries.length ? { nextCursor: String(end) } : {}) };
     },
     listContextPaths: async input => {
       await new Promise(resolve => setTimeout(resolve, 400));

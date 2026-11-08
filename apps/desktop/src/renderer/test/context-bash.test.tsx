@@ -26,9 +26,11 @@ describe("context-bash-model", () => {
     expect(formatBashDuration(ms)).toBe(text);
   });
 
-  it("占比按所有程序出现次数算，条形按最多的程序缩放；「其他」不计入程序数", () => {
-    const stats: ContextPanelBashStats = { calls: 3, failed: 0, durationMs: 0, programs: [program("ls", 3), program("cat", 1), program("", 1)] };
-    expect(bashProgramRows(stats).map(row => [row.label, row.percent, row.share, row.other])).toEqual([["ls", 60, 1, false], ["cat", 20, 1 / 3, false], ["其他", 20, 1 / 3, true]]);
+  it("子命令条形按所属程序的次数缩放，收起摘要按后端顺序；「其他」不计入程序数", () => {
+    const stats: ContextPanelBashStats = { calls: 3, failed: 0, durationMs: 0, programs: [{ ...program("git", 4), subcommands: [{ name: "status", count: 3, failed: 0 }, { name: "", count: 1, failed: 0 }] }, program("cat", 1), program("", 1)] };
+    const rows = bashProgramRows(stats);
+    expect(rows.map(row => [row.label, row.other, row.summary])).toEqual([["git", false, "status 3 · 其他 1"], ["cat", false, ""], ["其他", true, ""]]);
+    expect(rows[0]!.subcommands.map(sub => sub.share)).toEqual([0.75, 0.25]);
     expect(bashProgramCount(stats)).toBe(2);
   });
 });
@@ -56,7 +58,7 @@ describe("bashNotableRows", () => {
 });
 
 describe("ContextBash 值得注意", () => {
-  it("有数据的行按顺序显示，数值与圆点用语义色，命令原文单行截断并带 title", () => {
+  it("有数据的行按顺序显示，数值用语义色、不加底色和圆点，命令原文单行截断并带 title", () => {
     const command = "/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness --very-long-argument";
     const card = renderCard({ ...BASE_STATS, slowest: { command, durationMs: 1_233_000 }, mostFailedProgram: { program: "ls", count: 4 }, mostRepeated: { command: "cd /Users/me/code", count: 2 }, backgroundCount: 7 });
     expect(within(card).getByText("值得注意")).toBeInTheDocument();
@@ -72,6 +74,8 @@ describe("ContextBash 值得注意", () => {
     expect(within(rows[3]).getByText("×7")).toHaveClass("text-success");
     expect(rows[3]).toHaveTextContent("后台任务×7");
     expect(card.querySelector("[data-bash-notable] [title]")).not.toBeNull();
+    expect(rows[0]!.className).not.toMatch(/\bbg-/);
+    expect(rows[0]!.querySelector(".rounded-full")).toBeNull();
   });
 
   it("没有数据的行隐藏", () => {
@@ -81,13 +85,13 @@ describe("ContextBash 值得注意", () => {
     expect(within(card).queryByText("后台任务")).not.toBeInTheDocument();
   });
 
-  it("全部为空时整个区块不显示；位置在三格指标与程序表之间", () => {
+  it("全部为空时整个区块不显示；位置在一行总览与程序表之间", () => {
     const card = renderCard(BASE_STATS);
     expect(card.querySelector("[data-bash-notable]")).toBeNull();
     expect(within(card).queryByText("值得注意")).not.toBeInTheDocument();
     cleanup();
     const full = renderCard({ ...BASE_STATS, backgroundCount: 1 });
-    const grid = full.querySelector('[data-bash-stat="calls"]')!.closest(".grid")!;
+    const grid = full.querySelector("[data-bash-summary]")!;
     const notable = full.querySelector("[data-bash-notable]")!;
     const table = full.querySelector("[data-bash-program]")!;
     expect(grid.compareDocumentPosition(notable) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -103,30 +107,38 @@ describe("ContextBash 值得注意", () => {
   });
 });
 
-describe("ContextBash 程序名对齐", () => {
-  it("程序名与表头「程序」左对齐：行没有前置展开箭头占位，箭头跟在可展开程序名之后", () => {
+describe("ContextBash 按程序", () => {
+  it("可展开的程序行首是展开箭头，不可展开的留同宽空位；收起时列出子命令摘要", async () => {
     const card = renderCard(MOCK_CONTEXT_BASH);
-    for (const row of Array.from(card.querySelectorAll<HTMLElement>("[data-bash-program]"))) {
-      const first = (row.querySelector("button") ?? row).firstElementChild!;
-      expect(first.tagName).toBe("SPAN");
-      expect(first.className).toContain("font-mono");
-      expect(first.className).not.toMatch(/\binvisible\b/);
-    }
-    const git = card.querySelector('[data-bash-program="git"]')!;
-    expect(git.querySelector("svg")!.parentElement).toBe(git.querySelector("button")!.firstElementChild);
-    expect(card.querySelector('[data-bash-program="cat"] svg')).toBeNull();
-    const row = card.querySelector('[data-bash-program="cat"]')!;
-    expect(row.className).toContain("px-1.5");
-    expect(row.className).not.toMatch(/\bpl-\d/);
+    const git = card.querySelector<HTMLElement>('[data-bash-program="git"]')!;
+    expect(git.querySelector("button")!.firstElementChild!.querySelector("svg")).not.toBeNull();
+    expect(git).toHaveTextContent("status 5 · diff 4 · log 2 · show 1");
+    const cat = card.querySelector<HTMLElement>('[data-bash-program="cat"]')!;
+    expect(cat.firstElementChild!.querySelector("svg")).toBeNull();
+    await userEvent.click(within(git).getByRole("button"));
+    expect(git).not.toHaveTextContent("status 5 · diff 4");
+  });
+
+  it("「只看失败」只在有失败时出现，按下后只留有失败的程序", async () => {
+    const card = renderCard(MOCK_CONTEXT_BASH);
+    const chip = within(card).getByRole("button", { name: "只看失败" });
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(chip);
+    expect(chip).toHaveAttribute("aria-pressed", "true");
+    expect(programNames(card)).toEqual(["pnpm", "node"]);
+    cleanup();
+    const clean = renderCard({ ...MOCK_CONTEXT_BASH, failed: 0, programs: MOCK_CONTEXT_BASH.programs.map(item => ({ ...item, failed: 0 })) });
+    expect(within(clean).queryByRole("button", { name: "只看失败" })).not.toBeInTheDocument();
   });
 });
 
 describe("ContextBash", () => {
-  it("三格数字：失败大于 0 时用危险色", () => {
+  it("一行总览：失败大于 0 时数字用危险色", () => {
     const card = renderCard(MOCK_CONTEXT_BASH);
     const stat = (key: string) => card.querySelector<HTMLElement>(`[data-bash-stat="${key}"]`)!;
-    expect(stat("calls")).toHaveTextContent("38次");
-    expect(stat("failed")).toHaveTextContent("3次");
+    expect(stat("calls")).toHaveTextContent("38");
+    expect(stat("failed")).toHaveTextContent("3");
+    expect(card.querySelector("[data-bash-summary]")).toHaveTextContent("38次调用3次失败1m52s合计");
     expect(stat("failed")).toHaveClass("text-danger");
     expect(stat("duration")).toHaveTextContent("1m52s");
     expect(within(card).getByText("12 个程序")).toBeInTheDocument();
@@ -134,12 +146,12 @@ describe("ContextBash", () => {
     expect(renderCard({ ...MOCK_CONTEXT_BASH, failed: 0 }).querySelector('[data-bash-stat="failed"]')).not.toHaveClass("text-danger");
   });
 
-  it("程序行按后端顺序显示次数、占比和失败；默认 8 行，可以再显示", async () => {
+  it("程序行按后端顺序显示次数和失败、不写占比；默认 8 行，可以再显示", async () => {
     const card = renderCard(MOCK_CONTEXT_BASH);
     expect(programNames(card)).toEqual(["git", "pnpm", "cat", "grep", "rg", "tail", "ls", "sed"]);
     const pnpm = card.querySelector<HTMLElement>('[data-bash-program="pnpm"]')!;
-    expect(pnpm).toHaveTextContent("×8");
-    expect(pnpm).toHaveTextContent("16%");
+    expect(pnpm).toHaveTextContent(/8$/);
+    expect(pnpm).not.toHaveTextContent("%");
     expect(within(pnpm).getByText("2 失败")).toHaveClass("text-danger");
     expect(card.querySelector('[data-bash-program="cat"]')).not.toHaveTextContent("失败");
 
@@ -158,7 +170,7 @@ describe("ContextBash", () => {
     expect(git).toHaveAttribute("aria-expanded", "true");
     const subs = Array.from(card.querySelectorAll<HTMLElement>('[data-bash-program="git"] [data-bash-subcommand]'));
     expect(subs.map(row => row.dataset.bashSubcommand)).toEqual(["status", "diff", "log", "show"]);
-    expect(subs[0]).toHaveTextContent("×5");
+    expect(subs[0]).toHaveTextContent(/5$/);
     expect(subs[0]).not.toHaveTextContent("%");
     await userEvent.click(git);
     expect(card.querySelector("[data-bash-subcommand]")).toBeNull();

@@ -7,6 +7,7 @@ import { prepare, type ProjectionDatabase } from "./usage-sql";
 import { projectUsageJournalBatch } from "./usage-journal-projection";
 import { parseBashPrograms } from "./bash-programs";
 import { CONTEXT_PROJECTOR_VERSION } from "./context-history-version";
+import { describeSupplementEvent, describeToolChange, mergedDetail, switchDetail, type SupplementMemory } from "./context-history-events";
 
 /** 每会话最多记多少个（程序, 子命令）组合，超出的归入「其他」。 */
 export const CONTEXT_BASH_PROGRAM_LIMIT = 500;
@@ -121,28 +122,70 @@ export async function commitContextBatch(db: DatabaseSync, source: SessionQueryS
   }
 }
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-/** 跨批次的估算折叠状态（与会话投影 `contextEstimate` 同一个函数，agent-spec-request-record.md §6.4），外加已见过的 `request/tools` 条数。 */
-type EstimateRow = { estimate: ContextEstimateState; toolRecords: number };
+/**
+ * 跨批次的折叠状态：估算（与会话投影 `contextEstimate` 同一个函数，agent-spec-request-record.md §6.4）、已见过的 `request/tools` 条数，
+ * 以及写上下文事件要用的：当前轮 / 步序号、当前模式、压缩开始时的估算总量、每个补充来源上一次的解析结果、最近写的一条事件（同轮合并用）。
+ */
+type EstimateRow = {
+  estimate: ContextEstimateState;
+  toolRecords: number;
+  turn?: number | null;
+  step?: number | null;
+  mode?: string;
+  compactionStart?: number | null;
+  supplements?: Record<string, SupplementMemory>;
+  /** `tail` 不为空时，同轮同来源的下一条可以合进这一行。 */
+  last?: { row: ContextPanelEvent; tail?: string } | null;
+};
 function loadEstimate(db: ProjectionDatabase, id: string): EstimateRow {
   const saved = prepare(db, "SELECT state_json FROM context_estimate_state WHERE session_id=?").get(id) as { state_json: string } | undefined;
   if (saved) { try { return JSON.parse(saved.state_json) as EstimateRow; } catch { /* 损坏时从头折叠的结果由重建给出 */ } }
   return { estimate: initialContextEstimate(), toolRecords: 0 };
 }
+type EventValue = Omit<ContextPanelEvent, "at" | "turnIndex" | "stepIndex">;
+const supplementTokens = (state: ContextEstimateState, owner: string, id: string) => state.supplements.find(value => value.owner === owner && value.id === id)?.entry.estimatedTokens ?? 0;
+const toolTokens = (state: ContextEstimateState) => state.tools.reduce((sum, entry) => sum + entry.estimatedTokens, 0);
 async function projectContextEvents(db: ProjectionDatabase, source: SessionQuerySource, events: readonly SessionEventEnvelopeV1[], yieldBatch: () => Promise<void>): Promise<void> {
   const id = source.header.sessionId;
   const fold = loadEstimate(db, id);
-  const addEvent = (event: SessionEventEnvelopeV1, value: Omit<ContextPanelEvent, "at" | "turnIndex" | "stepIndex">) => prepare(db, "INSERT OR REPLACE INTO context_event VALUES(?,?,?,?)").run(id, value.id, event.seq, JSON.stringify({ ...value, at: new Date(event.time).toISOString(), turnIndex: null, stepIndex: null }));
+  /**
+   * 写一条事件，位置是当前轮 / 步。`tail` 不为空表示可以合并：上一条事件同轮、同类、同来源时改写那一行（规范 §2 第 6 块）。
+   */
+  const addEvent = (event: SessionEventEnvelopeV1, value: EventValue, tail?: string) => {
+    const at = new Date(event.time).toISOString();
+    const turnIndex = fold.turn ?? null; const last = fold.last;
+    const merge = tail !== undefined && last?.tail !== undefined && turnIndex !== null && last.row.turnIndex === turnIndex && last.row.kind === value.kind && last.row.source === value.source && last.row.label === value.label;
+    let row: ContextPanelEvent;
+    if (merge) {
+      const count = (last.row.count ?? 1) + 1;
+      const tokenDelta = last.row.tokenDelta === null || value.tokenDelta === null ? null : last.row.tokenDelta + value.tokenDelta;
+      row = { ...value, id: last.row.id, count, detail: mergedDetail(count, tail), tokenDelta, turnIndex, stepIndex: null, at };
+    } else row = { ...value, turnIndex, stepIndex: fold.step ?? null, at };
+    fold.last = { row, ...(tail === undefined ? {} : { tail }) };
+    prepare(db, "INSERT OR REPLACE INTO context_event VALUES(?,?,?,?)").run(id, row.id, event.seq, JSON.stringify(row));
+  };
   for (const event of events) {
     const data = record(event.data);
+    const before = fold.estimate;
     fold.estimate = applyContextEstimate(fold.estimate, event);
-    // 「工具清单已变化」：第一条 request/tools 之后，每条记一次（工具只在变化时才写这条事件）。
-    if (event.type === "request/tools" && fold.toolRecords++ > 0) addEvent(event, { id: `${event.seq}:tools`, kind: "tools-changed", label: "工具清单已变化", tokenDelta: null, inferred: true });
+    // 「工具清单变化」：第一条 request/tools 之后，每条记一次（工具只在变化时才写这条事件）。
+    if (event.type === "request/tools" && fold.toolRecords++ > 0) {
+      addEvent(event, { id: `${event.seq}:tools`, kind: "tools-changed", label: "工具清单变化", detail: describeToolChange(before.tools.map(entry => entry.title), fold.estimate.tools.map(entry => entry.title)), tokenDelta: toolTokens(fold.estimate) - toolTokens(before), inferred: true });
+    }
     const kind = event.type === "turn/start" ? "turn" : event.type === "step/start" ? "step" : event.type === "compaction/end" ? "compaction" : undefined;
     if (kind) {
       const identity = data[kind === "compaction" ? "compactionId" : `${kind}Id`];
       const ordinal = kind === "step" && typeof data.stepIndex === "number" ? data.stepIndex : Number((prepare(db, `SELECT ${kind}_count AS n FROM context_session_stats WHERE session_id=?`).get(id) as { n: number }).n) + 1;
       if (typeof identity === "string" && prepare(db, "INSERT OR IGNORE INTO context_identity VALUES(?,?,?,?)").run(id, kind, identity, ordinal).changes) prepare(db, `UPDATE context_session_stats SET ${kind}_count=${kind}_count+1 WHERE session_id=?`).run(id);
+      if (kind !== "compaction" && typeof identity === "string") {
+        const known = Number((prepare(db, "SELECT ordinal FROM context_identity WHERE session_id=? AND kind=? AND id=?").get(id, kind, identity) as { ordinal: number } | undefined)?.ordinal ?? ordinal);
+        if (kind === "turn") { fold.turn = known; fold.step = null; } else fold.step = known;
+      }
     }
+    // 轮与轮之间发生的事（如空闲时切模式）不挂在上一轮上。
+    if (event.type === "turn/end") { fold.turn = null; fold.step = null; }
+    if (event.type === "turn/start" && typeof data.mode === "string") fold.mode = data.mode.slice(0, 32);
+    if (event.type === "compaction/start") fold.compactionStart = viewContextEstimate(before).totalEstimatedTokens;
     if (event.type === "request/context" && typeof data.requestId === "string") {
       const snapshot = record(data.snapshot); const prepared = record(snapshot.prepared); const view = viewContextEstimate(fold.estimate);
       const counts = prepare(db, "SELECT turn_count,step_count FROM context_session_stats WHERE session_id=?").get(id) as { turn_count: number; step_count: number };
@@ -150,7 +193,8 @@ async function projectContextEvents(db: ProjectionDatabase, source: SessionQuery
       const positive = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
       const model = { modelKey: String(rawModel.modelKey ?? `${prepared.route ?? ""}/${prepared.model ?? ""}`).slice(0, 512), label: String(rawModel.label ?? prepared.model ?? "").slice(0, 160), contextWindow: positive(rawModel.contextWindow ?? prepared.contextWindow ?? view.contextWindow), autoCompactAtTokens: positive(rawModel.autoCompactAtTokens) };
       const previous = prepare(db, "SELECT model_json FROM context_request WHERE session_id=? ORDER BY seq DESC LIMIT 1").get(id) as { model_json: string } | undefined;
-      if (previous && record(JSON.parse(previous.model_json)).modelKey !== record(model).modelKey) addEvent(event, { id: `${event.seq}:model`, kind: "model-switch", label: "模型已切换", tokenDelta: null, inferred: true });
+      const previousModel = previous ? record(JSON.parse(previous.model_json)) : null;
+      if (previousModel && previousModel.modelKey !== model.modelKey) addEvent(event, { id: `${event.seq}:model`, kind: "model-switch", label: "模型切换", detail: switchDetail(String(previousModel.label || previousModel.modelKey || ""), model.label || model.modelKey), tokenDelta: null, inferred: true });
       // 只存非对话明细；对话项按 seq 对比（面板服务），不逐条存。
       const entries = view.entries;
       const summary: Omit<ContextContentManifest, "entries"> = { schemaVersion: 1, estimatorVersion: view.estimatorVersion, comparable: true, totalEstimatedTokens: view.totalEstimatedTokens, buckets: { ...view.buckets } };
@@ -160,9 +204,24 @@ async function projectContextEvents(db: ProjectionDatabase, source: SessionQuery
       prepare(db, "DELETE FROM context_manifest_entry WHERE session_id=? AND request_id NOT IN (SELECT request_id FROM context_request WHERE session_id=? ORDER BY seq DESC LIMIT 2)").run(id, id);
     }
     if (event.type === "tool/call" || event.type === "tool-workflow/run-start" || event.type === "tool/result") projectBashEvent(db, id, event, data);
-    if (event.type === "compaction/end") addEvent(event, { id: `${event.seq}:compact`, kind: "compact", label: "上下文已压缩", tokenDelta: null });
-    if (event.type === "agent/mode-set") addEvent(event, { id: `${event.seq}:mode`, kind: "mode-switch", label: `模式：${String(data.mode ?? "未知").slice(0, 32)}`, tokenDelta: null });
-    if (event.type === "plugin/actspace.context/supplement" && data.op === "add") addEvent(event, { id: `${event.seq}:inject`, kind: "inject", label: "上下文补充", source: String(data.owner ?? "").slice(0, 80), tokenDelta: null });
+    if (event.type === "compaction/end") {
+      const start = fold.compactionStart;
+      addEvent(event, { id: `${event.seq}:compact`, kind: "compact", label: "上下文已压缩", detail: "旧对话换成摘要", tokenDelta: typeof start === "number" ? viewContextEstimate(fold.estimate).totalEstimatedTokens - start : null });
+      fold.compactionStart = null;
+    }
+    if (event.type === "agent/mode-set") {
+      const mode = String(data.mode ?? "未知").slice(0, 32);
+      addEvent(event, { id: `${event.seq}:mode`, kind: "mode-switch", label: "模式切换", detail: switchDetail(fold.mode, mode), tokenDelta: null });
+      fold.mode = mode;
+    }
+    if (event.type === "plugin/actspace.context/supplement" && data.op === "add" && typeof data.owner === "string" && typeof data.id === "string" && typeof data.text === "string") {
+      const key = JSON.stringify([data.owner, data.id]);
+      const memory = fold.supplements ??= {};
+      const described = describeSupplementEvent(data.owner, data.id, data.text, memory[key]);
+      memory[key] = described.memory;
+      const tokenDelta = supplementTokens(fold.estimate, data.owner, data.id) - supplementTokens(before, data.owner, data.id);
+      addEvent(event, { id: `${event.seq}:inject`, kind: described.kind, label: described.label, detail: described.detail, source: data.owner.slice(0, 80), tokenDelta }, described.tail);
+    }
   }
   prepare(db, "INSERT INTO context_estimate_state VALUES(?,?) ON CONFLICT(session_id) DO UPDATE SET state_json=excluded.state_json").run(id, JSON.stringify(fold));
   await projectUsageJournalBatch(db, { sessionId: id, title: null, throughJournalSeq: source.throughSeq, workspaceRoot: null }, events.filter(event => !event.type.startsWith("tool/")), async rows => {

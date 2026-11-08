@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ContextDisclosureSummary, ContextPathsInput, ContextPathsPage } from "@actspace/shared";
 import { ContextPaths } from "../components/right-panel/context/ContextPaths";
-import { formatPathReadAgo, groupContextPaths, isContextPathRevisionError, splitContextPath } from "../components/right-panel/context/context-paths-model";
+import { formatPathReadAgo, isContextPathRevisionError, splitContextPath } from "../components/right-panel/context/context-paths-model";
 import { useContextPaths } from "../components/right-panel/context/use-context-paths";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { mockContextPaths, mockContextPathsPage, mockDisclosureSummary } from "../mock/context-paths-fixture";
@@ -33,12 +33,6 @@ describe("context-paths-model", () => {
     expect(splitContextPath(`${MOCK_WORKSPACE_ROOT}/src/a.ts`, `${MOCK_WORKSPACE_ROOT}/`)).toEqual({ dir: "src/", name: "a.ts" });
     expect(splitContextPath("/elsewhere/b.md", MOCK_WORKSPACE_ROOT)).toEqual({ dir: "/elsewhere/", name: "b.md" });
     expect(splitContextPath("README.md")).toEqual({ dir: "", name: "README.md" });
-  });
-
-  it("groups adjacent paths of the same directory without reordering", () => {
-    const groups = groupContextPaths(PATHS.paths.slice(0, 30), MOCK_WORKSPACE_ROOT);
-    expect(groups.flatMap(group => group.paths)).toEqual(PATHS.paths.slice(0, 30));
-    for (const group of groups) for (const path of group.paths) expect(splitContextPath(path.path, MOCK_WORKSPACE_ROOT).dir).toBe(group.dir);
   });
 
   it("formats read times and recognises revision errors", () => {
@@ -134,14 +128,18 @@ describe("ContextPaths", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it("expands to a grouped list, switches tabs and reveals more rows", async () => {
+  it("expands to a flat list with each row's directory, switches tabs and reveals more rows", async () => {
     const handler = pathsHandler();
     setupBridge({ "sessions.listContextPaths": handler });
     renderCard();
     const card = screen.getByRole("region", { name: "路径" });
     await userEvent.click(within(card).getByRole("button", { name: /显示活跃路径/ }));
     expect(await within(card).findByRole("button", { name: "活跃 · 已显示 12 / 87" })).toHaveAttribute("aria-expanded", "true");
-    expect(within(card).getByRole("button", { name: "按目录" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(card).queryByRole("button", { name: "按目录" })).not.toBeInTheDocument();
+    const row = card.querySelector<HTMLElement>("[data-path-id]")!;
+    const shown = PATHS.paths.find(path => path.id === row.dataset.pathId)!;
+    const parts = splitContextPath(shown.path, MOCK_WORKSPACE_ROOT);
+    expect(row).toHaveTextContent(`${parts.name}${parts.dir}`);
     await userEvent.click(within(card).getByRole("button", { name: "再显示 20 项（共 87）" }));
     expect(within(card).getByRole("button", { name: "活跃 · 已显示 32 / 87" })).toBeInTheDocument();
 

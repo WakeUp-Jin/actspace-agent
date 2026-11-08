@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ContextState } from "@actspace/shared";
 import { Button } from "../../ui/Button";
+import { cn } from "../../ui/cn";
 import { buildCategories } from "./context-panel-model";
 import { ContextBash } from "./ContextBash";
 import { ContextBrowser } from "./ContextBrowser";
@@ -11,9 +12,10 @@ import { ContextStats } from "./ContextStats";
 import { ContextTrend } from "./ContextTrend";
 import { useContextPanel } from "./use-context-panel";
 
-const BODY_CLASS = "flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto p-3";
+// 区块之间只有横线，不留间距（规范 §2）；提示条和说明自己留边。
+const BODY_CLASS = "flex min-h-0 flex-1 flex-col overflow-y-auto";
 const EMPTY_CLASS = "p-[18px] text-act-sm text-text-muted";
-const NOTE_CLASS = "m-0 text-center text-act-xxs text-text-faint";
+const NOTE_CLASS = "m-0 px-3 py-1.5 text-center text-act-xxs text-text-faint";
 
 /**
  * 右侧面板的 Context Tab（见 `front-Context面板规范.md`）：
@@ -48,7 +50,7 @@ export function ContextPanel({ sessionId, contextRevision, contextState, workspa
     <div className={BODY_CLASS} data-context-source={data?.source}>
       {errorBar}
       {status === "stale" || status === "recovering" ? (
-        <p className="m-0 rounded-act-md bg-warning-soft px-2.5 py-2 text-act-xxs text-warning">{view.current.basis === "last-request" ? "当前 Context 尚未加载，以下显示最近请求输入。" : "上下文正在重建，数字可能滞后。"}</p>
+        <p className="mx-3 mb-0 mt-3 rounded-act-md bg-warning-soft px-2.5 py-2 text-act-xxs text-warning">{view.current.basis === "last-request" ? "当前 Context 尚未加载，以下显示最近请求输入。" : "上下文正在重建，数字可能滞后。"}</p>
       ) : null}
       {status === "unavailable" ? (
         <div className={EMPTY_CLASS}>当前没有可展示的上下文。</div>
@@ -60,9 +62,8 @@ export function ContextPanel({ sessionId, contextRevision, contextState, workspa
       <ContextStats stats={view.stats} />
       {data?.source === "backend" ? <ContextPaths sessionId={sessionId} disclosure={view.disclosure} workspaceRoot={workspaceRoot} onStale={refresh} /> : null}
       {status === "unavailable" ? null : (
-        <ContextBrowser view={view} categories={categories} compare={compare} onCompareChange={setCompare} focus={focus} />
+        <ContextBrowser view={view} categories={categories} compare={compare} onCompareChange={setCompare} focus={focus} paging={paging} onLoadMore={loadMore} />
       )}
-      {view.entriesPage?.truncated ? <Button variant="secondary" size="xs" disabled={paging} onClick={() => void loadMore()}>{paging ? "正在读取…" : `加载更多明细（共 ${view.entriesPage.total} 项）`}</Button> : null}
       {data?.source === "backend" ? (
         <>
           <ContextTrend points={view.trend} />
@@ -73,14 +74,14 @@ export function ContextPanel({ sessionId, contextRevision, contextState, workspa
       ) : (
         <p className={NOTE_CLASS}>趋势、事件、路径和 Bash 命令需要后端数据，暂未提供</p>
       )}
-      <p className={NOTE_CLASS}>≈ 为本地估算</p>
+      <p className={cn(NOTE_CLASS, "pb-3.5 pt-2.5")}>≈ 为本地估算</p>
     </div>
   );
 }
 
 function ErrorBar({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div role="alert" className="flex items-start gap-2 rounded-act-md bg-danger-soft px-2.5 py-1.5 text-act-xs text-danger">
+    <div role="alert" className="mx-3 mt-3 flex items-start gap-2 rounded-act-md bg-danger-soft px-2.5 py-1.5 text-act-xs text-danger">
       <div className="min-w-0 flex-1">
         <p className="m-0">上下文读取失败，请重试。</p>
         <details className="mt-1">
