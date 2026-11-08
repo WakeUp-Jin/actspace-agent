@@ -79,8 +79,8 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
   - `browser-bridge`：`pnpm check:browser` 与 `go test`。
 - `scripts/check-package-cutover.mjs --strict` 会忽略相对导入里的 `plugins/` 片段（如 desktop main 的 `../plugins/plugin-switches`），也不把测试文件里的退役名当作运行时可达边；它要抓的是对退役 workspace `plugins/` 目录和旧包名的真实引用。
 - 浏览器客户端 `apps/web` 没有单独的 workflow：`pnpm typecheck`、`pnpm test`（`pnpm -r`）覆盖它的类型检查和 vitest，根 `pnpm build` 在 desktop 之后执行 `@actspace/web build`（依赖 desktop 构建先产出的 `@actspace/client` dist）。`pnpm check:frontend-tokens` 和 `pnpm check:frontend-theme` 同时检查 desktop 与 web 两套前端。web 产物 `apps/web/dist` 目前不打进任何发布包，由用户在 Host 配置的 `webRoot` 指向它。
-- workspace 依赖当前允许 `electron` 和 `esbuild` 执行构建脚本；否则 Electron 开发启动无法正确安装运行时。
-- 当前桌面端优先跟随较新的稳定 Electron 版本，以降低 macOS 26 这类新系统上的启动兼容风险。
+- workspace 依赖当前允许 `electron` 和 `esbuild` 执行构建脚本。Electron 42 起 npm 包不再在 postinstall 下载二进制，而是第一次 `require("electron")` / 跑 `electron` bin 时按需拉取（`pnpm --filter @actspace/desktop exec install-electron` 可手动触发）；开发启动脚本和 `release-package.sh` 都会自动走这条路，`pnpm install` 后看不到 `node_modules/electron/dist` 是正常的。
+- 当前桌面端优先跟随较新的稳定 Electron 版本（现在是 45，Node 24 / Chromium 156），以降低 macOS 26 这类新系统上的启动兼容风险。Electron 44 起不再支持 macOS 12 和 Windows 32 位。
 - `apps/desktop` 的开发启动依赖 `packages/util/shared`、领域 packages 和 `packages/core/runtime` 的可消费构建产物；如果包边界被改回源码直引，Electron 启动链会再次失稳。
 - `scripts/release-package.sh` 会先构建 desktop workspace，再用当前平台的 Electron runtime 组装 portable desktop archive；默认不需要付费证书，也不会强制签名。
 
@@ -216,6 +216,8 @@ SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 | macOS x64 | `macos-15-intel` | GitHub 为 public 仓库保留的免费 Intel 标准 runner；`macos-*-large` 是付费 larger runner，不要用 |
 | Linux x64 | `ubuntu-latest` | |
 | Windows x64 | `windows-latest` | 用 Git Bash 跑同一份 `release-package.sh` |
+
+产物支持的最低系统随 Electron 走：Electron 45 要求 macOS 13+、Windows 10+（64 位）。
 
 四个 job 都用 `actions/setup-go` 装 `go.mod` 要求的 Go 版本（打包要 `go build` 浏览器桥 CLI），用 `pnpm/action-setup` + `setup-node` 的 pnpm 缓存。
 

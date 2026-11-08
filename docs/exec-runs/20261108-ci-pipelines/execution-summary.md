@@ -5,7 +5,7 @@
 - **关联计划**：`docs/exec-plans/active/20261108-ci-pipelines.md`
 - **执行过程**：`docs/exec-runs/20261108-ci-pipelines/execution-process.md`
 - **执行模式**：交互
-- **执行结果**：部分完成（P1–P3 完成；P4、P5 另开 PR）
+- **执行结果**：完成（P1–P3 PR #48；P4 PR #57；P5 第三个 PR，叠在 #57 上）
 
 ## 核心变更清单
 
@@ -21,6 +21,7 @@
 | Dependabot + CodeQL | `.github/dependabot.yml`、`.github/workflows/codeql.yml`、`.github/codeql/codeql-config.yml` | 每周一分组开依赖 PR；JS/TS 与 Actions 的静态安全分析。 |
 | 文档 | `docs/CICD.md`、`docs/exec-plans/README.md`、`docs/exec-plans/tech-debt-tracker.md` | 费用前提、工作流表、重新启用步骤、分支保护提醒、技术债登记。 |
 | P4 桌面发布矩阵（第二个 PR） | `.github/workflows/release.yml`、`scripts/release-package.sh`、`scripts/package-browser-components.mjs`、`docs/CICD.md` | `v*` tag 触发 macOS arm64 / x64、Linux、Windows 四平台打包 + provenance，汇总 SBOM 与合成 manifest 后建草稿 Release；tag 与包版本一致性校验；打包脚本 PR 自动四平台 dry-run；Windows portable zip 分支。 |
+| P5 Electron 升级（第三个 PR） | `apps/desktop/package.json`、`pnpm-lock.yaml`、`apps/desktop/tsconfig.json`、`apps/desktop/src/main/artifact-context-menu-service.ts`、`scripts/release-package.sh`、`docs/CICD.md` | Electron 39 → 45.2.3（Node 24 / Chromium 156）；clipboard 迁到 W3C 风格 API；打包脚本按需下载 runtime（42 起不再 postinstall）；renderer lib 显式 ES2024。 |
 
 ## 人工验证指引
 
@@ -46,6 +47,10 @@
    - 验证方式：在 Windows 机器上解压 `actspace-desktop-windows-x64.zip`，运行 `ActSpace.exe`，跑一轮聊天和一次工具调用。
    - 预期结果：应用启动、工具调用正常；SmartScreen 提示属预期（未签名）。任何异常记到 `tech-debt-tracker.md`「Release / Windows」行。
 
+6. **P5：Electron 45 实机走查**（合并第三个 PR 后）
+   - 验证方式：macOS 上 `pnpm dev:log` 启动（首次会自动下载 Electron 45 二进制），跑一轮聊天、一次需要审批的工具调用、一次 `safeStorage` 相关操作（保存一个模型 API key 再读回）、会话图片右键「Copy image」和文件「Copy file contents」/「Copy path」后粘贴。
+   - 预期结果：应用启动无原生崩溃；审批弹层、设置页正常；API key 读回一致；三种复制都能粘贴出内容。`logs/latest-dev.log` 里允许出现 `safeStorage` 同步方法的 deprecation 警告（已记 tech debt），不允许有其它 Electron 报错。
+
 ### 建议验证
 
 1. **分支保护**
@@ -66,6 +71,7 @@
 - `GOTOOLCHAIN=go1.26.10 ./scripts/release-package.sh`（Linux）：生成 tar.gz，`DONE-0`；P4 改动后复跑，产物名不变、manifest 变为 `release-manifest-linux-x64.json`。
 - P4：`actionlint .github/workflows/release.yml`、`scripts/check-action-pinning.sh` 通过；四平台 dry-run 结果见第二个 PR 的检查。
 - `pnpm audit --prod`：只剩 `katex` 一条 low。
+- P5：`pnpm --filter @actspace/desktop typecheck` 通过；desktop 303 个测试文件 2897 用例通过；Linux `./scripts/release-package.sh` 在删掉 `node_modules/electron/dist` 后全程通过（含按需下载）；preload bundle 确认不依赖 45 移除的沙箱全局。Electron 45 的真实窗口没有在 Agent 环境里跑过。
 - `pnpm test:agent-cli:process`：19/19，safety 用例连跑三次稳定。
 - PR 上 GitHub 实际运行：CodeQL 两种语言均通过（JS/TS 1 分 41 秒），`文档`、`Agent CLI managed package` 在补 ripgrep 与更新 safety 断言后复跑。
 
@@ -77,4 +83,4 @@
 
 ## 后续建议
 
-- P5：Electron 39 → 当前稳定大版本，跑完整 desktop 测试与实机走查。
+- Electron 46 会移除 `safeStorage` 同步方法；在它成为 stable 前把 `SecretCrypto` 改成异步。

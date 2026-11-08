@@ -5,7 +5,7 @@
 - **关联计划**：`docs/exec-plans/active/20261108-ci-pipelines.md`
 - **执行模式**：交互
 - **开始时间**：2026-11-08 10:30
-- **结束时间**：P1–P3 2026-11-08 13:40（PR #48）；P4 2026-11-08 14:30（第二个 PR）；P5 另开 PR
+- **结束时间**：P1–P3 2026-11-08 13:40（PR #48）；P4 2026-11-08 14:30（PR #57）；P5 2026-11-08 17:30（第三个 PR）
 
 ## 执行时间线
 
@@ -90,8 +90,23 @@
   - **原因**：VM 预装 go1.22 而 `go.mod` 要求 1.26；`apps/desktop/node_modules/electron` 的 postinstall 没跑。
   - **应对**：本机用 `GOTOOLCHAIN=go1.26.10` 并手动 `node install.js`；CI 里 `build` job 加 `actions/setup-go`，Electron 由 `pnpm install` 的 postinstall 处理。
 
+### 步骤 9：P5 Electron 39 → 45
+
+- **开始时间**：2026-11-08 16:40
+- **目标**：`apps/desktop` 升到当前 stable Electron，desktop 全量测试与 Linux 打包通过。
+- **操作**：`pnpm add -D electron@^45.2.3`（Node 24.22.2 / Chromium 156）；通读 Electron 40–45 的 `breaking-changes.md`，逐条对照仓库：
+  - 42 起 npm 包不再 postinstall 下载二进制：`pnpm install` 后没有 `node_modules/electron/dist`。开发启动的 `run-electron-dev.mjs` 走 `require("electron")` 会自动下载；`release-package.sh` 直接 `cp` 这个目录，补一步 `node -e 'require("electron")'` 按需拉取。
+  - 44 clipboard 重构成 W3C 风格：`writeImage` 没了，`artifact-context-menu-service.ts` 改成 `clipboard.write([new ClipboardItem({ "image/png": new Blob([image.toPNG()]) })])`；`writeText` 变 Promise，三处 click 都包进 `runMenuAction` 以免 unhandled rejection。两处测试 mock 同步改。
+  - 45 沙箱 preload 去掉 `Buffer` / `setImmediate` / `require("events"|"url"|"timers")`：检查 `dist-electron/preload/index.bundle.js`，只 `require("electron")`，没有这些全局，不用改。
+  - 45 弃用 `safeStorage` 同步方法：`SecretCrypto` 接口与 `HostCredentials` 都在用，46 才移除，记 tech debt。
+  - 44 去掉 macOS 12 / Windows 32 位；43 对话框默认目录改 Downloads；44 renderer 不再有 `clipboard` 模块（renderer 没用过）。记进 `docs/CICD.md`。
+- **问题**：升级后 renderer 类型检查报 `findLastIndex` / `Object.groupBy` 不存在。
+  - **原因**：`tsc --explainFiles` 对比发现，es2023/2024 lib 之前是由 `type-fest@0.13.1` 的 `/// <reference lib="esnext"/>` 带进来的；这个包是 Electron 39 安装器 `@electron/get@2` → `global-agent` → `roarr` 的间接依赖，被 mermaid 的 d.ts（把 `type-fest` 放在 devDependencies 却在类型里 import）误引到。Electron 45 的 `@electron/get@5` 不再依赖它。
+  - **应对**：`apps/desktop/tsconfig.json` 的 `lib` 从 ES2022 改为 ES2024，把真实依赖写明。
+- **验证**：`pnpm --filter @actspace/desktop typecheck`、desktop 303 个测试文件全过（2897 个用例）、Linux `release-package.sh` 全程通过（先删 `node_modules/electron/dist`，确认按需下载那一步真的跑到）。解包产物在 `xvfb-run` 下带 `--remote-debugging-port` 启动，CDP 读到 `window.actspace` 桥和侧栏文案，主进程日志 `runtime v2 ready` 无错误。
+
 ## 跳过或推迟的事项
 
-- P5 Electron 39 → 当前稳定版：单独 PR。
+- `safeStorage` 同步方法改异步：Electron 45 只弃用、46 移除，`SecretCrypto` 调用链较长，单独做。
 - CodeQL 加 Go：先看 JS/TS 分析耗时。
 - `katex` 升级：留给 Dependabot。
