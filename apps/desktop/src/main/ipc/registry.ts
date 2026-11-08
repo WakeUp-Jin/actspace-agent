@@ -25,12 +25,12 @@ export type IpcRegistrarOptions = {
 
 export type IpcRegistrar = {
   /** 注册契约中的 invoke 成员。顺序：sender 校验 → guard → middleware → handler。channel 没有 guard 时直接抛错。 */
-  handle<S extends InvokeSpec<any, any>>(
+  handle<S extends InvokeSpec<unknown, unknown>>(
     spec: S,
     handler: (input: SpecInput<S>, event: IpcMainInvokeEvent) => SpecOutput<S> | Promise<SpecOutput<S>>,
   ): void;
   /** 注册契约中的 send 成员。非信任 sender 静默忽略；入参未经校验，listener 自己判断。 */
-  on<S extends SendSpec<any>>(spec: S, listener: (input: unknown, event: IpcMainEvent) => void): void;
+  on<S extends SendSpec<unknown>>(spec: S, listener: (input: unknown, event: IpcMainEvent) => void): void;
   readonly channels: readonly string[];
   dispose(): void;
 };
