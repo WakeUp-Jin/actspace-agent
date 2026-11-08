@@ -50,6 +50,7 @@ export const desktopBridgeContract = {
 - **grep 门槛只认一种写法**。迁移测试时用 `window\.actspace\s*=` 当验收 grep，漏了 `(window as {…}).actspace = …` 和 `delete (window as …).actspace`，9 个文件因此没迁移。审计脚本要覆盖成员访问、可选链、类型断言、下标和解构这几种写法，最好再拿迁移前的代码反向跑一次，确认它确实能报出问题。
 - **类型断言要放在会被 tsc 检查的地方**。`expectTypeOf` 写在一个被 tsconfig `exclude` 掉的测试目录里，vitest 照常跑完，但断言从来没被类型检查过。写完类型测试之后，故意改错一个类型，确认 typecheck 会失败。
 - **只禁 `window.actspace` 不够**。业务代码可以 `import { getBridge } from "api/bridge"` 绕开按域划分的 `api/<域>`。规则要同时限制「谁能导入入口模块」。
+- **「按需加 guard」等于没有机制**。入参 guard 最初的规则是「涉及路径、设置写入或远端 Host 时再加」，一个月后 130 个 invoke 只有 36 个有 guard，其余靠 handler 自觉；注册器查不到 guard 就 `input as SpecInput` 透传，没人能发现遗漏。修法不是补完 65 个 guard 就算，而是把登记表定义为「契约全部 invoke」：测试断言两者相等、注册器缺 guard 直接抛错，无入参的也显式登记 `NO_INPUT`。靠人判断「这个要不要」的策略，要么改成全集，要么就假设它会漂移。
 - **契约会暴露旧代码的类型谎言**。出参类型一收紧，main 里冒出 16 处不一致，比如共享类型写的是 `{ requestId }`，main 实际返回 `{ requestedAt }`。这些原本被 preload 里的 `as Promise<…>` 掩盖，迁移时要逐个核对线上负载，再决定改类型还是改实现。
 
 ## 生产者也要受契约约束：`as Promise<Result>` 拦不住字段拼错
