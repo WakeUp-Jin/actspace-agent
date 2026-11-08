@@ -30,6 +30,7 @@
 - preload 通过 `contextBridge` 只暴露最小、类型化的 bridge API。
 - **IPC sender 校验 fail-closed**：所有 `ipcMain.handle` / `on` 注册点都调用 `main/ipc/trusted-sender.ts` 的 `assertTrustedSender`。没有主窗口、窗口已销毁、sender 不是主窗口的 webContents、或 senderFrame 不是 mainFrame，任一成立就拒绝。
 - **IPC channel 审计**：`pnpm check:ipc-channels` 核对 shared 中的 channel 常量、main 的注册 / 发送、preload 的引用三者一致；main 不能用常量表之外的字面量注册或发送 channel。
+- **IPC 入参 guard 全覆盖**：契约里每个 invoke 都在 `main/ipc/guards.ts` 登记形状 guard（无入参的登记 `NO_INPUT`），注册器查不到 guard 就拒绝注册，`ipc-guards.test.ts` 断言登记表等于契约全集。guard 只做类型 / 形状 / 枚举检查，路径归属、会话存在性等业务校验仍在 handler。
 - **导航防护**：主窗口拒绝一切新窗口（`setWindowOpenHandler` 返回 `deny`），顶层导航到非应用 URL 时取消（`will-navigate`）；两种情况都把 URL 交给 `openExternalSafely`。应用 URL 在生产是 dist 下 `index.html` 的精确 file URL，dev 是 dev server 的同源 URL。任何 webContents 都不允许挂 `<webview>`。
 - **外部打开白名单**：main 中打开外部 URL 一律经 `main/platform-actions.ts` 的 `openExternalSafely`，只放行 `https:`、`http:`、`mailto:`；`file:`、`javascript:`、自定义协议和无法解析的字符串直接丢弃。「在 Cursor 中打开」等平台动作也收在同一文件，只接受 main 已 realpath 校验过的本机路径。
 - **主文档 CSP**：目前没有。严格 CSP 会拦掉 mermaid SVG 内的 `<style>`，见「待补强」。

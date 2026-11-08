@@ -37,6 +37,12 @@ describe("IPC registrar", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it("refuses to register a channel that has no guard", () => {
+    const { registrar } = setup({ guards: new Map() });
+    expect(() => registrar.handle(contract.workspaces.readFile, vi.fn())).toThrow(`Missing IPC input guard for ${channel}`);
+    expect(ipcMain.handle).not.toHaveBeenCalled();
+  });
+
   it("throws an error naming the channel when the guard rejects, without calling the handler", async () => {
     const handler = vi.fn();
     const { registrar, event } = setup();

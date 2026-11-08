@@ -13,7 +13,7 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
 | `packages/util/shared/src/desktop-bridge/build-bridge.ts` | `buildBridge(contract, transport, locals)`：按契约生成冻结的 bridge 对象。preload 和 mock 共用 |
 | `apps/desktop/src/preload/index.ts` | 用 `ipcRenderer` 作为 transport 调 `buildBridge`，`exposeInMainWorld("actspace", bridge)`。不写任何业务逻辑 |
 | `apps/desktop/src/main/ipc/registry.ts` | `createIpcRegistrar`：`ipc.handle(contract.域.成员, handler)` / `ipc.on(...)`，统一做 sender 校验、guard、middleware、错误包装 |
-| `apps/desktop/src/main/ipc/guards.ts` | `IPC_INPUT_GUARDS`：channel → 入参 guard，注册器按 channel 自动套用 |
+| `apps/desktop/src/main/ipc/guards.ts` | `IPC_INPUT_GUARDS`：channel → 入参 guard，覆盖契约里的每个 invoke；注册器按 channel 自动套用，查不到就拒绝注册 |
 | `apps/desktop/src/renderer/api/bridge.ts` | renderer 访问 bridge 的唯一入口：`getBridge()`、`hasPreloadBridge()`、`installBridge()`、`domainApi()` |
 | `apps/desktop/src/renderer/api/<域>.ts` | 每个域一个转发对象，如 `sessionsApi`、`hostsApi`、`eventsApi`（文件名用短横线：`quick-open.ts`、`english-learning.ts`、`browser-bridge.ts`） |
 | `apps/desktop/src/renderer/api/sessions.ts` | 另含会话投影：`createSession`、`forkSession`、`getSession`、`getSessionToolDetail` 在 renderer 里把原始 projection 转成 UI 形状 |
@@ -52,7 +52,7 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
    - invoke 成员：`ipc.handle(contract.域.成员, (input, event) => …)`，入参和出参类型由契约推导；
    - send 成员：`ipc.on(contract.域.成员, (input, event) => …)`，`input` 是 `unknown`，listener 自己校验；
    - event 成员：main 用常量 `webContents.send(CONST.key, payload)` 发送。
-4. **guard**：入参涉及路径、文件、设置写入或远端 Host 时，在 `IPC_INPUT_GUARDS` 里加 guard，并在 `apps/desktop/src/main/test/ipc-guards.test.ts` 补一个合法输入和一个非法输入（见 §5）。
+4. **guard**：每个 invoke 成员都必须在 `IPC_INPUT_GUARDS` 里登记：无入参的用 `NO_INPUT`，有入参的用 `shape(...)` 写出字段形状。漏登记时 `ipc-guards.test.ts` 会失败，main 启动时注册器也会抛 `Missing IPC input guard`。同时在 `apps/desktop/src/main/test/ipc-guards.test.ts` 补合法输入和非法输入（见 §5）。
 5. **mock**：在 `mock/handlers.ts` 的默认实现里补上，或明确不补。不补时，调用会 reject `Mock bridge does not implement 域.成员`。
 6. **调用方**：通过 `<域>Api.成员` 使用。
 7. **检查**：`pnpm check:ipc-channels` 以契约为准，下列情况都会失败：
@@ -72,10 +72,12 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
 - 注册器的处理顺序：sender 校验（`assertTrustedSender`）→ guard → middleware → handler。
   - 非信任 sender 发来的 invoke 被拒，guard 和 handler 都不执行；
   - send 成员遇到非信任 sender 时静默忽略。
-- guard 只检查类型和形状，不做业务判断。可选字段放行 `null`，因为 handler 统一用 `??` 兜底。
+- guard 只检查类型和形状，不做业务判断。可选字段放行 `null`，因为 handler 统一用 `??` 兜底。字段规则用 `"string"` / `"string?"` / `"boolean"` / `"number"` / `"record"` / `"string[]"` / `"array"` 这类标签，枚举和嵌套用 `oneOf(...)`、`nested(...)`、`listOf(...)`、`optional(...)`、`nullable(...)` 组合；联合类型（按 `kind` / `op` / `decision` 分支）先校验判别字段再按分支 `check`。
+- handler 会把入参整体 spread 进持久化数据时（如 `quickOpen.updateShortcut`），guard 还要拒绝未知键。
+- 无入参通道登记 `NO_INPUT`：只接受 `undefined`，renderer 夹带 payload 会被拒。
 - guard 拒绝时抛 `IpcInputError`，消息格式为「原因 (channel)」，例如 `Invalid session artifact (runtime-v2:fixed-renderer:read-session-artifact)`。
 - handler 抛出非 Error 值时，注册器把它包成 Error，因为 Electron 只能序列化 Error。Error 原样透传，不改原有文案。
-- guard 按 channel 查表，与在哪个文件注册无关，所以迁移注册位置不会漏掉 guard。`apps/desktop/src/main/test/ipc-guards.test.ts` 断言用例表的 channel 集合等于 `IPC_INPUT_GUARDS`。
+- guard 按 channel 查表，与在哪个文件注册无关，所以迁移注册位置不会漏掉 guard。`ipc.handle()` 查不到 guard 时直接抛 `Missing IPC input guard for <channel>`，不注册 handler。`apps/desktop/src/main/test/ipc-guards.test.ts` 断言两件事：`IPC_INPUT_GUARDS` 的 channel 集合等于契约里全部 invoke 的 channel；用例表的 channel 集合等于 `IPC_INPUT_GUARDS`。
 
 ## 6. 启动与 mock 注入
 

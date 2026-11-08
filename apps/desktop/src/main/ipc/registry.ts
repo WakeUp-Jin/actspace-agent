@@ -24,7 +24,7 @@ export type IpcRegistrarOptions = {
 };
 
 export type IpcRegistrar = {
-  /** 注册契约中的 invoke 成员。顺序：sender 校验 → guard → middleware → handler。 */
+  /** 注册契约中的 invoke 成员。顺序：sender 校验 → guard → middleware → handler。channel 没有 guard 时直接抛错。 */
   handle<S extends InvokeSpec<any, any>>(
     spec: S,
     handler: (input: SpecInput<S>, event: IpcMainInvokeEvent) => SpecOutput<S> | Promise<SpecOutput<S>>,
@@ -43,9 +43,11 @@ export function createIpcRegistrar(options: IpcRegistrarOptions): IpcRegistrar {
     handle(spec, handler) {
       const { channel } = spec;
       const guard = guards.get(channel);
+      // 没登记 guard 就不注册：让「忘了写 guard」在 main 启动时报错，而不是运行期信任 renderer。
+      if (!guard) throw new Error(`Missing IPC input guard for ${channel}; register it in main/ipc/guards.ts`);
       ipcMain.handle(channel, async (event, input: unknown) => {
         assertTrustedSender(event, options.getWindow, options.untrustedMessage);
-        const reason = guard?.(input);
+        const reason = guard(input);
         if (reason) throw new IpcInputError(channel, reason);
         const next = async () => handler(input as SpecInput<typeof spec>, event);
         try {
