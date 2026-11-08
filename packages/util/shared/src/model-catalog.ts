@@ -16,6 +16,17 @@ export type ModelCatalogEntry = {
   input: string[];
   reasoning: boolean;
 };
+/** 改价清单的一行：按来源和服务商指定一个已有模型的价格，见 model-catalog-overrides.ts。 */
+export type ModelCatalogPriceOverride = {
+  source: CatalogSource;
+  sourceProviderId: string;
+  apiModel: string;
+  rates: CatalogRates;
+  /** 价格来源链接。 */
+  sourceUrl: string;
+  /** 核对日期，YYYY-MM-DD。 */
+  checkedAt: string;
+};
 export type ModelCatalogSnapshot = {
   schemaVersion: 1;
   generatedAt: string;
@@ -43,10 +54,4 @@ export type UsageCostProvenance = {
   basis: "provider-reported" | "estimated" | "unknown";
   reason: string | null;
   pricingSnapshot: ModelPricingSnapshot | null;
-};
-export type ModelCatalogStatus = {
-  state: "idle" | "updating" | "failed";
-  updatedAt: string;
-  error?: string;
-  entries: ModelCatalogEntry[];
 };

@@ -167,8 +167,6 @@ export const desktopBridgeContract = {
   },
   models: {
     listUsable: invoke<S.ModelsListUsableInput, S.ModelsListUsableResult>(CH.listUsableModels),
-    getPricingCatalog: invoke<void, S.ModelCatalogStatus | null>(CH.getPricingCatalog),
-    refreshPricingCatalog: invoke<{ force?: boolean } | undefined, S.ModelCatalogStatus | null>(CH.refreshPricingCatalog),
   },
   /** 设置 › 模型：连接、连接下的模型、用途表。每个修改都返回整份视图。 */
   modelConnections: {

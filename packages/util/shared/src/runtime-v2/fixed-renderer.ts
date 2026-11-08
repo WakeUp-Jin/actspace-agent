@@ -89,8 +89,6 @@ export const RUNTIME_V2_FIXED_RENDERER_CHANNELS = Object.freeze({
   readAgentSystemPrompt: "runtime-v2:fixed-renderer:read-agent-system-prompt",
   writeAgentSystemPrompt: "runtime-v2:fixed-renderer:write-agent-system-prompt",
   listUsableModels: "runtime-v2:fixed-renderer:list-usable-models",
-  getPricingCatalog: "runtime-v2:fixed-renderer:get-pricing-catalog",
-  refreshPricingCatalog: "runtime-v2:fixed-renderer:refresh-pricing-catalog",
   listModelConnections: "runtime-v2:fixed-renderer:list-model-connections",
   probeModelConnection: "runtime-v2:fixed-renderer:probe-model-connection",
   createModelConnection: "runtime-v2:fixed-renderer:create-model-connection",

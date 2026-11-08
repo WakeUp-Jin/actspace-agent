@@ -87,7 +87,6 @@ export type FixedRendererIpcOptions = {
   readonly models: ModelStoreService;
   readonly modelRuntime: ModelRuntimeService;
   readonly providerNetwork: ProviderNetworkService;
-  readonly pricingCatalog?: import("../model-catalog-service").ModelCatalogService;
   readonly approvals: PendingApprovalRegistry;
   /** Absent when the 操控浏览器 plugin is switched off; the browser channels are then stubs. */
   readonly browserBridge?: BrowserBridgeService;
@@ -444,8 +443,6 @@ function registerFixedRendererSettings(options: FixedRendererIpcOptions, ipc: Ip
   ipc.handle(contract.settings.writeSystemPrompt, (input) => options.settings.writeAgentSystemPrompt(typeof input?.content === "string" ? input.content : ""));
 
   ipc.handle(contract.models.listUsable, (input) => ({ models: options.modelRuntime.listUsableModels(input?.purpose ?? "chat") }));
-  ipc.handle(contract.models.getPricingCatalog, () => options.pricingCatalog?.status() ?? null);
-  ipc.handle(contract.models.refreshPricingCatalog, (input = {}) => options.pricingCatalog?.refresh(input.force === true) ?? null);
 }
 
 /** 设置 › 模型：连接、连接下的模型、用途表。入参校验在 ModelConnectionsService 里。 */
