@@ -8,7 +8,7 @@
 - 本页按主题分组，每篇一行，日期为文章首次写入的月份或日期；合并过的文章在正文开头注明合并来源。标题括号里的篇数、每篇文章都被索引且只索引一次，由 `pnpm check:docs` 校验。
 - 2026-11-04 文档整理把 323 篇合并去重为 225 篇（含 HTML 全部转为 Markdown），详见[整理计划](../exec-plans/completed/20261104-docs-reorg.md)。
 
-## Agent 运行时、插件与架构分层（35）
+## Agent 运行时、插件与架构分层（36）
 
 Harness / Runtime / Host 的边界，Cordis 插件所有权与生命周期，设置与配置的所有权。
 
@@ -47,6 +47,7 @@ Harness / Runtime / Host 的边界，Cordis 插件所有权与生命周期，设
 - 2026-10-04 [插件副作用的释放权：Effect 所有权、通知观察者生命周期、依赖顺序关闭](2026-10/20261004-notification-lifetime.md)
 - 2026-10-06 [进程边界的接口只写一份：从契约生成各端，生产者也受契约约束](2026-10/20261006-single-contract-bridge.md)
 - 2026-11 [Harness 条目要的 Host 数据走 Host port，不走 import](2026-11/harness-entry-takes-host-data-through-ports.md)
+- 2026-11 [把一份 bundle 拆成多份时，沿服务接缝拆，并看产物而不是输入图判断模块身份风险](2026-11/split-bundles-along-service-seams-check-module-identity.md)
 
 ## 会话、事件、投影与读模型（50）
 

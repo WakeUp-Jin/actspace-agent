@@ -83,7 +83,19 @@
 - [x] P1-T6b Subagent 工具的 `pluginId` 改为贡献它们的 Harness 条目 `actspace.subagent-tools`（原来写的是 Host 侧管理器
   `actspace.subagent`，形态按 owner 匹配时会把必需成员判为缺失）。
 - [x] P1-T7 文档：设计文档 §4.1/§5、learning、history、exec-runs。
-- [ ] P2–P4 待立项细化（见里程碑）。
+- [x] P2-T1 `plugin-catalog.ts` 增加 `isHarnessToolPlugin` / `harnessToolPluginEntries`：贡献工具的 Harness 条目既是形态成员，也是
+  独立产物；`main-agent-form.ts` 改用同一谓词。
+- [x] P2-T2 `build-default-harness.mjs` 两层产出：内核条目一份代码分割闭包，每个工具插件一份自包含
+  `plugins/<entry>/plugin.js`；`files.json` 改为 `{ kernel, plugins }` 清单。
+- [x] P2-T3 `prepareDefaultHarnessArtifact` 发布内核产物 `actspace.default-harness` 加每个工具插件自己的产物（pluginId、版本、
+  来源、display 沿用 catalog manifest，条目 id 仍是 catalog id）；composition 的 `manifests` 是真实的多份 manifest，
+  每个条目带 `artifactId`；`upgradePristineBuiltin` 改按 `provenance` 判定。
+- [x] P2-T4 装配测试：真实产物上断言 15 个产物、内核不含工具条目、`filesystem-read` 的 manifest 身份，并用
+  `resolveHarnessPatch` + `checkHarnessCompatibility` 验证一条 `replace` 只换掉该插件的产物。
+- [x] P2-T5 `service-contract.ts` owner：增加对照 catalog 的漂移测试（owner / providerOwner / providerId 必须等于贡献该服务的
+  插件包与条目）；测试立即发现 `tools.browser` 写的是不存在的 `@actspace/browser-tools`，已改为 `@actspace/tool-browser`
+  并重新生成契约矩阵。
+- [ ] P3–P4 待立项细化（见里程碑）。
 
 ## 决策记录
 
@@ -98,6 +110,20 @@
 - 2026-11-09：形态经 Host port 传入 Harness，而不是让 Harness 自己从 composition manifests 推导。理由：bundle 白名单
   禁止 Harness 条目 import 插件目录；而 Harness 内部目前拿不到 composition manifests（`mountHarness` 只把 entries
   和 sharedServices 交给树）。P2 拆产物时如果给树暴露 composition，可以再把推导挪进 Harness。
+- 2026-11-09（P2）：默认 Harness 产物按「内核 + 每个工具插件」两层拆，而不是每个条目一份。理由：内核条目之间共享
+  `tool-runtime`、`llm-service`、`context-engine` 的类与 WeakMap（`instanceof ToolRuntimeError` / `LlmRuntimeError`、
+  上下文可信表面），逐条目打包会复制这些模块、破坏身份判断；工具插件只经服务与内核交互，单独打包后 esbuild 的摇树结果
+  里没有任何被实例化的共享类或 Symbol（探针对比过 14 个 bundle），可以安全独立。拆分依据与形态成员共用
+  `isHarnessToolPlugin`，两者天然一致。
+- 2026-11-09（P2）：工具插件产物保留 catalog 的 pluginId / 版本 / 来源，但行描述仍由 `DEFAULT_HARNESS_ENTRIES` 合成
+  （`host.required` 为空、`contracts` 补齐、条目 id 用 catalog id），不直接把 catalog manifest 当产物 manifest。理由：
+  catalog manifest 没有 `contracts`，`host.required` 会让 `capabilityCeiling` 为空的 Host（测试、CLI）无法挂载；
+  Host 能力门禁已经由 `harnessEntriesMissingHostCapabilities` 与 Host port 完成。
+- 2026-11-09（P2）：`service-contract.ts` 的 owner 不改成运行时推导，而是加漂移测试对照 catalog。理由：该表只是契约矩阵
+  的审计元数据，生成器用正则读源码，运行时推导会让生成器失去来源；测试已经把它变成「必须与 manifest 一致」的镜像，
+  首次运行就抓到一个错误的包名。彻底删掉叶子 owner、让生成器按 manifest 兜底（它已支持 `declared` 行）留作后续。
+- 2026-11-09（P2）：`plugin_manager` 的 `replace` 仍只接受带可编辑源码的 `actspace.evolved.*` 条目。内置工具产物是打包后的
+  JS，没有模板源码；让模型改写内置工具属于 P3/P4 之后的事。P2 交付的是产物与补丁层面的可替换性。
 
 ## 执行模式
 

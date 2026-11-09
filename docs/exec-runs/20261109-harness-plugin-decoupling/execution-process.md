@@ -55,6 +55,51 @@
 
 - **操作**：`pnpm typecheck`、`pnpm lint`、`pnpm check:packages`、`pnpm check:hot-path-reads` 通过；`pnpm check:docs` 在登记计划后通过。更新设计文档 §4.1 / §5 / §5.1、旧 learning 的指向、`packages/core/README.md`，新增 learning 与本执行文档、history。
 
+## P2：默认 Harness 按插件产出产物
+
+### 步骤 9：拆分方案探针
+
+- **操作**：在 `/tmp` 用 esbuild 对 14 个贡献工具的条目各打一份不分割 bundle，与内核闭包对比输入模块与输出代码。
+  输入层面叶子 bundle 和内核大量重叠（`tool-runtime`、`agent`、`subagent`），但摇树后的输出里只剩纯函数
+  （`isPathWithin`、`canonicalizeFileResource`、`redactToolText`）与常量；重复出现的 `AgentRuntimeError` / `AgentRegistryService`
+  类没有被实例化，`TODO_STATE` Symbol 只在 todo 插件内部使用，`image-inspection` 的 plugin 入口不含 `LlmRuntimeError`。
+  内核条目之间则确实共享 `instanceof` 类和 context-engine 的 WeakMap。
+- **结论**：按「内核 + 每个工具插件」两层拆，而不是逐条目拆；写进计划决策记录。
+
+### 步骤 10：构建脚本与产物发布
+
+- **操作**：`build-default-harness.mjs` 先打内核（splitting），再对每个 `isHarnessToolPlugin` 条目打 `plugins/<entry>/plugin.js`，
+  `files.json` 改为 `{ kernel, plugins }`。`prepareDefaultHarnessArtifact` 拆出 `behaviorFor` / `toolPluginManifest`，发布 1 + 14 个产物，
+  composition 的 `manifests` 为真实多份 manifest、每个条目带 `artifactId`、`digest` 为全部产物 id 的哈希。
+  `agent-runtime-plugin` 的 `upgradePristineBuiltin` 改为所有条目 `provenance` 以 `builtin:` 开头。
+- **影响文件**：`packages/core/runtime/scripts/build-default-harness.mjs`、`src/plugin-catalog.ts`、`src/main-agent-form.ts`、
+  `src/harness/{default-harness,default-harness-definition,agent-runtime-plugin}.ts`。
+- **验证**：重建后 `dist/default-harness/` 为 31 个内核文件 + 14 个插件目录；原有装配、进化测试不改即通过。
+
+### 步骤 11：替换单个内置插件的测试
+
+- **操作**：`default-harness.test.ts` 新增用例：断言产物数量与 manifest 顺序、内核不含工具条目、`actspace.filesystem-read`
+  的版本 / 来源 / 工具列表 / `./plugin.js`；再发布一个同 pluginId、版本 `2.0.1` 的替代产物，用 `resolveHarnessPatch` 做
+  `replace`，断言只有 `filesystem-read` 条目换了 `artifactId`、其余条目（含内核）不变、原产物不再被引用、
+  `checkHarnessCompatibility` 无诊断。
+- **验证**：`pnpm --filter @actspace/runtime test` 248 通过。
+
+### 步骤 12：service-contract owner 漂移测试
+
+- **操作**：同一测试文件增加用例，遍历 `harnessToolPluginEntries()`，对每个提供的服务要求 `ACTSPACE_SERVICE_DEFINITIONS[...].owner`
+  与 `ACTSPACE_SERVICE_ROLE_METADATA` 的 `providerOwner` 等于 `entry.module` 的包名、`providerId` 等于 `<entryId>:default`。
+  首次运行即失败：`tools.browser` 的 owner 写成不存在的 `@actspace/browser-tools`，实际包是 `@actspace/tool-browser`。
+  改正后 `pnpm gen:contract-matrix` 重新生成矩阵。
+- **影响文件**：`packages/composition/cordis-adapter/src/service-contract.ts`、
+  `docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md`。
+- **验证**：`cordis-adapter` 43 通过、`pnpm test:contract-matrix` 通过。
+
+### 步骤 13：全仓检查与文档
+
+- **操作**：`runtime`（248）、`cordis-adapter`（43）、`harness-control`（29）、`harness-evaluation`（12）、`plugin-manager`（6）通过；
+  `pnpm typecheck`、`pnpm lint`、`pnpm check:packages`、`pnpm check:hot-path-reads`、`pnpm test:plugin-catalog` 通过。
+  更新设计文档 07（内置产物说明）、装配规范、Run 生命周期文档、`packages/core/README.md`，计划进度与决策记录。
+
 ## 遇到的问题
 
 - **问题**：Harness 条目 import Host 侧模块在 `tsc` 与源码测试下都不报错，只在打包后的装配测试暴露。
@@ -64,10 +109,18 @@
   - **原因**：在 `main` 上同样失败（process Grant 与相对资源路径），属环境相关的既有问题。
   - **应对**：不在本轮处理，摘要里标注。
 
+- **问题**（P2）：直接把 catalog manifest 当工具插件的产物 manifest 不可行。
+  - **原因**：catalog manifest 没有 `contracts`（`checkHarnessCompatibility` 会报 Missing behavior contracts），`host.required`
+    （如 `filesystem.read`）会让 `capabilityCeiling` 为空的 Host 在 `mountHarness` 时报缺能力。
+  - **应对**：产物 manifest 只沿用 pluginId / 版本 / 来源 / display / contributions，行描述仍由 `DEFAULT_HARNESS_ENTRIES` 合成。
+
 ## 跳过或推迟的事项
 
-- P2–P4（默认 Harness 按条目产出产物、`service-contract.ts` owner 改由 manifest 提供、`agent-factory` 上下文来源注册式、文件/Shell 实现收回 Harness 树）：按计划留给后续轮次。
-- Harness 自己从 composition 推导形态：需要先让树拿到 manifests，与 P2 一起做。
+- P3–P4（`agent-factory` 上下文来源注册式、文件/Shell 实现收回 Harness 树）：按计划留给后续轮次。
+- Harness 自己从 composition 推导形态：P2 后 composition 已有真实的多份 manifest，但 `mountHarness` 仍只把 entries 交给树，
+  未在本轮改动。
+- 彻底删掉 `service-contract.ts` 里叶子插件的 owner、让契约矩阵生成器按 manifest 兜底：本轮只加漂移测试。
+- 让 `plugin_manager` 以内置工具为模板改写（需要内置插件携带可编辑源码）：属 P3/P4 之后。
 
 ## 夜间模式补充记录
 

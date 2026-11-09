@@ -33,7 +33,7 @@ core 是 Agent 的主干。`agent`、`scope`、`agent-loop` 定义 Agent 是什�
 ## 入口与测试
 
 - `runtime/src/plugin-catalog.ts`：唯一插件清单；`runtime/src/manifests.ts`：runtime 自带四个插件的 manifest；`runtime/cordis.yml`：由清单生成，勿手改。
-- `runtime/src/startup/`、`session/`、`harness/`、`profiles/`、`projection/`：分别是启动退出、会话接线、执行组合与默认 Harness、默认声明、Host 读模型。`runtime/scripts/build-default-harness.mjs` 把清单里的会话插件打成固定 ESM。
+- `runtime/src/startup/`、`session/`、`harness/`、`profiles/`、`projection/`：分别是启动退出、会话接线、执行组合与默认 Harness、默认声明、Host 读模型。`runtime/scripts/build-default-harness.mjs` 把清单里的会话插件打成固定 ESM：内核条目一份代码分割闭包（发布为 `actspace.default-harness`），每个贡献工具的插件（`isHarnessToolPlugin`）单独一份 `plugins/<entry>/plugin.js`，按自己的 pluginId 发布，可被 Harness 补丁单独替换。
 - 测试在各包 `src/test/` 或 `src/**/*.test.ts`：`pnpm --filter @actspace/runtime test`，其他包同理。`agent-service` 另见[包 README](agent-service/README.md)。
 
 ## 怎么扩展
