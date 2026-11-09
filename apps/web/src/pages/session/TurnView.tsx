@@ -59,7 +59,7 @@ function ChangesCard({ changes }: { readonly changes: TurnChanges }) {
   return (
     <div className="changes anim-rise">
       <div className="changes-head">
-        <span className="changes-tile"><FileText size={18} strokeWidth={1.8} aria-hidden /></span>
+        <span className="changes-tile"><FileText size={18} aria-hidden /></span>
         <span className="min-w-0 flex-1">
           <b className="block text-act-md font-medium">已编辑 {count} 个文件</b>
           <small className="text-act-xs tabular-nums"><span className="tl-add">+{changes.additions}</span> <span className="tl-del">-{changes.deletions}</span></small>
@@ -93,7 +93,7 @@ function TurnTail({ turn }: { readonly turn: Turn }) {
       {view ? (
         <>
           <Pressable onClick={() => setUsageOpen(true)} className="inline-flex h-[26px] w-auto items-center gap-1 rounded-act-pill px-2 tabular-nums hover:bg-hover-overlay">
-            <Database size={14} strokeWidth={1.75} aria-hidden />{view.label}
+            <Database size={14} aria-hidden />{view.label}
           </Pressable>
           <UsageSheet open={usageOpen} onOpenChange={setUsageOpen} view={view} />
         </>

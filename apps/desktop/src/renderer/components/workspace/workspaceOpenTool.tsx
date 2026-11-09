@@ -6,7 +6,7 @@
  * 各存一份会让同一个偏好出现两个互相矛盾的值。
  */
 
-import { Code2, Folder, MonitorUp, Terminal } from "lucide-react";
+import { CodeXml, Folder, MonitorUp, SquareTerminal } from "lucide-react";
 import type { WorkspaceOpenTool, WorkspaceOpenToolId } from "@actspace/shared";
 
 const LAST_TOOL_KEY = "actspace.workspace.open-tool.v1";
@@ -51,7 +51,7 @@ export function toolIcon(tool: Pick<WorkspaceOpenTool, "id" | "label" | "iconDat
     );
   }
   if (tool.id === "finder") return <Folder size={size} aria-hidden="true" />;
-  if (tool.id === "terminal" || tool.id === "iterm2") return <Terminal size={size} aria-hidden="true" />;
+  if (tool.id === "terminal" || tool.id === "iterm2") return <SquareTerminal size={size} aria-hidden="true" />;
   if (tool.id === "cursor") return <MonitorUp size={size} aria-hidden="true" />;
-  return <Code2 size={size} aria-hidden="true" />;
+  return <CodeXml size={size} aria-hidden="true" />;
 }

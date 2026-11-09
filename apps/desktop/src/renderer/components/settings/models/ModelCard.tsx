@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash } from "lucide-react";
 import type { ConnectionModelView, ModelOverrides } from "@actspace/shared";
 import { Button, cx } from "../../ui/Button";
 import { IconButton } from "../../ui/IconButton";
@@ -46,7 +46,7 @@ export function ModelCard({ model, level, flash, onLevel, onSave, onRemove }: {
           className={cx("opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100 max-[600px]:opacity-100", open && "opacity-100")}
           onClick={(event) => { event.stopPropagation(); onRemove(); }}
         >
-          <Trash2 size={14} aria-hidden="true" />
+          <Trash size={14} aria-hidden="true" />
         </IconButton>
         <IconButton
           label={`${open ? "收起" : "展开"} ${effective.label}`}

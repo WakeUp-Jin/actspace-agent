@@ -101,7 +101,7 @@ function isVisibleTab(tab: RightPanelTab, sessionId: string | null): boolean {
 
 /** 侧边对话 tab 前的状态：运行中转圈，待审批、未读、失败是小圆点，空闲是分叉图标。 */
 function SideChatTabIcon({ status }: { status: SessionUiStatusKind | undefined }) {
-  if (!status || status === "idle") return <GitFork size={12} strokeWidth={2} aria-hidden="true" />;
+  if (!status || status === "idle") return <GitFork size={12} aria-hidden="true" />;
   const meta = SESSION_STATUS_META[status];
   return <span className={`inline-block ${meta.dotClass}`} role="img" aria-label={meta.label} />;
 }
@@ -216,7 +216,7 @@ function RightPanelLauncher({
       id: "side-chat",
       label: sideChat.opening ? "正在打开…" : "侧边对话",
       description: sideChat.error ?? "另起一条线问，带上目前为止的上下文",
-      icon: <GitFork size={15} strokeWidth={1.8} />,
+      icon: <GitFork size={15} />,
       disabled: !sideChat.available || sideChat.opening,
       onClick: () => void sideChat.open().catch(() => undefined),
     });
@@ -227,7 +227,7 @@ function RightPanelLauncher({
         id: "subagents",
         label: "子 Agent",
         description: "这次对话派出的子智能体，空闲后还能继续派活",
-        icon: <MessageSquare size={15} strokeWidth={1.8} />,
+        icon: <MessageSquare size={15} />,
         disabled: !sessionId,
         onClick: () => sessionId && openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId }),
       },
@@ -235,7 +235,7 @@ function RightPanelLauncher({
         id: "background-tasks",
         label: "后台任务",
         description: "在后台跑的命令",
-        icon: <Layers size={15} strokeWidth={1.8} />,
+        icon: <Layers size={15} />,
         disabled: !sessionId,
         onClick: () => sessionId && openTab({ id: "background-tasks", kind: "backgroundTasks", title: "后台任务", sessionId }),
       },
@@ -243,14 +243,14 @@ function RightPanelLauncher({
         id: "docs",
         label: "MD 文档",
         description: "工作区里的 Markdown，可预览和编辑",
-        icon: <BookOpen size={15} strokeWidth={1.8} />,
+        icon: <BookOpen size={15} />,
         onClick: () => openTab({ id: "docs", kind: "docs", title: "MD 文档" }),
       },
       {
         id: "review",
         label: "改动",
         description: "这次的改动",
-        icon: <GitBranch size={15} strokeWidth={1.8} />,
+        icon: <GitBranch size={15} />,
         disabled: !onOpenReview,
         onClick: onOpenReview,
       },
@@ -260,7 +260,7 @@ function RightPanelLauncher({
     id: "context",
     label: "上下文",
     description: "上下文用了多少",
-    icon: <Eye size={15} strokeWidth={1.8} />,
+    icon: <Eye size={15} />,
     onClick: () => openTab({ id: "context", kind: "context", title: "上下文" }),
   });
   return (
@@ -274,7 +274,7 @@ function RightPanelLauncher({
           id: `side-chat:${item.id}`,
           label: title,
           description: sideChatAge(item.updatedAt),
-          icon: <GitFork size={15} strokeWidth={1.8} />,
+          icon: <GitFork size={15} />,
           onClick: () => sideChat.reopen(item, title),
         })),
       }]}

@@ -41,7 +41,7 @@ export function DocsOutline({
     <Popover open={shown} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <IconButton label="大纲" tooltip="大纲" disabled={disabled} aria-expanded={shown}>
-          <ListTree size={15} strokeWidth={1.8} aria-hidden="true" />
+          <ListTree size={15} aria-hidden="true" />
         </IconButton>
       </PopoverTrigger>
       <PopoverContent align="end" radius="lg" className="max-h-[360px] w-[240px] overflow-auto p-1.5" aria-label="本页大纲">

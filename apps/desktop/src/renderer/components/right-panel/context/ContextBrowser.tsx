@@ -94,7 +94,7 @@ function CategorySection({ category, count, grandTotal, open, dimmed, onToggle, 
           ROW_FOCUS_CLASS,
           dimmed && "opacity-45",
         )}>
-        <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true"
+        <ChevronRight size={12} aria-hidden="true"
           className={cn("shrink-0 text-text-faint transition-transform duration-(--motion-fast)", open && "rotate-90")} />
         <Swatch colorVar={category.colorVar} />
         <span className="font-medium">{contextBucketLabel(category.key)}</span>

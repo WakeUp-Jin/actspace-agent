@@ -1,5 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
-import { Loader2 } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { cn as cx } from "./cn";
 
 // 文字按钮的唯一实现。尺寸、圆角、focus、disabled、按下反馈都在这里定义；
@@ -69,7 +69,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       className={cx(buttonClass({ variant, size, shape }), className)}
       {...rest}
     >
-      {busy ? <Loader2 size={size === "xs" ? 12 : 13} strokeWidth={2.2} className="animate-spin" aria-hidden="true" /> : null}
+      {busy ? <LoaderCircle size={size === "xs" ? 12 : 13} className="animate-spin" aria-hidden="true" /> : null}
       {children}
     </button>
   );

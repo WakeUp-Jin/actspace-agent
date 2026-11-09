@@ -40,7 +40,7 @@ export function ThinkingBlock({ message, className, replyCompleted = false }: {
           {message.title}
           {running ? <ToolLogShimmer text={message.title} /> : null}
         </span>
-        {expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />}
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </button>
       {expanded ? <pre className={THINKING_CONTENT_CLASS}>{message.content}</pre> : null}
     </article>

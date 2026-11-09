@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useRef, useState } from "react";
-import { ChevronsLeft, ChevronsRight, Copy, FolderOpen, Loader2, Maximize2, Minimize2, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Copy, FolderOpen, LoaderCircle, Maximize2, Minimize2, ExternalLink, TriangleExclamationPoint } from "lucide-react";
 import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
 import { workspacesApi } from "../../../api/workspaces";
 import { Button } from "../../ui/Button";
@@ -111,31 +111,31 @@ export function DocsReader({
             {/* 面板窄时先收掉三个次要操作，保证文件名、未保存圆点、展开面板和收起文件树始终看得见。 */}
             <div className="hidden items-center gap-1 @[460px]:flex">
             <IconButton label="在 Finder 中显示" onClick={() => void run("reveal")}>
-              <FolderOpen size={15} strokeWidth={1.8} aria-hidden="true" />
+              <FolderOpen size={15} aria-hidden="true" />
             </IconButton>
             <IconButton label="用默认应用打开" onClick={() => void run("open")}>
-              <SquareArrowOutUpRight size={15} strokeWidth={1.8} aria-hidden="true" />
+              <ExternalLink size={15} aria-hidden="true" />
             </IconButton>
             <IconButton label="复制路径" tooltip={copied ? "已复制路径" : "复制路径"} onClick={() => void copyPath()}>
-              <Copy size={15} strokeWidth={1.8} aria-hidden="true" />
+              <Copy size={15} aria-hidden="true" />
             </IconButton>
             </div>
           </>
         ) : null}
         <IconButton label={expandLabel} aria-pressed={docsExpanded} onClick={toggleDocsExpanded}>
-          {docsExpanded ? <Minimize2 size={15} strokeWidth={1.8} aria-hidden="true" /> : <Maximize2 size={15} strokeWidth={1.8} aria-hidden="true" />}
+          {docsExpanded ? <Minimize2 size={15} aria-hidden="true" /> : <Maximize2 size={15} aria-hidden="true" />}
         </IconButton>
         {/* 用方向箭头而不是 PanelRight：PanelRight 已是窗口右上角「收起右侧面板」的图标，并排会认错。 */}
         <IconButton label={treeLabel} aria-expanded={!docsTreeCollapsed} onClick={toggleDocsTreeCollapsed}>
           {docsTreeCollapsed
-            ? <ChevronsLeft size={15} strokeWidth={1.8} aria-hidden="true" />
-            : <ChevronsRight size={15} strokeWidth={1.8} aria-hidden="true" />}
+            ? <ChevronsLeft size={15} aria-hidden="true" />
+            : <ChevronsRight size={15} aria-hidden="true" />}
         </IconButton>
       </div>
 
       {ready?.isStale ? (
         <div className={`${BAR_CLASS} bg-warning-soft text-on-warning`} role="status">
-          <TriangleAlert size={13} strokeWidth={2} className="shrink-0" aria-hidden="true" />
+          <TriangleExclamationPoint size={13} className="shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1">
             {dirty ? "文件已在磁盘上变更。保存会覆盖磁盘上的版本，重新加载会丢弃未保存的改动。" : "文件已在磁盘上变更，当前显示的是旧内容。"}
           </span>
@@ -154,15 +154,15 @@ export function DocsReader({
         <div className={STATE_CLASS}>请先在顶部选择工作区。</div>
       ) : !path ? (
         <div className={STATE_CLASS}>
-          {listingEmpty ? "这个工作区还没有 Markdown 文档" : listingStatus === "loading" ? <Loader2 size={15} className="animate-spin" aria-label="正在读取文档列表" /> : "从右侧选择一篇文档"}
+          {listingEmpty ? "这个工作区还没有 Markdown 文档" : listingStatus === "loading" ? <LoaderCircle size={15} className="animate-spin" aria-label="正在读取文档列表" /> : "从右侧选择一篇文档"}
         </div>
       ) : !doc || doc.status === "loading" ? (
-        <div className={STATE_CLASS}><Loader2 size={15} className="animate-spin" aria-label="正在读取文档" /></div>
+        <div className={STATE_CLASS}><LoaderCircle size={15} className="animate-spin" aria-label="正在读取文档" /></div>
       ) : doc.status === "error" ? (
         <div className={STATE_CLASS} role="alert">{doc.message ?? "读取文件失败。"}</div>
       ) : (
         // 编辑器是懒加载的 chunk：加载期间显示与读取文档时一样的占位。
-        <Suspense fallback={<div className={STATE_CLASS}><Loader2 size={15} className="animate-spin" aria-label="正在加载编辑器" /></div>}>
+        <Suspense fallback={<div className={STATE_CLASS}><LoaderCircle size={15} className="animate-spin" aria-label="正在加载编辑器" /></div>}>
           <MarkdownEditor
             ref={editorRef}
             value={doc.draft}

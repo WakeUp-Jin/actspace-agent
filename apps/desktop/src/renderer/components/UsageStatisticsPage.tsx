@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, Bot, ChartColumn, Clock, Code, Database, Gauge, RefreshCw, Terminal } from "lucide-react";
+import { BookOpen, Bot, ChartColumn, Clock, Code, Database, Gauge, RefreshCw, SquareTerminal } from "lucide-react";
 import type {
   SettingsV4NamespacePatch,
   SettingsV4Snapshot,
@@ -230,7 +230,7 @@ export function UsageStatisticsPage({ activitySnapshot: data = null, isLoading, 
                   aside={toolCalls == null ? undefined : `${fmtInt(toolCalls)} 次`}>
                   <RankList ariaLabel="工具调用" color="var(--act-context-tools)" rows={(data?.tools ?? []).map(toolRank)} />
                 </StatsCard>
-                <StatsCard id="commands" title="命令执行" icon={Terminal} span={3} flash={flashId === "commands"} note={harnessNote}
+                <StatsCard id="commands" title="命令执行" icon={SquareTerminal} span={3} flash={flashId === "commands"} note={harnessNote}
                   aside={bashCalls == null ? undefined : `${fmtInt(bashCalls)} 次`}>
                   <RankList ariaLabel="命令执行" color="var(--act-context-rules)" rows={(data?.commands ?? []).map(commandRank)} />
                 </StatsCard>

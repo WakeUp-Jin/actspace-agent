@@ -164,7 +164,7 @@ export function ApprovalReason({ reason }: { reason?: string }) {
   if (notes.length === 0) return null;
   return (
     <span className="grid size-4 flex-none place-items-center text-text-faint" role="img" aria-label="审批原因" title={notes.join("\n")}>
-      <Info size={13} strokeWidth={2} aria-hidden="true" />
+      <Info size={13} aria-hidden="true" />
     </span>
   );
 }

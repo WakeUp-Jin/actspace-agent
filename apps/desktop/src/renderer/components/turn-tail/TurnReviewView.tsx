@@ -1,4 +1,4 @@
-import { ChevronDown, Columns2, FileSearch, WrapText } from "lucide-react";
+import { ChevronDown, Columns2, FileSearch, TextWrap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { IconButton } from "../ui/IconButton";
 import { Menu, MenuContent, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "../ui/Menu";
@@ -78,7 +78,7 @@ export function TurnReviewView({ tab }: { tab: Extract<RightPanelTab, { kind: "t
             <Columns2 size={15} />
           </IconButton>
           <IconButton label="自动换行" tooltip={wrap ? "关闭自动换行" : "开启自动换行"} tooltipSide="bottom" aria-pressed={wrap} className={PRESSED_CLASS} onClick={() => setWrap((value) => !value)} data-review-tool="wrap">
-            <WrapText size={15} />
+            <TextWrap size={15} />
           </IconButton>
           {file.deleted ? null : (
             <IconButton label={`打开 ${file.path}`} tooltip="打开整个文件" tooltipSide="bottom" onClick={() => void openWholeFile()} data-review-tool="open-file">

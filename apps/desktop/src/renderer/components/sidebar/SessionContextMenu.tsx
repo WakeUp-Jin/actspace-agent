@@ -1,5 +1,5 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { AlignLeft, Archive, ArchiveRestore, Copy, GitFork, Hash, Pencil, Pin } from "lucide-react";
+import { TextAlignStart, Archive, ArchiveArrowUp, Copy, GitFork, Hash, Pencil, Pin } from "lucide-react";
 import {
   ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger,
 } from "../ui/ContextMenu";
@@ -70,42 +70,42 @@ export function SessionContextMenuContent({
       }}
     >
       <ContextMenuItem disabled={!onTogglePin || archived} onSelect={() => onTogglePin?.()}>
-        <Pin size={16} strokeWidth={1.9} fill={pinned ? "currentColor" : "none"} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+        <Pin size={16} fill={pinned ? "currentColor" : "none"} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
         {pinned ? "取消置顶" : "置顶"}
       </ContextMenuItem>
       <ContextMenuItem disabled={!onRename} onSelect={onStartRename}>
-        <Pencil size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+        <Pencil size={16} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
         重命名
       </ContextMenuItem>
       <ContextMenuSub>
         <ContextMenuSubTrigger disabled={!onCopySessionId && !onCopyTranscript}>
-          <Copy size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+          <Copy size={16} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
           复制
         </ContextMenuSubTrigger>
         <ContextMenuSubContent className="w-52">
           <ContextMenuItem disabled={!onCopySessionId} onSelect={() => onCopySessionId?.()}>
-            <Hash size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+            <Hash size={16} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
             复制 ID
           </ContextMenuItem>
           <ContextMenuItem disabled={!onCopyTranscript} onSelect={() => onCopyTranscript?.()}>
-            <AlignLeft size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+            <TextAlignStart size={16} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
             复制会话记录
           </ContextMenuItem>
         </ContextMenuSubContent>
       </ContextMenuSub>
       <ContextMenuItem disabled={forkDisabled} title={forkLabel} onSelect={() => onFork?.()}>
-        <GitFork size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+        <GitFork size={16} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
         分叉
       </ContextMenuItem>
       <ContextMenuSeparator />
       {archived ? (
         <ContextMenuItem disabled={!onRestore} onSelect={() => onRestore?.()}>
-          <ArchiveRestore size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+          <ArchiveArrowUp size={16} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
           取消归档
         </ContextMenuItem>
       ) : (
         <ContextMenuItem disabled={archiveDisabled} title={archiveLabel} onSelect={() => onArchive?.()}>
-          <Archive size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+          <Archive size={16} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
           归档
         </ContextMenuItem>
       )}

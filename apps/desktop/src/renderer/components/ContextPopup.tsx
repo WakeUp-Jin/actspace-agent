@@ -110,7 +110,7 @@ export function ContextPopup({
                     onClick={onExpand}
                     aria-label="查看完整上下文"
                   >
-                    <Eye size={15} strokeWidth={2} aria-hidden="true" />
+                    <Eye size={15} aria-hidden="true" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>查看完整上下文</TooltipContent>
@@ -119,7 +119,7 @@ export function ContextPopup({
             <Tooltip>
               <TooltipTrigger asChild>
                 <button className={CONTEXT_CLOSE_CLASS} type="button" onClick={onClose} aria-label="关闭上下文">
-                  <X size={15} strokeWidth={2.2} aria-hidden="true" />
+                  <X size={15} aria-hidden="true" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>关闭上下文用量</TooltipContent>

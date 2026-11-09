@@ -133,7 +133,7 @@ function localFacts(target: Extract<RunTarget, { kind: "local" | "invalid" }>, b
   if (branchLabel) {
     facts.push(
       <span className={FACT_CLASS} title={branchLabel}>
-        <GitBranch className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
+        <GitBranch className={ICON_CLASS} size={14} aria-hidden="true" />
         <span className="max-w-[240px] truncate">{branchLabel}</span>
       </span>,
     );
@@ -145,7 +145,7 @@ function localFacts(target: Extract<RunTarget, { kind: "local" | "invalid" }>, b
       <Tooltip>
         <TooltipTrigger asChild>
           <span tabIndex={0} aria-label={`工作树，${source}`} className={`${FACT_CLASS} rounded-act-sm outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}>
-            <GitFork className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
+            <GitFork className={ICON_CLASS} size={14} aria-hidden="true" />
             <span>工作树</span>
           </span>
         </TooltipTrigger>
@@ -155,7 +155,7 @@ function localFacts(target: Extract<RunTarget, { kind: "local" | "invalid" }>, b
   } else {
     facts.push(
       <span className={FACT_CLASS}>
-        <Laptop className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
+        <Laptop className={ICON_CLASS} size={14} aria-hidden="true" />
         <span>本机</span>
       </span>,
     );
@@ -172,7 +172,7 @@ function remoteFacts(target: Extract<RunTarget, { kind: "remote" }>, notReady: R
     <Tooltip>
       <TooltipTrigger asChild>
         <span className={FACT_CLASS} tabIndex={0}>
-          <Server className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
+          <Server className={ICON_CLASS} size={14} aria-hidden="true" />
           <span className="max-w-[200px] truncate">{hostName}</span>
         </span>
       </TooltipTrigger>
@@ -180,7 +180,7 @@ function remoteFacts(target: Extract<RunTarget, { kind: "remote" }>, notReady: R
     </Tooltip>
   ) : (
     <span className={FACT_CLASS}>
-      <Server className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
+      <Server className={ICON_CLASS} size={14} aria-hidden="true" />
       <span className="max-w-[200px] truncate">{hostName}</span>
     </span>
   );
@@ -192,7 +192,7 @@ function remoteFacts(target: Extract<RunTarget, { kind: "remote" }>, notReady: R
     </span>
   ) : target.workspaceName ? (
     <span className={FACT_CLASS}>
-      <Folder className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
+      <Folder className={ICON_CLASS} size={14} aria-hidden="true" />
       <span className="max-w-[200px] truncate">{target.workspaceName}</span>
     </span>
   ) : null;

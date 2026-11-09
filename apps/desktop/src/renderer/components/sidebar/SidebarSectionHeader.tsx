@@ -36,7 +36,7 @@ export function SidebarSectionHeader({ label, collapsed, onToggle, actions, over
     <div className={`${SECTION_HEADER_CLASS} ${compact ? "h-6" : "h-[30px]"} ${className}`}>
       <button className={`${SECTION_LABEL_CLASS} ${hidden}`} type="button" onClick={onToggle} aria-expanded={!collapsed}>
         {label}
-        <ChevronDown size={12} strokeWidth={2} className={`${SECTION_CHEVRON_CLASS} ${collapsed ? "-rotate-90 opacity-100" : "opacity-0"}`} aria-hidden="true" />
+        <ChevronDown size={12} className={`${SECTION_CHEVRON_CLASS} ${collapsed ? "-rotate-90 opacity-100" : "opacity-0"}`} aria-hidden="true" />
       </button>
       {actions ? <div className={`nav-section-actions ${NAV_SECTION_ACTIONS_CLASS} gap-px ${hidden}`}>{actions}</div> : null}
       {overlay}
@@ -61,7 +61,7 @@ export function SidebarSearchBox({ query, onQueryChange, onClose }: SidebarSearc
   }, []);
   return (
     <div className={`${SEARCH_BOX_CLASS} ${grown ? "w-[calc(100%-4px)]" : "w-7"}`} role="search">
-      <Search size={13} strokeWidth={1.9} className="shrink-0 text-text-faint" aria-hidden="true" />
+      <Search size={13} className="shrink-0 text-text-faint" aria-hidden="true" />
       <input
         ref={inputRef}
         className={SEARCH_INPUT_CLASS}
@@ -78,7 +78,7 @@ export function SidebarSearchBox({ query, onQueryChange, onClose }: SidebarSearc
         }}
       />
       <IconButton size="xs" label="关闭搜索" tooltip={false} onClick={() => onClose(true)}>
-        <X size={13} strokeWidth={1.9} aria-hidden="true" />
+        <X size={13} aria-hidden="true" />
       </IconButton>
     </div>
   );
@@ -88,7 +88,7 @@ export function SidebarSearchBox({ query, onQueryChange, onClose }: SidebarSearc
 export function SidebarSearchButton({ onOpen, buttonRef }: { onOpen: () => void; buttonRef?: Ref<HTMLButtonElement> }) {
   return (
     <IconButton ref={buttonRef} className="sidebar-search-button" size="xs" label="搜索会话" tooltip="搜索会话" onClick={onOpen}>
-      <Search size={13} strokeWidth={1.9} aria-hidden="true" />
+      <Search size={13} aria-hidden="true" />
     </IconButton>
   );
 }

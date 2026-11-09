@@ -173,7 +173,7 @@ export function ShortcutSettings({
                 disabled={dependentDisabled || saving || quickOpen.accelerator === DEFAULT_QUICK_OPEN_ACCELERATOR}
                 onClick={() => void update({ accelerator: DEFAULT_QUICK_OPEN_ACCELERATOR })}
               >
-                <RotateCcw size={13} strokeWidth={1.9} aria-hidden="true" />
+                <RotateCcw size={13} aria-hidden="true" />
               </IconButton>
             </>
           }

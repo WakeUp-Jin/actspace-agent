@@ -83,7 +83,7 @@ export const Sidebar = memo(function Sidebar({
             type="button"
             onClick={() => handleNewAgent()}
           >
-            <SquarePen size={14} strokeWidth={1.9} />
+            <SquarePen size={14} />
             <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>新建会话</span>
             <span className={SIDEBAR_PRIMARY_ACTION_SHORTCUT_CLASS} aria-hidden="true">⌘N</span>
           </button>
@@ -97,7 +97,7 @@ export const Sidebar = memo(function Sidebar({
           aria-current={view === "extensions" ? "page" : undefined}
           onClick={() => onSelectView?.("extensions")}
         >
-          <Blocks size={14} strokeWidth={1.9} />
+          <Blocks size={14} />
           <span className={SIDEBAR_PRIMARY_ACTION_LABEL_CLASS}>扩展</span>
         </button>
         {newSpace ? (
@@ -131,7 +131,7 @@ export const Sidebar = memo(function Sidebar({
         type="button"
         onClick={() => onSelectView?.("settings")}
       >
-        <Settings size={14} strokeWidth={1.9} />
+        <Settings size={14} />
         设置
       </button>
       <PerformancePanel />

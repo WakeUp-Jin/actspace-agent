@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, CircleAlert, Loader2, Square } from "lucide-react";
+import { Check, CircleExclamationPoint, LoaderCircle, Square } from "lucide-react";
 import { resolveModelSpecByApiModel, subagentListStatusLabel, type MessageBlock, type SubagentListStatus } from "@actspace/shared";
 import companion1 from "../../assets/subagents/companion-1.webp";
 import companion2 from "../../assets/subagents/companion-2.webp";
@@ -48,7 +48,7 @@ const spinClass = "animate-spin text-operational motion-reduce:animate-none";
 
 /** 只有图标的状态：运行中转圈（绿色），其余跟随外层文字颜色。 */
 export function AgentStatusIcon({ status, size = 13 }: { status: AgentMessage["status"]; size?: number }) {
-  const Icon = status === "running" ? Loader2 : status === "completed" ? Check : status === "failed" ? CircleAlert : Square;
+  const Icon = status === "running" ? LoaderCircle : status === "completed" ? Check : status === "failed" ? CircleExclamationPoint : Square;
   return <Icon size={size} aria-hidden="true" className={`shrink-0 ${status === "running" ? spinClass : ""}`} />;
 }
 

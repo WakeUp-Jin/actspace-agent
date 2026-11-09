@@ -78,7 +78,7 @@ export function SessionListPane({ selectedSessionId }: { readonly selectedSessio
           <Pressable onClick={openNewSession} aria-label="新建会话" className="flex h-[50px] items-center gap-2 rounded-act-pill pl-4 pr-2">
             <span className="min-w-0 flex-1 truncate text-act-base text-text-subtle">开始新会话…</span>
             {lastWorkspace ? <span className="flex max-w-[150px] items-center gap-1.5 text-act-sm font-medium text-text-muted"><Folder size={14} aria-hidden className="flex-none" /><span className="truncate">{lastWorkspace.name}</span></span> : null}
-            <span aria-hidden className="send-btn" data-tone="off"><ArrowUp size={16} strokeWidth={2.4} /></span>
+            <span aria-hidden className="send-btn" data-tone="off"><ArrowUp size={16} /></span>
           </Pressable>
         </GlassPill>
       </div>

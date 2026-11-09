@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Loader2, X } from "lucide-react";
+import { ChevronDown, LoaderCircle, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 
 /**
@@ -157,7 +157,7 @@ export function RightPanelTabStrip({
                     disabled={isClosing}
                     onClick={() => onClose(tab.id)}
                   >
-                    {isClosing ? <Loader2 size={12} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <X size={12} strokeWidth={2.2} aria-hidden="true" />}
+                    {isClosing ? <LoaderCircle size={12} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <X size={12} aria-hidden="true" />}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>{tab.closeHint ?? (isClosing ? "正在关闭…" : `${tab.closeVerb ?? "关闭"} ${tab.title}`)}</TooltipContent>
@@ -177,7 +177,7 @@ export function RightPanelTabStrip({
             title="所有标签页"
             onClick={() => setMenuOpen((value) => !value)}
           >
-            <ChevronDown size={15} strokeWidth={2} />
+            <ChevronDown size={15} />
           </button>
           {menuOpen ? (
             <div className={RIGHT_TAB_MENU_CLASS} role="menu">
@@ -217,7 +217,7 @@ export function RightPanelTabStrip({
                         onClose(tab.id);
                       }}
                     >
-                      {isClosing ? <Loader2 size={12} className="animate-spin motion-reduce:animate-none" /> : <X size={12} strokeWidth={2.2} />}
+                      {isClosing ? <LoaderCircle size={12} className="animate-spin motion-reduce:animate-none" /> : <X size={12} />}
                     </button>
                   </div>
                 );

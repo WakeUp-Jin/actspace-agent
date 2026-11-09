@@ -160,7 +160,7 @@ export function UserMessage({
 
               return (
                 <div className={USER_FILE_ATTACHMENT_CLASS} aria-label={`Attached file ${attachment.name}`} key={attachment.id}>
-                  <FileText size={16} strokeWidth={1.9} aria-hidden="true" />
+                  <FileText size={16} aria-hidden="true" />
                   <span className={USER_FILE_NAME_CLASS}>{attachment.name}</span>
                 </div>
               );

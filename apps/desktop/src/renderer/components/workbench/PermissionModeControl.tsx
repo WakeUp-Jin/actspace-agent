@@ -66,8 +66,8 @@ export function PermissionModeControl({ sessionId, mode, disabled, onChanged }: 
           disabled={submitting}
           title={`权限：${permissionModeLabel(mode)}`}
         >
-          <TriggerIcon size={14} strokeWidth={2} aria-hidden="true" />
-          <ChevronDown size={12} strokeWidth={2} aria-hidden="true" />
+          <TriggerIcon size={14} aria-hidden="true" />
+          <ChevronDown size={12} aria-hidden="true" />
         </button>
       </MenuTrigger>
       <MenuContent side="top" align="start" className="text-act-xs">

@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft, Copy, FolderOpen, Loader2, Square } from "lucide-react";
+import { Check, ChevronLeft, Copy, FolderOpen, LoaderCircle, Square } from "lucide-react";
 import { subagentKindLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
 import { IconButton } from "../ui/IconButton";
 import { Button } from "../ui/Button";
@@ -152,7 +152,7 @@ function SubagentRow({ agent, stopping, onOpen, onStop }: { agent: SubagentListI
       ? <span className="relative mr-2 grid size-7 shrink-0 place-items-center">
         {line?.letter && !stopping
           ? <span aria-hidden="true" data-testid="subagent-letter-dot" className={`${ROW_LETTER_DOT_CLASS}${idleClass}`} />
-          : <Loader2 size={15} aria-hidden="true" className={`${ROW_SPINNER_CLASS}${idleClass}`} />}
+          : <LoaderCircle size={15} aria-hidden="true" className={`${ROW_SPINNER_CLASS}${idleClass}`} />}
         <IconButton label={`停止 ${agent.description}`} tooltip="停止" variant="danger" shape="round" disabled={stopping} onClick={onStop}
           className={`absolute inset-0 ${stopping ? "opacity-0" : "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 group-focus-within/row:opacity-100"}`}>
           <Square size={11} fill="currentColor" />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRightFromLine, ChevronDown, Columns2, Eye, File, FileDiff, Folder, Image, ListCollapse, ListTree, MoreHorizontal, RefreshCw, Search } from "lucide-react";
+import { ArrowRightFromLine, ChevronDown, Columns2, Eye, File, FileDiff, Folder, Image, ListCollapse, ListTree, Ellipsis, RefreshCw, Search } from "lucide-react";
 import type { ReviewFileSummary, ReviewSelection, ReviewSnapshot } from "@actspace/shared";
 import { Menu, MenuCheckboxItem, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/Popover";
@@ -85,7 +85,7 @@ export function ReviewToolbar({ snapshot, selection, workspaceRoot, sessionId, f
         <div className="min-w-2 flex-1" />
         <div className="shrink-0">
           <Menu open={menu === "options"} onOpenChange={openChange("options")}>
-            <Tooltip><TooltipTrigger asChild><MenuTrigger asChild><button type="button" className={ICON} aria-label="审查选项"><MoreHorizontal size={15} /></button></MenuTrigger></TooltipTrigger><TooltipContent>审查选项</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><MenuTrigger asChild><button type="button" className={ICON} aria-label="审查选项"><Ellipsis size={15} /></button></MenuTrigger></TooltipTrigger><TooltipContent>审查选项</TooltipContent></Tooltip>
             <MenuContent align="end" className="w-[220px]">
               <MenuItem onSelect={onRefresh}><span className={ICON_SLOT}><RefreshCw size={13} /></span>刷新</MenuItem>
               {/* 显示设置切换后菜单不关，方便连着改几项。 */}

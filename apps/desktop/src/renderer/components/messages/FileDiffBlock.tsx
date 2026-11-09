@@ -104,8 +104,8 @@ function FileDiffApprovalCard({
             {stats}
             {/* 箭头提示这里可以展开：收起朝右，展开朝下。 */}
             {diffOpen
-              ? <ChevronDown className="text-text-faint" size={12} strokeWidth={2.2} aria-hidden />
-              : <ChevronRight className="text-text-faint" size={12} strokeWidth={2.2} aria-hidden />}
+              ? <ChevronDown className="text-text-faint" size={12} aria-hidden />
+              : <ChevronRight className="text-text-faint" size={12} aria-hidden />}
           </button>
         ) : stats ? <span className="inline-flex flex-none items-center font-mono text-act-xs leading-4">{stats}</span> : null}
         <ApprovalReason reason={message.reason} />
@@ -200,8 +200,8 @@ export function FileDiffBlock({ message, className, onExpand }: { message: FileD
           ) : null}
         </span>
         {expanded
-          ? <ChevronDown size={14} strokeWidth={2.2} />
-          : <ChevronRight size={14} strokeWidth={2.2} />}
+          ? <ChevronDown size={14} />
+          : <ChevronRight size={14} />}
       </button>
       {expanded ? <DiffLines message={message} /> : null}
     </article>

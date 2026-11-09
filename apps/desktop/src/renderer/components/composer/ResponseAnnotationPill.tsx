@@ -1,4 +1,4 @@
-import { MessageSquareText, Pencil, Trash2, X } from "lucide-react";
+import { MessageSquareText, Pencil, Trash, X } from "lucide-react";
 import { useRef, useState } from "react";
 import type { ResponseAnnotationReference } from "@actspace/shared";
 import { IconButton } from "../ui/IconButton";
@@ -140,7 +140,7 @@ export function ResponseAnnotationPill({
                         <Pencil size={13} aria-hidden="true" />
                       </IconButton>
                       <IconButton label={`删除第 ${number} 条批注`} tooltip="删除" size="xs" onClick={() => context?.removeDraft(annotation.annotationId)}>
-                        <Trash2 size={13} aria-hidden="true" />
+                        <Trash size={13} aria-hidden="true" />
                       </IconButton>
                     </div>
                     {body}
@@ -198,7 +198,7 @@ export function ResponseAnnotationPill({
             onClear();
           }}
         >
-          <X size={12} strokeWidth={2.4} aria-hidden="true" />
+          <X size={12} aria-hidden="true" />
         </IconButton>
       ) : null}
     </span>

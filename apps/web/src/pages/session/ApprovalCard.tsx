@@ -1,5 +1,5 @@
 import type { ApprovalRequest } from "@actspace/shared/runtime-v2";
-import { Check, FilePen, FileX, TerminalSquare, Wrench } from "lucide-react";
+import { Check, FilePen, FileX, SquareTerminal, Wrench } from "lucide-react";
 import { commandPrefixGrant } from "../../sessions/grant";
 import { useApprovalDecision, type DecisionKind } from "../../sessions/use-approval-decision";
 import { useApprovalCommand } from "../../sessions/use-approval-command";
@@ -27,7 +27,7 @@ export function describeApproval(request: ApprovalRequest, command?: string): Ap
   return { kind: "tool", title: request.toolName, target: "", detail: reason, destructive: false, cwd: null };
 }
 
-const ICONS = { command: TerminalSquare, write: FilePen, delete: FileX, read: FilePen, tool: Wrench } as const;
+const ICONS = { command: SquareTerminal, write: FilePen, delete: FileX, read: FilePen, tool: Wrench } as const;
 
 /**
  * 审批卡（桌面端样式）：只有一个框，卡头动作 + 目标，命令块，底栏环境信息与 [拒绝][本会话允许 前缀][运行]；框外不加文字行，等待状态只写在容器的 aria-label 上。
@@ -43,7 +43,7 @@ export function ApprovalCard({ request, command, sandboxed, onDecided, onStale }
   const props = (kind: DecisionKind) => ({
     disabled: locked || (kind !== "deny" && detail.missing),
     busy: state.status === "pending" && state.picked === kind,
-    icon: state.status === "done" && state.picked === kind ? <Check size={13} strokeWidth={2.6} aria-hidden /> : undefined,
+    icon: state.status === "done" && state.picked === kind ? <Check size={13} aria-hidden /> : undefined,
     className: cx(state.status === "done" && state.picked !== kind && "opacity-45"),
   });
   const meta = [sandboxed === true ? "沙盒" : sandboxed === false ? "真实环境" : "", view.cwd ? baseName(view.cwd) : ""].filter(Boolean).join(" · ");

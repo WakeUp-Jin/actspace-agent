@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, CircleAlert, KeyRound, ShieldCheck, X } from "lucide-react";
+import { ChevronRight, CircleExclamationPoint, KeyRound, ShieldCheck, X } from "lucide-react";
 import type { SecretProviderId } from "@actspace/shared";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
@@ -158,7 +158,7 @@ export function ImageGenerationSettingsDialog({
                 </label>
                 {baseUrl.trim().toLowerCase().startsWith("http://") ? (
                   <p className="flex gap-1.5 text-act-xxs leading-relaxed text-on-danger">
-                    <CircleAlert size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
+                    <CircleExclamationPoint size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
                     Base URL 使用 HTTP，Key 和请求内容将明文传输。
                   </p>
                 ) : null}

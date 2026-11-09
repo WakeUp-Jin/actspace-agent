@@ -26,7 +26,7 @@ export function StatDialogBody({ icon: Icon, dialog }: { icon: LucideIcon; dialo
     <>
       <div className="flex items-baseline justify-between gap-3">
         <span className="inline-flex items-center gap-1.5 font-semibold text-text-muted">
-          <Icon className="shrink-0 self-center" size={14} strokeWidth={1.75} aria-hidden="true" />
+          <Icon className="shrink-0 self-center" size={14} aria-hidden="true" />
           {dialog.title}
         </span>
         {dialog.titleValue ? <span className="font-semibold text-text-main tabular-nums">{dialog.titleValue}</span> : null}
