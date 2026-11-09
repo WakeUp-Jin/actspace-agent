@@ -16,6 +16,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [后端插件包解耦：让 Harness 自进化不必改 core](active/20261109-harness-plugin-decoupling.md) | P1 已完成（工具自声明 `modes`、形态成员从插件目录推导、`core/agent` 不再写工具名）；下一步 P2：默认 Harness 按条目产出产物、`service-contract.ts` owner 改由 manifest 提供。 |
 | [性能第三轮：高频路径不再整份读日志](active/20261108-perf-round3.md) | R1–R4 方案已拍板（自动审查、压缩摘要、子 Agent 面板、读旧事件深拷贝）；下一步按 spec → 代码执行。性能任务总表见 [性能待办](perf-backlog.md)。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 待拍板：2026-10-07 立项（来源：Desktop 前端重构 17 的特征测试），D1–D4 一直未决定；再不推进就降级回 [技术债](tech-debt-tracker.md)。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB（编辑器内 `@` 文件引用）待实施。 |

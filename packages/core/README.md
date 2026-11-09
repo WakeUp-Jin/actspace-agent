@@ -27,6 +27,7 @@ core 是 Agent 的主干。`agent`、`scope`、`agent-loop` 定义 Agent 是什�
 - **全局，启动时加载：** `actspace-runtime`（inject `actspace.host`）；`session-runtime`（provides `session.runtime`，inject `session.journal`、`session.store`、`session.projection`）；`core-agent`（`agent` 包，provides `agent.registry`）；`agent-runtime`（provides `agent.runtime`、`agent.service`、`harness.control`、`harness.hmr`、`harness.plugin-manager`；inject `agent.registry`、`session.runtime`、`session.checkpoint` 和一批 `actspace.host.*` 端口）。
 - **会话，每个 Harness 一份：** `tools-runtime`（provides `tools.runtime`，inject `tools.approval`）；所有 `tool-*` 工具插件都 inject `tools.runtime`；`agent-factory`（provides `agent.run-factory`）inject `agent.registry`、`session.runtime`、`session.checkpoint`、`llm.service`、`tools.runtime`、`prompt.runtime`、`context.engine`、`context.source.system`、`context.source.conversation`。
 - `agent-factory` 用 `agent-loop` 的 `AgentLoop` 建循环，并按 `context.source.*` 搭起 Context 来源；`agent-runtime` 为每个会话挂载 Harness、租用组合并运行。
+- 主 Agent 形态 `actspace.main` 的成员由 `runtime/src/main-agent-form.ts` 从 `PLUGIN_CATALOG` 推导（Harness 加载且 manifest 声明了 `contributions.tools` 的条目），`agent` 包只提供 `defineMainAgentForm` / `activateAgentFormTools` 契约；Host 在 `startup/boot.ts` 经 `actspace.host.agent.agentForm` 交给 `agent-factory`。工具在哪些模式可见由各自 `ToolDefinition.modes` 声明，`agent` 包的 `allowedAgentModeTools` 只按定义过滤，不列工具名。
 - `agent-service` 不导入默认循环和 runtime，只依赖结构化的 `RunFactory` 和 `RunLease`。
 
 ## 入口与测试
@@ -38,4 +39,5 @@ core 是 Agent 的主干。`agent`、`scope`、`agent-loop` 定义 Agent 是什�
 ## 怎么扩展
 
 - 新增一个插件：见[总地图](../README.md)“新增一个插件”，登记到 `runtime/src/plugin-catalog.ts`。
+- 新增一个工具：在 `ToolDefinition` 里声明 `modes`（漏声明会被 `normalizeToolDefinition` 拒绝），所属插件 manifest 的 `contributions.tools` 列出工具名即可进入主 Agent 形态；不用改 `agent` 包。
 - 改 Agent 循环：主体在 `agent-loop/src/loop.ts`，会话里的调用边界在 `runtime/src/harness/agent-factory-plugin.ts`。
