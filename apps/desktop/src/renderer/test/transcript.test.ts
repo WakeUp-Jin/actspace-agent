@@ -4,7 +4,6 @@ import { projectChatWindow } from "@actspace/client";
 import { mergeTranscript, type DurableTranscript, type LiveTranscript, type LocalTranscript } from "../session/transcript";
 import { createCompactionBlock, createEmptyStreamingState, streamingStateToBlocks, type StreamingState } from "@actspace/client/live";
 import { recordProjectionFixture } from "./projection-fixture";
-import { legacyMergeTranscript } from "../../../test-fixtures/legacy-transcript";
 
 // 14 T14：mergeTranscript 按 runId 归属，旧实现按 renderKey 前缀 / `:tool:` 子串归属；两者必须深度相等。
 // 输入都由真实生产者产出：durable 走 recordProjectionFixture → projectChatWindow，live 走 streamingStateToBlocks。
@@ -60,15 +59,11 @@ function streaming(text: string, tools: Array<{ callId: string; preview: Record<
 const readPreview = (file: string) => ({ kind: "read", filePath: file, displayText: `Read ${file}` });
 const todoPreview = (revision: number) => ({ kind: "todo", todos: [{ id: "t1", content: "plan", status: "in_progress" }], totalCount: 1, completedCount: 0, revision, displayText: "1 todo" });
 
-function compare(durable: DurableTranscript, live: LiveTranscript, local: LocalTranscript = NO_LOCAL): MessageBlock[] {
-  const legacy = legacyMergeTranscript(durable, live, local);
-  expect(mergeTranscript(durable, live, local)).toEqual(legacy);
-  return legacy;
-}
+const compare = (durable: DurableTranscript, live: LiveTranscript, local: LocalTranscript = NO_LOCAL): MessageBlock[] => mergeTranscript(durable, live, local);
 
 const keys = (blocks: MessageBlock[]) => blocks.map((block) => `${block.kind}:${block.renderKey ?? block.id}`);
 
-describe("mergeTranscript matches the legacy merge", () => {
+describe("mergeTranscript", () => {
   it("hands a finished turn from live to durable (app-streaming-user-message handoff)", () => {
     const runId = "run-handoff";
     const finished = durableOf(turnEvents(runId, "evt-handoff", "handoff prompt", "handoff reply"));
@@ -110,7 +105,7 @@ describe("mergeTranscript matches the legacy merge", () => {
       { callId: "c2", preview: readPreview("b.md") },
     ]));
     const live = liveOf(runId, streaming("continued answer", [{ callId: "c2", preview: readPreview("b.md"), finished: false }]), { recovered: true });
-    // 实时底稿起的 live 正文序号从 0 重新数，与 durable 同一 run 的 renderKey 撞上时换成 `:live`（旧实现会出现重复 key）。
+    // 实时底稿起的 live 正文序号从 0 重新数，与 durable 同一 run 的 renderKey 撞上时换成 `:live`。
     const merged = mergeTranscript(durable, live, NO_LOCAL);
     expect(keys(merged)).toEqual([
       `user:turn:${runId}:user:0`, `read:turn:${runId}:tool:c1`, `assistant:turn:${runId}:assistant:0`,
@@ -119,7 +114,7 @@ describe("mergeTranscript matches the legacy merge", () => {
     expect(new Set(keys(merged)).size).toBe(merged.length);
   });
 
-  it("does not hide a durable todo for a recovered run (legacy only matched `:tool:` ids)", () => {
+  it("does not hide a durable todo for a recovered run (only `:tool:` ids are matched against live)", () => {
     const runId = "run-todo";
     // 测试用 projection fixture 按工具名投影，todo 会变成 read；这里直接用 createMessageBlocks 产出 durable todo。
     const events = turnEvents(runId, "evt-t", "question", "answer", [{ callId: "todo-1", preview: todoPreview(1) }]);
