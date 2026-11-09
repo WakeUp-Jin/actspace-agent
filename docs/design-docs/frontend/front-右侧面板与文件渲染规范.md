@@ -148,7 +148,7 @@ macOS 上 `shell.openPath` 对没有关联应用的文件返回 `Failed to open 
 
 ## 10. IPC 契约与 main 侧规则
 
-类型真源 `packages/util/shared/src/ipc.ts`，bridge 入口 `packages/util/shared/src/desktop-bridge/contract.ts`（`workspaces.*`、`sessions.readArtifact`）。
+类型真源 `packages/util/shared/src/ipc/`（`workspace-git.ts`、`workspace-files.ts`、`artifacts.ts`），bridge 入口 `packages/util/shared/src/desktop-bridge/contract.ts`（`workspaces.*`、`sessions.readArtifact`）。
 
 | 接口 | 要点 |
 |---|---|

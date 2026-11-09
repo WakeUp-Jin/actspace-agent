@@ -42,6 +42,46 @@ test("loadable plugin packages require a lifecycle contract", async () => {
   }
 });
 
+test("desktop IPC contract types are only importable from client-surface packages", async () => {
+  const root = await mkdtemp(join(tmpdir(), "actspace-ipc-boundary-"));
+  try {
+    const sharedRoot = join(root, "packages", "util", "shared");
+    await mkdir(join(sharedRoot, "src", "ipc"), { recursive: true });
+    await writeFile(join(sharedRoot, "package.json"), JSON.stringify({ name: "@actspace/shared", private: true, exports: { ".": "./dist/index.js" } }));
+    await writeFile(join(sharedRoot, "src", "ipc", "index.ts"), "export * from \"./sessions\";\n");
+    await writeFile(join(sharedRoot, "src", "ipc", "sessions.ts"), "export type SessionListInput = { limit: number };\nexport interface SessionListPage { items: string[] }\n");
+    await writeFile(join(sharedRoot, "src", "index.ts"), "export * from \"./ipc\";\nexport type SessionId = string;\n");
+
+    const packageJson = (name) => JSON.stringify({ name, private: true, type: "module", exports: { ".": "./dist/index.js" } });
+    const violating = join(root, "packages", "core", "example-core");
+    await mkdir(join(violating, "src"), { recursive: true });
+    await writeFile(join(violating, "package.json"), packageJson("@actspace/example-core"));
+    await writeFile(join(violating, "src", "index.ts"), [
+      "import type { SessionId, SessionListInput as Input } from \"@actspace/shared\";",
+      "type Page = import(\"@actspace/shared\").SessionListPage;",
+      "export type Ok = [SessionId, Input, Page];",
+      "",
+    ].join("\n"));
+
+    const permitted = join(root, "packages", "host", "example-host");
+    await mkdir(join(permitted, "src"), { recursive: true });
+    await writeFile(join(permitted, "package.json"), packageJson("@actspace/example-host"));
+    await writeFile(join(permitted, "src", "index.ts"), "import type { SessionListInput } from \"@actspace/shared\";\nexport type Ok = SessionListInput;\n");
+
+    const result = spawnSync(process.execPath, ["scripts/check-package-boundaries.mjs"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, ACTSPACE_PACKAGE_BOUNDARY_ROOT: root },
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /@actspace\/example-core: desktop IPC contract \(SessionListInput, SessionListPage\) imported in packages\/core\/example-core\/src\/index\.ts/);
+    assert.doesNotMatch(result.stderr, /SessionId/);
+    assert.doesNotMatch(result.stderr, /example-host/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("packages must follow the two-level layout and directory-equals-name rule", async () => {
   const root = await mkdtemp(join(tmpdir(), "actspace-package-layout-"));
   try {
