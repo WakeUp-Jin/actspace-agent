@@ -1,7 +1,7 @@
 # Agent Contract Matrix
 
 > Generated artifact; edit source declarations instead. Do not hand-edit this file.
-> Generator 1.0.0; source digest `5f9d044afc8d202c64e6079f994780ea006ab338ab49573da3ecf95799262499`.
+> Generator 1.0.0; source digest `f226812e43b1ded3ada250eff2d2e2c0b2f10476733214423708aeae571e459a`.
 
 This document is an audit view of the current ActSpace v2 declarations. It never activates Runtime services, plugins, Session persistence, tools or Cordis entries.
 
@@ -57,7 +57,7 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | subagent.manager | actspace.subagent | declared |  | subagent.manager | - | packages/subagent/subagent/src/manifest.ts | cordis-adapter/service-contract |
 | tools.approval | actspace.tools.approval | declared |  | tools.approval | tools.runtime | packages/approval/approval/src/manifest.ts | cordis-adapter/service-contract |
 | tools.background-tasks | actspace.background-tasks | declared |  | tools.background-tasks | - | packages/background-tasks/tool-background-tasks/src/manifest.ts | cordis-adapter/service-contract |
-| tools.browser | @actspace/browser-tools | optional | agent | tools.browser:default | tools.runtime | packages/composition/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.browserTools | cordis-adapter/service-contract |
+| tools.browser | @actspace/tool-browser | optional | agent | tools.browser:default | tools.runtime | packages/composition/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.browserTools | cordis-adapter/service-contract |
 | tools.filesystem-read | @actspace/tool-fs-read | active | agent | tools.filesystem-read:default | tools.runtime | packages/composition/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.filesystemRead | cordis-adapter/service-contract |
 | tools.filesystem-search | @actspace/tool-fs-search | active | agent | tools.filesystem-search:default | tools.runtime | packages/composition/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.filesystemSearch | cordis-adapter/service-contract |
 | tools.filesystem-write | @actspace/tool-fs-write | active | agent | tools.filesystem-write:default | tools.runtime | packages/composition/cordis-adapter/src/service-contract.ts#ACTSPACE_SERVICE_DEFINITIONS.filesystemWrite | cordis-adapter/service-contract |
