@@ -130,7 +130,7 @@ export function thinkingToCapabilities(thinking: ModelThinking | null): {
   thinkingDefault: boolean;
   capabilities: Pick<ModelCapabilities, "reasoning" | "thinkingToggle" | "reasoningEfforts" | "reasoningDefaultEffort" | "reasoningMandatory">;
 } {
-  if (!thinking || !thinking.levels.length) {
+  if (!thinking?.levels.length) {
     return { thinkingDefault: false, capabilities: { reasoning: false, thinkingToggle: false } };
   }
   const { levels, default: def } = normalizeThinking(thinking);

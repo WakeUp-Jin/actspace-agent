@@ -15,9 +15,9 @@ Biome 读取 `.gitignore`，`dist/`、`node_modules/` 等不会被扫描。检�
 
 ## 规则分层
 
-- **error（阻塞 CI）**：Biome `recommended` 预设里剩下的规则，加上 `noUnusedImports`、`noUnusedVariables`、`noExplicitAny`（产品代码用 `unknown` 再收窄；测试文件通过 overrides 关闭，mock 和拦截到的请求体可以写 `any`），以及 nursery 的 `noFloatingPromises`（故意不等待的 Promise 写 `void promise`，并保证内部已处理 rejection；它的类型推断不完整，没报不代表没问题）。
-- **warn（可见但不阻塞）**：存量命中多、修复会改行为或需要逐处判断的规则——`useExhaustiveDependencies`、`noNonNullAssertion`、`useIterableCallbackReturn`、`noAssignInExpressions`、`noArrayIndexKey`。新代码不要再增加这些 warning；某条规则清零后把它升为 error。
-- **off**：与仓库惯用写法冲突或误报的规则，原因写在 `biome.jsonc` 里（a11y 整组、`noVoidTypeReturn`、`useHookAtTopLevel`、`noControlCharactersInRegex`、`noImplicitAnyLet`、`noExportsInTest`）。测试文件额外关闭 `noComponentHookFactories`、`useYield` 和 `noExplicitAny`。
+- **error（阻塞 CI）**：Biome `recommended` 预设里剩下的规则，加上 `noUnusedImports`、`noUnusedVariables`、`noExplicitAny`（产品代码用 `unknown` 再收窄；测试文件通过 overrides 关闭，mock 和拦截到的请求体可以写 `any`）、`useIterableCallbackReturn`（`forEach` 回调写块语句 `x => { f(x); }`，表达式体会被当成「返回了值」；这样 `map` / `filter` 漏 `return` 才能被抓到），以及 nursery 的 `noFloatingPromises`（故意不等待的 Promise 写 `void promise`，并保证内部已处理 rejection；它的类型推断不完整，没报不代表没问题）。预设里的 `useImportType`、`useOptionalChain` 已清零，保持预设默认级别。
+- **warn（可见但不阻塞）**：存量命中多、修复会改行为或需要逐处判断的规则——`useExhaustiveDependencies`、`noNonNullAssertion`。新代码不要再增加这些 warning；某条规则清零后把它升为 error。
+- **off**：与仓库惯用写法冲突或误报的规则，原因写在 `biome.jsonc` 里（a11y 整组、`noVoidTypeReturn`、`useHookAtTopLevel`、`noControlCharactersInRegex`、`noImplicitAnyLet`、`noExportsInTest`、`noConfusingVoidType`、`noAssignInExpressions`、`noArrayIndexKey`）。后三条是 2026-11-09 清理时逐处核对后关掉的：`Handlers | void` 回调返回类型、`x ??= init` / `return this.#closing = …` 惰性初始化与记忆化、diff 行 / token 这类无身份派生列表用 index 做 key，全部是有意写法，改写只会变长或更差。测试文件额外关闭 `noComponentHookFactories`、`useYield` 和 `noExplicitAny`。
 - CSS 不由 Biome 检查，由 `check:frontend-tokens` / `check:frontend-theme` 负责。
 
 ## 抑制单处告警

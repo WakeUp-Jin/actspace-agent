@@ -5,5 +5,5 @@
  */
 export function replyText(text: string) {
   return (_content: string, element: Element | null): boolean =>
-    element !== null && element.matches(".markdown-prose p, .markdown-prose li, .markdown-prose h1, .markdown-prose h2, .markdown-prose h3, .markdown-prose h4") && element.textContent === text;
+    element?.matches(".markdown-prose p, .markdown-prose li, .markdown-prose h1, .markdown-prose h2, .markdown-prose h3, .markdown-prose h4") === true && element.textContent === text;
 }

@@ -31,7 +31,7 @@ export function queuedMessages(tasks: TaskSnapshot | null): QueuedMessage[] {
   const items: QueuedMessage[] = [];
   for (const taskId of tasks.queue) {
     const task = byId.get(taskId);
-    if (!task || task.state !== "pending") continue;
+    if (task?.state !== "pending") continue;
     if (starting) { starting = false; continue; }
     if (!isBackgroundWake(task.content)) items.push({ taskId, text: taskText(task.content) });
   }

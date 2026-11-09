@@ -1,6 +1,6 @@
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import { isCommandPrefixSelector, isInboxSource, type GrantSelector, type GrantAccess, type GrantAction, type PermissionMode, type RuntimeV2JsonValue, type RuntimeV2SessionSnapshot, type RuntimeV2SessionTiming, type RuntimeV2UsageSummary, type SessionGrant } from "@actspace/shared/runtime-v2";
-import { SessionProjectionRegistry } from "./registry.js";
+import type { SessionProjectionRegistry } from "./registry.js";
 
 export type SessionFacts = Pick<RuntimeV2SessionSnapshot, "metadata" | "todos" | "delegations" | "usage" | "activity" | "pendingInbox" | "permissionMode" | "sessionGrants">;
 type Data = Readonly<Record<string, RuntimeV2JsonValue>>;

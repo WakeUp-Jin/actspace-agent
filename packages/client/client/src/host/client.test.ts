@@ -6,7 +6,7 @@ class Socket implements HostSocket {
   close() { this.readyState = 3; this.emit("close", {}); }
   addEventListener(type: string, listener: (event: { data?: unknown }) => void) { const listeners = this.listeners.get(type) ?? new Set(); listeners.add(listener); this.listeners.set(type, listeners); }
   removeEventListener(type: string, listener: (event: { data?: unknown }) => void) { this.listeners.get(type)?.delete(listener); }
-  emit(type: string, event: { data?: unknown }) { this.listeners.get(type)?.forEach(listener => listener(event)); }
+  emit(type: string, event: { data?: unknown }) { this.listeners.get(type)?.forEach(listener => { listener(event); }); }
   reply(result: unknown) { this.emit("message", { data: JSON.stringify({ jsonrpc: "2.0", id: JSON.parse(this.sent.at(-1)!).id, result }) }); }
 }
 it("refuses a changed Host identity before transmitting credentials", async () => {

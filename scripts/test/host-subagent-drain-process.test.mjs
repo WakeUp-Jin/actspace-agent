@@ -78,7 +78,7 @@ test('real Host drains an active parent and child before closing', { timeout: 60
       assert.ok(events.some(event => event.type === 'plugin/actspace.agent-service/run' && event.data.op === 'finish' && event.data.outcome === 'completed'), 'both parent and child must persist completion');
     }
   } finally {
-    clients.forEach(client => client.close()); waiting.forEach(response => response.destroy());
+    clients.forEach(client => { client.close(); }); waiting.forEach(response => { response.destroy(); });
     for (const child of children) if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill('SIGKILL'); await exited; }
     provider.closeAllConnections(); await new Promise(resolve => provider.close(resolve)); await rm(root, { recursive: true, force: true });
   }

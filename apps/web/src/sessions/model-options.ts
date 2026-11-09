@@ -9,7 +9,7 @@ export const effortLabel = (effort: string): string => EFFORT_LABELS[effort as M
 export function effortOptionsFor(modelId: string): ModelReasoningEffort[] {
   const apiModel = modelId.slice(modelId.indexOf("/") + 1);
   const entry = BUILTIN_MODEL_CATALOG.entries.find(item => item.apiModel === apiModel);
-  if (!entry || !entry.reasoning) return [];
+  if (!entry?.reasoning) return [];
   return resolveCustomModelReasoning(apiModel).efforts;
 }
 

@@ -6,7 +6,7 @@
  * - `onSave`：⌘S / Ctrl+S；只读时不响应。保存前会先把还没通知的变化补发出去，保证草稿是最新的。
  */
 import { Annotation, Facet } from "@codemirror/state";
-import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
+import { type EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 
 export interface EditorCallbacks {
   onChange?(doc: string): void;

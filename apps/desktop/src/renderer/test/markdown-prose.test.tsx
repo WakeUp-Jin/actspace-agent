@@ -55,7 +55,7 @@ describe("MarkdownProse", () => {
     expect(definitions[0].id).not.toBe(definitions[1].id);
     const labels = Array.from(container.querySelectorAll(".footnotes h2"));
     expect(labels[0].id).not.toBe(labels[1].id);
-    references.forEach((reference, index) => expect(reference).toHaveAttribute("aria-describedby", labels[index].id));
+    references.forEach((reference, index) => { expect(reference).toHaveAttribute("aria-describedby", labels[index].id); });
     const firstScroll = vi.spyOn(definitions[0], "scrollIntoView");
     const secondScroll = vi.spyOn(definitions[1], "scrollIntoView");
     await userEvent.click(references[1]);

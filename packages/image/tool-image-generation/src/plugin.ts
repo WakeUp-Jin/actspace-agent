@@ -1,7 +1,7 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime, ToolPermissionContract } from "@actspace/tool-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
-import { IMAGE_GENERATION_PLUGIN_ID, IMAGE_GENERATION_TOOLS } from "./manifest.js";
+import { IMAGE_GENERATION_PLUGIN_ID, type IMAGE_GENERATION_TOOLS } from "./manifest.js";
 
 export type ToolName = (typeof IMAGE_GENERATION_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;

@@ -357,7 +357,7 @@ export function initializeHeroStage() {
       const out = put(`<div><div class="row run"><span class="v">Ran</span><span class="p">pnpm test</span>${CHEV}</div>
         <div class="out">${lines.map((line) => `<div>${line}</div>`).join('')}</div></div>`);
       stage.light(['term']);
-      out.querySelectorAll('.out div').forEach((line, i) => clock.at(reduced ? 0 : 250 + i * 320, () => { line.classList.add('on'); follow(); }));
+      out.querySelectorAll('.out div').forEach((line, i) => { clock.at(reduced ? 0 : 250 + i * 320, () => { line.classList.add('on'); follow(); }); });
       clock.at(reduced ? 0 : 1700, () => {
         out.querySelector('.row')!.classList.remove('run');
         add('conv', 2.3);

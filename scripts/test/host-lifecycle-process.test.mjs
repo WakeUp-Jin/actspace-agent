@@ -73,7 +73,7 @@ test('real Host drains active provider work, pauses queued content across restar
     const forced = once(host, 'exit'), started = Date.now(); await management('stop', '--force'); await forced;
     assert.ok(Date.now() - started < 15000, 'force stop must be bounded');
   } finally {
-    clients.forEach(client => client.close()); waiting.forEach(response => response.destroy());
+    clients.forEach(client => { client.close(); }); waiting.forEach(response => { response.destroy(); });
     for (const child of children) if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill('SIGKILL'); await exited; }
     provider.closeAllConnections(); await new Promise(resolve => provider.close(resolve)); await rm(root, { recursive: true, force: true });
   }

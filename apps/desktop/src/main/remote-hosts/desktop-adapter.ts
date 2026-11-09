@@ -157,7 +157,7 @@ export class RemoteDesktopAdapter {
     }
     finally { this.#replaying.delete(sessionId); }
   }
-  dispose(): void { this.#cleanup.forEach(cleanup => cleanup()); this.#stream.dispose(); }
+  dispose(): void { this.#cleanup.forEach(cleanup => { cleanup(); }); this.#stream.dispose(); }
   async create(input: Record<string, unknown>): Promise<unknown> {
     if (typeof input.hostId !== "string" || typeof input.workspaceId !== "string") throw new Error("Choose a Host workspace");
     const created = await this.hosts.call(input.hostId, "sessions.create", { workspaceId: input.workspaceId, agentForm: input.agentForm ?? "agent" }) as { sessionId: string };

@@ -112,7 +112,7 @@ export function createHostDirectory(source: HostDirectorySource): HostDirectory 
       const before = previous.get(host.hostId);
       // 每次连接 describe 一次；上次失败的，下一次列表变化或 refresh 时重试（在途的 describe 已清掉失败记录，不会重复发）。
       const failed = snapshot.describeErrors[host.hostId] !== undefined;
-      if (!before || before.state !== "connected" || failed) describe(host.hostId);
+      if (before?.state !== "connected" || failed) describe(host.hostId);
     }
     if (fromEvent) for (const listener of [...hostListeners]) listener(hosts);
     for (const hostId of removed) for (const listener of [...removedListeners]) listener(hostId);

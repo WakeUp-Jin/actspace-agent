@@ -24,7 +24,7 @@ import {
   type RankRow, type TableColumn, type TableSort, useStatsJump,
 } from "./stats/stats-ui";
 import { DASH, average, fmtDateTime, fmtDuration, fmtInt, fmtPct, fmtRelativeDay, fmtTokens, fmtUsd, ratio } from "./stats/stats-format";
-import { type UsageQuery } from "./usage/usage-query";
+import type { UsageQuery } from "./usage/usage-query";
 import {
   PURPOSE_LABEL, SUBCOMMAND_PROGRAMS, cacheHitRate, costDetail, fmtCacheHit, failureLabel, fmtTrend, gapNote, modelCostDetail, modelSpeed, modelTokenDetail, modelsWithLabels,
   phaseSegments, priceDetail, rangeDays, timeDetail, tokenDetail, tokenModelSegments, tokenTypeSegments, toolTimeSegments, trendModel,

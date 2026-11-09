@@ -10,7 +10,7 @@ import { AgentLoop } from "@actspace/agent-loop";
 import type { AgentLoopAssembly } from "@actspace/agent-loop";
 import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, resolveMainAgentPreset, activateMainAgentFormTools, allowedAgentModeTools } from "@actspace/agent";
 import type { AgentSubject } from "@actspace/agent";
-import { AgentScope, scopeContext } from "@actspace/scope";
+import { type AgentScope, scopeContext } from "@actspace/scope";
 import type { LlmService } from "@actspace/llm-service";
 import type { ToolRuntime } from "@actspace/tool-runtime";
 import type { CompactionPlugin } from "@actspace/context-compaction";

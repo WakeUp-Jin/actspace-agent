@@ -707,7 +707,7 @@ async function main(): Promise<void> {
     console.log("\nResults");
     printResults(results);
     console.log("\nInterpretation");
-    findings.forEach((finding) => console.log(`- ${finding}`));
+    findings.forEach((finding) => { console.log(`- ${finding}`); });
   }
 
   if (!results.some((result) => result.ok)) process.exitCode = 2;
