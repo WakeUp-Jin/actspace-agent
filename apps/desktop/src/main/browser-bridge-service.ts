@@ -4,7 +4,7 @@
  * Browser Bridge 的运行时 host 由 Chrome Native Messaging 拉起；ActSpace 只负责
  * 安装 `abb`、注册 native host、暴露 doctor/capabilities 状态。
  */
-import { chmod, copyFile, cp, lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, copyFile, cp, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -177,18 +177,24 @@ export class BrowserBridgeService {
     return { ok: true, abbPath: this.binPath, extensionDir: this.extensionDir };
   }
 
+  /**
+   * 只接受 main 自己（系统目录对话框）拿到的绝对路径；保存前解析成真实路径，避免之后编译时符号链接指向别处。
+   * 传 null 切回随包扩展。
+   */
   async useSourceExtension(repoRoot: string | null): Promise<BrowserBridgeActionResult> {
+    let resolvedRoot: string | undefined;
     if (repoRoot !== null) {
       if (!isAbsolute(repoRoot)) return { ok: false, error: "请选择绝对源码目录。" };
       try {
-        const folder = join(resolvePluginDir(repoRoot), "apps", "chrome-extension");
+        resolvedRoot = await realpath(repoRoot);
+        const folder = join(resolvePluginDir(resolvedRoot), "apps", "chrome-extension");
         const manifest = JSON.parse(await readFile(join(folder, "manifest.json"), "utf8")) as Record<string, unknown>;
         await stat(join(folder, "src", "background.js"));
         if (manifest.name !== "ActSpace Browser" || typeof manifest.key !== "string" || chromeExtensionId(manifest.key) !== EXTENSION_ID || manifest.manifest_version !== 3) throw new Error("extension identity mismatch");
       } catch { return { ok: false, error: "该目录缺少有效的 ActSpace Chrome 扩展。" }; }
     }
     const config = await this.connectionConfig();
-    await this.saveConfig({ ...config, sourceRoot: repoRoot ?? undefined });
+    await this.saveConfig({ ...config, sourceRoot: resolvedRoot });
     return { ok: true };
   }
 
@@ -445,7 +451,10 @@ export class BrowserBridgeService {
     };
   }
 
-  async buildAndInstall(repoRoot: string): Promise<BrowserBridgeInstallResult> {
+  /** 只编译「选择源码扩展」保存下来的目录；renderer 不能指定路径。 */
+  async buildAndInstall(): Promise<BrowserBridgeInstallResult> {
+    const repoRoot = (await this.connectionConfig()).sourceRoot;
+    if (repoRoot === undefined) return { ok: false, error: "请先选择源码扩展目录，再从源码编译。" };
     const sourceValidation = await this.useSourceExtension(repoRoot);
     if (!sourceValidation.ok) return { ok: false, error: sourceValidation.error };
     const pluginDir = resolvePluginDir(repoRoot);
@@ -453,7 +462,8 @@ export class BrowserBridgeService {
     const sourceBinary = join(pluginDir, "skill", "scripts", "abb");
     const extensionDir = join(pluginDir, "apps", "chrome-extension");
     try {
-      await stat(buildScript);
+      // build.sh 要是目录内的普通文件；符号链接可能把编译步骤指到源码目录之外。
+      if (!(await lstat(buildScript)).isFile()) throw new Error("build.sh is not a regular file");
       await stat(join(extensionDir, "manifest.json"));
     } catch {
       return {

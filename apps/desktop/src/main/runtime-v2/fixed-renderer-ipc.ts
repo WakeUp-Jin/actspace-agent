@@ -380,10 +380,15 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   };
 }
 
-function registerBrowserBridgeIpc(ipc: IpcRegistrar, browserBridge: BrowserBridgeService): void {
+function registerBrowserBridgeIpc(options: FixedRendererIpcOptions, ipc: IpcRegistrar, browserBridge: BrowserBridgeService): void {
   ipc.handle(contract.browserBridge.getStatus, () => browserBridge.getStatus());
   ipc.handle(contract.browserBridge.connect, () => browserBridge.connect());
-  ipc.handle(contract.browserBridge.useSourceExtension, (repoRoot) => browserBridge.useSourceExtension(repoRoot));
+  ipc.handle(contract.browserBridge.selectSourceExtension, async () => {
+    const result = await showOpenDialog(options.getMainWindow(), { title: "选择 actspace 源码目录（需包含 browser-bridge/）", properties: ["openDirectory"] });
+    if (result.canceled || !result.filePaths[0]) return { ok: true, canceled: true };
+    return browserBridge.useSourceExtension(result.filePaths[0]);
+  });
+  ipc.handle(contract.browserBridge.useBundledExtension, () => browserBridge.useSourceExtension(null));
   ipc.handle(contract.browserBridge.prepareUpdate, () => browserBridge.prepareUpdate());
   ipc.handle(contract.browserBridge.disconnect, () => browserBridge.disconnect());
   ipc.handle(contract.browserBridge.selectInstance, (instanceId) => browserBridge.selectInstance(instanceId));
@@ -403,7 +408,7 @@ function registerBrowserBridgeIpc(ipc: IpcRegistrar, browserBridge: BrowserBridg
     shell.showItemInFolder(status.extensionDir);
     return { ok: true };
   });
-  ipc.handle(contract.browserBridge.installFromRepo, (input) => browserBridge.buildAndInstall(input.repoRoot));
+  ipc.handle(contract.browserBridge.installFromRepo, () => browserBridge.buildAndInstall());
   ipc.handle(contract.browserBridge.installNativeHost, () => browserBridge.installNativeHost());
 }
 
@@ -626,7 +631,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
   ipc.handle(contract.approvals.submit, (input) => options.approvals.decide(input.requestId, input.decision, input.decision === "session" ? input.suggestionId : undefined));
 
-  if (options.browserBridge) registerBrowserBridgeIpc(ipc, options.browserBridge);
+  if (options.browserBridge) registerBrowserBridgeIpc(options, ipc, options.browserBridge);
   else registerDisabledBrowserBridgeIpc(ipc);
 
   ipc.handle(contract.skills.list, async (input = {}) => listFixedRendererSkills({

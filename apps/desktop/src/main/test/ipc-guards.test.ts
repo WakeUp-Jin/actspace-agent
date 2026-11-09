@@ -134,9 +134,7 @@ const CASES: Record<string, Case> = {
   "modelConnections.getBalance": { spec: contract.modelConnections.getBalance, valid: [{ connectionId: "c" }], invalid: [{ connectionId: 1 }] },
   // 插件
   "englishLearning.setTarget": { spec: contract.englishLearning.setTarget, valid: [{ enabled: false, sessionId: null }, { enabled: true, sessionId: "s" }], invalid: [undefined, { enabled: true }, { enabled: "yes", sessionId: "s" }, { enabled: true, sessionId: 1 }] },
-  "browserBridge.useSourceExtension": { spec: contract.browserBridge.useSourceExtension, valid: [null, "/repo"], invalid: [undefined, { repoRoot: "/repo" }] },
   "browserBridge.selectInstance": { spec: contract.browserBridge.selectInstance, valid: ["i1"], invalid: [null, 1] },
-  "browserBridge.installFromRepo": { spec: contract.browserBridge.installFromRepo, valid: [{ repoRoot: "/repo" }], invalid: ["/repo", {}] },
   "skills.list": { spec: contract.skills.list, valid: [undefined, {}, { workspaceRoot: "/w" }], invalid: [{ workspaceRoot: 1 }] },
   "skills.uninstall": { spec: contract.skills.uninstall, valid: [{ directory: "/d" }], invalid: [{}, "/d"] },
 };
@@ -147,7 +145,8 @@ const NO_INPUT_SPECS: InvokeSpec<unknown, unknown>[] = [
   contract.harnessStats.getStatus, contract.settings.get, contract.settings.getV4, contract.settings.readSystemPrompt, contract.settings.getSearchUsage,
   contract.quickOpen.consume, contract.quickOpen.getShortcutStatus, contract.modelConnections.list, contract.englishLearning.getState, contract.englishLearning.stopSpeech,
   contract.englishLearning.previewSpeech, contract.browserBridge.getStatus, contract.browserBridge.connect, contract.browserBridge.prepareUpdate, contract.browserBridge.disconnect,
-  contract.browserBridge.openExtensions, contract.browserBridge.revealExtensionDirectory, contract.browserBridge.installNativeHost, contract.plugins.list, contract.skills.install,
+  contract.browserBridge.openExtensions, contract.browserBridge.revealExtensionDirectory, contract.browserBridge.installNativeHost,
+  contract.browserBridge.selectSourceExtension, contract.browserBridge.useBundledExtension, contract.browserBridge.installFromRepo, contract.plugins.list, contract.skills.install,
   contract.updates.getState, contract.updates.selectSource, contract.updates.start, contract.hosts.list,
 ];
 for (const spec of NO_INPUT_SPECS) CASES[`no-input ${spec.channel}`] = { spec, valid: [undefined], invalid: [null, {}, "x", 0] };

@@ -3,7 +3,6 @@ import { ChevronDown, Copy, ExternalLink, FolderOpen, Loader2 } from "lucide-rea
 import type { BrowserBridgeStatus } from "@actspace/shared";
 import { Button } from "../ui/Button";
 import { browserBridgeApi } from "../../api/browser-bridge";
-import { dialogsApi } from "../../api/dialogs";
 
 export function BrowserConnectPanel({ status, refresh }: { status: BrowserBridgeStatus | null; refresh: () => Promise<unknown> }) {
   const [busy, setBusy] = useState(false);
@@ -83,13 +82,9 @@ export function BrowserConnectPanel({ status, refresh }: { status: BrowserBridge
         <p>可加载本地源码中的扩展，默认仍使用随应用提供的本机组件。从源码编译仅在显式点击时执行，需要 Go。</p>
         {status?.sourceRoot && <p className="break-all">源码：{status.sourceRoot}</p>}
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" disabled={busy} onClick={() => void action(async () => {
-            const selected = await dialogsApi.selectWorkspaceDirectory();
-            if (!selected?.workspaceRoot || selected.canceled) return { ok: true };
-            return browserBridgeApi.useSourceExtension(selected.workspaceRoot);
-          })}>选择源码扩展</Button>
-          {status?.sourceRoot && <Button variant="secondary" disabled={busy} onClick={() => void action(() => browserBridgeApi.installFromRepo({ repoRoot: status.sourceRoot! }))}>从源码编译</Button>}
-          {status?.sourceRoot && <Button variant="secondary" disabled={busy} onClick={() => void action(() => browserBridgeApi.useSourceExtension(null))}>切回随包扩展</Button>}
+          <Button variant="secondary" disabled={busy} onClick={() => void action(() => browserBridgeApi.selectSourceExtension())}>选择源码扩展</Button>
+          {status?.sourceRoot && <Button variant="secondary" disabled={busy} onClick={() => void action(() => browserBridgeApi.installFromRepo())}>从源码编译</Button>}
+          {status?.sourceRoot && <Button variant="secondary" disabled={busy} onClick={() => void action(() => browserBridgeApi.useBundledExtension())}>切回随包扩展</Button>}
         </div>
         <p>更换来源后，请在 Chrome 扩展页移除旧加载位置，并按页面显示的目录重新加载。</p>
       </div>}
