@@ -161,7 +161,7 @@ SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 
 1. 继续保留 `repository-checks` 与各工程 job 的分层，避免仓库卫生与工程构建互相遮蔽失败原因。
 2. 新增 action 时必须继续 pin 到 commit SHA；`scripts/check-action-pinning.sh` 会拦截浮动 tag。
-3. 如果后续接 installer（dmg 之外的 pkg、Windows 安装器、Linux AppImage / deb）、Developer ID 签名、notarization、Windows Authenticode、远程自动更新，再在现有 release 流水线上扩展；Electron 大版本升级见 `docs/exec-plans/active/20261108-ci-pipelines.md` P5。
+3. 如果后续接 installer（dmg 之外的 pkg、Windows 安装器、Linux AppImage / deb）、Developer ID 签名、notarization、Windows Authenticode、远程自动更新，再在现有 release 流水线上扩展；Electron 大版本升级见 `docs/exec-plans/completed/20261108-ci-pipelines.md` P5。
 
 ## 供应链安全
 
