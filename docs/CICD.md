@@ -33,7 +33,7 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
 
 ### Dependabot
 
-`.github/dependabot.yml` 每周一开一批更新 PR：npm 按「开发依赖的 minor/patch」「运行时依赖的 minor/patch」各合成一个 PR，运行时依赖的 major 单独开 PR 逐个评估，上限 5 个；GitHub Actions 与 Go module 各合成一个 PR。Dependabot 对 SHA pin 的 action 会同时更新 SHA 和版本注释，不会破坏 `check-action-pinning.sh`。两类依赖被排除在自动更新之外：由 `pnpm.overrides` 钉死的 `@deepseek-ai/cordis*`，以及带 `patches/` 补丁的 `@earendil-works/pi-ai`——它们的升级必须连 overrides 或补丁一起手动改。
+`.github/dependabot.yml` 每周一开一批更新 PR：npm 按「开发依赖的 minor/patch」「运行时依赖的 minor/patch」各合成一个 PR，运行时依赖的 major 单独开 PR 逐个评估，上限 5 个；GitHub Actions 与 Go module 各合成一个 PR。Dependabot 对 SHA pin 的 action 会同时更新 SHA 和版本注释，不会破坏 `check-action-pinning.sh`。三类依赖被排除在自动更新之外：由 `pnpm.overrides` 钉死的 `@deepseek-ai/cordis*` 和 `katex`（`rehype-katex` / `mermaid` 各自声明的范围由 overrides 统一到一个版本），以及带 `patches/` 补丁的 `@earendil-works/pi-ai`——它们的升级必须连 overrides 或补丁一起手动改。
 
 ### 在 GitHub 上重新启用
 
