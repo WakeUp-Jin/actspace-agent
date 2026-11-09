@@ -33,7 +33,7 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
 
 ### Dependabot
 
-`.github/dependabot.yml` 每周一开一批更新 PR：npm 按「开发依赖的 minor/patch」「运行时依赖的 minor/patch」各合成一个 PR，运行时依赖的 major 单独开 PR 逐个评估，上限 5 个；GitHub Actions 与 Go module 各合成一个 PR。Dependabot 对 SHA pin 的 action 会同时更新 SHA 和版本注释，不会破坏 `check-action-pinning.sh`。两类依赖被排除在自动更新之外：由 `pnpm.overrides` 钉死的 `@deepseek-ai/cordis*`，以及带 `patches/` 补丁的 `@earendil-works/pi-ai`——它们的升级必须连 overrides 或补丁一起手动改。
+`.github/dependabot.yml` 每周一开一批更新 PR：npm 按「开发依赖的 minor/patch」「运行时依赖的 minor/patch」各合成一个 PR，运行时依赖的 major 单独开 PR 逐个评估，上限 5 个；GitHub Actions 与 Go module 各合成一个 PR。Dependabot 对 SHA pin 的 action 会同时更新 SHA 和版本注释，不会破坏 `check-action-pinning.sh`。两类依赖被排除在自动更新之外：由 `pnpm.overrides` 钉死的 `@deepseek-ai/cordis*`，以及带 `patches/` 补丁的 `@earendil-works/pi-ai`——它们的升级必须连 overrides 或补丁一起手动改。`typescript`、`vitest`、`vite`、`@types/node`、`@vitejs/plugin-react` 的版本只在 `pnpm-workspace.yaml` 的 `catalog:` 里，各包写 `catalog:`；升级这五个只改那一处再 `pnpm install`，`scripts/check-package-boundaries.mjs` 会拒绝在包里直接写版本号。
 
 ### 在 GitHub 上重新启用
 
