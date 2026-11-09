@@ -55,6 +55,7 @@
     "@actspace/tool-image-generation": "workspace:*",
     "@actspace/tool-image-inspection": "workspace:*",
     "@actspace/tool-runtime": "workspace:*",
+    "@actspace/python-runtime": "workspace:*",
     "@actspace/tool-shell": "workspace:*",
     "@actspace/tool-web": "workspace:*",
     "@codemirror/commands": "6.11.1",

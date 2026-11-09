@@ -1,5 +1,5 @@
 ---
-description: "命令行（Bash）工具：在沙箱里运行命令，长命令转后台。"
+description: "命令行（Bash）工具：在沙箱里运行命令，长命令转后台；随包 Python 运行时给 Agent 跑脚本。"
 kind: "package-group"
 ---
 
@@ -7,11 +7,14 @@ kind: "package-group"
 
 `tool-shell` 是给模型用的 `bash` 工具。它自己不实现沙箱和后台任务，而是接两个别的能力：命令默认进 [`sandbox`](../sandbox/README.md)，转后台的命令登记到 [`background-tasks`](../background-tasks/README.md) 的 Host 登记表。
 
+`python-runtime` 是 Host 用来找到并描述随包 Python（`actspace-python`）的库，以及按需下载数据扩展层的安装器；`tool-shell` 只拿到它产出的 `BashPythonRuntime`，把 shim 放进每条命令的 `PATH`。
+
 ## 包
 
 | 包 | 角色 | 类别 | 默认 | 职责 |
 | --- | --- | --- | --- | --- |
 | `tool-shell` | 工具 | 会话 | 开 | `bash` 工具：命令前缀与规则、权限评估、沙箱判断、前台和后台执行；提供 `tools.shell-tools` |
+| `python-runtime` | 库 | 库 | — | 随包 Python 的 `runtime.json` 清单、定位（`loadPythonRuntime`）、扩展层下载安装（`installExtensionLayer`）；`scripts/python-runtime/` 的 lock 与 prepare 脚本产出它读的目录 |
 
 ## 包之间怎么连
 
@@ -24,6 +27,7 @@ kind: "package-group"
 
 - `src/manifest.ts`、`src/plugin.ts`（工具定义与执行）、`src/command-prefix.ts`、`src/command-rules.ts`（命令前缀与规则）、`src/node-ports.ts`。沙箱和出沙箱的细节见[包 README](tool-shell/README.md)。
 - 测试在 `tool-shell/src/test/`：`pnpm --filter @actspace/tool-shell test`。
+- `python-runtime/src/runtime-manifest.ts`、`locate.ts`、`extension.ts`、`wheel.ts`；测试 `pnpm --filter @actspace/python-runtime test`。运行时怎么产出、怎么随包见[包 README](python-runtime/README.md)和[脚本执行设计](../../docs/design-docs/tool-system/agent-script-execution.md)。
 
 ## 怎么扩展
 

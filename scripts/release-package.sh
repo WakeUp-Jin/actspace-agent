@@ -113,6 +113,22 @@ nono_relative="sandbox-components/bin/nono"
 if [[ "${platform}" == "darwin" || "${platform}" == "linux" ]]; then
   node "${repo_root}/scripts/sandbox/fetch-nono.mjs" --out "${deploy_dir}/${nono_relative}"
 fi
+# The bundled Python the bash tool exposes as `actspace-python` (core layer; the data extension downloads on demand).
+# Downloads are pinned by sha256 in packages/shell/python-runtime/lock.json, so a failure here fails the package.
+phase "prepare python runtime"
+python_runtime_relative="runtime/python"
+case "${platform}-${artifact_arch}" in
+  darwin-arm64) python_runtime_target="mac-arm64" ;;
+  darwin-x64) python_runtime_target="mac-x64" ;;
+  linux-x64) python_runtime_target="linux-x64" ;;
+  linux-arm64) python_runtime_target="linux-arm64" ;;
+  windows-x64) python_runtime_target="win-x64" ;;
+  *)
+    echo "No bundled Python runtime for ${platform}-${artifact_arch}." >&2
+    exit 1
+    ;;
+esac
+node "${repo_root}/scripts/python-runtime/prepare.mjs" --target "${python_runtime_target}" --output "${deploy_dir}/${python_runtime_relative}"
 
 phase "prune deploy dir"
 find "${deploy_dir}" -type d -name test -prune -exec rm -rf {} +
@@ -164,9 +180,16 @@ case "${platform}" in
         || true
     fi
     packaged_nono="${packaged_app}/Contents/Resources/app/${nono_relative}"
+    packaged_python="${packaged_app}/Contents/Resources/app/${python_runtime_relative}"
     if [[ -n "${mac_codesign_identity}" ]]; then
       # --deep does not reach loose executables under Resources; sign nono on its own first.
       codesign --force --options runtime --timestamp --sign "${mac_codesign_identity}" "${packaged_nono}"
+      # Likewise every Mach-O in the Python runtime: extension modules and dylibs first, then the interpreter with
+      # the entitlements cffi / ctypes need under the hardened runtime.
+      find "${packaged_python}" -type f \( -name "*.so" -o -name "*.dylib" \) -print0 \
+        | xargs -0 codesign --force --options runtime --timestamp --sign "${mac_codesign_identity}"
+      find "${packaged_python}/bin" -type f -perm +111 -print0 \
+        | xargs -0 codesign --force --options runtime --timestamp --entitlements "${repo_root}/scripts/python-runtime/entitlements.plist" --sign "${mac_codesign_identity}"
       codesign --force --deep --options runtime --timestamp --sign "${mac_codesign_identity}" "${packaged_app}"
       codesign --verify --deep --strict --verbose=2 "${packaged_app}"
       signed=true
@@ -184,6 +207,7 @@ case "${platform}" in
     codesign --verify --strict --verbose=2 "${packaged_nono}"
     "${packaged_nono}" --version | grep -qx "nono $(node -p "require('${repo_root}/scripts/sandbox/nono-version.json').version")" \
       || { echo "Packaged nono does not report the pinned version." >&2; exit 1; }
+    node "${repo_root}/scripts/verify-python-runtime.mjs" "${packaged_python}"
     if is_truthy "${mac_notarize}"; then
       if [[ "${signed}" != "true" ]]; then
         echo "ACTSPACE_MAC_NOTARIZE=true requires ACTSPACE_MAC_CODESIGN_IDENTITY." >&2
@@ -232,6 +256,7 @@ case "${platform}" in
     mv "${artifact_root}/electron" "${artifact_root}/actspace" 2>/dev/null || true
     mkdir -p "${artifact_root}/resources"
     cp -R "${deploy_dir}" "${artifact_root}/resources/app"
+    node "${repo_root}/scripts/verify-python-runtime.mjs" "${artifact_root}/resources/app/${python_runtime_relative}"
     ;;
   windows)
     if [[ ! -f "${electron_runtime_dir}/electron.exe" ]]; then
@@ -245,6 +270,7 @@ case "${platform}" in
     mkdir -p "${artifact_root}/resources"
     cp -R "${deploy_dir}" "${artifact_root}/resources/app"
     node "${repo_root}/scripts/verify-browser-components.mjs" "${artifact_root}/resources/app/browser-components"
+    node "${repo_root}/scripts/verify-python-runtime.mjs" "${artifact_root}/resources/app/${python_runtime_relative}"
     # Fail fast instead of letting the archiver chase links; .bin shims are plain .cmd files on Windows.
     if leftover_link="$(find "${artifact_root}" -type l -print -quit)" && [[ -n "${leftover_link}" ]]; then
       echo "Windows package must not contain symlinks or junctions, found: ${leftover_link}" >&2

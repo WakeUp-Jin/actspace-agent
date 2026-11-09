@@ -18,7 +18,22 @@ export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & {
   readonly hasRunningBackgroundTask?: (sessionId: string) => boolean;
   /** Canonical Host-owned scratch directory; registered as Host-writable and accepted as a script location. */
   readonly scratchRoot?: string;
+  /** The Python the app ships; absent when it does not, and then the prompt tells the model to use the system one. */
+  readonly python?: BashPythonRuntime;
   readonly dispose?: () => Promise<void>;
+};
+/**
+ * What Bash and the prompt need to know about the bundled Python: the shim directory goes in front of `PATH` so
+ * the model's `actspace-python` resolves, `shim` becomes `ACTSPACE_PYTHON`, and the extension layer (read per
+ * command, so a download that finishes mid-Session takes effect on the next command) becomes `ACTSPACE_PYTHON_EXT`.
+ */
+export type BashPythonRuntime = {
+  readonly version: string;
+  readonly shimDirectory: string;
+  readonly shim: string;
+  readonly corePackages: readonly string[];
+  readonly extensionPackages: readonly string[];
+  readonly extensionSitePackages?: () => string | undefined;
 };
 export const SHELL_TOOLS_HOST_PORT_ID = "actspace.host.tools.shell-tools" as const;
 /**
@@ -41,7 +56,7 @@ export async function apply(ctx: CordisContext): Promise<void> {
   // write_file / read_file inside the scratch directory need no workspace-scope approval; the Host cleans it up.
   const writableRoots = ctx.get?.(HOST_WRITABLE_ROOTS_SERVICE_ID) as HostWritableRoots | undefined;
   if (ports.scratchRoot !== undefined) writableRoots?.add(ports.scratchRoot);
-  ctx.provide?.("tools.shell-tools", Object.freeze({ registrations, definitions: TOOL_DEFINITIONS, hasRunningBackgroundTask: ports.hasRunningBackgroundTask ?? (() => false), scratchRoot: ports.scratchRoot }));
+  ctx.provide?.("tools.shell-tools", Object.freeze({ registrations, definitions: TOOL_DEFINITIONS, hasRunningBackgroundTask: ports.hasRunningBackgroundTask ?? (() => false), scratchRoot: ports.scratchRoot, python: ports.python }));
   ctx.effect?.(() => async () => {
     if (ports.scratchRoot !== undefined) writableRoots?.remove(ports.scratchRoot);
     const results = await Promise.allSettled([...registrations].reverse().map((item) => item.handle.dispose()));

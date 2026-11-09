@@ -125,6 +125,9 @@ importers:
       '@actspace/official-skills':
         specifier: workspace:*
         version: link:../../packages/skill/official-skills
+      '@actspace/python-runtime':
+        specifier: workspace:*
+        version: link:../../packages/shell/python-runtime
       '@actspace/runtime':
         specifier: workspace:*
         version: link:../../packages/core/runtime
@@ -1659,6 +1662,9 @@ importers:
       '@actspace/llm-service':
         specifier: workspace:*
         version: link:../../llm/llm-service
+      '@actspace/python-runtime':
+        specifier: workspace:*
+        version: link:../../shell/python-runtime
       '@actspace/sandbox':
         specifier: workspace:*
         version: link:../../sandbox/sandbox
@@ -2102,6 +2108,18 @@ importers:
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../util/shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.19.2
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.12
+        version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+
+  packages/shell/python-runtime:
     devDependencies:
       '@types/node':
         specifier: ^24.0.3

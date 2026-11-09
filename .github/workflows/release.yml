@@ -24,6 +24,9 @@ on:
       - 'scripts/verify-browser-components.mjs'
       - 'scripts/check-provider-proxy-package.mjs'
       - 'scripts/sandbox/**'
+      - 'scripts/python-runtime/**'
+      - 'scripts/verify-python-runtime.mjs'
+      - 'packages/shell/python-runtime/lock.json'
 
 permissions:
   contents: read

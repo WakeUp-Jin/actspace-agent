@@ -36,7 +36,7 @@ kind: "package-map"
 | [`llm/`](llm/README.md) | 模型服务契约和提供商适配 | 2 | 全局、库 |
 | [`context/`](context/README.md) | 每一轮发给模型的上下文：引擎、提示词、各个来源、披露与压缩 | 12 | 会话 |
 | [`fs/`](fs/README.md) | 读、搜索、写工作区文件的工具 | 3 | 会话 |
-| [`shell/`](shell/README.md) | 命令行（Bash）工具 | 1 | 会话 |
+| [`shell/`](shell/README.md) | 命令行（Bash）工具与随包 Python 运行时 | 2 | 会话、库 |
 | [`web/`](web/README.md) | 网页搜索与读取工具 | 1 | 会话 |
 | [`image/`](image/README.md) | 生成图片、看图片的工具 | 2 | 会话 |
 | [`todo/`](todo/README.md) | 待办工具与待办视图 | 1 | 全局、会话 |

@@ -49,6 +49,7 @@
     "@actspace/tool-fs-read": "workspace:*",
     "@actspace/tool-fs-search": "workspace:*",
     "@actspace/tool-fs-write": "workspace:*",
+    "@actspace/python-runtime": "workspace:*",
     "@actspace/tool-shell": "workspace:*",
     "@actspace/tool-web": "workspace:*",
     "@actspace/tool-image-generation": "workspace:*",

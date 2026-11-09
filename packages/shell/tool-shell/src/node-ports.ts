@@ -2,14 +2,14 @@ import { randomUUID } from "node:crypto";
 import { createWriteStream, mkdirSync, realpathSync } from "node:fs";
 import { mkdir, open, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
 import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { spawnHostProcess } from "@actspace/sandbox/node-ports";
 import type { HostProcessSpec, SandboxExecution, SandboxRequest, SandboxResult, SandboxService } from "@actspace/sandbox/types";
 import type { BackgroundTaskHost, BackgroundTaskTerminal } from "@actspace/background-tasks";
 import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tool-runtime";
 import { redactToolText } from "@actspace/tool-runtime";
-import type { ToolPorts } from "./plugin.js";
+import type { BashPythonRuntime, ToolPorts } from "./plugin.js";
 import { SessionBashLogs, sweepStaleScratchDirectories } from "./bash-log.js";
 
 const INLINE_OUTPUT_CHARS = 8_000;
@@ -33,7 +33,7 @@ const SANDBOX_DENIAL_SIGNATURES = ["operation not permitted", "eperm"] as const;
 const SANDBOX_DENIAL_TAIL_BYTES = 8 * 1024;
 const SANDBOX_DENIAL_HINT = "The sandbox may have blocked this command: it ran in the sandbox and the output reports \"operation not permitted\". If it really needs to write outside the workspace or use the keychain, retry the same command once with sandbox_permissions: \"require_escalated\" and a one-sentence justification; the user will be asked to approve. If it should not need that, change the approach instead.";
 
-export type NodeBashToolPorts = Pick<ToolPorts, "bash"> & {
+export type NodeBashToolPorts = Pick<ToolPorts, "bash" | "python"> & {
   readonly hasRunningBackgroundTask: (sessionId: string) => boolean;
   /** Canonical `bash-v2/<process>/`: the sandbox `TMPDIR`, and the root of every Session's `scripts/<sessionId>/`. */
   readonly scratchRoot: string;
@@ -58,6 +58,8 @@ type BashOptions = {
   readonly sessionLogCapBytes?: number;
   /** Tests only: how long a subagent's command may run. */
   readonly subagentTimeoutMs?: number;
+  /** The Python the app ships, when it does; absent in development without `pnpm python-runtime:prepare`. */
+  readonly python?: BashPythonRuntime;
 };
 
 /**
@@ -76,6 +78,7 @@ export function createNodeBashToolPorts(options: BashOptions): NodeBashToolPorts
     bash: (args, context) => executeBash(args, context, options, registry),
     hasRunningBackgroundTask: (sessionId) => registry.running(sessionId) > 0,
     scratchRoot,
+    ...(options.python === undefined ? {} : { python: options.python }),
     dispose: () => registry.dispose(),
     forceTerminate: () => registry.forceTerminate(),
   });
@@ -107,7 +110,7 @@ async function executeBash(
   const scratchRoot = registry.scratchRoot;
   const sessionScratch = sessionScratchDirectory(scratchRoot, context.sessionId);
   await mkdir(sessionScratch, { recursive: true, mode: 0o700 });
-  const env = commandEnvironment(sessionScratch);
+  const env = commandEnvironment(sessionScratch, options.python);
   const log = await registry.logs.create(context.sessionId);
   // A log that never becomes a background task goes once the result exists; the artifact keeps long output.
   let keepLog = false;
@@ -253,8 +256,17 @@ async function sandboxedRequest(argv: readonly string[], cwd: string, workspaceR
 }
 
 /** The Session's scratch directory for scripts, plus the bundled Python when the app ships one. */
-function commandEnvironment(sessionScratch: string): NodeJS.ProcessEnv {
-  return { ...process.env, ACTSPACE_SCRATCH: sessionScratch };
+export function commandEnvironment(sessionScratch: string, python: BashPythonRuntime | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...base, ACTSPACE_SCRATCH: sessionScratch };
+  if (python === undefined) return env;
+  // Windows spells the variable `Path`; keep whichever key the parent has so the shell sees one PATH.
+  const pathKey = Object.keys(env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
+  const current = env[pathKey];
+  env[pathKey] = current ? `${python.shimDirectory}${delimiter}${current}` : python.shimDirectory;
+  env.ACTSPACE_PYTHON = python.shim;
+  const extension = python.extensionSitePackages?.();
+  if (extension !== undefined) env.ACTSPACE_PYTHON_EXT = extension;
+  return env;
 }
 
 /** The scratch directory exists from the start so its canonical path can be registered as Host-writable. */

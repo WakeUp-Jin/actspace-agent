@@ -8,6 +8,7 @@ import { createNodeToolPorts as createImageinspection, IMAGE_INSPECTION_HOST_POR
 import { createLlmImageInspector, type SessionArtifactReader } from "@actspace/tool-image-inspection";
 import type { WebSearchCredentials } from "@actspace/tool-web";
 import { createNodeSandboxHostPort, findBundledNono, repoNonoPath, SANDBOX_HOST_PORT_ID } from "@actspace/sandbox";
+import { findBundledPythonRuntime, pythonRuntimeForBash, repoPythonRuntimePath, type PythonRuntime } from "@actspace/python-runtime";
 
 /**
  * `ACTSPACE_NONO_PATH`, then the copy `pnpm sandbox:fetch-nono` fetched when the caller runs from the repo.
@@ -16,6 +17,10 @@ import { createNodeSandboxHostPort, findBundledNono, repoNonoPath, SANDBOX_HOST_
 export function resolveNodeHostNonoPath(env: NodeJS.ProcessEnv = process.env, repoRoot?: string): string | undefined {
   return findBundledNono([env.ACTSPACE_NONO_PATH, repoRoot === undefined ? undefined : repoNonoPath(repoRoot)]);
 }
+/** `ACTSPACE_PYTHON_RUNTIME`, then the runtime `pnpm python-runtime:prepare` built when the caller runs from the repo. */
+export function resolveNodeHostPythonRuntime(env: NodeJS.ProcessEnv = process.env, repoRoot?: string): PythonRuntime | undefined {
+  return findBundledPythonRuntime([env.ACTSPACE_PYTHON_RUNTIME, repoRoot === undefined ? undefined : repoPythonRuntimePath(repoRoot)]);
+}
 /**
  * The sandbox Host port on its own (the CLI's `--mock` has no tool ports). `sandboxInherited` comes only from an
  * explicit launch flag; Desktop never sets it.
@@ -23,7 +28,7 @@ export function resolveNodeHostNonoPath(env: NodeJS.ProcessEnv = process.env, re
 export function createNodeSandboxHostServices(options: { readonly nonoPath?: string; readonly sandboxInherited?: boolean }) {
   return Object.freeze({ [SANDBOX_HOST_PORT_ID]: createNodeSandboxHostPort({ nonoPath: options.nonoPath ?? resolveNodeHostNonoPath(), inherited: options.sandboxInherited === true }) });
 }
-export function createNodeToolHostServices(options: { readonly onShellProcesses?: (control: { readonly forceTerminate: () => void }) => void; readonly workspaceRoot: string; readonly tmpRoot: string; readonly model: string; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tool-runtime").SessionArtifactResolver; readonly nonoPath?: string; readonly sandboxInherited?: boolean }) {
+export function createNodeToolHostServices(options: { readonly onShellProcesses?: (control: { readonly forceTerminate: () => void }) => void; readonly workspaceRoot: string; readonly tmpRoot: string; readonly model: string; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tool-runtime").SessionArtifactResolver; readonly nonoPath?: string; readonly sandboxInherited?: boolean; readonly pythonRuntime?: PythonRuntime }) {
   const keys = { deepseek: process.env.ACTSPACE_DEEPSEEK_SEARCH === "1" ? process.env.DEEPSEEK_API_KEY : undefined, zhipu: process.env.ZHIPU_API_KEY, tavily: process.env.TAVILY_API_KEY, tinyfish: process.env.TINYFISH_API_KEY, exa: process.env.EXA_API_KEY };
   const credentials = Object.fromEntries(Object.entries(keys).filter((entry): entry is [keyof WebSearchCredentials, string] => Boolean(entry[1]))) as WebSearchCredentials;
   const apiKey = process.env.IMAGE_GENERATION_API_KEY; const baseUrl = process.env.IMAGE_GENERATION_BASE_URL; const model = process.env.IMAGE_GENERATION_MODEL;
@@ -32,7 +37,7 @@ export function createNodeToolHostServices(options: { readonly onShellProcesses?
     [FILESYSTEM_READ_HOST_PORT_ID]: { createPorts: () => createFilesystemread(options) },
     [FILESYSTEM_SEARCH_HOST_PORT_ID]: { createPorts: () => createFilesystemsearch(options) },
     [FILESYSTEM_WRITE_HOST_PORT_ID]: { createPorts: () => createFilesystemwrite(options) },
-    [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: (background: Parameters<typeof createShelltools>[0]["background"], sandbox: Parameters<typeof createShelltools>[0]["sandbox"], session: { readonly dataRoot: string }) => { const ports = createShelltools({ ...options, dataRoot: session.dataRoot, background, sandbox }); options.onShellProcesses?.(ports); return ports; } },
+    [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: (background: Parameters<typeof createShelltools>[0]["background"], sandbox: Parameters<typeof createShelltools>[0]["sandbox"], session: { readonly dataRoot: string }) => { const ports = createShelltools({ ...options, dataRoot: session.dataRoot, background, sandbox, ...(options.pythonRuntime === undefined ? {} : { python: pythonRuntimeForBash(options.pythonRuntime, session.dataRoot) }) }); options.onShellProcesses?.(ports); return ports; } },
     [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({ credentials, deepseekFetchApiKey: process.env.ACTSPACE_DEEPSEEK_FETCH === "1" ? process.env.DEEPSEEK_API_KEY : undefined }) },
     [IMAGE_GENERATION_HOST_PORT_ID]: { createPorts: () => createImagegeneration({ generation: apiKey && baseUrl && model ? { apiKey, baseUrl, model } : undefined }) },
     [IMAGE_INSPECTION_HOST_PORT_ID]: { createPorts: (llm: import("@actspace/llm-service").LlmService, recorder: import("@actspace/llm-service").AuxiliaryRequestRecorder) => createImageinspection({ readArtifact: options.readArtifact, inspect: createLlmImageInspector({ llm, recorder, routeId: "default", model: options.model }) }) },
