@@ -1,11 +1,11 @@
-# 后端插件包解耦 P1 / P2 — 执行摘要
+# 后端插件包解耦 P1–P4 — 执行摘要
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261109-harness-plugin-decoupling.md`
+- **关联计划**：`docs/exec-plans/completed/20261109-harness-plugin-decoupling.md`
 - **执行过程**：`docs/exec-runs/20261109-harness-plugin-decoupling/execution-process.md`
 - **执行模式**：夜间（云端 Agent 自主执行）
-- **执行结果**：P1、P2 完成；P3–P4 留在计划里待后续轮次
+- **执行结果**：P1–P4 全部完成；计划已移入 `completed/`
 
 ## 核心变更清单
 
@@ -20,6 +20,12 @@
 | 装配测试守住产品策略 | `packages/core/runtime/src/harness/default-harness.test.ts` | Chat / Plan / Agent 三个集合与推导出的成员在真实装配上断言 |
 | （P2）默认 Harness 两层产物 | `runtime/scripts/build-default-harness.mjs`、`src/plugin-catalog.ts`、`src/harness/default-harness.ts` | 内核一份代码分割闭包发布为 `actspace.default-harness`；每个 `isHarnessToolPlugin` 条目单独打成 `plugins/<entry>/plugin.js`，按 catalog 的 pluginId / 版本 / 来源发布；composition 带真实多份 manifest 与每条目 `artifactId` |
 | （P2）内置工具插件可单独替换 | `default-harness.test.ts`、`agent-runtime-plugin.ts` | 一条 `replace` 补丁换掉 `filesystem-read` 的产物，内核与其余插件不变，兼容性检查通过；pristine 判定改按 `provenance` |
+| （P3）上下文装配登记表 | `packages/context/context-assembly/*`、`core/runtime/src/plugin-catalog.ts` | 新 Harness 内核条目 `context-assembly` 提供 `context.assembly`：来源按种类 + Agent 角色登记，工具结果观察者登记，`sourcesFor(role)` 搭注册表；必需种类来自 manifest `config.required` |
+| （P3）来源插件与披露自己接线 | 八个 `context-*` 来源包、`context-disclosure/src/plugin.ts`、`context-engine/src/{compaction,engine,plugin}.ts` | `publish` 搬到 `@actspace/context-assembly`；后台任务 / 子智能体来源自己声明只给 `main`；披露经 `CompactionDisclosure.hydrate` + 协调器 `hydrator()` 接水合，向登记表登记来源与观察者 |
+| （P3）`agent-factory` 不认识种类 | `core/runtime/src/harness/agent-factory-plugin.ts`、`src/manifests.ts` | inject `context.assembly` 代替 `context.source.*`；`createSources` / `observeContextToolResult` / `createContextEngine` 全部委托登记表；不再 import 披露包 |
+| （P4）能力授予 | `core/tool-runtime/src/host-ports.ts`、`core/runtime/src/harness/{default-harness,default-harness-definition,agent-runtime-plugin}.ts` | `actspace.host.filesystem`（`FilesystemHostGrant`）与 `actspace.host.process`（`ProcessHostGrant`）替换四个 `actspace.host.tools.*`；`OPTIONAL_HOST_SHARED_SERVICES` 让 Host 可不给 |
+| （P4）文件 / Shell 实现随插件产物 | `tool-fs-read/search/write`、`tool-shell` 的 `src/{plugin,manifest}.ts` | 插件 `apply` 用授予自己建 `node-ports`；无授予时注册但返回 `CAPABILITY_UNAVAILABLE`；manifest 改 `optionalInjects` |
+| （P4）Host 只给授予 | `packages/host/agent-host/src/node-ports/tool-host-services.ts`、`apps/desktop/src/main/runtime-v2/tool-host-services.ts` | 两个 Host 只提供授予 + 网页 / 图片端口；CLI `--mock` 不给授予；`agent-host` 不再依赖四个工具包 |
 | （P2）service-contract owner 漂移测试 | `default-harness.test.ts`、`cordis-adapter/src/service-contract.ts` | owner / providerOwner / providerId 必须与贡献该服务的插件包、条目一致；修正 `tools.browser` 的错误包名并重新生成契约矩阵 |
 
 ## 人工验证指引
@@ -42,6 +48,18 @@
    - 验证方式：用一个在旧版本上只跑过内置 Harness（没做过进化）的数据目录启动新版本。
    - 预期结果：启动时记录一条 `builtin-upgrade` 选择，会话正常；做过进化补丁的数据目录保持原选择不被覆盖。
 
+5. **（P3）子智能体看不到后台任务 / 子智能体清单**
+   - 验证方式：主 Agent 派一个子智能体，查看子会话的 `request/context` 或上下文面板。
+   - 预期结果：主 Agent 的上下文有「后台任务」「运行中的子智能体」来源；子智能体与 fork 没有；`system` / `rules` / `skills` / `runtime` / `conversation` / `tools` 两边都有。
+
+6. **（P3）披露启用时仍能恢复与水合**
+   - 验证方式：Desktop 下让 Agent 读几个文件后触发压缩，重开会话。
+   - 预期结果：压缩摘要含「相关文件」节，重开后披露状态恢复，上下文里仍有 `disclosure` 来源；行为与改前一致。
+
+7. **（P4）文件与 Bash 工具在 Desktop / CLI 正常，`--mock` 下报不可用**
+   - 验证方式：Desktop 与 `actspace-cli` 正常模式下 `read_file` / `grep` / `write_file` / `bash`；`actspace-cli --mock` 下调用任一文件工具或 `bash`。
+   - 预期结果：正常模式行为与改前一致（含沙箱、审批、后台任务、强制退出时结束遗留进程）；`--mock` 下工具存在但返回 `CAPABILITY_UNAVAILABLE`，不报缺 Host 服务。
+
 ### 建议验证
 
 1. **新会话 Header 的 `agentMembers`**
@@ -55,6 +73,9 @@
 - `pnpm typecheck`、`pnpm lint`、`pnpm check:packages`、`pnpm check:docs`、`pnpm check:hot-path-reads` 通过。
 - P2：`runtime`（248，新增产物拆分 / 单插件替换 / owner 漂移三个用例）、`cordis-adapter`（43）、`harness-control`（29）、`harness-evaluation`（12）、`plugin-manager`（6）通过；`pnpm test:contract-matrix`、`pnpm test:plugin-catalog`、`pnpm typecheck`、`pnpm lint`、`pnpm check:packages`、`pnpm check:hot-path-reads` 通过。
 
+- P3：`context-assembly` 6、八个来源包与 `context-disclosure`（27）、`context-engine`（34）、`prompt`（9）通过；`runtime` 248 通过（含 `tool-composition` 真实树上的角色断言）。
+- P4：`tool-fs-read` 9、`tool-fs-search` 5、`tool-fs-write` 6、`tool-shell` 119、`agent-host` 128、`agent-cli` 16、`desktop` 2898、`runtime` 248 通过；`pnpm typecheck`、`pnpm lint`、`pnpm check:packages`、`pnpm check:docs`、`pnpm check:hot-path-reads`、`pnpm check:desktop-build-graph`、`pnpm test:contract-matrix`、`pnpm test:plugin-catalog` 通过。
+
 ## 已知风险和遗留事项
 
 - `tool-runtime` 有 3 个既有失败用例（process Grant、相对资源路径），在 `main` 上同样失败，与本次无关，未处理。
@@ -63,8 +84,13 @@
 - P2 后每次 bootstrap / builtin-upgrade 发布 15 个产物而不是 1 个，`artifactRoot` 目录数相应增加；产物是内容寻址的，重复发布不产生新目录。
 - 旧数据目录第一次用新版本启动会走 `builtin-upgrade`（内核产物内容变化、产物数量变化），属预期；选择记录的 `digest` 不再等于单个产物 id。
 
+- P3 后缺必需上下文来源在第一次建 Agent 时报错，不在装配时；错误信息 `Required context source <kind> is unavailable.` 会出现在 Run 失败里而不是启动日志。
+- P4 后 Host 不给授予时文件 / Shell 工具「存在但不可用」，与原来 `--mock` 行为一致；但一个真实 Host 漏提供授予不会在启动时报错，只会在工具调用时暴露。
+- Shell 插件产物现在自带 `@actspace/sandbox/node-ports` 的 `spawnHostProcess` 与 `@actspace/background-tasks` 的打包副本；它们只经参数与 Host 登记表交互，不共享类身份。
+
 ## 后续建议
 
-- P3：`agent-factory-plugin` 的上下文来源与 Loop 扩展点改为注册式；composition 现在已有真实多份 manifest，可顺带评估把形态推导挪进 Harness（需要 `mountHarness` 把 manifests 交给树）。
-- P4 见计划里程碑；之后再考虑让内置工具插件携带可编辑源码，使 `plugin_manager` 能以内置工具为模板改写。
+- 让内置工具插件携带可编辑源码，使 `plugin_manager` 能以内置工具为模板改写（P2 决策里预留）。
+- 出现远程 / 虚拟文件系统需求时，再在 `tool-runtime` 抽文件系统服务接口，三个 fs 包改成提供者。
+- `apps/cli/package.json` 里已无引用的 `tool-fs-*` / `tool-shell` 依赖可顺手清掉。
 - 契约矩阵生成器已支持按 manifest 兜底 `declared` 行，可在后续把 `service-contract.ts` 里叶子插件的 owner 删掉。

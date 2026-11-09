@@ -2,12 +2,13 @@
 
 这里的计划实现已经完成，原文保持不动；本页只做检索。人工验收边界保留在各计划正文和对应的[执行摘要](../../exec-runs/README.md)里，不代表全部验证通过。生命周期规则见 [执行计划](../README.md)。
 
-共 207 项，按日期从新到旧；无日期前缀的早期计划排在最后。
+共 208 项，按日期从新到旧；无日期前缀的早期计划排在最后。
 
 另有 [design-archive/](design-archive/)：docs 整理时从前端设计文档里拆出的决策表、测试清单、交接记录和早期重构稿，只做追溯。
 
 | 日期 | 计划 | 一句话 |
 |---|---|---|
+| 2026-11-09 | [后端插件包解耦：让 Harness 自进化不必改 core](20261109-harness-plugin-decoupling.md) | 工具自声明 `modes`、形态由 manifest 推导、默认 Harness 按插件产出产物、上下文来源登记式（新条目 `context-assembly`）、文件 / Shell 实现迁入 Harness 树（Host 只给 `actspace.host.filesystem` / `actspace.host.process` 授予）；PR #68；Desktop / CLI 实机走查未做 |
 | 2026-11-08 | [CI 重新上线与桌面发布流水线](20261108-ci-pipelines.md) | P1–P5 随 #48 / #57 / #58 合入 main：CI 必红修掉并分层加缓存、Dependabot / CodeQL、`v*` tag 四平台打包 + 草稿 Release、Electron 39 → 45；首个 tag 实发、Windows 与 Electron 45 实机走查未做 |
 | 2026-11-08 | [上下文面板整理](20261108-context-panel-polish.md) | 上下文事件写清变化、明细分页并入「再显示」、去掉卡片边框；合入 main #45；Electron 实机检查未做 |
 | 2026-11-08 | [pi-ai 1.5.0 与复用内置服务商](20261108-pi-ai-builtin-providers.md) | 连接 Base URL 命中 pi-ai 内置服务商时复用其协议、思考参数与请求头，代理改走请求级 fetch；合入 main #41；真实 Key 与 Electron 实机检查未做 |

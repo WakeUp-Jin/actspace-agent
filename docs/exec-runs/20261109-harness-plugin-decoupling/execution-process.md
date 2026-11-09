@@ -1,8 +1,8 @@
-# 后端插件包解耦 P1 — 执行过程
+# 后端插件包解耦 P1–P4 — 执行过程
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261109-harness-plugin-decoupling.md`
+- **关联计划**：`docs/exec-plans/completed/20261109-harness-plugin-decoupling.md`
 - **执行模式**：夜间（云端 Agent 自主执行）
 - **开始时间**：2026-11-09
 - **结束时间**：2026-11-09
@@ -100,6 +100,82 @@
   `pnpm typecheck`、`pnpm lint`、`pnpm check:packages`、`pnpm check:hot-path-reads`、`pnpm test:plugin-catalog` 通过。
   更新设计文档 07（内置产物说明）、装配规范、Run 生命周期文档、`packages/core/README.md`，计划进度与决策记录。
 
+## P3：上下文来源登记式
+
+### 步骤 14：新包 `context-assembly`
+
+- **操作**：新建 `packages/context/context-assembly`（Harness 内核条目，catalog 排在 `prompt-runtime` 之后、`context-system` 之前）。
+  `ContextAssembly` 按种类登记来源工厂（可带角色 `main` / `subagent` / `fork`），登记工具结果观察者；`sourcesFor(role, options)`
+  校验必需种类、搭 `ContextSourceRegistry` 并把注销和 `clear()` 挂到 `scope.disposer`。必需种类来自 manifest `config.required`
+  （默认 `["system", "conversation"]`），`apply` 校验配置形状。`publish(ctx, kind, create, roles?)` 从 `prompt/source-support` 搬来：
+  登记 + `ctx.effect` 撤销 + 仍 `provide` `context.source.<kind>`。
+- **影响文件**：`packages/context/context-assembly/*`、`packages/context/prompt/src/context-source-support.ts`（删 `publish`）、
+  `core/runtime/src/plugin-catalog.ts`、`core/runtime/package.json`、`scripts/contract-matrix/source-registry.mjs`。
+- **验证**：`context-assembly` 6 个用例（配置、按角色清理、缺必需 / 重复 / 未知角色、观察者顺序、`publish` 撤销与缺登记表报错）。
+
+### 步骤 15：来源插件与披露接线
+
+- **操作**：八个来源插件 inject `context.assembly`，`import { publish } from "@actspace/context-assembly"`；`background-tasks` /
+  `subagents` 传 `["main"]`；`context-tools` / `context-conversation` 原来直接 `ctx.provide`，改为 `publish`。
+  `context-disclosure`：`CompactionDisclosure` 增加可选 `hydrate`，协调器新增 `hydrator()`，`context.engine.create` 在没传
+  `disclosure` 时取它；插件启用时再向 `context.assembly` 登记 `disclosure` 来源和 `observe` 观察者。
+- **影响文件**：八个 `context-*/src/{source,manifest}.ts` 与 `package.json`、`context-disclosure/src/plugin.ts`、
+  `context-engine/src/{compaction,engine,plugin}.ts`。
+- **验证**：各来源包 lifecycle 测试改为「先提供登记表、断言按角色登记、缺登记表报错」；披露 lifecycle 新增启用路径
+  （来源 + 水合随 dispose 撤销）；引擎 lifecycle 新增「协调器上的披露水合每个引擎」。`context-subagents/source.test.ts`
+  里重复的 lifecycle 用例删除。
+
+### 步骤 16：`agent-factory` 去掉种类表
+
+- **操作**：inject 改 `context.assembly`（删 `context.source.system/conversation`）；`createSources` 一行调 `assembly.sourcesFor`；
+  `observeContextToolResult` 调 `assembly.observeToolResult`；`createContextEngine: options => engine.create(options)`；删除对
+  `@actspace/context-disclosure` 的 import。`modeRuntime`（`compaction.runtime`）保持。
+- **影响文件**：`core/runtime/src/harness/agent-factory-plugin.ts`、`src/manifests.ts`、`src/test/plugin-catalog.test.ts`、
+  `src/harness/tool-composition.test.ts`（真实树上断言 `kinds("main")` 含八种、`kinds("subagent")` 不含后台任务 / 子智能体）。
+- **验证**：`pnpm --filter @actspace/runtime build && test` 248 通过（测试跑 `dist`，改源码后必须先 build）。
+
+## P4：文件 / Shell 实现迁入 Harness 树
+
+### 步骤 17：能力授予与共享服务
+
+- **操作**：`tool-runtime/src/host-ports.ts` 定义 `FILESYSTEM_HOST_PORT_ID = "actspace.host.filesystem"`（`FilesystemHostGrant`：
+  `workspaceRoot`、`resolveArtifact?`、`ripgrepPath?`）和 `PROCESS_HOST_PORT_ID = "actspace.host.process"`（`ProcessHostGrant`：
+  `workspaceRoot`、`tmpRoot`、`onProcesses?`）。`DEFAULT_HARNESS_SHARED_SERVICES` 用两份授予替换四个 `actspace.host.tools.*`；
+  新增 `OPTIONAL_HOST_SHARED_SERVICES`（浏览器端口 + 两份授予），`agent-runtime` 的 inject 过滤它们，`agentRuntimeManifest.injects`
+  同步。`OPTIONAL_INJECT_FALLBACKS` 补两条。
+- **影响文件**：`core/tool-runtime/src/{host-ports,index}.ts`、`core/runtime/src/harness/{default-harness,default-harness-definition,agent-runtime-plugin}.ts`、`src/manifests.ts`。
+
+### 步骤 18：工具插件自带实现
+
+- **操作**：`tool-fs-read/search/write` 和 `tool-shell` 删除 `*_HOST_PORT_ID` / `HostPort`。`apply` 可选读授予：有则用包内
+  `createNodeToolPorts(grant)` / `createNodeBashToolPorts({ ...grant, dataRoot, sandbox, background })`（Shell 再调
+  `grant.onProcesses?.(ports)` 交出强制结束钩子），无则 `{}`，让既有的 `CAPABILITY_UNAVAILABLE` 兜底处理器生效。manifest：
+  fs `injects: ["tools.runtime"]` + `optionalInjects: ["actspace.host.filesystem"]`；shell 删 Host 端口、`optionalInjects`
+  加 `actspace.host.process`。`node-ports.ts` 原本就 `import type` 自 `plugin.ts`，反向 import 不成环。
+- **影响文件**：四个包的 `src/{plugin,manifest}.ts` 与 `src/test/lifecycle.test.ts`。
+- **验证**：lifecycle 测试新增「无授予 → 注册但 `CAPABILITY_UNAVAILABLE`；有授予 → 真读 / glob / 写成功、Shell 调 `onProcesses`」；
+  `tool-fs-read` 9、`tool-fs-search` 5、`tool-fs-write` 6、`tool-shell` 119 通过。`pnpm --filter @actspace/runtime build` 后
+  默认 Harness 仍是「33 内核文件 + 14 插件」，插件产物自包含实现。
+
+### 步骤 19：Host 侧只给授予
+
+- **操作**：`agent-host` 的 `createNodeToolHostServices` 保留参数签名，改为提供两份授予 + 网页 / 图片端口；
+  `createUnavailableToolHostServices`（CLI `--mock`）只给网页 / 图片的空端口；Desktop `createDesktopToolHostServices` 同样改授予。
+  `agent-host` 删除对 `tool-fs-*` / `tool-shell` 的依赖（Desktop 的测试仍直接用这些包，保留依赖）。运行时测试 fixture
+  （`default-harness` / `evolution` / `harness-stats-boot`）去掉四个端口；`tool-composition.test.ts` 改为传授予并断言
+  Shell 被组合掉时 `onProcesses` 未被调用。
+- **影响文件**：`packages/host/agent-host/src/node-ports/tool-host-services.ts`、`package.json`、
+  `apps/desktop/src/main/runtime-v2/tool-host-services.ts`、运行时四个测试。
+- **验证**：`runtime` 248、`agent-host` 128、`agent-cli` 16（含 `--mock` 的 runtime-v2 / pinned-harness 和 `sandbox-inherited`）、
+  `desktop` 2898 通过。
+
+### 步骤 20：全仓检查与文档
+
+- **操作**：`pnpm typecheck`、`pnpm lint`、`pnpm check:packages`、`pnpm check:docs`、`pnpm check:hot-path-reads`、
+  `pnpm check:desktop-build-graph`、`pnpm test:contract-matrix`、`pnpm test:plugin-catalog` 通过；重新生成 `cordis.yml` 与契约矩阵。
+  更新 `packages/{context,core,fs,shell}/README.md` 与四个工具包 README、Tool 插件边界设计文档、自进化边界文档；
+  计划补 P3 / P4 进度与八条决策并移入 `completed/`。
+
 ## 遇到的问题
 
 - **问题**：Harness 条目 import Host 侧模块在 `tsc` 与源码测试下都不报错，只在打包后的装配测试暴露。
@@ -114,9 +190,17 @@
     （如 `filesystem.read`）会让 `capabilityCeiling` 为空的 Host 在 `mountHarness` 时报缺能力。
   - **应对**：产物 manifest 只沿用 pluginId / 版本 / 来源 / display / contributions，行描述仍由 `DEFAULT_HARNESS_ENTRIES` 合成。
 
+- **问题**（P3）：源码测试与 `dist` 测试不一致——`runtime` 的 vitest 跑的是 `dist/test`，改了 catalog 后不重新 build 会报旧断言失败。
+  - **应对**：`runtime` 改动后固定先 `build` 再 `test`；步骤记录里标明。
+- **问题**（P4）：`agent-host` 测试首次运行时所有文件报失败。
+  - **原因**：与并行执行的 `pnpm install` / 构建图重生成撞上，`dist` 处于半更新状态；重跑全部通过。
+  - **应对**：无代码改动。
+
 ## 跳过或推迟的事项
 
-- P3–P4（`agent-factory` 上下文来源注册式、文件/Shell 实现收回 Harness 树）：按计划留给后续轮次。
+- Harness 自己从 composition 推导形态：评估后决定不做（见计划 P3 决策），形态继续经 `agentForm` 端口传入。
+- 抽象文件系统服务（DSH 的 `FsService` + `fs-local` 提供者）：只有一个本地后端，暂不抽层（见计划 P4 决策）。
+- `apps/cli/package.json` 仍声明 `tool-fs-*` / `tool-shell` 依赖，源码里已无引用；属既有冗余，本轮没动。
 - Harness 自己从 composition 推导形态：P2 后 composition 已有真实的多份 manifest，但 `mountHarness` 仍只把 entries 交给树，
   未在本轮改动。
 - 彻底删掉 `service-contract.ts` 里叶子插件的 owner、让契约矩阵生成器按 manifest 兜底：本轮只加漂移测试。

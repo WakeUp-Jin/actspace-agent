@@ -2,7 +2,7 @@
 
 把一段「只有 Host 知道」的数据（插件目录、组合结果、全局配置）交给默认 Harness 里的一个条目时，第一反应往往是在那个条目文件里 `import` 对应模块。这在 `tsc`、单测里都没问题，却会在默认 Harness 打包时被 `scripts/build-default-harness.mjs` 的外部 import 白名单拒绝，错误只在装配测试或启动时以 `Unapproved external import <包名> in <条目>.js` 出现。结论：Harness 条目需要的 Host 数据一律由 Host 算好、放进它已经注入的 Host port（如 `actspace.host.agent`），条目只读端口字段。
 
-关联：`docs/histories/2026-11/20261109-1400-harness-plugin-decoupling-p1.md`、`docs/exec-plans/active/20261109-harness-plugin-decoupling.md`。
+关联：`docs/histories/2026-11/20261109-1400-harness-plugin-decoupling-p1.md`、`docs/exec-plans/completed/20261109-harness-plugin-decoupling.md`。
 
 ## 为什么会这样
 
@@ -16,6 +16,10 @@
 2. 在 `AgentRuntimeHostPort`（或条目已经注入的别的 Host port）上加一个字段，由 Host 在 `startup/boot.ts` 填好。本次加的是 `agentForm: AgentForm`，值是 `MAIN_AGENT_FORM`。
 3. 条目里只读端口：`host.agentForm`，缺失时直接抛错（fail closed），不要在 Harness 里补一个默认值把 Host 的职责接过来。
 4. 测试里直接提供 `actspace.host.agent` 的用例（`default-harness.test.ts`、`evolution.test.ts`）要跟着补字段；走 `boot.ts` 的用例不用改。
+
+## 反方向也成立：port 里放数据，不放实现
+
+P4（同一计划）发现了镜像问题：文件 / Shell 工具的 Host port 原本是 `createPorts(workspaceRoot) => ToolPorts`，Host 把整套 Node 实现工厂塞进端口。打包、白名单都过，但 Harness 替换 `tool-fs-read` 只换到了注册壳——读写逻辑在 `agent-host` 里，根本不在插件产物里，自进化等于改不动。改法是端口只携带「能力授予」（根目录、artifact 解析器、强制结束钩子），实现由插件 `import` 自己包内的 `node-ports.ts`，随产物一起打包。判断口诀：Host 经端口给的东西应当是 Harness 自己算不出来的事实（路径、凭据、宿主回调），凡是能跟插件一起打包的代码都不该从端口进来。授予类型放 Host 与插件共同依赖的契约层（`tool-runtime`），否则 Host 为了 import 类型又得依赖具体工具包。
 
 ## 自检
 

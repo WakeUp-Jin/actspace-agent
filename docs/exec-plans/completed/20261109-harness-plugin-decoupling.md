@@ -19,8 +19,9 @@
     里「声明了工具的 Harness 条目」推导，不再手写。
   - `agent-factory-plugin` 不再特判 `actspace.plugin-manager`。
   - 产品策略（Chat 恰好两个工具、Plan 禁 Shell/写文件）改在默认 Harness 装配测试里守住。
-- 包含（P2–P4，后续轮次，见里程碑）：默认 Harness 按条目产出产物；`service-contract.ts` 不再写死叶子包 owner；
-  `agent-factory-plugin` 的上下文来源列表改为注册式；文件/Shell 工具实现从 Host port 收回 Harness 树。
+- 包含（P2–P4，后续轮次，见里程碑；全部已完成）：默认 Harness 按条目产出产物；`service-contract.ts` 不再写死叶子包 owner；
+  `agent-factory-plugin` 的上下文来源列表改为注册式（新条目 `context-assembly`）；文件/Shell 工具实现从 Host port 收回
+  Harness 树，Host 只留能力授予 `actspace.host.filesystem` / `actspace.host.process`。
 - 不包含：Harness 自进化 V2 的自动触发、评估沙箱、actor profile；前端改动；`plugin_manager` 工具契约变化。
 
 ## 背景
@@ -57,8 +58,8 @@
 
 1. P1：工具声明模式、形态由 manifest 推导（本轮）。
 2. P2：默认 Harness 按条目产出产物，`harness-control` 可替换单个内置条目；`service-contract.ts` owner 改为由 manifest 提供。
-3. P3：`agent-factory-plugin` 的上下文来源与 Loop 扩展点改为注册式，拆成 `agent-factory` + `context-assembly` 两个条目。
-4. P4：文件读/搜/写与 Shell 的实现迁入 Harness 树（`fs-local` / `shell-local` 风格的提供者插件），Host 只保留能力授予与审批。
+3. P3：`agent-factory-plugin` 的上下文来源与 Loop 扩展点改为注册式，拆成 `agent-factory` + `context-assembly` 两个条目。（已完成）
+4. P4：文件读/搜/写与 Shell 的实现迁入 Harness 树（`fs-local` / `shell-local` 风格的提供者插件），Host 只保留能力授予与审批。（已完成）
 
 ## 验证方式
 
@@ -95,7 +96,28 @@
 - [x] P2-T5 `service-contract.ts` owner：增加对照 catalog 的漂移测试（owner / providerOwner / providerId 必须等于贡献该服务的
   插件包与条目）；测试立即发现 `tools.browser` 写的是不存在的 `@actspace/browser-tools`，已改为 `@actspace/tool-browser`
   并重新生成契约矩阵。
-- [ ] P3–P4 待立项细化（见里程碑）。
+- [x] P3-T1 新包 `packages/context/context-assembly`（Harness 内核条目 `context-assembly`，提供 `context.assembly`）：按种类 + Agent
+  角色（`main` / `subagent` / `fork`）登记来源工厂、登记工具结果观察者，`sourcesFor(role, options)` 搭出 `ContextSourceRegistry`
+  并挂到 scope；必需种类来自 manifest `config.required`（默认 `system`、`conversation`）。`publish` 从 `prompt/source-support`
+  搬到这里，仍提供 `context.source.<kind>` 作为可见契约。
+- [x] P3-T2 八个来源插件 inject `context.assembly` 并用 `publish` 登记；`background-tasks` / `subagents` 自己声明只给 `main`；
+  `context-tools` / `context-conversation` 从直接 `provide` 改为 `publish`。
+- [x] P3-T3 `context-disclosure` 自己接线：`CompactionDisclosure.hydrate?` + 协调器 `hydrator()`，`context.engine.create` 默认取它；
+  向 `context.assembly` 登记 `disclosure` 来源与工具结果观察者。`agent-factory` 不再 import 披露包。
+- [x] P3-T4 `agent-factory-plugin` 删除种类列表与披露分支：inject `context.assembly` 代替 `context.source.system/conversation`，
+  `createSources` → `assembly.sourcesFor`，`observeContextToolResult` → `assembly.observeToolResult`，`createContextEngine` 直接
+  `engine.create(options)`。`tool-composition.test.ts` 在真实树上断言按角色登记的种类。
+- [x] P4-T1 `tool-runtime/src/host-ports.ts` 定义两份能力授予：`actspace.host.filesystem`（`FilesystemHostGrant`）和
+  `actspace.host.process`（`ProcessHostGrant`），加入 `DEFAULT_HARNESS_SHARED_SERVICES`；新增 `OPTIONAL_HOST_SHARED_SERVICES`，
+  `agent-runtime` 的 inject 过滤它们。
+- [x] P4-T2 `tool-fs-read/search/write` 与 `tool-shell` 删除 `*_HOST_PORT_ID` / `HostPort`：`apply` 可选读授予，用包内 `node-ports`
+  自己建实现（随 Harness 产物打包）；没有授予时注册但返回 `CAPABILITY_UNAVAILABLE`。manifest 改 `optionalInjects`，
+  `OPTIONAL_INJECT_FALLBACKS` 补两条 fallback。
+- [x] P4-T3 Host 侧：`agent-host` 的 `createNodeToolHostServices` / Desktop 的 `createDesktopToolHostServices` 只提供两份授予 +
+  网页 / 图片端口；`createUnavailableToolHostServices`（CLI `--mock`）不再给文件 / Shell 任何东西；`agent-host` 不再依赖
+  `tool-fs-*` / `tool-shell`。
+- [x] P4-T4 测试与文档：fs / shell lifecycle 测试覆盖「无授予 → 不可用」和「有授予 → 真读写 / 交出进程控制」；运行时测试
+  fixture、catalog 行断言、`packages/{fs,shell,context,core}/README.md`、Tool 插件边界设计文档、自进化边界文档、契约矩阵。
 
 ## 决策记录
 
@@ -124,10 +146,38 @@
   首次运行就抓到一个错误的包名。彻底删掉叶子 owner、让生成器按 manifest 兜底（它已支持 `declared` 行）留作后续。
 - 2026-11-09（P2）：`plugin_manager` 的 `replace` 仍只接受带可编辑源码的 `actspace.evolved.*` 条目。内置工具产物是打包后的
   JS，没有模板源码；让模型改写内置工具属于 P3/P4 之后的事。P2 交付的是产物与补丁层面的可替换性。
+- 2026-11-09（P3）：上下文来源登记表是一个独立内核条目 `context-assembly`，不是 `agent-factory` 的内部表。理由：来源插件
+  要在 Loop 之前登记，登记表本身必须比两边都长寿；它只依赖 `context-engine` / `prompt` 的类型，Harness 替换任一来源插件
+  或 `agent-factory` 都不用动它。必需种类放 manifest `config.required` 而不是写死，Host 以 `entryConfig` 可覆盖；缺失在
+  第一次建 Agent 时报错，而不是装配时——装配时还不知道哪些来源会按角色登记。
+- 2026-11-09（P3）：角色过滤放在登记侧（`publish(..., ["main"])`），不是消费侧。理由：「子智能体不能派子智能体、不能发后台
+  任务」是来源插件自己的业务约束，`agent-factory` 不该认识任何种类名。
+- 2026-11-09（P3）：披露的 Context 水合走协调器（`CompactionDisclosure.hydrate?` + `hydrator()`），不再由 `agent-factory` 把
+  `context.disclosure` 塞进 `engine.create`。理由：披露已经向协调器登记压缩钩子，水合只是它的第四个钩子；这样 Loop 侧
+  对披露零引用，`context-disclosure` 整包可被替换或移除。`modeRuntime`（`compaction.runtime`）保持现状：它是压缩策略的
+  模式切换，不是上下文来源，和本轮目标无关。
+- 2026-11-09（P3）：不把 composition manifests 暴露给 Harness 树、也不把形态推导挪进 Harness。理由：P2 后 manifests 真实可用，
+  但形态推导只需要 catalog 的一个谓词，Host 经 `agentForm` 端口传入已足够；给树暴露 manifests 会把 Host 的组合结果变成
+  Harness 的运行时输入，扩大自进化可触碰的面，收益只是省一个端口字段。
+- 2026-11-09（P4）：Host 给的是「能力授予」（根目录、artifact 解析、强制结束钩子），不是「工具实现工厂」。理由：
+  `createPorts()` 形式下文件 / Shell 的真正实现在 Host 包里，Harness 换掉 `tool-fs-read` 只能换注册壳；授予形式下实现随
+  插件产物一起打包（`build-default-harness.mjs` 对工具插件自包含打包），Host 只剩门禁与审批。授予是可选注入：CLI `--mock`
+  不给授予，工具注册但返回 `CAPABILITY_UNAVAILABLE`，与原来 `createPorts: () => ({})` 的行为一致。
+- 2026-11-09（P4）：两份授予的类型放 `tool-runtime`（Harness 内核）而不是各工具包。理由：Host（`agent-host`、Desktop）要 import
+  类型来构造授予，若放工具包，Host 就得继续依赖 `tool-fs-*` / `tool-shell`，等于保留旧耦合；`tool-runtime` 本就是 Host 与
+  工具插件共同依赖的契约层。
+- 2026-11-09（P4）：没有像 DSH 那样抽一层 `FsService` 抽象再做 `fs-local` 提供者。理由：目前只有一个本地 Node 后端，抽象层
+  没有第二个实现来约束形状；三个 fs 包各自持有 `node-ports`，Harness 替换粒度已经是「整个包」。等出现远程 / 虚拟文件系统
+  需求再抽。
 
 ## 执行模式
 
-- **夜间模式**：边界明确的实施任务；本轮由云端 Agent 自主执行，过程见执行文档。
+- **夜间模式**：边界明确的实施任务；P1–P4 均由云端 Agent 自主执行，过程见执行文档。
+
+## 状态
+
+P1–P4 全部完成，剩余为人工验收（见执行摘要的「人工验证指引」）。后续候选（未立项）：让内置工具插件携带可编辑源码、
+删除 `service-contract.ts` 里叶子插件的 owner、文件系统抽象层。
 
 ## 执行文档
 
