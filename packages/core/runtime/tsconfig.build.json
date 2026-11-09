@@ -37,6 +37,9 @@
       "path": "./../../composition/composition/tsconfig.build.json"
     },
     {
+      "path": "./../../context/context-assembly/tsconfig.build.json"
+    },
+    {
       "path": "./../../context/context-background-tasks/tsconfig.build.json"
     },
     {

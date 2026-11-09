@@ -6,6 +6,7 @@ import { manifest as browserToolsManifest } from "@actspace/tool-browser/manifes
 import { manifest as compactionManifest } from "@actspace/context-compaction/manifest";
 import { manifest as contextBackgroundTasksManifest } from "@actspace/context-background-tasks/manifest";
 import { manifest as contextSubagentsManifest } from "@actspace/context-subagents/manifest";
+import { manifest as contextAssemblyManifest } from "@actspace/context-assembly/manifest";
 import { manifest as contextConversationManifest } from "@actspace/context-conversation/manifest";
 import { manifest as contextDisclosureManifest } from "@actspace/context-disclosure/manifest";
 import { manifest as contextEngineManifest } from "@actspace/context-engine/manifest";
@@ -100,6 +101,7 @@ export const PLUGIN_CATALOG: readonly PluginCatalogEntry[] = Object.freeze([
   { id: "tools-runtime", manifest: toolRuntimeManifest, module: "@actspace/tool-runtime/plugin", loaders: harness, directory: "core" },
   { id: "context-engine", manifest: contextEngineManifest, module: "@actspace/context-engine/plugin", loaders: harness, codec: "@actspace/context-engine/codec", directory: "context" },
   { id: "prompt-runtime", manifest: promptManifest, module: "@actspace/prompt/plugin", loaders: harness, directory: "context" },
+  { id: "context-assembly", manifest: contextAssemblyManifest, module: "@actspace/context-assembly/plugin", loaders: harness, directory: "context" },
   { id: "context-system", manifest: contextSystemManifest, module: "@actspace/context-system/plugin", loaders: harness, directory: "context" },
   { id: "context-rules", manifest: contextRulesManifest, module: "@actspace/context-rules/plugin", loaders: harness, directory: "context" },
   { id: "context-skills", manifest: contextSkillsManifest, module: "@actspace/context-skills/plugin", loaders: harness, directory: "context" },

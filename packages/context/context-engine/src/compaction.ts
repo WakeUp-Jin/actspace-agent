@@ -43,10 +43,13 @@ export interface ContextCompactor {
   maybeCompact(session: CompactionSession, usage: CompactionUsage, observer?: CompactionObserver): Promise<boolean>;
 }
 export interface CompactionDisclosure {
+  /** Restores the disclosure state into a resolved Context; the engine applies it when the strategy offers one. */
+  hydrate?(context: Context, session: CompactionSession): Promise<Context>;
   recover(session: CompactionSession): Promise<boolean | void>;
   prepare(session: CompactionSession, context: Context, region: CompactionRegion, result: CompactionResult, compactionId: string): Promise<void>;
   applied(session: CompactionSession, compactionId: string): Promise<void>;
 }
+export type ContextHydrator = { hydrate(context: Context, session: CompactionSession): Promise<Context> };
 
 /** The sole owner of summary commits. Strategies never mutate Session. */
 export class ContextCompactionCoordinator implements ContextCompactor {
@@ -63,6 +66,11 @@ export class ContextCompactionCoordinator implements ContextCompactor {
     if (this.disclosure) throw new Error("A disclosure strategy is already registered.");
     this.disclosure = disclosure;
     return () => { if (this.disclosure === disclosure) this.disclosure = undefined; };
+  }
+  /** The registered disclosure as a Context hydrator, when it hydrates. */
+  hydrator(): ContextHydrator | undefined {
+    const disclosure = this.disclosure;
+    return disclosure?.hydrate ? { hydrate: (context, session) => disclosure.hydrate!(context, session) } : undefined;
   }
   withStrategy(strategy: ContextCompactionStrategy): ContextCompactor {
     return { threshold: capacity => strategy.threshold?.(capacity) ?? null, compact: (session, observer) => this.perform(session, strategy, observer, "manual"), maybeCompact: (session, usage, observer) => strategy.shouldCompact(usage) ? this.perform(session, strategy, observer, "auto") : Promise.resolve(false) };

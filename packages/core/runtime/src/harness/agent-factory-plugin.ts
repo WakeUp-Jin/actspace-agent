@@ -1,9 +1,9 @@
 import type { AutoReviewer } from "@actspace/auto-review";
 import { reviewSessionAction } from "./review-session-action.js";
-import { ContextSourceRegistry, type ContextCompactionCoordinator } from "@actspace/context-engine";
-import { createDisclosureSource, type ProgressiveDisclosure } from "@actspace/context-disclosure";
+import type { ContextCompactionCoordinator } from "@actspace/context-engine";
+import { CONTEXT_ASSEMBLY_SERVICE_ID, type ContextAgentRole, type ContextAssemblyService } from "@actspace/context-assembly";
 import type { ContributorRegistry, PromptContributor } from "@actspace/prompt";
-import type { SourceFactory, PromptHostPort, PromptRuntimeService } from "@actspace/prompt";
+import type { PromptHostPort, PromptRuntimeService } from "@actspace/prompt";
 import type { ContextEngine, ContextEngineOptions } from "@actspace/context-engine";
 import type { RunFactory } from "@actspace/agent-service";
 import { AgentLoop } from "@actspace/agent-loop";
@@ -26,7 +26,7 @@ import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-h
 import { blockedTool, isExternalRecordPath, isSubagentBlockedTool, SUBAGENT_APPROVAL_UNAVAILABLE, type ChildLoopInput } from "@actspace/subagent";
 
 const PURPOSE_ROUTE_IDS = new Set(["utility", "auto-review"]);
-type AgentRole = "main" | "subagent" | "fork";
+type AgentRole = ContextAgentRole;
 
 export type AgentFactoryService = {
   readonly runFactory: RunFactory;
@@ -42,8 +42,7 @@ export const inject = Object.freeze([
   "tools.runtime",
   "prompt.runtime",
   "context.engine",
-  "context.source.system",
-  "context.source.conversation",
+  CONTEXT_ASSEMBLY_SERVICE_ID,
 ]);
 
 /**
@@ -82,21 +81,13 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
   const prompt = requireService<PromptRuntimeService>(ctx, "prompt.runtime");
 
   const engine = requireService<{ compaction: ContextCompactionCoordinator; create(options: ContextEngineOptions): ContextEngine }>(ctx, "context.engine");
-  const getDisclosure = () => ctx.get?.("context.disclosure") as ProgressiveDisclosure | undefined;
+  const assembly = requireService<ContextAssemblyService>(ctx, CONTEXT_ASSEMBLY_SERVICE_ID);
   const activeSessions = new Map<string, import("@actspace/session-persistence").SessionHandle>();
 
-  const createSources = (scope: AgentScope, agent: import("@actspace/agent").AgentDescriptor, workspaceRoot: string, role: AgentRole) => {
-    const sources = new ContextSourceRegistry(["context-system", "context-conversation"]);
-    // 后台任务与运行中子智能体清单只给主 Agent：子智能体（含 fork）不能发起后台任务，也不能再派子智能体。
-    for (const kind of ["system", "rules", "skills", "runtime", "conversation", "tools", ...(role === "main" ? ["background-tasks", "subagents"] : [])]) {
-      const factory = ctx.get?.(`context.source.${kind}`) as SourceFactory | undefined;
-      if (!factory && (kind === "system" || kind === "conversation")) throw new Error(`Required context source ${kind} is unavailable.`);
-      if (factory) scope.disposer.add(sources.register(factory.create({ scope, scopeId: scope.identity.scopeId, agent, host: host.host, workspaceRoot, prompt })));
-    }
-    if (getDisclosure()) scope.disposer.add(sources.register(createDisclosureSource()));
-    scope.disposer.add(() => sources.clear());
-    return sources;
-  };
+  // Which sources an agent gets, and which tool results feed context state, is what the context plugins registered for its role.
+  const createSources = (scope: AgentScope, agent: import("@actspace/agent").AgentDescriptor, workspaceRoot: string, role: AgentRole) =>
+    assembly.sourcesFor(role, { scope, scopeId: scope.identity.scopeId, agent, host: host.host, workspaceRoot, prompt });
+  const observeContextToolResult = (session: SessionHandle, event: import("@actspace/session-journal").SessionEventEnvelopeV1) => assembly.observeToolResult(session, event);
   const extensions = (sessionId: string, scopeId: string, kind: "main" | "subagent") => () => (ctx.get?.("actspace.host.prompt") as PromptHostPort | undefined)?.extensions?.list(sessionId, scopeId, kind) ?? [];
   // A fork keeps its parent's system prompt (design 02 §8.4): the sections plugins registered for the parent main session,
   // plus whatever is registered for the fork's own scope.
@@ -182,8 +173,7 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
     if (role === "fork") registerMainTools(scope);
     const binding = tools.bindAgentScope(session.header.sessionId, subject.agentId, () => new Set(allowedToolNames ?? []));
     scope.disposer.add(binding.dispose);
-    const disclosure = getDisclosure();
-    const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot, role), contextExtensions: role === "fork" ? forkExtensions(session, scope.identity.scopeId) : extensions(session.header.sessionId, scope.identity.scopeId, "subagent"), observeContextToolResult: disclosure ? (session, event) => disclosure.observe(session, event) : undefined, createContextEngine: options => engine.create({ ...options, disclosure }), descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), llm, tools, toolEnvironment: scopedToolEnvironment, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction: engine.compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
+    const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot, role), contextExtensions: role === "fork" ? forkExtensions(session, scope.identity.scopeId) : extensions(session.header.sessionId, scope.identity.scopeId, "subagent"), observeContextToolResult, createContextEngine: options => engine.create(options), descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), llm, tools, toolEnvironment: scopedToolEnvironment, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction: engine.compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
     if (signal !== undefined) {
       const abort = () => loop.abort(typeof signal.reason === "string" ? signal.reason : "parent-abort");
       if (signal.aborted) abort(); else signal.addEventListener("abort", abort, { once: true });
@@ -220,8 +210,7 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
       const subject: AgentSubject = Object.freeze({ agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
       const inbox = new MainAgentInbox(session);
       const workspaceRoot = resolveSessionWorkspaceRoot(session.header, session.journal, host.workspaceRoot);
-      const disclosure = getDisclosure();
-      const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot, "main"), contextExtensions: extensions(session.header.sessionId, scope.identity.scopeId, "main"), observeContextToolResult: disclosure ? (session, event) => disclosure.observe(session, event) : undefined, createContextEngine: options => engine.create({ ...options, disclosure }), descriptor, scope, agentSubject: subject, session, inbox, inputSource: run.inputSource, modeRuntime: async mode => { const compaction = ctx.get?.("compaction.runtime") as CompactionPlugin | undefined; return { compaction: mode === "chat" && compaction ? engine.compaction.withStrategy(compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8))) : engine.compaction }; }, llm, tools, toolEnvironment: activeSession => {
+      const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot, "main"), contextExtensions: extensions(session.header.sessionId, scope.identity.scopeId, "main"), observeContextToolResult, createContextEngine: options => engine.create(options), descriptor, scope, agentSubject: subject, session, inbox, inputSource: run.inputSource, modeRuntime: async mode => { const compaction = ctx.get?.("compaction.runtime") as CompactionPlugin | undefined; return { compaction: mode === "chat" && compaction ? engine.compaction.withStrategy(compaction.withTriggerRatio(host.chatCompactionTriggerRatio ?? (() => 0.8))) : engine.compaction }; }, llm, tools, toolEnvironment: activeSession => {
         const environment = toolEnvironmentFor(activeSession);
         const broker = environment.approvalBroker;
         return !broker || !run.budget ? environment : { ...environment, approvalBroker: {

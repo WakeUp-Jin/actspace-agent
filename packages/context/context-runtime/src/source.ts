@@ -1,6 +1,7 @@
 import type { CordisContext } from "@actspace/cordis-adapter";
 import type { ContextSource } from "@actspace/context-engine";
-import { contribute, publish, promptSourceKey, runtimeInfo, type SourceOptions } from "@actspace/prompt/source-support";
+import { publish } from "@actspace/context-assembly";
+import { contribute, promptSourceKey, runtimeInfo, type SourceOptions } from "@actspace/prompt/source-support";
 export function createRuntimeSource(options: SourceOptions): ContextSource {
   let turn: string | undefined; let date = "";
   return { id: "context-runtime", owner: "actspace.context-runtime", order: 10, criticality: "required", fields: ["system", "supplements"],
