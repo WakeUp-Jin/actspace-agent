@@ -275,7 +275,7 @@ export class AgentLoop {
         if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames, requestModel);
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
         await this.checkpoint("before-next-step");
-        let updated = await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
+        const updated = await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
         if (compaction !== undefined && !controller.signal.aborted) {
           // Include this Step's tool bodies: the previous Provider usage cannot
           // account for results produced after that request completed.
@@ -289,7 +289,7 @@ export class AgentLoop {
           const compacted = await this.autoCompact(compaction, usage, { agentRunId, turnId }, controller.signal);
           if (compacted || this.options.session.lastSeq !== before) {
             await this.checkpoint("before-next-step");
-            updated = await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
+            await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
           }
         }
         controller.signal.throwIfAborted();
