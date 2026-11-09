@@ -78,7 +78,7 @@ function replay(text: string, options: { frameStep?: number; onFrame?: FrameChec
     }
     if (frames.length > 0) {
       const before = prose(rendered.container).textContent;
-      act(() => { const batch = frames; frames = []; batch.forEach((callback) => callback()); });
+      act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); });
       if (prose(rendered.container).textContent !== before) textFrames += 1;
       options.onFrame?.(prose(rendered.container));
     }
@@ -180,7 +180,7 @@ describe("原样尾巴", () => {
   it("写完时立即完整解析：没有尾巴、渐显和光标", () => {
     const text = "第一段\n\n第二段 **加粗** 和 `code` 结尾";
     const rendered = replay(text);
-    for (let i = 0; i < 100 && frames.length > 0; i += 1) act(() => { const batch = frames; frames = []; batch.forEach((callback) => callback()); });
+    for (let i = 0; i < 100 && frames.length > 0; i += 1) act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); });
     const root = prose(rendered.container);
     expect(root.querySelector(".md-tail-raw, .md-caret, .md-tail")).toBeNull();
     expect(root.querySelector("strong")?.textContent).toBe("加粗");

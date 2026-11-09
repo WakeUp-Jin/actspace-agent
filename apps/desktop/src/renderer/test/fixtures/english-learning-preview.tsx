@@ -19,7 +19,7 @@ setupBridge({
   "events.englishLearningStateChanged": (listener: (value: EnglishLearningState) => void) => { listeners.add(listener); return () => listeners.delete(listener); },
   "englishLearning.setTarget": async (input: { enabled: boolean; sessionId: string }) => {
     state = { ...state, enabled: input.enabled, targetSessionId: input.enabled ? input.sessionId : null, promptStatus: input.enabled ? "active" : "off", revision: state.revision + 1 };
-    listeners.forEach((listener) => listener(state)); return state;
+    listeners.forEach((listener) => { listener(state); }); return state;
   },
   "settings.updateV4": async (input) => {
     if (input?.namespace === "media") snapshot = { ...snapshot, settings: { ...snapshot.settings, media: { ...snapshot.settings.media, ...input.patch } } };

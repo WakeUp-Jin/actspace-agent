@@ -19,7 +19,7 @@ async function refresh(): Promise<void> {
     const next = snapshot.settings.general.showTurnCodeChanges !== false;
     if (next === value) return;
     value = next;
-    listeners.forEach((listener) => listener());
+    listeners.forEach((listener) => { listener(); });
   } catch {
     // 保持现值。
   }

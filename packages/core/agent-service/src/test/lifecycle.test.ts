@@ -9,7 +9,7 @@ import { activate } from "../plugin.js";
 describe("agent service plugin", () => {
   it("declares pure codecs and owns a single session manager across concurrent opens", async () => {
     expect(manifest.codecs[0].eventTypes).toEqual(codecs.map(codec => codec.type));
-    const registry = createCoreCodecRegistry(); codecs.forEach(codec => registry.register(codec));
+    const registry = createCoreCodecRegistry(); codecs.forEach(codec => { registry.register(codec); });
     const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "test", createdAt: "2026-10-03T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
     let opens = 0; let acquisitions = 0;
     const plugin = activate({ openSession: async () => { opens++; return session; }, harnessId: () => "main", readConfiguration: () => ({ mode: "plan" }), acquire: () => { acquisitions++; throw new Error("not needed"); } });
@@ -35,7 +35,7 @@ it("drains without reopening a Session whose ownership acquisition failed", asyn
 });
 
 it("retries a transient writer acquisition failure without duplicating concurrent managers", async () => {
-  const registry = createCoreCodecRegistry(); codecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); codecs.forEach(codec => { registry.register(codec); });
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "retry", createdAt: "2026-10-06T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
   let opens = 0;
   const locked = new SessionError("SESSION_WRITER_LOCKED", "Previous writer lease has not expired");
@@ -62,7 +62,7 @@ it("keeps durability failures blocked on subsequent requests", async () => {
 
 
 it("observes a provider-owned child without recovering it or admitting a second scheduler", async () => {
-  const registry = createCoreCodecRegistry(); codecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); codecs.forEach(codec => { registry.register(codec); });
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "child", createdAt: "2026-10-18T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
   let opens = 0;
   const plugin = activate({ openSession: async () => { opens++; return session; }, harnessId: () => "main", readConfiguration: () => ({ mode: "plan" }), acquire: () => { throw new Error("must not schedule child"); } });

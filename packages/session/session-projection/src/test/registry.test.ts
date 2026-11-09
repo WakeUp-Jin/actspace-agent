@@ -29,7 +29,7 @@ describe("SessionProjectionRegistry", () => {
     const before = views;
     batch.replayTail("s", events.slice(1));
     expect(views).toBe(before);
-    events.slice(1).forEach(event => sequential.apply("s", event));
+    events.slice(1).forEach(event => { sequential.apply("s", event); });
     expect(batch.checkpoint("s")).toEqual(sequential.checkpoint("s"));
     expect(batch.snapshot("s")).toEqual(sequential.snapshot("s"));
     const checkpoint = batch.checkpoint("s");
@@ -46,7 +46,7 @@ describe("SessionProjectionRegistry", () => {
     const base = eventJournal()[0]!;
     const events = ["compaction/start", "compaction/summary", "compaction/end"].map((type, seq) => ({ ...base, type, seq, data: { compactionId: "c" } }));
     const sequential = make();
-    events.slice(0, 2).forEach(event => sequential.apply("s", event));
+    events.slice(0, 2).forEach(event => { sequential.apply("s", event); });
     const batch = make(); batch.restore("s", sequential.checkpoint("s"));
     expect(batch.snapshot("s").values.types).toEqual([]);
     batch.replayTail("s", events.slice(2));

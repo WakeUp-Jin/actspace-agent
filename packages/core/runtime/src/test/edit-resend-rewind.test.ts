@@ -28,7 +28,7 @@ function longTask(taskId: string, sessionId: string): BackgroundTaskSource & { s
 
 it("rewinds a five-Turn Session to its second prompt: the Journal, Context cache, background work and dropped subagents all follow", async () => {
   const root = await mkdtemp(join(tmpdir(), "edit-resend-"));
-  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => { registry.register(codec); });
   const storage = new JsonlSessionStorage({ dataRoot: root, runtimeId: "rewind-test", registry });
   const store = new SessionStore({ registry }, storage);
   const sessions = new RuntimeSessionController({ dataRoot: root, runtimeId: "rewind-test", registry, profileId: "test", manifestDigest: "test", plugins: [] }, store);

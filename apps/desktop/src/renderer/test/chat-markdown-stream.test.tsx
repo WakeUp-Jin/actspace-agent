@@ -234,7 +234,7 @@ describe("useSmoothText", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  const tick = () => act(() => { const batch = frames; frames = []; batch.forEach((callback) => callback()); });
+  const tick = () => act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); });
   const settle = () => { for (let i = 0; i < 200 && frames.length > 0; i += 1) tick(); };
 
   it("首次挂载已有的内容整段直接显示", () => {
@@ -324,7 +324,7 @@ describe("MarkdownProse 流式效果", () => {
     vi.stubGlobal("cancelAnimationFrame", () => {});
   });
   afterEach(() => vi.unstubAllGlobals());
-  const tick = () => act(() => { const batch = frames; frames = []; batch.forEach((callback) => callback()); });
+  const tick = () => act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); });
 
   function stream(content: string, streaming: boolean) {
     return (

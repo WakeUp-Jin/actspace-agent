@@ -142,7 +142,7 @@ function relationUndo(state: MutableRelations, dataValue: RuntimeV2JsonValue): (
   save(state.requests, data.requestId); save(state.tools, data.callId ?? data.toolCallId); save(state.inbox, data.messageId);
   save(state.auxiliary, data.attemptId); saveSet(state.auxiliaryIds, data.attemptId);
   saveSet(state.requestIds, data.requestId); saveSet(state.toolIds, data.callId ?? data.toolCallId); saveSet(state.inboxIds, data.messageId); saveSet(state.committedRepairIds, data.repairId);
-  return () => { state.openTurnId = turn; state.openStepId = step; state.activeRepairId = repair; state.openAgentRunId = run; restores.forEach(restore => restore()); };
+  return () => { state.openTurnId = turn; state.openStepId = step; state.activeRepairId = repair; state.openAgentRunId = run; restores.forEach(restore => { restore(); }); };
 }
 
 export function effectiveSessionEvents(events: readonly SessionEventEnvelopeV1[]): readonly SessionEventEnvelopeV1[] {

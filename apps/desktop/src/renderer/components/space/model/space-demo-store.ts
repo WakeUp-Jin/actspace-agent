@@ -45,7 +45,7 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
   let resetEpoch = 0;
   let noticeTimer: unknown = null;
 
-  const emit = () => listeners.forEach((l) => l());
+  const emit = () => listeners.forEach((l) => { l(); });
   const update = (patch: Partial<SpaceDemoState> | ((s: SpaceDemoState) => Partial<SpaceDemoState>)) => {
     const p = typeof patch === "function" ? patch(state) : patch;
     state = materialize({ ...state, ...p });
@@ -63,7 +63,7 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     return h;
   };
   const clearScope = (scope: "space" | "global") => {
-    timers[scope].forEach((h) => clock.clearTimeout(h));
+    timers[scope].forEach((h) => { clock.clearTimeout(h); });
     timers[scope].clear();
   };
   /** 离开当前 Space / 视图前调用：清定时器，把流式中的消息收成完整文字 */

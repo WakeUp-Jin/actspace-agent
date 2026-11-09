@@ -20,7 +20,7 @@ beforeEach(() => {
   vi.stubGlobal("cancelAnimationFrame", () => {});
 });
 afterEach(() => vi.unstubAllGlobals());
-const flushFrames = () => { for (let i = 0; i < 200 && frames.length > 0; i += 1) act(() => { const batch = frames; frames = []; batch.forEach((callback) => callback()); }); };
+const flushFrames = () => { for (let i = 0; i < 200 && frames.length > 0; i += 1) act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); }); };
 
 const reply = (n: number) => Array.from({ length: n }, (_, i) => `第 ${i} 段\n\n\`\`\`ts\nconst x${i} = ${i};\n\`\`\``).join("\n\n");
 
