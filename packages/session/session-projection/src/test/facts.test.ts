@@ -16,7 +16,7 @@ describe("Session facts", () => {
   it("folds model timing from the full journal and keeps per-step scratch out of the view", () => {
     const codecs = createCoreCodecRegistry();
     const seconds = [0, 0, 1, 1, 3, 4, 5, 9, 9, 10, 12];
-    const journal = new SessionJournal({ registry: codecs, now: (() => { let i = 0; return () => new Date(Date.UTC(2026, 9, 15, 0, 0, seconds[i++]!)).toISOString(); })() });
+    const journal = new SessionJournal({ registry: codecs, now: (() => { let i = 0; return () => new Date(Date.UTC(2026, 9, 15, 0, 0, seconds[i++])).toISOString(); })() });
     const registry = new SessionProjectionRegistry(); registerSessionFacts(registry, value => value);
     const append = (type: string, data: Record<string, unknown>) => registry.apply("timing", journal.append({ type, eventVersion: 1, source, data: data as never, surface: null }));
     append("turn/start", { turnId: "t" });
@@ -41,7 +41,7 @@ describe("Session facts", () => {
   it("reads the first token from assistant/message when no chunks were journaled", () => {
     const codecs = createCoreCodecRegistry();
     const seconds = [0, 0, 1, 1, 9, 9, 10, 12];
-    const journal = new SessionJournal({ registry: codecs, now: (() => { let i = 0; return () => new Date(Date.UTC(2026, 9, 15, 0, 0, seconds[i++]!)).toISOString(); })() });
+    const journal = new SessionJournal({ registry: codecs, now: (() => { let i = 0; return () => new Date(Date.UTC(2026, 9, 15, 0, 0, seconds[i++])).toISOString(); })() });
     const registry = new SessionProjectionRegistry(); registerSessionFacts(registry, value => value);
     const append = (type: string, data: Record<string, unknown>) => registry.apply("timing", journal.append({ type, eventVersion: 1, source, data: data as never, surface: null }));
     append("turn/start", { turnId: "t" });
@@ -134,7 +134,7 @@ it.each([false, true])("settles failed attempts without retry wait (stop during 
 it("rejects old timing checkpoints so history can rebuild under the retry-aware version", () => {
   const registry = new SessionProjectionRegistry(); registerSessionFacts(registry, value => value);
   const checkpoint = registry.checkpoint("old");
-  const old = { ...checkpoint, rows: { ...checkpoint.rows, sessionStats: { ...checkpoint.rows.sessionStats!, stateVersion: 2 } } };
+  const old = { ...checkpoint, rows: { ...checkpoint.rows, sessionStats: { ...checkpoint.rows.sessionStats, stateVersion: 2 } } };
   expect(() => registry.restore("old", old)).toThrow("version mismatch: sessionStats");
   expect(registry.stateVersions.sessionStats).toBe(3);
 });
@@ -151,7 +151,7 @@ it("releases closed Step usage correction state while retaining exact totals and
     append("step/end", { stepId, usage: { inputTokens: 900, outputTokens: 900 } });
   }
   expect(registry.snapshot("bounded").values.providerUsage).toMatchObject({ inputTokens: 3000, outputTokens: 2000, totalTokens: 5000, costUsd: 0 });
-  const state = registry.checkpoint("bounded").rows.providerUsage!.state as Record<string, unknown>;
+  const state = registry.checkpoint("bounded").rows.providerUsage.state as Record<string, unknown>;
   expect(state.selected).toEqual({}); expect(state.requests).toEqual({}); expect(state.activeStep).toBeNull();
 });
 

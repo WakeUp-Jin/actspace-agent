@@ -20,7 +20,7 @@ function optionalInjects(entryId: string, ids: readonly string[]): readonly Defa
 
 export const DEFAULT_HARNESS_ENTRIES: readonly DefaultHarnessEntry[] = Object.freeze(
   PLUGIN_CATALOG.filter(entry => entry.loaders.includes("harness")).map((entry): DefaultHarnessEntry => {
-    const behavior = entry.manifest.behaviors[0]!;
+    const behavior = entry.manifest.behaviors[0];
     const optional = optionalInjects(entry.id, behavior.optionalInjects ?? []);
     return optional.length === 0
       ? [entry.id, behavior.provides ?? [], behavior.injects ?? []]

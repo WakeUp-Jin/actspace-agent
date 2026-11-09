@@ -343,7 +343,7 @@ export function subagentChildrenWithoutModel(journal: readonly SessionEventEnvel
 /** The model of the latest request a Session actually sent (`request/header`); not the purpose binding. */
 export function latestRequestModel(journal: readonly SessionEventEnvelopeV1[]): string | undefined {
   for (let index = journal.length - 1; index >= 0; index -= 1) {
-    const event = journal[index]!;
+    const event = journal[index];
     if (event.type !== "request/header") continue;
     const model = string(record(event.data).model);
     if (model) return model;

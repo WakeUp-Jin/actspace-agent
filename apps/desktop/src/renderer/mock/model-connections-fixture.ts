@@ -190,7 +190,7 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
     return null;
   };
   const clearPurposes = (keys: readonly ModelKey[]) => {
-    for (const purpose of PURPOSE_IDS) if (state.purposes[purpose].model && keys.includes(state.purposes[purpose].model!)) state.purposes[purpose] = { model: null, thinking: state.purposes[purpose].thinking };
+    for (const purpose of PURPOSE_IDS) if (state.purposes[purpose].model && keys.includes(state.purposes[purpose].model)) state.purposes[purpose] = { model: null, thinking: state.purposes[purpose].thinking };
   };
   const addModels = (connection: MockConnection, models: readonly ConnectionModelInput[]) => {
     for (const input of models) {
@@ -311,7 +311,7 @@ export function createModelConnectionsMock(): Partial<DesktopBridge["modelConnec
       return { effective: effectiveFor(scope, apiModel, {}, overrides), added: Boolean(connection?.models.some((model) => model.apiModel === apiModel)) };
     },
     updatePurposes: async (patch) => {
-      for (const purpose of PURPOSE_IDS) if (patch[purpose]) state.purposes[purpose] = structuredClone(patch[purpose]!);
+      for (const purpose of PURPOSE_IDS) if (patch[purpose]) state.purposes[purpose] = structuredClone(patch[purpose]);
       return ok();
     },
     getBalance: async ({ connectionId }) => {

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createNodeSandboxHostPort, createSandboxService, resolvePolicy, sandboxTemplate, type SandboxRequest } from "@actspace/sandbox";
 import { buildSeatbeltProfile, createSeatbeltBackend, sbplString } from "../backend.js";
 
-const template = sandboxTemplate("tool", { homeDir: "/Users/agent", platform: "darwin" })!;
+const template = sandboxTemplate("tool", { homeDir: "/Users/agent", platform: "darwin" });
 const base = (overrides: Partial<SandboxRequest> = {}): SandboxRequest => ({ purpose: "tool", isolation: "sandboxed", argv: ["/bin/zsh", "-lc", "true"], cwd: "/work", env: {}, scratchDir: "/scratch", filesystem: { readWrite: ["/work", "/scratch"] }, ...overrides });
 
 describe("seatbelt profile", () => {

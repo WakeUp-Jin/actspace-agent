@@ -36,7 +36,7 @@ export class SubagentActivity {
     }
     const active = [...this.tools.values()];
     if (active.length > 1) return `正在执行 ${active.length} 项工具调用 · ${active.at(-1)!.active}`;
-    if (active.length === 1) return active[0]!.active;
+    if (active.length === 1) return active[0].active;
     return this.recent && this.label !== "正在整理回复" ? `${this.label} · ${this.recent}` : this.label;
   }
 }

@@ -65,7 +65,7 @@ describe("MessageQueueTray", () => {
     renderTray(queueOf("a", "b", "c", "d", "e"));
     const list = screen.getByRole("list", { name: "排队的消息" });
     expect(list).toHaveClass("max-h-[144px]", "overflow-y-auto");
-    const actions = screen.getByRole("button", { name: "删除排队消息 1" }).parentElement!;
+    const actions = screen.getByRole("button", { name: "删除排队消息 1" }).parentElement;
     expect(actions).toHaveClass("opacity-60", "group-hover/queue-row:opacity-100", "group-focus-within/queue-row:opacity-100");
   });
 
@@ -85,7 +85,7 @@ describe("MessageQueueTray", () => {
     expect(paused).toHaveTextContent("已暂停");
     expect(screen.getByRole("list", { name: "排队的消息" }).compareDocumentPosition(paused) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await userEvent.click(within(tray).getByRole("button", { name: "撤回" }));
-    expect(controls.onUnsteer).toHaveBeenCalledWith(queue.steering[0]!.id);
+    expect(controls.onUnsteer).toHaveBeenCalledWith(queue.steering[0].id);
     await userEvent.click(within(tray).getByRole("button", { name: "继续发送" }));
     expect(controls.onResume).toHaveBeenCalled();
   });

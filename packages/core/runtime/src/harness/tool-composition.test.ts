@@ -21,7 +21,7 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
   } });
   const env = { workspaceRoot: root, hostCapabilities: new Set<string>(host.capabilityCeiling), capabilitySet: { ids: host.capabilityCeiling, has: () => true, get: <T>() => ({}) as T }, createArtifact: async () => { throw new Error("unused"); } };
   const mounted: string[] = [];
-  const ports = Object.fromEntries(PLUGIN_CATALOG.filter(item => item.manifest.behaviors[0]!.injects?.some(id => String(id) === `actspace.host.tools.${item.id}`)).map(item => [
+  const ports = Object.fromEntries(PLUGIN_CATALOG.filter(item => item.manifest.behaviors[0].injects?.some(id => String(id) === `actspace.host.tools.${item.id}`)).map(item => [
     `actspace.host.tools.${item.id}`, { createPorts: () => { mounted.push(item.id); return {}; } },
   ]));
   let profile: Awaited<ReturnType<typeof bootProfileRuntime>> | undefined;

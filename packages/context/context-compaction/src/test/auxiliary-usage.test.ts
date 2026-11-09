@@ -10,9 +10,9 @@ it("counts each repeated between-turn compaction as a distinct auxiliary request
     await summarizer.summarize([], { sessionId: "s" });
     await summarizer.summarize([], { sessionId: "s" });
     expect(start).toHaveBeenCalledTimes(2);
-    expect(start.mock.calls[0]![0]).toMatchObject({ sessionId: "s", purpose: "compaction", model: "compact-model" });
-    expect(start.mock.calls[0]![0]).not.toHaveProperty("agentRunId");
-    expect(start.mock.calls[0]![0].attemptId).not.toBe(start.mock.calls[1]![0].attemptId);
+    expect(start.mock.calls[0][0]).toMatchObject({ sessionId: "s", purpose: "compaction", model: "compact-model" });
+    expect(start.mock.calls[0][0]).not.toHaveProperty("agentRunId");
+    expect(start.mock.calls[0][0].attemptId).not.toBe(start.mock.calls[1][0].attemptId);
     expect(finish).toHaveBeenCalledTimes(2);
     expect(finish).toHaveBeenCalledWith({ status: "completed", usage: EMPTY_LLM_USAGE });
   } finally { await route.dispose(); }

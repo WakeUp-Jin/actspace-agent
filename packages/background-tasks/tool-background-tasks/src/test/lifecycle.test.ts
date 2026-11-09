@@ -32,7 +32,7 @@ function setup(host?: unknown) {
   };
   const run = async (name: string, args: unknown, sessionId = "parent") => {
     const [result] = await tools.executeBatch([{ name, callId: `${name}-${Math.random()}`, arguments: args, sessionId, agentRunId: "run", turnId: "turn", stepId: "step" }], env);
-    return { status: result!.status, text: JSON.stringify(result) };
+    return { status: result.status, text: JSON.stringify(result) };
   };
   return { registry, sessions, run, cleanup: () => cleanup!() };
 }

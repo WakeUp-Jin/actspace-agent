@@ -1195,7 +1195,7 @@ describe("Composer follow-up bar", () => {
 
     await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
     expect(screen.queryByRole("listbox", { name: "添加上下文或工具" })).not.toBeInTheDocument();
-    expect(screen.getAllByText("deepseek-flash").at(-1)!).toBeInTheDocument();
+    expect(screen.getAllByText("deepseek-flash").at(-1)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "上下文用量 36%" }));
     expect(document.querySelector(".model-menu")).not.toBeInTheDocument();
@@ -1737,7 +1737,7 @@ describe("Composer response annotation pill", () => {
     const { context } = renderWithAnnotations({ responseAnnotations: [first, second], onResponseAnnotationsChange: vi.fn() });
     await user.click(screen.getByRole("button", { name: "2 条批注" }));
     const card = await screen.findByRole("dialog", { name: "草稿批注" });
-    fireEvent.pointerEnter(within(card).getAllByRole("listitem")[1]!);
+    fireEvent.pointerEnter(within(card).getAllByRole("listitem")[1]);
     expect(context.setActiveAnnotationId).toHaveBeenLastCalledWith("ann_2");
     fireEvent.pointerLeave(card);
     expect(context.setActiveAnnotationId).toHaveBeenLastCalledWith(null);

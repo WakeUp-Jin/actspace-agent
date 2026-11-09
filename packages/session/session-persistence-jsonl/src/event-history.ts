@@ -40,9 +40,9 @@ export class JsonlEventHistory implements SessionEventHistory {
     // Read bounded pages; a single oversized record must still be readable.
     for (let seq = start; seq < end;) {
       let next = seq + 1;
-      while (next < end && this.ends[next + 1]! - this.ends[seq]! <= 256 * 1024) next++;
-      const position = this.ends[seq]!;
-      const bytes = Buffer.allocUnsafe(this.ends[next]! - position);
+      while (next < end && this.ends[next + 1] - this.ends[seq] <= 256 * 1024) next++;
+      const position = this.ends[seq];
+      const bytes = Buffer.allocUnsafe(this.ends[next] - position);
       let read = 0;
       while (read < bytes.length) {
         const count = readSync(this.fd, bytes, read, bytes.length - read, position + read);

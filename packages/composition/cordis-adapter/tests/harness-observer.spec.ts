@@ -42,7 +42,7 @@ describe("mount observer", () => {
       expect(wrapped.sort()).toEqual(["consumer", "provider"]);
       expect(applied.provider?.ok).toBe(true);
       expect(applied.consumer).toMatchObject({ ok: true, started: 1 });
-      expect(applied.consumer!.ms).toBeGreaterThanOrEqual(0);
+      expect(applied.consumer.ms).toBeGreaterThanOrEqual(0);
       await tree.dispose();
     } finally { await root.dispose(); }
   });

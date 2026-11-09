@@ -204,5 +204,5 @@ function canonical(value: RuntimeV2JsonValue): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   const object = value as Readonly<Record<string, RuntimeV2JsonValue>>;
-  return `{${Object.keys(object).sort().map(key => `${JSON.stringify(key)}:${canonical(object[key]!)}`).join(",")}}`;
+  return `{${Object.keys(object).sort().map(key => `${JSON.stringify(key)}:${canonical(object[key])}`).join(",")}}`;
 }

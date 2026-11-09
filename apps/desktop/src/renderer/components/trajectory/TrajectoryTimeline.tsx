@@ -269,7 +269,7 @@ export const TrajectoryTimeline = memo(function TrajectoryTimeline({
                 "--trajectory-span-width": `${widthPercent}%`,
                 "--trajectory-span-gap": `min(${widthPercent * 0.08}%, 1px)`,
                 "--trajectory-span-lane": span.lane,
-                ...(hasSplit ? { "--trajectory-assistant-ttft": `${span.ttftMs! / (span.ttftMs! + span.decodingMs!) * 100}%` } : {}),
+                ...(hasSplit ? { "--trajectory-assistant-ttft": `${span.ttftMs / (span.ttftMs + span.decodingMs) * 100}%` } : {}),
               } as CSSProperties} />;
           })}
         </div>

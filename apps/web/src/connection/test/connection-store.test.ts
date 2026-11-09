@@ -90,7 +90,7 @@ it("reconnects immediately when the page becomes visible again", async () => {
   let refuse = true;
   const { store, factory, events } = setup({}, () => refuse);
   await store.resume();
-  for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[i]!);
+  for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[i]);
   expect(store.getState().status).toBe("reconnecting");
   const before = factory.sockets.length;
   refuse = false;

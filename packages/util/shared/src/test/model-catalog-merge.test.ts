@@ -21,7 +21,7 @@ describe("mergeModelCatalog", () => {
     expect(entries.map(catalogEntryKey)).toEqual(["models.dev/openai/a", "models.dev/openai/gone", "models.dev/openai/new"]);
     expect(entries[0]).toEqual(previous[0]);
     expect(report).toMatchObject({ added: ["models.dev/openai/new"], kept: 2, delisted: ["models.dev/openai/gone"], overridden: [] });
-    expect(report.locked).toEqual([{ key: "models.dev/openai/a", from: previous[0]!.rates, to: fetched[0]!.rates }]);
+    expect(report.locked).toEqual([{ key: "models.dev/openai/a", from: previous[0].rates, to: fetched[0].rates }]);
   });
 
   it("keeps the same model under different providers separate", () => {
@@ -33,7 +33,7 @@ describe("mergeModelCatalog", () => {
   it("applies overrides every run, online and offline, without reporting them as locked", () => {
     const previous = [entry("openai", "a", 1)];
     const online = mergeModelCatalog(previous, [entry("openai", "a", 9)], [override("openai", "a", 6)]);
-    expect(online.entries[0]!.rates).toEqual({ input: 6, output: 3, cacheRead: null, cacheWrite: null });
+    expect(online.entries[0].rates).toEqual({ input: 6, output: 3, cacheRead: null, cacheWrite: null });
     expect(online.report.locked).toEqual([]);
     expect(online.report.overridden).toHaveLength(1);
     const again = mergeModelCatalog(online.entries, null, [override("openai", "a", 6)]);

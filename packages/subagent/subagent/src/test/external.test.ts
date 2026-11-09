@@ -83,14 +83,14 @@ async function until(check: () => boolean, ms = 3000): Promise<void> {
   const deadline = Date.now() + ms;
   while (!check()) { if (Date.now() > deadline) throw new Error("timed out"); await new Promise(resolve => setTimeout(resolve, 5)); }
 }
-function idOf(outcome: SubagentToolOutcome): string { return /subagent ([0-9a-f-]{36})/i.exec(outcome.text)![1]!; }
+function idOf(outcome: SubagentToolOutcome): string { return /subagent ([0-9a-f-]{36})/i.exec(outcome.text)![1]; }
 const settledCount = (root: SessionHandle, agentId: string) => subagentTree(root).agents[agentId]?.activations.filter(item => item.settle).length ?? 0;
 
 describe("external subagents", () => {
   it("runs a Codex task in the background, records it like any subagent and notifies the parent", async () => {
     const f = await fixture();
     const started = await f.spawn(f.codex, { model: "gpt-5.5" });
-    const agentId = idOf(started), path = f.codex.runs[0]!.path;
+    const agentId = idOf(started), path = f.codex.runs[0].path;
     expect(f.codex.starts[0]).toMatchObject({ prompt: "List the packages under packages/subagent.", cwd: f.logDir, model: "gpt-5.5" });
     expect(started.text).toBe([
       `Started Codex subagent ${agentId} (list packages) in the background.`,
@@ -105,12 +105,12 @@ describe("external subagents", () => {
     expect((await f.manager.listAgents({ sessionId: "root", callId: "l" })).text).toContain(`${agentId} [running] codex · gpt-5.5 · started`);
     expect(f.manager.running("root")).toMatchObject([{ agentId, label: "codex", transcriptPath: path }]);
 
-    f.codex.runs[0]!.finish({ status: "completed", text: "subagent, subagent-codex, subagent-claude-code" });
+    f.codex.runs[0].finish({ status: "completed", text: "subagent, subagent-codex, subagent-claude-code" });
     await until(() => settledCount(f.root, agentId) === 1 && f.manager.runningCount("root") === 0);
-    const view = subagentTree(f.root).agents[agentId]!;
+    const view = subagentTree(f.root).agents[agentId];
     expect(view.status).toBe("closed");
-    expect(view.activations[0]!.settle).toMatchObject({ status: "completed", delivery: "notified", result: "subagent, subagent-codex, subagent-claude-code", summary: `Subagent ${agentId} finished. It cannot receive follow-up messages.` });
-    const notice = String(new MainAgentInbox(f.root).pending()[0]!.content);
+    expect(view.activations[0].settle).toMatchObject({ status: "completed", delivery: "notified", result: "subagent, subagent-codex, subagent-claude-code", summary: `Subagent ${agentId} finished. It cannot receive follow-up messages.` });
+    const notice = String(new MainAgentInbox(f.root).pending()[0].content);
     expect(notice).toContain(`<transcript>${path}</transcript>`);
     expect(notice).toContain("<closing_message>\nsubagent, subagent-codex, subagent-claude-code\n</closing_message>");
     expect(f.woken).toEqual(["root"]);
@@ -126,14 +126,14 @@ describe("external subagents", () => {
     const f = await fixture();
     const pending = f.spawn(f.claude, { background: false });
     await until(() => f.claude.runs.length === 1);
-    const path = f.claude.runs[0]!.path;
-    f.claude.runs[0]!.finish({ status: "completed", text: "Three packages." });
+    const path = f.claude.runs[0].path;
+    f.claude.runs[0].finish({ status: "completed", text: "Three packages." });
     const outcome = await pending;
     const agentId = idOf(outcome);
     expect(outcome.text).toBe([`Subagent ${agentId} (list packages) finished.`, `transcript: ${path} (the log file does not exist yet)`, "", "Three packages."].join("\n"));
     // Not written yet: returned, but not registered as an active path.
     expect(outcome.ok && outcome.detail).toEqual([{ label: "delegation", value: { childSessionId: agentId, agentId, kind: "claude-code", description: "list packages", transcriptPath: path, background: false, status: "completed" } }]);
-    expect(subagentTree(f.root).agents[agentId]!.activations[0]!.settle).toMatchObject({ status: "completed", delivery: "returned" });
+    expect(subagentTree(f.root).agents[agentId].activations[0].settle).toMatchObject({ status: "completed", delivery: "returned" });
     expect(new MainAgentInbox(f.root).pending()).toEqual([]);
     await f.close();
   });
@@ -143,14 +143,14 @@ describe("external subagents", () => {
     const agentId = idOf(await f.spawn(f.codex));
     expect((await f.manager.interrupt({ sessionId: "root", callId: "i", agentId })).text).toBe(`Stopping subagent ${agentId}. You will be notified when it stops.`);
     await until(() => settledCount(f.root, agentId) === 1);
-    expect(f.codex.interrupts).toEqual([f.codex.runs[0]!.path]);
+    expect(f.codex.interrupts).toEqual([f.codex.runs[0].path]);
     expect(subagentTree(f.root).agents[agentId]).toMatchObject({ status: "closed", activations: [{ settle: { status: "interrupted", summary: `Subagent ${agentId} was stopped before it finished.` } }] });
     expect((await f.manager.interrupt({ sessionId: "root", callId: "i2", agentId })).text).toBe(`Subagent ${agentId} is not running.`);
 
     const failed = idOf(await f.spawn(f.codex));
-    f.codex.runs[1]!.finish({ status: "failed", text: "", error: "Codex is not logged in. Run codex login in a terminal.\nmore detail" });
+    f.codex.runs[1].finish({ status: "failed", text: "", error: "Codex is not logged in. Run codex login in a terminal.\nmore detail" });
     await until(() => settledCount(f.root, failed) === 1);
-    expect(subagentTree(f.root).agents[failed]!.activations[0]!.settle).toMatchObject({ status: "failed", summary: `Subagent ${failed} failed before it finished: Codex is not logged in. Run codex login in a terminal.` });
+    expect(subagentTree(f.root).agents[failed].activations[0].settle).toMatchObject({ status: "failed", summary: `Subagent ${failed} failed before it finished: Codex is not logged in. Run codex login in a terminal.` });
     await f.close();
   });
 
@@ -174,16 +174,16 @@ describe("external subagents", () => {
   it("kills the CLI on shutdown and reports the run as lost after a restart", async () => {
     const first = await fixture();
     const agentId = idOf(await first.spawn(first.codex));
-    const path = first.codex.runs[0]!.path;
+    const path = first.codex.runs[0].path;
     await first.close();
     expect(first.codex.interrupts).toEqual([path]);
     // Shutdown records nothing; the next start does.
-    expect(subagentTree(first.root).agents[agentId]!.status).toBe("running");
+    expect(subagentTree(first.root).agents[agentId].status).toBe("running");
 
     const second = await fixture({ dataRoot: first.dataRoot });
     await second.manager.recoverLost(second.root);
     expect(subagentTree(second.root).agents[agentId]).toMatchObject({ status: "closed", activations: [{ settle: { status: "lost", delivery: "lost", summary: `Subagent ${agentId} (list packages) was interrupted because the app exited. Its transcript shows how far it got.` } }] });
-    expect(String(new MainAgentInbox(second.root).pending()[0]!.content)).toContain(`<transcript>${path}</transcript>`);
+    expect(String(new MainAgentInbox(second.root).pending()[0].content)).toContain(`<transcript>${path}</transcript>`);
     // The exact record stays readable after the restart; its neighbours do not.
     expect(isExternalRecordPath(second.root, path)).toBe(true);
     expect(isExternalRecordPath(second.root, join(second.logDir, "rollout-9.jsonl"))).toBe(false);

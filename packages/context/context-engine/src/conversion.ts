@@ -23,13 +23,13 @@ export async function convertMessages(values: readonly RuntimeV2JsonValue[], ses
     const messages = values.map((value) => toMessage(value, paths));
     const repaired: LlmMessage[] = [];
     for (let index = 0; index < messages.length; index++) {
-      const message = messages[index]!;
+      const message = messages[index];
       repaired.push(message);
       if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
       const results = new Set<string>();
       let next = index + 1;
       while (messages[next]?.role === "tool") {
-        const result = messages[next++]!;
+        const result = messages[next++];
         repaired.push(result);
         if (result.callId) results.add(result.callId);
       }

@@ -15,8 +15,8 @@ export function collectPathHints(value: RuntimeV2JsonValue): readonly string[] {
   const walk = (item: RuntimeV2JsonValue): void => {
     if (typeof item === "string") {
       item = item.replace(/^\s*\d+\|/gm, " ");
-      for (const match of item.matchAll(/(?:^|[\s"'`(])((?:\.{0,2}\/|[A-Za-z0-9_.-]+\/)[^\s"'`<>|]*[A-Za-z0-9_.-])/g)) hints.add(match[1]!.replace(/:\d+(?::\d+)?$/, ""));
-      for (const match of item.matchAll(/(?:^|[\s"'`(])([A-Za-z0-9_-]+\.[A-Za-z][A-Za-z0-9_.-]*)(?=$|[\s"'`),:])/g)) hints.add(match[1]!);
+      for (const match of item.matchAll(/(?:^|[\s"'`(])((?:\.{0,2}\/|[A-Za-z0-9_.-]+\/)[^\s"'`<>|]*[A-Za-z0-9_.-])/g)) hints.add(match[1].replace(/:\d+(?::\d+)?$/, ""));
+      for (const match of item.matchAll(/(?:^|[\s"'`(])([A-Za-z0-9_-]+\.[A-Za-z][A-Za-z0-9_.-]*)(?=$|[\s"'`),:])/g)) hints.add(match[1]);
       return;
     }
     if (Array.isArray(item)) { item.forEach(walk); return; }

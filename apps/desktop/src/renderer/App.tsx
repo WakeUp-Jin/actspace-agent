@@ -982,8 +982,8 @@ export function App() {
       return new Error(message);
     };
     const expectedThroughSeq = sessionStore.peek(sessionId)?.snapshot?.throughJournalSeq;
-    if (expectedThroughSeq === undefined) throw refuse(REWIND_ERROR_MESSAGES.REWIND_CONFLICT!);
-    if (liveRuns.has(sessionId) || sendsInFlightRef.current.get(sessionId)) throw refuse(REWIND_ERROR_MESSAGES.SESSION_BUSY!);
+    if (expectedThroughSeq === undefined) throw refuse(REWIND_ERROR_MESSAGES.REWIND_CONFLICT);
+    if (liveRuns.has(sessionId) || sendsInFlightRef.current.get(sessionId)) throw refuse(REWIND_ERROR_MESSAGES.SESSION_BUSY);
     patchLocal(sessionId, { lastSendOptions: options, rewinding: { fromSeq } });
     setFailedForSession(sessionId, false);
     setCompactionFailureForSession(sessionId, null);

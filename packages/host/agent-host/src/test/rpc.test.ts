@@ -30,9 +30,9 @@ it("validates response ownership before accepting a reference and reuses accepte
   const input = { sessionId: "s", submissionId: "id", content: "", responseAnnotations: [annotation] };
   await expect(rpc.dispatch("tasks.submit", input, context)).rejects.toThrow("annotation_source_missing");
   expect(submitTask).not.toHaveBeenCalled(); valid = true;
-  await rpc.dispatch("tasks.submit", input, context); const accepted = submitTask.mock.calls[0]![2];
+  await rpc.dispatch("tasks.submit", input, context); const accepted = submitTask.mock.calls[0][2];
   valid = false; await rpc.dispatch("tasks.submit", input, context);
-  expect(submitTask.mock.calls[1]![2]).toEqual(accepted);
+  expect(submitTask.mock.calls[1][2]).toEqual(accepted);
   await expect(rpc.dispatch("tasks.submit", { ...input, content: "changed" }, context)).rejects.toThrow("different content");
 });
 it("paginates each workspace and pin group without duplicating the next page", async () => {

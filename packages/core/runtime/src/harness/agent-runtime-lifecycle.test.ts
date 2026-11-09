@@ -28,7 +28,7 @@ describe("agent runtime service lifecycle", () => {
         await runtime.runs.service.stop("notifications", "stale");
         expect(states.at(-1)?.queue).toHaveLength(1);
         const current = await runtime.runs.service.snapshot("notifications");
-        await runtime.runs.service.cancel("notifications", current.queue[0]!, current.revision);
+        await runtime.runs.service.cancel("notifications", current.queue[0], current.revision);
       });
       expect(snapshot.queue).toEqual([]);
       expect(states.at(-1)?.queue).toEqual([]);
@@ -49,13 +49,13 @@ describe("agent runtime service lifecycle", () => {
     expect([pins.size, gates.size]).toEqual([1, 1]);
     const [pin] = [...pins]; const [gate] = [...gates];
     // Nothing running, queued, spawned or backgrounded: the Session may go.
-    expect(pin!("idle")).toBe(false);
-    expect(gate!.canRelease("idle")).toBe(true);
+    expect(pin("idle")).toBe(false);
+    expect(gate.canRelease("idle")).toBe(true);
     vi.spyOn(runtime.backgroundTasks, "hasRunning").mockImplementation(id => id === "busy-bg");
     vi.spyOn(runtime.subagents, "runningCount").mockImplementation(id => id === "busy-agent" ? 1 : 0);
-    expect(pin!("busy-bg")).toBe(true);
-    expect(pin!("busy-agent")).toBe(true);
-    expect(await gate!.release("idle")).toBe(true);
+    expect(pin("busy-bg")).toBe(true);
+    expect(pin("busy-agent")).toBe(true);
+    expect(await gate.release("idle")).toBe(true);
     await runtime.dispose();
     expect([pins.size, gates.size]).toEqual([0, 0]);
     await ctx.fiber.dispose();

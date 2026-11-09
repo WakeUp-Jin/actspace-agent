@@ -16,7 +16,7 @@ it("observes on mount, shows live deltas and unobserves on unmount", async () =>
   await waitFor(() => expect(result.current.items.some(item => item.type === "block" && item.block.kind === "assistant" && item.block.content === "你好")).toBe(true));
   unmount();
   expect(client.calls.map(call => call.method)).toEqual(["sessions.observe", "sessions.unobserve"]);
-  expect(client.calls[1]!.params).toEqual({ subscriptionId: "sub-1" });
+  expect(client.calls[1].params).toEqual({ subscriptionId: "sub-1" });
 });
 
 it("buffers events that arrive before the snapshot is applied", async () => {

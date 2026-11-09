@@ -51,10 +51,10 @@ describe("history window slimming", () => {
     const unknown = envelope(3, "assistant/message", { messageId: "no-chunks", content: "unknown" });
     const out = slimHistoryWindow([empty, token, done, unknown]);
     expect(out.map(event => event.seq)).toEqual([2, 3]);
-    expect(out[0]!.data).toMatchObject({ firstTokenAt: token.time });
-    expect(out[1]!.data).not.toHaveProperty("firstTokenAt");
+    expect(out[0].data).toMatchObject({ firstTokenAt: token.time });
+    expect(out[1].data).not.toHaveProperty("firstTokenAt");
     expect(done.data).not.toHaveProperty("firstTokenAt");
-    expect(slimHistoryWindow([{ ...done, data: { ...done.data as object, firstTokenAt: empty.time } }])[0]!.data).toMatchObject({ firstTokenAt: empty.time });
+    expect(slimHistoryWindow([{ ...done, data: { ...done.data as object, firstTokenAt: empty.time } }])[0].data).toMatchObject({ firstTokenAt: empty.time });
   });
 
   it("keeps small request contexts and prompt / tool records as they are", () => {

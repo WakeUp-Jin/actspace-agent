@@ -33,7 +33,7 @@ describe("HostDirectory", () => {
     expect(directory.getSnapshot().hosts.map((item) => item.hostId)).toEqual(["a"]);
     for (const off of offs.slice(0, 3)) off();
     expect(fake.subscribed()).toBe(true);
-    offs[3]!();
+    offs[3]();
     expect(fake.subscribed()).toBe(false);
     expect(directory.getSnapshot().loaded).toBe(false);
   });

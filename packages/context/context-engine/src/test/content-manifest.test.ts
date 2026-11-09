@@ -15,7 +15,7 @@ describe("Context content manifest", () => {
     // 助手消息只有思考和工具调用：消息开销记一次，落在思考项上。
     expect(first.entries.find(row => row.kind === "thinking")?.estimatedTokens).toBe(Math.ceil("thought".length / 4) + BLOCK_OVERHEAD + MESSAGE_OVERHEAD);
     expect(first.entries.find(row => row.kind === "tool-call")?.estimatedTokens).toBe(Math.ceil("read".length / 4) + Math.ceil("{}".length / 4) + BLOCK_OVERHEAD);
-    expect(first.entries[0]!.preview).toHaveLength(600);
+    expect(first.entries[0].preview).toHaveLength(600);
     expect(first.entries.filter(row => row.bucket === "conversation").every(row => !row.preview)).toBe(true);
     expect(first.entries.find(row => row.kind === "thinking")?.trajectoryRef).toEqual({ messageId: "a" });
   });

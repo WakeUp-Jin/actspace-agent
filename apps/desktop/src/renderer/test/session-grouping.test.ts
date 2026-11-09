@@ -101,11 +101,11 @@ describe("sessionsByGroupKey", () => {
 
 describe("sessionWorkspaceRoot", () => {
   it("resolves the path shown in the row tooltip", () => {
-    expect(sessionWorkspaceRoot(MIXED[0]!, WORKSPACES)).toBe("/Users/me/a");
-    expect(sessionWorkspaceRoot(MIXED[2]!, WORKSPACES)).toBeUndefined();
-    expect(sessionWorkspaceRoot(MIXED[5]!, WORKSPACES)).toBe("/Users/me/gone/");
-    expect(sessionWorkspaceRoot(MIXED[7]!, WORKSPACES)).toBe("/srv/app");
-    expect(sessionWorkspaceRoot(MIXED[2]!, [])).toBeUndefined();
+    expect(sessionWorkspaceRoot(MIXED[0], WORKSPACES)).toBe("/Users/me/a");
+    expect(sessionWorkspaceRoot(MIXED[2], WORKSPACES)).toBeUndefined();
+    expect(sessionWorkspaceRoot(MIXED[5], WORKSPACES)).toBe("/Users/me/gone/");
+    expect(sessionWorkspaceRoot(MIXED[7], WORKSPACES)).toBe("/srv/app");
+    expect(sessionWorkspaceRoot(MIXED[2], [])).toBeUndefined();
   });
 });
 

@@ -71,7 +71,7 @@ describe("trusted Surface view", () => {
     expect(replaced.replaceGeneration).toBe(1);
     expect(surfaceViewVersion(replaced)).toBe("1:4:4");
     expect(isTrustedSurfaceView(replaced)).toBe(true);
-    expect(Object.isFrozen(replaced.entries[0]!.node)).toBe(true);
+    expect(Object.isFrozen(replaced.entries[0].node)).toBe(true);
   });
 
   it("does not trust views of Surfaces rebuilt from caller input", () => {

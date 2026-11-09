@@ -14,7 +14,7 @@ export async function startFakeOpenAi(steps: readonly FakeStep[]) {
   const server = createServer(async (req, res) => {
     const body = JSON.parse(await text(req)) as ChatRequest;
     requests.push(body);
-    const step = steps[Math.min(next++, steps.length - 1)]!;
+    const step = steps[Math.min(next++, steps.length - 1)];
     if ("hang" in step) return;
     const chunk = (delta: unknown, finish: string | null = null) => `data: ${JSON.stringify({ id: "fake", object: "chat.completion.chunk", created: 0, model: "fake", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
     res.writeHead(200, { "content-type": "text/event-stream" });

@@ -30,7 +30,7 @@ describe("context-bash-model", () => {
     const stats: ContextPanelBashStats = { calls: 3, failed: 0, durationMs: 0, programs: [{ ...program("git", 4), subcommands: [{ name: "status", count: 3, failed: 0 }, { name: "", count: 1, failed: 0 }] }, program("cat", 1), program("", 1)] };
     const rows = bashProgramRows(stats);
     expect(rows.map(row => [row.label, row.other, row.summary])).toEqual([["git", false, "status 3 · 其他 1"], ["cat", false, ""], ["其他", true, ""]]);
-    expect(rows[0]!.subcommands.map(sub => sub.share)).toEqual([0.75, 0.25]);
+    expect(rows[0].subcommands.map(sub => sub.share)).toEqual([0.75, 0.25]);
     expect(bashProgramCount(stats)).toBe(2);
   });
 });
@@ -74,8 +74,8 @@ describe("ContextBash 值得注意", () => {
     expect(within(rows[3]).getByText("×7")).toHaveClass("text-success");
     expect(rows[3]).toHaveTextContent("后台任务×7");
     expect(card.querySelector("[data-bash-notable] [title]")).not.toBeNull();
-    expect(rows[0]!.className).not.toMatch(/\bbg-/);
-    expect(rows[0]!.querySelector(".rounded-full")).toBeNull();
+    expect(rows[0].className).not.toMatch(/\bbg-/);
+    expect(rows[0].querySelector(".rounded-full")).toBeNull();
   });
 
   it("没有数据的行隐藏", () => {
@@ -135,7 +135,7 @@ describe("ContextBash 按程序", () => {
 describe("ContextBash", () => {
   it("一行总览：失败大于 0 时数字用危险色", () => {
     const card = renderCard(MOCK_CONTEXT_BASH);
-    const stat = (key: string) => card.querySelector<HTMLElement>(`[data-bash-stat="${key}"]`)!;
+    const stat = (key: string) => card.querySelector<HTMLElement>(`[data-bash-stat="${key}"]`);
     expect(stat("calls")).toHaveTextContent("38");
     expect(stat("failed")).toHaveTextContent("3");
     expect(card.querySelector("[data-bash-summary]")).toHaveTextContent("38次调用3次失败1m52s合计");

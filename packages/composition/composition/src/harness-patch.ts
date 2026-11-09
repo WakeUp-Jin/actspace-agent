@@ -30,7 +30,7 @@ export function resolveHarnessPatch(base: ResolvedComposition, patch: Patch, art
   for (const entry of result.entries) {
     const matches = artifacts.filter(a => a.manifest.plugin.pluginId === entry.pluginId && (!entry.artifactId || a.artifactId === entry.artifactId));
     if (matches.length !== 1) throw new Error(`Ambiguous or missing artifact for ${entry.pluginId}`);
-    const artifact = matches[0]!;
+    const artifact = matches[0];
     if (selected.has(entry.pluginId) && selected.get(entry.pluginId)!.artifactId !== artifact.artifactId) throw new Error(`Multiple artifacts for plugin ${entry.pluginId}`);
     selected.set(entry.pluginId, artifact);
   }

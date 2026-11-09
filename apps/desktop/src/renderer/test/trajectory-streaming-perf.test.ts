@@ -17,7 +17,7 @@ const toEvent = (node: RuntimeV2TrajectoryNode) => ({
 
 function percentile(samples: readonly number[], p: number): number {
   const sorted = [...samples].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))]!;
+  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
 }
 
 function measure(run: () => void): { p50: number; p95: number } {

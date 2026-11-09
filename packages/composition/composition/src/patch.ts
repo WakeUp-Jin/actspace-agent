@@ -12,11 +12,11 @@ export function applyPatch(entries: readonly CompositionEntry[], patch: Patch, r
     if (index < 0) { const skipped = miss(operation.id, operation.optional, `Target ${operation.target} not found.`); if (skipped) results.push(result(operation.id, "skipped", `Optional target ${operation.target} not found.`)); continue; }
     if (operation.kind === "replace") {
       if (!resolveReplacement) fail(operation.id, "Artifact resolver required for replacement.");
-      next[index] = resolveReplacement!(operation.artifactId, operation.manifestEntryId, operation.target);
+      next[index] = resolveReplacement(operation.artifactId, operation.manifestEntryId, operation.target);
     }
     else if (operation.kind === "remove") next.splice(index, 1);
-    else if (operation.kind === "disable") next[index] = Object.freeze({ ...next[index]!, enabled: false, state: "skipped" });
-    else if (operation.kind === "replace-config") next[index] = Object.freeze({ ...next[index]!, config: operation.config });
+    else if (operation.kind === "disable") next[index] = Object.freeze({ ...next[index], enabled: false, state: "skipped" });
+    else if (operation.kind === "replace-config") next[index] = Object.freeze({ ...next[index], config: operation.config });
     results.push(result(operation.id, "applied", `${operation.kind} applied.`));
   }
   return Object.freeze({ entries: Object.freeze(next), results: Object.freeze(results) });

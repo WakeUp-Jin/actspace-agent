@@ -23,7 +23,7 @@ function mountReply(scrollContainerRef: { current: HTMLElement | null }) {
   container.innerHTML = '<article data-assistant-message-id="v2-1"><div data-annotation-root><p>第一段内容</p><p>第二段的正文</p></div></article>';
   document.body.append(container);
   scrollContainerRef.current = container;
-  const paragraph = container.querySelectorAll("p")[1]!;
+  const paragraph = container.querySelectorAll("p")[1];
   paragraph.scrollIntoView = vi.fn();
   return { container, paragraph };
 }

@@ -45,7 +45,7 @@ export function effectiveRequestRecord(events: readonly RequestRecordEvent[], at
   let systemPrompt: EffectiveRequestRecord["systemPrompt"];
   let tools: EffectiveRequestRecord["tools"];
   for (let index = events.length - 1; index >= 0 && (systemPrompt === undefined || tools === undefined); index--) {
-    const event = events[index]!;
+    const event = events[index];
     if (event.seq > atSeq) continue;
     if (systemPrompt === undefined && event.type === REQUEST_SYSTEM_PROMPT_EVENT) systemPrompt = { seq: event.seq, data: event.data as RequestSystemPromptData };
     else if (tools === undefined && event.type === REQUEST_TOOLS_EVENT) tools = { seq: event.seq, data: event.data as RequestToolsData };
@@ -64,7 +64,7 @@ export function indexRequestRecords(events: readonly RequestRecordEvent[]): (atS
     let low = 0, high = list.length - 1, found: RequestRecordEvent | undefined;
     while (low <= high) {
       const mid = (low + high) >> 1;
-      if (list[mid]!.seq <= atSeq) { found = list[mid]; low = mid + 1; } else high = mid - 1;
+      if (list[mid].seq <= atSeq) { found = list[mid]; low = mid + 1; } else high = mid - 1;
     }
     return found;
   };
