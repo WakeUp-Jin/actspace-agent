@@ -25,7 +25,7 @@
 - **收窄 re-export 壳**：删 `runtime-v2/file-generation-counter.ts`、`session-list-page.ts` 两个单行壳和渲染层 `stream-blocks.ts`、`stream-state.ts`、`session-run-state.ts` 三个纯 re-export；`App.tsx`、`task-queue.ts`、`session-local-store.ts`、`use-session-transcript.ts` 及测试直接 import `@actspace/client/live`。`ARCHITECTURE.md` 与会话状态规范同步。
 - **移除影子对照**：`test-fixtures/legacy-transcript.ts` 与 `helpers/transcript-shadow.ts`（迁移期用旧 `mergeTranscript` 实现做对照）删除，三个 App 测试去掉对应 `vi.mock`，`transcript.test.ts` 直接调用 `mergeTranscript`。
 - **无入口测试接入**：`scripts/test/host-upload-disk-full.test.mjs`、`agent-provider-compaction.test.mjs` 挂到 `test:agent-host:process`；新增 `test:release-scripts` 跑 `browser-components.test.mjs`、`electron-runtime-integrity.test.mjs`，并进入 `pnpm test` 链。`agent-testing.md` 写明 `scripts/test/` 下每个文件都必须挂在某个 `test:*` 入口上。
-- **孤儿脚本**：删 `apps/desktop/scripts/benchmark-usage-json-baseline.mjs`（import 的 `projectIndexedUsageActivity` 早已不存在，一跑就 TypeError），`verify-usage-read-model.mjs` 去掉对它的调用。其余 `apps/desktop/scripts/*` 被 active 执行计划或已完成计划的验收命令引用，保留。
+- **孤儿脚本**：删 `apps/desktop/scripts/benchmark-usage-json-baseline.mjs`（import 的 `projectIndexedUsageActivity` 早已不存在，一跑就 TypeError）和 `test-usage-read-model.mjs`（见注意事项），`verify-usage-read-model.mjs` 去掉对前者的调用。其余 `apps/desktop/scripts/*` 被 active 执行计划或已完成计划的验收命令引用，保留。
 
 ### 🧠 Design Intent (Why)
 
@@ -38,7 +38,7 @@
 ### ⚠️ 注意事项
 
 - `cordis.yml` 里的 `@actspace/english-learning`、`side-chat`、`session-transcript` 之前靠根 `package.json` 直接依赖才能被 Cordis Loader 解析。删掉根依赖后，这三个包要靠 pnpm 把 workspace 包 hoist 到 `node_modules/.pnpm/node_modules/@actspace/`。本地只做删减的增量 `pnpm install` 可能不会立刻 hoist（`test:agent-host:process` 会报 `failed to apply loader entry include`），再跑一次 `pnpm install` 即可；CI 的 `--frozen-lockfile` 全新安装不受影响。已补进 `docs/learnings/2026-08/20260829-dsh-runtime-plugin-ownership.md` 的常见陷阱。
-- `apps/desktop/scripts/test-usage-read-model.mjs`（node:test，依赖 `dist-electron`）当前 76 个用例里 36 个失败，其中一部分同样是 import 已删除的 `projectIndexedUsageActivity`。它被多份已完成计划引用，本轮未删也未接入入口，留待单独处理。
+- `apps/desktop/scripts/test-usage-read-model.mjs`（node:test，依赖 `dist-electron`）76 个用例里 36 个失败，失败原因全是 API 漂移（import 已删除的 `projectIndexedUsageActivity` / `projectIndexedUsageStatistics`、不存在的 `service.getStatistics`、旧 Session 格式），不是真 bug；它不在任何 `test:*` 入口上，当前 Worker 查询已由 `apps/desktop/src/main/test/usage-*.test.ts` 覆盖，所以一并删除，连同只有它用的 `usage-rollups.ts` `runCountsSource` 导出。已完成计划和 exec-runs 里对它的引用是历史记录，不改。
 - 本轮没有做审计报告第 6 步（Settings v3/v4 双轨收口、legacy/v2 命名整改、迁移门禁脚本处置、browser-bridge `legacyRequest` 表），那部分涉及行为变更，需要单独立项。
 
 ### 📁 Files Modified
@@ -49,7 +49,7 @@
 - `apps/desktop/src/main/runtime-v2/{harness-stats-projection,usage-journal-projection,runtime-loader}.ts`、`file-generation-counter.ts`（删）、`session-list-page.ts`（删）、`apps/desktop/src/main/settings/types.ts`、`apps/desktop/src/main/test/workspace-*-service.test.ts`
 - `apps/desktop/src/renderer/App.tsx`、`session/{task-queue,session-local-store,use-session-transcript,projection-display}.ts`、`session/live-runs/{stream-blocks,stream-state}.ts`（删）、`session/session-run-state.ts`（删）、`components/**` 中约 20 个文件、`mock/docs-fixture.ts`、`trajectory/{format,strings}.ts`、`usage-format.ts`
 - `apps/desktop/test-fixtures/legacy-transcript.ts`（删）、`apps/desktop/src/renderer/test/helpers/transcript-shadow.ts`（删）、`apps/desktop/src/renderer/test/{app-approval-recovery,app-message-queue,app-streaming-user-message}.test.tsx`、`transcript.test.ts`
-- `apps/desktop/scripts/benchmark-usage-json-baseline.mjs`（删）、`apps/desktop/scripts/verify-usage-read-model.mjs`
+- `apps/desktop/scripts/benchmark-usage-json-baseline.mjs`（删）、`apps/desktop/scripts/test-usage-read-model.mjs`（删）、`apps/desktop/scripts/verify-usage-read-model.mjs`、`apps/desktop/src/main/runtime-v2/usage-rollups.ts`
 - `apps/site/src/lib/docs-navigation.ts`、`packages/core/runtime/src/projection/artifact.ts`、`packages/english-learning/english-learning/src/prompt.ts`
 - `packages/llm/llm-service/src/legacy-transport-adapter.ts`（删）、`src/index.ts`、`src/test/service.test.ts`、`packages/llm/llm-pi-ai/src/test/legacy-proxy-wire-engine.test.ts`
 - `docs/ARCHITECTURE.md`、`docs/design-docs/execution-safety/README.md`、`docs/design-docs/agent-plugin-runtime/{agent-llm-core-pi,agent-testing}.md`、`docs/design-docs/frontend/front-会话状态与数据流规范.md`、`docs/learnings/2026-08/20260829-dsh-runtime-plugin-ownership.md`
