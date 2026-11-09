@@ -26,6 +26,8 @@ updates:
     ignore:
       # 由 pnpm.overrides 统一钉死，升级要连 overrides 一起改。
       - dependency-name: "@deepseek-ai/cordis*"
+      # 同上：rehype-katex / mermaid 各自声明的 katex 范围由 overrides 统一到一个版本。
+      - dependency-name: "katex"
       # 带 patches/ 补丁，版本一动补丁就失效，必须手动升级。
       - dependency-name: "@earendil-works/pi-ai"
 
