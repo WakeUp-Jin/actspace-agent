@@ -55,7 +55,8 @@
 
 - **R1 常驻状态**：审查上下文按会话常驻在 `journal.project` 里，上限由 64 000 字符的 `overflow` 与 24 / 64 条有界缓冲控制；会话释放时随 journal 一起释放。
 - **R3 缓存**：主进程最多常驻 16 个会话的子 Agent 列表状态（LRU），日志被截断（`lastSeq` 回退）时从头重算。
-- **既有失败**：`packages/session/session-persistence-jsonl` 的 `refresh.test.ts > same-size rewrite falls back to a full read` 在 `main` 上同样失败，与本次无关，未处理。
+- **既有失败**：`packages/session/session-persistence-jsonl` 的 `refresh.test.ts > same-size rewrite falls back to a full read`，以及 `packages/core/tool-runtime` 的 3 个沙箱相关用例（`runtime.test.ts`），在 `main` 上同样失败，与本次无关，未处理。
+- **等价 golden**：`compactionId` 是 surface 条目的新字段，两份 golden 测试比较时抹掉它；它不进 messages、manifest、请求记录。若将来要把它交给渲染层使用，再按新语义更新 golden。
 - **pending 清单**：`scripts/scale-test-coverage.json` 里 9 个文件仍整份读日志但没有规模测试（多为打开 / 恢复会话时的一次性读或低频读），改到时再补。
 
 ## 后续建议

@@ -36,7 +36,8 @@
 ### ✅ Verification
 
 - `pnpm lint`、`pnpm typecheck` 通过。
-- 根 `pnpm test`：`check:hot-path-reads`、`test:hot-path-reads`、`check:scale-tests`、`test:scale-tests`、`check:docs` / `test:current-docs` 通过；各包测试里只有 `packages/session/session-persistence-jsonl` 的 `refresh.test.ts > same-size rewrite falls back to a full read` 失败，`main` 上同样失败，与本次无关。
+- 根 `pnpm test` 脚本检查链通过（`check:hot-path-reads`、`test:hot-path-reads`、`check:scale-tests`、`test:scale-tests`、`check:docs`、契约矩阵等）；契约矩阵因新增 `inspectSessionEventsAfter` 重新生成。
+- `pnpm -r --no-bail test`：`apps/desktop` 两份等价 golden 因 surface 条目新增 `compactionId` 失败，核对该字段不进 messages / manifest / 请求记录后在比较时抹掉它，golden 不动；其余只剩 `session-persistence-jsonl` 的 `refresh.test.ts` 1 个用例与 `tool-runtime` 的 3 个沙箱用例失败，`main` 上同样失败，与本次无关。
 - 四个规模测试均验证过「旧实现失败、新实现通过」。
 - 实机采样对比未做，验收指引见[执行摘要](../../exec-runs/20261108-perf-round3/execution-summary.md)。
 
@@ -50,6 +51,6 @@
 - `packages/core/runtime/src/session/session-controller.ts`、`live-child-reads.test.ts`
 - `packages/core/agent-service/src/application.ts`
 - `packages/client/client/src/sessions/{subagent-list,chat}.ts`、`src/test/subagent-list-fold.test.ts`（新增）
-- `apps/desktop/src/main/runtime-v2/{runtime-registry,fixed-renderer-ipc}.ts`、`src/main/test/subagent-list-ipc.scale.test.ts`（新增）
+- `apps/desktop/src/main/runtime-v2/{runtime-registry,fixed-renderer-ipc}.ts`、`src/main/test/subagent-list-ipc.scale.test.ts`（新增）、`src/main/test/{context-trusted-equivalence,surface-derived-equivalence}.test.ts`
 - `scripts/scale-test-coverage.json`、`scripts/check-scale-test-coverage.mjs`、`scripts/test/scale-test-coverage.test.mjs`（新增）、`scripts/hot-path-reads-baseline.json`、`package.json`
-- `AGENTS.md`、`docs/coding-standards/perf-memory-conventions.md`、`docs/exec-plans/{README,perf-backlog}.md`、`docs/exec-plans/completed/{README,20261108-perf-round3}.md`、`docs/exec-runs/20261108-perf-round3/*`（新增）、`docs/learnings/2026-11/hot-path-cost-grows-with-session.md`
+- `AGENTS.md`、`docs/coding-standards/perf-memory-conventions.md`、`docs/exec-plans/{README,perf-backlog}.md`、`docs/exec-plans/completed/{README,20261108-perf-round3}.md`、`docs/exec-runs/20261108-perf-round3/*`（新增）、`docs/learnings/2026-11/hot-path-cost-grows-with-session.md`、`docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md`

@@ -23,7 +23,8 @@
 
 - **操作**：`SessionSurfaceEntry` 增加 `compactionId`，`surface.apply` 处理 `surface/replaced` 时顺手记下；`agent-loop/src/loop.ts` 的 `contextInput` 改成从 surface 取 `compactionSummaries(surface)`，不再对每个条目 `journal.readEvents(seq, seq + 1)`。
 - **影响文件**：`session-journal/src/surface.ts`、`agent-loop/src/loop.ts`、`agent-loop/src/testing.ts`（`session` 选项）；新增 `agent-loop/src/test/context-input.scale.test.ts`。
-- **验证**：旧实现两次请求之间的归档读取 1k 为 337 条、10k 为 1533 条；新实现两者相等且 ≤ 16。`context-trusted-equivalence`、`surface-derived-equivalence` 等既有 golden 全过，已信任视图版本号未变。
+- **验证**：旧实现两次请求之间的归档读取 1k 为 337 条、10k 为 1533 条；新实现两者相等且 ≤ 16。已信任视图版本号未变。
+- **golden 的处理（步骤 8 才发现）**：`apps/desktop` 的 `context-trusted-equivalence`、`surface-derived-equivalence` 两份 golden 把 surface 条目原样序列化比较，新字段 `compactionId` 让它们失败。核对后确认该字段不进 `messages`、manifest 和请求记录（`requestRecords` 只取 `replaceGeneration`），所以在两份测试里比较前抹掉这个键（与 `instanceGeneration` 同一处理），golden 本身不动、仍是改前代码的输出；抹掉后全部一致。
 
 ### 步骤 3：R1 自动审查不再整份读日志（`12810fea`）
 
@@ -52,6 +53,11 @@
 ### 步骤 7：文档
 
 - `perf-backlog.md` P1–P4 移到「已完成」并写提交号与规模测试数字；上一轮两项补上提交号 `015b273f`、`297e170c`。计划移入 `completed/`，两份索引同步；本执行记录与 history。
+
+### 步骤 8：全量验证
+
+- `pnpm lint`、`pnpm typecheck` 通过；根 `pnpm test` 的脚本检查链（含 `check:hot-path-reads`、`check:scale-tests`、`check:docs`、契约矩阵）通过——契约矩阵因 agent-service 新增 `inspectSessionEventsAfter` 需要 `pnpm gen:contract-matrix` 重新生成。
+- `pnpm -r --no-bail test`：除上文的两份 golden（已处理）外，只剩 `tool-runtime` 的 3 个沙箱相关用例与 `session-persistence-jsonl` 的 `refresh.test.ts` 1 个用例失败，`main` 工作树上同样失败，与本次无关。
 
 ## 遇到的问题
 
