@@ -1,4 +1,5 @@
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
+import { trimTrailing } from "@actspace/shared";
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -92,13 +93,14 @@ export class DeepSeekFileUploader {
 }
 
 export function filesEndpoint(baseUrl: string): string {
-  let base = baseUrl.replace(/\/+$/, "");
+  let base = trimTrailing(baseUrl, "/");
   for (let index = 0; index < 3; index += 1) base = base.replace(/\/(?:anthropic|beta|v1)$/i, "");
   return `${base}/files`;
 }
 
+/** 缓存键按 apiKey 做 HMAC：不同账号上传同一张图拿到的 file id 不能互用，但 apiKey 本身不进摘要内容。 */
 function cacheKey(input: DeepSeekFileUploadInput): string {
-  return createHash("sha256").update(`${input.baseUrl}\0${input.apiKey}\0${input.sessionId}\0${input.artifactId}\0`).update(input.bytes).digest("hex");
+  return createHmac("sha256", input.apiKey).update(`${input.baseUrl}\0${input.sessionId}\0${input.artifactId}\0`).update(input.bytes).digest("hex");
 }
 
 function filenameFor(artifactId: string, mimeType: string): string {

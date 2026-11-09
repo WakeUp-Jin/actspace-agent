@@ -12,6 +12,7 @@ paths-ignore:
   - '**/test/**'
   - '**/tests/**'
   - '**/fixtures/**'
+  - 'scripts/acceptance/**'
   - '**/*.generated.ts'
   - 'docs/**'
   - 'tmp/**'

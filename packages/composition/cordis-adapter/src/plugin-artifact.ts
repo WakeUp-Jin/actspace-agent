@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, mkdir, mkdtemp, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { isBuiltin } from "node:module";
 import { dirname, join, posix } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -53,12 +54,22 @@ async function regularFile(root: string, path: string): Promise<Buffer> {
   validPath(path);
   let current = root;
   if (!(await lstat(current)).isDirectory() || (await lstat(current)).isSymbolicLink()) throw new Error(`Invalid artifact root: ${root}`);
-  for (const part of path.split("/")) {
+  const parts = path.split("/");
+  for (const part of parts.slice(0, -1)) {
     current = join(current, part);
     if ((await lstat(current)).isSymbolicLink()) throw new Error(`Artifact symlink is forbidden: ${path}`);
   }
-  if (!(await lstat(current)).isFile()) throw new Error(`Artifact requires a regular file: ${path}`);
-  return readFile(current);
+  // 最后一段不走 lstat 再 readFile：O_NOFOLLOW 打开后用同一句柄 stat 和读，检查与读取之间文件不会被换掉。
+  const handle = await open(join(current, parts[parts.length - 1]!), constants.O_RDONLY | constants.O_NOFOLLOW).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ELOOP") throw new Error(`Artifact symlink is forbidden: ${path}`);
+    throw error;
+  });
+  try {
+    if (!(await handle.stat()).isFile()) throw new Error(`Artifact requires a regular file: ${path}`);
+    return await handle.readFile();
+  } finally {
+    await handle.close();
+  }
 }
 async function verifyShared(modules: readonly SharedArtifactModule[]): Promise<void> {
   const seen = new Set<string>();

@@ -6,7 +6,8 @@ import { FixedRendererStreamAdapter } from "./fixed-renderer-stream-adapter";
 import { SubagentActivityBoard } from "./subagent-activity";
 import { randomUUID } from "node:crypto";
 import { LiveOutputBuffer, surfaceNode, type LiveOutputBaseline } from "@actspace/shared/runtime-v2";
-import { readFile, stat } from "node:fs/promises";
+import type { Stats } from "node:fs";
+import { open } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import type {
   RuntimeV2DesktopStatus,
@@ -349,11 +350,12 @@ export class DesktopRuntimeV2Registry {
     try {
       await this.requireApp().inspectSession(sessionId);
       if (this.#artifacts === undefined) throw new Error("Artifact store is unavailable.");
-      const metadata = await stat(path);
-      if (!metadata.isFile()) throw new Error("Attachment must be a regular file.");
-      if (metadata.size > 20 * 1024 * 1024) throw new Error("Attachment exceeds the 20 MiB limit.");
+      const bytes = await readAttachmentBytes(path, (metadata) => {
+        if (!metadata.isFile()) throw new Error("Attachment must be a regular file.");
+        if (metadata.size > 20 * 1024 * 1024) throw new Error("Attachment exceeds the 20 MiB limit.");
+      });
       const mediaType = attachmentMediaType(path);
-      const created = await this.#artifacts.create({ bytes: await readFile(path), mediaType, owner: { sessionId, callId: `attachment-${randomUUID()}`, pluginId: "@actspace/desktop", name: "user-attachment" } });
+      const created = await this.#artifacts.create({ bytes, mediaType, owner: { sessionId, callId: `attachment-${randomUUID()}`, pluginId: "@actspace/desktop", name: "user-attachment" } });
       return Object.freeze({ artifactId: created.artifactId, mimeType: created.mediaType, name: basename(path).slice(0, 240), sizeBytes: created.size });
     } finally { this.#admittedWork--; }
   }
@@ -788,19 +790,20 @@ async function prepareChatAttachment(path: string): Promise<PreparedChatAttachme
   const fail = (code: ChatAttachmentIssue["code"], limit?: number): never => {
     throw new ChatAttachmentValidationError({ code, fileName: basename(path).slice(0, 240), ...(limit === undefined ? {} : { limit }) });
   };
-  const metadata = await stat(path).catch(() => fail("unreadable"));
-  if (!metadata.isFile()) fail("not_file");
   const extension = extname(path).toLowerCase();
   const mediaType = chatAttachmentMediaType(extension);
-  if (mediaType === undefined) {
-    return fail("unsupported_format");
-  }
-  const isImage = mediaType.startsWith("image/");
+  const isImage = mediaType?.startsWith("image/") ?? false;
   const byteLimit = isImage ? CHAT_IMAGE_BYTE_LIMIT : CHAT_TEXT_BYTE_LIMIT;
-  if (metadata.size > byteLimit) {
-    fail(isImage ? "image_too_large" : "text_too_large", byteLimit);
-  }
-  const bytes = await readFile(path).catch(() => fail("unreadable"));
+  const bytes = await readAttachmentBytes(path, (metadata) => {
+    if (!metadata.isFile()) fail("not_file");
+    if (mediaType === undefined) fail("unsupported_format");
+    if (metadata.size > byteLimit) fail(isImage ? "image_too_large" : "text_too_large", byteLimit);
+  }).catch((error: unknown) => {
+    if (error instanceof ChatAttachmentValidationError) throw error;
+    // Windows 打开目录直接报 EISDIR，没有机会走到 isFile() 检查。
+    return fail((error as NodeJS.ErrnoException).code === "EISDIR" ? "not_file" : "unreadable");
+  });
+  if (mediaType === undefined) return fail("unsupported_format");
   if (bytes.byteLength > byteLimit) fail(isImage ? "image_too_large" : "text_too_large", byteLimit);
   if (isImage) return Object.freeze({ bytes, mediaType, name: basename(path).slice(0, 240) });
   let textContent: string;
@@ -811,6 +814,17 @@ async function prepareChatAttachment(path: string): Promise<PreparedChatAttachme
   }
   if (textContent.includes("\0")) fail("binary_content");
   return Object.freeze({ bytes, mediaType, name: basename(path).slice(0, 240), textContent });
+}
+
+/** 先 open 再用同一句柄 stat 和读：`check` 否决的文件不会被读，检查与读取之间文件也不会被换掉。 */
+async function readAttachmentBytes(path: string, check: (metadata: Stats) => void): Promise<Buffer> {
+  const handle = await open(path, "r");
+  try {
+    check(await handle.stat());
+    return await handle.readFile();
+  } finally {
+    await handle.close();
+  }
 }
 
 function chatAttachmentMediaType(extension: string): string | undefined {
