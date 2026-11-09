@@ -9,6 +9,7 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
+import { toolChildEnv } from "@actspace/shared";
 import type {
   BrowserBridgeActionResult,
   BrowserBridgeDoctorCheck,
@@ -764,6 +765,7 @@ function runCommand(
     try {
       child = spawn(command, args, {
         cwd,
+        env: toolChildEnv(process.env),
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch (error) {

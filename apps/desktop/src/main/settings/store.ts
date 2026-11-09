@@ -162,7 +162,7 @@ export class SettingsStore {
 
   /** 写 env 的唯一入口；调用点和拆分前相同。 */
   applyToEnv(): void {
-    applySettingsToEnv(this.settings, this.secrets, this.reloadEnv);
+    applySettingsToEnv(this.settings, this.reloadEnv);
   }
 
   private async readSettingsFile(): Promise<ReadSettingsResult> {

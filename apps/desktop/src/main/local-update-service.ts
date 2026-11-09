@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { constants } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { toolChildEnv } from "@actspace/shared";
 import type {
   LocalUpdateErrorCode,
   LocalUpdateProgress,
@@ -482,6 +483,7 @@ function defaultSpawnHelper(scriptPath: string): ChildProcess {
   return spawn("/bin/bash", [scriptPath], {
     detached: true,
     stdio: "ignore",
+    env: toolChildEnv(process.env),
   });
 }
 
