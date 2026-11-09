@@ -57,7 +57,7 @@ export async function runToolStreamFixture(options: {
   const tools = new ToolRuntime();
   tools.register({ definition: { abiVersion: 2, pluginId: "test.tools", name: "read_file", definitionVersion: 1,
     description: "Read fixture", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false },
-    effects: [], concurrency: "read-only", sensitiveArgumentPaths: [], resultSchemaVersion: 1 },
+    effects: [], modes: ["plan", "agent"], concurrency: "read-only", sensitiveArgumentPaths: [], resultSchemaVersion: 1 },
     permission: options.permission,
     executor: { concurrencySafe: true, execute: options.execute ?? (async () => ({ status: "completed", summary: "Read fixture.txt", modelOutput: [{ type: "text", text: "fixture content" }] })) } });
   let requests = 0;

@@ -37,6 +37,7 @@ function definition(overrides: Partial<ToolDefinition> = {}): ToolDefinition {
       additionalProperties: false,
     },
     effects: [{ capabilityId: "filesystem.read", mode: "read", resourceScope: null }],
+    modes: ["plan", "agent"],
     concurrency: "read-only",
     sensitiveArgumentPaths: ["/token"],
     resultSchemaVersion: 1,

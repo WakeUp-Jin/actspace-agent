@@ -8,8 +8,8 @@ import {
 import type { ExternalSubagentBackend } from "./external.js";
 import type { SubagentCaller, SubagentHostPort, SubagentToolOutcome } from "./types.js";
 
-/** The tools belong to the `actspace.subagent` Agent form member (agent-form.ts). */
-export const SUBAGENT_TOOL_PLUGIN_ID = "actspace.subagent";
+/** The Harness entry (`@actspace/tool-subagent`) that contributes these tools; the Host-side manager is `actspace.subagent`. */
+export const SUBAGENT_TOOL_PLUGIN_ID = "actspace.subagent-tools";
 export const SUBAGENT_TOOL_NAMES = Object.freeze(["agent", "agent_fork", "send_message", "wait_agent", "list_agents", "interrupt_agent", "list_subagent_models"] as const);
 export type SubagentToolRegistration = { readonly name: string; readonly dispose: () => Promise<void> };
 
@@ -84,7 +84,7 @@ export function registerSubagentTools(runtime: ToolRuntime, port: SubagentHostPo
     const definition: ToolDefinition = Object.freeze({
       abiVersion: 2, pluginId: SUBAGENT_TOOL_PLUGIN_ID, name, definitionVersion: 2, description,
       inputSchema: { type: "object", properties, required: [...required], additionalProperties: false },
-      effects: [], concurrency: "declared-safe", sensitiveArgumentPaths: [], resultSchemaVersion: 1,
+      effects: [], modes: ["plan", "agent"] as const, concurrency: "declared-safe", sensitiveArgumentPaths: [], resultSchemaVersion: 1,
     });
     const handle = runtime.register({ definition, executor: { concurrencySafe: true, execute: async (args, context) => toResult(name, await run(args, context)) } });
     return Object.freeze({ name, dispose: () => handle.dispose() });
@@ -109,7 +109,7 @@ export function registerExternalSubagentTool(runtime: ToolRuntime, port: Subagen
       },
       required: ["description", "prompt"], additionalProperties: false,
     },
-    effects: [], concurrency: "declared-safe", sensitiveArgumentPaths: [], resultSchemaVersion: 1,
+    effects: [], modes: ["agent"] as const, concurrency: "declared-safe", sensitiveArgumentPaths: [], resultSchemaVersion: 1,
   });
   const handle = runtime.register({ definition, executor: { concurrencySafe: true, execute: async (args, context) => {
     const scope = mainScope(context.sessionId);
