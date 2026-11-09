@@ -8,7 +8,7 @@
 - **Desktop 凭据入口**：模型、搜索和图片服务 Key 只从应用内设置页写入 main-only `<userData>/secrets.json` v2，再由 Host credential resolver 按请求解析。Desktop 不从仓库 `.env` 或 renderer 状态读取 provider key。
 - **CLI 凭据入口**：CLI Host 只读取启动进程显式提供的 provider 环境变量，例如 `DEEPSEEK_API_KEY`、`KIMI_API_KEY` 或 `OPENROUTER_API_KEY`。仓库没有通用 `loadEnv()` / dotenv 启动层，若开发者自行使用 `.env`，必须在启动 CLI 前显式导入到当前 shell。
 - **集中管理**：Runtime 只通过 LLM credential port 接收短生命周期凭据；Desktop 与 CLI 各自在 Host 边界解析来源，领域 package 不直接读取 provider key。
-- **DeepSeek API 格式边界**：Desktop 的 DeepSeek Base URL 与 Key 来自设置存储；CLI 的默认 Base URL 是 `https://api.deepseek.com`，并使用 OpenAI-compatible Chat Completions。旧 `DEEPSEEK_API_FORMAT` / `DEEPSEEK_ANTHROPIC_BASE_URL` 不是 v2 Runtime 配置面。
+- **DeepSeek API 格式边界**：Desktop 的 DeepSeek Base URL 与 Key 来自设置存储里的连接；CLI 的默认 Base URL 是 `https://api.deepseek.com`，并使用 OpenAI-compatible Chat Completions。
 - **Kimi key 边界**：Desktop Kimi Key 来自主进程凭据存储；CLI 才读取显式 `KIMI_API_KEY`。两种 Host 都不得把 Key 写入 renderer、Session Journal、Runtime Projection 或测试快照。
 - **本地凭据文件**：Desktop 设置页录入的 LLM、搜索和图片服务 Key 以明文写入 `<userData>/secrets.json` v2；目录沿用 `userData`，文件在创建、原子替换和启动读取时都收紧为 `0600`。`0600` 表示仅文件所有者可读写，避免 `0644` 允许同机其他用户读取，但它不是加密：当前 macOS 账号下的进程、备份或同步工具仍可能读取该文件。开发版与安装版共用同一 `userData` 和同一份凭据，稳定性优先于应用身份绑定的系统密钥串。
 - **主进程边界**：`secrets.json` 只由 Electron main 读取；renderer、typed preload、settings view、session、Trace 和普通日志只接收 `hasApiKey`、连接状态或脱敏错误码，不接收文件正文或明文 Key。凭据不提交到仓库，也不得复制到 `settings.json`。
@@ -57,23 +57,23 @@
 - Artifact 右键菜单里的打开、复制和 Finder 定位也是 main-owned 能力。Renderer 只能传递 `sessionId + artifactPath` 或 `workspaceRoot + relativePath`，main 必须重新校验 realpath 仍位于对应 session artifacts / workspace 边界内，不得直接对 renderer 传入的任意绝对路径调用 `shell.openPath` 或 `showItemInFolder`。
 - Sidebar 的 `Open in IDE` 同样是 main-owned Workspace 能力。Renderer 只传稳定 `workspaceId`，main 从 `<userData>/workspaces.json` 重新解析路径，并确认条目未隐藏、目标存在且是目录后，才能启动 Cursor；不接受 renderer 指定的任意绝对路径。
 - **工作区访问入口**：renderer 传来的 `workspaceRoot` 一律经 `main/workspace-access.ts` 解析，不再直接 `resolve`。
-  - 文件面板的 list / read / stat、Git context、Skills 列表、工作区文件右键菜单走 `resolveWorkspaceAccess`：请求路径 realpath 后必须**等于** registry 中某个条目或某个已存在本地会话 `workspaceRoot`（含 worktree）的 realpath，子目录也不行；否则抛 `workspace_not_registered`。后续操作都基于返回的 realpath root。
+  - 「MD 文档」面板的文件列表与读取、Git context、Skills 列表、工作区文件右键菜单走 `resolveWorkspaceAccess`：请求路径 realpath 后必须**等于** registry 中某个条目或某个已存在本地会话 `workspaceRoot`（含 worktree）的 realpath，子目录也不行；否则抛 `workspace_not_registered`。后续操作都基于返回的 realpath root。
   - `createSession` 只接受 registry 中的 root；`createWorkspaceFolder` 的父目录必须是用户最近一次在系统对话框中选中的目录（建成功后作废），或者通过上面的校验。
   - root 内的路径用 `path.relative` 判断包含（合法文件名 `..foo` 不算越界），再对目标或其最近的已存在祖先做 realpath，确认仍在 root 内；指向 root 外的 symlink 返回 `escapes_root`，也不会泄露外部路径是否存在。
 - 顶部 Environment 的分支创建、Commit、Push，以及“在编辑器中打开”都是 main-owned 本机能力。Renderer 只能传稳定 action / tool id；main 每次都把 `workspaceRoot` 解析回 workspace registry 或已有 session 中登记的路径，再使用固定 Git argv 或固定应用映射执行，不能让 renderer 用任意绝对路径、应用名或 argv 扩大能力边界。
 
 ## 真实模型调用
 
-- 真实 DeepSeek 与 Kimi 请求仅从 main 进程内的 Agent runtime 发起，renderer 只接收结构化事件与最终结果。
-- OpenRouter 的连接测试、模型目录拉取和真实模型请求都由 main 进程发起，renderer 只消费裁剪后的服务商、模型与连接状态；供应商级代理不写全局代理环境变量。
-- 普通会话默认使用真实 DeepSeek provider，并固定走 OpenAI-compatible Chat Completions；`LLM_PROVIDER=kimi` 可切换 Kimi 主模型。Electron 真实 turn 不允许被 mock 配置静默替代，mock 仅用于测试、浏览器 fixture 或显式 demo。
-- Usage 页 DeepSeek 余额查询通过 main 进程调用 `GET /user/balance`，renderer 只接收已裁剪的余额展示模型，不接触 `DEEPSEEK_API_KEY`、鉴权头或 DeepSeek 原始响应。
-- `web_search`（外部搜索 API 双通道）任一搜索 provider key 存在时注册，`web_fetch`（本地抓取）始终注册（见 `agent-web-tools.md`）。缺 key 时 executor 的兜底错误只提示需要配置的 key 名，不泄露其它运行时信息。
-- `generate_image` 仅在配置图片服务 Key 时向主 Agent 注册；默认模型为 `gpt-image-2`，但模型名和 Base URL 均由设置页覆盖。完整生成请求不自动重试，避免上游已计费时产生重复费用。
+- 所有真实模型请求（连接测试、模型目录拉取、会话内请求）都从 main 进程或 CLI Host 内的 Agent runtime 发起，renderer 只接收结构化事件、裁剪后的服务商 / 模型 / 连接状态与最终结果。
+- Desktop 的模型来源是设置页里的「连接」（内置模板或自定义协议）与四层模型数据模型（价格、能力、目录、覆盖），见 [模型目录与费用](design-docs/model-context/agent-model-catalog-and-usage-cost.md)；CLI 由启动进程的 `LLM_PROVIDER` / `<PROVIDER>_BASE_URL` / `<PROVIDER>_API_KEY` 决定连接，缺省 `deepseek`。两种 Host 都不允许 mock 配置静默替代真实 turn；mock 仅用于测试、浏览器 fixture 或显式 demo。
+- 连接 Base URL 命中 pi-ai 内置服务商时复用其实现（协议、思考参数、兼容开关、会话请求头），`auth.apiKey` 仍走 ActSpace 的请求级凭据解析器，不从 pi-ai 自己的环境变量读取 Key；规则见 [LLM Core Pi §17](design-docs/agent-plugin-runtime/agent-llm-core-pi.md)。
+- 服务商级代理只注入该连接的请求级 `fetch`，不写全局代理环境变量，不影响工具、更新器或其他连接。
+- 统计页的 DeepSeek 余额查询通过 main 进程调用 `GET /user/balance`，renderer 只接收裁剪后的余额展示模型，不接触 Key、鉴权头或原始响应。
+- `web_search`（外部搜索 API 双通道）任一搜索 provider key 存在时注册，`web_fetch`（本地抓取）始终注册（见 `agent-web-tools.md`）。缺 key 时 executor 的兜底错误只提示需要配置的 key 名，不泄露其它运行时信息。联网能力统一由受密钥和工具权限控制的本地 `web_search` / `web_fetch` 提供，不依赖任何服务商的原生联网搜索。
+- `generate_image` 仅在配置图片服务 Key 时向主 Agent 注册；默认模型为 `gpt-image-2`，模型名和 Base URL 均由设置页覆盖。完整生成请求不自动重试，避免上游已计费时产生重复费用。
 - 图片附件在当前模型 `input` 包含 `image` 时直接进入主 LLM 请求；text-only 主模型只接收附件元信息、runtime model 状态和可用时的 `inspect_image` 调用指引。`inspect_image` 的视觉请求只包含固定 system prompt、问题、安全文件名和单张图片，不携带主会话历史、主 system prompt 或其他附件。
-- `inspect_image` 的图片 Base64 只存在于单次视觉请求内存，不进入工具输出、session、renderer 或日志。图片内文字一律视为不可信证据；视觉模型只返回最终观察，不返回隐藏推理。单次请求 90 秒超时、SDK 重试为 0，失败不自动切换 Kimi / OpenRouter，避免重复计费和不可解释的数据发送。
-- DeepSeek 当前 OpenAI-compatible 路线不声明 provider-native server search，联网能力统一由受密钥和工具权限控制的本地 `web_search` / `web_fetch` 提供。历史 Anthropic 路线的 DSML guard 只为协议兼容测试与旧记录保留。
-- 历史 session 中的 Anthropic server `server_tool_use`、`web_search_tool_result` 属于 provider 响应协议，不应当作为本地 ToolManager 执行日志写入；session / run log 只保留 `serverToolUse` 请求计数，不应将未裁剪网页全文或 provider tool result 原文写入 session。
+- `inspect_image` 的图片 Base64 只存在于单次视觉请求内存，不进入工具输出、session、renderer 或日志。图片内文字一律视为不可信证据；视觉模型只返回最终观察，不返回隐藏推理。单次请求 90 秒超时、SDK 重试为 0，失败不自动切换其他 Key 或服务商，避免重复计费和不可解释的数据发送。
+- 服务商响应里的 server-side tool 结果（历史 Anthropic 路线的 `serverToolUse` 计数等）属于 provider 响应协议，不当作本地工具执行日志写入；session 只保留请求计数，不写未裁剪网页全文或 provider tool result 原文。
 - 验收真实 provider 时应先发送不含仓库内容和隐私的固定探针，确认连接后再决定是否允许工具结果进入外部模型上下文。
 - API 错误仅暴露必要的结构化诊断信息，不把鉴权请求头或密钥写入日志、session 或界面。
 - LLM 错误脱敏必须使用实际出站请求的凭据：Host 或 Desktop 在路由中延迟绑定凭据时，`PreparedLlmCall` 的早期解析结果可能为空。共用 PiAiAdapter 在最终凭据绑定后，对两种传输引擎的错误事件、取消原因和同步/异步异常执行请求级脱敏；正常回复内容不改写。脱敏器不跨请求共享密钥，不保留原始 cause、stack、headers 或任意 Provider 属性；通用格式匹配仅作补充，不能代替实际凭据匹配。

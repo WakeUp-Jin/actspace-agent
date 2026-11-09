@@ -404,7 +404,7 @@ Revision 不是另一套事件事实，也不是“索引版本替代 Session �
 
 ### SQLite 读模型的内容
 
-当前 schema 9 限定用途，不复制完整 Journal：
+当前读模型（版本号以 `apps/desktop/src/main/runtime-v2/usage-read-model-schema.ts` 的 `PRAGMA user_version` 为准，现为 18）限定用途，不复制完整 Journal：
 
 - `session_catalog`：标题、workspace/worktree、pin/archive、时间、会话类型、完成 turn 数和源 revision。
 - `usage_activity`：时间、model/provider/tool、token、费用、状态和有限 `row_json`。
@@ -499,7 +499,7 @@ Workspace admission 继续从 Session 事实恢复；启动时只按批读取 wo
 
 ### 当前实现补充
 
-- SQLite schema 9：activity 行、去重维度 FTS、catalog 标题/受限消息片段 FTS、小时/日/全量 rollup、run 去重计数、增量关联状态与水位。维度 FTS 不为每条请求重复保存相同 model/provider/tool 文本。
+- SQLite 读模型：activity 行、去重维度 FTS、catalog 标题/受限消息片段 FTS、小时/日/全量 rollup、run 去重计数、增量关联状态与水位。维度 FTS 不为每条请求重复保存相同 model/provider/tool 文本。
 - Provider 的轻量 Query Source 只返回必要 Header 字段、完整前缀 seq 和物理 stamp；128 个描述符一批。Provider Worker 缓存最多 10,000 项/16 MiB 编码量，单批结果最多 2 MiB。打开的 Session 由 Runtime durableSeq 限制，恢复与 Agent 仍读 Session。
 - 标题和片段搜索只作用于本机索引。片段最长 512 字符；它不承诺覆盖消息全部正文，点击会话读取原始详情。搜索结果每页 50 条、上限 500，翻页替换结果列表。
 - 首次同步、重建、查询与 fallback 状态可见；取消 SQL 查询通过终止查询 Worker 实现，Provider 批读和同步在批次边界检查取消。SQLite 所有者租约防止另一个 Worker 删除活动库。
@@ -517,7 +517,7 @@ Workspace admission 继续从 Session 事实恢复；启动时只按批读取 wo
 
 Activity支持精确`model`/`providerId`与range/status/kind/FTS组合；旧statistics接口保持原有整段范围汇总语义。标题命中全部catalog可直接使用全局rollup，部分命中在SQLite TEMP表中一次聚合，再复用摘要、费用和维度计算。仅保留最近一个TEMP结果，`total_changes()`变化即失效；不会把匹配行数组送到Main。时间窗口变化也会产生不同缓存键。未筛选Tab计数继续走全局汇总。
 
-旧statistics总览另有`usage_run_cardinality`，按天和全量维护精确运行身份数；同一运行的LLM/工具混合只计一次，删除最后一个kind才递减。schema 9 在空表阶段创建辅助表与触发器，后续随批次维护，避免每次总览重新对全部运行去重；滑动时间窗口仍使用精确边界查询。
+旧statistics总览另有`usage_run_cardinality`，按天和全量维护精确运行身份数；同一运行的LLM/工具混合只计一次，删除最后一个kind才递减。读模型在空表阶段创建辅助表与触发器，后续随批次维护，避免每次总览重新对全部运行去重；滑动时间窗口仍使用精确边界查询。
 
 ## 16. SQLite 查询 Worker：兼容性、资源和使用边界
 
@@ -645,7 +645,7 @@ Worker 相关验收至少覆盖：
 
 实际读取路径是 Main → Runtime/App → Storage.readEventBatch → JSONL Reader Worker，再由 Main 转发有界事件批次到 SQLite Worker。两个 Worker 都懒启动；前者由 Provider 生命周期管理，后者由 Usage Service 管理。Provider cursor 是不透明实现令牌，Main 不解释物理偏移。
 
-JSONL 每批至多 256 events、目标 256 KiB，单记录最大 1 MiB；SQLite 按 step/call 关联重算精简 Usage 行，不把整库装进数组。schema 9 每批提交 cursor、关联状态与构建进度。同 schema 重建写 building generation，旧 published 保持可读；完成后原子发布新代，部分构建不冒充完成水位。追加批次提交其已处理的 durable 前缀。单关联组 10,000 events / 8 MiB、fallback 1,000 Sessions / 5,000 events / 8 MiB 精简状态是当前有界失败阈值。
+JSONL 每批至多 256 events、目标 256 KiB，单记录最大 1 MiB；SQLite 按 step/call 关联重算精简 Usage 行，不把整库装进数组。读模型每批提交 cursor、关联状态与构建进度。同 schema 重建写 building generation，旧 published 保持可读；完成后原子发布新代，部分构建不冒充完成水位。追加批次提交其已处理的 durable 前缀。单关联组 10,000 events / 8 MiB、fallback 1,000 Sessions / 5,000 events / 8 MiB 精简状态是当前有界失败阈值。
 
 原 JSON cache 文件保留；主查询不再通过它加载全部历史。fallback 在 Worker 内复用原 Session projection，并用请求级内存 SQLite 复用正式 FTS、cursor 与汇总查询；超过预算时明确失败。取消、索引进度和 rollup 已实现，真实 Electron 资源验收仍在执行，详见[执行摘要](../exec-runs/20261011-usage-sqlite-read-model/execution-summary.md)。
 
@@ -693,11 +693,11 @@ Worker `terminate()` 发起停止后，同步原生 SQL 可能仍未返回；Que
 
 隔离源失败会同时失效该 Session 的 Usage、catalog缓存及目录fingerprint；源恢复且revision不变也会重新读取。Provider没有可选批读能力时，历史/正文继续原能力，Usage明确不支持有界查询，不返回假零统计或删除其健康派生行。
 
-### Context 联合实施（schema 9）
+### Context 联合实施
 
 Context/Usage/catalog 共用 Query Worker 与单写 owner，投影水位分开。Context 通过单 Session descriptor 查询，不枚举其他 Session；当前 Context 直接读引擎的缓存投影，不等待 Worker 的全局 Usage 同步。前台连续最多四个命令后轮到后台一个，服务总请求预算为 8。Context 消费需求带 20 秒租约；错误状态保留到显式重试，避免可见轮询反复清库。
 
-schema 8 首次查询触发 schema 9 空表/索引创建，按需逐 Session 导入；跨 schema 不承诺旧结果可读。同 schema 重建使用独立 building 表，FTS/rollup/run 计数随原子发布切换，退出和恢复复用已提交进度。
+`user_version` 变化时首次查询触发新 schema 空表/索引创建，按需逐 Session 导入；跨 schema 不承诺旧结果可读（最近一次是统计页重做的 17 → 18 整库重建）。同 schema 重建使用独立 building 表，FTS/rollup/run 计数随原子发布切换，退出和恢复复用已提交进度。
 
 Usage 批量插入在事务内按新增 rowid 范围汇总，范围 SQL 强制避免 GROUP BY 选择全历史覆盖索引。逐行/批量结果及回滚有性质回归；这不等于已通过增量耗时门槛。SQLite 页缓存预算 32 MiB，WAL 自动 checkpoint 约 16 MiB；Native 内存仍须与 JS heap 分开量测。
 

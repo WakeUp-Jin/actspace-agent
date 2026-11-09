@@ -25,7 +25,7 @@ import { createNodeSandboxHostPort } from "@actspace/sandbox";
 it("runs the model/tool pipeline: explicit development, next-message activation, session isolation and restart", async () => {
   const directory = await mkdtemp(join(tmpdir(), "runtime-evolution-"));
   let root = await createCordisRoot();
-  const registry = createCoreCodecRegistry(); [...taskCodecs, ...contextCodecs].forEach(c => registry.register(c));
+  const registry = createCoreCodecRegistry(); [...taskCodecs, ...contextCodecs].forEach(c => { registry.register(c); });
   const sessions = new RuntimeSessionController({ dataRoot: directory, runtimeId: "evolution", registry, profileId: "test", manifestDigest: "test", plugins: [] }, new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot: directory, runtimeId: "evolution", registry })));
   let runtime!: AgentRuntimeService;
   const approvals: string[] = [];

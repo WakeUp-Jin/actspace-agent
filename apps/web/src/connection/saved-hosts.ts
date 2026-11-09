@@ -13,7 +13,7 @@ function isSavedHost(value: unknown): value is SavedHost {
 export function readSavedHosts(storage: Storage = localStorage): SavedHosts | null {
   try {
     const value = JSON.parse(storage.getItem(KEY) ?? "null") as Record<string, unknown> | null;
-    if (!value || value.version !== 1 || typeof value.activeHostId !== "string" || !Array.isArray(value.hosts) || !value.hosts.every(isSavedHost)) return null;
+    if (value?.version !== 1 || typeof value.activeHostId !== "string" || !Array.isArray(value.hosts) || !value.hosts.every(isSavedHost)) return null;
     return value as unknown as SavedHosts;
   } catch { return null; }
 }

@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261105-live-assistant-stream.md`
+- **关联计划**：`docs/exec-plans/completed/20261105-live-assistant-stream.md`
 - **执行过程**：`docs/exec-runs/20261105-live-assistant-stream/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：完成（实机功能清单 §9 待用户逐项确认）

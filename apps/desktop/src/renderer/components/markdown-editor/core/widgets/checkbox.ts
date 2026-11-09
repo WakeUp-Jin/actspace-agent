@@ -1,4 +1,4 @@
-import { EditorView, WidgetType } from "@codemirror/view";
+import { type EditorView, WidgetType } from "@codemirror/view";
 import type { EditorState } from "@codemirror/state";
 import { checkIcon } from "./icons";
 

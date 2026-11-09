@@ -64,7 +64,7 @@ for (const lockedSession of [false, true]) test(`blocked recovery retains diagno
     await management('stop');
     await Promise.race([exited, pause(5000).then(() => { throw new Error('Blocked Host did not stop normally'); })]);
   } finally {
-    clients.forEach(client => client.close()); waiting.forEach(response => response.destroy());
+    clients.forEach(client => { client.close(); }); waiting.forEach(response => { response.destroy(); });
     for (const child of children) if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill('SIGKILL'); await exited; }
     provider.closeAllConnections(); await new Promise(resolve => provider.close(resolve)); await rm(root, { recursive: true, force: true });
   }

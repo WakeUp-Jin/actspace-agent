@@ -580,7 +580,7 @@ describe("App streaming user message", () => {
     expect(createSession).not.toHaveBeenCalled();
     await userEvent.click(within(document.querySelector('[data-session-id="title-session"]') as HTMLElement).getByRole("button", { name: "New chat" }));
     record = { ...record, meta: { ...record.meta, title: "项目架构分析" } };
-    act(() => listeners.forEach(listener => listener({ event: { kind: "runtime-live", sessionId: record.meta.id, message: "session-title-updated" } })));
+    act(() => listeners.forEach(listener => { listener({ event: { kind: "runtime-live", sessionId: record.meta.id, message: "session-title-updated" } }); }));
     await screen.findByRole("button", { name: "查看会话详情： 项目架构分析" });
     expect(document.querySelector('[data-session-id="title-session"]')).toHaveTextContent("项目架构分析");
   });
@@ -3064,8 +3064,8 @@ sessionId: input.sessionId,
     const liveMessage = { recordKind: 'event', seq: 21, type: 'user/message', eventVersion: 1, criticality: 'ignorable', time: latest.meta.createdAt, source: { ownerPluginId: '@actspace/core' },
       data: { agentRunId: 'r3', messageId: 'v2-21', content: 'Live question' }, surface: { kind: 'append' },
       provenance: { sourceEventSeqs: [], contributorIds: [], runtimeSelectionSeq: null } };
-    act(() => live.forEach(listener => listener({ event: { kind: 'journal-update', schemaVersion: 1, runtimeInstanceId: 'runtime-1', liveSeq: 1, throughJournalSeq: 21, sessionId: 'paged',
-      update: { sessionId: 'paged', throughJournalSeq: 21, event: liveMessage, values: {} } } })));
+    act(() => live.forEach(listener => { listener({ event: { kind: 'journal-update', schemaVersion: 1, runtimeInstanceId: 'runtime-1', liveSeq: 1, throughJournalSeq: 21, sessionId: 'paged',
+      update: { sessionId: 'paged', throughJournalSeq: 21, event: liveMessage, values: {} } } }); }));
     await screen.findByText('Live question');
     expect(screen.getByText('Earlier question')).toBeInTheDocument();
     expect(screen.getByText('Latest question')).toBeInTheDocument();

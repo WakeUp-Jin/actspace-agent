@@ -70,7 +70,7 @@
 
 | 截图 | 内容 |
 | --- | --- |
-| `md-render-demo/shots/01-preview-top.png` | 文件头属性卡、标题、正文 |
+| `md-render-demo/shots/01-preview-top.png`（demo 已删除） | 文件头属性卡、标题、正文 |
 | `02-lists-tasks.png` | 圆点列表、任务复选框 |
 | `03-quote-callouts.png` | 引用、五种提示框 |
 | `04-code-table.png` | 代码块头、行内伪表格 |

@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, appendFile, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSessionHeader } from "@actspace/session-journal";
-import { JsonlQueryReader } from "./query-reader.js";
+import type { JsonlQueryReader } from "./query-reader.js";
 
 // The provider Worker is a built artifact, tested independently of Vitest transforms.
 

@@ -21,7 +21,7 @@ beforeEach(() => {
   vi.stubGlobal("cancelAnimationFrame", () => {});
 });
 afterEach(() => vi.unstubAllGlobals());
-const flushFrames = () => { for (let i = 0; i < 200 && frames.length > 0; i += 1) act(() => { const batch = frames; frames = []; batch.forEach((callback) => callback()); }); };
+const flushFrames = () => { for (let i = 0; i < 200 && frames.length > 0; i += 1) act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); }); };
 
 const renderedSources = () => markdownSpy.mock.calls.map((call) => String(call[0]));
 const countOf = (needle: string) => renderedSources().filter((source) => source.includes(needle)).length;

@@ -19,7 +19,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   Reflect.deleteProperty(navigator, "clipboard");
 });
-const flush = () => { for (let i = 0; i < 300 && frames.length > 0; i += 1) act(() => { const batch = frames; frames = []; batch.forEach((callback) => callback()); }); };
+const flush = () => { for (let i = 0; i < 300 && frames.length > 0; i += 1) act(() => { const batch = frames; frames = []; batch.forEach((callback) => { callback(); }); }); };
 
 const lines = (count: number) => Array.from({ length: count }, (_, i) => `const line${i + 1} = ${i + 1};`).join("\n");
 const fence = (body: string, info = "ts") => `\`\`\`${info}\n${body}\n\`\`\``;

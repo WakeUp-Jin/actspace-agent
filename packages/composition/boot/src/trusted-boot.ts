@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { RuntimeV2BootManifest, RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
-import { type CordisAdmissionReport, type CordisRootHandle, type EventCodec } from "@actspace/cordis-adapter";
+import type { CordisAdmissionReport, CordisRootHandle, EventCodec } from "@actspace/cordis-adapter";
 import { createBootConfigDump, type ResolvedComposition } from "@actspace/composition";
 import { BootDiagnostics } from "@actspace/diagnostics";
 import type { TrustedBootCandidate } from "./types.js";

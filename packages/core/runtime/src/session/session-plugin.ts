@@ -1,7 +1,7 @@
 import { emitNotification, type CordisContext } from "@actspace/cordis-adapter";
 import type { EventCodecRegistry } from "@actspace/session-journal";
 import type { SessionProjectionService } from "@actspace/session-projection";
-import { SessionStoreService } from "@actspace/session-persistence";
+import type { SessionStoreService } from "@actspace/session-persistence";
 import type { RendererAllowlist } from "../projection/tool-dto.js";
 import { RuntimeSessionController } from "./session-controller.js";
 import { createAuxiliaryRequestRecorder } from "./auxiliary-request-recorder.js";

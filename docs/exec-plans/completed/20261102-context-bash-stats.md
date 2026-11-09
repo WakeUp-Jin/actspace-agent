@@ -4,7 +4,7 @@
 
 右侧「上下文」面板最底下新增「Bash 命令」卡片，按会话统计 Bash 调用次数、失败次数、合计耗时和每个程序（含子命令）的使用次数与失败次数。数据从会话日志增量汇总，历史会话第一次打开面板时自动补齐。
 
-设计规范：[front-Context面板Bash命令统计](design-archive/frontend/front-Context面板Bash命令统计.md)（下称“规范”）。视觉：[context-bash-demo.html](../../design-docs/frontend/context-bash-demo.html)。
+设计规范：[front-Context面板Bash命令统计](design-archive/frontend/front-Context面板Bash命令统计.md)（下称“规范”）。视觉：`context-bash-demo.html`（已删除）。
 
 ## 范围
 

@@ -20,7 +20,7 @@
 - `apps/web`：浏览器 / PWA 客户端（React + Vite），手机和电脑浏览器经 WebSocket `/rpc` 连接一台 Agent Host，查看会话、审批与发送消息；可由 Host 的 `webRoot` 同源托管。设计见 [front-web-pwa客户端规范](design-docs/frontend/front-web-pwa客户端规范.md)。
 - `apps/site`：Astro 静态官网、公开文档、博客与从 release 文档生成的更新页。
 - `browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层；对应插件 `browser-tools` 默认不加载，在 扩展 › 插件 中开启。
-- `scripts/`：正式自动化入口；人工诊断位于 `diagnostics/`，原生实验位于 `experiments/`，可复建验收环境位于 `acceptance/`。
+- `scripts/`：正式自动化入口；人工诊断脚本在 `scripts/diagnostics/`，可复建验收环境在 `scripts/acceptance/`。
 - `docs/`：仓库知识库；规范、计划、验收证据、历史与参考资料按用途分区。
 - `artifacts/`：Git 忽略的可再生成制品，包括 CLI 包、矩阵 JSON、图片与 Rust 输出；不再使用根 `output/` 或 `target/`。
 - `tmp/`：Git 忽略的临时工作和参考仓库，禁止被生产源码导入；工具自身的 `dist/`、`node_modules/` 和 `logs/` 保留默认位置。

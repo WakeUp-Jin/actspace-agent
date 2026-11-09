@@ -42,11 +42,11 @@ describe("trajectory streaming", () => {
 
   it("grows the streaming assistant row in place without rebuilding the settled layer", () => {
     const view = render(at(0));
-    spies().forEach(spy => spy.mockClear());
+    spies().forEach(spy => { spy.mockClear(); });
     const lengths: number[] = [];
     let row: HTMLTableRowElement | null = null;
     const removed: Node[] = [];
-    const observer = new MutationObserver(records => records.forEach(record => removed.push(...Array.from(record.removedNodes))));
+    const observer = new MutationObserver(records => records.forEach(record => { removed.push(...Array.from(record.removedNodes)); }));
     for (let frame = 1; frame <= 5; frame += 1) {
       view.rerender(at(frame));
       const current = runningRow();

@@ -2,7 +2,7 @@
 
 > 管每次模型调用在日志里留下什么（`request/header`、`request/context`，以及新增的 `request/system-prompt`、`request/tools`），以及上下文 token 估算从哪里来。流式输出见[流式输出只走实时通道](agent-spec-live-assistant-stream.md)，事件词汇见[事件模型](agent-spec-dsh-event-model.md)，投影架构见[Runtime Projection](agent-spec-runtime-projection.md)。
 
-状态：已实现（2026-11-06），执行计划 [20261106-request-record](../../exec-plans/active/20261106-request-record.md)。压缩替换按 DSH 的做法，在替换事件上记录被替换部分的估算（§6.3.1）。§9 的实机对比待用户删除旧会话后重跑。
+状态：已实现，执行计划 [20261106-request-record](../../exec-plans/completed/20261106-request-record.md)。压缩替换按 DSH 的做法，在替换事件上记录被替换部分的估算（§6.3.1）。§9 的实机对比待用户删除旧会话后重跑。
 
 ## 1. 为什么改
 

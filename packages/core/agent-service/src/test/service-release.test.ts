@@ -8,7 +8,7 @@ import { AgentService } from "../service.js";
 function gate() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
 
 function fixture(execute: () => Promise<void> = async () => {}) {
-  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => { registry.register(codec); });
   const sessions = new Map<string, SessionHandle>();
   let opened = 0;
   const openSession = async (id: string) => {

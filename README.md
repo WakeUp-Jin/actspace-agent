@@ -128,7 +128,7 @@ Host capability -> browser-bridge
 ## 一些闲谈
 
 <p align="center">
-  <img src="docs/assets/readme/space-people (1).png" alt="Actspace" width="100%">
+  <img src="docs/assets/readme/space-people.png" alt="Actspace" width="100%">
 </p>
 
 我很喜欢市面上的很多 Agent 产品，也希望拥有一个能按自己的想法持续构建的运行空间：让模型获得清晰的上下文、可靠的工具和可验证的执行边界。

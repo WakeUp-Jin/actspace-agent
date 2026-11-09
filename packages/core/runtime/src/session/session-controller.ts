@@ -9,7 +9,7 @@ import type { EventCodecRegistry } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { SessionHandle as RuntimeSessionHandle } from "@actspace/session-persistence";
 import { createSessionHeader } from "@actspace/session-journal";
-import { SessionStore } from "@actspace/session-persistence";
+import type { SessionStore } from "@actspace/session-persistence";
 import { applySessionRecovery, classifySessionRecoveryAccess, type SessionRecoveryAccess } from "@actspace/session-persistence";
 import { SessionReadModel } from "../projection/durable-session.js";
 import type { RendererAllowlist } from "../projection/tool-dto.js";

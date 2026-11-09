@@ -1,4 +1,4 @@
-import { EditorView, WidgetType } from "@codemirror/view";
+import { type EditorView, WidgetType } from "@codemirror/view";
 import { instantiateMermaidSvg, nextMermaidInstanceId, type MermaidRenderResult } from "../../../messages/mermaid-renderer";
 import { hostOf } from "../context";
 import { expandIcon } from "./icons";

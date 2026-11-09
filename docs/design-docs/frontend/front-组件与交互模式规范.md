@@ -6,7 +6,7 @@
 
 - `components/ui/` 只放通用控件，不接收 `modelId`、`sessionId`、`toolName` 这类业务字段；业务组件消费它，不重写按钮、菜单、浮层的样式。
 - 复杂交互（浮层定位、焦点、Esc、键盘导航）基于 Radix 封装；简单控件（`Button`、`IconButton`）用原生 HTML。需要新外观先在基础组件加 variant，不在业务组件新建 `*_BUTTON_CLASS` 常量。
-- 现有原语：`Button` `IconButton` `PlainButton` `Tooltip` `HoverCard` `Menu` `ContextMenu` `Select` `Popover` `Dialog` `ConfirmDialog` `UnderlineTabs` `JsonTree`。`Switch`、`Textarea` 仍是业务组件自写（设置页 `Toggle`、Composer 输入框），计划见 `exec-plans/active/frontend-ui-components-foundation.md`。
+- 现有原语：`Button` `IconButton` `PlainButton` `Tooltip` `HoverCard` `Menu` `ContextMenu` `Select` `Popover` `Dialog` `ConfirmDialog` `UnderlineTabs` `JsonTree`。`Switch`、`Textarea` 仍是业务组件自写（设置页 `Toggle`、Composer 输入框），计划见 `exec-plans/active/20260926-frontend-ui-components-foundation.md`。
 - 不进基础层：`SplitView`（工作台布局底座）、消息块（`BashRunBlock` 等）、只在一处用的列表项。
 - 区域组件放 `components/<区域>/`，不新建 `features/`；拆分与文件行数规则见 [新功能开发清单](front-新功能开发清单.md)。
 

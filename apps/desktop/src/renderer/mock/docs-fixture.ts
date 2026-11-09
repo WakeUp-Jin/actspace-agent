@@ -34,7 +34,7 @@ export const MOCK_DOCS_FILES: readonly string[] = [
   "docs/design-docs/frontend/front-右侧面板与文件渲染规范.md",
   "docs/design-docs/frontend/front-聊天输入框规范.md",
   "docs/design-docs/frontend/front-文档面板规范.md",
-  "docs/exec-plans/active/frontend-ui-components-foundation.md",
+  "docs/exec-plans/active/20260926-frontend-ui-components-foundation.md",
   "packages/skill/official-skills/plugin-dev/SKILL.md",
   "packages/browser-tools/README.md",
 ];

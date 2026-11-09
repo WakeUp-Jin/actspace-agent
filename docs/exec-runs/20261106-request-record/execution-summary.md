@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261106-request-record.md`
+- **关联计划**：`docs/exec-plans/completed/20261106-request-record.md`
 - **执行过程**：`docs/exec-runs/20261106-request-record/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：完成。自动化验证全部通过；实机对比（规范 §9）待用户删除旧会话后重跑。

@@ -1,4 +1,4 @@
-import { type ContextPanelBucketKey, type ContextPanelBashStats, type ContextPanelBucketTokens, type ContextPanelConversationKind, type ContextPanelEntry, type ContextPanelView } from "@actspace/shared";
+import type { ContextPanelBucketKey, ContextPanelBashStats, ContextPanelBucketTokens, ContextPanelConversationKind, ContextPanelEntry, ContextPanelView } from "@actspace/shared";
 import { mockContextPaths, mockDisclosureSummary } from "./context-paths-fixture";
 import type { MockSession } from "./mock-db";
 
@@ -93,7 +93,7 @@ const SHARE_BEFORE: [ContextPanelBucketKey, number][] = [["systemPrompt", 0.05],
 const SHARE_AFTER: [ContextPanelBucketKey, number][] = [["systemPrompt", 0.05], ["tools", 0.15], ["rules", 0.04], ["skills", 0.03], ["summarizedConversation", 0.06], ["conversation", 0.67]];
 const COMPACTED_AT = 16;
 
-/** 「Bash 命令」卡片：数字取自旧版 `docs/design-docs/frontend/context-bash-demo.html`。 */
+/** 「Bash 命令」卡片：数字取自已删除的旧版 Bash 卡片 demo。 */
 const bashCount = (name: string, count: number, failed = 0) => ({ name, count, failed });
 export const MOCK_CONTEXT_BASH: ContextPanelBashStats = {
   calls: 38,

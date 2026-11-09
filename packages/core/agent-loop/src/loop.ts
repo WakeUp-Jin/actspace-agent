@@ -22,7 +22,7 @@ import type { ContextCompactor } from "@actspace/context-engine";
 import { AgentRuntimeError } from "@actspace/agent";
 import type { MainAgentInbox } from "@actspace/agent";
 import type { RunTurnResult } from "@actspace/agent";
-import { type CordisContext, type AgentLoopIntervention, type AgentNotification } from "@actspace/cordis-adapter";
+import type { CordisContext, AgentLoopIntervention, AgentNotification } from "@actspace/cordis-adapter";
 
 export type RunTurnInput = { readonly content: RuntimeV2JsonValue; readonly messageId?: string; readonly agentRunId?: string; readonly model?: string; readonly mode?: RuntimeV2AgentMode; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly keepPendingOnAbort?: boolean; readonly selectedSkillIds?: readonly string[];
   /** Host wake turn: no user message; the first Step claims pending background notifications. */

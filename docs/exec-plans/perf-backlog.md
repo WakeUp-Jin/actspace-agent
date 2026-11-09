@@ -21,19 +21,12 @@
 | P2 | 主进程 | **每次请求查压缩摘要**：`loop.ts` 的 `contextInput` 对每个 surface 条目调一次 `journal.readEvents(seq, seq + 1)`（`packages/core/agent-loop/src/loop.ts`） | 约 480 MB | 进行中 | 第三轮 R2 |
 | P3 | 主进程 | **子 Agent 面板每秒整份读日志**：`getSubagents` 每次调 `inspectSessionEvents`（`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`），同文件的 `revealSubagentRecord`、`getSubAgentTranscript` 也一样 | 约 340 MB | 进行中 | 第三轮 R3 |
 | P4 | 主进程 | **读旧事件时多余的深拷贝**：`JsonlEventHistory.readEvents` 对刚 `JSON.parse` 出来的每一行再做 `snapshotSessionJson`（`packages/session/session-persistence-jsonl/src/event-history.ts`） | 约 860 MB（和 P1–P3 有重叠） | 进行中 | 第三轮 R4 |
-| P10 | 主进程 | **工具参数流式片段整段重解析**：pi-ai 每收到一个工具参数片段，就对已收到的全部参数做一次 `parseStreamingJson`（含 `repairJson`），参数越长越慢，是 O(n²)（`openai-completions.js`；`anthropic-messages.js`、`openai-responses-shared.js` 同样如此）。我们的适配层（`packages/llm/llm-pi-ai/src/pi-ai-stream.ts`）只用 `delta`，不用这份中间结果 | 约 1.9 GB（2026-11-07 用 `analyze.mjs` 复查 run8 时发现） | 待拍板 | 建议在现有 `patches/@earendil-works__pi-ai@0.82.1.patch` 里去掉片段时的解析，只在工具调用结束时解析一次；要先确认 pi-ai 自己的 `partial` 消息有没有别的读者 |
+| P10 | 主进程 | **工具参数流式片段整段重解析**：pi-ai 每收到一个工具参数片段，就对已收到的全部参数做一次 `parseStreamingJson`（含 `repairJson`），参数越长越慢，是 O(n²)（`openai-completions.js`；`anthropic-messages.js`、`openai-responses-shared.js` 同样如此）。我们的适配层（`packages/llm/llm-pi-ai/src/pi-ai-stream.ts`）只用 `delta`，不用这份中间结果 | 约 1.9 GB（2026-11-07 用 `analyze.mjs` 复查 run8 时发现） | 待拍板 | 建议在现有 `patches/@earendil-works__pi-ai@1.5.0.patch` 里去掉片段时的解析，只在工具调用结束时解析一次；要先确认 pi-ai 自己的 `partial` 消息有没有别的读者 |
 | P5 | 主进程 | `inspect` / `readModel` | 约 350 MB | 待查 | 第三轮做完重跑后，用 `callers.mjs` 查调用方 |
 | P6 | 主进程 | `sharedView` / `assertJson` | 约 295 MB | 待查 | 同上 |
 | P7 | 渲染进程 | 每个实时事件都重算整份聊天投影：`selectChatSession` / `projectChatWindow` / `applyLiveEvent` | 约 175 MB | 待查 | 查是否能只更新受影响的消息 |
 | P8 | 渲染进程 | `toolPreview` | 约 91 MB | 待查 | 查是否每帧重算 |
 | P9 | 主进程 | `usage-source-cache.ts` 对每个会话调 `inspectSessionEvents` 后再过滤 | 未单独测 | 待查 | 低频（统计页），先确认触发频率 |
-
-## 未收尾的上一轮
-
-| 项 | 状态 |
-|---|---|
-| 上下文引擎直接用日志视图（[计划](active/20261107-context-trusted-surface.md)） | 已实现，run8 验证有效；未提交 |
-| 流式 Markdown 解析降频（[计划](active/20261107-markdown-stream-throttle.md)） | 已实现，run8 验证有效；未提交；Electron 里流式观感待用户看 |
 
 ## 已完成
 
@@ -43,5 +36,5 @@
 | 第一轮 | 请求记录只在变化时写完整内容 | run4 日志 8.57 MB → 1.60 MB | `c6538dd7` |
 | 第一轮 | 子 Agent 运行时主进程不再整份重读日志；回复渲染共用一个高亮器 | run6 主进程每分钟 2～3.4 GB 分配，渲染进程高亮 1.8 GB | `0e0070a3` |
 | 第二轮 | 对话内容只存一份，surface 只做标记 | — | `cd0ff335` |
-| 第二轮 | 上下文引擎直接用日志视图 | `stateDigest` 239 → 87 MB，`toLlmInput` 156 → 31 MB，对话 `cacheKey` 133 → 约 0 MB（run7 → run8） | 未提交 |
-| 第二轮 | 流式 Markdown 解析降频、处理器常驻 | 渲染进程 Markdown 约 722 MB → 约 48 MB（run7 → run8，run8 时长是两倍） | 未提交 |
+| 第二轮 | 上下文引擎直接用日志视图 | `stateDigest` 239 → 87 MB，`toLlmInput` 156 → 31 MB，对话 `cacheKey` 133 → 约 0 MB（run7 → run8） | `015b273f` |
+| 第二轮 | 流式 Markdown 解析降频、处理器常驻 | 渲染进程 Markdown 约 722 MB → 约 48 MB（run7 → run8，run8 时长是两倍） | `297e170c` |

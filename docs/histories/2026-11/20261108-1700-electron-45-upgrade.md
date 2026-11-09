@@ -8,7 +8,7 @@
 
 ### 📥 User Query
 
-> 按计划 docs/exec-plans/active/20261108-ci-pipelines.md：……P5 是 Electron 39 升到当前稳定版。这两个各自单独开 PR。那么我们继续接下来的任务吧。
+> 按计划 docs/exec-plans/completed/20261108-ci-pipelines.md：……P5 是 Electron 39 升到当前稳定版。这两个各自单独开 PR。那么我们继续接下来的任务吧。
 
 ### 🛠 Changes Overview
 
@@ -39,4 +39,4 @@
 - `apps/desktop/package.json`、`pnpm-lock.yaml`、`apps/desktop/tsconfig.json`
 - `apps/desktop/src/main/artifact-context-menu-service.ts`、`apps/desktop/src/main/test/artifact-context-menu-service.test.ts`、`apps/desktop/src/main/test/file-applications-service.test.ts`
 - `scripts/release-package.sh`
-- `docs/CICD.md`、`docs/exec-plans/active/20261108-ci-pipelines.md`、`docs/exec-plans/tech-debt-tracker.md`、`docs/exec-runs/20261108-ci-pipelines/execution-process.md`、`docs/exec-runs/20261108-ci-pipelines/execution-summary.md`
+- `docs/CICD.md`、`docs/exec-plans/completed/20261108-ci-pipelines.md`、`docs/exec-plans/tech-debt-tracker.md`、`docs/exec-runs/20261108-ci-pipelines/execution-process.md`、`docs/exec-runs/20261108-ci-pipelines/execution-summary.md`

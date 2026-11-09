@@ -28,7 +28,7 @@ import { DEFAULT_HARNESS_ENTRIES } from "./default-harness-definition.js";
 it("executes the default Loop from its fixed closure with Harness-owned policies", async () => {
   const directory = await mkdtemp(join(tmpdir(), "actspace-default-harness-"));
   const root = await createCordisRoot();
-  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec)); contextCodecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => { registry.register(codec); }); contextCodecs.forEach(codec => { registry.register(codec); });
   const sessions = new RuntimeSessionController({ dataRoot: directory, runtimeId: "fixed-default", registry, profileId: "test", manifestDigest: "test", plugins: [] }, new SessionStore({ registry }, new JsonlSessionStorage({ dataRoot: directory, runtimeId: "fixed-default", registry })));
   const host = { hostKind: "cli-run" as const, capabilityCeiling: [], runtimeContract: "actspace.runtime.v2" as const, invocationId: "fixed-default" };
   const toolEnvironment = { workspaceRoot: directory, hostCapabilities: new Set<string>(), capabilitySet: { ids: [], has: () => false, get: <T>() => ({}) as T }, createArtifact: async () => { throw new Error("unused"); } };

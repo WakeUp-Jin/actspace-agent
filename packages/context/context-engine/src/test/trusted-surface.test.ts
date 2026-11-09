@@ -54,7 +54,7 @@ describe("trusted Surface in the Context engine", () => {
     expect(first.content.conversation).toBe(value.surface);
     const reconciled = await engineFor(value, instances).reconcile({ ...request, requestId: "r2", stepId: "step-2" }, value.lastSeq);
     expect(reconciled.content.conversation).toBe(value.surface);
-    reconciled.content.conversation.entries.forEach((entry, index) => expect(entry.node).toBe(value.surface.entries[index]!.node));
+    reconciled.content.conversation.entries.forEach((entry, index) => { expect(entry.node).toBe(value.surface.entries[index]!.node); });
     expect(projectContext(reconciled).content.conversation).toBe(value.surface);
 
     const input = await engineFor(value, instances).toLlmInput(reconciled);
