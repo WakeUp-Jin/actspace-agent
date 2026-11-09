@@ -40,8 +40,8 @@
     "@actspace/session-persistence-jsonl": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.0.3",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.4"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

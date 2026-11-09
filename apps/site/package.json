@@ -27,8 +27,8 @@
   "devDependencies": {
     "@astrojs/check": "0.9.9",
     "@types/mdast": "4.0.4",
-    "typescript": "6.0.3",
-    "vitest": "4.1.10"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=22.12.0"

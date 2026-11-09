@@ -4,3 +4,10 @@ packages:
 allowBuilds:
   electron: true
   esbuild: true
+# 工具链版本只在这里改；各包 package.json 写 `catalog:`，由 scripts/check-package-boundaries.mjs 守住。
+catalog:
+  "@types/node": ^24.0.3
+  "@vitejs/plugin-react": ^4.5.2
+  typescript: ^5.8.3
+  vite: ^5.4.19
+  vitest: ^3.2.4
