@@ -5,8 +5,6 @@
 
 export type CalloutType = "note" | "tip" | "important" | "warning" | "caution";
 
-export const CALLOUT_TYPES: readonly CalloutType[] = ["note", "tip", "important", "warning", "caution"];
-
 export const CALLOUT_LABEL: Record<CalloutType, string> = {
   note: "说明",
   tip: "提示",

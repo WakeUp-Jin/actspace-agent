@@ -50,9 +50,3 @@ export interface CliArtifactResult {
   persistent?: boolean;
 }
 
-export type SerializableTraceEvent = never;
-
-export interface ContextSnapshotArtifact {
-  readonly id: string;
-  readonly kind: "pre-llm" | "post-compaction" | "final";
-}

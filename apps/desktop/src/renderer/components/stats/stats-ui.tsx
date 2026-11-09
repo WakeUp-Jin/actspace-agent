@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Info, type LucideIcon } from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../ui/HoverCard";
 import { PlainButton } from "../ui/PlainButton";
@@ -612,13 +612,6 @@ export function Pager({ page, totalPages, totalRows, onPageChange, busy }: { pag
       <Button size="xs" disabled={page >= totalPages || busy} onClick={() => onPageChange(page + 1)}>下一页</Button>
     </nav>
   );
-}
-
-// ---------------------------------------------------------------- 其他
-
-/** 色块 + 名称的小图例（堆叠条下方用）。 */
-export function SwatchLabel({ color, children }: { color: string; children: ReactNode }) {
-  return <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><i aria-hidden="true" className="block size-[7px] stats-swatch" style={{ background: color } as CSSProperties} />{children}</span>;
 }
 
 export { DASH };

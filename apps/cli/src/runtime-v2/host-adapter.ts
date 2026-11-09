@@ -5,14 +5,11 @@ import { CliV2ApprovalBroker } from "./approval";
 import { NodeArtifactStore, NodeLlmAdapter, resolveEnvModelProvider } from "@actspace/agent-host/node-ports";
 import { loadRuntimeV2 } from "./loader";
 import { currentModelHostPort, MODELS_HOST_PORT_ID } from "@actspace/shared";
-import type { BootRuntimeOptions } from "@actspace/runtime";
 import type { RuntimeV2PermissionMode } from "./types";
 
 /** The CLI runs from `apps/cli/dist/runtime-v2`; a repo checkout keeps the fetched nono under `<repo>/dist/sandbox-components`. */
 export const CLI_REPO_ROOT = join(__dirname, "../../../..");
 
-let testCordis: BootRuntimeOptions["cordis"] | undefined;
-export function setCliV2CordisForTest(value?: BootRuntimeOptions["cordis"]): void { testCordis = value; }
 
 export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: () => void) => void; readonly kind: "cli-run"; readonly workspace: string; readonly dataRoot: string; readonly persistentArtifacts?: boolean; readonly permissionMode: RuntimeV2PermissionMode; readonly permissionModeExplicit?: boolean; readonly sandboxInherited?: boolean; readonly pinnedHarness?: import("@actspace/runtime").PinnedHarness; readonly mock: boolean; readonly model?: string; readonly headlessInput?: string; readonly headlessSessionId?: string; readonly env?: NodeJS.ProcessEnv; readonly onLiveEvent?: (event: Omit<RuntimeV2LiveEvent, "schemaVersion" | "runtimeInstanceId" | "liveSeq" | "throughJournalSeq">) => void; readonly onHeadlessSession?: (sessionId: string, abort: () => boolean) => void }) {
   const runtime = await loadRuntimeV2(); const provider = resolveEnvModelProvider(options.env ?? process.env);
@@ -64,7 +61,7 @@ export async function bootCliV2(options: { readonly onForceCleanup?: (cleanup: (
       onLiveEvent: (event) => {
         if (event.kind === "assistant-delta" || event.kind === "reasoning-delta" || event.kind === "run-state") options.onLiveEvent?.({ ...event });
       },
-      ...(testCordis ? { cordis: testCordis } : { cordis: { configPath: runtime.runtimeCordisConfigPath(), admission: await runtime.inspectCordisAdmission() } }),
+      cordis: { configPath: runtime.runtimeCordisConfigPath(), admission: await runtime.inspectCordisAdmission() },
       disposePlugins: disposeResources,
     });
     return Object.freeze({ profile, approval, artifacts });

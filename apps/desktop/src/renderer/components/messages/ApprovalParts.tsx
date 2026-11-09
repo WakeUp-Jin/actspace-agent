@@ -124,13 +124,6 @@ function useGrantSuggestion(requestId: string | undefined, pick: (suggestion: Gr
   return result?.requestId === requestId ? result?.suggestion : undefined;
 }
 
-const isExactSuggestion = (suggestion: GrantSuggestion) => suggestion.selector.kind === "exact";
-
-/** Compatibility for consumers that only need the exact suggestion. */
-export function useExactGrantSuggestion(requestId: string | undefined): GrantSuggestion | undefined {
-  return useGrantSuggestion(requestId, isExactSuggestion);
-}
-
 export function useFileGrantSuggestions(requestId: string | undefined): readonly GrantSuggestion[] {
   const [result, setResult] = useState<{ requestId: string; suggestions: readonly GrantSuggestion[] }>();
   useEffect(() => {
