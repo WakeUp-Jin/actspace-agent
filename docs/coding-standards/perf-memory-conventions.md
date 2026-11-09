@@ -73,6 +73,7 @@
 |---|---|---|
 | 静态检查 | 每次提交。扫描整份读日志和深拷贝的写法；超出基线的文件报错，不在高频路径上的要写注释说明 | `pnpm check:hot-path-reads` |
 | 规模测试 | 改了第 1 条里的任何路径。合成 1k 条和 10k 条事件的会话，断言读日志的条数、解析行数、拷贝次数不随规模增长。只计数，不计时 | 随 `pnpm test` 运行；写法见 [测试约定](#规模测试的写法) |
+| 覆盖检查 | 每次提交。核对 `scripts/scale-test-coverage.json`：高频入口都登记了对应的 `*.scale.test.ts`，每个规模测试都比较 1k 与 10k、用读取计数、不计时；静态检查基线里仍整份读日志的文件要么有规模测试，要么列在 `pending` 并写明原因 | `pnpm check:scale-tests` |
 | 实机采样 | 大改动之后，或者用户反馈卡顿、内存高的时候。按函数统计分配了多少 MB，和上一轮对比 | [内存采样工具](../tools/heap-monitor/README.md) |
 
 ### 规模测试的写法
@@ -80,6 +81,7 @@
 - 用 `@actspace/session-journal/testing` 的 `syntheticSessionEvents(count)` 生成会话，用 `countingHistory(events)` 包住归档历史，统计读了多少行。
 - 同一个操作在 1k 条和 10k 条事件上各跑一次，断言两次的读取行数相同（或者只差常数）。**不要断言毫秒数**：计时在不同机器上波动大，测试会偶尔失败。
 - 修 bug 时先写规模测试，确认它在旧代码上失败，再修。
+- 文件名以 `.scale.test.ts` 结尾，并登记到 `scripts/scale-test-coverage.json` 的 `entries`（入口文件 → 测试）。`pnpm check:scale-tests` 会核对登记、写法，以及静态检查基线里仍整份读日志的文件是否都有规模测试或 `pending` 理由；`pending` 只能变短。
 
 ## 自检
 

@@ -5,6 +5,8 @@ import { SessionError } from "./errors.js";
 export type SessionSurfaceEntry = {
   readonly node: SessionSurfaceNodeV1;
   readonly sourceEventSeqs: readonly number[];
+  /** 替换条目（压缩摘要）所属的压缩 id；追加条目没有。记在这里是为了每次请求不必回头读 `surface/replaced` 事件。 */
+  readonly compactionId?: string;
 };
 
 export type SessionSurfaceView = {
@@ -55,7 +57,7 @@ export class SessionSurface {
     const expected = uniqueSorted(shadowed.flatMap((entry) => entry.sourceEventSeqs));
     const supplied = uniqueSorted(operation.sourceEventSeqs);
     if (!sameNumbers(expected, supplied)) invalid("Surface replacement must cite every shadowed source event and no unrelated event.");
-    const replacement = createEntry(node, event, supplied);
+    const replacement = createEntry(node, event, supplied, compactionIdOf(event) ?? node.messageId);
     this.#entries.splice(operation.start, operation.end - operation.start, replacement);
     this.#replaceGeneration += 1;
     this.#view = undefined;
@@ -67,11 +69,17 @@ export class SessionSurface {
   }
 }
 
-function createEntry(node: SessionSurfaceNodeV1, event: SessionEventEnvelopeV1, additional: readonly number[] = []): SessionSurfaceEntry {
+function createEntry(node: SessionSurfaceNodeV1, event: SessionEventEnvelopeV1, additional: readonly number[] = [], compactionId?: string): SessionSurfaceEntry {
   return Object.freeze({
     node,
     sourceEventSeqs: Object.freeze(uniqueSorted([event.seq, ...event.provenance.sourceEventSeqs, ...additional])),
+    ...(compactionId === undefined ? {} : { compactionId }),
   });
+}
+
+function compactionIdOf(event: SessionEventEnvelopeV1): string | undefined {
+  const value = (event.data as { compactionId?: unknown }).compactionId;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function validateEligible(event: SessionEventEnvelopeV1, kind: SessionSurfaceNodeV1["kind"]): void {

@@ -4,11 +4,13 @@
  * Browser Bridge 的运行时 host 由 Chrome Native Messaging 拉起；ActSpace 只负责
  * 安装 `abb`、注册 native host、暴露 doctor/capabilities 状态。
  */
-import { chmod, copyFile, cp, lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { chmod, copyFile, cp, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
+import { toolChildEnv } from "@actspace/shared";
 import type {
   BrowserBridgeActionResult,
   BrowserBridgeDoctorCheck,
@@ -48,6 +50,36 @@ type ConnectionConfig = { schemaVersion: 1; enabled: boolean; selectedInstanceId
 type InstanceRecord = BrowserBridgeInstance & { socketPath: string; protocolVersion: string };
 const INSTANCE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const EXTENSION_ID = "eneeikpgpieikinaimmgmdiafbgbanei";
+
+/**
+ * 读只属于当前用户的私有文件（instances/selection 记录）。
+ * 先 open 再用同一句柄 stat 和读，检查与读取之间文件不会被换掉；不满足条件就抛错，调用方按「不可信记录」跳过。
+ */
+async function readOwnedFile(path: string, maxAgeMs?: number): Promise<string> {
+  const handle = await open(path, "r");
+  try {
+    const metadata = await handle.stat();
+    if (!metadata.isFile() || metadata.uid !== process.getuid?.() || metadata.mode & 0o077) throw new Error(`Untrusted file: ${path}`);
+    if (maxAgeMs !== undefined && Date.now() - metadata.mtimeMs > maxAgeMs) throw new Error(`Stale file: ${path}`);
+    return await handle.readFile("utf8");
+  } finally {
+    await handle.close();
+  }
+}
+
+/** 读内置组件文件；符号链接（O_NOFOLLOW；Windows 没有该标志，按位或得 0）或非普通文件返回 undefined。 */
+async function readRegularFile(path: string): Promise<Buffer | undefined> {
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ELOOP" || error.code === "EISDIR") return undefined;
+    throw error;
+  });
+  if (handle === undefined) return undefined;
+  try {
+    return (await handle.stat()).isFile() ? await handle.readFile() : undefined;
+  } finally {
+    await handle.close();
+  }
+}
 
 function chromeExtensionId(publicKey: string): string {
   const digest = createHash("sha256").update(Buffer.from(publicKey, "base64")).digest().subarray(0, 16);
@@ -176,18 +208,24 @@ export class BrowserBridgeService {
     return { ok: true, abbPath: this.binPath, extensionDir: this.extensionDir };
   }
 
+  /**
+   * 只接受 main 自己（系统目录对话框）拿到的绝对路径；保存前解析成真实路径，避免之后编译时符号链接指向别处。
+   * 传 null 切回随包扩展。
+   */
   async useSourceExtension(repoRoot: string | null): Promise<BrowserBridgeActionResult> {
+    let resolvedRoot: string | undefined;
     if (repoRoot !== null) {
       if (!isAbsolute(repoRoot)) return { ok: false, error: "请选择绝对源码目录。" };
       try {
-        const folder = join(resolvePluginDir(repoRoot), "apps", "chrome-extension");
+        resolvedRoot = await realpath(repoRoot);
+        const folder = join(resolvePluginDir(resolvedRoot), "apps", "chrome-extension");
         const manifest = JSON.parse(await readFile(join(folder, "manifest.json"), "utf8")) as Record<string, unknown>;
         await stat(join(folder, "src", "background.js"));
         if (manifest.name !== "ActSpace Browser" || typeof manifest.key !== "string" || chromeExtensionId(manifest.key) !== EXTENSION_ID || manifest.manifest_version !== 3) throw new Error("extension identity mismatch");
       } catch { return { ok: false, error: "该目录缺少有效的 ActSpace Chrome 扩展。" }; }
     }
     const config = await this.connectionConfig();
-    await this.saveConfig({ ...config, sourceRoot: repoRoot ?? undefined });
+    await this.saveConfig({ ...config, sourceRoot: resolvedRoot });
     return { ok: true };
   }
 
@@ -244,10 +282,7 @@ export class BrowserBridgeService {
     const candidates: InstanceRecord[] = [];
     for (const name of names.filter((value) => /^s-[0-9a-f]{16}\.sock\.json$/.test(value)).slice(0, 20)) {
       try {
-        const file = join(folder, name);
-        const metadata = await stat(file);
-        if (!metadata.isFile() || metadata.uid !== process.getuid?.() || metadata.mode & 0o077) continue;
-        const record = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+        const record = JSON.parse(await readOwnedFile(join(folder, name))) as Record<string, unknown>;
         const socketPath = join(this.supportDir(), name.slice(0, -5));
         if (record.hostId !== basename(socketPath) || record.socketPath !== socketPath ||
           typeof record.extensionInstanceId !== "string" || !INSTANCE_ID.test(record.extensionInstanceId) ||
@@ -285,10 +320,7 @@ export class BrowserBridgeService {
     const matches: InstanceRecord[] = [];
     for (const candidate of candidates) {
       try {
-        const path = join(folder, `selection-${candidate.hostId}.json`);
-        const file = await stat(path);
-        if (!file.isFile() || file.uid !== process.getuid?.() || file.mode & 0o077 || Date.now() - file.mtimeMs > 5 * 60_000) continue;
-        const selected = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+        const selected = JSON.parse(await readOwnedFile(join(folder, `selection-${candidate.hostId}.json`), 5 * 60_000)) as Record<string, unknown>;
         if (selected.nonce === this.selectionNonce && selected.instanceId === candidate.instanceId && selected.hostId === candidate.hostId) matches.push(candidate);
       } catch { /* No click from this profile. */ }
     }
@@ -444,7 +476,10 @@ export class BrowserBridgeService {
     };
   }
 
-  async buildAndInstall(repoRoot: string): Promise<BrowserBridgeInstallResult> {
+  /** 只编译「选择源码扩展」保存下来的目录；renderer 不能指定路径。 */
+  async buildAndInstall(): Promise<BrowserBridgeInstallResult> {
+    const repoRoot = (await this.connectionConfig()).sourceRoot;
+    if (repoRoot === undefined) return { ok: false, error: "请先选择源码扩展目录，再从源码编译。" };
     const sourceValidation = await this.useSourceExtension(repoRoot);
     if (!sourceValidation.ok) return { ok: false, error: sourceValidation.error };
     const pluginDir = resolvePluginDir(repoRoot);
@@ -452,7 +487,8 @@ export class BrowserBridgeService {
     const sourceBinary = join(pluginDir, "skill", "scripts", "abb");
     const extensionDir = join(pluginDir, "apps", "chrome-extension");
     try {
-      await stat(buildScript);
+      // build.sh 要是目录内的普通文件；符号链接可能把编译步骤指到源码目录之外。
+      if (!(await lstat(buildScript)).isFile()) throw new Error("build.sh is not a regular file");
       await stat(join(extensionDir, "manifest.json"));
     } catch {
       return {
@@ -497,10 +533,9 @@ export class BrowserBridgeService {
         if (isAbsolute(relativePath) || relativePath.split(/[\\/]/).some((part) => part === ".." || part === "" || part === ".") || !/^[a-f0-9]{64}$/.test(expectedHash)) {
           return { ok: false, error: "Chrome 连接组件清单无效。" };
         }
-        const resourcePath = join(this.bundledRoot, relativePath);
-        const resourceInfo = await lstat(resourcePath);
-        if (!resourceInfo.isFile()) return { ok: false, error: `Chrome 连接组件不是普通文件：${relativePath}` };
-        const actualHash = createHash("sha256").update(await readFile(resourcePath)).digest("hex");
+        const resource = await readRegularFile(join(this.bundledRoot, relativePath));
+        if (resource === undefined) return { ok: false, error: `Chrome 连接组件不是普通文件：${relativePath}` };
+        const actualHash = createHash("sha256").update(resource).digest("hex");
         if (actualHash !== expectedHash) return { ok: false, error: `Chrome 连接组件校验失败：${relativePath}` };
       }
       if (!manifest.files["bin/abb"] || !manifest.files["extension/manifest.json"] || !manifest.files["extension/src/background.js"]) {
@@ -764,6 +799,7 @@ function runCommand(
     try {
       child = spawn(command, args, {
         cwd,
+        env: toolChildEnv(process.env),
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch (error) {

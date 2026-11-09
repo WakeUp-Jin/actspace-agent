@@ -31,9 +31,10 @@ if (!process.argv.includes('--child')) {
     if (bootstrap) {
       await mkdir(join(bootstrap, 'user-data'));
       await writeFile(join(bootstrap, 'package.json'), JSON.stringify({ name: 'usage-worker-package-probe', main: 'main.cjs' }));
-      await writeFile(join(bootstrap, 'main.cjs'), `const { app } = require('electron'); app.setPath('userData', ${JSON.stringify(join(bootstrap, 'user-data'))}); app.whenReady().then(() => import(${JSON.stringify(pathToFileURL(import.meta.filename).href)})).then(() => app.exit(0), error => { console.error(error); app.exit(1); });`);
+      // 路径走环境变量，不拼进代码文本：bootstrap 与 ACTSPACE_DATA_DIR 同为 probeRoot/user-data。
+      await writeFile(join(bootstrap, 'main.cjs'), "const { app } = require('electron'); app.setPath('userData', process.env.ACTSPACE_DATA_DIR); app.whenReady().then(() => import(process.env.ACTSPACE_USAGE_PROBE_ENTRY)).then(() => app.exit(0), error => { console.error(error); app.exit(1); });");
     }
-    const env = { ...process.env, ACTSPACE_DATA_DIR: join(probeRoot, 'user-data'), ACTSPACE_WORKSPACE_ROOT: join(probeRoot, 'workspace'), ACTSPACE_USAGE_PROBE_RESULT: join(probeRoot, 'result.json') };
+    const env = { ...process.env, ACTSPACE_DATA_DIR: join(probeRoot, 'user-data'), ACTSPACE_WORKSPACE_ROOT: join(probeRoot, 'workspace'), ACTSPACE_USAGE_PROBE_RESULT: join(probeRoot, 'result.json'), ACTSPACE_USAGE_PROBE_ENTRY: pathToFileURL(import.meta.filename).href };
     delete env.ACTSPACE_REPO_ROOT;
     if (browserProcess) delete env.ELECTRON_RUN_AS_NODE;
     else env.ELECTRON_RUN_AS_NODE = '1';

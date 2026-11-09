@@ -27,7 +27,7 @@ export async function readHostConfig(file: string, env: NodeJS.ProcessEnv = proc
   const address = string(raw.listen.address), port = raw.listen.port;
   if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid listen port");
   const base = dirname(resolve(file)); let tls: HostConfig["tls"];
-  if (raw.tls !== undefined) { keys(raw.tls, ["cert", "key"]); tls = { cert: resolve(base, string(raw.tls.cert)), key: resolve(base, string(raw.tls.key)) }; await access(tls.cert, constants.R_OK); await access(tls.key, constants.R_OK); createSecureContext({ cert: await readFile(tls.cert), key: await readFile(tls.key) }); }
+  if (raw.tls !== undefined) { keys(raw.tls, ["cert", "key"]); tls = { cert: resolve(base, string(raw.tls.cert)), key: resolve(base, string(raw.tls.key)) }; createSecureContext({ cert: await readFile(tls.cert), key: await readFile(tls.key) }); }
   if (!tls && !["127.0.0.1", "::1"].includes(address)) throw new Error("Public Host binding requires TLS");
   if (!Array.isArray(raw.allowedOrigins) || raw.allowedOrigins.some(origin => typeof origin !== "string" || new URL(origin).origin !== origin || !origin.startsWith("https://"))) throw new Error("Origins must be exact HTTPS origins");
   let webRoot: string | undefined;

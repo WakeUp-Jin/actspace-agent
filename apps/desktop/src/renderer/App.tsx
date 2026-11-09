@@ -1364,16 +1364,12 @@ export function App() {
     if (!sessionId) return;
 
     try {
-      const listedSession = sessions.find((session) => session.id === sessionId);
-      let transcriptMessages: MessageBlock[];
-      let transcriptTitle = listedSession?.title ?? "Untitled session";
-
       const record = await getSession({ sessionId });
       if (!record) {
         throw new Error(`Session not found: ${sessionId}`);
       }
-      transcriptTitle = record.meta.title;
-      transcriptMessages = record.messageBlocks?.length
+      const transcriptTitle = record.meta.title;
+      const transcriptMessages: MessageBlock[] = record.messageBlocks?.length
         ? record.messageBlocks
         : createMessageBlocks(record.events);
 
@@ -1381,7 +1377,7 @@ export function App() {
     } catch (error) {
       console.error("Failed to copy session transcript", error);
     }
-  }, [sessions]);
+  }, []);
 
   const handleForkSession = useCallback(async (sessionId: string, turnId?: string) => {
     // 整个会话分叉要等本轮结束；从某条已完成的回复分叉不带当前运行中的一轮，可以随时做。

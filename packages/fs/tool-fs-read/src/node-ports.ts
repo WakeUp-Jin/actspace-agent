@@ -1,4 +1,4 @@
-import { lstat, stat, readFile, readdir, realpath } from "node:fs/promises";
+import { lstat, open, stat, readdir, realpath } from "node:fs/promises";
 import { basename, extname, isAbsolute, relative, resolve } from "node:path";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tool-runtime";
@@ -33,31 +33,37 @@ async function readFileTool(
   if (!pathArg) return failure("INVALID_ARGUMENTS", "path is required");
   try {
     const filePath = await resolveReadablePath(pathArg, workspaceRoot, context.sessionId, resolveArtifact, context);
-    const fileStat = await stat(filePath);
-    if (!fileStat.isFile()) return failure("NOT_A_FILE", `Path is not a regular file: ${pathArg}`);
-    const mimeType = IMAGE_MIME_BY_EXT[extname(filePath).toLowerCase()];
-    if (mimeType !== undefined) {
-      const bytes = await readFile(filePath);
-      const artifact = await context.createArtifact({ bytes, mediaType: mimeType });
-      const summary = `Read image ${displayPath(filePath, workspaceRoot)} (${fileStat.size} bytes).`;
-      return { status: "completed", summary, modelOutput: [{ type: "text", text: summary }, { type: "artifact", artifact, label: "Image" }], artifacts: [artifact], detail: [{ label: "actspace.context.file", value: { path: filePath, kind: "file", operation: "read" } }] };
+    // 先 open 再用同一句柄 stat 和读：stat 与读取之间文件不会被换掉。
+    const handle = await open(filePath, "r");
+    try {
+      const fileStat = await handle.stat();
+      if (!fileStat.isFile()) return failure("NOT_A_FILE", `Path is not a regular file: ${pathArg}`);
+      const mimeType = IMAGE_MIME_BY_EXT[extname(filePath).toLowerCase()];
+      if (mimeType !== undefined) {
+        const bytes = await handle.readFile();
+        const artifact = await context.createArtifact({ bytes, mediaType: mimeType });
+        const summary = `Read image ${displayPath(filePath, workspaceRoot)} (${fileStat.size} bytes).`;
+        return { status: "completed", summary, modelOutput: [{ type: "text", text: summary }, { type: "artifact", artifact, label: "Image" }], artifacts: [artifact], detail: [{ label: "actspace.context.file", value: { path: filePath, kind: "file", operation: "read" } }] };
+      }
+      const offset = integerArg(args, "offset", 1);
+      const limit = integerArg(args, "limit", READ_FILE_DEFAULT_LIMIT);
+      const cacheKey = `${context.sessionId}\0${context.contextGeneration ?? 0}\0${filePath}\0${offset}\0${limit}`;
+      const cached = cache.get(cacheKey);
+      if (args.force !== true && cached?.size === fileStat.size && cached.mtimeMs === fileStat.mtimeMs) {
+        const text = "File unchanged since the previous read of this exact path and range. Reuse the earlier numbered lines, or pass force=true.";
+        return completed(text, undefined, { path: filePath, kind: "file", operation: "read" });
+      }
+      const raw = await handle.readFile("utf8");
+      const lines = raw.split("\n");
+      const start = Math.max(0, offset - 1);
+      const end = Math.min(lines.length, start + limit);
+      let text = lines.slice(start, end).map((line, index) => `${String(start + index + 1).padStart(6)}|${line}`).join("\n");
+      if (end < lines.length) text += `\n\n[Showing lines ${offset}-${end} of ${lines.length}. Use offset/limit to read more.]`;
+      cache.set(cacheKey, { size: fileStat.size, mtimeMs: fileStat.mtimeMs });
+      return completed(text || "(empty file)", `Read ${displayPath(filePath, workspaceRoot)}`, { path: filePath, kind: "file", operation: "read" });
+    } finally {
+      await handle.close();
     }
-    const offset = integerArg(args, "offset", 1);
-    const limit = integerArg(args, "limit", READ_FILE_DEFAULT_LIMIT);
-    const cacheKey = `${context.sessionId}\0${context.contextGeneration ?? 0}\0${filePath}\0${offset}\0${limit}`;
-    const cached = cache.get(cacheKey);
-    if (args.force !== true && cached?.size === fileStat.size && cached.mtimeMs === fileStat.mtimeMs) {
-      const text = "File unchanged since the previous read of this exact path and range. Reuse the earlier numbered lines, or pass force=true.";
-      return completed(text, undefined, { path: filePath, kind: "file", operation: "read" });
-    }
-    const raw = await readFile(filePath, "utf8");
-    const lines = raw.split("\n");
-    const start = Math.max(0, offset - 1);
-    const end = Math.min(lines.length, start + limit);
-    let text = lines.slice(start, end).map((line, index) => `${String(start + index + 1).padStart(6)}|${line}`).join("\n");
-    if (end < lines.length) text += `\n\n[Showing lines ${offset}-${end} of ${lines.length}. Use offset/limit to read more.]`;
-    cache.set(cacheKey, { size: fileStat.size, mtimeMs: fileStat.mtimeMs });
-    return completed(text || "(empty file)", `Read ${displayPath(filePath, workspaceRoot)}`, { path: filePath, kind: "file", operation: "read" });
   } catch (error) {
     return ioFailure("read file", pathArg, error);
   }

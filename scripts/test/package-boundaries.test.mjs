@@ -61,3 +61,30 @@ test("packages must follow the two-level layout and directory-equals-name rule",
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("dependencies listed in the pnpm catalog must be referenced as catalog:", async () => {
+  const root = await mkdtemp(join(tmpdir(), "actspace-package-catalog-"));
+  try {
+    await writeFile(join(root, "pnpm-workspace.yaml"), 'packages:\n  - packages/*/*\ncatalog:\n  "@types/node": ^24.0.3\n  typescript: ^5.8.3\n');
+    const dir = join(root, "packages", "group", "pinned");
+    await mkdir(join(dir, "src"), { recursive: true });
+    await writeFile(join(dir, "package.json"), JSON.stringify({
+      name: "@actspace/pinned",
+      private: true,
+      type: "module",
+      exports: { ".": "./dist/index.js" },
+      devDependencies: { "@types/node": "catalog:", typescript: "6.0.3", vitest: "^3.2.4" },
+    }));
+    const result = spawnSync(process.execPath, ["scripts/check-package-boundaries.mjs"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, ACTSPACE_PACKAGE_BOUNDARY_ROOT: root },
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /devDependencies\.typescript must be "catalog:".*found 6\.0\.3/);
+    assert.doesNotMatch(result.stderr, /@types\/node must be/);
+    assert.doesNotMatch(result.stderr, /vitest/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

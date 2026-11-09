@@ -18,9 +18,18 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "jsdom",
     globals: true,
-    include: ["src/**/test/**/*.test.{ts,tsx}"],
     setupFiles: ["./src/renderer/test/setup.ts"],
+    // main 进程测试不需要 DOM；按目录分成两个 project，省掉 90 多个 jsdom 实例的启动开销。
+    projects: [
+      {
+        extends: true,
+        test: { name: "main", environment: "node", include: ["src/main/**/test/**/*.test.{ts,tsx}"] },
+      },
+      {
+        extends: true,
+        test: { name: "renderer", environment: "jsdom", include: ["src/renderer/**/test/**/*.test.{ts,tsx}"] },
+      },
+    ],
   },
 });

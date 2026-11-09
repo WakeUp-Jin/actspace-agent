@@ -4,6 +4,24 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@types/node':
+      specifier: ^24.0.3
+      version: 24.19.2
+    '@vitejs/plugin-react':
+      specifier: ^4.5.2
+      version: 4.7.0
+    typescript:
+      specifier: ^5.8.3
+      version: 5.9.3
+    vite:
+      specifier: ^7.3.7
+      version: 7.3.8
+    vitest:
+      specifier: ^4.1.12
+      version: 4.1.12
+
 overrides:
   '@deepseek-ai/cordis': 4.0.1
   '@deepseek-ai/cordis-plugin-loader': 1.0.2
@@ -51,13 +69,13 @@ importers:
         version: link:../../packages/util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   apps/desktop:
@@ -293,7 +311,7 @@ importers:
         version: link:../../packages/context/context-engine
       '@tailwindcss/vite':
         specifier: ^4.3.0
-        version: 4.3.5(vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+        version: 4.3.5(vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
       '@testing-library/jest-dom':
         specifier: ^6.6.3
         version: 6.9.1
@@ -304,8 +322,8 @@ importers:
         specifier: ^14.6.1
         version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/node':
-        specifier: ^22.19.19
-        version: 22.20.5
+        specifier: 'catalog:'
+        version: 24.19.2
       '@types/react':
         specifier: ^18.3.23
         version: 18.3.31
@@ -316,8 +334,8 @@ importers:
         specifier: ^8.18.1
         version: 8.18.2
       '@vitejs/plugin-react':
-        specifier: ^4.5.2
-        version: 4.7.0(vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+        specifier: 'catalog:'
+        version: 4.7.0(vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
       concurrently:
         specifier: ^9.1.2
         version: 9.2.5
@@ -334,14 +352,14 @@ importers:
         specifier: ^4.3.0
         version: 4.3.5
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vite:
-        specifier: ^7.3.7
-        version: 7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
+        specifier: 'catalog:'
+        version: 7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
       vitest:
-        specifier: ^4.1.12
-        version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@22.20.5)(jsdom@26.1.0)(vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+        specifier: 'catalog:'
+        version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
       wait-on:
         specifier: ^9.5.1
         version: 9.5.1
@@ -384,7 +402,7 @@ importers:
     devDependencies:
       '@astrojs/check':
         specifier: 0.9.12
-        version: 0.9.12(@emnapi/runtime@1.11.3)(prettier@3.9.10)(typescript@6.0.3)
+        version: 0.9.12(@emnapi/runtime@1.11.3)(prettier@3.9.10)(typescript@5.9.3)
       '@emnapi/runtime':
         specifier: 1.11.3
         version: 1.11.3
@@ -392,10 +410,10 @@ importers:
         specifier: 4.0.4
         version: 4.0.4
       typescript:
-        specifier: 6.0.3
-        version: 6.0.3
+        specifier: 'catalog:'
+        version: 5.9.3
       vitest:
-        specifier: 4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   apps/web:
@@ -427,7 +445,7 @@ importers:
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.3.0
-        version: 4.3.5(vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+        version: 4.3.5(vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
       '@testing-library/jest-dom':
         specifier: ^6.6.3
         version: 6.9.1
@@ -438,8 +456,8 @@ importers:
         specifier: ^14.6.1
         version: 14.6.8(@testing-library/dom@10.4.1)
       '@types/node':
-        specifier: ^22.15.30
-        version: 22.20.5
+        specifier: 'catalog:'
+        version: 24.19.2
       '@types/react':
         specifier: ^18.3.23
         version: 18.3.31
@@ -447,8 +465,8 @@ importers:
         specifier: ^18.3.7
         version: 18.3.7(@types/react@18.3.31)
       '@vitejs/plugin-react':
-        specifier: ^4.5.2
-        version: 4.7.0(vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+        specifier: 'catalog:'
+        version: 4.7.0(vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
       jsdom:
         specifier: ^26.1.0
         version: 26.1.0
@@ -456,14 +474,14 @@ importers:
         specifier: ^4.3.0
         version: 4.3.5
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vite:
-        specifier: ^7.3.7
-        version: 7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
+        specifier: 'catalog:'
+        version: 7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
       vitest:
-        specifier: ^4.1.12
-        version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@22.20.5)(jsdom@26.1.0)(vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+        specifier: 'catalog:'
+        version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
 
   packages/approval/approval:
     dependencies:
@@ -475,13 +493,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/approval/auto-review:
@@ -500,13 +518,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/background-tasks/background-tasks:
@@ -525,13 +543,13 @@ importers:
         specifier: workspace:*
         version: link:../../session/session-journal
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/background-tasks/tool-background-tasks:
@@ -559,13 +577,13 @@ importers:
         specifier: workspace:*
         version: link:../../session/session-persistence
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/browser/tool-browser:
@@ -581,13 +599,13 @@ importers:
         version: link:../../core/tool-runtime
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/client/client:
@@ -600,13 +618,13 @@ importers:
         version: 2.0.3
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/composition/boot:
@@ -628,13 +646,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/composition/bundle:
@@ -644,13 +662,13 @@ importers:
         version: link:../cordis-adapter
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/composition/composition:
@@ -663,13 +681,13 @@ importers:
         version: link:../cordis-adapter
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/composition/cordis-adapter:
@@ -690,14 +708,14 @@ importers:
         specifier: 1.1.3
         version: 1.1.3(@deepseek-ai/cordis@4.0.1)
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/context-background-tasks:
@@ -716,13 +734,13 @@ importers:
         version: link:../prompt
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/context-compaction:
@@ -747,13 +765,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/context-conversation:
@@ -766,13 +784,13 @@ importers:
         version: link:../../composition/cordis-adapter
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/context-disclosure:
@@ -791,13 +809,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/context-engine:
@@ -816,13 +834,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/context-rules:
@@ -838,13 +856,13 @@ importers:
         version: link:../prompt
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/context-runtime:
@@ -860,13 +878,13 @@ importers:
         version: link:../prompt
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/context-skills:
@@ -882,13 +900,13 @@ importers:
         version: link:../prompt
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/context-subagents:
@@ -907,13 +925,13 @@ importers:
         version: link:../../subagent/subagent
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/context-system:
@@ -929,13 +947,13 @@ importers:
         version: link:../prompt
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/context-tools:
@@ -948,13 +966,13 @@ importers:
         version: link:../../composition/cordis-adapter
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/context/prompt:
@@ -985,13 +1003,13 @@ importers:
         version: link:../../skill/skill
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/core/agent:
@@ -1013,13 +1031,13 @@ importers:
         version: link:../tool-runtime
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/core/agent-loop:
@@ -1059,13 +1077,13 @@ importers:
         version: link:../tool-runtime
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/core/agent-service:
@@ -1105,13 +1123,13 @@ importers:
         specifier: workspace:*
         version: link:../../session/session-persistence-jsonl
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/core/runtime:
@@ -1307,16 +1325,16 @@ importers:
         specifier: workspace:*
         version: link:../../session/session-storage
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/core/scope:
@@ -1326,13 +1344,13 @@ importers:
         version: link:../../composition/cordis-adapter
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/core/tool-runtime:
@@ -1348,13 +1366,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/english-learning/english-learning:
@@ -1382,13 +1400,13 @@ importers:
         specifier: workspace:*
         version: link:../../context/context-engine
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/fs/tool-fs-read:
@@ -1404,13 +1422,13 @@ importers:
         version: link:../../core/tool-runtime
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/fs/tool-fs-search:
@@ -1426,13 +1444,13 @@ importers:
         version: link:../../core/tool-runtime
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/fs/tool-fs-write:
@@ -1448,13 +1466,13 @@ importers:
         version: link:../../core/tool-runtime
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/harness-evolution/harness-control:
@@ -1476,13 +1494,13 @@ importers:
         version: link:../../session/session-persistence-jsonl
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/harness-evolution/harness-evaluation:
@@ -1501,13 +1519,13 @@ importers:
         specifier: workspace:*
         version: link:../../sandbox/sandbox-nono
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/harness-evolution/harness-hmr:
@@ -1520,13 +1538,13 @@ importers:
         version: link:../harness-control
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/harness-evolution/harness-stats:
@@ -1539,13 +1557,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/harness-evolution/plugin-manager:
@@ -1569,14 +1587,14 @@ importers:
         specifier: workspace:*
         version: link:../../core/tool-runtime
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/host/agent-host:
@@ -1634,16 +1652,16 @@ importers:
         version: 8.21.0
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/host/desktop-app:
@@ -1674,13 +1692,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/host/headless:
@@ -1699,13 +1717,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/image/tool-image-generation:
@@ -1721,13 +1739,13 @@ importers:
         version: link:../../core/tool-runtime
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/image/tool-image-inspection:
@@ -1746,13 +1764,13 @@ importers:
         version: link:../../core/tool-runtime
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/llm/llm-pi-ai:
@@ -1777,13 +1795,13 @@ importers:
         version: 7.19.0(@aws-sdk/credential-provider-node@3.972.94)(@smithy/signature-v4@5.7.5)(undici@8.12.4)(ws@8.22.2)(zod@4.6.7)
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/llm/llm-service:
@@ -1799,13 +1817,13 @@ importers:
         version: 7.30.2
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/sandbox/sandbox:
@@ -1815,13 +1833,13 @@ importers:
         version: link:../../composition/cordis-adapter
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/sandbox/sandbox-nono:
@@ -1834,13 +1852,13 @@ importers:
         version: link:../sandbox
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/sandbox/sandbox-seatbelt:
@@ -1853,13 +1871,13 @@ importers:
         version: link:../sandbox
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/session/session-checkpoint-policy:
@@ -1869,13 +1887,13 @@ importers:
         version: link:../../composition/cordis-adapter
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/session/session-journal:
@@ -1888,13 +1906,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/session/session-persistence:
@@ -1916,13 +1934,13 @@ importers:
         specifier: workspace:*
         version: link:../session-persistence-jsonl
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/session/session-persistence-jsonl:
@@ -1938,13 +1956,13 @@ importers:
         version: link:../session-storage
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/session/session-projection:
@@ -1960,13 +1978,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/session/session-projection-cache:
@@ -1985,13 +2003,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/session/session-storage:
@@ -2001,13 +2019,13 @@ importers:
         version: link:../session-journal
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/session/session-transcript:
@@ -2026,13 +2044,13 @@ importers:
         version: link:../../util/shared
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/shell/tool-shell:
@@ -2060,13 +2078,13 @@ importers:
         specifier: workspace:*
         version: link:../../sandbox/sandbox-seatbelt
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/side-chat/side-chat:
@@ -2082,25 +2100,25 @@ importers:
         version: link:../../session/session-journal
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/skill/official-skills:
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/skill/skill:
@@ -2110,13 +2128,13 @@ importers:
         version: link:../official-skills
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/subagent/subagent:
@@ -2150,13 +2168,13 @@ importers:
         version: link:../../core/tool-runtime
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/subagent/subagent-claude-code:
@@ -2178,13 +2196,13 @@ importers:
         specifier: workspace:*
         version: link:../../util/shared
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/subagent/subagent-codex:
@@ -2206,13 +2224,13 @@ importers:
         specifier: workspace:*
         version: link:../../util/shared
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/subagent/tool-subagent:
@@ -2234,13 +2252,13 @@ importers:
         specifier: workspace:*
         version: link:../../util/shared
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/todo/tool-todo:
@@ -2265,13 +2283,13 @@ importers:
         version: link:../../core/tool-runtime
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/util/diagnostics:
@@ -2281,22 +2299,22 @@ importers:
         version: link:../../composition/cordis-adapter
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/util/shared:
     devDependencies:
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/web/tool-web:
@@ -2315,16 +2333,16 @@ importers:
         version: 7.2.4
     devDependencies:
       '@types/node':
-        specifier: ^24.0.3
+        specifier: 'catalog:'
         version: 24.19.2
       '@types/turndown':
         specifier: 5.0.6
         version: 5.0.6
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.9.3
       vitest:
-        specifier: ^4.1.12
+        specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
 packages:
@@ -4614,9 +4632,6 @@ packages:
   '@types/nlcst@2.0.3':
     resolution: {integrity: sha512-vSYNSDe6Ix3q+6Z7ri9lyWqgGhJTmzRjZRqyq15N0Z/1/UnVsno9G/N40NBijoYx2seFDIl0+B2mgAb9mezUCA==}
 
-  '@types/node@22.20.5':
-    resolution: {integrity: sha512-U2+DNr+wSjpsTS/wZGYHq7GcwfuSmKiKvoPvK22zwTlRhU91yOniN4qRR5KhIjvif7ysw/dz/hKmfDH0Ris4aA==}
-
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
 
@@ -6608,11 +6623,6 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  typescript@6.0.3:
-    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
-    engines: {node: '>=14.17'}
-    hasBin: true
-
   ufo@1.6.4:
     resolution: {integrity: sha512-JFNbkD1Svwe0KvGi8GOeLcP4kAWQ609twvCdcHxq1oSL8svv39ZuSvajcD8B+5D0eL4+s1Is2D/O6KN3qcTeRA==}
 
@@ -6621,9 +6631,6 @@ packages:
 
   uncrypto@0.1.3:
     resolution: {integrity: sha512-Ql87qFHB3s/De2ClA9e0gsnS6zXG27SkTiSJwjCc9MebbfapQfuPzumMIUMi38ezPZVNFcHI9sUIepeQfw8J8Q==}
-
-  undici-types@6.21.0:
-    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
   undici-types@7.24.6:
     resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
@@ -7163,12 +7170,12 @@ snapshots:
     transitivePeerDependencies:
       - '@emnapi/runtime'
 
-  '@astrojs/check@0.9.12(@emnapi/runtime@1.11.3)(prettier@3.9.10)(typescript@6.0.3)':
+  '@astrojs/check@0.9.12(@emnapi/runtime@1.11.3)(prettier@3.9.10)(typescript@5.9.3)':
     dependencies:
-      '@astrojs/language-server': 2.17.3(@emnapi/runtime@1.11.3)(prettier@3.9.10)(typescript@6.0.3)
+      '@astrojs/language-server': 2.17.3(@emnapi/runtime@1.11.3)(prettier@3.9.10)(typescript@5.9.3)
       chokidar: 5.0.0
       kleur: 4.1.5
-      typescript: 6.0.3
+      typescript: 5.9.3
       yargs: 18.2.0
     transitivePeerDependencies:
       - '@emnapi/runtime'
@@ -7248,23 +7255,23 @@ snapshots:
       unified: 11.0.5
       yaml: 2.9.1
 
-  '@astrojs/language-server@2.17.3(@emnapi/runtime@1.11.3)(prettier@3.9.10)(typescript@6.0.3)':
+  '@astrojs/language-server@2.17.3(@emnapi/runtime@1.11.3)(prettier@3.9.10)(typescript@5.9.3)':
     dependencies:
       '@astrojs/astro2tsx': 0.1.3(@emnapi/runtime@1.11.3)
       '@astrojs/yaml2ts': 0.2.4
-      '@volar/kit': 2.4.31(typescript@6.0.3)
+      '@volar/kit': 2.4.31(typescript@5.9.3)
       '@volar/language-core': 2.4.31
-      '@volar/language-server': 2.4.31(typescript@6.0.3)
-      '@volar/language-service': 2.4.31(typescript@6.0.3)
+      '@volar/language-server': 2.4.31(typescript@5.9.3)
+      '@volar/language-service': 2.4.31(typescript@5.9.3)
       muggle-string: 0.4.1
       tinyglobby: 0.2.17
-      volar-service-css: 0.0.71(@volar/language-service@2.4.31(typescript@6.0.3))
-      volar-service-emmet: 0.0.71(@volar/language-service@2.4.31(typescript@6.0.3))
-      volar-service-html: 0.0.71(@volar/language-service@2.4.31(typescript@6.0.3))
-      volar-service-prettier: 0.0.71(@volar/language-service@2.4.31(typescript@6.0.3))(prettier@3.9.10)
-      volar-service-typescript: 0.0.71(@volar/language-service@2.4.31(typescript@6.0.3))
-      volar-service-typescript-twoslash-queries: 0.0.71(@volar/language-service@2.4.31(typescript@6.0.3))
-      volar-service-yaml: 0.0.71(@volar/language-service@2.4.31(typescript@6.0.3))
+      volar-service-css: 0.0.71(@volar/language-service@2.4.31(typescript@5.9.3))
+      volar-service-emmet: 0.0.71(@volar/language-service@2.4.31(typescript@5.9.3))
+      volar-service-html: 0.0.71(@volar/language-service@2.4.31(typescript@5.9.3))
+      volar-service-prettier: 0.0.71(@volar/language-service@2.4.31(typescript@5.9.3))(prettier@3.9.10)
+      volar-service-typescript: 0.0.71(@volar/language-service@2.4.31(typescript@5.9.3))
+      volar-service-typescript-twoslash-queries: 0.0.71(@volar/language-service@2.4.31(typescript@5.9.3))
+      volar-service-yaml: 0.0.71(@volar/language-service@2.4.31(typescript@5.9.3))
       vscode-html-languageservice: 5.6.2
       vscode-uri: 3.2.0
     optionalDependencies:
@@ -9275,12 +9282,12 @@ snapshots:
       '@tailwindcss/oxide-win32-arm64-msvc': 4.3.5
       '@tailwindcss/oxide-win32-x64-msvc': 4.3.5
 
-  '@tailwindcss/vite@4.3.5(vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))':
+  '@tailwindcss/vite@4.3.5(vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))':
     dependencies:
       '@tailwindcss/node': 4.3.5
       '@tailwindcss/oxide': 4.3.5
       tailwindcss: 4.3.5
-      vite: 7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
+      vite: 7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
 
   '@tanstack/react-virtual@3.14.26(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
@@ -9503,10 +9510,6 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
 
-  '@types/node@22.20.5':
-    dependencies:
-      undici-types: 6.21.0
-
   '@types/node@24.19.2':
     dependencies:
       undici-types: 7.24.6
@@ -9526,7 +9529,7 @@ snapshots:
 
   '@types/sax@1.2.7':
     dependencies:
-      '@types/node': 22.20.5
+      '@types/node': 24.19.2
 
   '@types/trusted-types@2.0.7':
     optional: true
@@ -9539,7 +9542,7 @@ snapshots:
 
   '@types/ws@8.18.2':
     dependencies:
-      '@types/node': 22.20.5
+      '@types/node': 24.19.2
 
   '@ungap/structured-clone@1.4.0': {}
 
@@ -9548,7 +9551,7 @@ snapshots:
       d3-selection: 3.0.1
       d3-transition: 3.0.2(d3-selection@3.0.1)
 
-  '@vitejs/plugin-react@4.7.0(vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))':
+  '@vitejs/plugin-react@4.7.0(vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))':
     dependencies:
       '@babel/core': 7.29.13
       '@babel/plugin-transform-react-jsx-self': 7.29.7(@babel/core@7.29.13)
@@ -9556,7 +9559,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.27
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
+      vite: 7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
     transitivePeerDependencies:
       - supports-color
 
@@ -9569,13 +9572,13 @@ snapshots:
       chai: 6.3.0
       tinyrainbow: 3.2.0
 
-  '@vitest/mocker@4.1.12(vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))':
+  '@vitest/mocker@4.1.12(vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))':
     dependencies:
       '@vitest/spy': 4.1.12
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
+      vite: 7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
 
   '@vitest/mocker@4.1.12(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:
@@ -9609,12 +9612,12 @@ snapshots:
       convert-source-map: 2.0.0
       tinyrainbow: 3.2.0
 
-  '@volar/kit@2.4.31(typescript@6.0.3)':
+  '@volar/kit@2.4.31(typescript@5.9.3)':
     dependencies:
-      '@volar/language-service': 2.4.31(typescript@6.0.3)
-      '@volar/typescript': 2.4.31(typescript@6.0.3)
+      '@volar/language-service': 2.4.31(typescript@5.9.3)
+      '@volar/typescript': 2.4.31(typescript@5.9.3)
       typesafe-path: 0.2.2
-      typescript: 6.0.3
+      typescript: 5.9.3
       vscode-languageserver-textdocument: 1.0.16
       vscode-uri: 3.2.0
 
@@ -9622,11 +9625,11 @@ snapshots:
     dependencies:
       '@volar/source-map': 2.4.31
 
-  '@volar/language-server@2.4.31(typescript@6.0.3)':
+  '@volar/language-server@2.4.31(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.31
-      '@volar/language-service': 2.4.31(typescript@6.0.3)
-      '@volar/typescript': 2.4.31(typescript@6.0.3)
+      '@volar/language-service': 2.4.31(typescript@5.9.3)
+      '@volar/typescript': 2.4.31(typescript@5.9.3)
       path-browserify: 1.0.1
       request-light: 0.7.0
       vscode-languageserver: 9.0.1
@@ -9634,27 +9637,27 @@ snapshots:
       vscode-languageserver-textdocument: 1.0.16
       vscode-uri: 3.2.0
     optionalDependencies:
-      typescript: 6.0.3
+      typescript: 5.9.3
 
-  '@volar/language-service@2.4.31(typescript@6.0.3)':
+  '@volar/language-service@2.4.31(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.31
       vscode-languageserver-protocol: 3.18.5
       vscode-languageserver-textdocument: 1.0.16
       vscode-uri: 3.2.0
     optionalDependencies:
-      typescript: 6.0.3
+      typescript: 5.9.3
 
   '@volar/source-map@2.4.31': {}
 
-  '@volar/typescript@2.4.31(typescript@6.0.3)':
+  '@volar/typescript@2.4.31(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.31
-      '@volar/language-service': 2.4.31(typescript@6.0.3)
+      '@volar/language-service': 2.4.31(typescript@5.9.3)
       path-browserify: 1.0.1
       vscode-uri: 3.2.0
     optionalDependencies:
-      typescript: 6.0.3
+      typescript: 5.9.3
 
   '@vscode/emmet-helper@2.11.0':
     dependencies:
@@ -11537,7 +11540,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.2
-      '@types/node': 22.20.5
+      '@types/node': 24.19.2
       long: 5.3.2
 
   proxy-agent-negotiate@1.1.0: {}
@@ -12083,15 +12086,11 @@ snapshots:
 
   typescript@5.9.3: {}
 
-  typescript@6.0.3: {}
-
   ufo@1.6.4: {}
 
   ultrahtml@1.7.0: {}
 
   uncrypto@0.1.3: {}
-
-  undici-types@6.21.0: {}
 
   undici-types@7.24.6: {}
 
@@ -12201,7 +12200,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.4
 
-  vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1):
+  vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1):
     dependencies:
       esbuild: 0.28.2
       fdir: 6.5.0(picomatch@4.0.7)
@@ -12210,7 +12209,7 @@ snapshots:
       rollup: 4.68.1
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 22.20.5
+      '@types/node': 24.19.2
       fsevents: 2.3.3
       jiti: 2.7.0
       lightningcss: 1.33.0
@@ -12234,10 +12233,10 @@ snapshots:
     optionalDependencies:
       vite: 8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
 
-  vitest@4.1.12(@opentelemetry/api@1.9.0)(@types/node@22.20.5)(jsdom@26.1.0)(vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)):
+  vitest@4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)):
     dependencies:
       '@vitest/expect': 4.1.12
-      '@vitest/mocker': 4.1.12(vite@7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+      '@vitest/mocker': 4.1.12(vite@7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
       '@vitest/pretty-format': 4.1.12
       '@vitest/runner': 4.1.12
       '@vitest/snapshot': 4.1.12
@@ -12254,11 +12253,11 @@ snapshots:
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
       tinyrainbow: 3.2.0
-      vite: 7.3.8(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
+      vite: 7.3.8(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
-      '@types/node': 22.20.5
+      '@types/node': 24.19.2
       jsdom: 26.1.0
     transitivePeerDependencies:
       - msw
@@ -12292,45 +12291,45 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  volar-service-css@0.0.71(@volar/language-service@2.4.31(typescript@6.0.3)):
+  volar-service-css@0.0.71(@volar/language-service@2.4.31(typescript@5.9.3)):
     dependencies:
       vscode-css-languageservice: 6.3.10
       vscode-languageserver-textdocument: 1.0.16
       vscode-uri: 3.2.0
     optionalDependencies:
-      '@volar/language-service': 2.4.31(typescript@6.0.3)
+      '@volar/language-service': 2.4.31(typescript@5.9.3)
 
-  volar-service-emmet@0.0.71(@volar/language-service@2.4.31(typescript@6.0.3)):
+  volar-service-emmet@0.0.71(@volar/language-service@2.4.31(typescript@5.9.3)):
     dependencies:
       '@emmetio/css-parser': 0.4.1
       '@emmetio/html-matcher': 1.3.0
       '@vscode/emmet-helper': 2.11.0
       vscode-uri: 3.2.0
     optionalDependencies:
-      '@volar/language-service': 2.4.31(typescript@6.0.3)
+      '@volar/language-service': 2.4.31(typescript@5.9.3)
 
-  volar-service-html@0.0.71(@volar/language-service@2.4.31(typescript@6.0.3)):
+  volar-service-html@0.0.71(@volar/language-service@2.4.31(typescript@5.9.3)):
     dependencies:
       vscode-html-languageservice: 5.6.2
       vscode-languageserver-textdocument: 1.0.16
       vscode-uri: 3.2.0
     optionalDependencies:
-      '@volar/language-service': 2.4.31(typescript@6.0.3)
+      '@volar/language-service': 2.4.31(typescript@5.9.3)
 
-  volar-service-prettier@0.0.71(@volar/language-service@2.4.31(typescript@6.0.3))(prettier@3.9.10):
+  volar-service-prettier@0.0.71(@volar/language-service@2.4.31(typescript@5.9.3))(prettier@3.9.10):
     dependencies:
       vscode-uri: 3.2.0
     optionalDependencies:
-      '@volar/language-service': 2.4.31(typescript@6.0.3)
+      '@volar/language-service': 2.4.31(typescript@5.9.3)
       prettier: 3.9.10
 
-  volar-service-typescript-twoslash-queries@0.0.71(@volar/language-service@2.4.31(typescript@6.0.3)):
+  volar-service-typescript-twoslash-queries@0.0.71(@volar/language-service@2.4.31(typescript@5.9.3)):
     dependencies:
       vscode-uri: 3.2.0
     optionalDependencies:
-      '@volar/language-service': 2.4.31(typescript@6.0.3)
+      '@volar/language-service': 2.4.31(typescript@5.9.3)
 
-  volar-service-typescript@0.0.71(@volar/language-service@2.4.31(typescript@6.0.3)):
+  volar-service-typescript@0.0.71(@volar/language-service@2.4.31(typescript@5.9.3)):
     dependencies:
       path-browserify: 1.0.1
       semver: 7.8.6
@@ -12339,14 +12338,14 @@ snapshots:
       vscode-nls: 5.2.0
       vscode-uri: 3.2.0
     optionalDependencies:
-      '@volar/language-service': 2.4.31(typescript@6.0.3)
+      '@volar/language-service': 2.4.31(typescript@5.9.3)
 
-  volar-service-yaml@0.0.71(@volar/language-service@2.4.31(typescript@6.0.3)):
+  volar-service-yaml@0.0.71(@volar/language-service@2.4.31(typescript@5.9.3)):
     dependencies:
       vscode-uri: 3.2.0
       yaml-language-server: 1.23.0
     optionalDependencies:
-      '@volar/language-service': 2.4.31(typescript@6.0.3)
+      '@volar/language-service': 2.4.31(typescript@5.9.3)
 
   vscode-css-languageservice@6.3.10:
     dependencies:
