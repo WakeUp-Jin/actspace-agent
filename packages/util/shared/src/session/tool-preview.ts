@@ -2,7 +2,7 @@
 
 import type { SubagentKind, SubagentPreset } from "../runtime-v2/subagents";
 import type { SubagentListStatus } from "../subagent-labels";
-import type { SessionEvent, SessionEventType } from "./events";
+import type { SessionEventType } from "./events";
 import type { AgentRunId, EventId, SessionError, SessionId, ToolCallId } from "./primitives";
 
 export type ToolArtifact = {
