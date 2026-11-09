@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "test:agent-host:process": "node --test scripts/test/host-process.test.mjs scripts/test/host-lifecycle-process.test.mjs scripts/test/host-tools-process.test.mjs scripts/test/host-receipt-process.test.mjs scripts/test/host-blocked-process.test.mjs scripts/test/host-subagent-drain-process.test.mjs scripts/test/host-subagent-fork-cache-process.test.mjs",
+    "test:agent-host:process": "node --test scripts/test/host-process.test.mjs scripts/test/host-lifecycle-process.test.mjs scripts/test/host-tools-process.test.mjs scripts/test/host-receipt-process.test.mjs scripts/test/host-blocked-process.test.mjs scripts/test/host-subagent-drain-process.test.mjs scripts/test/host-subagent-fork-cache-process.test.mjs scripts/test/host-upload-disk-full.test.mjs scripts/test/agent-provider-compaction.test.mjs",
     "models:generate": "node scripts/generate-model-catalog.mjs",
     "clean": "pnpm --filter @actspace/shared clean && pnpm --filter @actspace/runtime clean && pnpm --filter @actspace/agent-cli clean && pnpm --filter @actspace/desktop clean",
     "dev": "node scripts/desktop-dev.mjs",
@@ -27,7 +27,7 @@
     "build": "pnpm --filter @actspace/agent-cli... build && pnpm --filter @actspace/desktop build && pnpm --filter @actspace/web build",
     "build:web": "pnpm --filter @actspace/client... build && pnpm --filter @actspace/web build",
     "build:site": "pnpm --filter @actspace/site build",
-    "test": "pnpm run test:dev-runner && pnpm run test:fetch-nono && pnpm run test:repo-stats && pnpm run test:refactor-stats && pnpm run test:package-cutover && pnpm run test:package-boundaries && pnpm run test:plugin-catalog && pnpm run test:package-readmes && pnpm run test:current-docs && pnpm run test:contract-matrix && pnpm check:renderer-bridge && pnpm test:renderer-bridge && pnpm check:harness-events && pnpm test:harness-events && pnpm test:harness-recovery && pnpm test:agent-host:process && pnpm check:ipc-channels && pnpm test:ipc-channels && pnpm test:frontend-tokens && pnpm check:hot-path-reads && pnpm test:hot-path-reads && pnpm -r --if-present test",
+    "test": "pnpm run test:dev-runner && pnpm run test:fetch-nono && pnpm run test:repo-stats && pnpm run test:refactor-stats && pnpm run test:package-cutover && pnpm run test:package-boundaries && pnpm run test:plugin-catalog && pnpm run test:package-readmes && pnpm run test:current-docs && pnpm run test:contract-matrix && pnpm check:renderer-bridge && pnpm test:renderer-bridge && pnpm check:harness-events && pnpm test:harness-events && pnpm test:harness-recovery && pnpm test:agent-host:process && pnpm check:ipc-channels && pnpm test:ipc-channels && pnpm test:frontend-tokens && pnpm check:hot-path-reads && pnpm test:hot-path-reads && pnpm test:release-scripts && pnpm -r --if-present test",
     "test:dev-runner": "node --test scripts/test/dev-process-runner.test.mjs",
     "test:fetch-nono": "node --test scripts/test/fetch-nono.test.mjs",
     "sandbox:fetch-nono": "node scripts/sandbox/fetch-nono.mjs",
@@ -40,6 +40,7 @@
     "test:contract-matrix": "node --test scripts/test/contract-matrix.test.mjs",
     "test:frontend-tokens": "node --test scripts/test/frontend-design-tokens.test.mjs",
     "test:hot-path-reads": "node --test scripts/test/hot-path-reads.test.mjs",
+    "test:release-scripts": "node --test scripts/test/browser-components.test.mjs scripts/test/electron-runtime-integrity.test.mjs",
     "test:ipc-channels": "node --test scripts/test/ipc-channels.test.mjs",
     "test:renderer-bridge": "node --test scripts/test/renderer-bridge-access.test.mjs",
     "test:site": "pnpm --filter @actspace/site test",
