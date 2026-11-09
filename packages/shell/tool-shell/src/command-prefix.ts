@@ -2,7 +2,9 @@
 const PROGRAMS = new Set(["pnpm", "npm", "yarn", "cargo", "go", "make", "tsc", "vitest", "eslint", "prettier"]);
 const GIT_COMMANDS = new Set(["status", "diff", "log", "show", "ls-files", "rev-list", "rev-parse"]);
 const QUERIES = new Set(["ls", "pwd", "du", "stat", "file", "cat", "head", "tail", "wc", "rg", "grep"]);
-const VERSIONS = new Set(["node", "python", "python3"]);
+/** Script interpreters: running a script file (or a stdlib module) is reusable; inline source (`-c`, `-e`) stays single-use. */
+const INTERPRETERS = new Set(["node", "python", "python3", "actspace-python"]);
+const PYTHON_MODULES_EXCLUDED = new Set(["pip", "ensurepip", "venv"]);
 const EXCLUDED: Readonly<Record<string, ReadonlySet<string>>> = {
   pnpm: new Set(["dlx", "exec", "publish", "login", "config"]),
   npm: new Set(["exec", "x", "publish", "login", "config"]),
@@ -13,7 +15,7 @@ const UNSUPPORTED = /[;&|<>`$(){}!\n\r\\~*?\[\]#\x00-\x08\x0B\x0C\x0E-\x1F\x7F\u
 export function analyzeCommandPrefixGrant(command: string): { readonly argv: readonly string[]; readonly prefix: readonly string[]; readonly directory?: string; readonly queryPaths?: readonly string[] } | undefined {
   if (UNSUPPORTED.test(command)) return undefined;
   const head = /^[ \t]*([A-Za-z][A-Za-z0-9._+-]*)(?=[ \t]|$)/.exec(command)?.[1];
-  if (!head || (!PROGRAMS.has(head) && !QUERIES.has(head) && !VERSIONS.has(head) && head !== "git")) return undefined;
+  if (!head || (!PROGRAMS.has(head) && !QUERIES.has(head) && !INTERPRETERS.has(head) && head !== "git")) return undefined;
   const argv: string[] = [];
   let token = "", started = false, quote: string | undefined;
   for (const char of command) {
@@ -31,7 +33,7 @@ export function analyzeCommandPrefixGrant(command: string): { readonly argv: rea
     if (args.some(arg => excluded.has(arg) || /^--global(?:=|$)/.test(arg) || /^-[^-]*g/.test(arg))) return undefined;
     if (args[0]?.startsWith("-") && !["-v", "--version", "-h", "--help"].includes(args[0])) return undefined;
   }
-  if (VERSIONS.has(head)) return args.length === 1 && (args[0] === "--version" || head === "node" && args[0] === "-v") ? { argv, prefix: [head] } : undefined;
+  if (INTERPRETERS.has(head)) return interpreterGrant(head, argv, args);
   if (QUERIES.has(head)) {
     const queryPaths = queryOperands(head, args);
     return queryPaths ? { argv, prefix: [head], queryPaths } : undefined;
@@ -48,6 +50,22 @@ export function analyzeCommandPrefixGrant(command: string): { readonly argv: rea
     return { argv: [head, ...rest], prefix: [head, sub], ...(directory === undefined ? {} : { directory }), queryPaths: rest.slice(1).filter(arg => arg.includes("/") || arg === "..").map(arg => arg.includes("=") ? arg.slice(arg.indexOf("=") + 1) : arg) };
   }
   return { argv, prefix: [head] };
+}
+
+/**
+ * `python3 script.py …` and `node script.mjs …` reuse a grant with the script path checked against the workspace;
+ * `python3 -m module …` reuses it for stdlib modules. Any other leading option (`-c`, `-e`, `-i`, `-u`, …) is single-use.
+ */
+function interpreterGrant(head: string, argv: readonly string[], args: readonly string[]): { readonly argv: readonly string[]; readonly prefix: readonly string[]; readonly queryPaths?: readonly string[] } | undefined {
+  const first = args[0];
+  if (first === undefined) return undefined;
+  if (first === "--version" || head === "node" && first === "-v") return args.length === 1 ? { argv, prefix: [head] } : undefined;
+  if (first === "-m" && head !== "node") {
+    const module = args[1];
+    return module !== undefined && !module.startsWith("-") && !PYTHON_MODULES_EXCLUDED.has(module.split(".")[0]!) ? { argv, prefix: [head] } : undefined;
+  }
+  if (first.startsWith("-")) return undefined;
+  return { argv, prefix: [head], queryPaths: [first] };
 }
 
 /** Explicit option allowlist: unknown options keep the one-time approval path. */

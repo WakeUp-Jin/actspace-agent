@@ -114,7 +114,10 @@ it("offers grants only for canonical in-workspace literal commands and retains h
       const resources = await policy.extractResources(args, context);
       expect((await policy.suggestGrants!(args, resources, permissionContext)).length, command).toBe(count);
     }
-    const args = { command: "pnpm test | cat" };
-    expect(await policy.evaluate(args, await policy.extractResources(args, context), permissionContext)).toMatchObject({ kind: "deny" });
+    for (const [command, kind] of [["pnpm test | cat", "ask"], ["python3 run.py", "ask"], ["pnpm test $(id)", "deny"]] as const) {
+      const args = { command };
+      expect(await policy.evaluate(args, await policy.extractResources(args, context), permissionContext), command).toMatchObject({ kind });
+    }
+    expect((await policy.suggestGrants!({ command: "pnpm test | cat" }, await policy.extractResources({ command: "pnpm test | cat" }, context), permissionContext)).length).toBe(0);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
