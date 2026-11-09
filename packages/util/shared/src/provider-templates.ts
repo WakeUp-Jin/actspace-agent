@@ -34,6 +34,7 @@ export const PROVIDER_TEMPLATES: readonly ProviderTemplate[] = [
   { id: "volcengine-coding-plan", label: "火山方舟 Coding Plan", group: "official", logoKey: "volcengine", protocol: "openai-completions", defaultBaseUrl: "https://ark.cn-beijing.volces.com/api/coding/v3" },
   { id: "xiaomi", label: "小米 MiMo", group: "official", logoKey: "xiaomi", protocol: "openai-completions", defaultBaseUrl: "https://api.xiaomimimo.com/v1" },
   { id: "openrouter", label: "OpenRouter", group: "aggregator", logoKey: "openrouter", protocol: "openai-completions", defaultBaseUrl: "https://openrouter.ai/api/v1", catalogProvider: "openrouter", balance: "openrouter", legacyProviderId: "openrouter" },
+  { id: "opencode-go", label: "OpenCode Go", group: "aggregator", logoKey: "opencode", protocol: "openai-completions", defaultBaseUrl: "https://opencode.ai/inference/go/openai/v1", catalogProvider: "opencode-go" },
   { id: "custom", label: "自定义中转", group: "custom", logoKey: "generic" },
   // 旧版「自定义服务」按协议拆成的三个入口：不再出现在添加列表里，旧连接按自定义中转显示。
   { id: "openai-compatible", label: "自定义中转", group: "custom", logoKey: "generic", protocol: "openai-completions", hidden: true },
