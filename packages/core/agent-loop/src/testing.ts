@@ -21,6 +21,8 @@ export async function runToolStreamFixture(options: {
   contextSources?: import("@actspace/context-engine").ContextSourceRegistry;
   inputSource?: import("./loop.js").LoopInputSource;
   seedSession?: (session: SessionHandle) => Promise<void>;
+  /** 用调用方准备好的会话（例如带归档历史的长会话）代替默认的内存会话；fixture 结束时同样关闭它。 */
+  session?: SessionHandle;
   followup?: boolean;
   extraToolCall?: boolean;
   onTools?: (tools: readonly import("@actspace/llm-service").LlmToolDefinition[]) => void;
@@ -49,7 +51,7 @@ export async function runToolStreamFixture(options: {
   wake?: boolean;
 } = {}) {
   const registry = createCoreCodecRegistry();
-  const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({
+  const session = options.session ?? SessionHandle.createEphemeral({ registry, header: createSessionHeader({
     sessionId: options.sessionId ?? "tool-stream-test", createdAt: "2026-09-06T00:00:00.000Z", lineage: options.subagent ? { origin: "delegation", parentSessionId: "parent", parentCallId: "delegate", parentBoundarySeq: 0, seedDigest: "fixture", delegationDepth: 1 } : null,
     createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest },
   }) });

@@ -9,7 +9,7 @@
     "structured-clone": 7
   },
   "apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts": {
-    "inspect-events": 3,
+    "inspect-events": 1,
     "json-roundtrip": 2
   },
   "apps/desktop/src/main/runtime-v2/runtime-registry.ts": {
@@ -39,9 +39,6 @@
   "packages/context/context-engine/src/supplements.ts": {
     "journal-events": 2
   },
-  "packages/core/agent-loop/src/loop.ts": {
-    "per-entry-read": 1
-  },
   "packages/core/agent-service/src/task-ledger.ts": {
     "full-read": 1
   },
@@ -54,9 +51,6 @@
   "packages/core/runtime/src/harness/managed-runs.ts": {
     "full-read": 1,
     "structured-clone": 2
-  },
-  "packages/core/runtime/src/harness/review-session-action.ts": {
-    "full-iterate": 2
   },
   "packages/core/runtime/src/session/session-controller.ts": {
     "full-read": 4,
