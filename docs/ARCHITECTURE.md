@@ -16,7 +16,7 @@
 - `packages/host/agent-host`：独立 Node Host 接入、认证、观察与文件传输；bootstrap/lifecycle 拥有装配、维护和退出，CLI 注入 Runtime 端口；应用操作复用 AgentApplication，任务仍由 AgentService 调度。CLI 提供 `host` 启动与管理命令，Desktop Main 持有远端连接。当前验证边界见 [Host 指南](design-docs/agent-plugin-runtime/agent-host-guide.md)和 [P4 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)。
 - `packages/harness-evolution/harness-control`：Host 级固定 Harness 选择服务，负责 Patch 准备、独立授权、持久启用、恢复与回退；执行者只能经它异步获取租约。详见 [P3 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-3.md)。
 - `packages/session/session-storage`：存储中性 provider/handle 契约；`session-persistence-jsonl` 提供物理实现，`session-persistence` 负责 Session 业务语义。读写、列表、恢复、fork 与缓存均通过注入后端，详见[存储规范](design-docs/agent-plugin-runtime/agent-spec-session-core-persistence-separation.md)。
-- `packages/util/shared`：IPC contracts、session schema、跨进程共享类型。
+- `packages/util/shared`：IPC contracts、session schema、跨进程共享类型。桌面 IPC 契约集中在 `src/ipc/`，只允许 `apps/*`、`packages/client/*`、`packages/host/*` 引用，`pnpm check:packages` 把关；会话领域模型在 `src/session/`，前后端共用。目录划分见 [util 包地图](../packages/util/README.md)。
 - `apps/web`：浏览器 / PWA 客户端（React + Vite），手机和电脑浏览器经 WebSocket `/rpc` 连接一台 Agent Host，查看会话、审批与发送消息；可由 Host 的 `webRoot` 同源托管。设计见 [front-web-pwa客户端规范](design-docs/frontend/front-web-pwa客户端规范.md)。
 - `apps/site`：Astro 静态官网、公开文档、博客与从 release 文档生成的更新页。
 - `browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层；对应插件 `browser-tools` 默认不加载，在 扩展 › 插件 中开启。
@@ -79,7 +79,7 @@ runtime --(Host capability)--> browser-bridge
 - 交互基础组件优先采用 `Radix UI` primitives，而不是直接依赖重样式组件库。
 - 本地数据优先使用 `jsonl` 文件存储，直接落盘到用户电脑。
 - 工程骨架已落地为 `apps/{desktop,cli,site,web} + packages/core/runtime + 多个领域 workspace packages + packages/util/shared` 的单仓结构。
-- 桌面端主模型由前端模型选择器驱动，模型注册表定义在 `packages/util/shared/src/model-config.ts`，并由 IPC 契约 re-export。
+- 桌面端主模型由前端模型选择器驱动，模型注册表定义在 `packages/util/shared/src/model-config.ts`，从 `@actspace/shared` 根入口直接导出。
 - 密钥不进入 renderer 或 Session Journal，Host 只通过 credential resolver 向 Runtime 提供短生命周期凭据。
 - 开发态启动需要先确保 `shared`、领域 packages、`runtime` 有可消费产物，再启动 Electron main/preload 的 watch 与 renderer。
 - 更细的产品级技术选型以根目录 `README.md` 中的“技术栈”小节为准。
