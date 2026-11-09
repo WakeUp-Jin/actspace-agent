@@ -17,20 +17,22 @@ afterEach(async () => { if (dataRoot) await rm(dataRoot, { recursive: true, forc
 
 async function readAll(count: number) {
   const events = syntheticSessionEvents(count);
-  dataRoot = await mkdtemp(join(tmpdir(), "jsonl-history-scale-"));
-  const path = join(dataRoot, "journal.jsonl");
+  const root = await mkdtemp(join(tmpdir(), "jsonl-history-scale-"));
+  const path = join(root, "journal.jsonl");
   await writeFile(path, [JSON.stringify({ recordKind: "header" }), ...events.map(event => JSON.stringify(event))].join("\n") + "\n");
   const history = new JsonlEventHistory(path, events.length);
   try {
     copies.snapshots = 0;
     const read = history.readEvents(0, events.length);
     return { events, read, snapshots: copies.snapshots };
-  } finally { history.close(); }
+  } finally { history.close(); await rm(root, { recursive: true, force: true }); }
 }
 
 it("reads archived events without copying them and still hands out frozen, equal events", async () => {
+  const small = await readAll(1_000);
+  expect(small.snapshots).toBe(0);
   const { events, read, snapshots } = await readAll(10_000);
-  expect(snapshots).toBe(0);
+  expect(snapshots).toBe(small.snapshots);
   expect(read).toEqual(events);
   for (const event of read.slice(0, 50)) {
     expect(Object.isFrozen(event)).toBe(true);

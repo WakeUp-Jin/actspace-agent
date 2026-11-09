@@ -20,7 +20,7 @@ ActSpace 是一个本地优先的 Agent 工作台：桌面端（Electron）、We
 
 ## 写高频路径前要读
 
-- `docs/coding-standards/perf-memory-conventions.md`：每次请求、流式片段、每帧渲染、IPC 轮询、审批、工具调用会经过的代码，工作量不能随会话长度增长；提交前跑 `pnpm check:hot-path-reads`。性能任务总表见 `docs/exec-plans/perf-backlog.md`。
+- `docs/coding-standards/perf-memory-conventions.md`：每次请求、流式片段、每帧渲染、IPC 轮询、审批、工具调用会经过的代码，工作量不能随会话长度增长；提交前跑 `pnpm check:hot-path-reads` 和 `pnpm check:scale-tests`。性能任务总表见 `docs/exec-plans/perf-backlog.md`。
 
 ## 代码改完前要读
 
