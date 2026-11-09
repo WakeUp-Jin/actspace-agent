@@ -73,7 +73,7 @@ function revisions(scale: number): HarnessRevisionInfo[] {
 function metricsFor(key: string, scale: number): HarnessRevisionMetrics | null {
   const seed = VERSION_SEED.find(([revision]) => keyOf(revision) === key)?.[1];
   if (!seed) return null;
-  const share = seed.requests / VERSION_SEED[2]![1].requests;
+  const share = seed.requests / VERSION_SEED[2][1].requests;
   const sc = (value: number) => Math.round(value * scale * share);
   return {
     requests: Math.round(seed.requests * scale),
@@ -348,7 +348,7 @@ function flags(scale: number): HarnessFlag[] {
 
 function overview(filter: HarnessStatsFilter, scale: number): HarnessStatsOverview {
   const list = revisions(scale);
-  const current = filter.revision ?? list[0]!.key;
+  const current = filter.revision ?? list[0].key;
   const index = list.findIndex((item) => item.key === current);
   const previous = index >= 0 ? list[index + 1]?.key ?? null : null;
   return { flags: flags(scale), current, previous, metrics: metricsFor(current, scale), previousMetrics: previous ? metricsFor(previous, scale) : null };

@@ -33,7 +33,7 @@ async function fakeClaude(mode: string, permissionMode?: string) {
   await mkdir(cwd);
   await writeFile(command, `#!${process.execPath}\n${FAKE_CLAUDE}`); await chmod(command, 0o755);
   const backend = createClaudeCodeBackend({ command: async () => command, env: { ...process.env, FAKE_MODE: mode, FAKE_TRACE: trace, CLAUDE_CONFIG_DIR: configDir }, stopGraceMs: 300, ...(permissionMode ? { config: claudeCodeConfig({ permissionMode }) } : {}) });
-  return { dir, cwd, configDir, backend, trace: async () => JSON.parse((await readFile(trace, "utf8")).split("\n")[0]!) as { argv: string[]; cwd: string; input: string } };
+  return { dir, cwd, configDir, backend, trace: async () => JSON.parse((await readFile(trace, "utf8")).split("\n")[0]) as { argv: string[]; cwd: string; input: string } };
 }
 const start = (backend: ReturnType<typeof createClaudeCodeBackend>, cwd: string, model?: string) => backend.start({ prompt: "List the packages.", cwd, ...(model ? { model } : {}), signal: new AbortController().signal });
 
@@ -43,7 +43,7 @@ describe("Claude Code backend", () => {
     const run = await start(fake.backend, fake.cwd, "sonnet");
     expect(await run.result).toEqual({ status: "completed", text: "Three packages." });
     const { argv, cwd, input } = await fake.trace();
-    const sessionId = argv[argv.indexOf("--session-id") + 1]!;
+    const sessionId = argv[argv.indexOf("--session-id") + 1];
     expect(sessionId).toMatch(/^[0-9a-f-]{36}$/);
     expect(argv).toEqual(["-p", "--output-format", "stream-json", "--verbose", "--session-id", sessionId, "--permission-mode", "dontAsk", "--model", "sonnet"]);
     expect(input).toBe("List the packages.");

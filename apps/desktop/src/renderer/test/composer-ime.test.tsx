@@ -39,9 +39,9 @@ describe("Composer IME composition", () => {
     expect(first).toBeTruthy();
 
     fireEvent.keyDown(input, { key: "ArrowDown", code: "ArrowDown", ...flags });
-    expect(input).toHaveAttribute("aria-activedescendant", first!);
+    expect(input).toHaveAttribute("aria-activedescendant", first);
     fireEvent.keyDown(input, { key: "ArrowUp", code: "ArrowUp", ...flags });
-    expect(input).toHaveAttribute("aria-activedescendant", first!);
+    expect(input).toHaveAttribute("aria-activedescendant", first);
 
     fireEvent.keyDown(input, { key: "ArrowDown", code: "ArrowDown" });
     expect(input.getAttribute("aria-activedescendant")).not.toBe(first);

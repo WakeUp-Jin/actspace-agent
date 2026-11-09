@@ -71,13 +71,13 @@ it("unchanged Journal: refresh returns the same snapshot and reads no file conte
   const base = await storage.inspect("same");
   expect(reads.bytes).toBeGreaterThan(0); // control: the spy sees a full read
   reads.calls = 0; reads.bytes = 0;
-  const result = await storage.refresh!("same", base);
+  const result = await storage.refresh("same", base);
   expect(result).toEqual({ kind: "unchanged", snapshot: base });
   expect(result.snapshot).toBe(base);
   expect(reads).toEqual({ calls: 0, bytes: 0 });
   // Still refreshable afterwards: an unchanged answer must not consume the resume state.
   await appendEvents(path, ["c"]);
-  expect((await storage.refresh!("same", base)).kind).toBe("appended");
+  expect((await storage.refresh("same", base)).kind).toBe("appended");
 });
 
 it("append: reads only the new bytes, parses only new events, and matches a full read exactly (revision is still the file sha256)", async () => {
@@ -87,7 +87,7 @@ it("append: reads only the new bytes, parses only new events, and matches a full
   const added = ["new-1", "new-2", "new-3"];
   await appendEvents(path, added);
   reads.calls = 0; reads.bytes = 0;
-  const result = await storage.refresh!("grow", base);
+  const result = await storage.refresh("grow", base);
   expect(result.kind).toBe("appended");
   if (result.kind !== "appended") return;
   expect(result.fromEvent).toBe(base.events.length);
@@ -100,7 +100,7 @@ it("append: reads only the new bytes, parses only new events, and matches a full
   await expectSameAsFresh("grow", result.snapshot);
   // A refreshed snapshot is itself refreshable (chained appends keep the running hash correct).
   await appendEvents(path, ["new-4"]);
-  const chained = await storage.refresh!("grow", result.snapshot);
+  const chained = await storage.refresh("grow", result.snapshot);
   expect(chained.kind).toBe("appended");
   expect(chained.snapshot.revision).toBe(await sha(path));
   await expectSameAsFresh("grow", chained.snapshot);
@@ -110,7 +110,7 @@ it("append of only blank lines is still an append with no new events", async () 
   const path = await createSession("blank", ["a"]);
   const base = await storage.inspect("blank");
   await appendFile(path, "\n\n");
-  const result = await storage.refresh!("blank", base);
+  const result = await storage.refresh("blank", base);
   expect(result.kind).toBe("appended");
   expect(result.snapshot.events).toHaveLength(base.events.length);
   expect(result.snapshot.revision).toBe(await sha(path));
@@ -121,7 +121,7 @@ it("truncation falls back to a full read", async () => {
   const base = await storage.inspect("shrink");
   const lines = (await readFile(path, "utf8")).split("\n");
   await truncate(path, Buffer.byteLength(lines.slice(0, 3).join("\n") + "\n"));
-  const result = await storage.refresh!("shrink", base);
+  const result = await storage.refresh("shrink", base);
   expect(result.kind).toBe("replaced");
   expect(result.snapshot.events).toHaveLength(2);
   await expectSameAsFresh("shrink", result.snapshot);
@@ -131,7 +131,7 @@ it("same-size rewrite falls back to a full read", async () => {
   const path = await createSession("rewrite", ["aaaa", "bbbb"]);
   const base = await storage.inspect("rewrite");
   await writeFile(path, (await readFile(path, "utf8")).replace("aaaa", "zzzz"));
-  const result = await storage.refresh!("rewrite", base);
+  const result = await storage.refresh("rewrite", base);
   expect(result.kind).toBe("replaced");
   expect(JSON.stringify(result.snapshot.events)).toContain("zzzz");
   expect(result.snapshot.revision).not.toBe(base.revision);
@@ -142,7 +142,7 @@ it("growth combined with an in-place edit of already-consumed bytes falls back t
   const base = await storage.inspect("edit-and-grow");
   await writeFile(path, (await readFile(path, "utf8")).replace("bbbb", "BBBB"));
   await appendEvents(path, ["tail"]);
-  const result = await storage.refresh!("edit-and-grow", base);
+  const result = await storage.refresh("edit-and-grow", base);
   expect(result.kind).toBe("replaced");
   expect(JSON.stringify(result.snapshot.events)).toContain("BBBB");
   await expectSameAsFresh("edit-and-grow", result.snapshot);
@@ -154,7 +154,7 @@ it("a different file at the same path (rename-over, as repair does) falls back t
   const longer = (await readFile(path, "utf8")) + JSON.stringify(titleEvent("b")) + "\n" + JSON.stringify(titleEvent("c")) + "\n";
   await writeFile(`${path}.next`, longer);
   await rename(`${path}.next`, path);
-  const result = await storage.refresh!("replaced-file", base);
+  const result = await storage.refresh("replaced-file", base);
   expect(result.kind).toBe("replaced");
   expect(result.snapshot.events).toHaveLength(3);
   await expectSameAsFresh("replaced-file", result.snapshot);
@@ -164,14 +164,14 @@ it("a partial trailing line is reported by the full reader exactly like a fresh 
   const path = await createSession("torn", ["a"]);
   const base = await storage.inspect("torn");
   await appendFile(path, '{"recordKind":"event","seq":2,');
-  const result = await storage.refresh!("torn", base);
+  const result = await storage.refresh("torn", base);
   expect(result.kind).toBe("replaced");
   expect(result.snapshot.integrity).toBe("repair-required");
   expect(result.snapshot.problem).toContain("torn final line");
   await expectSameAsFresh("torn", result.snapshot);
   // The torn snapshot is never extensible.
   await appendFile(path, "x\n");
-  expect((await storage.refresh!("torn", result.snapshot)).kind).toBe("replaced");
+  expect((await storage.refresh("torn", result.snapshot)).kind).toBe("replaced");
 });
 
 it("an appended event that fails validation yields the same corruption report as a fresh inspect", async () => {
@@ -180,12 +180,12 @@ it("an appended event that fails validation yields the same corruption report as
   const skipped = titleEvent("skipped-seq"); // consume a seq so the next line has a gap
   void skipped;
   await appendFile(path, JSON.stringify(titleEvent("gap")) + "\n");
-  const result = await storage.refresh!("invalid", base);
+  const result = await storage.refresh("invalid", base);
   expect(result.kind).toBe("replaced");
   expect(result.snapshot.integrity).toBe("repair-required");
   await expectSameAsFresh("invalid", result.snapshot);
   await appendFile(path, "not json\n");
-  const garbage = await storage.refresh!("invalid", base);
+  const garbage = await storage.refresh("invalid", base);
   expect(garbage.kind).toBe("replaced");
   await expectSameAsFresh("invalid", garbage.snapshot);
 });
@@ -194,8 +194,8 @@ it("resume state is single-use: a second refresh of the same base is a safe full
   const path = await createSession("single-use", ["a"]);
   const base = await storage.inspect("single-use");
   await appendEvents(path, ["b"]);
-  expect((await storage.refresh!("single-use", base)).kind).toBe("appended");
-  const second = await storage.refresh!("single-use", base);
+  expect((await storage.refresh("single-use", base)).kind).toBe("appended");
+  const second = await storage.refresh("single-use", base);
   expect(second.kind).toBe("replaced");
   await expectSameAsFresh("single-use", second.snapshot);
 });
@@ -204,9 +204,9 @@ it("a snapshot not produced by this storage (or a missing file) refreshes as a f
   await createSession("foreign", ["a"]);
   const base = await storage.inspect("foreign");
   const copy = { ...base };
-  expect((await storage.refresh!("foreign", copy)).kind).toBe("replaced");
+  expect((await storage.refresh("foreign", copy)).kind).toBe("replaced");
   await rm(join(dataRoot, "sessions-v2", "foreign"), { recursive: true });
-  await expect(storage.refresh!("foreign", base)).rejects.toThrow();
+  await expect(storage.refresh("foreign", base)).rejects.toThrow();
 });
 
 it("snapshots expose bytes and the codec digest validation ran under", async () => {

@@ -14,7 +14,7 @@ it("passes the full Relevant Files instruction, prior summary once, no tools, an
     { node: { kind: "user", messageId: "prior", content: "PRIOR-FACT" }, sourceEventSeqs: [1] },
     { node: { kind: "user", messageId: "new", content: "NEW-FACT" }, sourceEventSeqs: [2] },
   ], { sessionId: "s", summaryIds: ["prior"], signal });
-  const request = prepareAsync.mock.calls[0]![0];
+  const request = prepareAsync.mock.calls[0][0];
   expect(request.tools).toEqual([]); expect(request.signal).toBe(signal);
   const text = JSON.stringify(request.messages);
   expect(text.match(/PRIOR-FACT/g)).toHaveLength(1); expect(text.match(/NEW-FACT/g)).toHaveLength(1);

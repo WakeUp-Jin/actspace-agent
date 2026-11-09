@@ -49,23 +49,23 @@ afterEach(() => vi.restoreAllMocks());
 describe("trajectory timeline view", () => {
   it("writes span position variables from the model", () => {
     const { spans } = setup();
-    const first = spans()[0]!;
+    const first = spans()[0];
     const n = model.spans.length;
     expect(spans()).toHaveLength(n);
     expect(first.style.getPropertyValue("--trajectory-span-left")).toBe("0%");
     expect(first.style.getPropertyValue("--trajectory-span-width")).toBe(`${100 / n}%`);
-    expect(first.style.getPropertyValue("--trajectory-span-lane")).toBe(String(model.spans[0]!.lane));
-    expect(spans()[2]!.style.getPropertyValue("--trajectory-span-left")).toBe(`${200 / n}%`);
+    expect(first.style.getPropertyValue("--trajectory-span-lane")).toBe(String(model.spans[0].lane));
+    expect(spans()[2].style.getPropertyValue("--trajectory-span-left")).toBe(`${200 / n}%`);
     expect(spans().map(span => span.dataset.lane)).toEqual(model.spans.map(span => String(span.lane)));
-    expect(spans()[0]!.getAttribute("aria-hidden")).toBe("true");
+    expect(spans()[0].getAttribute("aria-hidden")).toBe("true");
   });
 
   it("selects a block on click", () => {
     const { spans, track, onSelect, onRange } = setup();
-    const target = spans()[2]!;
+    const target = spans()[2];
     pointer(track, "pointerDown", 300, target);
     pointer(track, "pointerUp", 300, target);
-    expect(onSelect).toHaveBeenCalledWith(model.spans[2]!.recordId);
+    expect(onSelect).toHaveBeenCalledWith(model.spans[2].recordId);
     expect(onRange).toHaveBeenCalledWith(null);
   });
 
@@ -90,14 +90,14 @@ describe("trajectory timeline view", () => {
   });
 
   it("marks spans outside the search matches", () => {
-    const keep = model.spans[1]!.recordId;
+    const keep = model.spans[1].recordId;
     const { spans } = setup({ matches: new Set([keep]) });
     expect(spans().map(span => span.dataset.searchMatch)).toEqual(model.spans.map(span => span.recordId === keep ? "true" : "false"));
   });
 
   it("marks the selected span and the spans inside the range", () => {
-    const { spans } = setup({ selectedId: model.spans[0]!.recordId, range: { start: 1, end: 2 } });
-    expect(spans()[0]!.dataset.current).toBe("true");
+    const { spans } = setup({ selectedId: model.spans[0].recordId, range: { start: 1, end: 2 } });
+    expect(spans()[0].dataset.current).toBe("true");
     expect(spans().map(span => span.dataset.selected)).toEqual(model.spans.map(span => span.start <= 2 && span.end >= 1 ? "true" : "false"));
   });
 });

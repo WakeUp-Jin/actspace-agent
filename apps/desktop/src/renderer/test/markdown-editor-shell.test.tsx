@@ -244,11 +244,11 @@ describe("useMarkdownEditorHost（宿主实现）", () => {
     const { result } = mountHost();
     overrideBridge({ "workspaces.statFile": async ({ relativePath }: { relativePath: string }) => ({ relativePath, size: 1, mtimeMs: 1 }) });
     act(() => result.current.host.openPath("docs/b.md", 5));
-    await waitFor(() => expect(JSON.parse(screen.getByTestId("probe").textContent!)).toMatchObject({ path: "docs/b.md", line: 5, tab: "docs" }));
+    await waitFor(() => expect(JSON.parse(screen.getByTestId("probe").textContent)).toMatchObject({ path: "docs/b.md", line: 5, tab: "docs" }));
 
     overrideBridge({ "workspaces.statFile": async ({ relativePath }: { relativePath: string }) => ({ relativePath, size: 0, mtimeMs: 0, error: "not_found" as const }) });
     act(() => result.current.host.openPath("docs/gone.md"));
-    await waitFor(() => expect(JSON.parse(screen.getByTestId("probe").textContent!).tab).toBe("text"));
+    await waitFor(() => expect(JSON.parse(screen.getByTestId("probe").textContent).tab).toBe("text"));
   });
 
   it("没有本地工作区（远端会话）：openPath 什么都不做，loadImage 返回 null 且不读盘", async () => {
@@ -258,7 +258,7 @@ describe("useMarkdownEditorHost（宿主实现）", () => {
     act(() => result.current.host.openPath("docs/b.md", 5));
     expect(await result.current.host.loadImage("a.png")).toBeNull();
     expect(read).not.toHaveBeenCalled();
-    expect(JSON.parse(screen.getByTestId("probe").textContent!).path).toBeNull();
+    expect(JSON.parse(screen.getByTestId("probe").textContent).path).toBeNull();
   });
 
   it("openUrl：window.open 新标签并带 noopener", () => {

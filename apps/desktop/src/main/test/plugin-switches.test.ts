@@ -33,7 +33,7 @@ describe("plugin switches", () => {
     const startup = resolvePluginSwitches({ tools: {} }, catalog);
     const items = listPluginItems({ catalog, startupSwitches: startup, settings: { tools: { plugins: { "browser-tools": true } } } });
     expect(items.map((item) => item.id)).toEqual(["english-learning", "browser-tools", "shell-tools", "llm-service", "desktop-app"]);
-    const browser = items.find((item) => item.id === "browser-tools")!;
+    const browser = items.find((item) => item.id === "browser-tools");
     expect(browser).toMatchObject({ canDisable: true, loaded: false, enabled: true, scope: "session" });
     expect(items.find((item) => item.id === "llm-service")!.scope).toBe("global");
     expect(items.find((item) => item.id === "shell-tools")).toMatchObject({ canDisable: false, loaded: true, enabled: true });
@@ -84,7 +84,7 @@ describe("external subagent plugins", () => {
     const codex = items.find((item) => item.id === "subagent-codex")!;
     expect(codex).toMatchObject({ settings: { approvalPolicy: "never", sandbox: "read-only" }, settingsPendingRestart: true });
     expect(codex.unavailableReason).toBeUndefined();
-    const claude = items.find((item) => item.id === "subagent-claude-code")!;
+    const claude = items.find((item) => item.id === "subagent-claude-code");
     expect(claude).toMatchObject({ unavailableReason: "本机没有找到 claude 命令", settings: { permissionMode: "dontAsk" }, settingsPendingRestart: false });
   });
 

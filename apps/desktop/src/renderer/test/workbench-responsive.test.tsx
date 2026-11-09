@@ -195,7 +195,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
       messages: [{ kind: "user", id: "message-1", renderKey: "message-1", content: "你好", createdAt: "2026-10-06T00:00:00.000Z" }],
     });
     await user.click(screen.getByRole("button", { name: "打开面板" }));
-    const usage = screen.getAllByRole("button", { name: /^上下文用量 / })[0]!;
+    const usage = screen.getAllByRole("button", { name: /^上下文用量 / })[0];
 
     await user.click(usage);
     expect(screen.getByRole("dialog", { name: "上下文用量" })).toHaveFocus();

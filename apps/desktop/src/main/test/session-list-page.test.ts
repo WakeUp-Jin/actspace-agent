@@ -21,7 +21,7 @@ it('returns ten summaries per workspace and loads only the requested next page',
   expect(next.items).toHaveLength(10); expect(next.items.every(s => s.workspaceRoot === '/a')).toBe(true);
   expect(next.items.some(s => first.items.some(f => f.id === s.id))).toBe(false);
   const last = paginateSessionSummaries(result, { workspaceRoot: '/a', after: next.items.at(-1)!.id });
-  expect(last.items).toHaveLength(3); expect(last.groups[0]!.hasMore).toBe(false);
+  expect(last.items).toHaveLength(3); expect(last.groups[0].hasMore).toBe(false);
 });
 
 it('hides side chats from the page and counts them on their parent', () => {

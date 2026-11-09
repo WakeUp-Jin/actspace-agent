@@ -19,7 +19,7 @@ it("converts a detached frozen Context without changing its source or leaking st
   expect(reads).toBe(1);
   expect(JSON.stringify(original)).toBe(before);
   expect(context).not.toBe(original);
-  expect(Object.isFrozen(context.content.conversation.entries[0]!.node)).toBe(true);
+  expect(Object.isFrozen(context.content.conversation.entries[0].node)).toBe(true);
   expect(JSON.stringify(result)).not.toContain("do-not-inject");
   expect(JSON.stringify(result)).not.toContain("throughJournalSeq");
 });

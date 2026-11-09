@@ -11,7 +11,7 @@ const bash = (id: string, renderKey: string): MessageBlock => ({ kind: "bash", i
 it("groups adjacent explore blocks and counts files and searches", () => {
   const items = buildTranscript([user("u"), read("a"), read("b"), grep("c"), text("t", "done"), read("d")], { blocks: [], runId: null });
   expect(items.map(item => item.type)).toEqual(["block", "explore", "block", "explore"]);
-  const first = items[1]!;
+  const first = items[1];
   expect(first.type === "explore" && exploreSummary(first.blocks)).toEqual({ files: 2, searches: 1, running: false });
 });
 

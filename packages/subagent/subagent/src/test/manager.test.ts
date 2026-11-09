@@ -98,7 +98,7 @@ async function fixture(options: { script?: TurnScript; syncWaitMs?: number; sett
   });
   const settled = async (agentId: string, count = 1) => {
     await until(() => (subagentTree(root).agents[agentId]?.activations.filter(item => item.settle).length ?? 0) >= count && !manager.runningCount("root"));
-    return subagentTree(root).agents[agentId]!;
+    return subagentTree(root).agents[agentId];
   };
   const close = async () => { await manager.dispose(); for (const session of live.values()) await session.close().catch(() => undefined); await rootScope.dispose(); await store.storage.close(); };
   return { dataRoot, store, root, live, manager, rootScope, refreshed, woken, turns, loops, finished, spawn, settled, close, setScript: (next: TurnScript) => { script = next; }, setRootRunning: (value: boolean) => { rootRunning = value; } };
@@ -108,7 +108,7 @@ async function until(check: () => boolean, ms = 3000): Promise<void> {
   const deadline = Date.now() + ms;
   while (!check()) { if (Date.now() > deadline) throw new Error("timed out"); await new Promise(resolve => setTimeout(resolve, 5)); }
 }
-function idOf(outcome: SubagentToolOutcome): string { return /subagent ([0-9a-f-]{36})/i.exec(outcome.text)![1]!; }
+function idOf(outcome: SubagentToolOutcome): string { return /subagent ([0-9a-f-]{36})/i.exec(outcome.text)![1]; }
 function gate() { let open!: () => void; const promise = new Promise<void>(resolve => { open = resolve; }); return { promise, open }; }
 function pendingTexts(session: SessionHandle): string[] { return new MainAgentInbox(session).pending().map(item => String(item.content)); }
 
@@ -159,7 +159,7 @@ describe("SubagentManager", () => {
     const done = await f.spawn({ background: false });
     const first = idOf(done);
     expect(done.text).toBe(`Subagent ${first} (review auth) finished.\ntranscript: /data/sessions-v2/${first}/transcript.md\n\ndone`);
-    expect(subagentTree(f.root).agents[first]!.activations[0]!.settle).toMatchObject({ delivery: "returned" });
+    expect(subagentTree(f.root).agents[first].activations[0].settle).toMatchObject({ delivery: "returned" });
     expect(pendingTexts(f.root)).toEqual([]);
 
     const hold = gate();
@@ -169,7 +169,7 @@ describe("SubagentManager", () => {
     expect(moved.text.split("\n")[0]).toBe(`Subagent ${second} (slow job) is still running and has moved to the background (30 minute wait limit).`);
     hold.open();
     await f.settled(second);
-    expect(subagentTree(f.root).agents[second]!.activations[0]!.settle).toMatchObject({ delivery: "notified" });
+    expect(subagentTree(f.root).agents[second].activations[0].settle).toMatchObject({ delivery: "notified" });
     expect(pendingTexts(f.root)[0]).toContain("<closing_message>\nlate\n</closing_message>");
     await f.close();
   });
@@ -213,7 +213,7 @@ describe("SubagentManager", () => {
     const view = await f.settled(agentId);
     expect(view.activations).toHaveLength(1);
     expect(seen[1]).toEqual([`<agent_message from="root" relation="parent">\nOne more thing.\n</agent_message>`]);
-    expect(view.activations[0]!.settle).toMatchObject({ result: "turn 1" });
+    expect(view.activations[0].settle).toMatchObject({ result: "turn 1" });
     await f.close();
   });
 
@@ -223,13 +223,13 @@ describe("SubagentManager", () => {
     await until(() => f.turns.length === 1);
     expect(await f.manager.interrupt({ sessionId: "root", callId: "i", agentId })).toEqual({ ok: true, text: `Stopping subagent ${agentId}. You will be notified when it stops.` });
     const view = await f.settled(agentId);
-    expect(view.activations[0]!.settle).toMatchObject({ status: "interrupted" });
+    expect(view.activations[0].settle).toMatchObject({ status: "interrupted" });
     expect(f.finished).toEqual(["cancelled"]);
     expect(pendingTexts(f.root)[0]).toContain(`<summary>Subagent ${agentId} was stopped before it finished. Send it a message to continue.</summary>`);
     expect(await f.manager.interrupt({ sessionId: "root", callId: "i2", agentId })).toEqual({ ok: true, text: `Subagent ${agentId} is not running.` });
     f.setScript(async () => ({ reason: "completed", finalText: "resumed" }));
     await f.manager.sendMessage({ sessionId: "root", callId: "c", scope: f.rootScope, agentId, message: "Continue." });
-    expect((await f.settled(agentId, 2)).activations[1]!.settle).toMatchObject({ status: "completed", result: "resumed" });
+    expect((await f.settled(agentId, 2)).activations[1].settle).toMatchObject({ status: "completed", result: "resumed" });
     await f.close();
   });
 
@@ -241,9 +241,9 @@ describe("SubagentManager", () => {
     await f.manager.stopAll("root");
     expect(f.manager.runningCount("root")).toBe(0);
     const tree = subagentTree(f.root);
-    expect(tree.agents[background]!.activations[0]!.settle).toMatchObject({ status: "interrupted", delivery: "lost" });
+    expect(tree.agents[background].activations[0].settle).toMatchObject({ status: "interrupted", delivery: "lost" });
     const syncId = Object.keys(tree.agents).find(id => id !== background)!;
-    expect(tree.agents[syncId]!.activations[0]!.settle).toMatchObject({ status: "interrupted", delivery: "lost" });
+    expect(tree.agents[syncId].activations[0].settle).toMatchObject({ status: "interrupted", delivery: "lost" });
     // The synchronous caller still gets its answer: the tool call is closed, not left hanging.
     expect((await sync).text.split("\n")[0]).toMatch(/was stopped before it finished\.$/);
     expect(pendingTexts(f.root)).toEqual([]);
@@ -258,12 +258,12 @@ describe("SubagentManager", () => {
     await first.root.flush();
     await first.manager.dispose();
     // Shutdown does not settle: the next start reports it.
-    expect(subagentTree(first.root).agents[agentId]!.activations[0]!.settle).toBeUndefined();
+    expect(subagentTree(first.root).agents[agentId].activations[0].settle).toBeUndefined();
     await first.close();
 
     const second = await fixture({ dataRoot: first.dataRoot, script: async () => ({ reason: "completed", finalText: "picked up" }) });
     await second.manager.recoverLost(second.root);
-    const lost = subagentTree(second.root).agents[agentId]!;
+    const lost = subagentTree(second.root).agents[agentId];
     expect(lost).toMatchObject({ status: "inactive", activations: [{ settle: { status: "lost", delivery: "lost" } }] });
     expect(pendingTexts(second.root)).toEqual([[
       "<subagent_notification>", `<agent_id>${agentId}</agent_id>`, "<description>review auth</description>", "<status>lost</status>",
@@ -271,9 +271,9 @@ describe("SubagentManager", () => {
       `<transcript>/data/sessions-v2/${agentId}/transcript.md</transcript>`, "</subagent_notification>",
     ].join("\n")]);
     await second.manager.recoverLost(second.root);
-    expect(subagentTree(second.root).agents[agentId]!.activations).toHaveLength(1);
+    expect(subagentTree(second.root).agents[agentId].activations).toHaveLength(1);
     await second.manager.sendMessage({ sessionId: "root", callId: "c", scope: second.rootScope, agentId, message: "Continue." });
-    expect((await second.settled(agentId, 2)).activations[1]!.settle).toMatchObject({ status: "completed", result: "picked up" });
+    expect((await second.settled(agentId, 2)).activations[1].settle).toMatchObject({ status: "completed", result: "picked up" });
     await second.close();
   });
 

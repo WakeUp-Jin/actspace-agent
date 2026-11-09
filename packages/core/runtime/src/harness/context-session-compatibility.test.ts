@@ -46,7 +46,7 @@ it("copies the typed sleeping-index reference during a real JSONL fork without r
     const child = await store.fork({ parentSessionId: "parent", newSessionId: "child", boundarySeq: parent.lastSeq, createdAt: new Date().toISOString(), createdWith });
     try {
       expect(copies).toEqual(["sleeping"]);
-      expect(child.journal.events[0]!.data).toMatchObject({ index: { artifactId: "child-sleeping" } });
+      expect(child.journal.events[0].data).toMatchObject({ index: { artifactId: "child-sleeping" } });
       expect(await readFile(path)).toEqual(bytes);
       expect(child.journal.surface).toEqual(parent.journal.surface);
     } finally { await child.close(); }

@@ -5,7 +5,7 @@ import { collectPresentedFiles, collectTurnChanges, parseUnifiedDiff } from "../
 type DiffBlock = Extract<MessageBlock, { kind: "write_diff" | "edit_diff" }>;
 
 function diffBlock(kind: DiffBlock["kind"], path: string, diff: string, additions: number, deletions: number, status: DiffBlock["status"] = "completed"): DiffBlock {
-  return { kind, id: `${kind}-${path}-${additions}-${deletions}`, filePath: path.split("/").pop()!, outputPath: `/work/${path}`, outputRelativePath: path, additions, deletions, diff, createdAt: "now", status } as DiffBlock;
+  return { kind, id: `${kind}-${path}-${additions}-${deletions}`, filePath: path.split("/").pop(), outputPath: `/work/${path}`, outputRelativePath: path, additions, deletions, diff, createdAt: "now", status } as DiffBlock;
 }
 
 function deleteBlock(path: string): MessageBlock {

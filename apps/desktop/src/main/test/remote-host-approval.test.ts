@@ -36,7 +36,7 @@ it("lists pending remote approvals with their Host, including a hostId that cont
   const { adapter } = await adapterWith(["plain", "h:with:colons"]);
   const pending = await adapter.mergeList(C.listPendingApprovals, {}, []) as { requestId: string; hostId?: string }[];
   expect(pending.map((item) => item.hostId)).toEqual(["plain", "h:with:colons"]);
-  expect(pending[1]!.requestId).toBe("remote-approval:h:with:colons:r1");
+  expect(pending[1].requestId).toBe("remote-approval:h:with:colons:r1");
   adapter.dispose();
 });
 
@@ -45,10 +45,10 @@ it("routes an approval decision by hostId, even when the hostId contains ':'", a
   const { adapter, call } = await adapterWith([hostId]);
   const sessionId = encodeSessionLocator({ hostId, sessionId: "s1" });
   const [pending] = await adapter.handle(C.listPendingApprovals, { sessionId }, { hostId, sessionId: "s1" }) as { requestId: string; hostId?: string }[];
-  expect(pending!.hostId).toBe(hostId);
+  expect(pending.hostId).toBe(hostId);
   const gateway = createSessionGateway(adapter);
   const next = vi.fn(async () => ({ ok: false }));
-  await expect(gateway({ channel: C.submitApproval, input: { requestId: pending!.requestId, hostId, decision: "once" }, event: {} as never }, next)).resolves.toEqual({ ok: true });
+  await expect(gateway({ channel: C.submitApproval, input: { requestId: pending.requestId, hostId, decision: "once" }, event: {} as never }, next)).resolves.toEqual({ ok: true });
   expect(next).not.toHaveBeenCalled();
   expect(call).toHaveBeenCalledWith(hostId, "approvals.decide", expect.objectContaining({ requestId: "r1", kind: "once", sessionId: "s1" }));
   adapter.dispose();
@@ -57,7 +57,7 @@ it("routes an approval decision by hostId, even when the hostId contains ':'", a
 it("refuses an approval decision sent to the wrong Host", async () => {
   const { adapter, call } = await adapterWith(["a", "b"]);
   const [pending] = await adapter.handle(C.listPendingApprovals, {}, { hostId: "a", sessionId: "s1" }) as { requestId: string }[];
-  await expect(adapter.decide({ requestId: pending!.requestId, hostId: "b", decision: "once" })).rejects.toThrow("another Host");
+  await expect(adapter.decide({ requestId: pending.requestId, hostId: "b", decision: "once" })).rejects.toThrow("another Host");
   expect(call).not.toHaveBeenCalledWith(expect.anything(), "approvals.decide", expect.anything());
   adapter.dispose();
 });

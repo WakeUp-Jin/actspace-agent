@@ -54,8 +54,8 @@ describe("desktop live IPC", () => {
       expect(send).not.toHaveBeenCalled();
       vi.advanceTimersByTime(INTERVAL_MS);
       expect(send).toHaveBeenCalledTimes(1);
-      expect(send.mock.calls[0]![0]).toBe(CH.agentStream);
-      expect((send.mock.calls[0]![1] as { delta: string }).delta).toBe(Array.from({ length: 100 }, (_, index) => `t${index} `).join(""));
+      expect(send.mock.calls[0][0]).toBe(CH.agentStream);
+      expect((send.mock.calls[0][1] as { delta: string }).delta).toBe(Array.from({ length: 100 }, (_, index) => `t${index} `).join(""));
     } finally { registration.dispose(); adapter.dispose(); }
   });
 

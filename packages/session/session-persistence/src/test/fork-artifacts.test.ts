@@ -42,7 +42,7 @@ it("copies referenced artifacts once, rewrites data and surface, preserves paren
   await f.message("image"); await f.message("later"); await f.parent.close();
   const child = await f.fork();
   expect(f.artifacts.copyForSession.mock.calls).toEqual([["parent", "child", "image"]]);
-  const event = child.journal.events[0]!;
+  const event = child.journal.events[0];
   expect(event.data).toMatchObject({ content: [{ artifactId: "child-image" }, { artifact: { artifactId: "child-image" } }, { text: "keep image" }] });
   // surface 只是标记，节点从改写后的 data 推出（agent-spec-surface-derived.md §4.2）。
   expect(event.surface).toEqual({ kind: "append" });

@@ -24,12 +24,12 @@ it.each([
   const messages = journal.filter(event => event.type === "assistant/message");
   expect(headers).toHaveLength(2);
   expect(messages).toHaveLength(2);
-  expect(messages[0]!.data).toMatchObject({
-    requestId: (headers[0]!.data as { requestId: string }).requestId,
+  expect(messages[0].data).toMatchObject({
+    requestId: (headers[0].data as { requestId: string }).requestId,
     content: [], finishReason: "stop", usage,
   });
-  expect(messages[0]!.seq).toBeLessThan(journal.find(event => event.type === "step/end")!.seq);
-  expect(messages[1]!.data).toMatchObject({ content: [{ type: "text", text: "After empty." }] });
+  expect(messages[0].seq).toBeLessThan(journal.find(event => event.type === "step/end")!.seq);
+  expect(messages[1].data).toMatchObject({ content: [{ type: "text", text: "After empty." }] });
   expect(journal.filter(event => event.type === "turn/end")).toHaveLength(2);
   const replay = new SessionJournal({ registry: createCoreCodecRegistry(), seed: journal });
   expect(replay.validation.accessState).toBe("read-write");

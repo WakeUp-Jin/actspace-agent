@@ -80,7 +80,7 @@ describe("recorder", () => {
     recorder.restore(taken);
     const [cell] = recorder.take();
     expect(cell).toMatchObject({ calls: 2, errors: 1 });
-    expect(cell!.histogram.reduce((a, b) => a + b, 0)).toBe(2);
+    expect(cell.histogram.reduce((a, b) => a + b, 0)).toBe(2);
   });
 });
 
@@ -148,7 +148,7 @@ describe("HarnessStats", () => {
       await stats.flush();
     } finally { await mounted.close(); await stats.dispose(); }
     const lines = await readLines(root);
-    const service = lines.find((line): line is HarnessRuntimeStatLine => line.t === "runtime" && line.kind === "service" && line.method === "bump")!;
+    const service = lines.find((line): line is HarnessRuntimeStatLine => line.t === "runtime" && line.kind === "service" && line.method === "bump");
     expect(service).toMatchObject({ plugin: "consumer", name: "svc", provider: "provider", calls: 1, errors: 0, revision: "main@3" });
     // 依赖行不再记。
     expect(lines.filter(line => line.t === "runtime").every(line => (line as HarnessRuntimeStatLine).kind === "service" || (line as HarnessRuntimeStatLine).kind === "listener")).toBe(true);
@@ -225,8 +225,8 @@ describe("HarnessStats", () => {
     const lines = await readLines(root);
     const inventory = lines.filter((line): line is HarnessInventoryLine => line.t === "inventory");
     expect(inventory.map(line => [line.plugin, line.source, line.revision, line.ok])).toEqual([["tools.runtime", "builtin", "main@9", true], ["reader", "user", "main@9", true]]);
-    expect(inventory[0]!.provides).toEqual(["tools.runtime"]);
-    expect(inventory[1]!.loadMs).toBeGreaterThanOrEqual(0);
+    expect(inventory[0].provides).toEqual(["tools.runtime"]);
+    expect(inventory[1].loadMs).toBeGreaterThanOrEqual(0);
     expect(lines.filter((line): line is HarnessToolOwnerLine => line.t === "tool-owner")).toEqual([{ v: 1, t: "tool-owner", at: new Date(T0).toISOString(), revision: "main@9", plugin: "reader", toolPluginId: "actspace.reader", tool: "read_file" }]);
   });
 

@@ -31,7 +31,7 @@ describe("NodeArtifactStore", () => {
 
     const manifest = JSON.parse(await readFile(join(out, "artifacts", "manifest.json"), "utf8")) as readonly { filename: string }[];
     expect(manifest).toEqual([{ artifactId: ref.artifactId, mediaType: "image/png", filename: `${ref.artifactId}.png` }]);
-    expect(await readFile(join(out, "artifacts", manifest[0]!.filename))).toEqual(Buffer.from([137, 80, 78, 71]));
+    expect(await readFile(join(out, "artifacts", manifest[0].filename))).toEqual(Buffer.from([137, 80, 78, 71]));
     await store.dispose();
     await expect(access(storeRoot)).rejects.toMatchObject({ code: "ENOENT" });
   });

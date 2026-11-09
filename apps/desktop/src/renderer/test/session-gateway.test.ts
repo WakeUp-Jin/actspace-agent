@@ -120,7 +120,7 @@ describe("submit", () => {
     expect(value.pending.read("s")).toBeNull();
     expect(value.forgetOptions).toHaveBeenCalled();
     expect(value.submit).toHaveBeenCalledTimes(1);
-    const draft = value.restoreDraft.mock.calls[0]![1];
+    const draft = value.restoreDraft.mock.calls[0][1];
     expect(draft).toMatchObject({ id: 42, sessionId: "s", text: "hi", attachmentIssue });
     expect(draft).not.toHaveProperty("status");
   });

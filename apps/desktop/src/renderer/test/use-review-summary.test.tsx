@@ -41,7 +41,7 @@ function deferredBridge() {
   const handle = setupBridge({ "review.getSnapshot": getSnapshot, "review.refreshSnapshot": refreshSnapshot });
   const notify = (workspaceId: string) => act(() => handle.emit("reviewChanged", { workspaceId, generation: 2, reason: "refresh" }));
   const settle = async (index: number, result: ReviewGetSnapshotResult) => {
-    await act(async () => { calls[index]!.resolve(result); });
+    await act(async () => { calls[index].resolve(result); });
   };
   return { calls, started, getSnapshot, refreshSnapshot, notify, settle };
 }
@@ -160,7 +160,7 @@ describe("useReviewSummary", () => {
     const bridge = deferredBridge();
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { result } = renderHook(() => useReviewSummary({ workspaceRoot: "/tmp/current", sessionId: null }));
-    await act(async () => { bridge.calls[0]!.reject(new Error("git failed")); });
+    await act(async () => { bridge.calls[0].reject(new Error("git failed")); });
     expect(result.current.reviewSummary).toEqual({ status: "failed", reason: "command_failed" });
 
     act(() => { void result.current.refreshReviewSummary(); });

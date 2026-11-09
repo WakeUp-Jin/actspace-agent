@@ -25,8 +25,8 @@ function setup(...ids: string[]) {
   const sessions = new Map(ids.map(id => [id, session(id)]));
   const wakes: string[] = [];
   const registry = new BackgroundTaskRegistry({ openSession: async id => sessions.get(id)!, wake: id => wakes.push(id), now: () => Date.parse("2026-10-22T06:00:00.000Z") });
-  const facts = (id = ids[0]!) => sessions.get(id)!.journal.events.filter(event => event.type === "background/task").map(event => event.data as Record<string, unknown>);
-  const inbox = (id = ids[0]!) => new MainAgentInbox(sessions.get(id)!);
+  const facts = (id = ids[0]) => sessions.get(id)!.journal.events.filter(event => event.type === "background/task").map(event => event.data as Record<string, unknown>);
+  const inbox = (id = ids[0]) => new MainAgentInbox(sessions.get(id)!);
   return { registry, sessions, wakes, facts, inbox };
 }
 
@@ -44,8 +44,8 @@ describe("BackgroundTaskRegistry", () => {
     const pending = inbox().pending();
     expect(pending).toHaveLength(1);
     expect(pending[0]).toMatchObject({ source: "task_notification", notice: { taskId: "bash_1", kind: "bash", title: "task bash_1", status: "completed" } });
-    expect(String(pending[0]!.content)).toContain("<kind>bash</kind>");
-    expect(String(pending[0]!.content)).toContain("<output_tail>");
+    expect(String(pending[0].content)).toContain("<kind>bash</kind>");
+    expect(String(pending[0].content)).toContain("<output_tail>");
     expect(wakes).toEqual(["parent"]);
     expect(registry.hasRunning("parent")).toBe(false);
   });
@@ -95,7 +95,7 @@ describe("BackgroundTaskRegistry", () => {
     const pending = inbox().pending();
     expect(pending).toHaveLength(1);
     expect(pending[0]).toMatchObject({ source: "task_notification", notice: { taskId: "bash_1", kind: "bash", status: "stopped" } });
-    expect(String(pending[0]!.content)).toContain("The user stopped background bash task");
+    expect(String(pending[0].content)).toContain("The user stopped background bash task");
     expect(wakes).toEqual([]);
     // Stopping an ended task again neither stops nor notifies twice.
     await registry.stopByUser("parent", "bash_1");
@@ -161,7 +161,7 @@ describe("BackgroundTaskRegistry", () => {
     expect(reads).toEqual([4]);
     task.finish();
     await flush(); await flush();
-    const content = String(inbox().pending()[0]!.content);
+    const content = String(inbox().pending()[0].content);
     expect(content).toContain("</summary>\n<output_path>/data/sessions-v2/parent/bash-log/bash_1.log</output_path>\n<output_tail>");
   });
 
