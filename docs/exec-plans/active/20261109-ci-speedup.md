@@ -59,8 +59,8 @@
 ## 进度记录
 
 - [x] P1 `exclude` 修正、根脚本切到 `tsc -b`。
-- [ ] P2 `ci.yml` 拆 job + 缓存。
-- [ ] P3 desktop 分片 + node 环境。
+- [x] P2 `ci.yml` 拆 job + 缓存。
+- [x] P3 desktop 分片 + node 环境（本地两分片 65 s / 68 s，全部通过）。
 - [ ] 推送后记录 CI 各 job 时长。
 - [ ] 文档同步，plan 移到 `completed/`。
 

@@ -28,6 +28,20 @@
   - `pnpm build:deps` 热 5 s；`pnpm typecheck` 24 s（原 `typecheck:contracts` 32 s + `pnpm -r typecheck` 50 s）。
   - `pnpm --filter @actspace/agent-cli build && pnpm test:harness-recovery && pnpm test:agent-host:process && pnpm --filter @actspace/runtime test` 通过；runtime 33 个文件 10 s。
 
+### 步骤 2：P2 拆 job 与 tsc 缓存
+
+- **操作**：
+  - 新建 composite action `.github/actions/setup-workspace`：pnpm / Node / `pnpm install` + `actions/cache` 恢复 `packages/**/dist`。key 带 `github.sha`，`restore-keys` 退到同 lockfile 前缀；`workflow_dispatch` 跳过缓存。
+  - `ci.yml`：`typecheck-test` 拆成 `lint-typecheck`、`test-process`、`test-packages`、`test-desktop`（2 分片），互不 `needs`。`check:desktop-build-graph` 放在 `build:deps` 之前。
+  - 根 `package.json`：原 `test` 链拆成 `test:scripts`（根脚本与进程级测试）和 `test`（`test:scripts` + `pnpm -r test`），让 `test-process` 与 `test-packages` 各跑一半。
+  - `scripts/check-action-pinning.sh`：跳过 `uses: ./...` 的本地 action，并把扫描范围扩到 `.github/actions`。
+- **验证**：`./scripts/check-action-pinning.sh` 通过；`ci.yml`、`action.yml` 能被 YAML 解析；`pnpm lint`、`pnpm check:docs` 通过。
+
+### 步骤 3：P3 desktop 分片与 main 走 node 环境
+
+- **操作**：`apps/desktop/vitest.config.ts` 改为两个 project：`main`（node 环境）、`renderer`（jsdom）。`setupFiles` 保留在根配置由两个 project 继承。
+- **验证**：本地 `vitest run --shard=1/2` 152 个文件 1309 用例 65 s、`--shard=2/2` 151 个文件 1589 用例 68 s，全部通过；全量不分片原为 136 s。main 单独跑从 24 s 降到 17.6 s，93 passed / 1 skipped 与之前一致。
+
 ## 遇到的问题
 
 - **问题**：`tsc -b` 第一次在本地跑出 `agent-service` 的 TS2307。
