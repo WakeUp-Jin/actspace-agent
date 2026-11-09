@@ -1,22 +1,14 @@
 import type { ApprovalBroker, ApprovalDecision, ApprovalRequest } from "@actspace/approval";
-import type { TerminalLineInput } from "../terminal-input";
 
+/**
+ * CLI 没有交互式审批面：stdin 整段作为提示词读完即关闭，所以任何需要人工审批的调用都直接拒绝，
+ * 并把请求记在 `approvalRequired` 上，由 run 结果以 `APPROVAL_REQUIRED` 报告给调用方。
+ */
 export class CliV2ApprovalBroker implements ApprovalBroker {
   approvalRequired: ApprovalRequest | undefined;
-  constructor(private readonly input?: TerminalLineInput, private readonly write: (text: string) => void = () => undefined) {}
 
-  async requestApproval(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalDecision> {
-    if (this.input === undefined) { this.approvalRequired = request; return denied(request, "broker-unavailable"); }
-    this.write(`\nApproval required\nTool: ${request.toolName}\n${request.reasons.map((reason) => `Reason: ${reason.message}\nRisk: ${reason.risk}`).join("\n")}\n`);
-    while (!signal.aborted) {
-      const answer = await this.input.readLine("Approve? [y] once / [n] deny: ");
-      if (answer === null) return denied(request, "user-denied");
-      if (["y", "yes"].includes(answer.trim().toLowerCase())) return Object.freeze({ requestId: request.requestId, kind: "once", decidedAt: new Date().toISOString() });
-      if (["n", "no"].includes(answer.trim().toLowerCase())) return denied(request, "user-denied");
-      this.write("Please enter y or n.\n");
-    }
-    return denied(request, "aborted");
+  async requestApproval(request: ApprovalRequest): Promise<ApprovalDecision> {
+    this.approvalRequired = request;
+    return Object.freeze({ requestId: request.requestId, kind: "deny", code: "broker-unavailable", decidedAt: new Date().toISOString() });
   }
 }
-
-function denied(request: ApprovalRequest, code: Extract<ApprovalDecision, { kind: "deny" }>["code"]): ApprovalDecision { return Object.freeze({ requestId: request.requestId, kind: "deny", code, decidedAt: new Date().toISOString() }); }
