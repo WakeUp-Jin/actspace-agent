@@ -3,6 +3,7 @@ import { createWriteStream } from "node:fs";
 import { mkdir, open, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
+import { toolChildEnv } from "@actspace/shared";
 import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { spawnHostProcess } from "@actspace/sandbox/node-ports";
 import type { HostProcessSpec, SandboxExecution, SandboxRequest, SandboxResult, SandboxService } from "@actspace/sandbox/types";
@@ -104,9 +105,9 @@ async function executeBash(
     if (context.signal.aborted) return failed("TOOL_ABORTED", "Bash was cancelled before process creation.", true);
     const argv = [process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", "-lc", command];
     const run = !options.sandbox
-      ? directRun({ command: argv[0], args: argv.slice(1), cwd: realCwd, env: process.env })
+      ? directRun({ command: argv[0], args: argv.slice(1), cwd: realCwd, env: toolChildEnv(process.env) })
       : options.sandbox.run(noSandbox
-        ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env: process.env, scratchDir: scratchRoot }
+        ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env: toolChildEnv(process.env), scratchDir: scratchRoot }
         : await sandboxedRequest(argv, realCwd, workspaceRoot, scratchRoot));
     const sandboxed = !noSandbox;
     const monitor = new OutputMonitor(subscription);
@@ -237,7 +238,7 @@ function directRun(spec: HostProcessSpec): BashRun {
 /** Canonical paths, so the policy and TMPDIR name the same directory. The log is written by this process, not the command. The tool template adds the .git denies. */
 async function sandboxedRequest(argv: readonly string[], cwd: string, workspaceRoot: string, scratchRoot: string): Promise<SandboxRequest> {
   const scratch = await realpath(scratchRoot);
-  return { purpose: "tool", isolation: "sandboxed", argv, cwd, env: { ...process.env, TMPDIR: scratch }, scratchDir: scratch, filesystem: { readWrite: [await realpath(workspaceRoot), scratch, await realpath(tmpdir())] } };
+  return { purpose: "tool", isolation: "sandboxed", argv, cwd, env: { ...toolChildEnv(process.env), TMPDIR: scratch }, scratchDir: scratch, filesystem: { readWrite: [await realpath(workspaceRoot), scratch, await realpath(tmpdir())] } };
 }
 
 /** The admitted process resource is what the user approved; direct callers without one only get an explicit request. */

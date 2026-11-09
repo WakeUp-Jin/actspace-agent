@@ -1,3 +1,5 @@
+import { trimTrailing } from "./trim-trailing";
+
 export const ACTSPACE_DATA_DIRECTORY_NAME = "ActSpace";
 
 export type ActSpaceDataRootPlatform = "darwin" | "linux" | "win32" | "other";
@@ -33,5 +35,5 @@ function isAbsolute(value: string, platform: ActSpaceDataRootPlatform): boolean 
 function join(...parts: string[]): string {
   const first = parts[0] ?? "";
   const separator = first.includes("\\") ? "\\" : "/";
-  return parts.map((part, index) => index === 0 ? part.replace(/[\\/]+$/, "") : part.replace(/^[\\/]+|[\\/]+$/g, "")).filter(Boolean).join(separator);
+  return parts.map((part, index) => trimTrailing(index === 0 ? part : part.replace(/^[\\/]+/, ""), "\\/")).filter(Boolean).join(separator);
 }

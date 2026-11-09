@@ -1,5 +1,5 @@
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
-import { SessionError, snapshotSessionJson, type SessionEventEnvelopeV1, type SessionEventHistory } from "@actspace/session-journal";
+import { SessionError, freezeSessionJson, type SessionEventEnvelopeV1, type SessionEventHistory } from "@actspace/session-journal";
 
 /** Byte locators retain no event bodies. The fd pins this writer's file identity. */
 export class JsonlEventHistory implements SessionEventHistory {
@@ -52,7 +52,8 @@ export class JsonlEventHistory implements SessionEventHistory {
       for (const line of bytes.toString("utf8").split("\n").filter(line => line.length > 0)) {
         const event = JSON.parse(line) as SessionEventEnvelopeV1;
         if (event.recordKind !== "event" || event.seq !== seq) throw new SessionError("SESSION_CORRUPT", `History sequence mismatch at ${seq}.`);
-        events.push(snapshotSessionJson(event)); seq++;
+        // 刚解析出来的对象没有别人引用，只校验、冻结，不再拷贝一份（perf-memory-conventions.md §3）。
+        events.push(freezeSessionJson(event)); seq++;
       }
     }
     return Object.freeze(events);

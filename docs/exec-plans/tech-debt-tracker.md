@@ -31,14 +31,17 @@
 
 ## Desktop 安全遗留
 
-2026-10-06 Desktop 前端重构 11（安全与 IPC，`completed/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md`）之后仍未处理的项：
+2026-10-06 Desktop 前端重构 11（安全与 IPC，`completed/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md`）之后登记的四条，2026-11-09 由 [Desktop 安全遗留清零](completed/20261109-desktop-security-debt.md) 收口，结果见 `docs/exec-runs/20261109-desktop-security-debt/execution-summary.md`：
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
-| 2026-10-06 | main / 子进程环境（C1） | `settings-service` 的 `applyToEnv` 把搜索服务 Key（`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY` / `TINYFISH_API_KEY`）等写进 `process.env`。以下子进程继承完整环境：bash 工具（`packages/shell/tool-shell/src/node-ports.ts`）、`rg`（`packages/fs/tool-fs-search/src/node-ports.ts`）、git / gh（`review-git-service`、`review-git-engine`、`review-git-worker`、`review-pr-service`、`workspace-environment-service`、`workspace-git-context-service`）、ssh（`remote-hosts/ssh.ts`）、Browser Bridge 命令、本地更新脚本。内置终端已随功能减法删除，目前没有任何子进程做环境过滤。 | 01 S7：工具配置改由 Runtime 配置端口注入，删除 `applyToEnv`；子进程改用环境变量白名单。需要单独设计。2026-10-07（17）：`applyToEnv` 已集中到 `apps/desktop/src/main/settings/env.ts`，调用点和次数不变，退役时只改这一处和 store 的转调。 |
-| 2026-10-06 | main / Browser Bridge 安装 | `browserBridge.installFromRepo`（`fixed-renderer-ipc.ts`）把 renderer 传来的 `repoRoot` 交给 `browser-bridge-service.buildAndInstall`，只校验扩展 manifest（名称、key、扩展 id）就在该目录执行 `build.sh`。renderer 被注入脚本时，可以让 main 在任意满足条件的目录里跑脚本。11 的复核发现，不在 11 范围内。 | 改为 main 弹系统对话框选择源码目录（与 `selectWorkspaceDirectory` 相同的做法），channel 不再接受路径参数。 |
-| 2026-10-06 | scripts / IPC 审计 | `check:ipc-channels` 只核对常量、注册和 preload 引用三者一致，不检查注册是否经过 `assertTrustedSender`；preload 只要出现 channel 字符串就算引用，不区分 invoke 和 on。 | 13 落地统一注册器和 IPC contract 后，由注册器强制 sender 校验，审计脚本改为以 contract 为来源并区分方向。 |
-| 2026-10-06 | renderer / 主文档 CSP | 主文档没有 CSP。严格策略会拦 mermaid SVG 内的 `<style>`（HTML 预览已在功能减法中删除，不再是阻碍）；应用本身启动、React style prop、highlight.js、`data:` 图片不受影响。实测结论见 `docs/exec-runs/20261005-desktop-fe-11-security-ipc/execution-summary.md`。 | mermaid 样式改走 nonce / hash 或隔离渲染；之后由 main 用 `onHeadersReceived` 注入严格 CSP。 |
+| 2026-10-06 | main / 子进程环境（C1） | ~~`applyToEnv` 把搜索服务 Key 写进 `process.env`，bash / `rg` / git / ssh / Browser Bridge / 更新脚本子进程继承完整环境。~~ 已解决：Desktop 不再把任何凭据写进 env（工具端口早已直接从 `getToolEnvironment()` 拿 Key）；子进程 env 由 `@actspace/shared` 的 `toolChildEnv`（继承 + 剥离凭据模式变量，用于 bash / `rg` / Browser Bridge 编译 / 更新脚本）与 `hostChildEnv`（基础白名单，用于 git / ssh）构造。 | 已完成。`toolChildEnv` 是模式过滤，不是穷举：用户 shell 里名字不像凭据的敏感变量仍会被 Agent bash 看到，这是沿用「Agent 可以用用户工具链」的产品取舍。 |
+| 2026-10-06 | main / Browser Bridge 安装 | ~~`browserBridge.installFromRepo` 接受 renderer 传来的 `repoRoot`，只校验扩展 manifest 就在该目录执行 `build.sh`。~~ 已解决：`selectSourceExtension` 由 main 弹系统目录对话框并校验，`installFromRepo` 不带参数只编译已保存的目录；保存前 `realpath`，`build.sh` 必须是目录内普通文件。 | 已完成。 |
+| 2026-10-06 | scripts / IPC 审计 | ~~`check:ipc-channels` 不检查注册是否经过 `assertTrustedSender`。~~ 13 之后注册器强制 sender 校验与 guard，审计以契约为来源并区分方向；2026-11-09 再加一条：main 在 `ipc/registry.ts` 之外直接调用 `ipcMain.handle / handleOnce / on / once` 即失败。 | 已完成。 |
+| 2026-10-06 | renderer / 主文档 CSP | ~~主文档没有 CSP。~~ 已解决：main 用 `onHeadersReceived` 下发 CSP，`script-src 'self'`、`connect-src 'self'`、frame / object / worker / base-uri / form-action 全 `'none'`，dev 只放开 Vite 需要的内联脚本和 ws。 | 已完成。残余见下一行。 |
+| 2026-11-09 | main / safeStorage | ~~`SecretCrypto`（secrets v1 迁移）与 `remote-hosts/credentials.ts` 调用 `safeStorage.encryptString / decryptString / isEncryptionAvailable`，Electron 45 弃用、46 移除，此前未登记。~~ 已解决：全部改为 `isAsyncEncryptionAvailable / encryptStringAsync / decryptStringAsync`，`HostCredentials` 读到 `shouldReEncrypt` 时顺手重写。 | 已完成。升级 Electron 46 时不再被这条挡住。 |
+| 2026-11-09 | renderer / CSP `style-src` | `style-src` 仍含 `'unsafe-inline'`。headless Chrome 实测（`execution-process.md`）：`style-src 'self'` 下 innerHTML 的 `<style>` 和 `style` 属性都被拦，DOMParser + `importNode` 的 `style` 属性能活、`<style>` 不行，`adoptedStyleSheets` / `el.style.cssText` 可用；但 CodeMirror 的 style-mod 用 `<style>` 标签注入、Vite dev 也注入 `<style>`，要去掉 `'unsafe-inline'` 需三处同时改。 | mermaid 改 DOM 挂载 + `<style>` 转 `adoptedStyleSheets`；CodeMirror 传 `EditorView.cspNonce`，nonce 由 main 每次启动生成并随 CSP 头与 preload 下发；Vite dev 配 `html.cspNonce`。做完后 `style-src 'self' 'nonce-…'`。 |
+| 2026-11-09 | main / 偏好 env | `settings/env.ts` 仍把 `IMAGE_GENERATION_BASE_URL` / `IMAGE_GENERATION_MODEL` / `ACTSPACE_DISABLED_TOOLS` / `ACTSPACE_BASH_ALWAYS_ASK` / `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` 写进 main 自己的 `process.env`（不含凭据）。 | 找出 Desktop 内还在读这些 env 的路径，改走 settings 读模型后删掉 `applyToEnv` 与 `reloadEnv`。 |
 
 ## Desktop settings 遗留
 
@@ -78,6 +81,7 @@
 | 2026-11-08 | 供应链安全 | ~~`supply-chain-security.yml` 的 `osv-scan` 对整个 lockfile（含 devDependencies）扫描，当前报 93 条已知漏洞（axios、vite 5、vitest 3、devalue、fast-uri、joi 等），所以每个改到 `pnpm-lock.yaml` 的 PR 这个 job 都是红的，和改动本身无关；`pnpm audit --prod` 只剩 `katex` 一条 low。~~ 已解决：vite 7 / vitest 4 / esbuild 0.28 / astro 7.4 / wait-on 9 / katex 0.18 升级并重新生成 lockfile 后，osv-scanner 本地与 CI 扫描都是 0 条；工作流的路径过滤还排除了 `docs/**` 下的原型 `package.json`。 | 已完成。`osv-scan` 仍不是必需检查，后续新漏洞由每周定时扫描和 Dependabot 分组 PR 兜底。 |
 | 2026-11-08 | Release / Windows | Windows 包只在 CI 上打出、校验过文件结构，没有人实机启动过；沙盒缺位（nono 只有 darwin / linux）没验证。浏览器桥 CLI 在 Windows 上只是能编译（`ownedByCurrentUser` 的 Windows 实现恒为 `false`，实例注册表用 Unix socket 与 POSIX 权限位），`browser-tools` 插件在 Windows 上不可用。 | 第一个 tag 的草稿 Release 出来后，用 Windows 机器解压运行 `ActSpace.exe` 走一遍聊天、工具调用、浏览器桥。 |
 | 2026-11-08 | Release | 四个平台的完整产物经 Actions artifact 中转到 Release（每次 tag 约 700 MB，保留 1 天）；若将来 artifact 配额紧张，改成在各 job 内直接 `gh release upload` 到草稿。 | 观察 Settings › Billing 的 Actions storage，超过一半再改。 |
+| 2026-11-09 | CI / `build` job | `ci.yml` 的 `build` job 和 `release-package.sh` 仍走逐包 `pnpm --filter ... build`，没有接 `setup-workspace` 的 `tsc -b` 缓存（`completed/20261109-ci-speedup.md` 决策记录）。`build` 不是最长的 job，而且 release 链需要确认 `tsc -b` 产物与逐包 build 完全等价（esbuild 包、prompts 拷贝、默认 harness）才能换。 | `build` 成为 `ci.yml` 关键路径时，让它也用 `setup-workspace` + `pnpm build:deps`，再比对两种方式的 `dist/` 目录差异后替换 release 链。 |
 
 ## Web / PWA 客户端遗留
 

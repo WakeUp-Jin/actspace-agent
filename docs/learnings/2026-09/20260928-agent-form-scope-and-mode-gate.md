@@ -23,4 +23,4 @@ AgentScope 拥有工具贡献、prompt contributor、订阅及 disposer。多个
 - 释放一个 Agent，其他 Agent 的共享 executor 和贡献是否仍可使用？
 - 排队或审批恢复时，是否重新校验当前策略，并证明被拒绝调用没有进入 executor body？
 
-对应实现见 `packages/core/agent/src/agent-form.ts`、`packages/core/agent/src/agent-mode-policy.ts` 和 `packages/tools/runtime/src/`；变更记录见 `docs/histories/2026-09/20260928-forms-and-modes-design.md`。
+对应实现见 `packages/core/agent/src/agent-form.ts`、`packages/core/agent/src/agent-mode-policy.ts` 和 `packages/core/tool-runtime/src/`；变更记录见 `docs/histories/2026-09/20260928-forms-and-modes-design.md`。

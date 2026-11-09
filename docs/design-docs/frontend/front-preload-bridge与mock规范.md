@@ -59,7 +59,8 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
    - 契约里的 invoke / send 没有在 main 注册，或 event 没有由 main 发送；
    - main 注册或发送了契约之外的 channel，或方向与类别不符；
    - 常量表里有契约没用到的 channel；
-   - preload 不按契约生成，或绕过契约直接引用 channel。
+   - preload 不按契约生成，或绕过契约直接引用 channel；
+   - main 在 `ipc/registry.ts` 之外直接调用 `ipcMain.handle / handleOnce / on / once`（绕过 `assertTrustedSender` 与 guard）。
 
    另外跑 `pnpm --filter @actspace/desktop typecheck` 和 `pnpm --filter @actspace/desktop test`。
 

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { stat, realpath } from "node:fs/promises";
 import { basename, isAbsolute, relative, resolve } from "node:path";
+import { toolChildEnv } from "@actspace/shared";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
@@ -116,7 +117,7 @@ async function runRipgrep(command: string | undefined, args: readonly string[], 
     let stderr = "";
     let truncated = false;
     let settled = false;
-    const child = spawn(command || "rg", [...args], { cwd, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(command || "rg", [...args], { cwd, env: toolChildEnv(process.env), stdio: ["ignore", "pipe", "pipe"] });
     const finish = (exitCode: number | null, error = stderr.trim()) => {
       if (settled) return;
       settled = true;

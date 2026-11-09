@@ -13,7 +13,7 @@ import type { ProviderNetworkService } from "../runtime-v2/provider-network-serv
 import { thinkingLevelOptions } from "../runtime-v2/legacy-llm-adapter";
 
 const roots: string[] = [];
-const crypto: SecretCrypto = { isAvailable: () => true, encrypt: (text) => Buffer.from(text), decrypt: (data) => data.toString() };
+const crypto: SecretCrypto = { isAvailable: async () => true, encrypt: async (text) => Buffer.from(text), decrypt: async (data) => data.toString() };
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 
 const entry = (over: Partial<ModelCatalogEntry> & Pick<ModelCatalogEntry, "apiModel" | "sourceProviderId">): ModelCatalogEntry => ({

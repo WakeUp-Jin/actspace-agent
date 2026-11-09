@@ -1,4 +1,5 @@
 import { toolPreview } from "./tool-card.js";
+import { foldSubagentList, subagentListChildrenWithoutModel } from "./subagent-list.js";
 import {
   type BackgroundNotice,
   createMessageBlocks,
@@ -311,33 +312,9 @@ export function projectSubagentTranscript(snapshot: RuntimeV2SessionSnapshot, jo
   return events;
 }
 
-/**
- * Child Sessions whose model the parent Journal does not know yet: the parent
- * learns it only on `delegation/completed`, so a running (or a failed/stopped
- * without model) child needs its own request facts. See `latestRequestModel`.
- * `finished` children cannot send another request, so their answer can be cached.
- */
+/** 整份折叠版的 `subagentListChildrenWithoutModel`（见 subagent-list.ts）；面板轮询用按会话常驻的增量状态。 */
 export function subagentChildrenWithoutModel(journal: readonly SessionEventEnvelopeV1[]): { readonly childSessionId: string; readonly finished: boolean }[] {
-  const requested = new Set<string>();
-  const finished = new Set<string>();
-  const known = new Set<string>();
-  for (const event of journal) {
-    const data = record(event.data);
-    const childSessionId = string(data.childSessionId);
-    if (!childSessionId) continue;
-    if (event.type === "delegation/requested") requested.add(childSessionId);
-    if (event.type === "delegation/completed") { finished.add(childSessionId); if (string(data.model)) known.add(childSessionId); }
-  }
-  // New Sessions: the model is on each activation's start; one without a model follows the parent's request facts.
-  for (const view of Object.values(foldSubagentTree(journal).agents)) {
-    // External subagents have no ActSpace Session to read a request from.
-    if (view.legacy || view.kind === "codex" || view.kind === "claude-code") continue;
-    requested.add(view.agentId);
-    if (lastActivationModel(view)) known.add(view.agentId);
-    // An inactive local subagent can be continued and send more requests; only a closed one cannot.
-    if (view.status === "closed") finished.add(view.agentId);
-  }
-  return [...requested].filter((id) => !known.has(id)).map((childSessionId) => ({ childSessionId, finished: finished.has(childSessionId) }));
+  return subagentListChildrenWithoutModel(foldSubagentList(journal));
 }
 
 /** The model of the latest request a Session actually sent (`request/header`); not the purpose binding. */

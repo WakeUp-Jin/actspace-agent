@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { parentPort } from "node:worker_threads";
+import { hostChildEnv } from "@actspace/shared";
 import { parseReviewPatchBatch, runReviewGitCommand } from "./review-git-engine";
 import type { ReviewGitObjectOutcome } from "./review-git-engine";
 import type { ReviewWorkerRequest, ReviewWorkerResponse } from "./review-git-worker-client";
@@ -90,7 +91,7 @@ function runGitBuffer(cwd: string, args: string[], input: string, signal: AbortS
       reject(new Error("Review request was cancelled."));
       return;
     }
-    const child = spawn("git", ["-C", cwd, ...args], { cwd, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn("git", ["-C", cwd, ...args], { cwd, windowsHide: true, stdio: ["pipe", "pipe", "pipe"], env: hostChildEnv(process.env, { GIT_TERMINAL_PROMPT: "0" }) });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let stdoutBytes = 0;

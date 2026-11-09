@@ -3,7 +3,12 @@ import type { ModelCatalogEntry, ModelCatalogSnapshot } from "./model-catalog";
 export type CatalogMatch = { entry: ModelCatalogEntry; exact: boolean };
 
 const DATE_SUFFIX = /-(\d{8}|\d{4}-\d{2}-\d{2}|\d{4}|latest|preview)$/;
-const bare = (id: string) => id.trim().split("/").pop()!.replace(/:.*$/, "").toLowerCase();
+const bare = (id: string) => stripModelTag(id.trim().split("/").pop()!).toLowerCase();
+/** 去掉模型 id 的 `:tag` 后缀（如 OpenRouter 的 `:free`、Ollama 的 `:8b`）。 */
+export function stripModelTag(id: string): string {
+  const colon = id.indexOf(":");
+  return colon === -1 ? id : id.slice(0, colon);
+}
 /** OpenRouter 写 claude-opus-4.5，官方写 claude-opus-4-5；比较时统一成连字符。 */
 const loose = (id: string) => bare(id).replace(/\./g, "-");
 

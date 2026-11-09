@@ -20,6 +20,9 @@ import type {
 } from "@actspace/shared/runtime-v2";
 import type { ManagedContextProjection } from "@actspace/shared";
 
+/** `afterSeq` 之后的事件和读取时的 lastSeq；lastSeq 小于调用方记住的序号说明日志被换掉了，要从头折叠。 */
+export type SessionEventsAfter = { readonly lastSeq: number; readonly events: readonly SessionEventEnvelopeV1[] };
+
 export type ApplicationSessionService = {
   creationProvenance(mode?: RuntimeV2AgentMode): SessionHandle["header"]["createdWith"];
   readProjection(input: import("@actspace/shared/runtime-v2").RuntimeV2SessionProjectionInput): Promise<import("@actspace/shared/runtime-v2").RuntimeV2DesktopSessionProjection>;
@@ -42,6 +45,7 @@ export type ApplicationSessionService = {
   inspect(sessionId: string): Promise<RuntimeV2SessionSnapshot>;
   projectionValue(sessionId: string, key: string): Promise<RuntimeV2JsonValue | undefined>;
   inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]>;
+  inspectEventsAfter(sessionId: string, afterSeq: number): Promise<SessionEventsAfter>;
   latestEvent(sessionId: string, type: string): Promise<SessionEventEnvelopeV1 | undefined>;
   list(): Promise<readonly RuntimeV2SessionListItem[]>;
   browseSessions(): Promise<import("@actspace/shared/runtime-v2").RuntimeV2BrowseList>;
@@ -113,6 +117,7 @@ export type AgentApplicationContract = {
   readonly inspectSession: (sessionId: string) => Promise<RuntimeV2SessionSnapshot>;
   readonly readSessionEventBatch: (sessionId: string, input: import("@actspace/session-storage").SessionEventBatchInput) => Promise<import("@actspace/session-storage").SessionEventBatch>;
   readonly inspectSessionEvents: (sessionId: string) => Promise<readonly SessionEventEnvelopeV1[]>;
+  readonly inspectSessionEventsAfter: (sessionId: string, afterSeq: number) => Promise<SessionEventsAfter>;
   readonly latestSessionEvent: (sessionId: string, type: string) => Promise<SessionEventEnvelopeV1 | undefined>;
   readonly readSessionProjectionValue: (sessionId: string, key: string) => Promise<RuntimeV2JsonValue | undefined>;
   readonly readContextEntryText: (sessionId: string, scope: string, key: string, revision: number, generation: string) => Promise<string | null>;
@@ -307,6 +312,7 @@ export class AgentApplication implements AgentApplicationContract {
     return this.#sessions.readEventBatch(sessionId, input);
   }
   inspectSessionEvents(sessionId: string) { return this.#sessions.inspectEvents(sessionId); }
+  inspectSessionEventsAfter(sessionId: string, afterSeq: number) { return this.#sessions.inspectEventsAfter(sessionId, afterSeq); }
   latestSessionEvent(sessionId: string, type: string) { return this.#sessions.latestEvent(sessionId, type); }
   readSessionProjectionValue(sessionId: string, key: string) { return this.#sessions.projectionValue(sessionId, key); }
   async readContextProjection(sessionId: string, logicalAgentScopeId = `main:${sessionId}`): Promise<ManagedContextProjection | null> {

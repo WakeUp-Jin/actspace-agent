@@ -28,8 +28,8 @@
     "@astrojs/check": "0.9.12",
     "@emnapi/runtime": "1.11.3",
     "@types/mdast": "4.0.4",
-    "typescript": "6.0.3",
-    "vitest": "4.1.12"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=22.12.0"

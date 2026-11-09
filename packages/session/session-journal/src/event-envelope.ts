@@ -44,6 +44,15 @@ export function validateSessionJson(value: unknown): void {
   }
 }
 
+/**
+ * 校验并深冻结，不复制。用于刚 `JSON.parse` 出来、还没有别人引用的对象（例如从文件读回的旧事件）：
+ * 拒绝的输入和 `snapshotSessionJson` 一样，但省掉一次序列化和一份副本。
+ */
+export function freezeSessionJson<T>(value: T): Readonly<T> {
+  validateSessionJson(value);
+  return deepFreeze(value);
+}
+
 export function validateEventEnvelopeShape(value: unknown): asserts value is SessionEventEnvelopeV1 {
   if (!isPlainRecord(value) || value.recordKind !== "event") invalid("Event envelope must be an event object.");
   if (!Number.isSafeInteger(value.seq) || (value.seq as number) < 0) invalid("Event seq must be a non-negative integer.");

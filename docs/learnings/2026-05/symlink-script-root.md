@@ -4,7 +4,7 @@
 
 ## 发生了什么
 
-初始化命令 `code-harness-init` 由 `npm link` 暴露到 Node 的全局 `bin` 目录里。这个全局命令本身是一个 symlink，指向仓库里的 `scripts/create-project.sh`。
+初始化命令 `code-harness-init` 由 `npm link` 暴露到 Node 的全局 `bin` 目录里。这个全局命令本身是一个 symlink，指向仓库里的 `scripts/create-project.sh`（历史：该初始化脚本已移除，教训本身与具体脚本无关）。
 
 原来的脚本直接这样推导模板根目录：
 
