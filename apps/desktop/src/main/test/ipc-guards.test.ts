@@ -147,7 +147,7 @@ const NO_INPUT_SPECS: InvokeSpec<unknown, unknown>[] = [
   contract.harnessStats.getStatus, contract.settings.get, contract.settings.getV4, contract.settings.readSystemPrompt, contract.settings.getSearchUsage,
   contract.quickOpen.consume, contract.quickOpen.getShortcutStatus, contract.modelConnections.list, contract.englishLearning.getState, contract.englishLearning.stopSpeech,
   contract.englishLearning.previewSpeech, contract.browserBridge.getStatus, contract.browserBridge.connect, contract.browserBridge.prepareUpdate, contract.browserBridge.disconnect,
-  contract.browserBridge.openExtensions, contract.browserBridge.revealExtensionDirectory, contract.browserBridge.installNativeHost, contract.plugins.list, contract.skills.install,
+  contract.browserBridge.openExtensions, contract.browserBridge.revealExtensionDirectory, contract.browserBridge.installNativeHost, contract.plugins.list, contract.pythonRuntime.getStatus, contract.pythonRuntime.installExtension, contract.skills.install,
   contract.updates.getState, contract.updates.selectSource, contract.updates.start, contract.hosts.list,
 ];
 for (const spec of NO_INPUT_SPECS) CASES[`no-input ${spec.channel}`] = { spec, valid: [undefined], invalid: [null, {}, "x", 0] };

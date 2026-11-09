@@ -160,6 +160,8 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
   [contract.browserBridge.revealExtensionDirectory, NO_INPUT],
   [contract.browserBridge.installNativeHost, NO_INPUT],
   [contract.plugins.list, NO_INPUT],
+  [contract.pythonRuntime.getStatus, NO_INPUT],
+  [contract.pythonRuntime.installExtension, NO_INPUT],
   [contract.skills.install, NO_INPUT],
   [contract.updates.getState, NO_INPUT],
   [contract.updates.selectSource, NO_INPUT],
