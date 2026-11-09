@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("electron", () => ({ shell: { openExternal: vi.fn() } }));
 
-import { attachNavigationGuards, blockWebviewAttachment, createAppUrlMatcher, createMainWindowOptions } from "../window-security";
+import { attachNavigationGuards, blockWebviewAttachment, buildContentSecurityPolicy, createAppUrlMatcher, createMainWindowOptions, installContentSecurityPolicy } from "../window-security";
 
 function fakeWindow() {
   const contents = Object.assign(new EventEmitter(), {
@@ -124,5 +124,56 @@ describe("webview blocking", () => {
     const event = { preventDefault: vi.fn() };
     contents.emit("will-attach-webview", event);
     expect(event.preventDefault).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("content security policy", () => {
+  function directives(policy: string): Record<string, string> {
+    return Object.fromEntries(policy.split("; ").map((directive) => {
+      const [name, ...values] = directive.split(" ");
+      return [name, values.join(" ")];
+    }));
+  }
+
+  it("locks scripts to the bundle and blocks frames, plugins, workers and form targets in production", () => {
+    const policy = directives(buildContentSecurityPolicy());
+    expect(policy).toMatchObject({
+      "default-src": "'self'",
+      "script-src": "'self'",
+      "img-src": "'self' data: blob:",
+      "connect-src": "'self'",
+      "worker-src": "'none'",
+      "object-src": "'none'",
+      "frame-src": "'none'",
+      "frame-ancestors": "'none'",
+      "base-uri": "'none'",
+      "form-action": "'none'",
+    });
+    expect(policy["script-src"]).not.toContain("unsafe");
+    expect(buildContentSecurityPolicy()).not.toMatch(/unsafe-eval|http:|ws:/);
+  });
+
+  it("only relaxes inline scripts and the dev server connection when Vite serves the page", () => {
+    const policy = directives(buildContentSecurityPolicy({ devServerUrl: "http://localhost:5173/" }));
+    expect(policy["script-src"]).toBe("'self' 'unsafe-inline'");
+    expect(policy["connect-src"]).toBe("'self' http://localhost:5173 ws://localhost:5173");
+    expect(policy["frame-src"]).toBe("'none'");
+    expect(directives(buildContentSecurityPolicy({ devServerUrl: "not a url" }))["script-src"]).toBe("'self'");
+  });
+
+  it("sets the header on document responses only and replaces any existing policy", () => {
+    let listener: ((details: { resourceType: string; responseHeaders?: Record<string, string[]> }, callback: (response: { responseHeaders?: Record<string, string[]> }) => void) => void) | undefined;
+    installContentSecurityPolicy({ webRequest: { onHeadersReceived: (fn) => { listener = fn; } } }, "default-src 'self'");
+    const responses: Array<{ responseHeaders?: Record<string, string[]> }> = [];
+    listener!({ resourceType: "mainFrame", responseHeaders: { "content-security-policy": ["default-src *"], "Content-Type": ["text/html"] } }, (response) => responses.push(response));
+    listener!({ resourceType: "subFrame", responseHeaders: {} }, (response) => responses.push(response));
+    listener!({ resourceType: "script", responseHeaders: { "Content-Type": ["text/javascript"] } }, (response) => responses.push(response));
+    listener!({ resourceType: "mainFrame" }, (response) => responses.push(response));
+    expect(responses).toEqual([
+      { responseHeaders: { "Content-Type": ["text/html"], "Content-Security-Policy": ["default-src 'self'"] } },
+      { responseHeaders: { "Content-Security-Policy": ["default-src 'self'"] } },
+      { responseHeaders: { "Content-Type": ["text/javascript"] } },
+      { responseHeaders: { "Content-Security-Policy": ["default-src 'self'"] } },
+    ]);
   });
 });

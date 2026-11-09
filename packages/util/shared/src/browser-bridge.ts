@@ -77,5 +77,7 @@ export type BrowserBridgeInstallResult = {
 export type BrowserBridgeActionResult = {
   operationId?: string;
   ok: boolean;
+  /** 用户在系统对话框里取消了选择；`ok` 为 true 且无需提示。 */
+  canceled?: boolean;
   error?: string;
 };

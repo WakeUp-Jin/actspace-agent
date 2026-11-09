@@ -20,7 +20,7 @@ vi.mock("@actspace/llm-pi-ai", async (importOriginal) => ({ ...await importOrigi
 }));
 
 const roots: string[] = [];
-const crypto: SecretCrypto = { isAvailable: () => true, encrypt: (text) => Buffer.from(text), decrypt: (data) => data.toString() };
+const crypto: SecretCrypto = { isAvailable: async () => true, encrypt: async (text) => Buffer.from(text), decrypt: async (data) => data.toString() };
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "actspace-connection-protocol-"));

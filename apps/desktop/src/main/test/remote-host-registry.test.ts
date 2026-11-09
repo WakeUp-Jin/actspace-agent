@@ -7,7 +7,7 @@ import { once } from "node:events";
 import { WebSocketServer } from "ws";
 import { HOST_PROTOCOL } from "@actspace/shared/host-protocol";
 import { RemoteHostRegistry } from "../remote-hosts/registry";
-vi.mock("electron", () => ({ safeStorage: { isEncryptionAvailable: () => true, getSelectedStorageBackend: () => "gnome_libsecret", encryptString: (s: string) => Buffer.from(s), decryptString: (b: Buffer) => b.toString() } }));
+vi.mock("electron", () => ({ safeStorage: { isAsyncEncryptionAvailable: async () => true, getSelectedStorageBackend: () => "gnome_libsecret", encryptStringAsync: async (s: string) => Buffer.from(s), decryptStringAsync: async (b: Buffer) => ({ result: b.toString(), shouldReEncrypt: false }) } }));
 // Transport trust has separate TLS/SSH tests; exercise real RPC/auth ordering here.
 vi.mock("ws", async importOriginal => {
   const actual = await importOriginal<typeof import("ws")>();
