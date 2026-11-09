@@ -2,18 +2,18 @@
 
 ## 当前范围
 
-- 当前文字模型供应商：DeepSeek、Kimi、OpenRouter。
-- DuckCoding 文字模型供应商已退役；历史配置会在启动时清理，但图片生成仍使用独立的 `image-generation` 连接配置，默认端点可以继续是 DuckCoding Images API。
-- 对应 execution plan：`docs/exec-plans/completed/20260724-multi-provider-llm/README.md`。
-- 当前实现已贯通 DeepSeek / Kimi / OpenRouter 的 settings v3 持久化、`AppSettingsV2` 兼容视图、动态模型解析、服务商级代理 transport、任务模型 runtime、IPC 与设置页；旧 DuckCoding 文字模型配置会被迁移清理。OpenRouter 真实代理和跨任务模型场景仍按 execution plan 由用户统一手动验收。
+本文是多供应商 LLM、模型管理、服务商级代理和任务模型分配的设计事实来源，正文写的是 2026-07 定下的结构（Provider / Connection / Model 分离、目的感知的可用模型解析器、服务商级代理、轻量任务模型）。这个结构仍然有效，但下面几处已被后续设计取代，以被引用的文档为准：
 
-本文是 actspace 多供应商 LLM、用户模型管理、服务商级代理和任务模型分配的长期设计事实来源。
+- **供应商不再固定为三家。** 设置页的「连接」来自 `packages/util/shared/src/provider-templates.ts` 的 `PROVIDER_TEMPLATES`：官方模板（Anthropic、OpenAI、DeepSeek、Kimi、智谱 Z.AI、MiniMax、火山方舟 Coding Plan、小米 MiMo）、聚合（OpenRouter）和三种协议的自定义中转。正文里「首批只支持 DeepSeek、Kimi、OpenRouter」「首版不开放任意自定义供应商」是当时的范围，不是当前限制。DuckCoding 文字模型已退役，只有图片生成仍可用独立的 `image-generation` 连接。
+- **价格与能力按四层数据模型算。** 用户修改 → 服务商数据 → 模型目录 → 未知，纯函数 `resolveEffectiveModel`；连接级 `billingMode`（reference / token / manual）和「已乘倍率」开关已删除，见[模型目录与费用](agent-model-catalog-and-usage-cost.md)。
+- **连接 Base URL 命中 pi-ai 内置服务商时复用其实现**，代理走请求级 `fetch`，见 [LLM Core Pi §17](../agent-plugin-runtime/agent-llm-core-pi.md)。
+- **设置页形态**以 [设置页规范](../frontend/front-设置页规范.md)为准；本文「设置页信息架构」一节只保留数据与流程约束。
 
 相关当前实现文档：
 
 - `packages/core/runtime/`、`packages/llm/` 与 `docs/design-docs/agent-plugin-runtime/`：当前 v2 Runtime、LLM 领域包与插件边界事实。
-- `docs/exec-plans/completed/design-archive/frontend/front-设置中心重构规范.md`：当前设置中心的信息架构、模型统一流程和持久化边界；旧设置页仅作迁移追溯。
-- `docs/design-docs/model-context/agent-token-usage-and-context-state.md`：模型 usage、价格快照和成本统计。
+- [模型 usage、价格快照和成本统计](agent-token-usage-and-context-state.md)。
+- 最初的执行计划：`docs/exec-plans/completed/20260724-multi-provider-llm/README.md`；之后的重做：`20260926-custom-connection-setup-redesign.md`、`20261021-model-provider-redesign.md`、`20261108-pi-ai-builtin-providers.md`。
 
 ## 背景
 
@@ -585,10 +585,6 @@ renderer 只调用结构化 IPC：
 - 手动价格写入 `ModelDefinition.pricing`，请求开始时冻结为 `source: "configured"` 的 `ModelPricingSnapshot`，后续编辑价格不会重算历史请求。
 - 每次 `llm_usage` 仍保存当次价格快照与 provider-qualified ModelKey，历史成本不因目录刷新而变化。
 - 目录价格缺失时显示“价格未知”，不能按 0 计费。
-- 自定义连接的计费方式 `billingMode`（旧数据缺省 `manual`，保持升级前行为）：
-  - `reference`：按协议对应厂商（Anthropic 协议查 `anthropic`，OpenAI 协议查 `openai`）的内置目录价 × 连接倍率 `defaultPricingMultiplier`。模型上手填的单价优先，且不再乘倍率。
-  - `token`：只统计 Token，不估算金额。
-  - `manual`：只用模型上手填的单价；没填的只统计 Token。
 - OpenRouter 同一上游模型与原厂模型分别统计，不按 `apiModel` 合并。
 - Usage 活动行从 Journal request / tool 事件重建，并保留 provider、ModelKey、attempt 和 `costBasis`。当 provider 未返回 usage、currency 或价格来源不完整时，活动行保持 unknown / unavailable，不能用默认价格或零值伪造账单结果。
 
