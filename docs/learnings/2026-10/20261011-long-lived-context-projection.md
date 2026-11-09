@@ -39,4 +39,4 @@ Context 不是一个允许插件任意替换的“大对象”。每个 reducer 
 2. 一个事件已经被 Context 处理过，但 Journal 尚未 durable，系统重启后应该依据哪个事实恢复？
 3. 前端想显示当前 Context 时，为什么需要 Projection，而不是直接读取 Context 对象？
 
-关联实现：`packages/context/src/instances.ts`、`reducers.ts`、`projection.ts`；关联设计：`docs/design-docs/上下文管理引擎设计/上下文管理引擎V2/`。
+关联实现：`packages/context/context-engine/src/instances.ts`、`reducers.ts`、`projection.ts`；关联设计：`docs/design-docs/上下文管理引擎设计/上下文管理引擎V2/`。
