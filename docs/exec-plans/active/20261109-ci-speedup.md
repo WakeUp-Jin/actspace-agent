@@ -66,7 +66,7 @@
 
 ## 决策记录
 
-- 2026-11-09：用 `actions/cache` 缓存 `packages/**/dist`（含 `.tsbuildinfo`，约 16 MB）而不是用 artifact 在 job 间传递产物：各 job 不加 `needs`，都从 install 开始并行，关键路径只取最长的那个 job；缓存 miss 时每个 job 自己 `tsc -b` 冷编一次（9 s 级），比等上游 job 再下载 artifact 便宜。
+- 2026-11-09：用 `actions/cache` 缓存 `packages/*/*/dist`（含 `.tsbuildinfo`，约 16 MB）而不是用 artifact 在 job 间传递产物：各 job 不加 `needs`，都从 install 开始并行，关键路径只取最长的那个 job；缓存 miss 时每个 job 自己 `tsc -b` 冷编一次（9 s 级），比等上游 job 再下载 artifact 便宜。
 - 2026-11-09：根 `typecheck` 不再跑 `pnpm -r typecheck`。`tsc -b` 已经用每个包自己的 `tsconfig.json` 全量检查过 packages，再起 60 多个 `tsc --noEmit` 是重复劳动；只补 apps 和图外的 `test-support`、`util`。
 - 2026-11-09：`构建` job 和 `release-package.sh` 这一轮不动。`pnpm build` 里 desktop 的 `build:deps` 走逐包 `tsc -p`，还带 `context-compaction` 的 license 拷贝和 `clean`，是发布链路；`构建` job 2:37 本来就不是关键路径，收益小于改发布链的风险。登记到 `docs/exec-plans/tech-debt-tracker.md`。
 

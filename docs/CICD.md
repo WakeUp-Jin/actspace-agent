@@ -27,7 +27,7 @@
 
 所有 PR 触发的工作流都带 `concurrency` 组并 `cancel-in-progress`，同一个 PR 连续推送只保留最后一次；`main` 上的 push 不取消。需要 pnpm 的 job 统一用 `pnpm/action-setup`（读根 `package.json` 的 `packageManager`）加 `actions/setup-node` 的 `cache: pnpm`，store 命中时 `pnpm install` 约 20 秒。
 
-`ci.yml` 里需要 workspace 产物的四个 job（`lint-typecheck`、`test-process`、`test-packages`、`test-desktop`）共用 `.github/actions/setup-workspace`：装 pnpm / Node、`pnpm install`，再用 `actions/cache` 恢复 `packages/**/dist`（含 `tsc -b` 的 `.tsbuildinfo`）。随后各 job 跑 `pnpm build:deps`——即 desktop 的 `build:deps:dev`：`tsc -b tsconfig.desktop-deps.json` 按项目引用图编全部 packages，再补 client / agent-host 的 esbuild 包、english-learning 的 prompts 和 runtime 的默认 harness。缓存 key 带 commit SHA、`restore-keys` 退到同一 lockfile 下最近一次的产物，所以 `tsc -b` 只重编源码变了的包（冷 10 s 级、热 1 s 级）；PR 分支能读到 `main` 和自己之前推送的缓存。手动 `workflow_dispatch` 不恢复缓存，用来强制全量构建。四个 job 互不 `needs`，总时长取最长的那个。
+`ci.yml` 里需要 workspace 产物的四个 job（`lint-typecheck`、`test-process`、`test-packages`、`test-desktop`）共用 `.github/actions/setup-workspace`：装 pnpm / Node、`pnpm install`，再用 `actions/cache` 恢复 `packages/*/*/dist`（含 `tsc -b` 的 `.tsbuildinfo`；不能写 `packages/**/dist`，`**` 会跟进 `node_modules` 里的符号链接匹配上万个第三方 `dist`）。随后各 job 跑 `pnpm build:deps`——即 desktop 的 `build:deps:dev`：`tsc -b tsconfig.desktop-deps.json` 按项目引用图编全部 packages，再补 client / agent-host 的 esbuild 包、english-learning 的 prompts 和 runtime 的默认 harness。缓存 key 带 commit SHA、`restore-keys` 退到同一 lockfile 下最近一次的产物，所以 `tsc -b` 只重编源码变了的包（冷 10 s 级、热 1 s 级）；PR 分支能读到 `main` 和自己之前推送的缓存。手动 `workflow_dispatch` 不恢复缓存，用来强制全量构建。四个 job 互不 `needs`，总时长取最长的那个。
 
 markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-cli2.jsonc`：第三方 skill 原文（`.agents/skills/**`）、已完成的 history 和测试 fixture 不扫；纯排版类规则（空行、列表周围空行、表格对齐、代码块语言等）关闭，只保留会影响渲染或链接正确性的规则（表格列数、标题层级、重复的兄弟标题、图片 alt、文件末尾换行等）。本地复现用 `npx -y markdownlint-cli2@0.20.0 "**/*.md"`。
 
@@ -79,7 +79,7 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
 - `.github/workflows/ci.yml` 中的工程 job 都从 `pnpm install --frozen-lockfile` 开始，然后各自执行：
   - `lint-typecheck`：`pnpm check:desktop-build-graph`（必须排在 `build:deps` 之前，因为后者会重新生成 `tsconfig.build.json`）、`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。`pnpm typecheck` = `build:deps`（`tsc -b` 本身就是对全部 packages 的类型检查）+ 只对 apps 和图外的 `@actspace/test-support`、`@actspace/util` 跑 `tsc --noEmit`。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
   - `test-process`：装 ripgrep、`pnpm build:deps`、`pnpm --filter @actspace/agent-cli build`、`pnpm test:scripts`（根目录全部 `node --test` 与 `check:*`，含 `test:agent-host:process` 等直接 spawn `apps/cli/dist/cli.js` 的进程级测试）。
-  - `test-packages`：装 ripgrep（`tool-fs-search` 的测试调真实 `rg`）、`pnpm build:deps`、`pnpm -r --filter '!@actspace/desktop' test`。
+  - `test-packages`：装 ripgrep（`tool-fs-search` 的测试调真实 `rg`）、`pnpm build:deps`、`pnpm -r --filter '!@actspace/desktop' --filter '!actspace' test`（只带排除式 `--filter` 时 pnpm 会把 workspace 根也选进来，根的 `test` 会递归回 `pnpm -r test`，所以要一并排除）。
   - `test-desktop`：两个分片，`pnpm build:deps` 后 `vitest run --shard=N/2`。desktop 的 vitest 配置分成 `main`（node 环境）和 `renderer`（jsdom）两个 project，`vitest run src/main` 这类路径过滤照常可用。
   - `build`：`pnpm build`（`agent-cli...` 带依赖闭包，runner 上没有现成的 `dist/`，要先按拓扑顺序构建 workspace 依赖）；在 `main` 上再装 Go 并执行 `./scripts/release-package.sh` 作为打包冒烟，产物不上传。
   - `site`：`check:site`、`test:site` 和 `build:site`，并使用 Netlify 的 `/` base path 验证生产构建；CI 中的 `https://example.com` 仅用于构建检查，不是官网地址。

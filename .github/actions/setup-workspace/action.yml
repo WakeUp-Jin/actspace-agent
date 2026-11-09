@@ -1,6 +1,6 @@
 name: Setup workspace
 description: >
-  pnpm + Node 22 + 依赖安装，并恢复 packages/**/dist（含 tsc -b 的 .tsbuildinfo）缓存。
+  pnpm + Node 22 + 依赖安装，并恢复 packages/*/*/dist（含 tsc -b 的 .tsbuildinfo）缓存。
   调用方随后跑 `pnpm build:deps` 即可按增量得到全部 workspace 依赖的产物。
 
 runs:
@@ -19,11 +19,13 @@ runs:
 
     # key 带 commit SHA，每次运行都存一份新的；restore-keys 退到同一 lockfile 下最近一次的产物，
     # tsc -b 只重编源码 hash 变了的包。手动触发时不恢复，留一个强制全量构建的入口。
+    # path 不能写 packages/**/dist：`**` 会跟进 packages/*/*/node_modules 里指向 pnpm store 的符号链接，
+    # 匹配上万个第三方 dist，post 阶段打包缓存要十几分钟。包产物只在 packages/<类别>/<包>/dist。
     - name: Restore tsc build cache
       if: github.event_name != 'workflow_dispatch'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: packages/**/dist
+        path: packages/*/*/dist
         key: tsbuild-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json') }}-${{ github.sha }}
         restore-keys: |
           tsbuild-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json') }}-

@@ -31,7 +31,7 @@
 ### 步骤 2：P2 拆 job 与 tsc 缓存
 
 - **操作**：
-  - 新建 composite action `.github/actions/setup-workspace`：pnpm / Node / `pnpm install` + `actions/cache` 恢复 `packages/**/dist`。key 带 `github.sha`，`restore-keys` 退到同 lockfile 前缀；`workflow_dispatch` 跳过缓存。
+  - 新建 composite action `.github/actions/setup-workspace`：pnpm / Node / `pnpm install` + `actions/cache` 恢复 `packages/*/*/dist`。key 带 `github.sha`，`restore-keys` 退到同 lockfile 前缀；`workflow_dispatch` 跳过缓存。
   - `ci.yml`：`typecheck-test` 拆成 `lint-typecheck`、`test-process`、`test-packages`、`test-desktop`（2 分片），互不 `needs`。`check:desktop-build-graph` 放在 `build:deps` 之前。
   - 根 `package.json`：原 `test` 链拆成 `test:scripts`（根脚本与进程级测试）和 `test`（`test:scripts` + `pnpm -r test`），让 `test-process` 与 `test-packages` 各跑一半。
   - `scripts/check-action-pinning.sh`：跳过 `uses: ./...` 的本地 action，并把扫描范围扩到 `.github/actions`。
@@ -50,6 +50,15 @@
 - **问题**：本地 `vitest list` 一度只列出 0 个文件。
   - **原因**：只跑了 `tsc -b`，没跑 `build:deps` 的其余步骤，`english-learning/dist/prompts/*.md` 不存在导致 runtime 的模块加载失败。
   - **应对**：CI 各 job 统一用 `pnpm build:deps`，不要只调 `tsc -b`。
+
+### 步骤 4：第一次 CI 运行（run 42627494856）暴露的四个问题
+
+- **现象与原因**：
+  - `包测试` 失败：`pnpm -r --filter '!@actspace/desktop' test` 把 workspace 根包 `actspace` 也选进来，根的 `test` 又去跑 `pnpm -r test`，递归后在根脚本的进程级测试里找不到 `apps/cli/dist/cli.js`。本地复现：只带排除式 `--filter` 时 pnpm 选中 73 个项目（含根），再加 `--filter '!actspace'` 是 72 个。
+  - `桌面端测试 (2/2)` 失败两例：`runtime-v2-output-reference-flow` 的 grep 返回 `failed`，是 `test-desktop` job 漏装 ripgrep；`workbench-responsive` 的「返回应用」按钮 1 s 内没出现，是 `SettingsPage` 走 `React.lazy`，分片后 vite 转译缓存冷，第一次打开设置超过 `findBy` 默认超时。
+  - `Lint 与类型检查` 步骤 1:11 跑完，但 `Post Run setup-workspace`（缓存保存）跑了 5 min 以上没结束：`actions/cache` 的 `packages/**/dist` 跟进 `packages/*/*/node_modules` 里指向 pnpm store 的符号链接，本地统计匹配 16 880 个第三方 `dist`，而真正的包产物只有 67 个、都在 `packages/*/*/dist`。
+- **应对**：`--filter '!actspace'`；`test-desktop` 补装 ripgrep；该测试文件两处等待改为 10 s 超时的 `findSettingsBackButton()`；缓存 `path` 改为 `packages/*/*/dist`。
+- **首轮各 job 时长（缓存全 miss）**：`官网` 0:41、`Browser Bridge` 1:01、`构建` 2:43、`包测试` 2:54（含递归的多余工作）、`桌面端测试 (2/2)` 2:55、`Lint 与类型检查` 正常步骤 1:11。
 
 ## 跳过或推迟的事项
 

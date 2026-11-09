@@ -91,8 +91,9 @@ jobs:
         run: pnpm build:deps
 
       # desktop 单独一个分片 job；其余包在这里跑。
+      # 只带排除式 --filter 时 pnpm 会把 workspace 根（actspace）也选进来，根的 test 会递归回 pnpm -r test，所以要一并排除。
       - name: Test
-        run: pnpm -r --if-present --filter '!@actspace/desktop' test
+        run: pnpm -r --if-present --filter '!@actspace/desktop' --filter '!actspace' test
 
   test-desktop:
     name: 桌面端测试 (${{ matrix.shard }}/2)
@@ -107,6 +108,10 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-workspace
+
+      - name: Install ripgrep
+        # main 进程的 runtime-v2 输出引用测试会经真实 Runtime 调 rg 搜索落盘的大输出；ubuntu-latest 不预装。
+        run: sudo apt-get install -y --no-install-recommends ripgrep
 
       - name: Build workspace dependencies
         run: pnpm build:deps
