@@ -21,7 +21,6 @@
 | [统计页重做（使用统计 + Harness 统计）](active/20261107-stats-redesign.md) | 2026-11-08 T1–T14 已实现并提交（分支 `feat/harness-stats-redesign`，PR #38）；测试与浏览器 mock 截图已过；剩 Electron 真实数据走查。 |
 | [子智能体单行卡片与来信卡片](active/20261108-subagent-compact-cards.md) | 2026-11-08 K1 方案 1–9 已实现并提交（分支 `fix/subagent-list-return-style`）；测试与浏览器 mock 截图已过；剩 Electron 实机检查。 |
 | [编辑提问重发与空闲发送不进队列](active/20261107-edit-resend-rewind.md) | 2026-11-07 demo 与后端方案一已确认，规范已写；下一步按 B1–B6、F1–F5 实施。 |
-| [性能第三轮：高频路径不再整份读日志](active/20261108-perf-round3.md) | 2026-11-07 立项，R1–R4 方案已拍板（自动审查、压缩摘要、子 Agent 面板、读旧事件深拷贝）；下一步按 spec → 代码执行。性能任务总表见 [性能待办](perf-backlog.md)。 |
 | [上下文引擎不再每次请求复制对话](active/20261107-context-trusted-surface.md) | 2026-11-07 T1–T6 已实现并提交；run8 实测 `stateDigest` 239 → 87 MB、`toLlmInput` 156 → 31 MB；随 `fix/bug-batch-1104` 的 PR 合入。 |
 | [流式 Markdown：尾部解析降频与解析器常驻](active/20261107-markdown-stream-throttle.md) | 2026-11-07 T1–T5 已实现并提交；run8 实测渲染进程 Markdown 约 722 → 48 MB；剩 Electron 看流式观感。 |
 | [对话内容只存一份](active/20261107-surface-derived.md) | 2026-11-07 T1–T9 已实现并提交（cd0ff335）；79 个旧会话已按用户确认删除；run7/run8 已实机重跑；剩 Electron 功能验收。 |
@@ -45,6 +44,7 @@
 
 全部已完成计划的日期、标题和一句话见 [completed/README.md](completed/README.md)。最近几项：
 
+- [性能第三轮：高频路径不再整份读日志](completed/20261108-perf-round3.md)：自动审查、每次请求查压缩摘要、子 Agent 面板轮询都改成增量；读旧事件不再深拷贝；每项配 1k / 10k 规模测试，新增 `pnpm check:scale-tests`；实机采样对比未做。见[执行摘要](../exec-runs/20261108-perf-round3/execution-summary.md)。
 - [卡顿与内存修复](completed/20261104-perf-jank-fix.md)：journal 增量续读与缓存（37MB 会话命中 633ms → 0.3ms）、空闲会话释放（常驻 3 个）、IPC 合并、渲染订阅隔离与懒加载；Electron 实机验收未做。
 - [docs 整理：前端设计规范重建与冗余清理](completed/20261104-docs-reorg.md)：前端四份必读规范 + 区域规范路由表，设计文档唯一索引，exec-runs 与 learnings 去重，文档检查加严。
 - [子智能体与后台任务改造](completed/20261103-subagent-background-redesign/README.md)：S1–S6 完成，合入 main 的 #32、#33；Electron 实机验收 23 点 17 通过、0 失败、6 部分覆盖。见[执行摘要](../exec-runs/20261103-subagent-background-redesign/execution-summary.md)。
