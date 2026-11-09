@@ -8,7 +8,7 @@ import { BROWSER_PLUGIN_ID, disabledPluginIds, ENGLISH_LEARNING_PLUGIN_ID, resol
 import { registerPluginsIpc } from "./plugins/plugins-ipc";
 import { registerDisabledEnglishLearningIpc } from "./plugins/optional-plugin-stubs";
 import { loadRuntimeV2Module } from "./runtime-v2/runtime-loader";
-import { app, BrowserWindow, globalShortcut, safeStorage, screen } from "electron";
+import { app, BrowserWindow, globalShortcut, safeStorage, screen, session } from "electron";
 import { presentQuickOpenWindow } from "./quick-open-window";
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -31,7 +31,7 @@ import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
 import { registerFixedRendererIpc, type FixedRendererIpcRegistration } from "./runtime-v2/fixed-renderer-ipc";
 import { LocalUpdateService } from "./local-update-service";
 import { attachWindowLifecycle, installProcessErrorLogging } from "./main-lifecycle";
-import { attachNavigationGuards, blockWebviewAttachment, createAppUrlMatcher, createMainWindowOptions } from "./window-security";
+import { attachNavigationGuards, blockWebviewAttachment, buildContentSecurityPolicy, createAppUrlMatcher, createMainWindowOptions, installContentSecurityPolicy } from "./window-security";
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const APP_ID = process.env.ACTSPACE_DEV_APP_ID?.trim() || "com.actspace.desktop";
@@ -104,9 +104,9 @@ const approvalRegistry = new PendingApprovalRegistry({
 });
 
 const electronSecretCrypto: SecretCrypto = {
-  isAvailable: () => safeStorage.isEncryptionAvailable(),
-  encrypt: (plain) => safeStorage.encryptString(plain),
-  decrypt: (cipher) => safeStorage.decryptString(cipher),
+  isAvailable: () => safeStorage.isAsyncEncryptionAvailable(),
+  encrypt: (plain) => safeStorage.encryptStringAsync(plain),
+  decrypt: async (cipher) => (await safeStorage.decryptStringAsync(cipher)).result,
 };
 
 function configureAppPaths(): void {
@@ -281,6 +281,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
 app.whenReady().then(async () => {
   configureAppPaths();
   app.setAppUserModelId(APP_ID);
+  installContentSecurityPolicy(session.defaultSession, buildContentSecurityPolicy({ devServerUrl: DEV_SERVER_URL }));
   const roots = await ensureDataDirectories();
   try {
     await bootRuntime(roots);

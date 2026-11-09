@@ -101,10 +101,11 @@ export class HostUploads {
       const value = await this.#read(id); this.#check(value, deviceId, sessionId);
       if (value.offset !== value.size) throw new HostError("CONFLICT", "Upload incomplete");
       const path = join(this.#directory(id), "content");
-      // Upper bound is 20 MiB. Read only the acknowledged content after truncation.
+      // Upper bound is 20 MiB. Read only the acknowledged content after truncation, through the same handle.
       const file = await open(path, "r+");
-      try { await file.truncate(value.offset); await file.sync(); } finally { await file.close(); }
-      if (digest(await readFile(path)) !== value.sha256) throw new HostError("CONFLICT", "Upload digest mismatch");
+      let content: Buffer;
+      try { await file.truncate(value.offset); await file.sync(); content = await file.readFile(); } finally { await file.close(); }
+      if (digest(content) !== value.sha256) throw new HostError("CONFLICT", "Upload digest mismatch");
       const next = { ...value, complete: true }; await this.#save(next); return this.#reference(next);
     });
   }

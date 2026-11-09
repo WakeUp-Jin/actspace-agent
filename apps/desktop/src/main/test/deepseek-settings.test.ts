@@ -8,7 +8,7 @@ import { ModelRuntimeService } from "../model-runtime-service";
 import type { ModelStoreService } from "../model-store-service";
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
-const crypto = { isAvailable: () => true, encrypt: (plain: string) => Buffer.from(plain), decrypt: (cipher: Buffer) => cipher.toString() };
+const crypto = { isAvailable: async () => true, encrypt: async (plain: string) => Buffer.from(plain), decrypt: async (cipher: Buffer) => cipher.toString() };
 
 describe("DeepSeek settings and runtime authorization", () => {
   it("requires separate opt-ins, keeps other sources enabled, persists choices and observes live changes", async () => {

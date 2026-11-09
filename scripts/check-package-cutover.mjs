@@ -39,7 +39,7 @@ async function scanFile(path) {
     const withoutRelativeImports = source.replace(/["'`]\.{1,2}\/[^"'`]*["'`]/g, "");
     if (/(?:^|[\\/])plugins(?:[\\/]|['"])/.test(withoutRelativeImports) && !source.includes("browser-bridge")) findings.genericPlugins.push(label);
     // Tests may use retired names as plain fixture data (for example "/eval" as a sandbox path).
-    const isTest = /(?:^|[\\/])test[\\/]|\.test\.[cm]?[jt]sx?$/.test(label);
+    const isTest = /(?:^|[\\/])test[\\/]/.test(label) || /\.test\.[cm]?[jt]sx?$/.test(label);
     if (!isTest) for (const token of retired) if (token === "/eval" ? /\/eval(?=[\s/\x22\x27`]|$)/u.test(source) : source.includes(token)) findings.retiredPaths.push(`${label}: ${token}`);
   }
 }
