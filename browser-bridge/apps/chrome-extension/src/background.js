@@ -342,7 +342,7 @@ async function handleNativeRequest(message) {
       case "agent_browser_bridge.backend.cursor.move":
         return ok(id, await moveCursorPrimitive(message.params ?? {}));
       case "agent_browser_bridge.session.start":
-        return ok(id, { sessionId: (message.params ?? {}).sessionId });
+        return ok(id, { sessionId: message.params?.sessionId });
       case "agent_browser_bridge.session.end":
         return ok(id, endSession(message.params ?? {}));
       default:

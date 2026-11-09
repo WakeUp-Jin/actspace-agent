@@ -1,4 +1,4 @@
-import { type ContextPanelBucketKey, type ContextPanelBashStats, type ContextPanelBucketTokens, type ContextPanelConversationKind, type ContextPanelEntry, type ContextPanelView } from "@actspace/shared";
+import type { ContextPanelBucketKey, ContextPanelBashStats, ContextPanelBucketTokens, ContextPanelConversationKind, ContextPanelEntry, ContextPanelView } from "@actspace/shared";
 import { mockContextPaths, mockDisclosureSummary } from "./context-paths-fixture";
 import type { MockSession } from "./mock-db";
 

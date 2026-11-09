@@ -369,7 +369,7 @@ class HarnessReplay {
         if (!since.includes(path) && since.length < MAX_TRACKED) since.push(path);
         const pending = this.s.compaction.pending;
         // 压缩后窗口内重读压缩前读过的路径：立即记一次（会话可能在窗口结束前就停了）。
-        if (pending && pending.before.includes(path) && !pending.found.includes(path)) { pending.found.push(path); this.acc.add("compaction", this.sessionId, { compaction_id: pending.id }, { reread: 1 }); }
+        if (pending?.before.includes(path) && !pending.found.includes(path)) { pending.found.push(path); this.acc.add("compaction", this.sessionId, { compaction_id: pending.id }, { reread: 1 }); }
       }
       trim(d.paths, MAX_TRACKED * 2);
     }

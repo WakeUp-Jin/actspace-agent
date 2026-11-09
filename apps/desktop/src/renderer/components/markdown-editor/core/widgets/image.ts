@@ -1,4 +1,4 @@
-import { EditorView, WidgetType } from "@codemirror/view";
+import { type EditorView, WidgetType } from "@codemirror/view";
 import { hostOf } from "../context";
 import { imageCacheGeneration, loadImageCached, peekImage } from "./image-cache";
 

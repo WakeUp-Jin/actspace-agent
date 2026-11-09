@@ -195,7 +195,7 @@ export class FixedRendererStreamAdapter {
   }
   progress(update: { sessionId: string; agentRunId: string; callId: string; message: string; additions?: number; deletions?: number }): void {
     const entry = this.#calls.get(this.#key(update.sessionId, update.agentRunId, update.callId));
-    if (!entry || entry.phase !== "running") return;
+    if (entry?.phase !== "running") return;
     entry.message = update.message;
     if (update.additions !== undefined) entry.additions = Math.max(0, update.additions);
     if (update.deletions !== undefined) entry.deletions = Math.max(0, update.deletions);

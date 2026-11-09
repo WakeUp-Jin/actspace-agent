@@ -10,7 +10,7 @@ import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime,
 import type { CordisContext } from "@actspace/cordis-adapter";
 import type { BackgroundTaskHost } from "@actspace/background-tasks";
 import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
-import { SHELL_TOOLS_PLUGIN_ID, SHELL_TOOLS_TOOLS } from "./manifest.js";
+import { SHELL_TOOLS_PLUGIN_ID, type SHELL_TOOLS_TOOLS } from "./manifest.js";
 
 export type ToolName = (typeof SHELL_TOOLS_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;

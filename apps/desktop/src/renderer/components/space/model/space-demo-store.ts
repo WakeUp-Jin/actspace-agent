@@ -224,7 +224,7 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
   function approve(id: string) {
     const sp = currentSpace(state);
     const m = findMember(sp, id);
-    if (!m || m.status !== "wait") return;
+    if (m?.status !== "wait") return;
     update((s) => afterDecision(s, sp.id, id, (x) => ({
       ...x, status: "run", ask: null, time: "", denied: false,
       todo: x.todo && x.todo[0] < x.todo[1] ? [x.todo[0] + 1, x.todo[1]] : x.todo,
@@ -235,7 +235,7 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
   function deny(id: string) {
     const sp = currentSpace(state);
     const m = findMember(sp, id);
-    if (!m || m.status !== "wait") return;
+    if (m?.status !== "wait") return;
     update((s) => afterDecision(s, sp.id, id, (x) => ({
       ...x, status: "idle", last: x.task, note: "命令被拒绝，等你给方向", time: "刚刚", denied: true, ask: null,
     })));

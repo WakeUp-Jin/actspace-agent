@@ -67,7 +67,10 @@
         "noControlCharactersInRegex": "off",
         // `let x; try { x = await ... } catch {}` 依赖 tsc 控制流推断，不是 implicit any。
         "noImplicitAnyLet": "off",
-        "noExportsInTest": "off"
+        "noExportsInTest": "off",
+        // `(…) => Handlers | void` 表示回调可以不返回；换成 `| undefined` 会让 tsc 要求每个分支显式 return。
+        // 这和 React 的 `EffectCallback = () => void | Destructor` 是同一种写法，不是误用。
+        "noConfusingVoidType": "off"
       },
       "nursery": {
         // 类型推断不完整，可能漏报，但不会误报：明确不等待的调用写 `void`。
