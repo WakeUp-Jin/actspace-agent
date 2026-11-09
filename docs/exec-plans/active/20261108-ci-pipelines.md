@@ -6,7 +6,7 @@
 
 ## 状态
 
-2026-11-08 立项。P1–P3 已随本计划的第一个 PR（#48）完成；P4（release matrix）在第二个 PR 中实现，等它的 PR dry-run 四平台跑绿并合并后，再做 P5（Electron 大版本升级）。
+2026-11-08 立项。P1–P3 已随本计划的第一个 PR（#48）完成；P4（release matrix）在第二个 PR（#57）中实现，四平台 dry-run 已绿；P5（Electron 39 → 45）在第三个 PR 中实现，叠在 #57 之上（它依赖 #57 修好的 `类型检查与测试` job），等 #57 合并后再合。
 
 ## 范围
 
@@ -65,9 +65,13 @@
 - [x] P2 markdownlint 收敛到能绿：`.markdownlint-cli2.jsonc` 排除第三方 skill、history、fixture；`.markdownlint.json` 关掉纯排版规则；修掉剩余 45 处真实问题（表格列数、标题层级、图片 alt、末尾换行等）。
 - [x] P3 `dompurify` 3.4.17、`undici` 7.30.x；`.github/dependabot.yml`；`codeql.yml` + `codeql-config.yml`。
 - [x] P4 `release.yml` 矩阵 + 草稿 Release；`release-package.sh` Windows 分支；`release.yml` 显式 `setup-go`。（第二个 PR；tag 实发由用户在合并后做）
-- [ ] P5 Electron 升级。
+- [x] P5 Electron 39 → 45.2.3（Node 24.22 / Chromium 156）：clipboard 迁移到 W3C 风格 API，`release-package.sh` 按需下载 runtime，renderer tsconfig lib 显式 ES2024。（第三个 PR；实机走查由用户做）
 
 ## 决策记录
+
+- 2026-11-08（P5）：直接升到当前 stable 45，不在 40–44 停留。中间版本没有一个是 LTS，Electron 只维护最近三个大版本，逐级升不会减少要处理的 breaking change，只会多几轮测试。
+- 2026-11-08（P5）：`safeStorage` 的同步方法（`isEncryptionAvailable` / `encryptString` / `decryptString`）在 45 只是弃用、46 才移除。`SecretCrypto` 接口是同步的，改异步要动 settings store、model-connections 等调用链，不塞进版本升级 PR；记入 tech debt，46 之前单独做。
+- 2026-11-08（P5）：renderer tsconfig 把 `lib` 从 ES2022 改成 ES2024 而不是改掉代码里的 `findLastIndex` / `Object.groupBy`。这些 API Chromium 117 起就有，之前能过类型检查只是因为 Electron 39 安装器的间接依赖 `type-fest@0.13.1` 被 mermaid 的 d.ts 误引、顺带带入了 esnext lib；现在把真实依赖写明。
 
 - 2026-11-08：用 `paths-ignore` / `paths` 互补的两份工作流（`ci.yml` / `docs.yml`）而不是在一个工作流里用第三方 paths-filter action 做 job 级过滤——GitHub 原生、不引入新依赖；代价是混合 PR 上 `scripts/ci.sh` 跑两次（约 1 分钟）。
 - 2026-11-08：CodeQL 用仓库内 workflow（advanced setup）而不是 UI 的 default setup，为了把 `paths-ignore` 和查询集版本化在仓库里；两者不能同时开。

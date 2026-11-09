@@ -118,8 +118,14 @@ phase "prune deploy dir"
 find "${deploy_dir}" -type d -name test -prune -exec rm -rf {} +
 find "${deploy_dir}" \( -name "*.map" -o -name "*.d.ts" -o -name "*.d.mts" \) -type f -delete
 if [[ ! -d "${electron_runtime_dir}" ]]; then
+  # Since Electron 42 the npm package no longer downloads the binary in postinstall; requiring it
+  # from the desktop package fetches the runtime for this platform on demand.
+  phase "download electron runtime"
+  (cd "${desktop_dir}" && node -e 'require("electron")')
+fi
+if [[ ! -d "${electron_runtime_dir}" ]]; then
   echo "Electron runtime not found at ${electron_runtime_dir}" >&2
-  echo "Run pnpm install before packaging release assets." >&2
+  echo "Run 'pnpm --filter @actspace/desktop exec install-electron' before packaging release assets." >&2
   exit 1
 fi
 
