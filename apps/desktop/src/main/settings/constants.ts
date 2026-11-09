@@ -39,10 +39,3 @@ export const ALL_SECRET_PROVIDER_IDS: readonly PersistedSecretProviderId[] = [
   "image-generation",
   "speech-minimax",
 ];
-
-export const SEARCH_PROVIDER_ENV_KEYS = {
-  zhipu: "ZHIPU_API_KEY",
-  tavily: "TAVILY_API_KEY",
-  tinyfish: "TINYFISH_API_KEY",
-  exa: "EXA_API_KEY",
-} as const;

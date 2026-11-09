@@ -4,7 +4,8 @@
 //   2. 契约里的 event 成员在 main 中没有发送（send）；
 //   3. main 注册或发送了契约之外的 channel（含字符串字面量），或注册 / 发送的方向与契约的类别不符；
 //   4. channel 常量表里有契约没用到的 channel；
-//   5. preload 没有按契约生成 bridge，或绕过契约直接引用了 channel。
+//   5. preload 没有按契约生成 bridge，或绕过契约直接引用了 channel；
+//   6. main 在统一注册器（ipc/registry.ts）之外直接调用 ipcMain.handle / on，绕过 assertTrustedSender 与输入守卫。
 // channel 值来自常量表；main 的引用按「常量名.key」「别名.key」（`const channels = CONST`）、
 // 注册器的 `ipc.handle(contract.域.成员)` 或字符串值匹配。
 import fs from "node:fs";
@@ -137,6 +138,9 @@ const CONTRACT_REGISTER_CALL = "(?:\\bhandle|\\.on)";
 const SEND_CALL = "(?:\\.send|#send|\\bsend)";
 // preload 按契约整体生成 bridge 的写法。
 const PRELOAD_BUILDS_CONTRACT = /\bbuildBridge\(\s*desktopBridgeContract\b/;
+// 只有注册器可以碰 ipcMain 的注册 API；其他文件必须走 `ipc.handle(contract.…)`，才会经过 assertTrustedSender 和 guard。
+const REGISTRAR_PATH = "apps/desktop/src/main/ipc/registry.ts";
+const RAW_IPC_MAIN_REGISTER = /\bipcMain\.(handle|handleOnce|on|once)\s*\(/g;
 
 /**
  * @param {{
@@ -144,10 +148,11 @@ const PRELOAD_BUILDS_CONTRACT = /\bbuildBridge\(\s*desktopBridgeContract\b/;
  *   contract: Map<string, { channel: string, kind: "invoke" | "send" | "event" }>,
  *   mainSources: { path: string, text: string }[],
  *   preloadSources: { path: string, text: string }[],
+ *   registrarPath?: string,
  * }} input
  * @returns {string[]} 不一致的描述；空数组表示通过。
  */
-export function auditIpcChannels({ constants, contract, mainSources, preloadSources }) {
+export function auditIpcChannels({ constants, contract, mainSources, preloadSources, registrarPath = REGISTRAR_PATH }) {
   const byChannel = new Map();
   for (const [member, spec] of contract) byChannel.set(spec.channel, { member, ...spec });
 
@@ -155,6 +160,11 @@ export function auditIpcChannels({ constants, contract, mainSources, preloadSour
   const registered = new Set();
   const sent = new Set();
   for (const { path: file, text } of mainSources) {
+    if (file !== registrarPath) {
+      for (const match of text.matchAll(RAW_IPC_MAIN_REGISTER)) {
+        errors.push(`main 绕过统一注册器直接调用了 ipcMain.${match[1]}（${file}），请改用 ipc.${match[1] === "on" || match[1] === "once" ? "on" : "handle"}(contract.…)`);
+      }
+    }
     for (const value of channelsInCalls(text, REGISTER_CALL, constants, contract, CONTRACT_REGISTER_CALL)) {
       registered.add(value);
       const spec = byChannel.get(value);

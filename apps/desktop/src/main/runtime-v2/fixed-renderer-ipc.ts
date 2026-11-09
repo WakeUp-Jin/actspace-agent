@@ -32,7 +32,6 @@ import {
 } from "@actspace/shared";
 import {
   RUNTIME_V2_FIXED_RENDERER_CHANNELS,
-  foldSubagentTree,
   type RuntimeV2JsonValue,
   type RuntimeV2SessionListItem,
   type RuntimeV2SessionSnapshot,
@@ -66,10 +65,13 @@ import { ChatAttachmentValidationError, type DesktopRuntimeV2Registry } from "./
 import { installFixedRendererSkill, listFixedRendererSkills, uninstallFixedRendererSkill } from "./fixed-renderer-skills";
 import {
   projectSubagentTranscript,
-  projectSubagentItems,
-  subagentChildrenWithoutModel,
+  createSubagentListState,
+  reduceSubagentList,
+  subagentListItems,
+  subagentListChildrenWithoutModel,
   latestRequestModel,
   toolPreview,
+  type SubagentListState,
 } from "@actspace/client/sessions";
 
 export type FixedRendererIpcOptions = {
@@ -368,6 +370,7 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
       usageReadModels.delete(options.registry);
       unsubscribeRendererStream();
       unsubscribeSettingsV4();
+      subagentLists.clear();
       ipc.dispose();
     },
     requestQuickOpen: () => {
@@ -380,10 +383,15 @@ export function registerFixedRendererIpc(options: FixedRendererIpcOptions): Fixe
   };
 }
 
-function registerBrowserBridgeIpc(ipc: IpcRegistrar, browserBridge: BrowserBridgeService): void {
+function registerBrowserBridgeIpc(options: FixedRendererIpcOptions, ipc: IpcRegistrar, browserBridge: BrowserBridgeService): void {
   ipc.handle(contract.browserBridge.getStatus, () => browserBridge.getStatus());
   ipc.handle(contract.browserBridge.connect, () => browserBridge.connect());
-  ipc.handle(contract.browserBridge.useSourceExtension, (repoRoot) => browserBridge.useSourceExtension(repoRoot));
+  ipc.handle(contract.browserBridge.selectSourceExtension, async () => {
+    const result = await showOpenDialog(options.getMainWindow(), { title: "选择 actspace 源码目录（需包含 browser-bridge/）", properties: ["openDirectory"] });
+    if (result.canceled || !result.filePaths[0]) return { ok: true, canceled: true };
+    return browserBridge.useSourceExtension(result.filePaths[0]);
+  });
+  ipc.handle(contract.browserBridge.useBundledExtension, () => browserBridge.useSourceExtension(null));
   ipc.handle(contract.browserBridge.prepareUpdate, () => browserBridge.prepareUpdate());
   ipc.handle(contract.browserBridge.disconnect, () => browserBridge.disconnect());
   ipc.handle(contract.browserBridge.selectInstance, (instanceId) => browserBridge.selectInstance(instanceId));
@@ -403,7 +411,7 @@ function registerBrowserBridgeIpc(ipc: IpcRegistrar, browserBridge: BrowserBridg
     shell.showItemInFolder(status.extensionDir);
     return { ok: true };
   });
-  ipc.handle(contract.browserBridge.installFromRepo, (input) => browserBridge.buildAndInstall(input.repoRoot));
+  ipc.handle(contract.browserBridge.installFromRepo, () => browserBridge.buildAndInstall());
   ipc.handle(contract.browserBridge.installNativeHost, () => browserBridge.installNativeHost());
 }
 
@@ -626,7 +634,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
   ipc.handle(contract.approvals.submit, (input) => options.approvals.decide(input.requestId, input.decision, input.decision === "session" ? input.suggestionId : undefined));
 
-  if (options.browserBridge) registerBrowserBridgeIpc(ipc, options.browserBridge);
+  if (options.browserBridge) registerBrowserBridgeIpc(options, ipc, options.browserBridge);
   else registerDisabledBrowserBridgeIpc(ipc);
 
   ipc.handle(contract.skills.list, async (input = {}) => listFixedRendererSkills({
@@ -661,12 +669,12 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   ipc.handle(contract.sessions.readContextEntry, input => contextPanel.readEntry(input));
   ipc.handle(contract.usage.getActivity, (input) => createUsageActivity(options.registry, options.roots.dataRoot, input));
   ipc.handle(contract.sessions.getSubagents, async (input) => {
-    const journal = await options.registry.inspectSessionEvents(input.sessionId);
+    const list = await subagentListFor(options.registry, input.sessionId);
     // The parent records a child's model only when it finishes; until then use the child's own request facts.
     // The panel polls every second: only the child's latest `request/header` is read (a live child answers from
     // its in-memory type index), and a finished child's answer is remembered.
     const childModels = new Map<string, string>();
-    await Promise.all(subagentChildrenWithoutModel(journal).map(async ({ childSessionId, finished }) => {
+    await Promise.all(subagentListChildrenWithoutModel(list).map(async ({ childSessionId, finished }) => {
       const cached = finishedChildModels.get(childSessionId);
       const model = cached !== undefined ? cached : latestRequestModel(await options.registry.latestSessionEvent(childSessionId, "request/header").then(event => event ? [event] : [], () => [])) ?? null;
       if (finished) rememberFinished(finishedChildModels, childSessionId, model);
@@ -675,7 +683,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     // List rows show each child's cumulative token usage, read from its own Session snapshot. External
     // subagents have no child Session and show none. A settled activation's count is remembered; a
     // continuation starts a new activation, so the cache key carries the activation count.
-    const items = projectSubagentItems(journal, childModels);
+    const items = subagentListItems(list, childModels);
     const childTokens = new Map<string, number>();
     await Promise.all(items.filter(item => item.kind === "local" || item.kind === "fork").map(async ({ agentId, status, activationCount }) => {
       const key = `${agentId}#${activationCount}`;
@@ -694,7 +702,7 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
   });
   ipc.handle(contract.sessions.interruptSubagent, async (input) => options.registry.interruptSubagent(input.sessionId, input.agentId));
   ipc.handle(contract.sessions.revealSubagentRecord, async (input) => {
-    const path = foldSubagentTree(await options.registry.inspectSessionEvents(input.sessionId)).agents[input.agentId]?.transcriptPath;
+    const path = (await subagentListFor(options.registry, input.sessionId)).tree.agents[input.agentId]?.transcriptPath;
     if (!path || !(await stat(path).then(info => info.isFile(), () => false))) return { ok: false };
     shell.showItemInFolder(path);
     return { ok: true };
@@ -707,6 +715,25 @@ function registerFixedRendererHostCapabilities(options: FixedRendererIpcOptions,
     return projectSubagentTranscript(snapshot, journal, options.registry.liveOutput(input.transcriptRef.runId));
   });
 
+}
+
+/**
+ * 子 Agent 面板每秒轮询一次：折叠状态按会话常驻，记住折叠到的序号，之后只读、只折叠新增事件（perf-backlog P3）。
+ * 日志的 lastSeq 比记住的序号小，说明会话被换掉了，从头折叠。只保留最近看过的少数会话。
+ */
+const subagentLists = new Map<string, { throughSeq: number; state: SubagentListState }>();
+const SUBAGENT_LIST_CACHE_LIMIT = 16;
+async function subagentListFor(registry: Pick<DesktopRuntimeV2Registry, "inspectSessionEventsAfter">, sessionId: string): Promise<SubagentListState> {
+  const cached = subagentLists.get(sessionId);
+  let fold = cached ?? { throughSeq: -1, state: createSubagentListState() };
+  let read = await registry.inspectSessionEventsAfter(sessionId, fold.throughSeq);
+  if (read.lastSeq < fold.throughSeq) { fold = { throughSeq: -1, state: createSubagentListState() }; read = await registry.inspectSessionEventsAfter(sessionId, -1); }
+  let state = fold.state;
+  for (const event of read.events) state = reduceSubagentList(state, event);
+  subagentLists.delete(sessionId);
+  if (subagentLists.size >= SUBAGENT_LIST_CACHE_LIMIT) subagentLists.delete(subagentLists.keys().next().value as string);
+  subagentLists.set(sessionId, { throughSeq: Math.max(fold.throughSeq, read.lastSeq), state });
+  return state;
 }
 
 /** Request model of finished subagent children whose parent recorded none (null = the child sent no request). */

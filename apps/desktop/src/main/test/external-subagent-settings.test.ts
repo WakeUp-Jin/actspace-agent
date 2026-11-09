@@ -8,7 +8,7 @@ import { resolvePluginSettings } from "../plugins/plugin-switches";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
-const crypto = { isAvailable: () => true, encrypt: (plain: string) => Buffer.from(plain), decrypt: (cipher: Buffer) => cipher.toString() };
+const crypto = { isAvailable: async () => true, encrypt: async (plain: string) => Buffer.from(plain), decrypt: async (cipher: Buffer) => cipher.toString() };
 
 it("persists external subagent plugin settings through tools updates, merging per plugin", async () => {
   const root = await mkdtemp(join(tmpdir(), "actspace-ext-subagent-")); roots.push(root);

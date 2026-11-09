@@ -12,7 +12,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { open, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { open, readdir, rename, stat, unlink, writeFile, type FileHandle } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { WORKSPACE_TEXT_PREVIEW_LIMIT_BYTES } from "@actspace/shared";
 import type {
@@ -119,71 +119,79 @@ export async function readWorkspaceFile(
     return { relativePath: normalized, renderKind: "external", size: 0, mtimeMs: 0, error: "escapes_root" };
   }
 
-  let size: number;
-  let mtimeMs: number;
+  // 先 open 再用同一句柄 stat 和读：stat 与读取之间文件不会被换掉。
+  let handle: FileHandle;
   try {
-    const stats = await stat(inside.abs);
-    if (stats.isDirectory()) {
-      return { relativePath: inside.rel, renderKind: "external", size: 0, mtimeMs: 0, error: "not_a_file" };
-    }
-    size = stats.size;
-    mtimeMs = stats.mtimeMs;
-  } catch {
-    return { relativePath: inside.rel, renderKind: "external", size: 0, mtimeMs: 0, error: "not_found" };
+    handle = await open(inside.abs, "r");
+  } catch (error) {
+    // Windows 打开目录直接报 EISDIR；POSIX 能打开目录，交给下面的 isDirectory() 判断。
+    const code = (error as NodeJS.ErrnoException).code;
+    return { relativePath: inside.rel, renderKind: "external", size: 0, mtimeMs: 0, error: code === "EISDIR" ? "not_a_file" : "not_found" };
   }
-
-  const ext = extname(inside.rel).toLowerCase();
-  const renderKind = renderKindOf(ext);
-
-  if (renderKind === "image") {
-    // 图片保留整体拒绝：截断的字节流无法解码成可显示的图，部分读没有意义。
-    if (size > MAX_IMAGE_BYTES) {
-      return { relativePath: inside.rel, renderKind, size, mtimeMs, error: "too_large" };
+  try {
+    let size: number;
+    let mtimeMs: number;
+    try {
+      const stats = await handle.stat();
+      if (stats.isDirectory()) {
+        return { relativePath: inside.rel, renderKind: "external", size: 0, mtimeMs: 0, error: "not_a_file" };
+      }
+      size = stats.size;
+      mtimeMs = stats.mtimeMs;
+    } catch {
+      return { relativePath: inside.rel, renderKind: "external", size: 0, mtimeMs: 0, error: "not_found" };
     }
-    const buffer = await readFile(inside.abs);
-    const mime = IMAGE_MIME_BY_EXT[ext] ?? "application/octet-stream";
-    return {
+
+    const ext = extname(inside.rel).toLowerCase();
+    const renderKind = renderKindOf(ext);
+
+    if (renderKind === "image") {
+      // 图片保留整体拒绝：截断的字节流无法解码成可显示的图，部分读没有意义。
+      if (size > MAX_IMAGE_BYTES) {
+        return { relativePath: inside.rel, renderKind, size, mtimeMs, error: "too_large" };
+      }
+      const buffer = await handle.readFile();
+      const mime = IMAGE_MIME_BY_EXT[ext] ?? "application/octet-stream";
+      return {
+        relativePath: inside.rel,
+        renderKind,
+        size,
+        mtimeMs,
+        dataUrl: `data:${mime};base64,${buffer.toString("base64")}`,
+      };
+    }
+
+    // external 不读内容：由 renderer 交给系统默认应用打开，这里只给 stat。
+    if (renderKind === "external") {
+      return { relativePath: inside.rel, renderKind, size, mtimeMs };
+    }
+
+    // markdown 按 UTF-8 文本读。
+    // 超限不再整体拒绝：只读上限内的完整行并标 truncated，让大文件至少前半段可读。
+    const truncated = size > MAX_TEXT_BYTES;
+    const buffer = truncated ? await readHead(handle, MAX_TEXT_BYTES) : await handle.readFile();
+
+    const result: WorkspaceReadFileResult = {
       relativePath: inside.rel,
       renderKind,
       size,
       mtimeMs,
-      dataUrl: `data:${mime};base64,${buffer.toString("base64")}`,
+      content: truncated ? sliceToLastCompleteLine(buffer) : buffer.toString("utf8"),
     };
-  }
-
-  // external 不读内容：由 renderer 交给系统默认应用打开，这里只给 stat。
-  if (renderKind === "external") {
-    return { relativePath: inside.rel, renderKind, size, mtimeMs };
-  }
-
-  // markdown 按 UTF-8 文本读。
-  // 超限不再整体拒绝：只读上限内的完整行并标 truncated，让大文件至少前半段可读。
-  const truncated = size > MAX_TEXT_BYTES;
-  const buffer = truncated ? await readHead(inside.abs, MAX_TEXT_BYTES) : await readFile(inside.abs);
-
-  const result: WorkspaceReadFileResult = {
-    relativePath: inside.rel,
-    renderKind,
-    size,
-    mtimeMs,
-    content: truncated ? sliceToLastCompleteLine(buffer) : buffer.toString("utf8"),
-  };
-  if (truncated) {
-    result.truncated = true;
-  }
-  return result;
-}
-
-/** 只读文件开头 `limit` 字节，避免把整个大文件载入内存。 */
-async function readHead(absPath: string, limit: number): Promise<Buffer> {
-  const handle = await open(absPath, "r");
-  try {
-    const buffer = Buffer.alloc(limit);
-    const { bytesRead } = await handle.read(buffer, 0, limit, 0);
-    return buffer.subarray(0, bytesRead);
+    if (truncated) {
+      result.truncated = true;
+    }
+    return result;
   } finally {
     await handle.close();
   }
+}
+
+/** 只读文件开头 `limit` 字节，避免把整个大文件载入内存。 */
+async function readHead(handle: FileHandle, limit: number): Promise<Buffer> {
+  const buffer = Buffer.alloc(limit);
+  const { bytesRead } = await handle.read(buffer, 0, limit, 0);
+  return buffer.subarray(0, bytesRead);
 }
 
 /**

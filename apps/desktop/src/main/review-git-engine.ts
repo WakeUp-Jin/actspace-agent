@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { lstat, open, readFile, realpath } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { hostChildEnv } from "@actspace/shared";
 import type {
   ReviewBranch,
   ReviewCapabilities,
@@ -664,6 +665,7 @@ export function runReviewGitCommand(
       maxBuffer: options.maxOutputChars,
       windowsHide: true,
       encoding: "utf8",
+      env: hostChildEnv(process.env, { GIT_TERMINAL_PROMPT: "0" }),
     }, (error, stdout, stderr) => {
       const err = error as (NodeJS.ErrnoException & { killed?: boolean }) | null;
       resolveResult({

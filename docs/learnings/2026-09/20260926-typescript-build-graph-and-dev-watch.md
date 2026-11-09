@@ -16,5 +16,6 @@ TypeScript 的增量编译只有在项目边界稳定时才可靠。把每个 wo
 - 只监听 TypeScript，忘记 Client 的 esbuild bundle 或运行时复制的 prompt 资源。
 - 用独立的手写包列表替代 workspace manifest，新增依赖后项目图静默失真。
 - 只验证 warm build，不验证 clean build，无法发现残留产物问题。
+- 共享 tsconfig 里的 `exclude` 相对**声明它的文件**解析，不是相对继承它的包。根目录 `tsconfig.package.json` 写 `exclude: ["src/**/test"]`，到每个包里就成了 `../../../src/**/test`，静默变成空操作；测试文件被编进 `dist/`，而测试 import 的 devDependencies 不在 references 图里（图只从 `dependencies` 生成），`tsc -b` 报 TS2307，逐包 `pnpm build` 却因为拓扑序恰好先编了那些包而能过。共享配置里的 `exclude` 要写成 `**/test`、`**/*.test.ts` 这种不依赖起点的模式。（2026-11-09 CI 提速时发现，`docs/histories/2026-11/20261109-1400-ci-speedup.md`）
 
-自检：新增一个 workspace 依赖后，生成脚本是否能发现它？删除一个导出文件后，清理构建是否仍能产生不含旧文件的 `dist`？
+自检：新增一个 workspace 依赖后，生成脚本是否能发现它？删除一个导出文件后，清理构建是否仍能产生不含旧文件的 `dist`？任选一个包跑 `tsc -p tsconfig.json --listFilesOnly | grep test`，结果是否为空？

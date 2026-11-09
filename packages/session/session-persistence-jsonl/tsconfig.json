@@ -1,1 +1,1 @@
-{"extends":"../../../tsconfig.package.json","compilerOptions":{"rootDir":"src","outDir":"dist"},"include":["src"],"exclude":["src/test"]}
+{"extends":"../../../tsconfig.package.json","compilerOptions":{"rootDir":"src","outDir":"dist"},"include":["src"],"exclude":["src/test","src/**/*.test.ts"]}

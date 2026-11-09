@@ -46,9 +46,9 @@
     "@actspace/side-chat": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.0.3",
-    "typescript": "^5.8.3",
-    "vitest": "^4.1.12",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
     "@actspace/boot": "workspace:*",
     "@actspace/bundle": "workspace:*",
     "@actspace/composition": "workspace:*",

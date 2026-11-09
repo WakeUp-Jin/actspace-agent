@@ -52,10 +52,11 @@ export type CustomConnectionRuntimeConfig = ProviderRuntimeConfig & {
   readonly resolvedAuth?: CustomConnectionResolvedAuth;
 };
 
+/** 只用于 secrets v1 → v2 迁移解密；Electron 46 起 safeStorage 只有异步 API。 */
 export interface SecretCrypto {
-  isAvailable(): boolean;
-  encrypt(plain: string): Buffer;
-  decrypt(cipher: Buffer): string;
+  isAvailable(): Promise<boolean>;
+  encrypt(plain: string): Promise<Buffer>;
+  decrypt(cipher: Buffer): Promise<string>;
 }
 
 export type AtomicJsonWriter = (filePath: string, value: unknown, options?: { mode?: number }) => Promise<void>;

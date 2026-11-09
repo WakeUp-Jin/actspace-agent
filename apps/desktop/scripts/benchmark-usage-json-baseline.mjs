@@ -1,4 +1,4 @@
-import { mkdtemp, open, readFile, rm, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, open, rm, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
@@ -9,7 +9,7 @@ const { projectIndexedUsageActivity }=require('../../../packages/client/client/d
 const option=name=>process.argv.find(value=>value.startsWith(`--${name}=`))?.slice(name.length+3);
 const rows=Number(option('rows')??100000),sessions=Number(option('sessions')??100);
 const root=await mkdtemp(join(tmpdir(),'usage-json-baseline-')),path=join(root,'index.json');
-const file=await open(path,'w',0o600);
+const file=await open(path,'w+',0o600);
 try {
   await file.write('[');
   for(let s=0;s<sessions;s++) {
@@ -23,11 +23,13 @@ try {
     }
     await file.write(batch+']}');
   }
-  await file.write(']');await file.close();
+  await file.write(']');
   const loop=monitorEventLoopDelay({resolution:10});loop.enable();
   await new Promise(resolve=>setTimeout(resolve,30));
   const before=process.memoryUsage(),start=performance.now();
-  const sources=JSON.parse(await readFile(path,'utf8'));const parseMs=performance.now()-start;
+  // 通过同一句柄回读（句柄位置已在文件末尾，指定 position 0），不按路径重新打开。
+  const {size}=await file.stat();const text=Buffer.alloc(size);await file.read(text,0,size,0);await file.close();
+  const sources=JSON.parse(text.toString('utf8'));const parseMs=performance.now()-start;
   let peak=process.memoryUsage();const timings={};
   for(const [name,filter] of [['first',{}],['page',{requestRowsPage:{page:2,limit:100}}],['filter',{search:'model-3'}]]) {
     const times=[];
