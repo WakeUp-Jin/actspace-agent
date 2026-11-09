@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"syscall"
 	"time"
 )
 
@@ -126,11 +125,6 @@ func ownedPrivateFile(info os.FileInfo) bool {
 
 func ownedPrivateSocket(info os.FileInfo) bool {
 	return info.Mode()&os.ModeSocket != 0 && info.Mode().Perm()&0077 == 0 && ownedByCurrentUser(info)
-}
-
-func ownedByCurrentUser(info os.FileInfo) bool {
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	return ok && stat.Uid == uint32(os.Getuid())
 }
 
 func publishInstanceSelection(socketPath string, extensionID string) error {

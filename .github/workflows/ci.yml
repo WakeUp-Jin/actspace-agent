@@ -59,6 +59,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Install ripgrep
+        # tool-fs-search 的 grep / glob 直接调 rg，它的测试需要真实二进制；ubuntu-latest 不预装。
+        run: sudo apt-get install -y --no-install-recommends ripgrep
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -70,6 +74,10 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      # test:agent-host:process 等进程级测试直接 spawn apps/cli/dist/cli.js，runner 上没有现成的 dist。
+      - name: Build Agent CLI for process tests
+        run: pnpm --filter '@actspace/agent-cli...' build
 
       - name: Test
         run: pnpm test
@@ -170,3 +178,11 @@ jobs:
       - name: Browser Bridge Go tests
         working-directory: browser-bridge
         run: go test ./packages/protocol/... ./apps/cli/...
+
+      # release.yml 会在 macOS / Windows runner 上 go build 这个 CLI；这里提前交叉编译，
+      # 省得 Unix-only 的 syscall 用法要等到发布流水线才暴露。
+      - name: Browser Bridge cross-compile
+        working-directory: browser-bridge/apps/cli
+        run: |
+          GOOS=windows GOARCH=amd64 go build -o /dev/null .
+          GOOS=darwin GOARCH=arm64 go build -o /dev/null .

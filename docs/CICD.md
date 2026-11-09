@@ -15,12 +15,12 @@
 
 | 工作流 | 触发 | 内容 |
 |---|---|---|
-| `ci.yml` | `pull_request`（忽略纯文档路径）、`push: main`、手动 | 五个并行 job：`repository-checks`（`scripts/ci.sh` + markdownlint）、`typecheck-test`（contract matrix、Biome lint、typecheck、`pnpm test`）、`build`（`pnpm build`；`main` 上额外跑一次 Linux `release-package.sh` 冒烟，不上传产物）、`site`（check / test / build）、`browser-bridge`（契约检查 + Go 测试）。 |
+| `ci.yml` | `pull_request`（忽略纯文档路径）、`push: main`、手动 | 五个并行 job：`repository-checks`（`scripts/ci.sh` + markdownlint）、`typecheck-test`（contract matrix、Biome lint、typecheck、`pnpm test`）、`build`（`pnpm build`；`main` 上额外跑一次 Linux `release-package.sh` 冒烟，不上传产物）、`site`（check / test / build）、`browser-bridge`（契约检查 + Go 测试 + Windows / macOS 交叉编译，保证发布矩阵能 `go build`）。 |
 | `docs.yml` | `pull_request` 且只改 `docs/**`、`*.md` 等文档路径 | `scripts/ci.sh` + markdownlint，与 `ci.yml` 的 `paths-ignore` 互补。 |
 | `agent-cli-binaries.yml` | `pull_request` 改到 CLI / packages / 打包脚本时、手动 | 在 CLI 支持的最低 Node 大版本上构建并校验 managed package，artifact 保留 3 天。 |
 | `supply-chain-security.yml` | `pull_request` 改到依赖清单 / lockfile / patches 时、每周一定时、手动 | 依赖变更审查（仅 PR）、OSV 扫描。 |
 | `codeql.yml` | `push: main`、`pull_request`（均忽略纯文档路径）、每周一定时、手动 | CodeQL `javascript-typescript` 与 `actions` 两种语言，`security-and-quality` 查询集；忽略测试、fixture、dist、生成文件（`.github/codeql/codeql-config.yml`）。不要在仓库设置里同时开启 CodeQL default setup。 |
-| `release.yml` | 手动 | 打包 unsigned portable 桌面制品、生成 SBOM / provenance，并创建 GitHub Release。 |
+| `release.yml` | `push` 到 `v*` tag、手动、改到打包脚本的 `pull_request` | 四平台矩阵（macOS arm64 / x64、Linux x64、Windows x64）打包 portable 桌面制品并生成 provenance；tag 或填了 tag 的手动运行再汇总 SBOM 并创建**草稿** Release。PR 只跑打包做验证，不上传完整产物。详见下文「桌面发布」。 |
 | `site-pages.yml` | 手动 | GitHub Pages 备用部署，不随 `main` 自动发布。 |
 
 `netlify.toml` 是官网默认部署配置；在 Netlify 连接 GitHub 后由 Netlify 构建并发布 `apps/site`，不走 Actions。
@@ -73,7 +73,7 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
   - GitHub Actions pinning
   - shell 脚本语法检查
 - `.github/workflows/ci.yml` 中的工程 job（`typecheck-test`、`build`、`site`、`browser-bridge`）都从 `pnpm install --frozen-lockfile` 开始，然后各自执行：
-  - `typecheck-test`：`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
+  - `typecheck-test`：`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。job 开头装 ripgrep（`tool-fs-search` 的测试调真实 `rg`）；`pnpm test` 之前先 `pnpm --filter '@actspace/agent-cli...' build`，因为 `test:agent-host:process` 等进程级测试直接 spawn `apps/cli/dist/cli.js`。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
   - `build`：`pnpm build`（`agent-cli...` 带依赖闭包，runner 上没有现成的 `dist/`，要先按拓扑顺序构建 workspace 依赖）；在 `main` 上再装 Go 并执行 `./scripts/release-package.sh` 作为打包冒烟，产物不上传。
   - `site`：`check:site`、`test:site` 和 `build:site`，并使用 Netlify 的 `/` base path 验证生产构建；CI 中的 `https://example.com` 仅用于构建检查，不是官网地址。
   - `browser-bridge`：`pnpm check:browser` 与 `go test`。
@@ -161,8 +161,7 @@ SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 
 1. 继续保留 `repository-checks` 与各工程 job 的分层，避免仓库卫生与工程构建互相遮蔽失败原因。
 2. 新增 action 时必须继续 pin 到 commit SHA；`scripts/check-action-pinning.sh` 会拦截浮动 tag。
-3. 多平台 release：把 `release.yml` 改成 tag 触发的 macOS / Linux / Windows runner matrix，汇总后创建草稿 Release，并让 provenance 覆盖每个平台产物。计划见 `docs/exec-plans/active/20261108-ci-pipelines.md`。
-4. 如果后续接 installer、Developer ID 签名、notarization、远程自动更新，再在现有 release 流水线上扩展。
+3. 如果后续接 installer（dmg 之外的 pkg、Windows 安装器、Linux AppImage / deb）、Developer ID 签名、notarization、Windows Authenticode、远程自动更新，再在现有 release 流水线上扩展；Electron 大版本升级见 `docs/exec-plans/active/20261108-ci-pipelines.md` P5。
 
 ## 供应链安全
 
@@ -184,17 +183,41 @@ SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 - OpenSSF Scorecard 默认不启用：等分支保护、release 历史和 SAST 姿态配置完成后再按需加回。
 - 后续可把 attestation 校验下沉到部署平台或准入层。
 
-## 默认 release 产物
+## 桌面发布
 
-当前 release 流水线仍会产出：
+### 怎么发一个版本
 
-- `release-manifest.json`
-- `actspace-desktop-<platform>-<arch>.tar.gz`
-- macOS: `actspace-desktop-darwin-<arch>.dmg`
-- `sbom.spdx.json`
-- 对 release artifact 生成的 GitHub artifact attestation
+1. 改 `apps/desktop/package.json` 的 `version`，并在 `docs/releases/feature-release-notes.md` 写这次用户可见的变化。
+2. 合并到 `main` 后打 tag 并推送：`git tag v0.1.1 && git push origin v0.1.1`。tag 必须等于 `v` + `package.json` 的版本，`release.yml` 第一步会校验，不一致直接失败。
+3. 等 `发布` 工作流跑完（四个平台并行，约 10–15 分钟），到 **Releases** 页会多出一个草稿，自动生成的 release notes 列出合并的 PR；检查产物、改标题和说明，点 **Publish release**。草稿对外不可见，发之前随时可以删掉重来。
 
-`release-manifest.json` 会标明产物平台、架构、archive / dmg 大小，以及 `signed`、`notarized`、`signature`。`signature: "ad-hoc"` 代表本地临时签名，不是 Developer ID 分发签名。当前交付链路产出真实桌面应用 archive 和 macOS 本地安装介质，但不是正式签名分发包。
+不想打 tag 只想看四个平台能不能打出来：Actions → `发布` → **Run workflow**，`tag` 留空。产物作为 Actions artifact 保留 3 天。填了 `tag` 就等同于 tag 推送（会在当前分支 HEAD 上建 tag）。
+
+改到 `scripts/release-package.sh`、`scripts/package-browser-components.mjs` 等打包脚本的 PR 会自动在四个平台跑一遍打包；只上传每个平台的 manifest 做验证，不占 artifact 存储，也不创建 Release。
+
+### 产物
+
+每个 tag 的草稿 Release 挂着：
+
+- `actspace-desktop-darwin-arm64.tar.gz` / `.dmg`、`actspace-desktop-darwin-x64.tar.gz` / `.dmg`：macOS，`.dmg` 里拖 `ActSpace.app` 到 Applications。
+- `actspace-desktop-linux-x64.tar.gz`：解压后运行 `./actspace`。
+- `actspace-desktop-windows-x64.zip`：解压后运行 `ActSpace.exe`。portable 布局，没有安装器、没有图标和 Authenticode 签名，首次运行 SmartScreen 会提示；Windows 上没有 nono 沙盒。`resources/app/node_modules` 用 pnpm 的 `node-linker=hoisted` 平铺（zip 装不下 pnpm 默认布局里的 junction，归档工具跟着 junction 走还会在循环依赖里无限递归），所以 zip 比 tar.gz 大一些。
+- `release-manifest.json`：四个平台的 manifest 合成一份，每个平台标明 archive / dmg 大小、`signed`、`notarized`、`signature`、`packaging`。`signature: "ad-hoc"` 代表本地临时签名，不是 Developer ID 分发签名。
+- `sbom.spdx.json`：源码树的 SPDX SBOM。
+- 每个 archive / dmg / zip 还有一份 GitHub artifact attestation（build provenance），在 Release 页或 `gh attestation verify` 里看。
+
+本地 `pnpm package:desktop` 产出当前平台的那一份，manifest 名为 `release-manifest-<platform>-<arch>.json`。当前交付链路产出真实桌面应用 archive 和 macOS 本地安装介质，但不是正式签名分发包。
+
+### Runner
+
+| 平台 | runner | 说明 |
+|---|---|---|
+| macOS arm64 | `macos-latest` | 当前 Apple Silicon 镜像 |
+| macOS x64 | `macos-15-intel` | GitHub 为 public 仓库保留的免费 Intel 标准 runner；`macos-*-large` 是付费 larger runner，不要用 |
+| Linux x64 | `ubuntu-latest` | |
+| Windows x64 | `windows-latest` | 用 Git Bash 跑同一份 `release-package.sh` |
+
+四个 job 都用 `actions/setup-go` 装 `go.mod` 要求的 Go 版本（打包要 `go build` 浏览器桥 CLI），用 `pnpm/action-setup` + `setup-node` 的 pnpm 缓存。
 
 ## 可选 macOS 签名接口
 

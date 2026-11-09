@@ -29,6 +29,11 @@ is_truthy() {
   esac
 }
 
+# Timestamped phase markers so a slow or stuck CI run shows which phase it is in.
+phase() {
+  echo "[release-package $(date -u +%H:%M:%S)] $*" >&2
+}
+
 require_env() {
   local name="$1"
   if [[ -z "${!name:-}" ]]; then
@@ -38,6 +43,12 @@ require_env() {
 }
 
 platform="$(uname -s | tr '[:upper:]' '[:lower:]')"
+case "${platform}" in
+  mingw* | msys* | cygwin*)
+    # Git Bash on Windows (also what GitHub's windows runners use for `shell: bash`).
+    platform="windows"
+    ;;
+esac
 arch="$(uname -m)"
 case "${arch}" in
   arm64 | aarch64)
@@ -51,8 +62,14 @@ case "${arch}" in
     ;;
 esac
 
-artifact_name="actspace-desktop-${platform}-${artifact_arch}.tar.gz"
+# Windows users expect a zip; macOS and Linux keep the tar.gz.
+artifact_extension="tar.gz"
+if [[ "${platform}" == "windows" ]]; then
+  artifact_extension="zip"
+fi
+artifact_name="actspace-desktop-${platform}-${artifact_arch}.${artifact_extension}"
 artifact_path="${dist_dir}/${artifact_name}"
+manifest_name="release-manifest-${platform}-${artifact_arch}.json"
 dmg_name=""
 dmg_path=""
 dmg_manifest_value=null
@@ -70,14 +87,25 @@ git_sha="${GITHUB_SHA:-$(git -C "${repo_root}" rev-parse HEAD 2>/dev/null || ech
 rm -rf "${dist_dir}"
 mkdir -p "${artifact_root}"
 
+phase "build desktop"
 pnpm --filter @actspace/desktop build
-if ! pnpm --filter @actspace/desktop --prod deploy --legacy --offline "${deploy_dir}"; then
+phase "deploy production dependencies"
+deploy_args=(--filter @actspace/desktop --prod deploy --legacy)
+if [[ "${platform}" == "windows" ]]; then
+  # pnpm's default layout links every package into node_modules/.pnpm (junctions on Windows). A zip cannot
+  # carry those, and archivers that follow them recurse forever through circular dependencies, so Windows
+  # gets a flat hoisted node_modules instead (bigger, but plain files only).
+  deploy_args+=(--config.node-linker=hoisted)
+fi
+if ! pnpm "${deploy_args[@]}" --offline "${deploy_dir}"; then
   echo "Offline deploy failed; retrying with registry access so local packaging can hydrate the pnpm store." >&2
   rm -rf "${deploy_dir}"
-  pnpm --filter @actspace/desktop --prod deploy --legacy "${deploy_dir}"
+  pnpm "${deploy_args[@]}" "${deploy_dir}"
 fi
 
+phase "check provider proxy package"
 node "${repo_root}/scripts/check-provider-proxy-package.mjs" "${deploy_dir}"
+phase "build browser components"
 node "${repo_root}/scripts/package-browser-components.mjs" "${deploy_dir}/browser-components"
 # The tool sandbox only uses this bundled nono (never one on PATH); without it macOS falls back to Seatbelt and
 # Linux bash needs approval, so a missing or unverified binary fails the package.
@@ -86,6 +114,7 @@ if [[ "${platform}" == "darwin" || "${platform}" == "linux" ]]; then
   node "${repo_root}/scripts/sandbox/fetch-nono.mjs" --out "${deploy_dir}/${nono_relative}"
 fi
 
+phase "prune deploy dir"
 find "${deploy_dir}" -type d -name test -prune -exec rm -rf {} +
 find "${deploy_dir}" \( -name "*.map" -o -name "*.d.ts" -o -name "*.d.mts" \) -type f -delete
 if [[ ! -d "${electron_runtime_dir}" ]]; then
@@ -94,6 +123,7 @@ if [[ ! -d "${electron_runtime_dir}" ]]; then
   exit 1
 fi
 
+phase "assemble ${platform} application"
 case "${platform}" in
   darwin)
     runtime_app="${electron_runtime_dir}/Electron.app"
@@ -174,7 +204,18 @@ case "${platform}" in
     mkdir -p "${dmg_root}"
     cp -R "${packaged_app}" "${dmg_root}/${app_bundle_name}"
     ln -s /Applications "${dmg_root}/Applications"
-    hdiutil create -volname "${app_name}" -srcfolder "${dmg_root}" -ov -format UDZO "${dmg_path}"
+    # GitHub 托管的 macOS runner 上 hdiutil 偶发 "Resource busy"（挂载点被 Spotlight / 杀毒扫描占住），
+    # 重试几次即可，见 electron-builder#6110 等同类问题。
+    dmg_attempt=1
+    until hdiutil create -volname "${app_name}" -srcfolder "${dmg_root}" -ov -format UDZO "${dmg_path}"; do
+      if (( dmg_attempt >= 5 )); then
+        echo "hdiutil create failed after ${dmg_attempt} attempts" >&2
+        exit 1
+      fi
+      dmg_attempt=$((dmg_attempt + 1))
+      echo "hdiutil create failed; retrying (${dmg_attempt}/5) in 5s" >&2
+      sleep 5
+    done
     rm -rf "${dmg_root}"
     dmg_manifest_value="\"${dmg_name}\""
     dmg_size_bytes="$(wc -c < "${dmg_path}" | tr -d '[:space:]')"
@@ -186,16 +227,55 @@ case "${platform}" in
     mkdir -p "${artifact_root}/resources"
     cp -R "${deploy_dir}" "${artifact_root}/resources/app"
     ;;
+  windows)
+    if [[ ! -f "${electron_runtime_dir}/electron.exe" ]]; then
+      echo "electron.exe not found at ${electron_runtime_dir}" >&2
+      exit 1
+    fi
+    cp -R "${electron_runtime_dir}/." "${artifact_root}/"
+    # Portable layout: <app>.exe next to Electron's DLLs, app code under resources/app. No installer, no icon
+    # patching and no Authenticode signature yet; SmartScreen will warn on first launch.
+    mv "${artifact_root}/electron.exe" "${artifact_root}/${app_executable_name}.exe"
+    mkdir -p "${artifact_root}/resources"
+    cp -R "${deploy_dir}" "${artifact_root}/resources/app"
+    node "${repo_root}/scripts/verify-browser-components.mjs" "${artifact_root}/resources/app/browser-components"
+    # Fail fast instead of letting the archiver chase links; .bin shims are plain .cmd files on Windows.
+    if leftover_link="$(find "${artifact_root}" -type l -print -quit)" && [[ -n "${leftover_link}" ]]; then
+      echo "Windows package must not contain symlinks or junctions, found: ${leftover_link}" >&2
+      exit 1
+    fi
+    ;;
   *)
     echo "Unsupported release packaging platform: ${platform}" >&2
     exit 1
     ;;
 esac
 
-tar -czf "${artifact_path}" -C "${artifact_root}" .
+phase "archive ${artifact_name}"
+if [[ "${artifact_extension}" == "zip" ]]; then
+  # Both tools get native Windows paths so MSYS path mangling can't bite. PowerShell's Compress-Archive is
+  # deliberately not a fallback: on a 20k-file tree it runs for the better part of an hour.
+  artifact_root_win="$(cygpath -w "${artifact_root}")"
+  artifact_path_win="$(cygpath -w "${artifact_path}")"
+  windows_tar="$(cygpath -u "${SYSTEMROOT:-C:/Windows}")/System32/tar.exe"
+  if command -v 7z >/dev/null 2>&1; then
+    phase "archive via 7z"
+    7z a -tzip -bsp0 "${artifact_path_win}" "${artifact_root_win}\\*"
+  elif [[ -x "${windows_tar}" ]]; then
+    # Windows 10+ ships bsdtar; -a picks the zip format from the extension.
+    phase "archive via bsdtar"
+    "${windows_tar}" -a -c -f "${artifact_path_win}" -C "${artifact_root_win}" .
+  else
+    echo "Neither 7z nor the Windows bsdtar is available to create ${artifact_name}." >&2
+    exit 1
+  fi
+else
+  tar -czf "${artifact_path}" -C "${artifact_root}" .
+fi
 
+phase "write ${manifest_name}"
 artifact_size_bytes="$(wc -c < "${artifact_path}" | tr -d '[:space:]')"
-cat > "${dist_dir}/release-manifest.json" <<EOF
+cat > "${dist_dir}/${manifest_name}" <<EOF
 {
   "repository": "${GITHUB_REPOSITORY:-local}",
   "git_sha": "${git_sha}",
