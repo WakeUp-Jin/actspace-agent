@@ -146,6 +146,19 @@ export function pluginCatalogEntry(id: string): PluginCatalogEntry | undefined {
 }
 
 /**
+ * A Harness entry that contributes tools. Each one is published as its own artifact under its manifest's
+ * plugin id (so a patch can replace that one plugin) and is a member of the main Agent form; the other
+ * Harness entries (loop, context, tools runtime, sandbox, approval) form the shared kernel closure.
+ */
+export function isHarnessToolPlugin(entry: PluginCatalogEntry | undefined): entry is PluginCatalogEntry {
+  return entry !== undefined && entry.loaders.includes("harness") && (entry.manifest.contributions.tools?.length ?? 0) > 0;
+}
+
+export function harnessToolPluginEntries(): readonly PluginCatalogEntry[] {
+  return PLUGIN_CATALOG.filter(isHarnessToolPlugin);
+}
+
+/**
  * Harness entries a user turns on in 扩展 › 插件 (`canDisable`, `defaultEnabled: false`). A Host without
  * plugin switches (CLI, remote Host) leaves them off, e.g. the external subagents that run local CLIs.
  */

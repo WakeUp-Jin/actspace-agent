@@ -5,6 +5,9 @@ import { PLUGIN_CATALOG } from "../plugin-catalog.js";
 export type DefaultHarnessOptionalInject = { readonly id: string; readonly fallback: string };
 export type DefaultHarnessEntry = readonly [id: string, provides: readonly string[], injects: readonly string[], optionalInjects?: readonly DefaultHarnessOptionalInject[]];
 
+/** Plugin id of the kernel artifact: every Harness entry that is not a tool plugin (`isHarnessToolPlugin`). */
+export const DEFAULT_HARNESS_KERNEL_ID = "actspace.default-harness";
+
 /** Manifests list optional injects by service id; what a plugin does without the service is stated here. */
 const OPTIONAL_INJECT_FALLBACKS: Readonly<Record<string, string>> = Object.freeze({
   sandbox: "bash runs outside the sandbox after approval",
