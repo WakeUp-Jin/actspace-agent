@@ -15,8 +15,8 @@
 
 | 工作流 | 触发 | 内容 |
 |---|---|---|
-| `ci.yml` | `pull_request`（忽略纯文档路径）、`push: main`、手动 | 五个并行 job：`repository-checks`（`scripts/ci.sh` + markdownlint）、`typecheck-test`（contract matrix、Biome lint、typecheck、`pnpm test`）、`build`（`pnpm build`；`main` 上额外跑一次 Linux `release-package.sh` 冒烟，不上传产物）、`site`（check / test / build）、`browser-bridge`（契约检查 + Go 测试 + Windows / macOS 交叉编译，保证发布矩阵能 `go build`）。 |
-| `docs.yml` | `pull_request` 且只改 `docs/**`、`*.md` 等文档路径 | `scripts/ci.sh` + markdownlint，与 `ci.yml` 的 `paths-ignore` 互补。 |
+| `base-checks.yml` | `pull_request`（**不带路径过滤**）、`push: main`、手动 | `repository-checks`（`scripts/ci.sh` + markdownlint）。唯一每个 PR 都会产生的 check，也是唯一能安全设为 required status check 的 job。 |
+| `ci.yml` | `pull_request`（忽略纯文档路径）、`push: main`、手动 | 四个并行 job：`typecheck-test`（contract matrix、Biome lint、typecheck、`pnpm test`）、`build`（`pnpm build`；`main` 上额外跑一次 Linux `release-package.sh` 冒烟，不上传产物）、`site`（check / test / build）、`browser-bridge`（契约检查 + Go 测试 + Windows / macOS 交叉编译，保证发布矩阵能 `go build`）。 |
 | `agent-cli-binaries.yml` | `pull_request` 改到 CLI / packages / 打包脚本时、手动 | 在 CLI 支持的最低 Node 大版本上构建并校验 managed package，artifact 保留 3 天。 |
 | `supply-chain-security.yml` | `pull_request` 改到依赖清单 / lockfile / patches 时（`docs/**` 下的原型 `package.json` 不算）、每周一定时、手动 | 依赖变更审查（仅 PR）、OSV 扫描。 |
 | `codeql.yml` | `push: main`、`pull_request`（均忽略纯文档路径）、每周一定时、手动 | CodeQL `javascript-typescript` 与 `actions` 两种语言，`security-and-quality` 查询集；忽略测试、fixture、dist、生成文件（`.github/codeql/codeql-config.yml`）。不要在仓库设置里同时开启 CodeQL default setup。 |
@@ -29,7 +29,7 @@
 
 markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-cli2.jsonc`：第三方 skill 原文（`.agents/skills/**`）、已完成的 history 和测试 fixture 不扫；纯排版类规则（空行、列表周围空行、表格对齐、代码块语言等）关闭，只保留会影响渲染或链接正确性的规则（表格列数、标题层级、重复的兄弟标题、图片 alt、文件末尾换行等）。本地复现用 `npx -y markdownlint-cli2@0.20.0 "**/*.md"`。
 
-分支保护如果要求「必须通过的检查」，不要把 `typecheck-test`、`build` 这类带路径过滤的 job 设为必需——纯文档 PR 不会产生这些检查，会被永远卡住；只把两边都会跑的 `repository-checks` / `docs-checks` 设为必需，或者使用 GitHub 的 merge queue。
+`main` 的 ruleset 如果要加 required status checks，只能选 `仓库基础检查`（`base-checks.yml` 的 `repository-checks`）：它不带路径过滤，每个 PR 都会报告。`typecheck-test`、`build`、CodeQL 这类带 `paths` / `paths-ignore` 的 job 不能设为必需——纯文档 PR 不触发它们，GitHub 会一直显示 Expected 并永远卡住合并。历史上 `repository-checks` 曾放在 `ci.yml`、并有一份路径互补的 `docs.yml`，两者都带路径过滤、任一设为必需都会卡死另一类 PR，所以拆成了独立的 `base-checks.yml`。
 
 ### Dependabot
 
@@ -37,7 +37,7 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
 
 ### 在 GitHub 上重新启用
 
-工作流在 GitHub 上被手动停用后，改文件不会自动恢复。合并本次改动后，到仓库的 **Actions** 页左侧找到 `CI`、`供应链安全`、`发布`，在各自页面点 **Enable workflow**；新文件 `docs.yml`、`codeql.yml` 和 `dependabot.yml` 合入即生效。CodeQL 的结果出现在 **Security › Code scanning**。
+工作流在 GitHub 上被手动停用后，改文件不会自动恢复。合并本次改动后，到仓库的 **Actions** 页左侧找到 `CI`、`供应链安全`、`发布`，在各自页面点 **Enable workflow**；新文件 `base-checks.yml`、`codeql.yml` 和 `dependabot.yml` 合入即生效。CodeQL 的结果出现在 **Security › Code scanning**。
 
 当前根命令还包括：
 
@@ -72,6 +72,7 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
   - repo hygiene
   - GitHub Actions pinning
   - shell 脚本语法检查
+- `.github/workflows/base-checks.yml` 的 `repository-checks` 不需要 pnpm，只装 ripgrep 后跑 `scripts/ci.sh` 与 markdownlint。
 - `.github/workflows/ci.yml` 中的工程 job（`typecheck-test`、`build`、`site`、`browser-bridge`）都从 `pnpm install --frozen-lockfile` 开始，然后各自执行：
   - `typecheck-test`：`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。job 开头装 ripgrep（`tool-fs-search` 的测试调真实 `rg`）；`pnpm test` 之前先 `pnpm --filter '@actspace/agent-cli...' build`，因为 `test:agent-host:process` 等进程级测试直接 spawn `apps/cli/dist/cli.js`。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
   - `build`：`pnpm build`（`agent-cli...` 带依赖闭包，runner 上没有现成的 `dist/`，要先按拓扑顺序构建 workspace 依赖）；在 `main` 上再装 Go 并执行 `./scripts/release-package.sh` 作为打包冒烟，产物不上传。
@@ -159,7 +160,7 @@ SITE_URL=https://wakeup-jin.github.io SITE_BASE=/actspace-agent pnpm build:site
 
 ## 下一步推荐
 
-1. 继续保留 `repository-checks` 与各工程 job 的分层，避免仓库卫生与工程构建互相遮蔽失败原因。
+1. 继续保留 `repository-checks`（`base-checks.yml`）与各工程 job（`ci.yml`）的分层，避免仓库卫生与工程构建互相遮蔽失败原因；`base-checks.yml` 不要加路径过滤，否则 required check 会失效。
 2. 新增 action 时必须继续 pin 到 commit SHA；`scripts/check-action-pinning.sh` 会拦截浮动 tag。
 3. 如果后续接 installer（dmg 之外的 pkg、Windows 安装器、Linux AppImage / deb）、Developer ID 签名、notarization、Windows Authenticode、远程自动更新，再在现有 release 流水线上扩展；Electron 大版本升级见 `docs/exec-plans/completed/20261108-ci-pipelines.md` P5。
 

@@ -55,7 +55,7 @@
 
 1. **分支保护**
    - 验证方式：Settings › Branches 看 `main` 的 required checks。
-   - 预期结果：只有 `仓库检查`（`repository-checks`）/ `文档检查`（`docs-checks`）被设为必需；不要把 `typecheck-test`、`build` 等带路径过滤的 job 设为必需。
+   - 预期结果：只有 `仓库基础检查`（`base-checks.yml` 的 `repository-checks`）被设为必需；不要把 `typecheck-test`、`build` 等带路径过滤的 job 设为必需。（2026-11-09 更正：当时写的「`repository-checks` / `docs-checks` 都设为必需」是错的，两者路径互斥，任一设为必需都会卡死另一类 PR；已拆出不带路径过滤的 `base-checks.yml`。）
 
 2. **Dependabot 首批 PR**
    - 验证方式：下周一上午看 Pull requests。
