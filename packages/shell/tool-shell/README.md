@@ -22,7 +22,7 @@ Host port 为 `actspace.host.tools.shell-tools`；factory 只创建本包资源�
 
 ## 随包 Python
 
-`createNodeBashToolPorts` 的 `python`（`BashPythonRuntime`，由 Host 用 `@actspace/python-runtime` 的 `pythonRuntimeForBash` 构造）存在时，每条命令的环境里 `PATH` 前置 shim 目录（只含 `actspace-python`，Windows 另有 `.cmd`），并导出 `ACTSPACE_PYTHON=<shim>`；扩展层已安装时再导出 `ACTSPACE_PYTHON_EXT=<site-packages>`，这个值每条命令都重新从 getter 读，所以设置页里下载完成后下一条命令就能 `import pandas`。没有 `python`（开发环境没跑 `pnpm python-runtime:prepare`）时什么都不注入，提示词退化成用本机 `python3`。`tools.shell-tools` 服务上也带 `scratchRoot` 与 `python`，提示词从那里取。
+`createNodeBashToolPorts` 的 `python`（`BashPythonRuntime`，由 Host 用 `@actspace/python-runtime` 的 `pythonRuntimeForBash` 构造）存在时，每条命令的环境里 `PATH` 前置 shim 目录（只含 `actspace-python`，Windows 另有 `.cmd`），并导出 `ACTSPACE_PYTHON=<shim>`；扩展层已安装时再导出 `ACTSPACE_PYTHON_EXT=<site-packages>`，这个值每条命令都重新从 getter 读，所以设置页里下载完成后下一条命令就能 `import pandas`。没有 `python`（开发环境没跑 `pnpm python-runtime:prepare`）时什么都不注入，提示词退化成用本机 `python3`。`apply` 时 `ctx.provide("tools.shell-tools", ShellToolsService)`，服务上除 `registrations` / `hasRunningBackgroundTask` 外还带 `scratchRoot`、`scratchDirectory(sessionId)`（`scratch.ts` 的 `sessionScratchDirectory`，与 `ACTSPACE_SCRATCH` 同一路径）与 `python`；`core/runtime` 的 agent-factory 用它们构造 `prompt` 的 `ScriptingFacts`，生成 `core/scripting` 提示段和 `host/scripting-facts` model-fact。
 
 ## Bash 硬拒绝
 

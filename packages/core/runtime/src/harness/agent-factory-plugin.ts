@@ -3,7 +3,8 @@ import { reviewSessionAction } from "./review-session-action.js";
 import { ContextSourceRegistry, type ContextCompactionCoordinator } from "@actspace/context-engine";
 import { createDisclosureSource, type ProgressiveDisclosure } from "@actspace/context-disclosure";
 import type { ContributorRegistry, PromptContributor } from "@actspace/prompt";
-import type { SourceFactory, PromptHostPort, PromptRuntimeService } from "@actspace/prompt";
+import type { SourceFactory, PromptHostPort, PromptRuntimeService, ScriptingFacts } from "@actspace/prompt";
+import type { ShellToolsService } from "@actspace/tool-shell";
 import type { ContextEngine, ContextEngineOptions } from "@actspace/context-engine";
 import type { RunFactory } from "@actspace/agent-service";
 import { AgentLoop } from "@actspace/agent-loop";
@@ -87,11 +88,12 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
 
   const createSources = (scope: AgentScope, agent: import("@actspace/agent").AgentDescriptor, workspaceRoot: string, role: AgentRole) => {
     const sources = new ContextSourceRegistry(["context-system", "context-conversation"]);
+    const scripting = scriptingFacts(ctx.get?.("tools.shell-tools") as ShellToolsService | undefined);
     // 后台任务与运行中子智能体清单只给主 Agent：子智能体（含 fork）不能发起后台任务，也不能再派子智能体。
     for (const kind of ["system", "rules", "skills", "runtime", "conversation", "tools", ...(role === "main" ? ["background-tasks", "subagents"] : [])]) {
       const factory = ctx.get?.(`context.source.${kind}`) as SourceFactory | undefined;
       if (!factory && (kind === "system" || kind === "conversation")) throw new Error(`Required context source ${kind} is unavailable.`);
-      if (factory) scope.disposer.add(sources.register(factory.create({ scope, scopeId: scope.identity.scopeId, agent, host: host.host, workspaceRoot, prompt })));
+      if (factory) scope.disposer.add(sources.register(factory.create({ scope, scopeId: scope.identity.scopeId, agent, host: host.host, workspaceRoot, prompt, ...(scripting === undefined ? {} : { scripting }) })));
     }
     if (getDisclosure()) scope.disposer.add(sources.register(createDisclosureSource()));
     scope.disposer.add(() => sources.clear());
@@ -333,4 +335,15 @@ function taskContent(content: import("@actspace/shared/runtime-v2").RuntimeV2Jso
 const SESSION_GRANTS = Symbol("session-grants");
 function activeGrants(session: import("@actspace/session-persistence").SessionHandle) {
   return session.journal.project(SESSION_GRANTS, () => [], applySessionGrantEvent).flatMap(item => item.grant && item.revokedAt === null ? [item.grant] : []);
+}
+
+/** The scripting guidance only applies when Bash is in this Harness and owns a scratch directory. */
+function scriptingFacts(shell: ShellToolsService | undefined): ScriptingFacts | undefined {
+  const scratchDirectory = shell?.scratchDirectory;
+  if (scratchDirectory === undefined) return undefined;
+  const python = shell?.python;
+  return Object.freeze({
+    scratchDirectory,
+    ...(python === undefined ? {} : { python: Object.freeze({ version: python.version, corePackages: python.corePackages, extensionPackages: python.extensionPackages, extensionInstalled: () => python.extensionSitePackages?.() !== undefined }) }),
+  });
 }

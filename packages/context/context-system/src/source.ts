@@ -7,7 +7,7 @@ export function createSystemSource(options: SourceOptions): ContextSource {
     get: async (context, write) => {
       const selected = options.prompt.selectSystem?.(context.request);
       if (selected !== undefined) write({ system: { sections: [{ id: "model-prompt", owner: "actspace.context-system", order: 0, content: selected }], modelFacts: [] } });
-      else await contribute(options, context, "actspace.context-system", item => item.id === "core/identity" || item.id === "core/safety" || item.id === "core/output-choice", write);
+      else await contribute(options, context, "actspace.context-system", item => item.id === "core/identity" || item.id === "core/safety" || item.id === "core/output-choice" || item.id === "core/scripting", write);
     } };
 }
 export function apply(ctx: CordisContext): void { publish(ctx, "system", createSystemSource); }

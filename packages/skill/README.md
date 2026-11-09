@@ -5,14 +5,14 @@ kind: "package-group"
 
 # skill
 
-两个库包：`skill` 负责发现技能并建目录（`SkillCatalog`、`discoverSkills`），`official-skills` 随应用发布官方 Skill（目前是插件开发 Skill）。两者都不是插件，Skill 进入模型上下文由 `context/` 里的 `context-skills` 和 `prompt` 完成。
+两个库包：`skill` 负责发现技能并建目录（`SkillCatalog`、`discoverSkills`），`official-skills` 随应用发布官方 Skill（插件开发 Skill，以及面向随包 Python 的 `office-docx`、`office-xlsx`、`office-pptx`、`pdf`、`data-analysis`）。两者都不是插件，Skill 进入模型上下文由 `context/` 里的 `context-skills` 和 `prompt` 完成。
 
 ## 包
 
 | 包 | 角色 | 类别 | 默认 | 职责 |
 | --- | --- | --- | --- | --- |
 | `skill` | 库 | 库 | — | 技能目录与发现：`SkillCatalog`、`discoverSkills`、`DEFAULT_SKILL_ROOTS`；发现时包含官方 Skill 的根目录 |
-| `official-skills` | 库 | 库 | — | 官方 Skill 内容与路径：`officialSkillsRoot`、`pluginDevelopmentRoot`（`actspace-plugin-development`），按 Node 资源路径解析 |
+| `official-skills` | 库 | 库 | — | 官方 Skill 内容与路径：`officialSkillsRoot`、`pluginDevelopmentRoot`（`actspace-plugin-development`）、`SCRIPTING_SKILL_IDS`（脚本类 Skill 的 id），按 Node 资源路径解析 |
 
 ## 包之间怎么连
 
@@ -33,4 +33,4 @@ official-skills ──→ skill ──→ prompt（在 context/，建 Skill 目�
 
 ## 怎么扩展
 
-新增一个官方 Skill：放进 `official-skills/skills/<名>/`，需要特殊路径时在 `index.ts` 导出。新增发现位置：改 `skill/src/discovery.ts` 的默认根目录。通用步骤见[总地图](../README.md)。
+新增一个官方 Skill：放进 `official-skills/skills/<名>/`，需要特殊路径时在 `index.ts` 导出。脚本类 Skill 的解释器统一写 `actspace-python`、临时文件写 `$ACTSPACE_SCRATCH`、不得出现 `pip install`，由 `official-skills` 的测试校验；从 anthropics/skills 改编的目录要附上游 `LICENSE.txt` 并在仓库根 `NOTICE` 登记。新增发现位置：改 `skill/src/discovery.ts` 的默认根目录。通用步骤见[总地图](../README.md)。

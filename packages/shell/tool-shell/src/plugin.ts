@@ -1,6 +1,7 @@
 import { realpath } from "node:fs/promises";
 import { analyzeCommandPrefixGrant } from "./command-prefix.js";
 import { queryPathsWithinWorkspace } from "./query-paths.js";
+import { sessionScratchDirectory } from "./scratch.js";
 import { HOST_WRITABLE_ROOTS_SERVICE_ID, isPathWithin } from "@actspace/tool-runtime";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
@@ -36,6 +37,16 @@ export type BashPythonRuntime = {
   readonly extensionSitePackages?: () => string | undefined;
 };
 export const SHELL_TOOLS_HOST_PORT_ID = "actspace.host.tools.shell-tools" as const;
+/** The `tools.shell-tools` service: what other plugins (the prompt, forks) read about Bash in this Harness. */
+export type ShellToolsService = {
+  readonly registrations: readonly ToolRegistration[];
+  readonly definitions: typeof TOOL_DEFINITIONS;
+  readonly hasRunningBackgroundTask: (sessionId: string) => boolean;
+  readonly scratchRoot?: string;
+  /** A Session's scratch directory (`ACTSPACE_SCRATCH` of its commands); absent without a scratch root. */
+  readonly scratchDirectory?: (sessionId: string) => string;
+  readonly python?: BashPythonRuntime;
+};
 /**
  * `sandbox` is absent when the sandbox plugin is not loaded; the ports then only run commands approved for outside the sandbox.
  * `session.dataRoot` holds `sessions-v2/<id>/bash-log/`, where command logs go.
@@ -56,7 +67,12 @@ export async function apply(ctx: CordisContext): Promise<void> {
   // write_file / read_file inside the scratch directory need no workspace-scope approval; the Host cleans it up.
   const writableRoots = ctx.get?.(HOST_WRITABLE_ROOTS_SERVICE_ID) as HostWritableRoots | undefined;
   if (ports.scratchRoot !== undefined) writableRoots?.add(ports.scratchRoot);
-  ctx.provide?.("tools.shell-tools", Object.freeze({ registrations, definitions: TOOL_DEFINITIONS, hasRunningBackgroundTask: ports.hasRunningBackgroundTask ?? (() => false), scratchRoot: ports.scratchRoot, python: ports.python }));
+  const scratchRoot = ports.scratchRoot;
+  const service: ShellToolsService = Object.freeze({
+    registrations, definitions: TOOL_DEFINITIONS, hasRunningBackgroundTask: ports.hasRunningBackgroundTask ?? (() => false), scratchRoot, python: ports.python,
+    ...(scratchRoot === undefined ? {} : { scratchDirectory: (sessionId: string) => sessionScratchDirectory(scratchRoot, sessionId) }),
+  });
+  ctx.provide?.("tools.shell-tools", service);
   ctx.effect?.(() => async () => {
     if (ports.scratchRoot !== undefined) writableRoots?.remove(ports.scratchRoot);
     const results = await Promise.allSettled([...registrations].reverse().map((item) => item.handle.dispose()));

@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { createWriteStream, mkdirSync, realpathSync } from "node:fs";
 import { mkdir, open, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { sessionScratchDirectory } from "./scratch.js";
+export { sessionScratchDirectory } from "./scratch.js";
 import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
 import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { spawnHostProcess } from "@actspace/sandbox/node-ports";
@@ -40,11 +42,6 @@ export type NodeBashToolPorts = Pick<ToolPorts, "bash" | "python"> & {
   readonly dispose: () => Promise<void>;
   readonly forceTerminate: () => void;
 };
-
-/** Where a Session's temporary scripts go; exported to Bash as `ACTSPACE_SCRATCH` and told to the model by the prompt. */
-export function sessionScratchDirectory(scratchRoot: string, sessionId: string): string {
-  return join(scratchRoot, "scripts", sessionId);
-}
 
 type BashOptions = {
   readonly workspaceRoot: string;

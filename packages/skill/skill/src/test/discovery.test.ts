@@ -26,10 +26,14 @@ it("discovers packaged official resources outside a checkout, with id shadowing 
   const root = await mkdtemp(join(tmpdir(), "official-discovery-")); roots.push(root);
   const options = { workspaceRoot: root };
   const official = (await discoverSkills(options)).list();
-  expect(official).toEqual([expect.objectContaining({ id: "actspace-plugin-development", source: "actspace-official@1" })]);
-  expect((await discoverSkills({ ...options, disabled: ["actspace-plugin-development"] })).list()).toEqual([]);
+  const officialIds = ["actspace-plugin-development", "data-analysis", "office-docx", "office-pptx", "office-xlsx", "pdf"];
+  expect(official.map(skill => skill.id)).toEqual(officialIds);
+  expect(official.every(skill => skill.source === "actspace-official@2")).toBe(true);
+  expect((await discoverSkills({ ...options, disabled: officialIds })).list()).toEqual([]);
   const local = join(root, ".actspace/skills/override"); await mkdir(local, { recursive: true });
   await writeFile(join(local, "SKILL.md"), "---\r\nid: actspace-plugin-development\r\nname: Local Development\r\ndescription: override\r\n---\r\nbody");
-  expect((await discoverSkills(options)).list()).toEqual([expect.objectContaining({ name: "Local Development", source: ".actspace/skills" })]);
-  expect((await discoverSkills({ ...options, disabled: ["Local Development"] })).list()).toEqual([]);
+  const shadowed = (await discoverSkills(options)).list();
+  expect(shadowed).toHaveLength(officialIds.length);
+  expect(shadowed.find(skill => skill.id === "actspace-plugin-development")).toEqual(expect.objectContaining({ name: "Local Development", source: ".actspace/skills" }));
+  expect((await discoverSkills({ ...options, disabled: ["Local Development"] })).list().map(skill => skill.id)).not.toContain("actspace-plugin-development");
 });
