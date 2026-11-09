@@ -25,6 +25,7 @@
 - **收窄 re-export 壳**：删 `runtime-v2/file-generation-counter.ts`、`session-list-page.ts` 两个单行壳和渲染层 `stream-blocks.ts`、`stream-state.ts`、`session-run-state.ts` 三个纯 re-export；`App.tsx`、`task-queue.ts`、`session-local-store.ts`、`use-session-transcript.ts` 及测试直接 import `@actspace/client/live`。`ARCHITECTURE.md` 与会话状态规范同步。
 - **移除影子对照**：`test-fixtures/legacy-transcript.ts` 与 `helpers/transcript-shadow.ts`（迁移期用旧 `mergeTranscript` 实现做对照）删除，三个 App 测试去掉对应 `vi.mock`，`transcript.test.ts` 直接调用 `mergeTranscript`。
 - **无入口测试接入**：`scripts/test/host-upload-disk-full.test.mjs`、`agent-provider-compaction.test.mjs` 挂到 `test:agent-host:process`；新增 `test:release-scripts` 跑 `browser-components.test.mjs`、`electron-runtime-integrity.test.mjs`，并进入 `pnpm test` 链。`agent-testing.md` 写明 `scripts/test/` 下每个文件都必须挂在某个 `test:*` 入口上。
+- **打包检查跟随真实依赖链**：`apps/cli/package.json` 里的 `@actspace/llm-service` 之前并非 CLI 源码在用，而是 `scripts/check-provider-proxy-package.mjs` 用 `createRequire(<部署根>/package.json)` 解析它时需要它是直接依赖。改为先解析 `@actspace/runtime` 再从那里解析 `llm-service`，CLI 与 Desktop 两条 deploy 都适用；`agent-cli-binaries.yml` 的 managed ESM package 检查由此恢复。
 - **孤儿脚本**：删 `apps/desktop/scripts/benchmark-usage-json-baseline.mjs`（import 的 `projectIndexedUsageActivity` 早已不存在，一跑就 TypeError）和 `test-usage-read-model.mjs`（见注意事项），`verify-usage-read-model.mjs` 去掉对前者的调用。其余 `apps/desktop/scripts/*` 被 active 执行计划或已完成计划的验收命令引用，保留。
 
 ### 🧠 Design Intent (Why)
@@ -52,4 +53,5 @@
 - `apps/desktop/scripts/benchmark-usage-json-baseline.mjs`（删）、`apps/desktop/scripts/test-usage-read-model.mjs`（删）、`apps/desktop/scripts/verify-usage-read-model.mjs`、`apps/desktop/src/main/runtime-v2/usage-rollups.ts`
 - `apps/site/src/lib/docs-navigation.ts`、`packages/core/runtime/src/projection/artifact.ts`、`packages/english-learning/english-learning/src/prompt.ts`
 - `packages/llm/llm-service/src/legacy-transport-adapter.ts`（删）、`src/index.ts`、`src/test/service.test.ts`、`packages/llm/llm-pi-ai/src/test/legacy-proxy-wire-engine.test.ts`
+- `scripts/check-provider-proxy-package.mjs`、`docs/design-docs/model-context/agent-multi-provider-llm.md`
 - `docs/ARCHITECTURE.md`、`docs/design-docs/execution-safety/README.md`、`docs/design-docs/agent-plugin-runtime/{agent-llm-core-pi,agent-testing}.md`、`docs/design-docs/frontend/front-会话状态与数据流规范.md`、`docs/learnings/2026-08/20260829-dsh-runtime-plugin-ownership.md`
