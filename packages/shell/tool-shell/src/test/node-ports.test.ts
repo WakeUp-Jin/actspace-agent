@@ -264,6 +264,21 @@ describe("shell-tools ports", () => {
     } finally { await ports.dispose(); }
   });
 
+  it("creates a per-Session scripts directory under the canonical scratch root and exports it as ACTSPACE_SCRATCH", async () => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot });
+    try {
+      expect(ports.scratchRoot).toBe(await realpath(ports.scratchRoot));
+      expect(ports.scratchRoot.startsWith(join(await realpath(tmpRoot), "bash-v2"))).toBe(true);
+      const result = await invoke(ports.bash, { command: "printf '%s' \"$ACTSPACE_SCRATCH\"", intent: "scratch env", blockMs: 5_000 }, "session-a");
+      const expected = join(ports.scratchRoot, "scripts", "session-a");
+      expect(result.status).toBe("completed");
+      expect(JSON.stringify(result.modelOutput)).toContain(expected);
+      expect(existsSync(expected)).toBe(true);
+    } finally { await ports.dispose(); }
+    expect(existsSync(ports.scratchRoot)).toBe(false);
+  });
+
   it("writes a background log into the Session directory, keeps it after dispose and removes only the scratch directory", async () => {
     const root = await workspace(); const tmpRoot = await workspace(); const dataRoot = await workspace();
     const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, dataRoot });

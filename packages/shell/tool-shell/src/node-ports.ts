@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { createWriteStream } from "node:fs";
+import { createWriteStream, mkdirSync, realpathSync } from "node:fs";
 import { mkdir, open, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
@@ -35,9 +35,16 @@ const SANDBOX_DENIAL_HINT = "The sandbox may have blocked this command: it ran i
 
 export type NodeBashToolPorts = Pick<ToolPorts, "bash"> & {
   readonly hasRunningBackgroundTask: (sessionId: string) => boolean;
+  /** Canonical `bash-v2/<process>/`: the sandbox `TMPDIR`, and the root of every Session's `scripts/<sessionId>/`. */
+  readonly scratchRoot: string;
   readonly dispose: () => Promise<void>;
   readonly forceTerminate: () => void;
 };
+
+/** Where a Session's temporary scripts go; exported to Bash as `ACTSPACE_SCRATCH` and told to the model by the prompt. */
+export function sessionScratchDirectory(scratchRoot: string, sessionId: string): string {
+  return join(scratchRoot, "scripts", sessionId);
+}
 
 type BashOptions = {
   readonly workspaceRoot: string;
@@ -60,12 +67,15 @@ type BashOptions = {
  */
 export function createNodeBashToolPorts(options: BashOptions): NodeBashToolPorts {
   const bashRoot = join(options.tmpRoot, "bash-v2");
-  const scratchRoot = join(bashRoot, randomUUID());
+  // Created now and canonicalized, so the writable-roots registration and the sandbox name the same directory.
+  const ownScratch = join(bashRoot, randomUUID());
+  const scratchRoot = canonicalScratchRoot(ownScratch);
   const registry = new BashTaskRegistry(scratchRoot, new SessionBashLogs(options.dataRoot, options.sessionLogCapBytes), options.background);
-  void sweepStaleScratchDirectories(bashRoot, scratchRoot).catch((error: unknown) => console.warn("[shell-tools] scratch sweep failed", error));
+  void sweepStaleScratchDirectories(bashRoot, ownScratch).catch((error: unknown) => console.warn("[shell-tools] scratch sweep failed", error));
   return Object.freeze({
     bash: (args, context) => executeBash(args, context, options, registry),
     hasRunningBackgroundTask: (sessionId) => registry.running(sessionId) > 0,
+    scratchRoot,
     dispose: () => registry.dispose(),
     forceTerminate: () => registry.forceTerminate(),
   });
@@ -95,7 +105,9 @@ async function executeBash(
 
   // The scratch directory is recreated per command: another process's sweep may have taken an idle one.
   const scratchRoot = registry.scratchRoot;
-  await mkdir(scratchRoot, { recursive: true, mode: 0o700 });
+  const sessionScratch = sessionScratchDirectory(scratchRoot, context.sessionId);
+  await mkdir(sessionScratch, { recursive: true, mode: 0o700 });
+  const env = commandEnvironment(sessionScratch);
   const log = await registry.logs.create(context.sessionId);
   // A log that never becomes a background task goes once the result exists; the artifact keeps long output.
   let keepLog = false;
@@ -104,10 +116,10 @@ async function executeBash(
     if (context.signal.aborted) return failed("TOOL_ABORTED", "Bash was cancelled before process creation.", true);
     const argv = [process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", "-lc", command];
     const run = !options.sandbox
-      ? directRun({ command: argv[0]!, args: argv.slice(1), cwd: realCwd, env: process.env })
+      ? directRun({ command: argv[0]!, args: argv.slice(1), cwd: realCwd, env })
       : options.sandbox.run(noSandbox
-        ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env: process.env, scratchDir: scratchRoot }
-        : await sandboxedRequest(argv, realCwd, workspaceRoot, scratchRoot));
+        ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env, scratchDir: scratchRoot }
+        : await sandboxedRequest(argv, realCwd, workspaceRoot, scratchRoot, env));
     const sandboxed = !noSandbox;
     const monitor = new OutputMonitor(subscription);
     const processHandle = new ProcessHandle(run, log.path, monitor.handleChunk);
@@ -235,9 +247,19 @@ function directRun(spec: HostProcessSpec): BashRun {
 }
 
 /** Canonical paths, so the policy and TMPDIR name the same directory. The log is written by this process, not the command. The tool template adds the .git denies. */
-async function sandboxedRequest(argv: readonly string[], cwd: string, workspaceRoot: string, scratchRoot: string): Promise<SandboxRequest> {
+async function sandboxedRequest(argv: readonly string[], cwd: string, workspaceRoot: string, scratchRoot: string, env: NodeJS.ProcessEnv): Promise<SandboxRequest> {
   const scratch = await realpath(scratchRoot);
-  return { purpose: "tool", isolation: "sandboxed", argv, cwd, env: { ...process.env, TMPDIR: scratch }, scratchDir: scratch, filesystem: { readWrite: [await realpath(workspaceRoot), scratch, await realpath(tmpdir())] } };
+  return { purpose: "tool", isolation: "sandboxed", argv, cwd, env: { ...env, TMPDIR: scratch }, scratchDir: scratch, filesystem: { readWrite: [await realpath(workspaceRoot), scratch, await realpath(tmpdir())] } };
+}
+
+/** The Session's scratch directory for scripts, plus the bundled Python when the app ships one. */
+function commandEnvironment(sessionScratch: string): NodeJS.ProcessEnv {
+  return { ...process.env, ACTSPACE_SCRATCH: sessionScratch };
+}
+
+/** The scratch directory exists from the start so its canonical path can be registered as Host-writable. */
+function canonicalScratchRoot(path: string): string {
+  try { mkdirSync(path, { recursive: true, mode: 0o700 }); return realpathSync(path); } catch { return path; }
 }
 
 /** The admitted process resource is what the user approved; direct callers without one only get an explicit request. */

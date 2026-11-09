@@ -19,7 +19,7 @@ import type { CordisContext } from "@actspace/cordis-adapter";
 import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
 import { isBashLogReadPath, isSessionTranscriptReadPath } from "@actspace/session-transcript";
 import type { SessionHandle } from "@actspace/session-persistence";
-import { HOST_READABLE_FILES_SERVICE_ID, HostReadableFiles } from "@actspace/tool-runtime";
+import { HOST_READABLE_FILES_SERVICE_ID, HOST_WRITABLE_ROOTS_SERVICE_ID, HostReadableFiles, type HostWritableRoots } from "@actspace/tool-runtime";
 import { projectPermissionMode, applySessionGrantEvent } from "@actspace/session-projection";
 import { isBackgroundWake } from "@actspace/shared/runtime-v2";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
@@ -109,12 +109,15 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
   const sessionDataRoot = (ctx.get?.("actspace.host.session") as { readonly dataRoot?: string } | undefined)?.dataRoot;
   const isHostReadablePath = composeHostReadablePath(sessionDataRoot, hostReadableFiles);
   const readableFor = composeSessionReadablePath(isHostReadablePath, id => sessions.getOpen(id));
+  // Resolved per call: shell-tools registers its scratch directory after this plugin is applied.
+  const isHostWritablePath = (canonicalPath: string) => (ctx.get?.(HOST_WRITABLE_ROOTS_SERVICE_ID) as HostWritableRoots | undefined)?.has(canonicalPath) === true;
   const toolEnvironmentFor = (session: import("@actspace/session-persistence").SessionHandle) => {
     activeSessions.set(session.header.sessionId, session);
     const configuredMode = host.toolEnvironment.permissionMode;
     return Object.freeze({
       ...host.toolEnvironment,
       isHostReadablePath: readableFor(session),
+      isHostWritablePath,
       autoReview: async (input: import("@actspace/tool-runtime").AutoReviewInput) => {
         const reviewer = ctx.get?.("approval.auto-review") as AutoReviewer | undefined;
         if (!reviewer) throw new Error("Auto reviewer unavailable");

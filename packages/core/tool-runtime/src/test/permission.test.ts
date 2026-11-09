@@ -3,7 +3,7 @@ import type { SessionGrant } from "@actspace/shared/runtime-v2";
 import { mkdtemp, mkdir, rm, symlink, writeFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifyFileResource, combinePermissionDecisions, evaluateGlobalBoundary, HostReadableFiles, sessionGrantsCoverResources } from "../permission/index.js";
+import { classifyFileResource, combinePermissionDecisions, evaluateGlobalBoundary, HostReadableFiles, HostWritableRoots, sessionGrantsCoverResources } from "../permission/index.js";
 
 const file = (canonicalPath: string, access: "read" | "write" | "delete" = "read") => ({
   kind: "file" as const,
@@ -113,6 +113,23 @@ describe("host-readable exact files", () => {
       expect(evaluateGlobalBoundary("default", "/workspace", [file(join(root, "dir-only", "inside.txt"))], has)).toMatchObject({ kind: "ask" });
       files.remove(listed);
       expect(evaluateGlobalBoundary("default", "/workspace", [file(listed)], has)).toMatchObject({ kind: "ask" });
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it("lets reads and writes inside a Host-writable root pass while deletes, siblings and other temp paths still ask", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "actspace-host-writable-")));
+    try {
+      const scratch = join(root, "bash-v2", "process"); await mkdir(scratch, { recursive: true });
+      const inside = join(scratch, "scripts", "session", "convert.py"); const other = join(root, "other", "convert.py");
+      const roots = new HostWritableRoots(); roots.add(scratch);
+      const has = (path: string) => roots.has(path);
+      expect(evaluateGlobalBoundary("default", "/workspace", [file(inside, "write")], undefined, has)).toEqual({ kind: "pass" });
+      expect(evaluateGlobalBoundary("default", "/workspace", [file(inside)], undefined, has)).toEqual({ kind: "pass" });
+      expect(evaluateGlobalBoundary("default", "/workspace", [file(inside, "delete")], undefined, has)).toMatchObject({ kind: "ask", reasons: [{ code: "WORKSPACE_SCOPE_APPROVAL_REQUIRED" }] });
+      expect(evaluateGlobalBoundary("default", "/workspace", [file(other, "write")], undefined, has)).toMatchObject({ kind: "ask", reasons: [{ code: "WORKSPACE_SCOPE_APPROVAL_REQUIRED" }] });
+      expect(evaluateGlobalBoundary("default", "/workspace", [file(join(root, "bash-v2", "process-other", "x.py"), "write")], undefined, has)).toMatchObject({ kind: "ask" });
+      roots.remove(scratch);
+      expect(evaluateGlobalBoundary("default", "/workspace", [file(inside, "write")], undefined, has)).toMatchObject({ kind: "ask" });
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 

@@ -1,12 +1,12 @@
 import { realpath } from "node:fs/promises";
 import { analyzeCommandPrefixGrant } from "./command-prefix.js";
 import { queryPathsWithinWorkspace } from "./query-paths.js";
-import { isPathWithin } from "@actspace/tool-runtime";
+import { HOST_WRITABLE_ROOTS_SERVICE_ID, isPathWithin } from "@actspace/tool-runtime";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { getBashHardRejectReason } from "./command-rules.js";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
-import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime, ToolPermissionContract } from "@actspace/tool-runtime";
+import type { HostWritableRoots, ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime, ToolPermissionContract } from "@actspace/tool-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
 import type { BackgroundTaskHost } from "@actspace/background-tasks";
 import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
@@ -14,7 +14,12 @@ import { SHELL_TOOLS_PLUGIN_ID, type SHELL_TOOLS_TOOLS } from "./manifest.js";
 
 export type ToolName = (typeof SHELL_TOOLS_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
-export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & { readonly hasRunningBackgroundTask?: (sessionId: string) => boolean; readonly dispose?: () => Promise<void> };
+export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & {
+  readonly hasRunningBackgroundTask?: (sessionId: string) => boolean;
+  /** Canonical Host-owned scratch directory; registered as Host-writable and accepted as a script location. */
+  readonly scratchRoot?: string;
+  readonly dispose?: () => Promise<void>;
+};
 export const SHELL_TOOLS_HOST_PORT_ID = "actspace.host.tools.shell-tools" as const;
 /**
  * `sandbox` is absent when the sandbox plugin is not loaded; the ports then only run commands approved for outside the sandbox.
@@ -33,8 +38,12 @@ export async function apply(ctx: CordisContext): Promise<void> {
   let registrations: readonly ToolRegistration[];
   try { registrations = registerTools(runtime, ports, sandbox); }
   catch (error) { await ports.dispose?.(); throw error; }
-  ctx.provide?.("tools.shell-tools", Object.freeze({ registrations, definitions: TOOL_DEFINITIONS, hasRunningBackgroundTask: ports.hasRunningBackgroundTask ?? (() => false) }));
+  // write_file / read_file inside the scratch directory need no workspace-scope approval; the Host cleans it up.
+  const writableRoots = ctx.get?.(HOST_WRITABLE_ROOTS_SERVICE_ID) as HostWritableRoots | undefined;
+  if (ports.scratchRoot !== undefined) writableRoots?.add(ports.scratchRoot);
+  ctx.provide?.("tools.shell-tools", Object.freeze({ registrations, definitions: TOOL_DEFINITIONS, hasRunningBackgroundTask: ports.hasRunningBackgroundTask ?? (() => false), scratchRoot: ports.scratchRoot }));
   ctx.effect?.(() => async () => {
+    if (ports.scratchRoot !== undefined) writableRoots?.remove(ports.scratchRoot);
     const results = await Promise.allSettled([...registrations].reverse().map((item) => item.handle.dispose()));
     if (ports.dispose) results.push(...await Promise.allSettled([ports.dispose()]));
     const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
@@ -46,7 +55,7 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts, sandbox?: 
   try {
     for (const item of TOOL_DEFINITIONS) {
       const handler = ports[item.localName] ?? (async () => ({ status: "failed" as const, modelOutput: [{ type: "text" as const, text: `${item.localName} Host capability is unavailable.` }], summary: `${item.localName} unavailable`, failure: { code: "CAPABILITY_UNAVAILABLE", message: `${item.localName} Host capability is unavailable.`, retryable: false } }));
-      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract(item.localName, sandbox) }) }));
+      registrations.push(Object.freeze({ name: item.definition.name, localName: item.localName, handle: runtime.register({ definition: item.definition, executor: { concurrencySafe: item.definition.concurrency !== "exclusive", execute: handler }, permission: permissionContract(item.localName, sandbox, ports.scratchRoot) }) }));
     }
     return Object.freeze(registrations);
   } catch (error) {
@@ -59,8 +68,9 @@ export function registerTools(runtime: ToolRuntime, ports: ToolPorts, sandbox?: 
  * `noSandbox` on the process resource is what the user approves: `full-access`, an escalation request, or a sandbox that
  * is missing or cannot serve the tool template. Execution follows the admitted value, never a later mode or status.
  */
-function permissionContract(name: ToolName, sandbox: SandboxService | undefined): ToolPermissionContract {
+function permissionContract(name: ToolName, sandbox: SandboxService | undefined, scratchRoot?: string): ToolPermissionContract {
   if (name !== "bash") return { extractResources: () => [], evaluate: () => ({ kind: "allow" as const }) };
+  const scriptRoots = scratchRoot === undefined ? [] : [scratchRoot];
   const contract: ToolPermissionContract = {
     grantAudience: { pluginId: SHELL_TOOLS_PLUGIN_ID, permissionDomain: "bash", policyVersion: 1 },
     extractResources: async (args, context) => {
@@ -69,7 +79,7 @@ function permissionContract(name: ToolName, sandbox: SandboxService | undefined)
       const cwd = await realpath(resolve(context.workspaceRoot, typeof args.cwd === "string" ? args.cwd : "."));
       const noSandbox = context.mode === "full-access" || escalation(args) === "requested" || !(await sandbox?.status("tool"))?.available;
       let analysis = !noSandbox && isPathWithin(workspaceRoot, cwd) ? analyzeCommandPrefixGrant(command) : undefined;
-      if (analysis && !await queryPathsWithinWorkspace(analysis, cwd, workspaceRoot)) analysis = undefined;
+      if (analysis && !await queryPathsWithinWorkspace(analysis, cwd, workspaceRoot, scriptRoots)) analysis = undefined;
       return [{ kind: "process" as const, access: "execute" as const, commandDigest: createHash("sha256").update(command).digest("hex"), cwd, workspaceRoot, noSandbox, dynamic: false, ...(analysis ? { argv: analysis.argv, grantPrefix: analysis.prefix } : {}) }];
     },
     evaluate: (args, resources, context) => {
