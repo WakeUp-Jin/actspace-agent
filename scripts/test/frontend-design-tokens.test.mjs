@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   checkCssBlocks,
+  checkLucideImports,
   checkNativeButtons,
   checkSource,
   checkTokenReferences,
@@ -78,6 +79,34 @@ test("ignores comments and exact allowlisted literals", () => {
   assert.deepEqual(rules("components/A.tsx", '// text-[13px] 只是说明\nconst A = "text-act-sm";'), []);
   assert.deepEqual(rules("components/ContextPopup.tsx", 'const A = "rounded-[3px]";'), []);
   assert.deepEqual(rules("components/ContextPopup.tsx", 'const A = "rounded-[4px]";'), ["radius-literal:rounded-[4px]"]);
+});
+
+test("flags strokeWidth on JSX elements unless the exact literal is allowlisted for the file", () => {
+  assert.deepEqual(rules("components/A.tsx", '<Check size={14} strokeWidth={2.4} /><Info strokeWidth="1.8" /><X strokeWidth={active ? 2 : 1.5} />'), [
+    "icon-stroke-width-literal:strokeWidth={2.4}",
+    'icon-stroke-width-literal:strokeWidth="1.8"',
+    "icon-stroke-width-literal:strokeWidth={active ? 2 : 1.5}",
+  ]);
+  assert.deepEqual(rules("components/A.tsx", '<Check size={14} aria-hidden="true" className="transition-[stroke-width]" />'), []);
+  assert.deepEqual(rules("components/trajectory/kind-icons.tsx", '<svg strokeWidth={1} /><path strokeWidth="1.8" />'), []);
+  assert.deepEqual(rules("components/trajectory/kind-icons.tsx", "<svg strokeWidth={3} />"), ["icon-stroke-width-literal:strokeWidth={3}"]);
+});
+
+const lucide = (relative, source) => checkLucideImports(relative, source).map((violation) => `${violation.match}→${violation.hint.match(/用 (\w+)/)[1]}@${violation.line}`);
+
+test("flags lucide aliases and synonym icons in import specifiers only", () => {
+  assert.deepEqual(lucide("components/A.tsx", 'import { Check, Loader2, Trash2 as Bin, type LucideIcon } from "lucide-react";'), [
+    "Loader2→LoaderCircle@1",
+    "Trash2→Trash@1",
+  ]);
+  assert.deepEqual(lucide("components/A.tsx", 'import x from "y";\nimport {\n  Terminal,\n  SquareArrowOutUpRight,\n} from "lucide-react";'), [
+    "Terminal→SquareTerminal@2",
+    "SquareArrowOutUpRight→ExternalLink@2",
+  ]);
+  assert.deepEqual(lucide("components/A.tsx", 'import { LoaderCircle, SquareTerminal, RefreshCw, RotateCcw, Columns2 } from "lucide-react";'), []);
+  // 只看 lucide-react 的导入；别处的同名标识符和注释不算
+  assert.deepEqual(lucide("components/A.tsx", 'import { Terminal } from "@xterm/xterm";\n// import { Loader2 } from "lucide-react";\nconst Loader2 = 1;'), []);
+  assert.deepEqual(lucide("styles/a.css", 'import { Loader2 } from "lucide-react";'), []);
 });
 
 test("reports token classes that the style layer never defines", () => {
@@ -261,6 +290,13 @@ test("web root: native <button>, createPortal and role=dialog are only allowed i
   assert.ok(problems.some((problem) => /pages\/A\.tsx:1 createPortal — .*apps\/web|pages\/A\.tsx:1 createPortal — 弹层用 ui\//.test(problem)));
   assert.ok(problems.some((problem) => /role="dialog" — .*ui\//.test(problem)));
   assert.ok(problems.some((problem) => /^\[web\] pages\/A\.tsx 有 1 个原生 <button>，基线是 0 — 用 ui\/ 的 Button/.test(problem)));
+});
+
+test("web root: lucide aliases and strokeWidth fail with no allowlist", () => {
+  const problems = webProblems({ "pages/A.tsx": 'import { Loader2 } from "lucide-react";\nexport const A = () => <Loader2 size={14} strokeWidth={2.2} />;' });
+  assert.equal(problems.length, 2);
+  assert.match(problems[0], /^\[web\] pages\/A\.tsx:2 strokeWidth=\{2\.2\} — lucide 图标不传 strokeWidth/);
+  assert.match(problems[1], /^\[web\] pages\/A\.tsx:1 Loader2 — lucide 图标用 LoaderCircle/);
 });
 
 test("web root is skipped when apps/web/src does not exist", () => {
