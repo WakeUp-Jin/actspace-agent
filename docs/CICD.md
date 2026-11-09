@@ -19,7 +19,7 @@
 | `ci.yml` | `pull_request`（忽略纯文档路径）、`push: main`、手动 | 八个并行 job：`lint-typecheck`（build graph、contract matrix、Biome lint、`pnpm typecheck`）、`test-process`（根目录脚本测试 + 进程级测试）、`test-packages`（desktop 以外全部包的 vitest）、`test-desktop` ×2（desktop vitest 按 `--shard` 对半）、`build`（`pnpm build`；`main` 上额外跑一次 Linux `release-package.sh` 冒烟，不上传产物）、`site`（check / test / build）、`browser-bridge`（契约检查 + Go 测试 + Windows / macOS 交叉编译，保证发布矩阵能 `go build`）。 |
 | `agent-cli-binaries.yml` | `pull_request` 改到 CLI / packages / 打包脚本时、手动 | 在 CLI 支持的最低 Node 大版本上构建并校验 managed package，artifact 保留 3 天。 |
 | `supply-chain-security.yml` | `pull_request` 改到依赖清单 / lockfile / patches 时（`docs/**` 下的原型 `package.json` 不算）、每周一定时、手动 | 依赖变更审查（仅 PR）、OSV 扫描。 |
-| `codeql.yml` | `push: main`、`pull_request`（均忽略纯文档路径）、每周一定时、手动 | CodeQL `javascript-typescript` 与 `actions` 两种语言，`security-and-quality` 查询集；忽略测试、fixture、dist、生成文件（`.github/codeql/codeql-config.yml`）。不要在仓库设置里同时开启 CodeQL default setup。 |
+| `codeql.yml` | `push: main`、`pull_request`（均忽略纯文档路径）、每周一定时、手动 | CodeQL `javascript-typescript` 与 `actions` 两种语言，`security-and-quality` 查询集；忽略测试、fixture、dist、生成文件和 `scripts/acceptance/**`（`.github/codeql/codeql-config.yml`）。不要在仓库设置里同时开启 CodeQL default setup。本地复现：用 [CodeQL CLI](https://github.com/github/codeql-action/releases) `database create --language=javascript-typescript --codescanning-config=.github/codeql/codeql-config.yml` 建库后 `database analyze --format=sarif-latest`，结果与 GitHub 一致。 |
 | `release.yml` | `push` 到 `v*` tag、手动、改到打包脚本的 `pull_request` | 四平台矩阵（macOS arm64 / x64、Linux x64、Windows x64）打包 portable 桌面制品并生成 provenance；tag 或填了 tag 的手动运行再汇总 SBOM 并创建**草稿** Release。PR 只跑打包做验证，不上传完整产物。详见下文「桌面发布」。 |
 | `site-pages.yml` | 手动 | GitHub Pages 备用部署，不随 `main` 自动发布。 |
 

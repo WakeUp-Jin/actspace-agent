@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, rm, lstat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { mkdir, open, readdir, rm, lstat } from "node:fs/promises";
 import { join } from "node:path";
 import { SessionWriterLease } from "@actspace/session-persistence-jsonl";
 import { isRecord } from "@actspace/shared/host-protocol";
@@ -31,13 +32,21 @@ export class HostAdmin {
       await this.assertOwned();
       for (const name of (await readdir(this.root)).slice(0, 256)) {
         if (!/^[0-9a-f-]{36}\.(request|response)\.json$/.test(name)) continue;
-        const path = join(this.root, name), info = await lstat(path);
-        if (Date.now() - info.mtimeMs > 60_000) { await rm(path, { force: true }); continue; }
-        if (!info.isFile() || info.isSymbolicLink() || !name.endsWith(".request.json") || info.size > 4096 || (info.mode & 0o077) !== 0 || (process.getuid && info.uid !== process.getuid())) continue;
+        const path = join(this.root, name);
+        // O_NOFOLLOW 打开后用同一句柄 stat 与读：检查与读取之间文件不会被换掉；符号链接在 open 时就被拒绝。
+        const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => undefined);
+        if (!handle) continue;
+        let text: string;
+        try {
+          const info = await handle.stat();
+          if (Date.now() - info.mtimeMs > 60_000) { await rm(path, { force: true }); continue; }
+          if (!info.isFile() || !name.endsWith(".request.json") || info.size > 4096 || (info.mode & 0o077) !== 0 || (process.getuid && info.uid !== process.getuid())) continue;
+          text = await handle.readFile("utf8");
+        } finally { await handle.close(); }
         const nonce = name.slice(0, 36);
         let response: unknown;
         try {
-          const request: unknown = JSON.parse(await readFile(path, "utf8"));
+          const request: unknown = JSON.parse(text);
           if (!isRecord(request) || request.nonce !== nonce || !["status", "pair", "devices", "revoke", "stop"].includes(String(request.command)) || typeof request.createdAt !== "number" || Math.abs(Date.now() - request.createdAt) > 30_000 || (request.force !== undefined && typeof request.force !== "boolean") || (request.deviceId !== undefined && typeof request.deviceId !== "string")) throw new Error("Invalid admin request");
           response = { nonce, result: await this.dispatch(request as unknown as AdminRequest) };
         } catch (error) { response = { nonce, error: error instanceof Error ? error.message : "Admin request failed" }; }
@@ -56,9 +65,17 @@ export async function requestHostAdmin(dataRoot: string, command: AdminCommand, 
   try {
     for (let attempt = 0; attempt < 100; attempt++) {
       try {
-        const responseInfo = await lstat(responsePath);
-        if (!responseInfo.isFile() || responseInfo.isSymbolicLink() || responseInfo.size > 1024 * 1024 || (responseInfo.mode & 0o077) !== 0 || (process.getuid && responseInfo.uid !== process.getuid())) throw new Error("Unsafe admin response");
-        const response: unknown = JSON.parse(await readFile(responsePath, "utf8"));
+        const handle = await open(responsePath, constants.O_RDONLY | constants.O_NOFOLLOW).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ELOOP") throw new Error("Unsafe admin response");
+          throw error;
+        });
+        let text: string;
+        try {
+          const responseInfo = await handle.stat();
+          if (!responseInfo.isFile() || responseInfo.size > 1024 * 1024 || (responseInfo.mode & 0o077) !== 0 || (process.getuid && responseInfo.uid !== process.getuid())) throw new Error("Unsafe admin response");
+          text = await handle.readFile("utf8");
+        } finally { await handle.close(); }
+        const response: unknown = JSON.parse(text);
         if (!isRecord(response) || response.nonce !== nonce) throw new Error("Invalid admin response");
         if (typeof response.error === "string") throw new Error(response.error);
         return response.result;

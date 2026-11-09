@@ -61,7 +61,7 @@ export type ResolveEffectiveInput = {
 export function catalogFacts(entry: ModelCatalogEntry, protocol: ModelApi): ModelFacts {
   const { input, output, cacheRead, cacheWrite } = entry.rates;
   return {
-    label: entry.name.replace(/\s*\(latest\)$/i, ""),
+    label: withoutLatestSuffix(entry.name),
     contextWindow: entry.contextWindow,
     maxOutput: entry.maxOutput,
     input: entry.input.includes("image") ? ["text", "image"] : ["text"],
@@ -110,6 +110,12 @@ export function resolveEffectiveModel(input: ResolveEffectiveInput): EffectiveMo
     catalog: match ? { apiModel: match.entry.apiModel, name: catalogFacts(match.entry, input.protocol).label!, exact: match.exact } : null,
     aliased: Boolean(aliasedEntry),
   };
+}
+
+/** 目录名里的 "Foo (latest)" 展示成 "Foo"。 */
+function withoutLatestSuffix(name: string): string {
+  const suffix = "(latest)";
+  return name.toLowerCase().endsWith(suffix) ? name.slice(0, -suffix.length).trimEnd() : name;
 }
 
 function scaleRates(rates: ModelRates, factor: number): ModelRates {
