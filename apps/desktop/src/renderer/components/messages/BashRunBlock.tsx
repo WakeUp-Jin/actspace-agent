@@ -1,15 +1,25 @@
-import { ChevronDown, ChevronRight, MoreHorizontal, ShieldCheck, ShieldOff, TerminalSquare } from "lucide-react";
-import { createContext, useContext, useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
+import { detectScriptCommand, elideScriptSource, type ScriptCommand } from "@actspace/shared/runtime-v2";
+import { ChevronDown, ChevronRight, MoreHorizontal, ShieldCheck, ShieldOff, TerminalSquare } from "lucide-react";
+import { createContext, useContext, useMemo, useState } from "react";
+import { PlainButton } from "../ui/PlainButton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
-import { ApprovalActions, ApprovalCard, getCommandPrefixGrant, useApprovalDecision, useCommandPrefixGrantSuggestion } from "./ApprovalParts";
-import { getShellCommandHeads, tokenizeShellCommand, type ShellTokenKind } from "./shell-highlight";
-import { TOOL_LOG_LINE_TEXT_RUNNING_CLASS, getToolLogRunningTextAttrs } from "./toolLogStyles";
+import {
+  ApprovalActions,
+  ApprovalCard,
+  getCommandPrefixGrant,
+  useApprovalDecision,
+  useCommandPrefixGrantSuggestion,
+} from "./ApprovalParts";
+import { ScriptSourceBlock, scriptFileName, scriptSummary } from "./ScriptSourceBlock";
+import { getShellCommandHeads, type ShellTokenKind, tokenizeShellCommand } from "./shell-highlight";
 import { ToolLogShimmer } from "./ToolLogShimmer";
+import { getToolLogRunningTextAttrs, TOOL_LOG_LINE_TEXT_RUNNING_CLASS } from "./toolLogStyles";
 
 type BashMessage = Extract<MessageBlock, { kind: "bash" }>;
 
-const BASH_RUN_CLASS = "message-row bash-run max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)]";
+const BASH_RUN_CLASS =
+  "message-row bash-run max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)]";
 const BASH_RUN_TOGGLE_CLASS =
   "bash-run-toggle flex w-full max-w-full items-center gap-[7px] overflow-hidden border-0 bg-transparent p-0 text-left text-act-md font-normal leading-[22px] text-text-muted";
 const BASH_RUN_SUMMARY_CLASS = "bash-run-summary flex-none whitespace-nowrap";
@@ -17,12 +27,17 @@ const BASH_COMMAND_PREVIEW_CLASS =
   "bash-command-preview min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-normal text-text-faint";
 const BASH_RUN_TRAILING_CLASS = "bash-run-trailing inline-flex flex-none items-center gap-[7px]";
 const BASH_OUTPUT_SHELL_CLASS =
-  "bash-output-shell relative mt-[7px] max-h-[236px] overflow-auto rounded-act-md border border-line bg-surface-subtle";
+  "bash-output-shell relative mt-[7px] overflow-auto rounded-act-md border border-line bg-surface-subtle";
+const BASH_OUTPUT_MAX_HEIGHT_CLASS = "max-h-[236px]";
+// 带脚本代码块的详情放高一些：折叠后的 8 行代码 + 命令头 + 几行输出刚好不用先在容器里滚。
+const BASH_SCRIPT_OUTPUT_MAX_HEIGHT_CLASS = "max-h-[460px]";
 const BASH_OUTPUT_MENU_CLASS =
   "bash-output-menu absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-act-sm border-0 bg-transparent text-text-faint transition-colors hover:bg-hover-overlay hover:text-text-main focus-visible:bg-selected focus-visible:text-text-main";
 const BASH_OUTPUT_TEXT_CLASS =
   "bash-output-text m-0 min-w-0 whitespace-pre-wrap pt-[10px] pr-[38px] pb-3 pl-[var(--conversation-card-padding)] font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.6] text-text-muted [word-break:break-word]";
 const BASH_PROMPT_CLASS = "bash-prompt text-text-faint";
+const SCRIPT_FILE_LINK_CLASS =
+  "script-file-link inline cursor-pointer border-0 bg-transparent p-0 font-mono text-text-muted underline underline-offset-2 hover:text-text-main";
 const BASH_INTENT_COMMENT_CLASS =
   "bash-intent-comment font-mono text-[length:var(--act-font-mono-size,13px)] italic leading-[1.55] text-text-faint";
 const BASH_APPROVAL_INTENT_CLASS = "min-w-0 truncate text-text-muted";
@@ -41,12 +56,63 @@ const SHELL_TOKEN_CLASS: Record<ShellTokenKind, string | undefined> = {
   text: undefined,
 };
 
-export function BashRunBlock({ message, replyCompleted = false, onExpand }: { message: BashMessage; replyCompleted?: boolean; onExpand?: () => void }) {
+type OpenWorkspaceFile = (path: string, line?: number) => void;
+
+export function BashRunBlock({
+  message,
+  replyCompleted = false,
+  onExpand,
+  onOpenWorkspaceFile,
+}: {
+  message: BashMessage;
+  replyCompleted?: boolean;
+  onExpand?: () => void;
+  onOpenWorkspaceFile?: OpenWorkspaceFile;
+}) {
   if (message.status === "pending") {
-    return <BashApprovalBlock message={message} />;
+    return <BashApprovalBlock message={message} onOpenWorkspaceFile={onOpenWorkspaceFile} />;
   }
 
-  return <BashExecutionBlock message={message} replyCompleted={replyCompleted} onExpand={onExpand} />;
+  return (
+    <BashExecutionBlock
+      message={message}
+      replyCompleted={replyCompleted}
+      onExpand={onExpand}
+      onOpenWorkspaceFile={onOpenWorkspaceFile}
+    />
+  );
+}
+
+/** 命令是 `python -c` / heredoc / 脚本文件时的识别结果；命令定稿后不变，按命令文本 memo。 */
+function useScriptCommand(command: string): ScriptCommand | undefined {
+  return useMemo(() => detectScriptCommand(command), [command]);
+}
+
+/** 脚本文件名：工作区内的相对路径可点开到右侧面板；`$ACTSPACE_SCRATCH` 下的临时脚本只显示名字。 */
+function ScriptFileName({ path, onOpenWorkspaceFile }: { path: string; onOpenWorkspaceFile?: OpenWorkspaceFile }) {
+  const name = scriptFileName(path);
+  const openable =
+    onOpenWorkspaceFile !== undefined &&
+    !path.startsWith("$") &&
+    !path.startsWith("/") &&
+    !/^[A-Za-z]:[\\/]/.test(path) &&
+    !path.split(/[\\/]+/).includes("..");
+  if (!openable) {
+    return (
+      <code className="min-w-0 truncate font-mono" title={path}>
+        {name}
+      </code>
+    );
+  }
+  return (
+    <PlainButton
+      className={SCRIPT_FILE_LINK_CLASS}
+      title={`在右侧面板打开 ${path}`}
+      onClick={() => onOpenWorkspaceFile(path)}
+    >
+      {name}
+    </PlainButton>
+  );
 }
 
 /** 后台 Bash 与后台子 Agent 共用的「后台」标签；状态仍由卡片自身的状态表达。 */
@@ -88,7 +154,11 @@ export function EnvironmentIcon({ sandboxed, className = "" }: { sandboxed: bool
 
 // 行尾的执行环境标记（沙盒盾牌 / 划掉的盾牌）只在命令运行中显示，结束后收掉，
 // 避免一轮里十几条命令把整列盾牌铺满右侧；环境仍写在展开详情的 `# environment:` 里。
-function EnvironmentBadge({ sandboxed, notExecuted, status }: Pick<BashMessage, "sandboxed" | "notExecuted" | "status">) {
+function EnvironmentBadge({
+  sandboxed,
+  notExecuted,
+  status,
+}: Pick<BashMessage, "sandboxed" | "notExecuted" | "status">) {
   if (notExecuted) {
     return <span className={BASH_NOT_EXECUTED_BADGE_CLASS}>未执行</span>;
   }
@@ -96,18 +166,38 @@ function EnvironmentBadge({ sandboxed, notExecuted, status }: Pick<BashMessage, 
   return <EnvironmentIcon sandboxed={sandboxed} />;
 }
 
-function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { message: BashMessage; replyCompleted?: boolean; onExpand?: () => void }) {
+function BashExecutionBlock({
+  message,
+  replyCompleted = false,
+  onExpand,
+  onOpenWorkspaceFile,
+}: {
+  message: BashMessage;
+  replyCompleted?: boolean;
+  onExpand?: () => void;
+  onOpenWorkspaceFile?: OpenWorkspaceFile;
+}) {
   const [expanded, setExpanded] = useState(!replyCompleted && message.status === "failed");
   const chevron = expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />;
   const summary = getExecutionSummary(message);
-  const target = message.commandPreview || message.command || "Bash command";
+  const script = useScriptCommand(message.command);
+  // 内联脚本的命令文本就是整段代码，主行改写成「Python 脚本（N 行）」；脚本文件的命令本身很短，照常显示。
+  const target =
+    script?.source !== undefined ? scriptSummary(script) : message.commandPreview || message.command || "Bash command";
+  const output = [
+    !message.notExecuted && message.stdout ? message.stdout.trimEnd() : "",
+    !message.notExecuted && message.stderr ? message.stderr.trimEnd() : "",
+    message.reason ?? "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   // 前台执行中 / 后台仍在跑：标题走 shimmer 高光，让用户看出命令正在执行
   const isActive = message.status === "running";
   const openBackgroundTask = useContext(BackgroundTaskLinkContext);
   const backgroundTaskId = message.background ? message.backgroundTaskId : undefined;
   // 标签可点时不能嵌在展开按钮里，挪到按钮后面并排。
-  const backgroundLink = backgroundTaskId && openBackgroundTask
-    ? (
+  const backgroundLink =
+    backgroundTaskId && openBackgroundTask ? (
       <button
         type="button"
         className={`${BACKGROUND_TAG_CLASS} ${BACKGROUND_TAG_LINK_CLASS}`}
@@ -116,15 +206,17 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
       >
         后台
       </button>
-    )
-    : null;
+    ) : null;
 
   const toggle = (
     <button
       className={`${BASH_RUN_TOGGLE_CLASS}${backgroundLink ? " min-w-0 flex-1" : ""}${["failed", "denied", "expired"].includes(message.status) ? " text-on-danger" : ""}`}
       type="button"
       aria-expanded={expanded}
-      onClick={() => { if (!expanded) onExpand?.(); setExpanded((value) => !value); }}
+      onClick={() => {
+        if (!expanded) onExpand?.();
+        setExpanded((value) => !value);
+      }}
     >
       {isActive ? (
         <span
@@ -137,7 +229,9 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
       ) : (
         <span className={BASH_RUN_SUMMARY_CLASS}>{summary}</span>
       )}
-      <span className={BASH_COMMAND_PREVIEW_CLASS} title={target}>{target}</span>
+      <span className={BASH_COMMAND_PREVIEW_CLASS} title={script?.source !== undefined ? message.command : target}>
+        {target}
+      </span>
       <span className={BASH_RUN_TRAILING_CLASS}>
         <EnvironmentBadge sandboxed={message.sandboxed} notExecuted={message.notExecuted} status={message.status} />
         {message.background && !backgroundLink ? <BackgroundTag /> : null}
@@ -148,10 +242,19 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
 
   return (
     <article className={`${BASH_RUN_CLASS} is-${message.status}`}>
-      {backgroundLink ? <div className="flex items-center gap-[7px]">{toggle}{backgroundLink}</div> : toggle}
+      {backgroundLink ? (
+        <div className="flex items-center gap-[7px]">
+          {toggle}
+          {backgroundLink}
+        </div>
+      ) : (
+        toggle
+      )}
 
       {expanded ? (
-        <div className={BASH_OUTPUT_SHELL_CLASS}>
+        <div
+          className={`${BASH_OUTPUT_SHELL_CLASS} ${script?.source !== undefined ? BASH_SCRIPT_OUTPUT_MAX_HEIGHT_CLASS : BASH_OUTPUT_MAX_HEIGHT_CLASS}`}
+        >
           <Tooltip>
             <TooltipTrigger asChild>
               <button className={BASH_OUTPUT_MENU_CLASS} type="button" aria-label="Open Bash output actions">
@@ -162,29 +265,59 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
           </Tooltip>
           <pre className={BASH_OUTPUT_TEXT_CLASS}>
             {message.intent ? (
-              <span className={BASH_INTENT_COMMENT_CLASS}># {message.intent}{"\n"}</span>
+              <span className={BASH_INTENT_COMMENT_CLASS}>
+                # {message.intent}
+                {"\n"}
+              </span>
             ) : null}
-            <span className={BASH_PROMPT_CLASS}>$ </span>{message.command}
+            <span className={BASH_PROMPT_CLASS}>$ </span>
+            {script ? elideScriptSource(message.command, script) : message.command}
+            {script?.path !== undefined ? (
+              <>
+                {"\n# script: "}
+                <ScriptFileName path={script.path} onOpenWorkspaceFile={onOpenWorkspaceFile} />
+              </>
+            ) : null}
             {message.cwd ? `\n# cwd: ${message.cwd}` : ""}
             {message.backgroundTaskId ? `\n# task: ${message.backgroundTaskId}` : ""}
             {message.outputFilePath ? `\n# output: ${message.outputFilePath}` : ""}
             {!message.notExecuted && message.exitCode != null ? `\n# exit: ${message.exitCode}` : ""}
             {!message.notExecuted && message.durationMs !== undefined ? `\n# duration: ${message.durationMs}ms` : ""}
-            {message.notExecuted ? "\n# 未执行" : message.sandboxed === undefined ? "" : `\n# environment: ${message.sandboxed ? "沙盒" : "真实环境"}`}
-            {message.title && message.title !== "Bash command" && message.title !== message.intent ? `\n# summary: ${message.title}` : ""}
-            {!message.notExecuted && message.stdout ? `\n\n${message.stdout.trimEnd()}` : ""}
-            {!message.notExecuted && message.stderr ? `\n\n${message.stderr.trimEnd()}` : ""}
-            {message.reason ? `\n\n${message.reason}` : ""}
+            {message.notExecuted
+              ? "\n# 未执行"
+              : message.sandboxed === undefined
+                ? ""
+                : `\n# environment: ${message.sandboxed ? "沙盒" : "真实环境"}`}
+            {message.title && message.title !== "Bash command" && message.title !== message.intent
+              ? `\n# summary: ${message.title}`
+              : ""}
+            {script?.source === undefined && output ? `\n\n${output}` : ""}
           </pre>
+          {script?.source !== undefined ? (
+            // 内联脚本：正文作为代码块夹在命令头和输出之间，避免在 `$` 行重复整段代码。
+            <>
+              <div className="px-[var(--conversation-card-padding)] pb-3">
+                <ScriptSourceBlock script={script} source={script.source} className="bg-surface" />
+              </div>
+              {output ? <pre className={`${BASH_OUTPUT_TEXT_CLASS} pt-0`}>{output}</pre> : null}
+            </>
+          ) : null}
         </div>
       ) : null}
     </article>
   );
 }
 
-function BashApprovalBlock({ message }: { message: BashMessage }) {
+function BashApprovalBlock({
+  message,
+  onOpenWorkspaceFile,
+}: {
+  message: BashMessage;
+  onOpenWorkspaceFile?: OpenWorkspaceFile;
+}) {
   const decision = useApprovalDecision(message.approvalRequestId);
   const suggestion = useCommandPrefixGrantSuggestion(message.approvalRequestId);
+  const script = useScriptCommand(message.command);
 
   if (decision.resolved) {
     const denied = decision.resolved === "deny";
@@ -197,34 +330,62 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
           sandboxed: denied ? undefined : message.sandboxed,
           notExecuted: denied ? true : undefined,
         }}
+        onOpenWorkspaceFile={onOpenWorkspaceFile}
       />
     );
   }
 
-  const heads = getShellCommandHeads(message.command).join(", ");
+  // 脚本命令的摘要写「运行 Python 脚本（12 行）」而不是命令名列表；正文用代码块代替整段 shell。
+  const heads = script ? scriptSummary(script, "运行 ") : getShellCommandHeads(message.command).join(", ");
   return (
     <ApprovalCard
       icon={<TerminalSquare size={14} strokeWidth={2} />}
-      target={<>
-        <span className={BASH_APPROVAL_INTENT_CLASS} title={message.intent}>{message.intent || "Bash 命令"}</span>
-        {heads ? <span className={BASH_APPROVAL_HEADS_CLASS}>{heads}</span> : null}
-      </>}
+      target={
+        <>
+          <span className={BASH_APPROVAL_INTENT_CLASS} title={message.intent}>
+            {message.intent || "Bash 命令"}
+          </span>
+          {heads ? <span className={BASH_APPROVAL_HEADS_CLASS}>{heads}</span> : null}
+        </>
+      }
       divided
       footerMeta={<BashApprovalEnvironment sandboxed={message.sandboxed} cwd={message.cwd} />}
-      actions={<ApprovalActions
-        state={decision}
-        primaryLabel="运行"
-        suggestion={suggestion}
-        sessionDetail={suggestion ? getCommandPrefixGrant(suggestion) ?? undefined : undefined}
-      />}
+      actions={
+        <ApprovalActions
+          state={decision}
+          primaryLabel="运行"
+          suggestion={suggestion}
+          sessionDetail={suggestion ? (getCommandPrefixGrant(suggestion) ?? undefined) : undefined}
+        />
+      }
     >
       <pre className={BASH_APPROVAL_COMMAND_CLASS}>
         <span className={`${BASH_PROMPT_CLASS} select-none`}>$ </span>
-        {tokenizeShellCommand(message.command).map((token, index) => {
-          const className = SHELL_TOKEN_CLASS[token.kind];
-          return className ? <span key={index} className={className}>{token.text}</span> : token.text;
-        })}
+        {tokenizeShellCommand(script ? elideScriptSource(message.command, script) : message.command).map(
+          (token, index) => {
+            const className = SHELL_TOKEN_CLASS[token.kind];
+            return className ? (
+              <span key={index} className={className}>
+                {token.text}
+              </span>
+            ) : (
+              token.text
+            );
+          },
+        )}
+        {script?.path !== undefined ? (
+          <>
+            {"\n"}
+            <span className={BASH_PROMPT_CLASS}># script: </span>
+            <ScriptFileName path={script.path} onOpenWorkspaceFile={onOpenWorkspaceFile} />
+          </>
+        ) : null}
       </pre>
+      {script?.source !== undefined ? (
+        <div className="px-3 pt-1.5 pb-0.5">
+          <ScriptSourceBlock script={script} source={script.source} />
+        </div>
+      ) : null}
       {message.justification ? <p className={BASH_APPROVAL_JUSTIFICATION_CLASS}>{message.justification}</p> : null}
     </ApprovalCard>
   );
@@ -234,11 +395,17 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
 function BashApprovalEnvironment({ sandboxed, cwd }: Pick<BashMessage, "sandboxed" | "cwd">) {
   const showCwd = Boolean(cwd && cwd !== "." && cwd !== "./");
   if (sandboxed === undefined && !showCwd) return null;
-  return <>
-    {sandboxed === undefined ? null : <EnvironmentIcon sandboxed={sandboxed} className="bash-approval-environment" />}
-    {sandboxed !== undefined && showCwd ? <span aria-hidden="true">·</span> : null}
-    {showCwd ? <code className="min-w-0 truncate font-mono" title={cwd}>{cwd}</code> : null}
-  </>;
+  return (
+    <>
+      {sandboxed === undefined ? null : <EnvironmentIcon sandboxed={sandboxed} className="bash-approval-environment" />}
+      {sandboxed !== undefined && showCwd ? <span aria-hidden="true">·</span> : null}
+      {showCwd ? (
+        <code className="min-w-0 truncate font-mono" title={cwd}>
+          {cwd}
+        </code>
+      ) : null}
+    </>
+  );
 }
 
 function getExecutionSummary(message: BashMessage): string {

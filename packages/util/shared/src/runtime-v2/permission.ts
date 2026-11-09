@@ -1,3 +1,5 @@
+import type { ScriptCommand } from "./script-command";
+
 export type PermissionMode = "default" | "full-access" | "auto-review";
 export type FileScope = "workspace" | "all";
 export type GrantLifetime = "once" | "session";
@@ -70,6 +72,8 @@ export type ApprovalResourceSummary =
       readonly dynamic: boolean;
       /** Set by Bash: approving runs the command outside the sandbox. */
       readonly noSandbox?: boolean;
+      /** Set by Bash: the command runs a script (inline body or file); the card shows it as code. */
+      readonly script?: ScriptCommand;
     };
 
 export type GrantSuggestion = {

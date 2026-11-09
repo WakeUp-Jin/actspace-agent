@@ -19,6 +19,7 @@ export * from "./projection";
 export * from "./todo";
 export * from "./runtime";
 export * from "./permission";
+export * from "./script-command";
 export * from "./desktop-ipc";
 export * from "./fixed-renderer";
 
