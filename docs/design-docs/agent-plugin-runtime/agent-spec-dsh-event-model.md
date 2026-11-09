@@ -11,7 +11,7 @@
 
 当前事件词汇与 envelope 以 ActSpace `packages/session/session-journal/src/core-codecs.ts`、默认 Agent Loop 和 [Session Format v1](agent-spec-session-format-v1.md)为准。以下保留设计时的参考资料顺序，不覆盖当前实现：
 
-1. DSH 外部参考快照的 `packages/core/session/src/types.ts` 与 `packages/core/agent-loop/src/agent.ts` 的源码行为；
+1. DSH 外部参考快照中 session `types.ts` 与 agent-loop `agent.ts` 的源码行为（外部仓库路径，不在本仓库）；
 2. `tmp/deepseek-harness/docs/persistence-catalog.md` 的持久化目录；
 3. 事实 / 干预 / 通知三平面的整理（结论已并入本文 §3，原始笔记不入库）；
 4. 当前 ActSpace 工具执行器的行为测试和实现。
@@ -144,7 +144,7 @@ Journal 的 append 是唯一逻辑提交点：先校验 codec 和序号并接纳
 以下旧 ActSpace 名称不再存在，也不提供兼容读取：
 
 - `turn/started`, `turn/completed`, `step/started`, `step/completed`；
-- `request/snapshot`；
+- `request/snapshot`（已删除）；
 - 旧的持久化 `llm/chunk`、`llm/usage`、`llm/error`、`llm/aborted`；当前同名 `llm/chunk` 仅是非持久化增量通知；
 - 任何把工具权限、审批或 UI 临时状态冒充核心事件的旧名称。
 

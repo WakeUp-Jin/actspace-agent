@@ -77,9 +77,23 @@ const forbiddenCurrentClaims = [
   { pattern: /<userData>\/sessions\/<sessionId>/g, message: "仍描述 v1 Session 目录" },
   { pattern: /apps\/desktop\/src\/main\/(?:agent-run|desktop-agent-runtime)\.ts/g, message: "仍链接已删除的 Desktop v1 Runtime" },
   { pattern: /apps\/cli\/src\/runtime-adapter\.ts/g, message: "仍链接已删除的 CLI v1 adapter" },
-  { pattern: /@actspace\/(?:tools-|core-agent|core-scope|session-jsonl)/g, message: "仍使用插件结构调整前的旧包名", allowHistoricalLine: true },
-  { pattern: /packages\/(?:tools-[a-z-]+|core-(?:agent|scope)[a-z-]*|session-jsonl)(?:\/|\b)/g, message: "仍使用插件结构调整前的一级包路径", allowHistoricalLine: true },
+  { pattern: /@actspace\/(?:tools-|core-agent|core-scope|session-jsonl)/g, message: "仍使用插件结构调整前的旧包名", allowHistoricalLine: true, skipMigrationSubjectDocs: true },
+  { pattern: /packages\/(?:tools-[a-z-]+|core-(?:agent|scope)[a-z-]*|session-jsonl)(?:\/|\b)/g, message: "仍使用插件结构调整前的一级包路径", allowHistoricalLine: true, skipMigrationSubjectDocs: true },
+  { pattern: /`(?:request\/snapshot|llm\/usage|llm\/ended)`/g, message: "仍把旧 v2 草案的事件名当作当前事件词汇", allowHistoricalLine: true },
+  { pattern: /schema\s*(?:=\s*)?9\b|user_version\s*=\s*9\b/g, message: "仍把 SQLite 读模型写成 schema 9（以 usage-read-model-schema.ts 的 user_version 为准）", allowHistoricalLine: true },
+  { pattern: /`billingMode`/g, message: "仍描述已删除的连接级 billingMode", allowHistoricalLine: true },
+  { pattern: /\/Users\/[A-Za-z0-9_.-]+\//g, message: "仍包含个人机器的绝对路径" },
 ];
+
+/** Design docs outside the truth list still must not restate retired facts; links are checked separately. */
+const claimOnlyDirectories = ["docs/design-docs"];
+
+/**
+ * Docs whose subject is a past migration: pre-migration package names and paths are the thing being
+ * described, so the old-name claims and the code-path existence check do not apply to them.
+ */
+const migrationSubjectDocs = new Set(["docs/design-docs/架构优化/02-插件结构设计.md"]);
+const historicalLinePattern = /历史|追溯|已删除|已退役|已废弃|删掉|旧|不是当前|不再|不提供|无 `|退役|historical|retired/iu;
 
 /** Replace fenced and inline code with same-length blanks, keeping offsets and line numbers. */
 export function maskCode(source) {
@@ -123,23 +137,26 @@ export async function checkMarkdownFiles(repoRoot, files, { checkClaims = true }
       continue;
     }
 
-    for (const { pattern, message, allowHistoricalLine } of checkClaims ? forbiddenCurrentClaims : []) {
+    const isMigrationSubject = migrationSubjectDocs.has(relativePath);
+    for (const { pattern, message, allowHistoricalLine, skipMigrationSubjectDocs } of checkClaims ? forbiddenCurrentClaims : []) {
+      if (skipMigrationSubjectDocs && isMigrationSubject) continue;
       pattern.lastIndex = 0;
       for (const match of source.matchAll(pattern)) {
         const line = source.split("\n")[lineNumber(source, match.index) - 1];
-        if (allowHistoricalLine && /历史|追溯|已删除|已退役|旧路径|不提供|无 `|退役|historical|retired/iu.test(line)) continue;
+        if (allowHistoricalLine && historicalLinePattern.test(line)) continue;
         failures.push(`${relativePath}:${lineNumber(source, match.index)}: ${message}`);
       }
     }
 
-    if (checkClaims) {
+    if (checkClaims && !isMigrationSubject) {
       // Code paths named in current docs must exist; lines that explicitly describe a removed or rejected path are exempt.
       const lines = source.split("\n");
       for (const [index, line] of lines.entries()) {
         if (/不|旧|迁移前|历史|已删除|已退役|retired|historical/iu.test(line)) continue;
         for (const match of line.matchAll(/`((?:packages|apps)\/[^`\s]+)`/gu)) {
           const path = match[1].replace(/[:#].*$/u, "").replace(/\/$/u, "");
-          if (/[*{}<>…]|\.\.\./u.test(path)) continue;
+          // Globs, alternations (`a|b`) and elisions (`1..9`, `...`) are shorthand, not paths.
+          if (/[*{}<>…|]|\.\./u.test(path)) continue;
           if (!(await exists(resolve(repoRoot, path)))) failures.push(`${relativePath}:${index + 1}: code path does not exist: ${path}`);
         }
       }
@@ -211,12 +228,83 @@ export async function checkDocumentationLinks(repoRoot, directories) {
   return failures;
 }
 
+async function collectTopLevelMarkdown(repoRoot, directory) {
+  const entries = await readdir(resolve(repoRoot, directory), { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => `${directory}/${entry.name}`)
+    .sort();
+}
+
+/**
+ * docs/learnings/README.md is a hand-maintained index: every article must be listed once,
+ * and each "## 主题（N）" heading must match the number of entries under it.
+ */
+export async function checkLearningsIndex(repoRoot, indexPath = "docs/learnings/README.md") {
+  const failures = [];
+  const absoluteIndex = resolve(repoRoot, indexPath);
+  const source = await readFile(absoluteIndex, "utf8");
+  const lines = source.split("\n");
+
+  let heading = null;
+  let declared = 0;
+  let counted = 0;
+  const closeSection = () => {
+    if (heading && declared !== counted) {
+      failures.push(`${indexPath}:${heading.line}: 「${heading.title}」声明 ${declared} 篇，实际列出 ${counted} 篇`);
+    }
+  };
+  for (const [index, line] of lines.entries()) {
+    const match = /^## (.+?)（(\d+)）\s*$/u.exec(line);
+    if (match) {
+      closeSection();
+      heading = { title: match[1], line: index + 1 };
+      declared = Number(match[2]);
+      counted = 0;
+    } else if (heading && /^- /u.test(line)) {
+      counted += 1;
+    }
+  }
+  closeSection();
+
+  const linked = new Map();
+  for (const match of maskCode(source).matchAll(/\]\(((?:\d{4}-\d{2})\/[^)#]+\.md)\)/gu)) {
+    const target = decodeURIComponent(match[1]);
+    linked.set(target, (linked.get(target) ?? 0) + 1);
+  }
+  for (const [target, count] of linked) {
+    if (count > 1) failures.push(`${indexPath}: 「${target}」在索引里出现了 ${count} 次`);
+  }
+
+  const learningsRoot = dirname(absoluteIndex);
+  for (const entry of await readdir(learningsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !/^\d{4}-\d{2}$/u.test(entry.name)) continue;
+    for (const file of await readdir(resolve(learningsRoot, entry.name))) {
+      if (!file.endsWith(".md")) continue;
+      const relativeTarget = `${entry.name}/${file}`;
+      if (!linked.has(relativeTarget)) failures.push(`${indexPath}: 缺少对 ${relativeTarget} 的索引条目`);
+    }
+  }
+  return failures;
+}
+
 export async function checkCurrentDocs(repoRoot) {
-  const [claims, links] = await Promise.all([
+  const designDocs = [];
+  for (const directory of claimOnlyDirectories) {
+    designDocs.push(...(await collectDocumentationFiles(repoRoot, directory)).filter((path) => path.endsWith(".md")));
+  }
+  const otherCurrentDocs = [
+    ...(await collectTopLevelMarkdown(repoRoot, "docs")),
+    ...(await collectTopLevelMarkdown(repoRoot, "docs/exec-plans")),
+  ];
+  const [claims, designClaims, links, otherLinks, learningsIndex] = await Promise.all([
     checkMarkdownFiles(repoRoot, currentTruthFiles),
-    checkDocumentationLinks(repoRoot, ["docs/design-docs", "docs/exec-plans", "docs/exec-runs"]),
+    checkMarkdownFiles(repoRoot, designDocs.filter((path) => !currentTruthFiles.includes(path))),
+    checkDocumentationLinks(repoRoot, ["docs/design-docs", "docs/exec-plans", "docs/exec-runs", "docs/learnings", "docs/coding-standards"]),
+    checkMarkdownFiles(repoRoot, otherCurrentDocs, { checkClaims: false }),
+    checkLearningsIndex(repoRoot),
   ]);
-  return [...new Set([...claims, ...links])];
+  return [...new Set([...claims, ...designClaims, ...links, ...otherLinks, ...learningsIndex])];
 }
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -231,6 +319,6 @@ if (isMain) {
     process.stderr.write(`current docs check failed (${failures.length}):\n${failures.join("\n")}\n`);
     process.exitCode = 1;
   } else {
-    process.stdout.write(`current docs check passed (${currentTruthFiles.length} truth files; design/plans/runs links and assets)\n`);
+    process.stdout.write(`current docs check passed (${currentTruthFiles.length} truth files; design-docs claims; docs/plans/runs/learnings/coding-standards links; learnings index)\n`);
   }
 }
