@@ -45,9 +45,9 @@ export interface DefaultedInvokeSpec<I, O> extends InvokeSpec<I, O> {
 }
 
 export type BridgeSpec =
-  | InvokeSpec<any, any>
-  | EventSpec<any>
-  | SendSpec<any>
+  | InvokeSpec<unknown, unknown>
+  | EventSpec<unknown>
+  | SendSpec<unknown>
   | LocalSpec<(...args: never[]) => unknown>;
 
 export type BridgeContract = Readonly<Record<string, Readonly<Record<string, BridgeSpec>>>>;
@@ -87,6 +87,6 @@ export type BridgeOf<C extends BridgeContract> = {
 };
 
 /** 契约成员的入参 / 出参，供 main handler 和测试使用。 */
-export type SpecInput<S> = S extends InvokeSpec<infer I, any> ? I : S extends SendSpec<infer I> ? I : never;
-export type SpecOutput<S> = S extends InvokeSpec<any, infer O> ? O : never;
+export type SpecInput<S> = S extends InvokeSpec<infer I, unknown> ? I : S extends SendSpec<infer I> ? I : never;
+export type SpecOutput<S> = S extends InvokeSpec<unknown, infer O> ? O : never;
 export type SpecPayload<S> = S extends EventSpec<infer P> ? P : never;

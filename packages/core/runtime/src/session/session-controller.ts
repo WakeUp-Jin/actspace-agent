@@ -586,15 +586,6 @@ function latestBefore(seqs: readonly number[], seq: number): number | null {
   while (low < high) { const mid = (low + high) >> 1; if (seqs[mid]! < seq) low = mid + 1; else high = mid; }
   return low > 0 ? seqs[low - 1]! : null;
 }
-function turnStarts(events: readonly SessionEventEnvelopeV1[]): number[] {
-  const starts: number[] = []; let floor = 0;
-  for (const event of events) {
-    if (event.type === "turn/start") starts.push(floor);
-    if (event.type === "turn/end") floor = event.seq + 1;
-  }
-  return starts;
-}
-
 function watermarksFor(session: SessionHandle | undefined, projectionThroughSeq: number, windowThroughSeq: number): RuntimeV2ReadModelWatermarks {
   return { acceptedThroughSeq: session?.acceptedSeq ?? projectionThroughSeq, durableThroughSeq: session?.durableSeq ?? projectionThroughSeq, projectionThroughSeq, windowThroughSeq, indexGeneration: null };
 }

@@ -1,11 +1,11 @@
 import { expect, it } from "vitest";
 import { RemoteSessionCache } from "../remote-hosts/session-cache";
 import { parseRemoteSessionKey, remoteSessionKey } from "../remote-hosts/session-router";
-it("isolates identical session ids and preserves offline observations", () => {
+it("isolates identical session ids and preserves offline observations", async () => {
   const cache = new RemoteSessionCache();
   const a = { hostId: "a", sessionId: "same" }, b = { hostId: "b", sessionId: "same" };
-  cache.setObservation(a, { sessionId: "same", snapshot: { marker: "a" } } as never);
-  cache.setObservation(b, { sessionId: "same", snapshot: { marker: "b" } } as never);
+  await cache.setObservation(a, { sessionId: "same", snapshot: { marker: "a" } } as never);
+  await cache.setObservation(b, { sessionId: "same", snapshot: { marker: "b" } } as never);
   expect(cache.observation(a)?.snapshot).toEqual({ marker: "a" });
   expect(cache.observation(b)?.snapshot).toEqual({ marker: "b" });
   expect(parseRemoteSessionKey(remoteSessionKey(a))).toEqual(a);

@@ -304,12 +304,6 @@ export function App() {
     return registry;
   }, []);
 
-  const findWorkspaceOption = useCallback((workspaceRoot: string | null | undefined) => {
-    const normalized = normalizeWorkspaceRoot(workspaceRoot);
-    if (!normalized) return undefined;
-    return workspaceRegistry?.items.find((workspace) => workspace.path === normalized);
-  }, [workspaceRegistry?.items]);
-
   const setApprovalPendingForSession = useCallback((sessionId: string | null | undefined, pending: boolean) => {
     if (!sessionId) return;
     patchLocal(sessionId, { approvalVersion: ++requestVersionRef.current });

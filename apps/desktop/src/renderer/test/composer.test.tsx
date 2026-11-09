@@ -1182,7 +1182,7 @@ describe("Composer follow-up bar", () => {
 
   it("keeps command menu, model menu, and context popup mutually exclusive", async () => {
     const user = userEvent.setup();
-    const { container } = renderComposer();
+    renderComposer();
 
     await user.type(screen.getByLabelText("消息输入框"), "/");
     expect(await screen.findByRole("listbox", { name: "斜杠命令" })).toBeInTheDocument();
@@ -1324,7 +1324,7 @@ describe("Composer follow-up bar", () => {
 
   it("keeps model rows compact and reveals Edit only on row interaction", async () => {
     const user = userEvent.setup();
-    const { container } = renderComposer();
+    renderComposer();
 
     await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
 
@@ -1456,7 +1456,7 @@ describe("Composer follow-up bar", () => {
 
   it("sends a supported OpenRouter reasoning effort and animates both popovers", async () => {
     const user = userEvent.setup();
-    const { onSend, container } = renderComposer({
+    const { onSend } = renderComposer({
       models: reasoningModels,
       defaultModelId: "openrouter:openai/gpt-5",
     });

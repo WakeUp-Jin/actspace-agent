@@ -90,7 +90,6 @@ function setupQueueFixture() {
   const taskCommand = vi.fn(async (input: TaskCommand) => {
     const current = state(input.sessionId);
     if (input.op === "designate") {
-      const task = current.tasks.find(task => task.taskId === input.taskId)!;
       if (input.runId) {
         const result = await designateSupplement(input);
         if (!result) return { snapshot: current, error: "RUN_NOT_ACTIVE" };
