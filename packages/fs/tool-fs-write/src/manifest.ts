@@ -6,6 +6,8 @@ export const manifest = defineBuiltinPluginManifest({
   pluginId: FILESYSTEM_WRITE_PLUGIN_ID, version: "2.0.0", name: "ActSpace Filesystem Write",
   entry: { entryId: "tools.filesystem-write", behavior: "./plugin.js" },
   host: { required: ["filesystem.write"], optional: [] }, frontend: null,
-  injects: ["tools.runtime", "actspace.host.tools.filesystem-write"],
+  injects: ["tools.runtime"],
+  // Without the grant the tools register but report the capability as unavailable.
+  optionalInjects: ["actspace.host.filesystem"],
   contributions: { services: ["tools.filesystem-write"], tools: FILESYSTEM_WRITE_TOOLS, prompts: [], events: [] },
 });

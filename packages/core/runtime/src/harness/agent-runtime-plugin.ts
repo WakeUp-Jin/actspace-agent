@@ -15,13 +15,13 @@ import type { RuntimeSessionController } from "../session/session-controller.js"
 import type { AgentFactoryService } from "./agent-factory-plugin.js";
 import { PinnedHarnessError, type AgentRuntimeHostPort, type PinnedHarness } from "./agent-host-port.js";
 import type { RuntimeSessionHostPort } from "../session/session-plugin.js";
-import { prepareDefaultHarnessArtifact, defaultHarnessSharedModules, DEFAULT_HARNESS_SHARED_SERVICES } from "./default-harness.js";
+import { prepareDefaultHarnessArtifact, defaultHarnessSharedModules, DEFAULT_HARNESS_SHARED_SERVICES, OPTIONAL_HOST_SHARED_SERVICES } from "./default-harness.js";
 import { TaskLedger } from "@actspace/agent-service";
 import { BackgroundTaskRegistry } from "@actspace/background-tasks";
 import { ManagedRuns } from "./managed-runs.js";
 import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
 
-export const inject = Object.freeze(DEFAULT_HARNESS_SHARED_SERVICES.filter(name => name !== "actspace.host.tools.browser"));
+export const inject = Object.freeze(DEFAULT_HARNESS_SHARED_SERVICES.filter(name => !OPTIONAL_HOST_SHARED_SERVICES.includes(name)));
 
 /** Host owns scheduling and lifetime; execution services live in isolated Harness trees. */
 export class AgentRuntimeService {

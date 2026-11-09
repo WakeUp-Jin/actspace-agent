@@ -46,7 +46,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   const ports = {
     "actspace.host.sandbox": createNodeSandboxHostPort(),
     "agent.registry": agentRegistry,
-    ...Object.fromEntries(["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }])),
+    ...Object.fromEntries(["web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }])),
     "session.runtime": sessions,
     "llm.auxiliary-requests": createAuxiliaryRequestRecorder(sessions),
     "session.journal": { registry },

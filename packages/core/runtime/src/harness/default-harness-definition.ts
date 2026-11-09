@@ -11,6 +11,8 @@ export const DEFAULT_HARNESS_KERNEL_ID = "actspace.default-harness";
 /** Manifests list optional injects by service id; what a plugin does without the service is stated here. */
 const OPTIONAL_INJECT_FALLBACKS: Readonly<Record<string, string>> = Object.freeze({
   sandbox: "bash runs outside the sandbox after approval",
+  "actspace.host.filesystem": "file tools register but report the capability as unavailable",
+  "actspace.host.process": "bash registers but reports the capability as unavailable",
 });
 
 function optionalInjects(entryId: string, ids: readonly string[]): readonly DefaultHarnessOptionalInject[] {

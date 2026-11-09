@@ -1,24 +1,27 @@
 import { dirname, resolve } from "node:path";
 import { homedir } from "node:os";
 import type { GrantAudience } from "@actspace/shared/runtime-v2";
-import { isPathWithin, type ToolGrantSuggestion } from "@actspace/tool-runtime";
+import { FILESYSTEM_HOST_PORT_ID, isPathWithin, type FilesystemHostGrant, type ToolGrantSuggestion } from "@actspace/tool-runtime";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime, ToolPermissionContract } from "@actspace/tool-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
+import { createNodeToolPorts } from "./node-ports.js";
 import { FILESYSTEM_WRITE_PLUGIN_ID, type FILESYSTEM_WRITE_TOOLS } from "./manifest.js";
 
 export type ToolName = (typeof FILESYSTEM_WRITE_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & { readonly dispose?: () => Promise<void> };
-export const FILESYSTEM_WRITE_HOST_PORT_ID = "actspace.host.tools.filesystem-write" as const;
-export type HostPort = { readonly createPorts: () => ToolPorts | Promise<ToolPorts> };
 export type ToolRegistration = { readonly name: string; readonly localName: ToolName; readonly handle: ReturnType<ToolRuntime["register"]> };
 
+/**
+ * The Host grants the filesystem (roots, artifact resolution); this plugin owns the tool implementation. Without the
+ * grant every tool reports CAPABILITY_UNAVAILABLE instead of failing the Harness.
+ */
 export async function apply(ctx: CordisContext): Promise<void> {
   const runtime = ctx.get?.("tools.runtime") as ToolRuntime | undefined;
-  const host = ctx.get?.(FILESYSTEM_WRITE_HOST_PORT_ID) as HostPort | undefined;
-  if (!runtime || !host) throw new Error("filesystem-write requires tools.runtime and actspace.host.tools.filesystem-write.");
-  const ports = await host.createPorts();
+  if (!runtime) throw new Error("filesystem-write requires tools.runtime.");
+  const grant = ctx.get?.(FILESYSTEM_HOST_PORT_ID) as FilesystemHostGrant | undefined;
+  const ports: ToolPorts = grant ? createNodeToolPorts(grant) : {};
   let registrations: readonly ToolRegistration[];
   try { registrations = registerTools(runtime, ports); }
   catch (error) { await ports.dispose?.(); throw error; }

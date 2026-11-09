@@ -1,7 +1,7 @@
 import { realpath } from "node:fs/promises";
 import { analyzeCommandPrefixGrant } from "./command-prefix.js";
 import { queryPathsWithinWorkspace } from "./query-paths.js";
-import { isPathWithin } from "@actspace/tool-runtime";
+import { isPathWithin, PROCESS_HOST_PORT_ID, type ProcessHostGrant } from "@actspace/tool-runtime";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { getBashHardRejectReason } from "./command-rules.js";
@@ -11,25 +11,32 @@ import type { CordisContext } from "@actspace/cordis-adapter";
 import type { BackgroundTaskHost } from "@actspace/background-tasks";
 import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
 import { SHELL_TOOLS_PLUGIN_ID, type SHELL_TOOLS_TOOLS } from "./manifest.js";
+import { createNodeBashToolPorts } from "./node-ports.js";
+
+function createGrantedPorts(grant: ProcessHostGrant, background: BackgroundTaskHost | undefined, sandbox: SandboxService | undefined, dataRoot: string): ToolPorts {
+  const ports = createNodeBashToolPorts({ workspaceRoot: grant.workspaceRoot, tmpRoot: grant.tmpRoot, dataRoot, sandbox, background });
+  grant.onProcesses?.(ports);
+  return ports;
+}
 
 export type ToolName = (typeof SHELL_TOOLS_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & { readonly hasRunningBackgroundTask?: (sessionId: string) => boolean; readonly dispose?: () => Promise<void> };
-export const SHELL_TOOLS_HOST_PORT_ID = "actspace.host.tools.shell-tools" as const;
-/**
- * `sandbox` is absent when the sandbox plugin is not loaded; the ports then only run commands approved for outside the sandbox.
- * `session.dataRoot` holds `sessions-v2/<id>/bash-log/`, where command logs go.
- */
-export type HostPort = { readonly createPorts: (background: BackgroundTaskHost | undefined, sandbox: SandboxService | undefined, session: { readonly dataRoot: string }) => ToolPorts | Promise<ToolPorts> };
 export type ToolRegistration = { readonly name: string; readonly localName: ToolName; readonly handle: ReturnType<ToolRuntime["register"]> };
 
+/**
+ * The Host grants process execution (roots, shutdown hook); this plugin owns Bash itself. `sandbox` is absent when
+ * the sandbox plugin is not loaded; commands then only run after approval for outside the sandbox. Without the
+ * process grant, `bash` registers but reports CAPABILITY_UNAVAILABLE. `session.dataRoot` holds
+ * `sessions-v2/<id>/bash-log/`, where command logs go.
+ */
 export async function apply(ctx: CordisContext): Promise<void> {
   const runtime = ctx.get?.("tools.runtime") as ToolRuntime | undefined;
-  const host = ctx.get?.(SHELL_TOOLS_HOST_PORT_ID) as HostPort | undefined;
   const dataRoot = (ctx.get?.("actspace.host.session") as { readonly dataRoot?: string } | undefined)?.dataRoot;
-  if (!runtime || !host || !dataRoot) throw new Error("shell-tools requires tools.runtime, actspace.host.tools.shell-tools and actspace.host.session.");
+  if (!runtime || !dataRoot) throw new Error("shell-tools requires tools.runtime and actspace.host.session.");
   const sandbox = ctx.get?.(SANDBOX_SERVICE_ID) as SandboxService | undefined;
-  const ports = await host.createPorts(ctx.get?.("actspace.host.background-tasks") as BackgroundTaskHost | undefined, sandbox, { dataRoot });
+  const grant = ctx.get?.(PROCESS_HOST_PORT_ID) as ProcessHostGrant | undefined;
+  const ports: ToolPorts = grant ? createGrantedPorts(grant, ctx.get?.("actspace.host.background-tasks") as BackgroundTaskHost | undefined, sandbox, dataRoot) : {};
   let registrations: readonly ToolRegistration[];
   try { registrations = registerTools(runtime, ports, sandbox); }
   catch (error) { await ports.dispose?.(); throw error; }
