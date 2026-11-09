@@ -40,4 +40,4 @@
 - mock：`renderer/mock/context-panel-fixture.ts`、`mock/scenarios/context-pagination.ts`
 - 测试：`main/test/{context-history-events(新),context-paths}.test.ts`、`renderer/test/{context-bash,context-paths,context-panel}.test.tsx`
 - `scripts/native-button-baseline.json`
-- 文档：`front-Context面板规范.md`、`context-panel-polish-demo.html`、前端与 exec-plans README、`exec-plans/active/20261108-context-panel-polish.md`
+- 文档：`front-Context面板规范.md`、`context-panel-polish-demo.html`、前端与 exec-plans README、`exec-plans/completed/20261108-context-panel-polish.md`

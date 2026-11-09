@@ -8,7 +8,7 @@
 
 ### 📥 User Query
 
-> 按计划 docs/exec-plans/active/20261108-ci-pipelines.md：P4 是 release.yml 改成 v* tag 触发的 macOS arm64 / x64、Linux、Windows 矩阵 + 草稿 Release，并给 release-package.sh 补 Windows 分支。那么我们继续接下来的任务吧。
+> 按计划 docs/exec-plans/completed/20261108-ci-pipelines.md：P4 是 release.yml 改成 v* tag 触发的 macOS arm64 / x64、Linux、Windows 矩阵 + 草稿 Release，并给 release-package.sh 补 Windows 分支。那么我们继续接下来的任务吧。
 
 ### 🛠 Changes Overview
 
@@ -32,7 +32,7 @@ Agent 这边 `gh` 只读、不能手动 `workflow_dispatch`，要在合并前验
 
 - `.github/workflows/release.yml`
 - `scripts/release-package.sh`、`scripts/package-browser-components.mjs`
-- `docs/CICD.md`、`docs/exec-plans/active/20261108-ci-pipelines.md`、`docs/exec-plans/tech-debt-tracker.md`、`docs/exec-runs/20261108-ci-pipelines/execution-process.md`、`docs/exec-runs/20261108-ci-pipelines/execution-summary.md`
+- `docs/CICD.md`、`docs/exec-plans/completed/20261108-ci-pipelines.md`、`docs/exec-plans/tech-debt-tracker.md`、`docs/exec-runs/20261108-ci-pipelines/execution-process.md`、`docs/exec-runs/20261108-ci-pipelines/execution-summary.md`
 - `browser-bridge/apps/cli/instance_registry.go`、`instance_registry_unix.go`（新）、`instance_registry_windows.go`（新）：`ownedByCurrentUser` 按构建标签拆分，Windows 恒为 `false`，让 CLI 在 Windows 上可编译
 - `.github/workflows/ci.yml`：`browser-bridge` job 加 Windows / macOS 交叉编译步骤
 - `.github/workflows/ci.yml`（`typecheck-test` 构建 Agent CLI）、`apps/web/src/sessions/test/output-download.test.ts`

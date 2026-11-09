@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261105-live-assistant-stream.md`
+- **关联计划**：`docs/exec-plans/completed/20261105-live-assistant-stream.md`
 - **设计规范**：`docs/design-docs/agent-plugin-runtime/agent-spec-live-assistant-stream.md`
 - **执行模式**：交互
 - **开始时间**：2026-11-05（规范、计划经用户确认后）

@@ -14,5 +14,5 @@
 
 ## 和其他专题的关系
 
-- [collaboration/](../collaboration/)：当前的一次性子智能体与 Explore。子智能体保持现状，不参与 Space。更早的 Member / Room / Team 产品稿已删除，由本专题取代。
+- [collaboration/](../collaboration/)：当前的子智能体运行时（默认后台运行、可续聊、Fork、外部 Codex / Claude Code）与 Explore 只读预设。子智能体不参与 Space。更早的 Member / Room / Team 产品稿已删除，由本专题取代。
 - [frontend/](../frontend/)：桌面端通用的视觉、组件与工作台规范，本专题的实现遵守那里的规则。

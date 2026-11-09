@@ -699,7 +699,7 @@ Runtime 重启后不恢复旧 live progress。Session repair 根据 Journal：
 
 这些机械选择不得引入插件前端代码、第二份 renderer-only tool state、未脱敏 live payload 或绕过 Journal 的 terminal 更新路径。
 
-## 14. 当前读取实现与独立水位
+## 15. 当前读取实现与独立水位
 
 ### 水位
 
