@@ -195,4 +195,4 @@ Composer 上下文弹层的「查看完整上下文」、对象启动页的「�
 - 浏览器 mock：`?mock=long-session` 展示完整区块（含路径 87 活跃 / 342 睡眠和 Bash 12 个程序）；`?mock=context-pagination` 覆盖历史失败 / 重试、670 条清单与原文分段、路径活跃满 100、睡眠 1284 条多页、每页 400ms 延迟、首次读睡眠失败一次。
 - mock 成功不证明真实 IPC / Loop；真实模型切换、压缩、历史重建与大规模交互只能在 Electron 下验收。
 - 浅色、深色、360px 宽、键盘焦点和滚动都要验；路径验收点：数量 / 周期 / 上限与后端一致，长路径与缺失字段可读，Step 完成或压缩后随新版本更新且不重置未变化的分页，快速切会话与翻页期间的乱序响应不混入旧页，仅查看 / 复制不触发文件读取。
-- 视觉参考 [context-panel-polish-demo.html](context-panel-polish-demo.html)（边框 B、路径、Bash、事件，待 Electron 复验后删除）；[context-bash-demo.html](context-bash-demo.html) 是 Bash 卡片的旧版，已被取代，Electron 复验后一起删除。
+- 视觉参考 [context-panel-polish-demo.html](context-panel-polish-demo.html)（边框 B、路径、Bash、事件，待 Electron 复验后删除）。

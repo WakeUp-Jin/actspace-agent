@@ -33,7 +33,7 @@ it("runs replaceable implementations from real fixed artifacts and retains the o
     const artifact = await publishPluginArtifact({ sourceRoot, artifactRoot: join(directory, "artifacts"), plugin: manifest, files: ["plugin.mjs"] });
     return harnesses.prepare("main", revision, { composition, artifacts: new Map([[manifest.pluginId, artifact]]), sharedServices: ["fixture.host"] });
   }
-  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => { registry.register(codec); });
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "same-session", createdAt: "2026-10-03T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
   const service = new AgentService({ openSession: async () => session, harnessId: () => "main", acquire: id => harnesses.acquire(id), readConfiguration: () => ({ mode: "agent" }) });
   try {

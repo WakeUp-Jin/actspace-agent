@@ -1,5 +1,5 @@
 import type { RuntimeV2LiveEvent, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
-import { LiveProgressHub, type LiveCursor, type LiveHandshake, type LiveProgressInput } from "./live-progress.js";
+import type { LiveProgressHub, LiveCursor, LiveHandshake, LiveProgressInput } from "./live-progress.js";
 
 export class RuntimeProjectionStream {
   constructor(

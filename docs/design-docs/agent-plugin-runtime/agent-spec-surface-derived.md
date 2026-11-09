@@ -2,7 +2,7 @@
 
 > 管日志里进入模型对话的那几种事件（用户消息、回复、工具结果、Inbox 插入、恢复结果、压缩替换）把内容存在哪里，以及所有读取方怎样拿到对话节点。事件词汇见[事件模型](agent-spec-dsh-event-model.md) §7，请求记录见[请求记录](agent-spec-request-record.md)，投影架构见[Runtime Projection](agent-spec-runtime-projection.md)。
 
-状态：已实现（2026-11-07），执行计划 [20261107-surface-derived](../../exec-plans/active/20261107-surface-derived.md)。实机对比（§9 最后一条）待用户删除旧会话后重跑。
+状态：已实现，执行计划 [20261107-surface-derived](../../exec-plans/completed/20261107-surface-derived.md)。实机对比（§9 最后一条）待用户删除旧会话后重跑。
 
 ## 1. 为什么改
 

@@ -2,7 +2,7 @@
 
 > 归档：现行规则已并入 [Context 面板规范](../../../../design-docs/frontend/front-Context面板规范.md)；本文保留当时的决策表、存储设计与交接记录。
 
-更新：2026-11-04。状态：已实现（浏览器 mock 已验，Electron 真实会话待验）。执行计划见 [20261102-context-bash-stats](../../20261102-context-bash-stats.md)；视觉以 [context-bash-demo.html](../../../../design-docs/frontend/context-bash-demo.html) 为准。
+更新：2026-11-04。状态：已实现（浏览器 mock 已验，Electron 真实会话待验）。执行计划见 [20261102-context-bash-stats](../../20261102-context-bash-stats.md)；视觉以 `context-bash-demo.html`（已删除，结论见现行上下文面板规范） 为准。
 
 ## 1. 为什么做
 
@@ -124,7 +124,7 @@ bash?: ContextPanelBashStats | null;
 
 ## 5. 界面
 
-视觉以 [context-bash-demo.html](../../../../design-docs/frontend/context-bash-demo.html) 为准，组件放在 `apps/desktop/src/renderer/components/right-panel/context/ContextBash.tsx`，外观复用 `ContextPanelParts` 的 `CARD_CLASS` 等常量。
+视觉以 `context-bash-demo.html`（已删除） 为准，组件放在 `apps/desktop/src/renderer/components/right-panel/context/ContextBash.tsx`，外观复用 `ContextPanelParts` 的 `CARD_CLASS` 等常量。
 
 - **位置**：`ContextPanel` 里「上下文事件」之后、底部注释之前。只在后端数据源（`data.source === "backend"`）且 `view.bash` 不为 `null` 时显示。
 - **标题行**：「Bash 命令」，不带 `?`、不写口径说明（2026-11-04 起界面文案不解释口径，见[全局视觉语言规范](../../../../design-docs/frontend/front-文案与状态表达规范.md)「界面文案与说明文字」；口径以本文 §3 为准）。右侧写「N 个程序」（不含「其他」）。

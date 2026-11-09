@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261107-edit-resend-rewind.md`
+- **关联计划**：`docs/exec-plans/completed/20261107-edit-resend-rewind.md`
 - **执行过程**：`docs/exec-runs/20261107-edit-resend-rewind/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：完成。自动化验证全部通过；Electron 实机（规范 §7 最后一条）待验收。

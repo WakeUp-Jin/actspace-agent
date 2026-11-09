@@ -12,7 +12,7 @@ const releaseHooks = { addPin: () => () => undefined, addReleaseGate: () => () =
 describe("agent runtime service lifecycle", () => {
   it("publishes committed queue changes to Host Cordis observers", async () => {
     const ctx = new CordisContextClass();
-    const codecs = createCoreCodecRegistry(); taskCodecs.forEach(codec => codecs.register(codec));
+    const codecs = createCoreCodecRegistry(); taskCodecs.forEach(codec => { codecs.register(codec); });
     const session = SessionHandle.createEphemeral({ registry: codecs, header: createSessionHeader({ sessionId: "notifications", createdAt: "2026-10-03T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "2", manifestDigest: "test", plugins: [], codecSetDigest: codecs.digest } }) });
     ctx.provide("actspace.host.agent", { host: {}, plugins: [] });
     ctx.provide("agent.registry", { list: () => [] });

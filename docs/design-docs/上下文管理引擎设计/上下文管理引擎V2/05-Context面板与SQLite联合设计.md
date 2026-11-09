@@ -1,6 +1,6 @@
 # Context 面板与 SQLite 联合设计
 
-schema 9、Context manifest、分批发布和刷新协议已在后续联合实施落地；它们不属于早期 SQLite 分支基线。
+schema 9（历史版本号，当前以 `usage-read-model-schema.ts` 为准）、Context manifest、分批发布和刷新协议已在后续联合实施落地；它们不属于早期 SQLite 分支基线。
 
 > 2026-11-06 起，请求清单不再写进日志：`request/context` 只留小字段，提示词与工具改成变化才写的 `request/system-prompt` / `request/tools`，估算统一成 `ceil(字数/4)` 加结构开销，并由同一个折叠函数 `applyContextEstimate` 从日志推算。本文 §5 的「manifest 随 `request/context` 持久化」与 §10 的 `context-content-1` 估算器已被取代，以[请求记录规范](../../agent-plugin-runtime/agent-spec-request-record.md)为准。
 

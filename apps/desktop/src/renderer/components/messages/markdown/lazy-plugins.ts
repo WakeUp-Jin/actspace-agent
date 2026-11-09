@@ -41,7 +41,7 @@ function createChunk<T>(load: () => Promise<T>) {
       load().then(
         (loaded) => {
           module = loaded;
-          listeners.forEach((listener) => listener());
+          listeners.forEach((listener) => { listener(); });
         },
         (error: unknown) => { console.warn("Markdown 插件加载失败，按原文显示", error); },
       );

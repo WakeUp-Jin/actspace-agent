@@ -69,7 +69,7 @@ test('real Host shares approval decisions across devices and exposes immutable t
     assert.equal(Buffer.from((await second.call('artifacts.read', { sessionId, artifactId: ref.id, offset: 0, length: 100 })).data, 'base64').toString(), 'host-tool-result');
     assert.equal(requests, 3);
   } finally {
-    clients.forEach(client => client.close());
+    clients.forEach(client => { client.close(); });
     for (const child of children) if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill('SIGKILL'); await exited; }
     provider.closeAllConnections(); await new Promise(resolve => provider.close(resolve)); await rm(root, { recursive: true, force: true });
   }

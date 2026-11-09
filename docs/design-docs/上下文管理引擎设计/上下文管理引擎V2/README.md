@@ -1,10 +1,12 @@
 # 上下文管理引擎 V2
 
-V2 引擎、Context 面板与 SQLite 联合实现已落地。面板契约为 schemaVersion 2，SQLite 读模型为 schema 9；验收结果与未覆盖边界见[联合执行摘要](../../../exec-runs/20261011-context-sqlite-integration/execution-summary.md)。
+V2 引擎、Context 面板与 SQLite 联合实现已落地。面板契约为 schemaVersion 2，SQLite 读模型版本以 `usage-read-model-schema.ts` 的 `user_version` 为准（现为 18）；验收结果与未覆盖边界见[联合执行摘要](../../../exec-runs/20261011-context-sqlite-integration/execution-summary.md)。
 
 **Context 是按 Session 与 Agent 逻辑作用域隔离的长期状态；每次模型调用从它生成不可变的 LlmInput。** 模型与工具输出继续先进入 Session，再由对应插件更新 Context。
 
 ## 阅读顺序
+
+编号不连续是 2026-11-04 文档整理合并的结果（04、06 已并入其他篇），不重新编号以免外部引用失效。
 
 | 文档 | 回答的问题 |
 | --- | --- |

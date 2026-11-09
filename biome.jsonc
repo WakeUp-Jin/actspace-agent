@@ -59,15 +59,22 @@
       "suspicious": {
         // 产品代码用 `unknown` 加收窄；测试里的 mock / 响应体允许 `any`，见下方 overrides。
         "noExplicitAny": "error",
-        // 存量命中较多，先以 warning 暴露、不阻塞 CI。
-        "useIterableCallbackReturn": "warn",
-        "noAssignInExpressions": "warn",
-        "noArrayIndexKey": "warn",
+        // forEach 回调一律写块语句 `x => { f(x); }`，让 map / filter 漏 return 能被这条规则抓到。
+        "useIterableCallbackReturn": "error",
+        // `x ??= init`、`(map[k] ??= []).push(v)`、`return this.#closing = …` 是仓库成规模使用的惰性初始化 / 记忆化写法，
+        // 全部有意为之；逐处拆成语句只会变长。
+        "noAssignInExpressions": "off",
+        // 命中的全是 diff 行、token、文本片段、坐标标签这类没有稳定身份、也不会重排的派生列表，index 就是正确的 key；
+        // 有身份的数据（message、session、tool call）本来就用 id。
+        "noArrayIndexKey": "off",
         // 终端 / ANSI 清洗代码里的控制字符正则是有意为之。
         "noControlCharactersInRegex": "off",
         // `let x; try { x = await ... } catch {}` 依赖 tsc 控制流推断，不是 implicit any。
         "noImplicitAnyLet": "off",
-        "noExportsInTest": "off"
+        "noExportsInTest": "off",
+        // `(…) => Handlers | void` 表示回调可以不返回；换成 `| undefined` 会让 tsc 要求每个分支显式 return。
+        // 这和 React 的 `EffectCallback = () => void | Destructor` 是同一种写法，不是误用。
+        "noConfusingVoidType": "off"
       },
       "nursery": {
         // 类型推断不完整，可能漏报，但不会误报：明确不等待的调用写 `void`。

@@ -19,5 +19,5 @@
     "@actspace/session-journal": "workspace:*",
     "@actspace/shared": "workspace:*"
   },
-  "devDependencies": { "@types/node": "^24.0.3", "typescript": "^5.8.3", "vitest": "^3.2.4" }
+  "devDependencies": { "@types/node": "^24.0.3", "typescript": "^5.8.3", "vitest": "^4.1.12" }
 }

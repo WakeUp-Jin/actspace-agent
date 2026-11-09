@@ -1,6 +1,6 @@
 import { prepareImageMessages } from "./image-messages.js";
 import { validateDeepSeekImage, validateDeepSeekImageMessages, validateDeepSeekPayload } from "./deepseek-images.js";
-import { type ModelPricingSnapshot } from "@actspace/shared";
+import type { ModelPricingSnapshot } from "@actspace/shared";
 import { calculateUsageCost } from "@actspace/llm-service";
 import { withReasoningPayload, withoutReasoningPayload } from "./reasoning-options.js";
 import { builtinChatModel, builtinProviderForBaseUrl, loadBuiltinProvider, type PiAiBuiltinLoader, type PiAiBuiltinProvider } from "./builtin-providers.js";

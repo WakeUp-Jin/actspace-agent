@@ -11,7 +11,7 @@ import { hostTransportPatches, loadBuiltinToolCodec, toolTransportPatches } from
 import { harnessEntriesMissingHostCapabilities, harnessEntriesOffByDefault } from "../plugin-catalog.js";
 import type { EventCodec } from "@actspace/session-journal";
 import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
-import { LlmService } from "@actspace/llm-service";
+import type { LlmService } from "@actspace/llm-service";
 import type { ResolvedComposition } from "@actspace/composition";
 import { discoverPluginCodecs, type CodecModuleLoader, type CordisContext } from "@actspace/cordis-adapter";
 import { inspectCordisAdmission } from "@actspace/cordis-adapter";
@@ -20,7 +20,7 @@ import { bootDshCordis, createDshBootCandidate } from "@actspace/boot";
 import { RuntimeProfileConflictError } from "./errors.js";
 import { RuntimeShutdownFailure } from "./errors.js";
 import { createRuntimeHostServices, type RuntimeHostServices } from "./host-services.js";
-import { RuntimeSessionController } from "../session/session-controller.js";
+import type { RuntimeSessionController } from "../session/session-controller.js";
 import { SESSION_RUNTIME_HOST_PORT_ID, type RuntimeSessionHostPort } from "../session/session-plugin.js";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "../harness/agent-host-port.js";
 import type { AgentRuntimeService } from "../harness/agent-runtime-plugin.js";

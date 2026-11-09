@@ -63,4 +63,4 @@ run7 渲染进程里，聊天区 Markdown 每帧把最后一块解析两遍（�
 - `docs/design-docs/frontend/`：
   - `front-流式Markdown解析降频规范.md`（新增）
   - `front-聊天区Markdown渲染规范.md`、`README.md`
-- `docs/exec-plans/active/20261107-markdown-stream-throttle.md`（新增）、`docs/exec-plans/README.md`
+- `docs/exec-plans/completed/20261107-markdown-stream-throttle.md`（新增）、`docs/exec-plans/README.md`

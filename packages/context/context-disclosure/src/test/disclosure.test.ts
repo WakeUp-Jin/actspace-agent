@@ -8,7 +8,7 @@ import { selectActive } from "../policy.js";
 import { collectPathHints, type DisclosureHost } from "../paths.js";
 
 function fixture(seed: readonly SessionEventEnvelopeV1[] = [], sessionId = "s", origin?: string): CompactionSession {
-  const registry = createCoreCodecRegistry(); codecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); codecs.forEach(codec => { registry.register(codec); });
   const journal = new SessionJournal({ registry, seed });
   return { header: { sessionId, lineage: origin ? { origin } : null }, journal, get lastSeq() { return journal.lastSeq; }, append: async value => journal.append(value), appendMany: async values => journal.appendMany(values), flush: async () => {} };
 }
@@ -162,7 +162,7 @@ it("excludes navigation indexes from summary and history candidates", async () =
   const before = await disclosure.hydrate(context(session), session);
   const indexPath = before.status.sleepingDirectory!.path;
   await disclosure.prepare(session, context(session), { start: 0, end: 3 }, { content: `summary ${indexPath}`, pathlist: [indexPath, "/file/kept.ts"] }, "exclude-index");
-  const state = emptyDisclosureState(); session.journal.events.forEach(event => applyStateEvent(state, event));
+  const state = emptyDisclosureState(); session.journal.events.forEach(event => { applyStateEvent(state, event); });
   expect(candidatePaths(state, "exclude-index")!.map(path => path.path)).toContain("/file/kept.ts");
   expect(candidatePaths(state, "exclude-index")!.map(path => path.path)).not.toContain(indexPath);
 });

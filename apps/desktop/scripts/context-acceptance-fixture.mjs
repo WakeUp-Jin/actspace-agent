@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
 import { startAgentProvider } from '../../../scripts/test/fixtures/agent-provider.mjs';
 const rootArg=process.argv.find(arg=>arg.startsWith('--root='))?.slice(7);
-if(!rootArg||!rootArg.startsWith('/tmp/actspace-context-'))throw new Error('Pass a new isolated /tmp/actspace-context-* root.');
+if(!rootArg?.startsWith('/tmp/actspace-context-'))throw new Error('Pass a new isolated /tmp/actspace-context-* root.');
 const root=resolve(rootArg),workspace=join(root,'workspace'),data=join(root,'desktop-data');
 await mkdir(root);await mkdir(workspace);await mkdir(data);
 await writeFile(join(workspace,'README.md'),'Synthetic Context / SQLite acceptance workspace.\n');

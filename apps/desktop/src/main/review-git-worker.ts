@@ -51,7 +51,7 @@ async function loadGitObjects(input: Extract<ReviewWorkerRequest, { type: "cat-f
     }
     const match = /^[0-9a-f]+\s+(\S+)\s+(\d+)$/.exec(line);
     const bytes = Number(match?.[2] ?? 0);
-    if (!match || match[1] !== "blob") {
+    if (match?.[1] !== "blob") {
       outcomes.set(request.key, { key: request.key, side: { available: false, bytes, partial: false } });
     } else if (bytes > input.maxBytes) {
       outcomes.set(request.key, { key: request.key, side: { available: false, bytes, partial: true } });

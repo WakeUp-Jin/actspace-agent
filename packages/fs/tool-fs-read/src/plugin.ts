@@ -5,7 +5,7 @@ import { isPathWithin, type ToolGrantSuggestion } from "@actspace/tool-runtime";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime, ToolPermissionContract } from "@actspace/tool-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
-import { FILESYSTEM_READ_PLUGIN_ID, FILESYSTEM_READ_TOOLS, PRESENT_MAX_FILES } from "./manifest.js";
+import { FILESYSTEM_READ_PLUGIN_ID, type FILESYSTEM_READ_TOOLS, PRESENT_MAX_FILES } from "./manifest.js";
 
 export type ToolName = (typeof FILESYSTEM_READ_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;

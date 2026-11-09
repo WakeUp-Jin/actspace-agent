@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261108-pi-ai-builtin-providers.md`
+- **关联计划**：`docs/exec-plans/completed/20261108-pi-ai-builtin-providers.md`
 - **设计**：`docs/design-docs/agent-plugin-runtime/agent-llm-core-pi.md` §17
 - **执行模式**：交互
 - **执行结果**：代码与自动化完成；真实 Key 与 Electron 实机检查未做

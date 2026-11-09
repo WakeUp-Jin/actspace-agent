@@ -159,7 +159,7 @@ export class PluginManager {
     delete workspace.candidate; delete workspace.changeId;
   }
   #path(id: string) { if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error("Invalid workspace identity"); return join(this.options.dataRoot, "evolution", "workspaces", id + ".json"); }
-  async #read(id: string, sessionId: string): Promise<Workspace> { const workspace = await readJson<Workspace>(this.#path(id)); if (!workspace || workspace.schemaVersion !== 1 || workspace.workspaceId !== id || workspace.sessionId !== sessionId) throw new Error("Workspace not found for this session"); return workspace; }
+  async #read(id: string, sessionId: string): Promise<Workspace> { const workspace = await readJson<Workspace>(this.#path(id)); if (workspace?.schemaVersion !== 1 || workspace.workspaceId !== id || workspace.sessionId !== sessionId) throw new Error("Workspace not found for this session"); return workspace; }
   #save(workspace: Workspace) { return atomicJson(this.#path(workspace.workspaceId), workspace); }
   async close() { this.#closed = true; await Promise.allSettled(this.#gates.values()); }
 }

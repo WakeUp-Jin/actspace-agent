@@ -1,4 +1,4 @@
-import { EditorView, WidgetType } from "@codemirror/view";
+import { type EditorView, WidgetType } from "@codemirror/view";
 import { KATEX_OPTIONS, loadKatex } from "../../../markdown-common/katex";
 
 type Katex = Awaited<ReturnType<typeof loadKatex>>;

@@ -369,8 +369,7 @@ function contextCompactionBlock(event: SessionEvent): MessageBlock[] {
 function workspacePreparationBlock(event: SessionEvent): MessageBlock[] {
   const payload = isRecord(event.payload) ? event.payload as WorkspacePreparationPayload : null;
   if (
-    !payload ||
-    payload.kind !== "worktree" ||
+    payload?.kind !== "worktree" ||
     payload.status !== "completed" ||
     typeof payload.sourceWorkspaceRoot !== "string" ||
     typeof payload.workspaceRoot !== "string" ||

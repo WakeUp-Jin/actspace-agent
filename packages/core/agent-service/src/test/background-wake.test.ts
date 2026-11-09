@@ -8,7 +8,7 @@ import { TaskLedger } from "../task-ledger.js";
 import { SessionRunManager, type RunExecutionResult } from "../run-manager.js";
 
 async function fixture(options: { readonly outcome?: (content: RuntimeV2JsonValue) => RunExecutionResult; readonly canStart?: () => boolean } = {}) {
-  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => { registry.register(codec); });
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "wake", createdAt: "2026-10-22T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
   const ledger = await TaskLedger.open(session);
   const state = { pending: false, executed: [] as RuntimeV2JsonValue[] };

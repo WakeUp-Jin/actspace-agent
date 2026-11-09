@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkCurrentDocs, checkDocumentationLinks, checkMarkdownFiles, maskCode } from "../check-current-docs.mjs";
+import { checkCurrentDocs, checkDocumentationLinks, checkLearningsIndex, checkMarkdownFiles, maskCode } from "../check-current-docs.mjs";
 
 test("current documentation truth zone is v2-first and link-complete", async () => {
   const failures = await checkCurrentDocs(process.cwd());
@@ -140,6 +140,63 @@ test("current docs must name code paths that exist, unless the line marks them a
     );
     const failures = await checkMarkdownFiles(root, ["docs/current.md"]);
     assert.deepEqual(failures, ["docs/current.md:2: code path does not exist: packages/gone/src/index.ts"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("drifted facts (old event names, schema 9, billingMode, personal paths) need historical labels", async () => {
+  const root = await mkdtemp(join(tmpdir(), "actspace-current-docs-"));
+  try {
+    await writeFile(join(root, "current.md"), [
+      "Emit `request/snapshot` and `llm/usage`.",
+      "SQLite read model is schema 9.",
+      "Connections carry `billingMode`.",
+      "Notes live in /Users/someone/Desktop/notes.md.",
+    ].join("\n"));
+    const failures = await checkMarkdownFiles(root, ["current.md"]);
+    assert.equal(failures.length, 5);
+    assert.equal(failures.filter((line) => line.includes("事件词汇")).length, 2);
+    assert.ok(failures.some((line) => line.includes("schema 9")));
+    assert.ok(failures.some((line) => line.includes("billingMode")));
+    assert.ok(failures.some((line) => line.includes("绝对路径")));
+
+    await writeFile(join(root, "current.md"), [
+      "- `request/snapshot`（已删除）；",
+      "schema 9（历史版本号）已被后续版本取代。",
+      "连接级 `billingMode` 已删除。",
+    ].join("\n"));
+    assert.deepEqual(await checkMarkdownFiles(root, ["current.md"]), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("learnings index counts, coverage and duplicates are verified", async () => {
+  const root = await mkdtemp(join(tmpdir(), "actspace-current-docs-"));
+  try {
+    await mkdir(join(root, "docs/learnings/2026-05"), { recursive: true });
+    await writeFile(join(root, "docs/learnings/2026-05/a.md"), "# A\n");
+    await writeFile(join(root, "docs/learnings/2026-05/b.md"), "# B\n");
+    await writeFile(join(root, "docs/learnings/2026-05/orphan.md"), "# Orphan\n");
+    await writeFile(join(root, "docs/learnings/README.md"), [
+      "# 索引",
+      "",
+      "## 主题一（3）",
+      "",
+      "- 2026-05 [A](2026-05/a.md)",
+      "- 2026-05 [B](2026-05/b.md)",
+      "",
+      "## 主题二（1）",
+      "",
+      "- 2026-05 [A again](2026-05/a.md)",
+      "",
+    ].join("\n"));
+    const failures = await checkLearningsIndex(root);
+    assert.equal(failures.length, 3);
+    assert.ok(failures.some((line) => line.includes("「主题一」声明 3 篇，实际列出 2 篇")));
+    assert.ok(failures.some((line) => line.includes("2026-05/a.md」在索引里出现了 2 次")));
+    assert.ok(failures.some((line) => line.includes("缺少对 2026-05/orphan.md 的索引条目")));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -8,12 +8,12 @@ import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import { providerCodeFromUnknown, retryAfterMsFromUnknown, type LlmFailure, type LlmFailureKind } from "@actspace/llm-service";
 import type { LlmContentBlock, LlmMessage, LlmToolDefinition } from "@actspace/llm-service";
 import type { PiAiArtifactReader, PiAiWireRoute } from "./pi-ai-stream.js";
-import { ProviderProxyError, ProviderProxyPool } from "@actspace/llm-service";
+import { ProviderProxyError, type ProviderProxyPool } from "@actspace/llm-service";
 import { redactLlmText } from "@actspace/llm-service";
 import { describeTransportFailure, transportCauseOf, transportKind } from "./transport-failure.js";
 import type { LlmStreamEvent, LlmStreamSource } from "@actspace/llm-service";
 import type { LlmUsage } from "@actspace/llm-service";
-import { DeepSeekFileUploader } from "./deepseek-files.js";
+import type { DeepSeekFileUploader } from "./deepseek-files.js";
 import { anthropicCacheControl, applyAnthropicPromptCache } from "./anthropic-cache.js";
 
 type SdkClient = Record<string, unknown>;

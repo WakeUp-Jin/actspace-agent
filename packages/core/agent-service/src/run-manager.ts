@@ -3,7 +3,7 @@ import { snapshotSessionJson } from "@actspace/session-journal";
 import { BACKGROUND_WAKE_KIND, isBackgroundWake, type RuntimeV2JsonValue, type RuntimeV2AgentMode } from "@actspace/shared/runtime-v2";
 import { TaskError, type HarnessIdentity, type RunOutcome, type TaskRecord, type TaskReceipt } from "./contracts.js";
 import { RunBudget } from "./execution-budget.js";
-import { TaskLedger } from "./task-ledger.js";
+import type { TaskLedger } from "./task-ledger.js";
 
 export const RUN_FACTORY_SERVICE = "agent.run-factory";
 export type ExecutionConfiguration = { readonly durationMs?: number; readonly deadline?: number; readonly mode: RuntimeV2AgentMode; readonly model?: string; readonly thinkingEnabled?: boolean; readonly reasoningEffort?: import("@actspace/shared").ModelReasoningEffort; readonly selectedSkillIds?: readonly string[] };

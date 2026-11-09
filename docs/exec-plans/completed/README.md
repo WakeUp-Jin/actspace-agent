@@ -2,7 +2,7 @@
 
 这里的计划实现已经完成，原文保持不动；本页只做检索。人工验收边界保留在各计划正文和对应的[执行摘要](../../exec-runs/README.md)里，不代表全部验证通过。生命周期规则见 [执行计划](../README.md)。
 
-共 198 项，按日期从新到旧；无日期前缀的早期计划排在最后。
+共 208 项，按日期从新到旧；无日期前缀的早期计划排在最后。
 
 另有 [design-archive/](design-archive/)：docs 整理时从前端设计文档里拆出的决策表、测试清单、交接记录和早期重构稿，只做追溯。
 
@@ -10,6 +10,16 @@
 |---|---|---|
 | 2026-11-08 | [性能第三轮：高频路径不再整份读日志](20261108-perf-round3.md) | P1–P4：自动审查上下文、压缩摘要查找、子 Agent 面板轮询改成增量，读旧事件不再深拷贝；每项配 1k / 10k 规模测试，新增 `pnpm check:scale-tests` 覆盖检查；实机采样对比未做 |
 | 2026-11-08 | [CI 重新上线与桌面发布流水线](20261108-ci-pipelines.md) | P1–P5 随 #48 / #57 / #58 合入 main：CI 必红修掉并分层加缓存、Dependabot / CodeQL、`v*` tag 四平台打包 + 草稿 Release、Electron 39 → 45；首个 tag 实发、Windows 与 Electron 45 实机走查未做 |
+| 2026-11-08 | [上下文面板整理](20261108-context-panel-polish.md) | 上下文事件写清变化、明细分页并入「再显示」、去掉卡片边框；合入 main #45；Electron 实机检查未做 |
+| 2026-11-08 | [pi-ai 1.5.0 与复用内置服务商](20261108-pi-ai-builtin-providers.md) | 连接 Base URL 命中 pi-ai 内置服务商时复用其协议、思考参数与请求头，代理改走请求级 fetch；合入 main #41；真实 Key 与 Electron 实机检查未做 |
+| 2026-11-08 | [子智能体单行卡片、来信卡片与面板实时动态](20261108-subagent-compact-cards.md) | 派发卡片改单行，实时动态移到右侧列表，`agent_message` 改为来信卡片；合入 main #37；Electron 实机检查未做 |
+| 2026-11-07 | [统计页重做（使用统计 + Harness 统计）](20261107-stats-redesign.md) | 两页按 demo 第 4 版重做，只算页面显示的数，统计库 Schema 17 → 18 整库重建；合入 main #38；Electron 真实数据走查未做 |
+| 2026-11-07 | [编辑提问重发与空闲发送不进队列](20261107-edit-resend-rewind.md) | 点提问卡片原地编辑后从该轮重来，`tasks.submit` 带 `rewind`；空闲发送不闪队列；合入 main #36 |
+| 2026-11-07 | [对话内容只存一份：surface 只做标记](20261107-surface-derived.md) | envelope 的 `surface` 不再带 `node`，节点由 `surfaceNode(event)` 从 `data` 推出；旧会话按用户确认删除；合入 main #35 |
+| 2026-11-07 | [上下文引擎不再每次请求复制对话](20261107-context-trusted-surface.md) | 日志交出的对话视图登记为已信任，上下文引擎直接引用；run8 实测 `stateDigest` 239 → 87 MB；合入 main #35 |
+| 2026-11-07 | [流式 Markdown：尾部解析降频与解析器常驻](20261107-markdown-stream-throttle.md) | 流式尾部最多每 100ms 解析一次，两次解析之间原样显示；run8 实测渲染进程 Markdown 约 722 → 48 MB；合入 main #35 |
+| 2026-11-06 | [请求记录只在变化时写完整内容](20261106-request-record.md) | 提示词、工具拆成只在变化时写的事件，`request/context` 只留小字段，估算从日志推算；run4 日志 8.57 → 1.60 MB；合入 main #35 |
+| 2026-11-05 | [流式输出只走实时通道](20261105-live-assistant-stream.md) | 新会话不再持久化 `assistant/chunk`，`assistant/message` 记 `firstTokenAt`，主进程保存未定稿底稿；合入 main #35 |
 | 2026-11-08 | [模型目录价格锁定与删除运行时刷新](20261108-catalog-price-lock.md) | 生成脚本改合并模式（已有条目锁定、只新增、不删除、改价清单、报告），删除 Desktop 运行时目录刷新；Electron 实机检查未做 |
 | 2026-11-04 | [卡顿与内存修复](20261104-perf-jank-fix.md) | journal 增量续读 + LRU 缓存、空闲会话释放、流式 IPC 合并、渲染订阅隔离与懒加载、客户端追加与缓存上限；Electron 实机验收未做 |
 | 2026-11-04 | [docs 整理：前端设计规范重建与冗余清理](20261104-docs-reorg.md) | 前端四份必读规范与区域规范路由表、设计文档唯一索引、执行记录与学习文档去重、文档检查加严 |

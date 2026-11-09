@@ -1,6 +1,6 @@
 # 执行过程：统计页重做
 
-计划：[20261107-stats-redesign](../../exec-plans/active/20261107-stats-redesign.md)
+计划：[20261107-stats-redesign](../../exec-plans/completed/20261107-stats-redesign.md)
 
 ## 2026-11-07
 

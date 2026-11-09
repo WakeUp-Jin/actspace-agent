@@ -36,7 +36,7 @@ it("reuses the previous transcript when the fetch is identical and keeps unchang
   const more = reconcileTranscript(first, JSON.parse(JSON.stringify([user, reply, event("a2", "assistant_message", { content: "done" })])));
   expect(more).not.toBe(first);
   expect(more.blocks.length).toBe(first.blocks.length + 1);
-  first.blocks.forEach((block, index) => expect(more.blocks[index]).toBe(block));
+  first.blocks.forEach((block, index) => { expect(more.blocks[index]).toBe(block); });
 });
 
 it("keeps the list and unchanged agents by reference when a poll carries no change", () => {

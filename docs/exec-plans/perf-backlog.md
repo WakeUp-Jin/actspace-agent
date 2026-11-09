@@ -17,18 +17,12 @@
 
 | # | 进程 | 热点 | run8 分配 | 状态 | 方案 / 下一步 |
 |---|---|---|---|---|---|
-| P10 | 主进程 | **工具参数流式片段整段重解析**：pi-ai 每收到一个工具参数片段，就对已收到的全部参数做一次 `parseStreamingJson`（含 `repairJson`），参数越长越慢，是 O(n²)（`openai-completions.js`；`anthropic-messages.js`、`openai-responses-shared.js` 同样如此）。我们的适配层（`packages/llm/llm-pi-ai/src/pi-ai-stream.ts`）只用 `delta`，不用这份中间结果 | 约 1.9 GB（2026-11-07 用 `analyze.mjs` 复查 run8 时发现） | 待拍板 | 建议在现有 `patches/@earendil-works__pi-ai@0.82.1.patch` 里去掉片段时的解析，只在工具调用结束时解析一次；要先确认 pi-ai 自己的 `partial` 消息有没有别的读者 |
+| P10 | 主进程 | **工具参数流式片段整段重解析**：pi-ai 每收到一个工具参数片段，就对已收到的全部参数做一次 `parseStreamingJson`（含 `repairJson`），参数越长越慢，是 O(n²)（`openai-completions.js`；`anthropic-messages.js`、`openai-responses-shared.js` 同样如此）。我们的适配层（`packages/llm/llm-pi-ai/src/pi-ai-stream.ts`）只用 `delta`，不用这份中间结果 | 约 1.9 GB（2026-11-07 用 `analyze.mjs` 复查 run8 时发现） | 待拍板 | 建议在现有 `patches/@earendil-works__pi-ai@1.5.0.patch` 里去掉片段时的解析，只在工具调用结束时解析一次；要先确认 pi-ai 自己的 `partial` 消息有没有别的读者 |
 | P5 | 主进程 | `inspect` / `readModel` | 约 350 MB | 待查 | 第三轮做完重跑后，用 `callers.mjs` 查调用方 |
 | P6 | 主进程 | `sharedView` / `assertJson` | 约 295 MB | 待查 | 同上 |
 | P7 | 渲染进程 | 每个实时事件都重算整份聊天投影：`selectChatSession` / `projectChatWindow` / `applyLiveEvent` | 约 175 MB | 待查 | 查是否能只更新受影响的消息 |
 | P8 | 渲染进程 | `toolPreview` | 约 91 MB | 待查 | 查是否每帧重算 |
 | P9 | 主进程 | `usage-source-cache.ts` 对每个会话调 `inspectSessionEvents` 后再过滤 | 未单独测 | 待查 | 低频（统计页），先确认触发频率 |
-
-## 未收尾的上一轮
-
-| 项 | 状态 |
-|---|---|
-| 流式 Markdown 解析降频（[计划](active/20261107-markdown-stream-throttle.md)） | 已提交 `297e170c`，run8 验证有效；Electron 里流式观感待用户看 |
 
 ## 已完成
 

@@ -4,7 +4,7 @@ import { codecs, SUPPLEMENT_EVENT } from "../codec.js";
 import { ContextSupplements, type ContextSession } from "../supplements.js";
 
 function fixture(seed: SessionJournal["events"] = []): ContextSession {
-  const registry = createCoreCodecRegistry(); codecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); codecs.forEach(codec => { registry.register(codec); });
   const journal = new SessionJournal({ registry, seed });
   return { header: { sessionId: "s" }, journal, get lastSeq() { return journal.lastSeq; }, append: async value => journal.append(value), flush: async () => {} };
 }
