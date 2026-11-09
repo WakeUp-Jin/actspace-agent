@@ -9,7 +9,7 @@
 - **进行中**：已经开了执行计划。
 - **已完成**：写明提交号。
 
-一项做完，就从「待做」移到「已完成」，写上实测前后的数字。
+一项做完，就从「待做」移到「已完成」，写上实测前后的数字。第三轮（P1–P4）2026-11-09 完成，实机对比待用户按[内存采样工具](../tools/heap-monitor/README.md)重跑一轮后补数字；执行记录见 [执行摘要](../exec-runs/20261108-perf-round3/execution-summary.md)。
 
 ## 待做
 
@@ -17,10 +17,6 @@
 
 | # | 进程 | 热点 | run8 分配 | 状态 | 方案 / 下一步 |
 |---|---|---|---|---|---|
-| P1 | 主进程 | **自动审查整份读日志**：`reviewSessionAction` 每次审批对整个会话做两遍 `iterateEvents()`（`packages/core/runtime/src/harness/review-session-action.ts`），内存窗口外的事件逐行从文件解析 | 约 1.3 GB | 进行中 | 第三轮 R1，见 [执行计划](active/20261108-perf-round3.md) |
-| P2 | 主进程 | **每次请求查压缩摘要**：`loop.ts` 的 `contextInput` 对每个 surface 条目调一次 `journal.readEvents(seq, seq + 1)`（`packages/core/agent-loop/src/loop.ts`） | 约 480 MB | 进行中 | 第三轮 R2 |
-| P3 | 主进程 | **子 Agent 面板每秒整份读日志**：`getSubagents` 每次调 `inspectSessionEvents`（`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`），同文件的 `revealSubagentRecord`、`getSubAgentTranscript` 也一样 | 约 340 MB | 进行中 | 第三轮 R3 |
-| P4 | 主进程 | **读旧事件时多余的深拷贝**：`JsonlEventHistory.readEvents` 对刚 `JSON.parse` 出来的每一行再做 `snapshotSessionJson`（`packages/session/session-persistence-jsonl/src/event-history.ts`） | 约 860 MB（和 P1–P3 有重叠） | 进行中 | 第三轮 R4 |
 | P10 | 主进程 | **工具参数流式片段整段重解析**：pi-ai 每收到一个工具参数片段，就对已收到的全部参数做一次 `parseStreamingJson`（含 `repairJson`），参数越长越慢，是 O(n²)（`openai-completions.js`；`anthropic-messages.js`、`openai-responses-shared.js` 同样如此）。我们的适配层（`packages/llm/llm-pi-ai/src/pi-ai-stream.ts`）只用 `delta`，不用这份中间结果 | 约 1.9 GB（2026-11-07 用 `analyze.mjs` 复查 run8 时发现） | 待拍板 | 建议在现有 `patches/@earendil-works__pi-ai@1.5.0.patch` 里去掉片段时的解析，只在工具调用结束时解析一次；要先确认 pi-ai 自己的 `partial` 消息有没有别的读者 |
 | P5 | 主进程 | `inspect` / `readModel` | 约 350 MB | 待查 | 第三轮做完重跑后，用 `callers.mjs` 查调用方 |
 | P6 | 主进程 | `sharedView` / `assertJson` | 约 295 MB | 待查 | 同上 |
@@ -38,3 +34,8 @@
 | 第二轮 | 对话内容只存一份，surface 只做标记 | — | `cd0ff335` |
 | 第二轮 | 上下文引擎直接用日志视图 | `stateDigest` 239 → 87 MB，`toLlmInput` 156 → 31 MB，对话 `cacheKey` 133 → 约 0 MB（run7 → run8） | `015b273f` |
 | 第二轮 | 流式 Markdown 解析降频、处理器常驻 | 渲染进程 Markdown 约 722 MB → 约 48 MB（run7 → run8，run8 时长是两倍） | `297e170c` |
+| 第三轮 | P1 自动审查：审查上下文按会话增量折叠（`journal.project`），审查后的检查改 `eventsAfter`；审查语义不变（压缩后仍交原始消息） | 规模测试：第二次审查从归档读的事件数 1k / 10k 都 ≤ 16（旧实现 1008 / 19008）；实机待重跑 | `12810fea` |
+| 第三轮 | P2 每次请求查压缩摘要：surface 替换条目记 `compactionId`，`contextInput` 直接从 surface 取 | 规模测试：两次请求之间归档读取 1k / 10k 相同（旧实现 337 / 1533）；实机待重跑 | `1a300840` |
+| 第三轮 | P3 子 Agent 面板：按会话常驻折叠状态，只折叠 `inspectSessionEventsAfter(throughSeq)` 的新增事件 | 规模测试：连续轮询 10 次，第二次起归档读取为 0（旧实现 4392 / 85428）；实机待重跑 | `8f1e6d4b` |
+| 第三轮 | P4 读旧事件：只校验、深冻结，不再 `snapshotSessionJson` 深拷贝 | 规模测试：读 1k / 10k 条 `snapshotSessionJson` 调用 0 次；实机待重跑 | `45b675b1` |
+| 第三轮 | 配套：`pnpm check:scale-tests` 规模测试覆盖检查，hot-path-reads 基线收紧 | — | `d8fe2499`、`24910abc` |

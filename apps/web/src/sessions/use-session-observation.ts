@@ -38,8 +38,8 @@ export function useSessionObservation(sessionId: string): SessionObservation {
   }, [connection, sessionId, store]);
 
   const state = useSyncExternalStore(observer ? observer.subscribe : never, observer ? observer.getState : () => EMPTY_OBSERVATION);
-  const loadOlder = useCallback(() => observer?.loadOlder() ?? Promise.resolve(), [observer]);
-  const refresh = useCallback(() => observer?.refresh() ?? Promise.resolve(), [observer]);
+  const loadOlder = useCallback(() => (observer ? observer.loadOlder() : Promise.resolve()), [observer]);
+  const refresh = useCallback(() => (observer ? observer.refresh() : Promise.resolve()), [observer]);
   const applyTasks = useCallback<SessionObserver["applyTasks"]>(snapshot => observer?.applyTasks(snapshot), [observer]);
   return { ...state, disconnected: connection === null, loadOlder, applyTasks, refresh };
 }

@@ -11,18 +11,28 @@ export function extractEnglish(text: string): string[] {
       continue;
     }
     if (fence || /^(?: {4}|\t)/.test(line)) continue;
-    const clean = line
+    const clean = withoutTags(line
       .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
       .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
       .replace(/`+[^`]*`+/g, "")
-      .replace(/https?:\/\/\S+/g, "")
-      .replace(/<[^>]*>/g, "")
+      .replace(/https?:\/\/\S+/g, ""))
       .replace(/^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/, "")
       .replace(/[*_~|]/g, "").replace(/\s+/g, " ").trim();
     if (!/[A-Za-z]{2}/.test(clean) || /\p{Script=Han}/u.test(clean) || /^(?:[./~]|[A-Za-z]:[\\/])\S*$/.test(clean)) continue;
     result.push(...splitEnglish(clean));
   }
   return result;
+}
+
+/** 反复剥到不再变化：单次 replace 会把 `<<b>b>` 剥成 `<b>`。 */
+function withoutTags(text: string): string {
+  let current = text;
+  let previous: string;
+  do {
+    previous = current;
+    current = current.replace(/<[^>]*>/g, "");
+  } while (current !== previous);
+  return current;
 }
 
 export function splitEnglish(text: string, limit = 1_000): string[] {

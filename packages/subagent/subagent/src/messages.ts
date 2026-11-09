@@ -1,3 +1,4 @@
+import { trimTrailing } from "@actspace/shared";
 import { SUBAGENT_RESULT_LIMIT_BYTES, type SubagentActivationStatus } from "@actspace/shared/runtime-v2";
 
 /**
@@ -198,9 +199,9 @@ function resultBody(text: string, truncated: boolean): string {
 /** One sentence of an error message, without its own final period (the template adds one). */
 function sentence(error: string | undefined): string {
   const line = (error ?? "").split("\n").map(value => value.trim()).find(Boolean) ?? "unknown error";
-  return line.replace(/[.。]+$/u, "");
+  return trimTrailing(line, ".。");
 }
 
 function escapeXml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

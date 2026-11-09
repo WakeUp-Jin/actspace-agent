@@ -1,0 +1,45 @@
+{
+  "entries": [
+    {
+      "path": "每次模型请求",
+      "source": "packages/core/agent-loop/src/loop.ts",
+      "tests": ["packages/core/agent-loop/src/test/context-input.scale.test.ts"]
+    },
+    {
+      "path": "每次审批",
+      "source": "packages/core/runtime/src/harness/review-session-action.ts",
+      "tests": ["packages/core/runtime/src/harness/review-session-action.scale.test.ts"]
+    },
+    {
+      "path": "每次审批",
+      "source": "packages/approval/auto-review/src/context.ts",
+      "tests": ["packages/core/runtime/src/harness/review-session-action.scale.test.ts"]
+    },
+    {
+      "path": "IPC 轮询（子 Agent 面板）",
+      "source": "apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts",
+      "tests": ["apps/desktop/src/main/test/subagent-list-ipc.scale.test.ts"]
+    },
+    {
+      "path": "IPC 轮询（子 Agent 面板）",
+      "source": "packages/client/client/src/sessions/subagent-list.ts",
+      "tests": ["apps/desktop/src/main/test/subagent-list-ipc.scale.test.ts"]
+    },
+    {
+      "path": "内存窗口外的事件从文件读回",
+      "source": "packages/session/session-persistence-jsonl/src/event-history.ts",
+      "tests": ["packages/session/session-persistence-jsonl/src/test/event-history.scale.test.ts"]
+    }
+  ],
+  "pending": {
+    "apps/desktop/src/main/runtime-v2/runtime-registry.ts": "历史产物查找与导出；低频，待确认触发频率后归入 perf-backlog",
+    "packages/context/context-engine/src/supplements.ts": "补充条目投影用 journal.events；perf-backlog P6 待查",
+    "packages/core/agent-service/src/task-ledger.ts": "任务账本整份读；低频（打开任务列表），待归入 perf-backlog",
+    "packages/core/runtime/src/harness/managed-runs.ts": "托管运行恢复整份读；低频（启动），待归入 perf-backlog",
+    "packages/core/runtime/src/session/session-controller.ts": "inspectEvents / 冷会话读模型；perf-backlog P5 待查",
+    "packages/session/session-journal/src/journal.ts": "journal.events 兼容入口与 latestEvent 的逐条读；perf-backlog P5 待查",
+    "packages/session/session-persistence-jsonl/src/repair.ts": "修复流程整份读；低频（恢复）",
+    "packages/session/session-persistence/src/recovery.ts": "恢复流程整份读；低频（恢复）",
+    "packages/subagent/subagent/src/manager.ts": "子 Agent 管理器整份遍历日志；待归入 perf-backlog"
+  }
+}

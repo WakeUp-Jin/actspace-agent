@@ -63,9 +63,14 @@ function reducers(): ContextReducerRegistry {
   return registry;
 }
 
-/** 生成的 instanceGeneration 是随机 UUID，比较前抹掉。 */
+/**
+ * 生成的 instanceGeneration 是随机 UUID，比较前抹掉。
+ * surface 条目上的 compactionId 是 1a300840 之后才记的（每次请求不再逐条读 surface/replaced 事件），
+ * 不进 messages、manifest 和请求记录，golden 是改前代码跑出来的，所以比较时也抹掉。
+ */
+const IGNORED_KEYS: Record<string, unknown> = { instanceGeneration: "<generation>", compactionId: undefined };
 function stable(value: unknown): string {
-  return JSON.stringify(value, (key, child) => key === "instanceGeneration" ? "<generation>" : child);
+  return JSON.stringify(value, (key, child) => key in IGNORED_KEYS ? IGNORED_KEYS[key] : child);
 }
 function plain(value: unknown): RuntimeV2JsonValue { return JSON.parse(stable(value)) as RuntimeV2JsonValue; }
 function digest(value: unknown): string { return createHash("sha256").update(stable(value)).digest("hex"); }

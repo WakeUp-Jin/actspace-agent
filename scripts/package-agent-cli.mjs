@@ -86,9 +86,12 @@ async function integrityManifest(root) {
   const files = (await regularFiles(root)).filter((path) => path !== join(root, "MANIFEST.sha256")).sort();
   const rows = [];
   for (const path of files) {
-    const metadata = await lstat(path);
     const relativePath = path.slice(root.length + 1);
-    const payload = metadata.isSymbolicLink() ? Buffer.from(`symlink:${await readlink(path)}`) : await readFile(path);
+    // readlink 对非符号链接报 EINVAL；不先 lstat 再读，避免两步之间文件被换掉。
+    const payload = await readlink(path).then(
+      (target) => Buffer.from(`symlink:${target}`),
+      (error) => { if (error?.code !== "EINVAL") throw error; return readFile(path); },
+    );
     rows.push(`${createHash("sha256").update(payload).digest("hex")}  ${relativePath}`);
   }
   return `${rows.join("\n")}\n`;
