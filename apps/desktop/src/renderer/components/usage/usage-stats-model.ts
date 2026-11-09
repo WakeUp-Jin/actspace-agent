@@ -83,7 +83,7 @@ export function tokenTypeSegments(summary: Summary): DonutSegment[] {
 
 export function tokenModelSegments(models: readonly UsageActivityAggregate[]): DonutSegment[] {
   return modelsWithLabels(models).filter((model) => model.totalTokens > 0).map((model, index) => ({
-    key: model.key, label: model.displayLabel, value: model.totalTokens, color: SERIES_COLORS[index % SERIES_COLORS.length]!, valueLabel: fmtTokens(model.totalTokens),
+    key: model.key, label: model.displayLabel, value: model.totalTokens, color: SERIES_COLORS[index % SERIES_COLORS.length], valueLabel: fmtTokens(model.totalTokens),
   }));
 }
 
@@ -113,7 +113,7 @@ export function phaseSegments(data: UsageActivitySnapshot): DonutSegment[] {
 
 export function toolTimeSegments(data: UsageActivitySnapshot): DonutSegment[] {
   return [...(data.tools ?? [])].sort((a, b) => b.durationMs - a.durationMs).slice(0, 7).filter((tool) => tool.durationMs > 0).map((tool, index) => ({
-    key: tool.name, label: tool.name, value: tool.durationMs, color: SERIES_COLORS[index % SERIES_COLORS.length]!, valueLabel: timeValue(tool.durationMs, tool.durationSamples),
+    key: tool.name, label: tool.name, value: tool.durationMs, color: SERIES_COLORS[index % SERIES_COLORS.length], valueLabel: timeValue(tool.durationMs, tool.durationSamples),
   }));
 }
 
@@ -134,10 +134,10 @@ export function trendModel(series: UsageSeries, metric: TrendMetric) {
   const values = series.buckets.map((bucket) => bucketValue(metric, bucket));
   const unitWord = series.unit === "hour" ? "每小时" : series.unit === "week" ? "每周" : "每天";
   const total = values.reduce((sum, value) => sum + value, 0);
-  const bars = series.buckets.map((bucket, index) => ({ key: bucket.start, value: values[index]!, tip: `${bucketLabel(series.unit, bucket.start)}\n${fmtTrend(metric, values[index]!)}` }));
+  const bars = series.buckets.map((bucket, index) => ({ key: bucket.start, value: values[index], tip: `${bucketLabel(series.unit, bucket.start)}\n${fmtTrend(metric, values[index])}` }));
   const n = series.buckets.length;
   const short = (start: string) => (series.unit === "hour" ? `${Number(start.slice(11, 13))}:00` : `${Number(start.slice(5, 7))}月${Number(start.slice(8, 10))}日`);
-  const xLabels = n === 0 ? [] : n < 3 ? series.buckets.map((bucket) => short(bucket.start)) : [short(series.buckets[0]!.start), short(series.buckets[Math.floor((n - 1) / 2)]!.start), short(series.buckets[n - 1]!.start)];
+  const xLabels = n === 0 ? [] : n < 3 ? series.buckets.map((bucket) => short(bucket.start)) : [short(series.buckets[0].start), short(series.buckets[Math.floor((n - 1) / 2)].start), short(series.buckets[n - 1].start)];
   return { bars, xLabels, max: n ? Math.max(...values) : 0, average: n ? total / n : 0, unitWord };
 }
 

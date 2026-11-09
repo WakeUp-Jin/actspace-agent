@@ -63,7 +63,7 @@ function describeFiles(text: string, previous: SupplementMemory | undefined): De
   const paths = text.split("\n").flatMap(line => {
     const match = /^- ("(?:[^"\\]|\\.)*")/.exec(line);
     if (!match) return [];
-    try { const path = JSON.parse(match[1]!) as unknown; return typeof path === "string" ? [path] : []; } catch { return []; }
+    try { const path = JSON.parse(match[1]) as unknown; return typeof path === "string" ? [path] : []; } catch { return []; }
   });
   const old = new Set(previous?.paths ?? []); const now = new Set(paths);
   const added = paths.filter(path => !old.has(path));
@@ -102,7 +102,7 @@ function running(descriptions: readonly string[]): string {
 }
 
 function changed(verb: string, paths: readonly string[]): string {
-  const first = basename(paths[0]!);
+  const first = basename(paths[0]);
   return paths.length === 1 ? `${verb} ${first}` : `${verb} ${first} 等 ${paths.length} 个`;
 }
 

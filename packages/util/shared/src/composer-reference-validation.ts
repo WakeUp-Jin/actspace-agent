@@ -18,7 +18,7 @@ export async function validateRunReferences(ports: ReferenceValidationPorts, inp
   const snapshot = await ports.inspectSession(input.sessionId);
   if (files.value.length) {
     if (snapshot.agentForm === "chat") return { ok: false, issue: { code: "file_references_not_allowed", kind: "file" } };
-    if (!snapshot.workspaceRoot) return { ok: false, issue: { code: "file_not_found", kind: "file", index: 0, relativePath: files.value[0]!.relativePath } };
+    if (!snapshot.workspaceRoot) return { ok: false, issue: { code: "file_not_found", kind: "file", index: 0, relativePath: files.value[0].relativePath } };
     for (const [index, reference] of files.value.entries()) {
       const resolved = await ports.resolveFile(snapshot.workspaceRoot, reference.relativePath);
       if (resolved.ok === false) return { ok: false, issue: { code: resolved.code, kind: "file", index, relativePath: reference.relativePath } };

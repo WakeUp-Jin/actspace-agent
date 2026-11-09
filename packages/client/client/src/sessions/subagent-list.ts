@@ -27,7 +27,7 @@ export function projectSubagentItems(journal: readonly SessionEventEnvelopeV1[],
   }
   return tree.order.map((agentId) => {
     const message = lastMessages.get(agentId);
-    const listed = item(tree.agents[agentId]!, childModels.get(agentId), callArgs);
+    const listed = item(tree.agents[agentId], childModels.get(agentId), callArgs);
     return message ? { ...listed, lastMessage: { text: message.text, at: message.at } } : listed;
   });
 }

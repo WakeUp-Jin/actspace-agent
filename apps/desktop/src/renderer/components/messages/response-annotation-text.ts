@@ -54,8 +54,8 @@ export function rangeToOffsets(model: AnnotatableText, range: Range, root: HTMLE
   if (start === null || end === null) return null;
   let trimmedStart = start;
   let trimmedEnd = end;
-  while (trimmedStart < trimmedEnd && /\s/u.test(model.text[trimmedStart]!)) trimmedStart += 1;
-  while (trimmedEnd > trimmedStart && /\s/u.test(model.text[trimmedEnd - 1]!)) trimmedEnd -= 1;
+  while (trimmedStart < trimmedEnd && /\s/u.test(model.text[trimmedStart])) trimmedStart += 1;
+  while (trimmedEnd > trimmedStart && /\s/u.test(model.text[trimmedEnd - 1])) trimmedEnd -= 1;
   return trimmedStart < trimmedEnd ? { start: trimmedStart, end: trimmedEnd } : null;
 }
 

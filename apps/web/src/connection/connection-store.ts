@@ -264,7 +264,7 @@ export class ConnectionStore {
   }
 
   #schedule(error: ConnectionError): void {
-    const delay = RECONNECT_DELAYS_MS[Math.min(this.#attempt, RECONNECT_DELAYS_MS.length - 1)]!;
+    const delay = RECONNECT_DELAYS_MS[Math.min(this.#attempt, RECONNECT_DELAYS_MS.length - 1)];
     this.#attempt++;
     clearTimeout(this.#timer);
     const generation = this.#generation;

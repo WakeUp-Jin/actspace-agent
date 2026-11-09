@@ -71,7 +71,7 @@ export class SessionStore {
         }
         const result: Record<string, unknown> = {};
         for (const [key, item] of Object.entries(record)) {
-          result[key] = key === "artifactId" && artifactId !== undefined ? copied.get(artifactId)! : await rewrite(item);
+          result[key] = key === "artifactId" && artifactId !== undefined ? copied.get(artifactId) : await rewrite(item);
         }
         return result;
       };

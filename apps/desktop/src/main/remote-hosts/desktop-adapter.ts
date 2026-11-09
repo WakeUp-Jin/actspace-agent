@@ -84,7 +84,7 @@ export class RemoteDesktopAdapter {
     for (const [previous, subscriptionId] of this.#subscribed) {
       if (previous === key) continue;
       this.#subscribed.delete(previous);
-      const hostId = (JSON.parse(previous) as string[])[0]!;
+      const hostId = (JSON.parse(previous) as string[])[0];
       if (subscriptionId) await this.hosts.call(hostId, "sessions.unobserve", { subscriptionId }).catch(() => undefined);
       for (const cursor of this.#cursors.keys()) if (cursor.endsWith(`:${subscriptionId}`)) this.#cursors.delete(cursor);
     }

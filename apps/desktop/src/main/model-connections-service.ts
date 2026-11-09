@@ -529,7 +529,7 @@ export class ModelConnectionsService {
   #connectionModels(connectionId: string): { key: ModelKey; apiModel: string }[] {
     const models = this.settings.getV4().settings.models;
     const definitions = this.models.getModelSnapshot().definitions;
-    return this.#keysOf(models, connectionId).flatMap((key) => definitions[key] ? [{ key, apiModel: definitions[key]!.apiModel }] : []);
+    return this.#keysOf(models, connectionId).flatMap((key) => definitions[key] ? [{ key, apiModel: definitions[key].apiModel }] : []);
   }
 
   async #run(action: () => Promise<string | undefined>): Promise<ModelConnectionsResult> {
@@ -618,7 +618,7 @@ function removeKeysPatch(models: SettingsV4Models, keys: ModelKey[]): SettingsV4
   const nulls: Partial<Record<ModelKey, null>> = Object.fromEntries(keys.map((key) => [key, null]));
   const bindings = models.taskBindings;
   const cleared: SettingsV4ModelsPatch["taskBindings"] = Object.fromEntries((["defaultChat", "utility", "autoReview", "subagentDefaultModel", "vision"] as const)
-    .filter((field) => bindings[field] && removed.has(bindings[field]!))
+    .filter((field) => bindings[field] && removed.has(bindings[field]))
     .map((field) => [field, null]));
   return {
     definitions: Object.fromEntries(keys.filter((key) => models.definitions[key]?.source !== "builtin" && models.definitions[key]?.source !== "curated").map((key) => [key, null])),

@@ -44,7 +44,7 @@ export const emptyLiveContent = (): LiveContent => ({ text: "", thinking: "", ca
 /** Fold `chunks[from..]` into `content`: message text, reasoning, and tool-argument deltas per callId. */
 export function appendChunks(content: LiveContent, chunks: readonly RuntimeV2TrajectoryNode[], from = 0): LiveContent {
   for (let index = from; index < chunks.length; index += 1) {
-    const node = chunks[index]!;
+    const node = chunks[index];
     const data = dataOf(node);
     content.sequences.push(node.eventSeq);
     content.chunks.push(node.data);

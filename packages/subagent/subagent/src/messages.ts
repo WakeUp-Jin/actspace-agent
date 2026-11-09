@@ -187,7 +187,7 @@ export function truncateUtf8(text: string, limitBytes = SUBAGENT_RESULT_LIMIT_BY
   const bytes = Buffer.from(text, "utf8");
   if (bytes.length <= limitBytes) return { text, truncated: false };
   let end = limitBytes;
-  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end -= 1;
+  while (end > 0 && (bytes[end] & 0xc0) === 0x80) end -= 1;
   return { text: bytes.subarray(0, end).toString("utf8"), truncated: true };
 }
 

@@ -57,9 +57,9 @@ export const TrajectoryTable = memo(function TrajectoryTable(props: TrajectoryTa
     scrollMargin,
   });
   const items = virtualized ? virtualizer.getVirtualItems() : [];
-  const rendered = virtualized ? items.map(item => ({ position: item.index, row: rows[item.index]! })) : rows.map((row, position) => ({ position, row }));
+  const rendered = virtualized ? items.map(item => ({ position: item.index, row: rows[item.index] })) : rows.map((row, position) => ({ position, row }));
   const virtualTop = virtualized ? Math.max(0, (items[0]?.start ?? 0) - scrollMargin) : 0;
-  const virtualBottom = virtualized && items.length > 0 ? Math.max(0, virtualizer.getTotalSize() + scrollMargin - items.at(-1)!.end) : 0;
+  const virtualBottom = virtualized && items.length > 0 ? Math.max(0, virtualizer.getTotalSize() + scrollMargin - items.at(-1).end) : 0;
 
   const scrollToBottom = useCallback(() => {
     const pane = paneRef.current;
@@ -82,7 +82,7 @@ export const TrajectoryTable = memo(function TrajectoryTable(props: TrajectoryTa
     if (index < 0) return;
     followsTail.current = false;
     if (virtualized) virtualizer.scrollToIndex(index, { align: 'auto' });
-    else paneRef.current?.querySelector<HTMLElement>(`tr[data-trajectory-row-key="${CSS.escape(rows[index]!.key)}"]`)?.scrollIntoView?.({ block: 'nearest' });
+    else paneRef.current?.querySelector<HTMLElement>(`tr[data-trajectory-row-key="${CSS.escape(rows[index].key)}"]`)?.scrollIntoView?.({ block: 'nearest' });
     props.onScrolled();
   }, [props.scrollToId, rows, virtualized, virtualizer, props.onScrolled]);
 
