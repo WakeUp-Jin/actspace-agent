@@ -460,6 +460,14 @@ export class RuntimeSessionController {
     return { ...batch, events };
   }
   async inspectEvents(sessionId: string): Promise<readonly SessionEventEnvelopeV1[]> { const open = this.liveSession(sessionId); if (open !== undefined) return open.journal.readEvents(); const inspection = await this.store.inspect(sessionId); if (inspection.header === null || inspection.validation === null) throw new Error(`Session ${sessionId} is corrupt.`); return inspection.events; }
+  /** `afterSeq` 之后的事件和当前 lastSeq，给按会话常驻的增量折叠用。内存里的会话只碰尾部窗口；冷会话才整份读取。 */
+  async inspectEventsAfter(sessionId: string, afterSeq: number): Promise<{ readonly lastSeq: number; readonly events: readonly SessionEventEnvelopeV1[] }> {
+    const live = this.liveSession(sessionId);
+    if (live !== undefined) { const lastSeq = live.journal.lastSeq; return { lastSeq, events: afterSeq >= lastSeq ? [] : live.journal.eventsAfter(afterSeq) }; }
+    const events = await this.inspectEvents(sessionId);
+    const lastSeq = events.at(-1)?.seq ?? -1;
+    return { lastSeq, events: afterSeq < 0 ? events : events.filter(event => event.seq > afterSeq) };
+  }
   /** 某类事件的最新一条。内存里的会话查日志自带的类型索引，不读历史；冷会话才整份读取。 */
   async latestEvent(sessionId: string, type: string): Promise<SessionEventEnvelopeV1 | undefined> {
     const live = this.liveSession(sessionId);

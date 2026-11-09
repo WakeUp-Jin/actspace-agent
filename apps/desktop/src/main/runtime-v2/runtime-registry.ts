@@ -173,6 +173,7 @@ export class DesktopRuntimeV2Registry {
   inspectSession(sessionId: string) { return this.requireApp().inspectSession(sessionId); }
   readSessionEventBatch(sessionId: string, input: Parameters<DesktopAppServiceContract["readSessionEventBatch"]>[1]): ReturnType<DesktopAppServiceContract["readSessionEventBatch"]> { return this.requireApp().readSessionEventBatch(sessionId, input); }
   inspectSessionEvents(sessionId: string) { return this.requireApp().inspectSessionEvents(sessionId); }
+  inspectSessionEventsAfter(sessionId: string, afterSeq: number): ReturnType<DesktopAppServiceContract["inspectSessionEventsAfter"]> { return this.requireApp().inspectSessionEventsAfter(sessionId, afterSeq); }
   latestSessionEvent(sessionId: string, type: string) { return this.requireApp().latestSessionEvent(sessionId, type); }
   readSessionProjectionValue(sessionId: string, key: string) { return this.requireApp().readSessionProjectionValue(sessionId, key); }
   readContextEntryText(sessionId: string, scope: string, key: string, revision: number, generation: string) { return this.requireApp().readContextEntryText(sessionId, scope, key, revision, generation); }
