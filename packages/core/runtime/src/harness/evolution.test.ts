@@ -20,6 +20,7 @@ import { AgentRuntimeService } from "./agent-runtime-plugin.js";
 import { RuntimeSessionController } from "../session/session-controller.js";
 import { createAuxiliaryRequestRecorder } from "../session/auxiliary-request-recorder.js";
 import { createContextHost } from "./context-host.js";
+import { MAIN_AGENT_FORM } from "../main-agent-form.js";
 import { createNodeSandboxHostPort } from "@actspace/sandbox";
 
 it("runs the model/tool pipeline: explicit development, next-message activation, session isolation and restart", async () => {
@@ -40,7 +41,7 @@ it("runs the model/tool pipeline: explicit development, next-message activation,
     "session.runtime": sessions,
     "llm.auxiliary-requests": createAuxiliaryRequestRecorder(sessions), "session.journal": { registry }, "session.projection": {},
     "actspace.host.session": { dataRoot: directory, runtimeId: "evolution" },
-    "actspace.host.agent": { disabledHarnessEntries: ["browser-tools"], evolution: { inspect: (context: any) => runtime.evolution.inspect(context), execute: (args: any, context: any) => runtime.evolution.execute(args, context) }, contextDisclosure: createContextHost(() => sessions, toolEnvironment), host, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
+    "actspace.host.agent": { disabledHarnessEntries: ["browser-tools"], evolution: { inspect: (context: any) => runtime.evolution.inspect(context), execute: (args: any, context: any) => runtime.evolution.execute(args, context) }, contextDisclosure: createContextHost(() => sessions, toolEnvironment), host, agentForm: MAIN_AGENT_FORM, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
     "actspace.host.prompt": { workspaceRoot: directory, resolveSource: async () => emptyRuntimePromptSource() },
     "actspace.host.llm": { credentials: { resolve: async () => ({}) }, routes: [{ routeId: "default", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async (input: LlmAdapterDispatchInput) => (async function* () {
       seen.push({ phase, tools: input.request.tools.map(t => t.name) });

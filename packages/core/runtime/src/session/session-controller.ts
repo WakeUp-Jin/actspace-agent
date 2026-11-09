@@ -1,7 +1,8 @@
 import { GlobalSessionIndex, SessionProjectionCache, type ProjectionCacheRead } from "@actspace/session-projection-cache";
 import type { RuntimeV2DesktopSessionProjection, RuntimeV2SessionProjectionInput, RuntimeV2SessionUpdate, RuntimeV2ProjectionValues, RuntimeV2JsonValue, RuntimeV2SessionObservation, RuntimeV2ReadModelWatermarks, RuntimeV2WindowSupportFact } from "@actspace/shared/runtime-v2";
 import { randomUUID } from "node:crypto";
-import { mainAgentFormComposition } from "@actspace/agent";
+import { agentFormComposition } from "@actspace/agent";
+import { MAIN_AGENT_FORM } from "../main-agent-form.js";
 import type { RuntimeV2SessionListItem, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 import type { MainAgentForm } from "@actspace/shared/runtime-v2";
 import { surfaceNode } from "@actspace/shared/runtime-v2";
@@ -283,12 +284,12 @@ export class RuntimeSessionController {
   }; }
   /** New headers describe this runtime; inherited events retain their original provenance. */
   creationProvenance(mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode = "agent"): import("@actspace/session-journal").SessionCreatedWithV1 {
-    const composition = mainAgentFormComposition(this.options.plugins);
+    const composition = agentFormComposition(MAIN_AGENT_FORM, this.options.plugins);
     return {
       profileId: this.options.profileId,
       presetId: "actspace.main",
-      agentFormId: "actspace.main",
-      agentFormVersion: 1,
+      agentFormId: MAIN_AGENT_FORM.id,
+      agentFormVersion: MAIN_AGENT_FORM.version,
       agentCompositionDigest: composition.digest,
       agentMembers: composition.members,
       initialAgentMode: mode,

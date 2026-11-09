@@ -1,6 +1,7 @@
 import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
 import type { AgentLoopLiveEvent } from "@actspace/agent-loop";
 import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
+import type { AgentForm } from "@actspace/agent";
 
 export const AGENT_RUNTIME_HOST_PORT_ID = "actspace.host.agent" as const;
 
@@ -29,6 +30,8 @@ export type AgentRuntimeHostPort = {
   readonly harnessEntryConfig?: Readonly<Record<string, Readonly<Record<string, import("@actspace/shared/runtime-v2").RuntimeV2JsonValue>>>>;
   readonly pinnedHarness?: PinnedHarness;
   readonly host: RuntimeV2HostDescriptor;
+  /** The main Agent form the Host composed from its plugin catalog (`main-agent-form.ts`); the Harness binds its members. */
+  readonly agentForm: AgentForm;
   readonly toolEnvironment: Omit<ToolPreparedEnvironment, "journal">;
   readonly workspaceRoot: string;
   readonly compositionDigest: string;

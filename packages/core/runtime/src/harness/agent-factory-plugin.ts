@@ -8,7 +8,7 @@ import type { ContextEngine, ContextEngineOptions } from "@actspace/context-engi
 import type { RunFactory } from "@actspace/agent-service";
 import { AgentLoop } from "@actspace/agent-loop";
 import type { AgentLoopAssembly } from "@actspace/agent-loop";
-import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, resolveMainAgentPreset, activateMainAgentFormTools, allowedAgentModeTools } from "@actspace/agent";
+import { MAIN_AGENT_DESCRIPTOR, MainAgentInbox, resolveMainAgentPreset, activateAgentFormTools, allowedAgentModeTools, isEvolvedPluginId } from "@actspace/agent";
 import type { AgentSubject } from "@actspace/agent";
 import { type AgentScope, scopeContext } from "@actspace/scope";
 import type { LlmService } from "@actspace/llm-service";
@@ -134,11 +134,12 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
     });
   };
 
-  // The main agent's tools in its scope: form members, plugin manager and evolved plugins.
+  if (host.agentForm === undefined) throw new Error("Agent factory plugin requires actspace.host.agent.agentForm.");
+  // The main agent's tools in its scope: the Host-declared form members and evolved plugins.
   const registerMainTools = (scope: AgentScope) => {
-    activateMainAgentFormTools(scope, tools);
+    activateAgentFormTools(host.agentForm, scope, tools);
     for (const definition of tools.registry.listDefinitions()) {
-      if (definition.pluginId === "actspace.plugin-manager" || definition.pluginId.startsWith("actspace.evolved.")) scope.tools.register({ id: definition.name, owner: definition.pluginId, value: definition.pluginId });
+      if (isEvolvedPluginId(definition.pluginId)) scope.tools.register({ id: definition.name, owner: definition.pluginId, value: definition.pluginId });
     }
   };
 
@@ -212,9 +213,8 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
     try {
       registerMainTools(scope);
       const binding = tools.bindAgentScope(session.header.sessionId, agentId, () => {
-        const mode = run.mode;
-        const names = scope.tools.entries().map(entry => entry.id);
-        return allowedAgentModeTools(mode, names, tools.registry.listDefinitions().filter(d => d.pluginId.startsWith("actspace.evolved.")).map(d => d.name));
+        const scoped = new Set(scope.tools.entries().map(entry => entry.id));
+        return allowedAgentModeTools(run.mode, tools.registry.listDefinitions().filter(definition => scoped.has(definition.name)));
       });
       scope.disposer.add(binding.dispose);
       const subject: AgentSubject = Object.freeze({ agentId, scopeId: scope.identity.scopeId, descriptorId: descriptor.id });
