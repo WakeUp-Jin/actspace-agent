@@ -52,8 +52,7 @@ kind: "package-map"
 | [`browser/`](browser/README.md) | 操控浏览器的工具（默认关） | 1 | 会话 |
 | [`english-learning/`](english-learning/README.md) | 英语学习（默认关） | 1 | 全局 |
 | [`skill/`](skill/README.md) | Skill 的发现、注册和官方 Skill | 2 | 库 |
-| [`util/`](util/README.md) | 跨包共享的契约、工具和诊断 | 3 | 库 |
-| [`test-support/`](test-support/README.md) | 测试辅助 | 1 | 库 |
+| [`util/`](util/README.md) | 跨包共享的契约和诊断 | 2 | 库 |
 
 ## 3. 依赖方向
 
@@ -78,7 +77,7 @@ util/shared  composition/cordis-adapter        最底层：不依赖其他 @acts
 - **`core/runtime` 是总装配点。** 它在 `package.json` 里依赖几乎所有插件包（打包默认 Harness 要解析它们），但“加载哪些插件”只在 `plugin-catalog.ts` 里定义。
 - **`host/*` 在能力之上。** 没有能力包依赖 `host/*`；只有 `core/runtime` 依赖三个宿主包。
 - **`apps/*` 不被包依赖。** 可复用包依赖应用会被 `check:packages` 拒绝，应用之间也不能互相依赖。
-- **`test-support` 只进测试。** 生产代码不依赖它。
+- **测试辅助不单独成包。** 测试共用的夹具放在用到它的包的测试目录里（例如 `composition/cordis-adapter/tests/fixtures/`），不再设 `test-support` 这类没有消费者的库包。
 - 包之间不能成环，`check:packages` 会检查。依赖只走公开 exports，不能深导入别的包的 `src`。
 
 ## 4. 新增一个插件
