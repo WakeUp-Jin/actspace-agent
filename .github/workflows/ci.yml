@@ -22,28 +22,22 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# 下面四个 job 互不依赖，各自 install → 恢复 tsc 缓存 → pnpm build:deps，总时长取最长的那个。
+# 共用步骤在 .github/actions/setup-workspace；build:deps 走 tsc -b 项目引用图，缓存命中时只重编改动过的包。
 jobs:
-  typecheck-test:
-    name: 类型检查与测试
+  lint-typecheck:
+    name: Lint 与类型检查
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: ./.github/actions/setup-workspace
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install ripgrep
-        # tool-fs-search 的 grep / glob 直接调 rg，它的测试需要真实二进制；ubuntu-latest 不预装。
-        run: sudo apt-get install -y --no-install-recommends ripgrep
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # build:deps 会重新生成 tsconfig.build.json，所以图是否过期要在它之前检查。
+      - name: Check desktop build graph
+        run: pnpm check:desktop-build-graph
 
       - name: Check Agent contract matrix
         run: pnpm run gen:contract-matrix --check
@@ -51,15 +45,75 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # 先 tsc -b 全部 packages（既是构建也是类型检查），再对 apps 和图外的两个包跑 tsc --noEmit。
       - name: Typecheck
         run: pnpm typecheck
 
-      # test:agent-host:process 等进程级测试直接 spawn apps/cli/dist/cli.js，runner 上没有现成的 dist。
-      - name: Build Agent CLI for process tests
-        run: pnpm --filter '@actspace/agent-cli...' build
+  test-process:
+    name: 仓库脚本与进程级测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Install ripgrep
+        # 进程级测试会真的拉起 Agent Host，工具 grep / glob 直接调 rg；ubuntu-latest 不预装。
+        run: sudo apt-get install -y --no-install-recommends ripgrep
+
+      - name: Build workspace dependencies
+        run: pnpm build:deps
+
+      # test:agent-host:process 等直接 spawn apps/cli/dist/cli.js，依赖已由 build:deps 产出，这里只编 CLI 自己。
+      - name: Build Agent CLI
+        run: pnpm --filter @actspace/agent-cli build
 
       - name: Test
-        run: pnpm test
+        run: pnpm test:scripts
+
+  test-packages:
+    name: 包测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Install ripgrep
+        # tool-fs-search 的 grep / glob 直接调 rg，它的测试需要真实二进制；ubuntu-latest 不预装。
+        run: sudo apt-get install -y --no-install-recommends ripgrep
+
+      - name: Build workspace dependencies
+        run: pnpm build:deps
+
+      # desktop 单独一个分片 job；其余包在这里跑。
+      - name: Test
+        run: pnpm -r --if-present --filter '!@actspace/desktop' test
+
+  test-desktop:
+    name: 桌面端测试 (${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Build workspace dependencies
+        run: pnpm build:deps
+
+      # desktop 单包 300 多个测试文件、CPU 时间 6 min 以上，单台 4 vCPU runner 要 2 min 多；按文件数对半切到两台。
+      - name: Test
+        run: pnpm --filter @actspace/desktop exec vitest run --shard=${{ matrix.shard }}/2
 
   build:
     name: 构建

@@ -78,6 +78,7 @@
 | 2026-11-08 | 供应链安全 | ~~`supply-chain-security.yml` 的 `osv-scan` 对整个 lockfile（含 devDependencies）扫描，当前报 93 条已知漏洞（axios、vite 5、vitest 3、devalue、fast-uri、joi 等），所以每个改到 `pnpm-lock.yaml` 的 PR 这个 job 都是红的，和改动本身无关；`pnpm audit --prod` 只剩 `katex` 一条 low。~~ 已解决：vite 7 / vitest 4 / esbuild 0.28 / astro 7.4 / wait-on 9 / katex 0.18 升级并重新生成 lockfile 后，osv-scanner 本地与 CI 扫描都是 0 条；工作流的路径过滤还排除了 `docs/**` 下的原型 `package.json`。 | 已完成。`osv-scan` 仍不是必需检查，后续新漏洞由每周定时扫描和 Dependabot 分组 PR 兜底。 |
 | 2026-11-08 | Release / Windows | Windows 包只在 CI 上打出、校验过文件结构，没有人实机启动过；沙盒缺位（nono 只有 darwin / linux）没验证。浏览器桥 CLI 在 Windows 上只是能编译（`ownedByCurrentUser` 的 Windows 实现恒为 `false`，实例注册表用 Unix socket 与 POSIX 权限位），`browser-tools` 插件在 Windows 上不可用。 | 第一个 tag 的草稿 Release 出来后，用 Windows 机器解压运行 `ActSpace.exe` 走一遍聊天、工具调用、浏览器桥。 |
 | 2026-11-08 | Release | 四个平台的完整产物经 Actions artifact 中转到 Release（每次 tag 约 700 MB，保留 1 天）；若将来 artifact 配额紧张，改成在各 job 内直接 `gh release upload` 到草稿。 | 观察 Settings › Billing 的 Actions storage，超过一半再改。 |
+| 2026-11-09 | CI / `build` job | `ci.yml` 的 `build` job 和 `release-package.sh` 仍走逐包 `pnpm --filter ... build`，没有接 `setup-workspace` 的 `tsc -b` 缓存（`completed/20261109-ci-speedup.md` 决策记录）。`build` 不是最长的 job，而且 release 链需要确认 `tsc -b` 产物与逐包 build 完全等价（esbuild 包、prompts 拷贝、默认 harness）才能换。 | `build` 成为 `ci.yml` 关键路径时，让它也用 `setup-workspace` + `pnpm build:deps`，再比对两种方式的 `dist/` 目录差异后替换 release 链。 |
 
 ## Web / PWA 客户端遗留
 
