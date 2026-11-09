@@ -4,7 +4,7 @@ import type { ClientSessionStore } from "@actspace/client/sessions";
 import { useChatSessionRecord } from "./session-store";
 import { useLiveRunView, type LiveRunStore, type LiveRunView } from "./live-runs/live-run-store";
 import { useSessionLocalState, type SessionLocalState, type SessionLocalStore } from "./session-local-store";
-import type { CompactionBlock } from "./live-runs/stream-blocks";
+import type { CompactionBlock } from "@actspace/client/live";
 import { mergeTranscript } from "./transcript";
 
 const EMPTY_EVENTS: SessionEvent[] = [];

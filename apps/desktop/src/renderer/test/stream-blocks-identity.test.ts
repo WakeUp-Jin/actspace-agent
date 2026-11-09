@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCompactionBlock, streamingStateToBlocks } from "../session/live-runs/stream-blocks";
-import { createEmptyStreamingState } from "../session/session-run-state";
+import { createCompactionBlock, createEmptyStreamingState, streamingStateToBlocks } from "@actspace/client/live";
 
 // 14 T13：每个 live 块都带所属 run 的 runId。
 describe("live block identity", () => {

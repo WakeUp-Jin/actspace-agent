@@ -23,7 +23,7 @@ App 只负责把这些 store 装配起来、把事件接到对应的 store，以
 | `R/session/transcript.ts` | `mergeTranscript(durable, live, local)`：会话视图的消息序列（纯函数） |
 | `R/session/session-local-store.ts` | `createSessionLocalStore()`、`useSessionLocalState`、`useSessionLocalIds`、`useSessionLocal`、`SessionLocalStoreContext` |
 | `R/session/live-runs/live-run-store.ts` | `createLiveRunStore()`：run 状态、流式事件处理、busy 集合、terminal runId 有界集合；`useLiveRunView`、`useBusySessionIds` |
-| `R/session/live-runs/stream-blocks.ts`、`stream-state.ts` | 流式状态 → 块（`streamingStateToBlocks`、`toolEntryToBlock`、`createCompactionBlock`）与状态变更 helper |
+| `@actspace/client/live`（`packages/client/client/src/live/`） | 流式状态 → 块（`streamingStateToBlocks`、`toolEntryToBlock`、`createCompactionBlock`）、`createEmptyStreamingState` 与状态变更 helper（`upsertStreamingTool`、`upsertCompactionSegment` 等）；desktop 与 Web 共用，渲染层直接 import |
 | `R/session/task-queue.ts` | `createTaskQueueStore()`：任务快照、提交参数、steer 正文；`applyTaskSnapshot(snapshot, effects)` |
 | `R/session/pending-submission.ts` | 未确认提交记录：`read / write / clear / sweepExpired` |
 | `R/session/desktop-session-bridge.ts` | 把 live 事件接到 `ClientSessionStore`：增量 refresh、失败退避重试 |

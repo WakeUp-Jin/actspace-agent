@@ -40,16 +40,16 @@ AgentLoop
         -> pi-ai Provider / Model / stream
 ```
 
-必要时，特定 route 可以显式选择兼容 backend：
+需要代理的请求由 `PiAiAdapter` 内部切到兼容 wire：
 
 ```text
 PreparedLlmCall
-  -> Route Adapter
-    -> PiAiAdapter -> pi-ai
-    -> LegacyTransportAdapter -> legacy wire
+  -> PiAiAdapter
+    -> pi-ai Provider / Model / stream        （直连）
+    -> LegacyProxyWireEngine -> legacy wire   （proxy）
 ```
 
-legacy backend 是兼容性降级路径，不向 Agent Loop 暴露第二套消息、流或错误类型。
+legacy wire 是兼容性降级路径，只在 `PiAiAdapter` 内部切换，不向 Agent Loop 暴露第二套 adapter、消息、流或错误类型。
 
 ## 4. 责任边界
 
@@ -342,7 +342,7 @@ Provider-specific reasoning signature 或 replay state 只能作为 Adapter-priv
 2. 先让 direct route 由 PiAiAdapter 直接调用 pi-ai，再处理 proxy 和特殊图片路线。
 3. 每迁移一条 route，保留同一 ActSpace contract 的 parity fixture。
 4. 所有消费者迁移后删除 `PiAiEngine` 间接层；当前 Runtime/plugin 与生产 Host 已完成迁移。
-5. 若 pi-ai 某项能力在公开 API 下无法通过门禁，保留显式 LegacyTransportAdapter，不为了缩短代码破坏代理、错误或生命周期语义。
+5. 若 pi-ai 某项能力在公开 API 下无法通过门禁，在 `PiAiAdapter` 内走 `LegacyProxyWireEngine`，不为了缩短代码破坏代理、错误或生命周期语义；不再单独保留一个没有调用方的 `LegacyTransportAdapter` 类。
 
 ## 11. 成功标准
 

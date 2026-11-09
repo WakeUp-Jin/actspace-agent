@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createMessageBlocks, type MessageBlock, type SessionEvent, type SessionRecord } from "@actspace/shared";
 import { projectChatWindow } from "@actspace/client";
 import { mergeTranscript, type DurableTranscript, type LiveTranscript, type LocalTranscript } from "../session/transcript";
-import { createEmptyStreamingState, type StreamingState } from "../session/session-run-state";
-import { createCompactionBlock, streamingStateToBlocks } from "../session/live-runs/stream-blocks";
+import { createCompactionBlock, createEmptyStreamingState, streamingStateToBlocks, type StreamingState } from "@actspace/client/live";
 import { recordProjectionFixture } from "./projection-fixture";
 import { legacyMergeTranscript } from "../../../test-fixtures/legacy-transcript";
 

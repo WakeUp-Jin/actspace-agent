@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, it } from 'vitest';
-import { paginateSessionSummaries } from '../runtime-v2/session-list-page';
+import { paginateSessionSummaries } from '@actspace/shared/session-list-page';
 import type { RuntimeV2BrowseList } from '@actspace/shared/runtime-v2';
 it('keeps forks and unknown historical origins visible, excluding delegation before pagination', () => {
   const items = Array.from({ length: 12 }, (_, i) => ({ sessionId: `s${i}`, createdAt: '', updatedAt: String(i).padStart(2, '0'), workspaceRoot: '/a', profileId: 'test', accessState: 'read-write' as const, metadata: { title: 'test', pinned: false, archived: false }, lineage: { origin: i === 11 ? 'delegation' : i === 10 ? 'fork' : 'historical' } }));

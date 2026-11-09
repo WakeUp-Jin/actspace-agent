@@ -4,10 +4,8 @@ import { useRunTarget } from "./target/use-run-target";
 import type { RunTargetValue } from "./target/run-target-context";
 import type { SideChatRuntimeValue } from "./components/right-panel/side-chat/side-chat-runtime";
 import { sideChatOpenError } from "./components/right-panel/side-chat/use-open-side-chat";
-import { createEmptyStreamingState } from "./session/session-run-state";
 import { REWIND_ERROR_MESSAGES, taskOperation } from "@actspace/shared/runtime-v2";
-import { upsertStreamingTool } from "./session/live-runs/stream-state";
-import type { CompactionBlock } from "./session/live-runs/stream-blocks";
+import { createEmptyStreamingState, upsertStreamingTool, type CompactionBlock, type SessionRunState } from "@actspace/client/live";
 import { getSessionTitle } from "./session/session-title";
 import { createSessionCellRetention } from "./session/session-store";
 import { useChatSessionRecord } from "./session/session-store";
@@ -924,7 +922,7 @@ export function App() {
   const startOptimisticRun = useCallback((sessionId: string, agentRunId: string, text: string, options: ComposerSendOptions) => {
     const state = createEmptyStreamingState();
     state.waitingForModel = true;
-    const run: import("./session/session-run-state").SessionRunState = { sessionId, agentRunId, state, aborting: false,
+    const run: SessionRunState = { sessionId, agentRunId, state, aborting: false,
       userBlock: { kind: "user", id: `turn:${agentRunId}:user:0`, runId: agentRunId, content: text, createdAt: new Date().toISOString(),
         attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } };
     liveRuns.start(run);
