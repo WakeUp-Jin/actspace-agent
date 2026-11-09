@@ -87,7 +87,7 @@ export class HarnessGenerations {
     record.state = "current";
     this.#current.set(candidate.harnessId, { record, revision });
     this.#observed(record, revision);
-    if (previous) { previous.record.state = "retired"; this.#collect(previous.record); }
+    if (previous) { previous.record.state = "retired"; void this.#collect(previous.record); }
     return Object.freeze({ revision, generationId: candidate.generationId });
   }
 
@@ -148,7 +148,7 @@ export class HarnessGenerations {
   close(): Promise<void> {
     if (this.#closing) return this.#closing;
     this.#closed = true;
-    for (const record of this.#records.values()) if (record.state === "current" || record.state === "ready") { record.state = "retired"; this.#collect(record); }
+    for (const record of this.#records.values()) if (record.state === "current" || record.state === "ready") { record.state = "retired"; void this.#collect(record); }
     this.#current.clear();
     return this.#closing = (async () => {
       await Promise.allSettled([...this.#preparing]);

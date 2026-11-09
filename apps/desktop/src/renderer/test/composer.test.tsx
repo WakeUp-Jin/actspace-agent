@@ -15,6 +15,7 @@ import type { RunTargetReadiness } from "../target/readiness";
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {}) {
@@ -572,7 +573,8 @@ describe("Composer follow-up bar", () => {
   });
 
   it("always stacks in a narrow window", () => {
-    vi.spyOn(window, "matchMedia").mockImplementation((query: string) => ({
+    // jsdom 没有 matchMedia，vitest 4 的 spyOn 不再接受 undefined 属性，改为 stub 全局。
+    vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
       matches: query === "(max-width: 600px)",
       media: query,
       onchange: null,
@@ -581,7 +583,7 @@ describe("Composer follow-up bar", () => {
       addListener: () => {},
       removeListener: () => {},
       dispatchEvent: () => false,
-    }) as MediaQueryList);
+    }) as MediaQueryList));
     renderComposer();
     const body = screen.getByLabelText("消息输入面板").querySelector(".composer-body") as HTMLElement;
     expect(body.dataset.layout).toBe("stacked");
@@ -1182,7 +1184,7 @@ describe("Composer follow-up bar", () => {
 
   it("keeps command menu, model menu, and context popup mutually exclusive", async () => {
     const user = userEvent.setup();
-    const { container } = renderComposer();
+    renderComposer();
 
     await user.type(screen.getByLabelText("消息输入框"), "/");
     expect(await screen.findByRole("listbox", { name: "斜杠命令" })).toBeInTheDocument();
@@ -1324,7 +1326,7 @@ describe("Composer follow-up bar", () => {
 
   it("keeps model rows compact and reveals Edit only on row interaction", async () => {
     const user = userEvent.setup();
-    const { container } = renderComposer();
+    renderComposer();
 
     await user.click(screen.getByRole("button", { name: /deepseek-flash/i }));
 
@@ -1456,7 +1458,7 @@ describe("Composer follow-up bar", () => {
 
   it("sends a supported OpenRouter reasoning effort and animates both popovers", async () => {
     const user = userEvent.setup();
-    const { onSend, container } = renderComposer({
+    const { onSend } = renderComposer({
       models: reasoningModels,
       defaultModelId: "openrouter:openai/gpt-5",
     });

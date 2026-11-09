@@ -27,6 +27,8 @@ async function grepTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, cont
     if (glob) rgArgs.push("--glob", glob);
     rgArgs.push("--", pattern, searchPath);
     const result = await runRipgrep(ripgrepPath, rgArgs, workspaceRoot, context.signal);
+    // exitCode 为 null 表示 rg 没跑起来（找不到、超时、被中止），不能当成「没有匹配」吞掉。
+    if (result.exitCode === null) return failure("SEARCH_FAILED", result.error || "ripgrep did not complete.");
     if (result.exitCode === 1 || !result.stdout.trim()) return completed(`No matches found for pattern "${pattern}"`);
     if (result.exitCode !== 0) return failure("SEARCH_FAILED", result.error || `ripgrep exited with code ${result.exitCode}`);
     const lines = result.stdout.trim().split("\n").filter(Boolean);
@@ -46,6 +48,8 @@ async function globTool(args: Readonly<Record<string, RuntimeV2JsonValue>>, cont
     const searchRoot = await resolveExistingPath(pathArg, workspaceRoot, context, "read");
     const globPattern = pattern.startsWith("**/") || pattern.includes("/") || pattern.startsWith("!") ? pattern : `**/${pattern}`;
     const result = await runRipgrep(ripgrepPath, ["--files", "--glob", globPattern, "--color", "never", searchRoot], workspaceRoot, context.signal);
+    // exitCode 为 null 表示 rg 没跑起来（找不到、超时、被中止），不能当成「没有匹配」吞掉。
+    if (result.exitCode === null) return failure("SEARCH_FAILED", result.error || "ripgrep did not complete.");
     if (result.exitCode === 1 || !result.stdout.trim()) return completed(`No files found matching "${pattern}"`);
     if (result.exitCode !== 0) return failure("SEARCH_FAILED", result.error || `ripgrep exited with code ${result.exitCode}`);
     const paths = result.stdout.trim().split("\n").filter(Boolean);

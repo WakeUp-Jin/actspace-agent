@@ -34,7 +34,6 @@ async function fixture(turns = 25) {
 
 describe("history window slimming", () => {
   const envelope = (seq: number, type: string, data: Record<string, unknown>) => ({ seq, type, time: "2026-09-26T00:00:00Z", data, surface: null }) as unknown as SessionEventEnvelopeV1;
-  const bigContext = (seq: number, requestId: string) => envelope(seq, "request/context", { requestId, turnId: "t", stepId: "s", snapshot: { prepared: { model: "m", route: "r", contextWindow: 1000, messages: "x".repeat(30_000) }, requestOptions: { temperature: 0 } } });
 
   it("drops chunks of completed messages but keeps an in-flight message's chunks", () => {
     const out = slimHistoryWindow([

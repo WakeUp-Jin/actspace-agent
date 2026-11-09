@@ -16,7 +16,7 @@ describe("SessionPersistenceCoordinator", () => {
       close: async () => undefined,
     };
     const coordinator = new SessionPersistenceCoordinator(driver, []);
-    coordinator.accept(event(0));
+    void coordinator.accept(event(0));
     order.push("accepted");
     await coordinator.flush(0);
     expect(order).toEqual(["accepted", "write:0"]);
@@ -32,7 +32,7 @@ describe("SessionPersistenceCoordinator", () => {
       close: async () => undefined,
     };
     const coordinator = new SessionPersistenceCoordinator(driver, []);
-    coordinator.accept(event(0));
+    void coordinator.accept(event(0));
     await expect(coordinator.flush(0)).rejects.toThrow("fsync failed");
     expect(coordinator.blocked).toBe(true);
     expect(coordinator.durableSeq).toBe(-1);
@@ -43,7 +43,7 @@ describe("SessionPersistenceCoordinator", () => {
 it("does not advance durable sequence when append succeeds but flush fails, and still closes", async () => {
   let closed = false;
   const coordinator = new SessionPersistenceCoordinator({ append: async () => undefined, flush: async () => { throw new Error("flush failed"); }, assertOwned: async () => undefined, close: async () => { closed = true; } }, []);
-  coordinator.accept(event(0));
+  void coordinator.accept(event(0));
   await expect(coordinator.flush(0)).rejects.toThrow("flush failed");
   expect(coordinator.durableSeq).toBe(-1);
   expect(coordinator.blocked).toBe(true);

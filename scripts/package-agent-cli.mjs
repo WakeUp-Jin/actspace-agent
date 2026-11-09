@@ -44,7 +44,7 @@ const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 manifest.bin = { "actspace-agent": "bin/actspace-agent" };
 manifest.engines = { node: ">=22.19.0" };
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-assertNoDeepImports(await regularFiles(join(packageRoot, "dist")));
+await assertNoDeepImports(await regularFiles(join(packageRoot, "dist")));
 const dependencies = await dependencyInventory(packageRoot);
 await writeFile(join(packageRoot, "DEPENDENCIES.json"), `${JSON.stringify({ schemaVersion: 1, generatedAt: new Date().toISOString(), packages: dependencies }, null, 2)}\n`, "utf8");
 await writeFile(join(packageRoot, "THIRD_PARTY_NOTICES.md"), licenseNotice(dependencies), "utf8");

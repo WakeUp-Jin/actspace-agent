@@ -20,7 +20,9 @@ import type { BlockPipeline } from "./pipeline";
  * 只保留我们用到的选项：components、remarkRehypeOptions、默认 urlTransform；
  * raw 节点按 react-markdown 默认（不 skipHtml）转成文本。
  */
-type FrozenProcessor = Processor<any, any, any, any, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+// unified 的 Processor 泛型描述的是管线各阶段的树类型，这里只缓存已冻结的实例，不关心具体阶段。
+// biome-ignore lint/suspicious/noExplicitAny: 任意管线形状都要能存进同一个 WeakMap
+type FrozenProcessor = Processor<any, any, any, any, any>;
 
 const processors = new WeakMap<BlockPipeline, FrozenProcessor>();
 let created = 0;

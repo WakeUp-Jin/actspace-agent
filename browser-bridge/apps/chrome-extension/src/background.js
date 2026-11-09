@@ -227,6 +227,8 @@ function connectNativeHost() {
         } catch (error) {
           console.error("[agent-browser-bridge] failed to post native response", error);
         }
+      }).catch((error) => {
+        console.error("[agent-browser-bridge] native request failed", error);
       });
     });
 
@@ -689,7 +691,7 @@ function validateUrl(rawUrl) {
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       throw new Error("URL must use http or https.");
     }
-  } catch (error) {
+  } catch {
     const wrapped = new Error(`Invalid URL: ${rawUrl}`);
     wrapped.code = "invalid_params";
     throw wrapped;
@@ -888,7 +890,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     id: "runtime_message",
     method: message.type,
     params: message.params ?? {}
-  }).then(sendResponse);
+  }).then(sendResponse).catch((error) => {
+    sendResponse(fail("runtime_message", "internal_error", error instanceof Error ? error.message : String(error)));
+  });
   return true;
 });
 

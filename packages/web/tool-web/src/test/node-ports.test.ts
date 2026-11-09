@@ -1,15 +1,8 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolExecutionContext } from "@actspace/tool-runtime";
 import type { ToolBodyResult } from "@actspace/tool-runtime";
 
-const roots: string[] = [];
-afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
-
-async function workspace(): Promise<string> { const root = await mkdtemp(join(tmpdir(), "actspace-v2-node-tools-")); roots.push(root); return root; }
 function context(sessionId = "session", notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>, workspaceRoot = ""): ToolExecutionContext { return { pluginId: "actspace.web-tools", name: "test", callId: "call", sessionId, workspaceRoot, agentRunId: "run", turnId: "turn", stepId: "step", signal: new AbortController().signal, capabilities: { ids: [], has: () => false, get: () => { throw new Error("missing"); } }, reportProgress: () => undefined, createArtifact: async ({ bytes, mediaType }) => ({ artifactId: "artifact", mediaType, size: bytes.byteLength, sha256: "sha" }), defer: () => undefined, ...(notifyAgent === undefined ? {} : { notifyAgent }) }; }
 async function invoke(handler: ((args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>) | undefined, args: Readonly<Record<string, RuntimeV2JsonValue>>, sessionId = "session", notifyAgent?: (content: RuntimeV2JsonValue) => Promise<void>, workspaceRoot = "") { if (!handler) throw new Error("handler unavailable"); return handler(args, context(sessionId, notifyAgent, workspaceRoot)); }
 
@@ -22,7 +15,7 @@ describe("web-tools ports", () => {
     expect(requests).toBe(0);
   });
   it("searches through Host-injected credentials without exposing the key", async () => {
-    const root = await workspace(); const calls: Array<{ url: string; authorization: string | null }> = [];
+    const calls: Array<{ url: string; authorization: string | null }> = [];
     const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
       const headers = new Headers(init?.headers); calls.push({ url: String(input), authorization: headers.get("authorization") });
       return new Response(JSON.stringify({ results: [{ title: "Result", url: "https://example.com/page", content: "Useful result" }] }), { status: 200, headers: { "content-type": "application/json" } });
@@ -35,7 +28,6 @@ describe("web-tools ports", () => {
     expect(calls).toEqual([{ url: "https://api.tavily.com/search", authorization: "Bearer secret-search-key" }]);
   });
   it("routes the Chat web facade to search and open while rejecting unknown actions", async () => {
-    const root = await workspace();
     const fetchImpl = (async (input: string | URL | Request) => String(input).includes("api.tavily.com")
       ? new Response(JSON.stringify({ results: [{ title: "Result", url: "https://example.com/page", content: "Useful result" }] }), { status: 200, headers: { "content-type": "application/json" } })
       : new Response("public body", { status: 200, headers: { "content-type": "text/plain" } })) as typeof fetch;
@@ -45,7 +37,7 @@ describe("web-tools ports", () => {
     await expect(invoke(ports.web, { action: "invalid" })).resolves.toMatchObject({ status: "failed", failure: { code: "INVALID_ARGUMENTS", retryable: false } });
   });
   it("blocks private Web fetch targets and revalidates every redirect", async () => {
-    const root = await workspace(); let requests = 0;
+    let requests = 0;
     const fetchImpl = (async () => { requests += 1; return new Response(null, { status: 302, headers: { location: "http://127.0.0.1/private" } }); }) as typeof fetch;
     const ports = createNodeToolPorts({  fetchImpl, resolveHostname: async () => ["93.184.216.34"] });
     await expect(invoke(ports.web_fetch, { url: "http://127.0.0.1/secret" })).resolves.toMatchObject({ status: "failed", failure: { code: "WEB_FETCH_FAILED" } });
@@ -54,7 +46,7 @@ describe("web-tools ports", () => {
     expect(requests).toBe(1);
   });
   it("fetches bounded public text and serves the second read from its local cache", async () => {
-    const root = await workspace(); let requests = 0;
+    let requests = 0;
     const fetchImpl = (async () => { requests += 1; return new Response("public body", { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } }); }) as typeof fetch;
     const ports = createNodeToolPorts({  fetchImpl, resolveHostname: async () => ["93.184.216.34"] });
     const first = await invoke(ports.web_fetch, { url: "https://example.com/read" }); expect(JSON.stringify(first)).toContain("public body");
@@ -62,10 +54,3 @@ describe("web-tools ports", () => {
     expect(requests).toBe(1);
   });
 });
-async function waitFor(predicate: () => boolean, timeoutMs = 1_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!predicate()) {
-    if (Date.now() >= deadline) throw new Error("Timed out waiting for asynchronous notification.");
-    await new Promise((resolveWait) => setTimeout(resolveWait, 10));
-  }
-}

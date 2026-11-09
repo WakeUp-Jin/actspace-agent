@@ -48,6 +48,7 @@
       "a11y": { "preset": "none" },
       "correctness": {
         "noUnusedImports": "error",
+        "noUnusedVariables": "error",
         // 存量命中较多，先以 warning 暴露、不阻塞 CI；清零后再升 error。
         "useExhaustiveDependencies": "warn",
         // `case x: return this.handle();` 在 void 方法里是仓库惯用写法，tsc 已经约束返回类型。
@@ -56,7 +57,8 @@
         "useHookAtTopLevel": "off"
       },
       "suspicious": {
-        "noExplicitAny": "warn",
+        // 产品代码用 `unknown` 加收窄；测试里的 mock / 响应体允许 `any`，见下方 overrides。
+        "noExplicitAny": "error",
         // 存量命中较多，先以 warning 暴露、不阻塞 CI。
         "useIterableCallbackReturn": "warn",
         "noAssignInExpressions": "warn",
@@ -68,7 +70,8 @@
         "noExportsInTest": "off"
       },
       "nursery": {
-        "noFloatingPromises": "warn"
+        // 类型推断不完整，可能漏报，但不会误报：明确不等待的调用写 `void`。
+        "noFloatingPromises": "error"
       }
     }
   },
@@ -81,6 +84,10 @@
             // 测试里在 it() 内定义 Fixture 组件、用只 throw 的 generator 模拟流失败都是常规写法。
             "noComponentHookFactories": "off",
             "useYield": "off"
+          },
+          "suspicious": {
+            // 测试里 mock 对象、拦截到的请求体用 `any` 比为每个形状写类型更直接。
+            "noExplicitAny": "off"
           }
         }
       }
