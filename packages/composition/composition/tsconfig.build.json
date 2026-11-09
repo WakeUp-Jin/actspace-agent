@@ -11,9 +11,6 @@
     },
     {
       "path": "./../cordis-adapter/tsconfig.build.json"
-    },
-    {
-      "path": "./../../util/diagnostics/tsconfig.build.json"
     }
   ]
 }

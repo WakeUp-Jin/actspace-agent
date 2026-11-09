@@ -38,7 +38,6 @@
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/tool-runtime": "workspace:*",
     "@actspace/bundle": "workspace:*",
-    "@actspace/shared": "workspace:*",
     "typescript": "^5.8.3"
   },
   "devDependencies": {

@@ -16,7 +16,6 @@
   "dependencies": {
     "@actspace/agent-service": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*",
-    "@actspace/agent-loop": "workspace:*",
     "@actspace/session-persistence": "workspace:*",
     "@actspace/shared": "workspace:*"
   },

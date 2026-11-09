@@ -36,7 +36,6 @@
     "@actspace/composition": "workspace:*",
     "@actspace/bundle": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*",
-    "@actspace/session-persistence": "workspace:*",
     "@actspace/session-persistence-jsonl": "workspace:*"
   },
   "devDependencies": {

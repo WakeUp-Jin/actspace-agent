@@ -35,7 +35,6 @@
     "@actspace/english-learning": "workspace:*",
     "@actspace/bundle": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*",
-    "@actspace/context-compaction": "workspace:*",
     "@actspace/llm-service": "workspace:*",
     "@actspace/session-journal": "workspace:*",
     "@actspace/session-persistence": "workspace:*",

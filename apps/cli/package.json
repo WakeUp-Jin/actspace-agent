@@ -23,17 +23,7 @@
     "@actspace/agent-host": "workspace:*",
     "@actspace/runtime": "workspace:*",
     "@actspace/shared": "workspace:*",
-    "@actspace/llm-service": "workspace:*",
-    "@actspace/llm-pi-ai": "workspace:*",
-    "@actspace/approval": "workspace:*",
-    "@actspace/tool-runtime": "workspace:*",
-    "@actspace/tool-fs-read": "workspace:*",
-    "@actspace/tool-fs-search": "workspace:*",
-    "@actspace/tool-fs-write": "workspace:*",
-    "@actspace/tool-shell": "workspace:*",
-    "@actspace/tool-web": "workspace:*",
-    "@actspace/tool-image-generation": "workspace:*",
-    "@actspace/tool-image-inspection": "workspace:*"
+    "@actspace/approval": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

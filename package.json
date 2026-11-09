@@ -86,10 +86,7 @@
     "test:package-cutover": "node --test scripts/test/package-cutover.test.mjs"
   },
   "dependencies": {
-    "@actspace/desktop-app": "workspace:*",
-    "@actspace/english-learning": "workspace:*",
-    "@actspace/session-transcript": "workspace:*",
-    "@actspace/side-chat": "workspace:*"
+    "@actspace/desktop-app": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",
