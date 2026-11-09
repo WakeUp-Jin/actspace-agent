@@ -59,7 +59,7 @@ export const TrajectoryTable = memo(function TrajectoryTable(props: TrajectoryTa
   const items = virtualized ? virtualizer.getVirtualItems() : [];
   const rendered = virtualized ? items.map(item => ({ position: item.index, row: rows[item.index] })) : rows.map((row, position) => ({ position, row }));
   const virtualTop = virtualized ? Math.max(0, (items[0]?.start ?? 0) - scrollMargin) : 0;
-  const virtualBottom = virtualized && items.length > 0 ? Math.max(0, virtualizer.getTotalSize() + scrollMargin - items.at(-1).end) : 0;
+  const virtualBottom = virtualized && items.length > 0 ? Math.max(0, virtualizer.getTotalSize() + scrollMargin - items.at(-1)!.end) : 0;
 
   const scrollToBottom = useCallback(() => {
     const pane = paneRef.current;
