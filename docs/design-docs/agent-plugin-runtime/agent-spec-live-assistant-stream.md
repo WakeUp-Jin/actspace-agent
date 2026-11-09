@@ -74,7 +74,7 @@
   - `revision` 全局单调，跨会话、跨运行不归零，所以运行切换后旧帧也能按它截断。
   - 每段带产生它的请求 `requestId`（旧版远程 Host 不带），轨迹按它把文字放进占位行（§6）。
   - 过长的单个增量按 8192 字拆成多片，每片一个 revision。
-- 桌面 IPC：`sessions.liveOutput({ sessionId })` 返回 `{ runId, revision, segments }`；远程会话返回 `null`。界面侧把底稿包装成 `live_output_baseline` 事件（`packages/util/shared/src/session.ts`）交给 `LiveRunStore`，只认恢复运行的第一份。
+- 桌面 IPC：`sessions.liveOutput({ sessionId })` 返回 `{ runId, revision, segments }`；远程会话返回 `null`。界面侧把底稿包装成 `live_output_baseline` 事件（`packages/util/shared/src/session/stream-events.ts`）交给 `LiveRunStore`，只认恢复运行的第一份。
 - 远程协议：`sessions.output` 的参数从 `offset` 改成 `afterRevision`，返回 revision 大于它的片段（每页最多四片）和 `next`。页按 revision 定位，两页之间有消息定稿也不会错位。这是不兼容改动，桌面端、Web 端与远程 Host 要同版本。
 - 恢复运行的界面合并：消息定稿后，日志里出现同一运行、同样内容的块，实时块就不再显示（`transcript.ts` 的 `recoveredLiveBlocks`，与 Web 端一致）。
 - 合并间隔常量 `RENDERER_STREAM_INTERVAL_MS`（33ms）移到 `runtime-registry.ts`，随 `live-envelope-batcher.ts` 一起删掉的只是 chunk 批处理。

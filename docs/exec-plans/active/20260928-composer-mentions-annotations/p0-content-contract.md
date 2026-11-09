@@ -17,7 +17,7 @@
 ## 必读
 
 - `AGENTS.md`、`docs/SECURITY.md`、`docs/REPO_COLLAB_GUIDE.md`。
-- 代码：`packages/util/shared/src/ipc.ts`（`RunAgentInput`，约 134 行）、`packages/util/shared/src/session.ts`（`UserMessagePayload` 约 185 行、`MessageBlock` user 约 696 行）、`packages/util/shared/src/chat-attachments.ts`（`RunAgentPreparationFailure`）、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`（`agent:run` handler 约 222 行、`toRunContent` 约 759 行）、`packages/core/agent-loop/src/loop.ts`（`toLlmContent` 约 393 行）、`packages/client/client/src/sessions/chat.ts`（`projectSurfaceNode` 约 185 行、`contentText` / `attachmentViews`）、`packages/util/shared/src/session-selectors.ts`（`createMessageBlocks` 约 371 行）、`packages/util/shared/src/session-transcript.ts`、`apps/desktop/src/main/artifact-context-menu-service.ts`（realpath 双重校验的参考写法）。
+- 代码：`packages/util/shared/src/ipc/`（桌面 IPC 契约，按通道分文件）、`packages/util/shared/src/session/events.ts`（`UserMessagePayload`）、`packages/util/shared/src/session/message-block.ts`（`MessageBlock` user 分支）、`packages/util/shared/src/chat-attachments.ts`（`RunAgentPreparationFailure`）、`apps/desktop/src/main/runtime-v2/fixed-renderer-ipc.ts`（`agent:run` handler 约 222 行、`toRunContent` 约 759 行）、`packages/core/agent-loop/src/loop.ts`（`toLlmContent` 约 393 行）、`packages/client/client/src/sessions/chat.ts`（`projectSurfaceNode` 约 185 行、`contentText` / `attachmentViews`）、`packages/util/shared/src/session-selectors.ts`（`createMessageBlocks` 约 371 行）、`packages/util/shared/src/session-transcript.ts`、`apps/desktop/src/main/artifact-context-menu-service.ts`（realpath 双重校验的参考写法）。
 
 ## 契约（以 `packages/util/shared/src/composer-content.ts` 为唯一真源）
 
@@ -103,7 +103,7 @@ The user referenced this workspace file. It has not been read; use read tools if
   - `readFileReferenceBlocks(content: unknown): FileReference[]`、`readResponseExcerptBlocks(content: unknown): ResponseAnnotationReference[]`：从 surface content 里宽松读取，不合法的块跳过。
   - `renderFileReferencesForModel(refs)`、`renderResponseExcerptForModel(ann)`：生成上面的模型文本。
   - `formatComposerReferenceIssue(issue): string`：中文错误文案，比如「文件“src/a.ts”不存在或已被移动」「引用的回复已不在当前会话中」。
-- 修改 `packages/util/shared/src/ipc.ts`、`session.ts`、`chat-attachments.ts` 按上面的契约加字段。
+- 修改 `packages/util/shared/src/ipc/`（对应通道文件）、`session/events.ts`、`session/message-block.ts`、`chat-attachments.ts` 按上面的契约加字段。
 - 测试 `packages/util/shared/src/test/composer-content.test.ts`，至少覆盖：
   - 路径：`src/a.ts` 通过；`./src/a.ts` → `src/a.ts`；`src\\a.ts` → `src/a.ts`；`/etc/passwd`、`C:\\x`、`../x`、`a/../../x`、`file:///x`、含 NUL、超长 全部拒绝。
   - 文件引用去重、超过 20 条返回 `too_many_references`。

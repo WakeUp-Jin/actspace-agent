@@ -103,7 +103,7 @@ type SearchWorkspaceFilesResult =
 
 本节保留未来 PB.3 的目标文件与通道名。PB 尚未实施，下面的 `workspace-file-search-service.ts`、IPC 通道和测试路径不能作为现行代码入口；当前实现仍以本节顶部的计划状态和现有源码为准。
 
-- `packages/util/shared/src/ipc.ts`：新增上面三个类型。
+- `packages/util/shared/src/ipc/workspace-files.ts`：新增上面三个类型。
 - `packages/util/shared/src/runtime-v2/fixed-renderer.ts`：新增通道 `searchWorkspaceFiles: "runtime-v2:fixed-renderer:search-workspace-files"`。
 - 新增 `apps/desktop/src/main/workspace-file-search-service.ts`：`createWorkspaceFileSearchService()`，内含索引构建、缓存、匹配排序。
 - `fixed-renderer-ipc.ts`：在 `registerFixedRendererHostCapabilities` 里用 `handle` 注册，root 经 `registeredWorkspaceRoot`。

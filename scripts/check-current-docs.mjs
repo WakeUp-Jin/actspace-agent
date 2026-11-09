@@ -124,7 +124,7 @@ async function exists(path) {
   }
 }
 
-export async function checkMarkdownFiles(repoRoot, files, { checkClaims = true } = {}) {
+export async function checkMarkdownFiles(repoRoot, files, { checkClaims = true, checkCodePaths = checkClaims } = {}) {
   const failures = [];
 
   for (const relativePath of files) {
@@ -148,15 +148,15 @@ export async function checkMarkdownFiles(repoRoot, files, { checkClaims = true }
       }
     }
 
-    if (checkClaims && !isMigrationSubject) {
-      // Code paths named in current docs must exist; lines that explicitly describe a removed or rejected path are exempt.
+    if (checkCodePaths && !isMigrationSubject) {
+      // Code and doc paths named in current docs must exist; lines that explicitly describe a removed or rejected path are exempt.
       const lines = source.split("\n");
       for (const [index, line] of lines.entries()) {
-        if (/不|旧|迁移前|历史|已删除|已退役|retired|historical/iu.test(line)) continue;
-        for (const match of line.matchAll(/`((?:packages|apps)\/[^`\s]+)`/gu)) {
+        if (/不|旧|迁移前|历史|已删除|已退役|已清理|retired|historical/iu.test(line)) continue;
+        for (const match of line.matchAll(/`((?:packages|apps|scripts|docs)\/[^`\s]+)`/gu)) {
           const path = match[1].replace(/[:#].*$/u, "").replace(/\/$/u, "");
-          // Globs, alternations (`a|b`) and elisions (`1..9`, `...`) are shorthand, not paths.
-          if (/[*{}<>…|]|\.\./u.test(path)) continue;
+          // Globs, alternations (`a|b`), elisions (`1..9`, `...`) and date placeholders (`YYYY-MM`) are shorthand, not paths.
+          if (/[*{}<>…|]|\.\.|YYYY/u.test(path)) continue;
           if (!(await exists(resolve(repoRoot, path)))) failures.push(`${relativePath}:${index + 1}: code path does not exist: ${path}`);
         }
       }
@@ -297,14 +297,17 @@ export async function checkCurrentDocs(repoRoot) {
     ...(await collectTopLevelMarkdown(repoRoot, "docs")),
     ...(await collectTopLevelMarkdown(repoRoot, "docs/exec-plans")),
   ];
-  const [claims, designClaims, links, otherLinks, learningsIndex] = await Promise.all([
+  // Learnings keep old symbols only with a「历史：…」label (see docs/learnings/WRITING_GUIDE.md), so their code paths must exist too.
+  const learningsDocs = (await collectDocumentationFiles(repoRoot, "docs/learnings")).filter((path) => path.endsWith(".md"));
+  const [claims, designClaims, links, otherLinks, learningsPaths, learningsIndex] = await Promise.all([
     checkMarkdownFiles(repoRoot, currentTruthFiles),
     checkMarkdownFiles(repoRoot, designDocs.filter((path) => !currentTruthFiles.includes(path))),
     checkDocumentationLinks(repoRoot, ["docs/design-docs", "docs/exec-plans", "docs/exec-runs", "docs/learnings", "docs/coding-standards"]),
     checkMarkdownFiles(repoRoot, otherCurrentDocs, { checkClaims: false }),
+    checkMarkdownFiles(repoRoot, learningsDocs, { checkClaims: false, checkCodePaths: true }),
     checkLearningsIndex(repoRoot),
   ]);
-  return [...new Set([...claims, ...designClaims, ...links, ...otherLinks, ...learningsIndex])];
+  return [...new Set([...claims, ...designClaims, ...links, ...otherLinks, ...learningsPaths, ...learningsIndex])];
 }
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -319,6 +322,6 @@ if (isMain) {
     process.stderr.write(`current docs check failed (${failures.length}):\n${failures.join("\n")}\n`);
     process.exitCode = 1;
   } else {
-    process.stdout.write(`current docs check passed (${currentTruthFiles.length} truth files; design-docs claims; docs/plans/runs/learnings/coding-standards links; learnings index)\n`);
+    process.stdout.write(`current docs check passed (${currentTruthFiles.length} truth files; design-docs claims; docs/plans/runs/learnings/coding-standards links; learnings code paths and index)\n`);
   }
 }

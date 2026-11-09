@@ -4,7 +4,7 @@
 
 ## 是什么
 
-`actspace` 的主 Agent 和 Kairos 自治 Agent 是两个独立的"事件生产者"，但它们写出的事件流共用同一份 `SessionEvent` schema（`packages/shared/src/session.ts`）。Kairos 没有自创"KairosEvent" schema，而是在 `SessionEventType` union 末尾加 4 个枚举值：
+`actspace` 的主 Agent 和 Kairos 自治 Agent 是两个独立的"事件生产者"，但它们写出的事件流共用同一份 `SessionEvent` schema（`packages/shared/src/session.ts`；历史：Kairos 已从 v2 删除，`packages/shared` 现为 `packages/util/shared`，v2 的事件词汇见 `agent-spec-dsh-event-model.md`，文中路径只代表当时）。Kairos 没有自创"KairosEvent" schema，而是在 `SessionEventType` union 末尾加 4 个枚举值：
 
 ```ts
 type SessionEventType =
@@ -84,7 +84,7 @@ Kairos 专属事件（只有 Kairos producer 写）：
 
 ### 3. 聚合器纯函数 + 单文件
 
-`packages/shared/src/kairos-aggregator.ts` 是个纯函数：
+`packages/shared/src/kairos-aggregator.ts`（历史：已随 Kairos 移除）是个纯函数：
 
 ```ts
 export function aggregateKairosEvents(events: SessionEvent[]): KairosEventRow[] {
