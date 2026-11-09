@@ -12,7 +12,7 @@ Runtime、Session、LLM、Tools 和共享契约的共同属性则是被其他单
 
 ## 2. 迁移目录时保持 package identity 稳定
 
-物理路径和 package identity 是两件事。把 `packages/agent-cli` 移到 `apps/cli` 时，可以继续保留 `@actspace/agent-cli`：
+物理路径和 package identity 是两件事。把迁移前的 `packages/agent-cli` 移到 `apps/cli` 时，可以继续保留 `@actspace/agent-cli`：
 
 - workspace consumer 不需要更换依赖名；
 - managed packaging 和命令名不需要变化；

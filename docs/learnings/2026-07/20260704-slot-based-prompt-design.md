@@ -1,7 +1,7 @@
 # 插槽式系统提示词设计：让用户改人格而不弄坏 Agent
 
 > 提炼自：`docs/histories/2026-07/20260704-1020-kairos-soul-slot-and-settings-section.md`
-> 相关设计：`docs/archive/v1/design-docs/agent-kairos-prompt-design.md`
+> 相关设计：v1 的 Kairos prompt 设计文档（历史：Kairos 已从 v2 删除，文档已移除，需要时查 git 历史）；v2 的 prompt 拼装边界见 `docs/design-docs/agent-plugin-runtime/agent-spec-prompt-context-contributors.md`
 
 ## 是什么
 

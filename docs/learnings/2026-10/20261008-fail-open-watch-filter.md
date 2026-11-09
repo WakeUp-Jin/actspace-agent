@@ -1,6 +1,6 @@
 # 文件监听降噪：在事件源头按 Git 语义过滤，拿不准就放行
 
-> 来自 Review 资源优化。history：`docs/histories/2026-10/20261008-2337-review-cpu-optimization.md`；数据见 `docs/exec-runs/20261008-review-resource-test/optimization-results.md`。
+> 来自 Review 资源优化。history：`docs/histories/2026-10/20261008-2337-review-cpu-optimization.md`；数据摘要见 `docs/exec-runs/20261008-review-resource-test/execution-summary.md`（原始测量 JSON 已清理，见 git 历史）。
 
 ## 问题：监听本身不贵，贵的是每个事件引发的下游工作
 

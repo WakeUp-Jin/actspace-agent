@@ -4,7 +4,7 @@
 
 ## 1. 先分两类：事实与视图
 
-- 事实回答“发生过什么”：`user_message`、`assistant_message`、`llm_usage`（`packages/util/shared/src/session.ts`）等，append-only。
+- 事实回答“发生过什么”：`user_message`、`assistant_message`、`llm_usage`（`packages/util/shared/src/session/events.ts`）等，append-only。
 - 视图回答“现在界面该展示什么”：Context 面板、聊天折叠行、轨迹、工具卡片、累计 usage。视图可以覆盖更新，也可以直接删掉重建。
 - 只有事实流：历史完整，但每次读当前状态都要 replay，可编辑状态和不可变历史混在一起。只有当前状态：界面好做，但 token 统计、成本追溯、崩溃恢复都失去依据。
 - 当前 Context entries 不放进 `session.jsonl`，因为用户以后会增删改它；它属于可覆盖的视图文件（`context-state.json`，见 `packages/session/session-persistence`）。`context_snapshot` 只是历史水位读数，不是当前 Context 的完整清单，不能当 source of truth。
