@@ -117,7 +117,7 @@ mergeTranscript(
 4. **本地装饰**：不在流式时追加压缩失败块；后台 bash 状态（`bashUpdates`）覆写 durable bash 块的 `backgroundStatus` / `exitCode`。
 5. **回退进行中**（`local.rewindFromSeq`，来自 `SessionLocalState.rewinding`）：durable 部分截到 `sourceSeq >= fromSeq` 的第一块之前，被编辑轮及之后不再显示，新提问由乐观 run 显示。会话重载完清掉。
 
-`mergeTranscript` 是纯函数。改动它时，`R/test/transcript.test.ts` 的场景必须全部通过；App 级用例经 `R/test/helpers/transcript-shadow.ts` 与基准实现（`apps/desktop/test-fixtures/legacy-transcript.ts`）逐次对照，有意改变行为时要同时更新对照基准。
+`mergeTranscript` 是纯函数。改动它时，`R/test/transcript.test.ts` 的场景必须全部通过，有意改变行为时在那里补上对应场景；迁移期用过的旧实现影子对照已经移除。
 
 恢复中的 run 如果 durable 和 live 都有 todo，会出现两块 todo，这是保留的既有行为。
 
