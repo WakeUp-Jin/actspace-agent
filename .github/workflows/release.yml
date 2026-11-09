@@ -1,41 +1,106 @@
 name: 发布
 
+# 推 `v*` tag 就在四个平台上打包并创建草稿 Release；手动触发可以只打包（不填 tag）或补一次发布（填 tag）。
+# 改到打包脚本的 PR 会在四个平台上跑一遍打包做验证，但不创建 Release、不上传完整产物。
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 要创建的 release tag，例如 v0.1.0
-        required: true
-      title:
-        description: 给人看的发布标题
+        description: 要创建的 release tag（例如 v0.1.1）。留空则只打包、不创建 Release。
         required: false
+        default: ''
+      title:
+        description: 给人看的发布标题，留空用 tag
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'scripts/release-package.sh'
+      - 'scripts/package-browser-components.mjs'
+      - 'scripts/verify-browser-components.mjs'
+      - 'scripts/check-provider-proxy-package.mjs'
+      - 'scripts/sandbox/**'
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # tag 推送用 tag 本身；手动触发用输入；PR 没有 tag。
+  RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag || '' }}
+
 jobs:
-  package-and-release:
-    runs-on: macos-latest
+  package:
+    name: 打包（${{ matrix.platform }}-${{ matrix.arch }}）
+    runs-on: ${{ matrix.runner }}
+    # 正常 10–15 分钟；超时多半是某一步卡住，别让它占满 6 小时。
+    timeout-minutes: 45
     permissions:
-      contents: write
+      contents: read
       attestations: write
       id-token: write
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            platform: darwin
+            arch: arm64
+          - runner: macos-15-intel
+            platform: darwin
+            arch: x64
+          - runner: ubuntu-latest
+            platform: linux
+            arch: x64
+          - runner: windows-latest
+            platform: windows
+            arch: x64
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: 启用 pnpm
+      - name: 校验 tag 与桌面版本一致
+        if: env.RELEASE_TAG != ''
         run: |
-          corepack enable
-          corepack prepare "$(node -p "require('./package.json').packageManager")" --activate
-          pnpm --version
+          version="$(node -p "require('./apps/desktop/package.json').version")"
+          if [[ "${RELEASE_TAG}" != "v${version}" ]]; then
+            echo "Release tag ${RELEASE_TAG} does not match apps/desktop/package.json version ${version}." >&2
+            echo "Bump the version (and docs/releases/feature-release-notes.md) before tagging." >&2
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # release-package.sh 会 go build 浏览器桥 CLI；runner 预装的 Go 可能低于 go.mod 要求。
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: browser-bridge/apps/cli/go.mod
+          cache-dependency-path: |
+            browser-bridge/apps/cli/go.mod
+            browser-bridge/packages/protocol/go.mod
 
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
       - name: 打包 release 制品
         env:
+          # 只在仓库配置了对应 secret 时才会签名 / 公证；fork PR 拿不到 secret，走默认的无签名路径。
           ACTSPACE_MAC_CODESIGN_IDENTITY: ${{ secrets.ACTSPACE_MAC_CODESIGN_IDENTITY }}
           ACTSPACE_MAC_NOTARIZE: ${{ secrets.ACTSPACE_MAC_NOTARIZE }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -43,38 +108,93 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: ./scripts/release-package.sh
 
+      - name: 列出产物
+        run: |
+          ls -la dist/actspace-desktop-* dist/release-manifest-*.json
+          cat dist/release-manifest-*.json
+
+      - name: 生成 build provenance
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/actspace-desktop-*.tar.gz
+            dist/actspace-desktop-*.zip
+            dist/actspace-desktop-*.dmg
+
+      # PR 只证明脚本在该平台能跑通；完整产物几百 MB，不占 artifact 存储。
+      - name: 上传 manifest（PR 验证）
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-manifest-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/release-manifest-*.json
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: 上传产物
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            dist/actspace-desktop-*.tar.gz
+            dist/actspace-desktop-*.zip
+            dist/actspace-desktop-*.dmg
+            dist/release-manifest-*.json
+          if-no-files-found: error
+          # 只是从打包 job 搬到发布 job 的中转；没有 tag 的手动运行留 3 天供下载。
+          retention-days: ${{ env.RELEASE_TAG != '' && 1 || 3 }}
+
+  release:
+    name: 创建草稿 Release
+    needs: package
+    if: github.event_name != 'pull_request' && (github.event_name == 'push' || inputs.tag != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
       - name: 生成 SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           path: .
           format: spdx-json
           output-file: dist/sbom.spdx.json
           upload-artifact: false
 
-      - name: 上传 release 产物
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: release-assets
-          path: |
-            dist/actspace-desktop-*.tar.gz
-            dist/actspace-desktop-*.dmg
-            dist/release-manifest.json
-            dist/sbom.spdx.json
+      - name: 汇总
+        run: |
+          ls -la dist
+          # 四个平台的 manifest 合成一份，方便一眼看全。
+          node -e '
+            const fs = require("node:fs");
+            const files = fs.readdirSync("dist").filter(f => /^release-manifest-.*\.json$/.test(f)).sort();
+            const platforms = files.map(f => JSON.parse(fs.readFileSync(`dist/${f}`, "utf8")));
+            fs.writeFileSync("dist/release-manifest.json", JSON.stringify({ tag: process.env.RELEASE_TAG, platforms }, null, 2) + "\n");
+          '
 
-      - name: 生成 build provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+      - name: 创建或更新草稿 Release
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
-          subject-path: |
-            dist/actspace-desktop-*.tar.gz
-            dist/actspace-desktop-*.dmg
-
-      - name: 创建 GitHub Release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
-        with:
-          tag_name: ${{ inputs.tag }}
-          name: ${{ inputs.title || inputs.tag }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ inputs.title || env.RELEASE_TAG }}
+          draft: true
+          generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             dist/actspace-desktop-*.tar.gz
+            dist/actspace-desktop-*.zip
             dist/actspace-desktop-*.dmg
             dist/release-manifest.json
             dist/sbom.spdx.json
