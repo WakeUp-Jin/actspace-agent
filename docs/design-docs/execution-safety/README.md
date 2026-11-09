@@ -65,7 +65,7 @@ checkpoint 之前失败可以安全报告 not-started；checkpoint 之后如果�
 `packages/shell/tool-shell/src/command-rules.ts` 在执行前拒绝：
 
 - 控制字符和不支持的 Unicode whitespace；
-- 当前分类器无法安全解析的 pipe、redirection、shell expansion；
+- 未加引号的 `$`、反引号、子 shell、brace group、进程替换；输出重定向到工作区和临时目录以外；分隔符未加引号的 heredoc。引号内的脚本源码是字面量，管道按简单命令逐段分类（见[脚本执行](../tool-system/agent-script-execution.md)第 2.1 节）；
 - `eval`、`source`、`exec` 等 blocked builtin；
 - 无显式目标、使用 glob、命中关键目录或逃出 workspace 的删除；
 - 删除或移动 `.git` 元数据。
@@ -87,6 +87,6 @@ Bash executor 经 Harness 的 `sandbox` 服务执行：macOS 优先 nono、其�
 - Bash Session Grant 或命令 pattern；
 - 运行中热更新 policy；
 - 不可信第三方插件沙箱；
-- 对任意 shell pipeline / expansion 的安全静态分类。
+- 对 shell expansion（`$`、命令替换、子 shell）的安全静态分类。
 
 已立项的权限目标只按上方两份 execution plan 实施。其他能力若重新立项，必须新增 v2 设计和 execution plan，不能直接恢复归档文档中的 v1 类型或文件路径。

@@ -16,12 +16,24 @@ Host port 为 `actspace.host.tools.shell-tools`；factory 只创建本包资源�
 
 详细契约见 [Tool 插件边界](../../../docs/design-docs/agent-plugin-runtime/agent-tool-plugin-boundaries.md)。
 
+## Bash 硬拒绝
+
+`command-rules.ts` 在所有模式下生效。命令先按 shell 引号规则切成简单命令，只对**未加引号**的语法判断（设计见[脚本执行](../../../docs/design-docs/tool-system/agent-script-execution.md)第 2.1 节）：
+
+- 单引号内任意字符、双引号内除 `$` 和反引号以外的字符都是字面量，所以 `python3 -c 'print(1)'`、`node -e '…'` 可以运行。
+- 未加引号的 `$`、反引号、`( ) { }`、`<( )` 一律拒绝；拒绝文案告诉模型把脚本源码放进单引号或写成文件。
+- `;` `&&` `||` `|` `&` 和换行切开的每条简单命令各自经过 `eval`/`source` 等内建、`rm`/`rmdir` 目标与 `.git` 规则。
+- 输出重定向目标解析后必须在工作区或系统临时目录内，或是 `/dev/null`、`/dev/stdout`、`/dev/stderr`；`2>&1` 这类描述符复制放行；`~`、glob、`.git` 内的目标拒绝。输入重定向放行。
+- heredoc 的分隔符必须带引号（`<<'EOF'`），正文整体跳过、不参与分类；未加引号的分隔符拒绝。
+
 ## Bash 会话前缀授权
 
-Bash 先执行既有硬拒绝检查。显式批准后，符合 `command-prefix.ts` 规则的简单命令可复用当前会话授权；不是字符串 startsWith，也不是只读保证。
+Bash 先执行硬拒绝检查。显式批准后，符合 `command-prefix.ts` 规则的简单命令可复用当前会话授权；不是字符串 startsWith，也不是只读保证。
 
-程序级：pnpm、npm、yarn、cargo、go、make、tsc、vitest、eslint、prettier；Git 支持 status、diff、log、show、ls-files、rev-list、rev-parse，以及 remote -v/get-url、branch --list、tag --list 查询形式。包管理器的动态执行、发布、配置、全局安装及指定 registry 等参数不复用。复杂 shell 语法（即使在引号内）、申请出沙箱、工作区外 cwd 不提供建议。是否单次询问或硬拒绝仍由既有策略决定。
+程序级：pnpm、npm、yarn、cargo、go、make、tsc、vitest、eslint、prettier；Git 支持 status、diff、log、show、ls-files、rev-list、rev-parse，以及 remote -v/get-url、branch --list、tag --list 查询形式。包管理器的动态执行、发布、配置、全局安装及指定 registry 等参数不复用。管道、重定向等复杂 shell 语法（即使在引号内）、申请出沙箱、工作区外 cwd 不提供建议。是否单次询问或硬拒绝仍由既有策略决定。
 
-新增查询：ls、pwd、du、stat、file、cat、head、tail、wc、rg、grep；node -v/--version 与 python/python3 --version。选项采用保守白名单；tail follow、rg 预处理器、未知选项和跟随链接参数不复用。git -C 真实目录和明确读取路径必须在工作区，敏感或无法解析的目标保持单次审批。
+查询：ls、pwd、du、stat、file、cat、head、tail、wc、rg、grep。选项采用保守白名单；tail follow、rg 预处理器、未知选项和跟随链接参数不复用。git -C 真实目录和明确读取路径必须在工作区，敏感或无法解析的目标保持单次审批。
+
+解释器：python、python3、actspace-python、node 运行脚本文件（`python3 run.py …`，脚本路径必须在工作区内）或 `python3 -m <模块>`（pip、ensurepip、venv 除外）时前缀为解释器名；`-c`、`-e`、`-p` 等内联源码和其他前置选项保持单次审批；`--version` / `node -v` 照旧。
 
 cwd 和 workspace 经过 realpath；Runtime 校验 session、agent、audience/version、有效期和前缀，Journal 记录签发、撤销和使用。只有本地 Desktop 主 Agent 开启能力；切换工作区撤销 process 授权。授权可随同一持久化 Session 恢复，不跨新会话或子 Agent。沙箱实现保持不变。
