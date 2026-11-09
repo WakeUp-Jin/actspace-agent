@@ -13,7 +13,7 @@
 
 1. DSH 外部参考快照的 `packages/core/session/src/types.ts` 与 `packages/core/agent-loop/src/agent.ts` 的源码行为；
 2. `tmp/deepseek-harness/docs/persistence-catalog.md` 的持久化目录；
-3. `/Users/wakeup-jin/Downloads/session/干预主链和相关通知.md` 的三平面整理；
+3. 事实 / 干预 / 通知三平面的整理（结论已并入本文 §3，原始笔记不入库）；
 4. 当前 ActSpace 工具执行器的行为测试和实现。
 
 本文只规定 Session 事件、重放和事件到 UI/通知的投影。Cordis 插入点见 [Agent Loop 插入面](./agent-spec-cordis-event-abi-and-eventhub-retirement.md)，工具内核与可替换外壳见 [Tool Runtime Boundary](./agent-spec-tool-runtime-boundary.md)。

@@ -45,4 +45,4 @@ run7 主进程里，上下文引擎每次请求约 960 MB 的分配，几乎都�
 - `packages/context/context-conversation/src/source.ts`
 - `apps/desktop/package.json`、`src/main/test/context-trusted-equivalence.test.ts`（新增）、`surface-fixture.ts`（新增）、`surface-derived-equivalence.test.ts`、`fixtures/context-trusted/expected.json`（新增）
 - `docs/design-docs/agent-plugin-runtime/agent-spec-context-trusted-surface.md`（新增）、`agent-plugin-runtime/README.md`、`design-docs/index.md`、`上下文管理引擎设计/README.md`、`agent-contract-matrix.generated.md`
-- `docs/exec-plans/active/20261107-context-trusted-surface.md`（新增）、`docs/exec-plans/README.md`
+- `docs/exec-plans/completed/20261107-context-trusted-surface.md`（新增）、`docs/exec-plans/README.md`

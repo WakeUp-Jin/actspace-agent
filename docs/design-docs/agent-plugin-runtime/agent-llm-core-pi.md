@@ -424,7 +424,7 @@ Desktop 在 prepare 阶段应用连接级关闭开关，`promptCacheMode: off` �
 
 ## 17. pi-ai 1.5.0 与复用内置服务商（2026-11-08）
 
-> 执行计划：[20261108-pi-ai-builtin-providers](../../exec-plans/active/20261108-pi-ai-builtin-providers.md)。起因是外部 PR #34（OpenCode Go）：同一个服务商下不同模型走不同协议、还要带会话请求头，这些 pi-ai 内置服务商已经做好，我们自己拼 Provider 做不到。
+> 执行计划：[20261108-pi-ai-builtin-providers](../../exec-plans/completed/20261108-pi-ai-builtin-providers.md)。起因是外部 PR #34（OpenCode Go）：同一个服务商下不同模型走不同协议、还要带会话请求头，这些 pi-ai 内置服务商已经做好，我们自己拼 Provider 做不到。
 
 ### 17.1 依赖
 

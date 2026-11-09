@@ -14,7 +14,7 @@
 |---|---|---|---|
 | 2026-09-26 | renderer 间距 | 组件中仍有 `p-[7px]`、`gap-[9px]`、`py-[5px]` 等间距写死值，没有纳入 `check:frontend-tokens`。 | 先统计分布，决定是否收敛到 4px 网格或登记例外，再加检查规则。 |
 | 2026-09-26 | 内容边界 CSS | `styles/markdown.css`、`diff.css`、`tool-result.css`、`web-tool.css` 内部仍用 px 字号。 | 这些文件服务模型输出和第三方 DOM，改为 `var(--text-act-*)` 前需逐个对照渲染结果。 |
-| 2026-09-26 | 未迁移的按钮形态 | 菜单项（Composer 命令菜单、模型列表）、下拉触发器（Composer 模式 / 模型选择器）、分段控件（预览 / 源码切换）仍是各自的样式常量；Composer 附件删除按钮、Sidebar 会话行置顶 / 归档等内联按钮未改为 `IconButton`。2026-10-06：消息操作菜单和 `SettingsSelect` 已由 Desktop 前端重构 16 改用 `ui/Menu`、`ui/Select`；原生按钮数由 `check:frontend-tokens` 的基线守住，不再增加。 | Composer 的随 09 迁移；分段控件随 `active/frontend-ui-components-foundation.md` 的 `Tabs`。 |
+| 2026-09-26 | 未迁移的按钮形态 | 菜单项（Composer 命令菜单、模型列表）、下拉触发器（Composer 模式 / 模型选择器）、分段控件（预览 / 源码切换）仍是各自的样式常量；Composer 附件删除按钮、Sidebar 会话行置顶 / 归档等内联按钮未改为 `IconButton`。2026-10-06：消息操作菜单和 `SettingsSelect` 已由 Desktop 前端重构 16 改用 `ui/Menu`、`ui/Select`；原生按钮数由 `check:frontend-tokens` 的基线守住，不再增加。 | Composer 的随 09 迁移；分段控件随 `active/20260926-frontend-ui-components-foundation.md` 的 `Tabs`。 |
 
 ## Desktop 前端组件遗留
 
@@ -24,7 +24,6 @@
 |---|---|---|---|
 | 2026-10-06 | renderer / 文件行数 | `settings/SettingsPrimitives.tsx` 856 行、`workspace/WorkspaceChromeControls.tsx` 662 行，超过 500 行（RightPanel 已拆到 `right-panel/`，不再超标）。SettingsPrimitives 剩下的组件都被两个以上设置文件使用，再降要拆成多个文件。 | SettingsPrimitives 按行 / 表单控件 / 菜单拆成 `settings/primitives/`；WorkspaceChromeControls 按控件拆。 |
 | 2026-10-06 | renderer / 手写弹层 | `right-panel/RightPanelTabStrip.tsx` 的标签溢出菜单（菜单项里嵌「关闭标签」按钮）没有迁到 `components/ui/`，仍自己监听 Escape 和外部点击（`ModelMultiSelector` 已随模型页重做删除）。 | 先改交互（关闭按钮挪出菜单项或改子菜单）再换 `ui/Menu`。 |
-| 2026-10-06 | renderer / 死状态 | WorkbenchLayout 的 `usageSnapshot` 状态从未被写入（`setUsageSnapshot` 没有调用方），SettingsPage 收到的恒为 null。 | 先确认 SettingsPage 用量页的数据来源，再删掉这条 prop 链或接上数据。 |
 | 2026-10-06 | renderer / 死入口 | `ProviderKeyModal` 打不开：`SettingsPage` 传下去的 `onConnectProvider` 在 `settings/sections/` 里没有调用方（16 之前的 `ProvidersSection` 也只解构不调用）。 | 确认 Provider Key 是否已全部改由模型连接向导录入；是就删掉 `ProviderKeyModal` 和这条 prop，否则补上入口。 |
 | 2026-10-06 | renderer / 占位按钮 | Composer 的「更多审查操作」`⋯`（`review-overflow-button`）没有 `onClick`，点了没有反应，16 之前就是这样。 | 补上菜单内容，或先隐藏。09（2026-10-07）只把它搬进 `composer/ReviewStrip.tsx`，行为未改。 |
 | 2026-10-06 | renderer / 窄窗 | 窗口最小宽度 480 时打开侧栏覆盖层，会话右键菜单的「复制」子菜单（208px）左右都放不下，翻到左侧后左边约 52px 出界。Radix 只翻转，不在水平方向挪。 | 子菜单加 `max-w-[calc(100vw-16px)]` 并允许文字截断，或窄窗下把两个复制项平铺到主菜单。 |
@@ -36,7 +35,7 @@
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
-| 2026-10-06 | main / 子进程环境（C1） | `settings-service` 的 `applyToEnv` 把搜索服务 Key（`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY` / `TINYFISH_API_KEY`）等写进 `process.env`。以下子进程继承完整环境：bash 工具（`packages/shell/tool-shell/src/node-ports.ts`）、`rg`（`packages/fs/tool-fs-search/src/node-ports.ts`）、git / gh（`review-git-service`、`review-git-engine`、`review-git-worker`、`review-pr-service`、`workspace-environment-service`、`workspace-git-context-service`）、ssh（`remote-hosts/ssh.ts`）、Browser Bridge 命令、本地更新脚本。只有终端 pty 经 `sanitizeEnvironment` 过滤。 | 01 S7：工具配置改由 Runtime 配置端口注入，删除 `applyToEnv`；子进程改用环境变量白名单。需要单独设计。2026-10-07（17）：`applyToEnv` 已集中到 `apps/desktop/src/main/settings/env.ts`，调用点和次数不变，退役时只改这一处和 store 的转调。 |
+| 2026-10-06 | main / 子进程环境（C1） | `settings-service` 的 `applyToEnv` 把搜索服务 Key（`ZHIPU_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY` / `TINYFISH_API_KEY`）等写进 `process.env`。以下子进程继承完整环境：bash 工具（`packages/shell/tool-shell/src/node-ports.ts`）、`rg`（`packages/fs/tool-fs-search/src/node-ports.ts`）、git / gh（`review-git-service`、`review-git-engine`、`review-git-worker`、`review-pr-service`、`workspace-environment-service`、`workspace-git-context-service`）、ssh（`remote-hosts/ssh.ts`）、Browser Bridge 命令、本地更新脚本。内置终端已随功能减法删除，目前没有任何子进程做环境过滤。 | 01 S7：工具配置改由 Runtime 配置端口注入，删除 `applyToEnv`；子进程改用环境变量白名单。需要单独设计。2026-10-07（17）：`applyToEnv` 已集中到 `apps/desktop/src/main/settings/env.ts`，调用点和次数不变，退役时只改这一处和 store 的转调。 |
 | 2026-10-06 | main / Browser Bridge 安装 | `browserBridge.installFromRepo`（`fixed-renderer-ipc.ts`）把 renderer 传来的 `repoRoot` 交给 `browser-bridge-service.buildAndInstall`，只校验扩展 manifest（名称、key、扩展 id）就在该目录执行 `build.sh`。renderer 被注入脚本时，可以让 main 在任意满足条件的目录里跑脚本。11 的复核发现，不在 11 范围内。 | 改为 main 弹系统对话框选择源码目录（与 `selectWorkspaceDirectory` 相同的做法），channel 不再接受路径参数。 |
 | 2026-10-06 | scripts / IPC 审计 | `check:ipc-channels` 只核对常量、注册和 preload 引用三者一致，不检查注册是否经过 `assertTrustedSender`；preload 只要出现 channel 字符串就算引用，不区分 invoke 和 on。 | 13 落地统一注册器和 IPC contract 后，由注册器强制 sender 校验，审计脚本改为以 contract 为来源并区分方向。 |
 | 2026-10-06 | renderer / 主文档 CSP | 主文档没有 CSP。严格策略会拦 mermaid SVG 内的 `<style>`（HTML 预览已在功能减法中删除，不再是阻碍）；应用本身启动、React style prop、highlight.js、`data:` 图片不受影响。实测结论见 `docs/exec-runs/20261005-desktop-fe-11-security-ipc/execution-summary.md`。 | mermaid 样式改走 nonce / hash 或隔离渲染；之后由 main 用 `onHeadersReceived` 注入严格 CSP。 |
@@ -65,7 +64,7 @@
 
 ## CI 与工程化遗留
 
-2026-11-08 CI 重新上线（`active/20261108-ci-pipelines.md`）时发现、但不在那一轮处理的事项：
+2026-11-08 CI 重新上线（`completed/20261108-ci-pipelines.md`）时发现、但不在那一轮处理的事项：
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|

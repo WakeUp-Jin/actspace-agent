@@ -4,7 +4,7 @@
 
 关联：[`20260528-2000-usage-page-global-scope.md`](../../histories/2026-05/20260528-2000-usage-page-global-scope.md)、[`20260604-1954-usage-request-details.md`](../../histories/2026-06/20260604-1954-usage-request-details.md)、[`20260528-1735-kairos-usage-accumulator-persistent.md`](../../histories/2026-05/20260528-1735-kairos-usage-accumulator-persistent.md)
 
-> 历史说明：文中 `usage-statistics:get`、`createUsageStatisticsSnapshot`、`aggregateKairosUsage`、`usage-accumulator.json` 来自 v1 的 Kairos 与旧 Usage IPC，当前代码已不存在；当前使用统计的入口见 `packages/client/client/src/sessions/indexed-usage.ts` 与 [派生读模型](20261011-derived-read-model-worker.md)。下列契约原则仍然适用。
+> 历史说明：文中 `usage-statistics:get`、`createUsageStatisticsSnapshot`、`aggregateKairosUsage`、`usage-accumulator.json` 来自 v1 的 Kairos 与旧 Usage IPC，当前代码已不存在；当前使用统计的入口见 `packages/client/client/src/sessions/indexed-usage.ts` 与 [派生读模型](../2026-10/20261011-derived-read-model-worker.md)。下列契约原则仍然适用。
 
 三条规则回答同一个问题：**页面上的数字到底统计了哪些事实**。
 

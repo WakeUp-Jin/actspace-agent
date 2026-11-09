@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261107-edit-resend-rewind.md`
+- **关联计划**：`docs/exec-plans/completed/20261107-edit-resend-rewind.md`
 - **设计规范**：`docs/design-docs/agent-runtime/agent-edit-resend-rewind.md`
 - **执行模式**：交互
 - **开始时间**：2026-11-07（demo A1 与后端方案一经用户确认后）
