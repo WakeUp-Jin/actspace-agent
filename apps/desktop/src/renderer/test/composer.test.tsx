@@ -15,6 +15,7 @@ import type { RunTargetReadiness } from "../target/readiness";
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {}) {
@@ -572,7 +573,8 @@ describe("Composer follow-up bar", () => {
   });
 
   it("always stacks in a narrow window", () => {
-    vi.spyOn(window, "matchMedia").mockImplementation((query: string) => ({
+    // jsdom 没有 matchMedia，vitest 4 的 spyOn 不再接受 undefined 属性，改为 stub 全局。
+    vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
       matches: query === "(max-width: 600px)",
       media: query,
       onchange: null,
@@ -581,7 +583,7 @@ describe("Composer follow-up bar", () => {
       addListener: () => {},
       removeListener: () => {},
       dispatchEvent: () => false,
-    }) as MediaQueryList);
+    }) as MediaQueryList));
     renderComposer();
     const body = screen.getByLabelText("消息输入面板").querySelector(".composer-body") as HTMLElement;
     expect(body.dataset.layout).toBe("stacked");
