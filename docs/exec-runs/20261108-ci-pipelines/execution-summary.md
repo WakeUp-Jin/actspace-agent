@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **关联计划**：`docs/exec-plans/active/20261108-ci-pipelines.md`
+- **关联计划**：`docs/exec-plans/completed/20261108-ci-pipelines.md`
 - **执行过程**：`docs/exec-runs/20261108-ci-pipelines/execution-process.md`
 - **执行模式**：交互
 - **执行结果**：完成（P1–P3 PR #48；P4 PR #57；P5 第三个 PR，叠在 #57 上）
