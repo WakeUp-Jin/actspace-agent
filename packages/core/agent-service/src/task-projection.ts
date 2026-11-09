@@ -10,8 +10,8 @@ export function projectTasks(sessionId: string, events: readonly SessionEventEnv
   let queue: string[] = [...(initial?.queue ?? [])];
   let revision = initial?.revision ?? -1;
   let paused = initial?.paused ?? false;
-  const pending = (id: string) => { const task = tasks.get(id); if (!task || task.state !== "pending") invalid(); return task; };
-  const active = (id: string) => { const run = runs.get(id); if (!run || run.state !== "running") invalid(); return run; };
+  const pending = (id: string) => { const task = tasks.get(id); if (task?.state !== "pending") invalid(); return task; };
+  const active = (id: string) => { const run = runs.get(id); if (run?.state !== "running") invalid(); return run; };
   for (const event of events) {
     if (![TASK_EVENT, RUN_EVENT, QUEUE_EVENT, QUEUE_RETURN_EVENT].includes(event.type)) continue;
     if (event.source.ownerPluginId !== TASK_OWNER) invalid();
@@ -53,7 +53,7 @@ export function projectTasks(sessionId: string, events: readonly SessionEventEnv
       }
       case "operation-finish": {
         const task = tasks.get(data.taskId);
-        if (!task || task.state !== "claimed" || task.runId !== null) invalid();
+        if (task?.state !== "claimed" || task.runId !== null) invalid();
         tasks.set(task.taskId, { ...task, state: data.outcome, ...(data.result !== undefined ? { result: data.result } : {}) });
         if (data.outcome !== "completed") paused = true;
         break;

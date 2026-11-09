@@ -45,7 +45,7 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
   let resetEpoch = 0;
   let noticeTimer: unknown = null;
 
-  const emit = () => listeners.forEach((l) => l());
+  const emit = () => listeners.forEach((l) => { l(); });
   const update = (patch: Partial<SpaceDemoState> | ((s: SpaceDemoState) => Partial<SpaceDemoState>)) => {
     const p = typeof patch === "function" ? patch(state) : patch;
     state = materialize({ ...state, ...p });
@@ -63,7 +63,7 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
     return h;
   };
   const clearScope = (scope: "space" | "global") => {
-    timers[scope].forEach((h) => clock.clearTimeout(h));
+    timers[scope].forEach((h) => { clock.clearTimeout(h); });
     timers[scope].clear();
   };
   /** 离开当前 Space / 视图前调用：清定时器，把流式中的消息收成完整文字 */
@@ -224,7 +224,7 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
   function approve(id: string) {
     const sp = currentSpace(state);
     const m = findMember(sp, id);
-    if (!m || m.status !== "wait") return;
+    if (m?.status !== "wait") return;
     update((s) => afterDecision(s, sp.id, id, (x) => ({
       ...x, status: "run", ask: null, time: "", denied: false,
       todo: x.todo && x.todo[0] < x.todo[1] ? [x.todo[0] + 1, x.todo[1]] : x.todo,
@@ -235,7 +235,7 @@ export function createSpaceDemoStore(opts: { clock?: SpaceDemoClock; makeId?: ()
   function deny(id: string) {
     const sp = currentSpace(state);
     const m = findMember(sp, id);
-    if (!m || m.status !== "wait") return;
+    if (m?.status !== "wait") return;
     update((s) => afterDecision(s, sp.id, id, (x) => ({
       ...x, status: "idle", last: x.task, note: "命令被拒绝，等你给方向", time: "刚刚", denied: true, ask: null,
     })));

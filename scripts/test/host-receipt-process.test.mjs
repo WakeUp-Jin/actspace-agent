@@ -76,7 +76,7 @@ test('lost submission receipt plus Host crash retains one accepted task without 
     const after = (await second.call('tasks.command', { sessionId, op: 'snapshot' })).snapshot;
     assert.equal(after.tasks.length, 1); assert.equal(after.runs.length, before.runs.length); assert.ok(requests <= 1);
   } finally {
-    clients.forEach(client => client.close()); waiting.forEach(response => response.destroy());
+    clients.forEach(client => { client.close(); }); waiting.forEach(response => { response.destroy(); });
     for (const child of children) if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill('SIGKILL'); await exited; }
     provider.closeAllConnections(); await new Promise(resolve => provider.close(resolve)); await rm(root, { recursive: true, force: true });
   }

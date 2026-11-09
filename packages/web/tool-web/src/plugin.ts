@@ -1,7 +1,7 @@
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime, ToolPermissionContract } from "@actspace/tool-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
-import { WEB_TOOLS_PLUGIN_ID, WEB_TOOLS_TOOLS } from "./manifest.js";
+import { WEB_TOOLS_PLUGIN_ID, type WEB_TOOLS_TOOLS } from "./manifest.js";
 
 export type ToolName = (typeof WEB_TOOLS_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;

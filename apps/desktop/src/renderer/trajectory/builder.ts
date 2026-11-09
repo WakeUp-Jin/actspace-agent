@@ -70,7 +70,7 @@ function associateCalls(records: readonly TrajectoryRecord[]): TrajectoryRecord[
     seen.add(call.callId);
     const messageId = pick(asRecord(call.raw), ["assistantMessageId"]);
     const candidates = new Set(owners.get(call.callId));
-    if (messageId) assistants.filter(record => record.messageId === messageId).forEach(record => candidates.add(record));
+    if (messageId) assistants.filter(record => record.messageId === messageId).forEach(record => { candidates.add(record); });
     if (candidates.size > 0) return candidates.size === 1 ? [...candidates][0]! : null;
     const parent = call.parentCallId ? calls.get(call.parentCallId) : undefined;
     return parent ? ownerFor(parent, seen) : null;

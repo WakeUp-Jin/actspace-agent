@@ -73,7 +73,7 @@ export function useComposerLayout({ surface, mode, message, inputRef, hasExtras,
       const measurement = body.cloneNode(true) as HTMLDivElement;
       measurement.setAttribute("aria-hidden", "true");
       measurement.setAttribute("inert", "");
-      measurement.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
+      measurement.querySelectorAll("[id]").forEach((node) => { node.removeAttribute("id"); });
       Object.assign(measurement.style, {
         position: "fixed",
         visibility: "hidden",

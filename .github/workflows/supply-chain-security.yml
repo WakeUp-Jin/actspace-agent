@@ -5,6 +5,8 @@ on:
     # 依赖没变就不用审查；代码变更的门禁在 ci.yml。
     paths:
       - '**/package.json'
+      # 文档里的原型 demo 不进安装包，不属于供应链。
+      - '!docs/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - '.npmrc'

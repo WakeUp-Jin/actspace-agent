@@ -47,7 +47,7 @@ function validateSchema(schema: JsonSchema, value: RuntimeV2JsonValue, path: str
   if (type === "array" && Array.isArray(value)) {
     if (typeof schema.minItems === "number" && value.length < schema.minItems) fail(path, "Array has too few items.");
     if (typeof schema.maxItems === "number" && value.length > schema.maxItems) fail(path, "Array has too many items.");
-    if (isRecord(schema.items)) value.forEach((item, index) => validateSchema(schema.items as JsonSchema, item, `${path}/${index}`));
+    if (isRecord(schema.items)) value.forEach((item, index) => { validateSchema(schema.items as JsonSchema, item, `${path}/${index}`); });
   }
   if (type === "string" && typeof value === "string") {
     if (typeof schema.minLength === "number" && value.length < schema.minLength) fail(path, "String is too short.");

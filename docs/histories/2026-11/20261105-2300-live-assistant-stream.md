@@ -28,6 +28,6 @@
 
 ### 📁 Files Modified
 
-- 规范与计划：`docs/design-docs/agent-plugin-runtime/agent-spec-live-assistant-stream.md`（新增）、`docs/exec-plans/active/20261105-live-assistant-stream.md`（新增）、`docs/exec-runs/20261105-live-assistant-stream/`（新增）
+- 规范与计划：`docs/design-docs/agent-plugin-runtime/agent-spec-live-assistant-stream.md`（新增）、`docs/exec-plans/completed/20261105-live-assistant-stream.md`（新增）、`docs/exec-runs/20261105-live-assistant-stream/`（新增）
 - 前端规范：`front-会话状态与数据流规范.md`、`front-轨迹视图规范.md`、`front-聊天输入框规范.md`、`front-web-pwa客户端规范.md`、`docs/tools/session-viewer/README.md`
 - 代码与测试：完整清单见执行过程 `execution-process.md`

@@ -42,7 +42,7 @@ run2 实机记录里，日志 9.1 MB，其中 `request/context` 占 7.9 MB：每
 
 - 规范与计划：
   - `docs/design-docs/agent-plugin-runtime/agent-spec-request-record.md`（新增）
-  - `docs/exec-plans/active/20261106-request-record.md`（新增）
+  - `docs/exec-plans/completed/20261106-request-record.md`（新增）
   - `docs/exec-runs/20261106-request-record/`（新增）
 - 相关规范：
   - `agent-token-usage-and-context-state.md`、`agent-spec-dsh-event-model.md`、`agent-spec-runtime-projection.md`、`front-轨迹视图规范.md`

@@ -134,7 +134,7 @@ export class BackgroundTaskRegistry {
   /** Bash output subscriptions: a progress notification that neither settles nor dedupes. */
   async notifyOutputMatch(taskId: string, summary: string, line: string): Promise<void> {
     const entry = this.#entries.get(taskId);
-    if (!entry || entry.status !== "running" || this.#disposed) return;
+    if (entry?.status !== "running" || this.#disposed) return;
     const { source } = entry;
     await this.#enqueue(source.sessionId, renderOutputMatchNotification(source, summary, line), { taskId: source.taskId, kind: source.kind, title: source.description, status: "output_match" });
     this.options.wake(source.sessionId);

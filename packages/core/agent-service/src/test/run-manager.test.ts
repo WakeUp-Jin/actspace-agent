@@ -10,7 +10,7 @@ import { ExecutionBudget, RunBudget } from "../execution-budget.js";
 
 function gate() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
 async function fixture(factory: RunFactory, release: () => Promise<void> = async () => {}, beforeAcquire: () => Promise<void> = async () => {}, canStart: () => boolean = () => true) {
-  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => { registry.register(codec); });
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "runs", createdAt: "2026-10-03T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
   const ledger = await TaskLedger.open(session);
   let model = "first"; let mode: "plan" | "agent" = "plan"; let acquired = 0;
@@ -145,7 +145,7 @@ it("reserves manual operations against new Runs while allowing content acceptanc
 });
 
 it("runs a queued maintenance task without constructing a Loop", async () => {
-  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => { registry.register(codec); });
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "operations", createdAt: "2026-10-03T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
   const ledger = await TaskLedger.open(session); let compacted = 0;
   const manager = new SessionRunManager({ ledger, harnessId: "main", acquire: () => { throw new Error("No Run lease for scheduling operation"); }, readConfiguration: () => ({ mode: "agent" }), operationForTask: () => async () => { compacted++; return { compacted: false }; } });
@@ -170,7 +170,7 @@ it("keeps an absolute deadline active while approvals pause execution time", asy
 });
 
 it("does not acquire a Harness for input whose absolute deadline has already expired", async () => {
-  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => { registry.register(codec); });
   const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({ sessionId: "expired", createdAt: "2026-10-03T00:00:00Z", lineage: null, createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest } }) });
   const ledger = await TaskLedger.open(session);
   const acquire = vi.fn(() => { throw new Error("expired input must not start"); });

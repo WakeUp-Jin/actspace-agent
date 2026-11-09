@@ -1,26 +1,25 @@
-name: 文档
+name: 仓库基础检查
 
-# 只改文档时跑的轻量检查，与 ci.yml 的 paths-ignore 互补。
+# 唯一不带路径过滤的 PR 工作流：每个 PR 都会产生「仓库基础检查」这一个 check，
+# 因此它是 main ruleset 里唯一可以安全设为 required status check 的 job。
+# ci.yml（代码）和其他带 paths 过滤的工作流只在相关文件改动时触发，设为必需会把纯文档 PR 卡死。
 on:
   pull_request:
-    paths:
-      - 'docs/**'
-      - '**/*.md'
-      - '.markdownlint.json'
-      - '.markdownlint-cli2.jsonc'
-      - 'scripts/check-docs.sh'
-      - 'scripts/check-current-docs.mjs'
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: docs-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: base-checks-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  docs-checks:
-    name: 文档检查
+  repository-checks:
+    name: 仓库基础检查
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

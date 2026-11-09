@@ -2,7 +2,7 @@
 
 > 管上下文引擎每次请求时怎样对待对话、怎样判断「上下文变了没有」、发给模型的请求怎样检查。引擎结构见 [上下文管理引擎](../上下文管理引擎设计/README.md)，对话节点从哪里来见[对话内容只存一份](agent-spec-surface-derived.md)，请求记录见[请求记录](agent-spec-request-record.md)。
 
-状态：已实现（2026-11-07，未提交）。执行计划与记录见 [20261107-context-trusted-surface](../../exec-plans/active/20261107-context-trusted-surface.md)；实机分配对比（§6 最后一条）待用户重跑 monitor。
+状态：已实现。执行计划与记录见 [20261107-context-trusted-surface](../../exec-plans/completed/20261107-context-trusted-surface.md)；实机分配对比（§6 最后一条）待用户重跑 monitor。
 
 ## 1. 为什么改
 

@@ -100,7 +100,7 @@ test('a forked subagent sends its first request with the parent\'s prompt, tools
     const forkResult = consumed.messages.find(message => message.role === 'tool' && message.tool_call_id === 'fork-b');
     assert.match(JSON.stringify(forkResult?.content), /Plan B works\./);
   } finally {
-    clients.forEach(client => client.close());
+    clients.forEach(client => { client.close(); });
     for (const child of children) if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill('SIGKILL'); await exited; }
     provider.closeAllConnections(); await new Promise(resolve => provider.close(resolve)); await rm(root, { recursive: true, force: true });
   }

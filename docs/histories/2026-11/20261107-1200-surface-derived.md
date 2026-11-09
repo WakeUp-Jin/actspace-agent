@@ -43,4 +43,4 @@ run5 的日志里，每条工具结果、用户消息和回复都在 `data` 和 
 - `apps/desktop/src/main/runtime-v2/runtime-registry.ts`、`usage-catalog-projection.ts`、`renderer/trajectory/builder.ts`、`renderer/mock/mock-db.ts`
 - `apps/desktop/src/main/test/surface-derived-equivalence.test.ts` 和 `fixtures/surface-derived/`（新增）
 - `docs/design-docs/agent-plugin-runtime/agent-spec-surface-derived.md`、`agent-spec-dsh-event-model.md`、`agent-spec-session-format-v1.md`
-- `docs/exec-plans/active/20261107-surface-derived.md`（新增）、`docs/exec-plans/README.md`
+- `docs/exec-plans/completed/20261107-surface-derived.md`（新增）、`docs/exec-plans/README.md`

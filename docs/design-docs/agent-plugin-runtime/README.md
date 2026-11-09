@@ -1,59 +1,37 @@
 # Agent Plugin Runtime 文档导航
 
-当前分层以 [Host/Harness/Run 总览](agent-target-overall-architecture.md)为入口；[P5 摘要](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)汇总已完成的自动化及 Computer Use；本次冗余与文档收尾见[清理计划](../../exec-plans/completed/20261004-agent-refactor-cleanup.md)。
+这个专题管 v2 Agent Runtime 的当前事实：Host / Harness / Run 分层、Profile-first 的多包 Cordis 插件组装、Session 事件与投影、Tool 与 Prompt 的公共契约、LLM 适配层，以及独立 Host 的部署方式。读代码之前先读这里；每份文档只写当前实现，实现状态与未完成门禁写在各自正文里。
 
-P2 当前接线：[Task、Run 与 Harness 生命周期](agent-task-run-lifecycle.md)；[阶段验证记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)。
+## 先读
 
-
-- [Tool 插件边界与 Todo 领域事件](agent-tool-plugin-boundaries.md)：独立工具包、Host port、Projection Contributor、scope 和不兼容旧 Todo 的事件断点。
-
-> 当前入口：v2 Profile-first、多包 Cordis Plugin Runtime。本文按用途导航；每份文档的实现状态与未完成门禁分别维护。
-
-## 当前架构与启动
-
-- [Agent Host 使用指南](agent-host-guide.md)：启动、配对、WSS/SSH、附件、停机及 systemd 示例。
-
-1. [总体架构](agent-target-overall-architecture.md)：Host、Profile、应用 Service、Agent 与 Journal/Projection 的整体关系。
-2. [Runtime 与 Composition](agent-target-runtime-architecture.md)：生产 BootedRuntimeProfile、Host/Harness 组合、启动失败与 shutdown。
+1. [总体架构](agent-target-overall-architecture.md)：Host、Profile、应用 Service、Agent 与 Journal / Projection 的整体关系。
+2. [Runtime 与 Composition](agent-target-runtime-architecture.md)：生产 `BootedRuntimeProfile`、Host / Harness 组合、启动失败与 shutdown。
 3. [插件组装与 Agent 启动](agent-spec-dsh-plugin-assembly-and-agent-startup.md)：从三个 Host 入口到 TaskLedger、Run Factory 和 Loop。
 4. [Task、Run 与 Harness 生命周期](agent-task-run-lifecycle.md)：任务调度、执行与组合租约。
 5. [测试策略](agent-testing.md)：自动化、Host 和外部人工门禁的边界。
 
-## 领域契约
+## 契约文档
 
-- [Session 事件持久化重构](agent-spec-session-core-persistence-separation.md)：核心行为已实现；接纳、observer、durability barrier 与 checkpoint 语义以此为准，[执行记录](../../exec-plans/completed/20260920-session-event-persistence/README.md)。
-
-| 主题 | 规范 |
+| 主题 | 文档 |
 |---|---|
-| Plugin 与包边界 | [Plugin ABI](agent-spec-plugin-runtime-abi.md)、[Package layout 与包清单](agent-spec-package-layout-and-plugin-packaging.md)、[包地图](../../../packages/README.md) |
-| Session 与上下文 | [Session/Context](agent-spec-session-core-persistence-separation.md)、[Session Format v1](agent-spec-session-format-v1.md)、[DSH 事件模型](agent-spec-dsh-event-model.md)、[流式输出只走实时通道](agent-spec-live-assistant-stream.md)、[请求记录与上下文估算](agent-spec-request-record.md)、[上下文引擎不再每次请求复制对话](agent-spec-context-trusted-surface.md)、[Prompt contributors](agent-spec-prompt-context-contributors.md) |
-| Agent 与 Loop | [Core 所有权](agent-target-agent-core.md)、[Agent/Subagent](agent-spec-agent-and-subagent.md)、[Scope](agent-spec-agent-scope-model.md)、[Loop 插入面](agent-spec-cordis-event-abi-and-eventhub-retirement.md#agent-loop-插入面) |
-| Cordis Service 与事件 | [Service 所有权与契约](agent-spec-package-layout-and-plugin-packaging.md)、[Cordis 原生事件 ABI](agent-spec-cordis-event-abi-and-eventhub-retirement.md) |
-| LLM | [Adapter](agent-target-llm-adapter.md)、[Core Pi 收敛目标（已实施）](agent-llm-core-pi.md)、[多供应商](../model-context/agent-multi-provider-llm.md) |
-| Tools | [内核与外壳](agent-spec-tool-runtime-boundary.md)、[Prepared execution ABI](agent-spec-tool-runtime-abi.md)、[Tool name](agent-spec-tool-name-contract.md) |
-| Projection | [Runtime Projection](agent-spec-runtime-projection.md)、[持久化与投影收敛](agent-spec-runtime-projection.md) |
-| Session 三类读模型 | [设计规范](agent-spec-runtime-projection.md)、[执行计划](../../exec-plans/completed/20260922-session-three-read-models.md)、[执行记录](../../exec-runs/20260922-session-three-read-models/execution-summary.md) |
-| 英语辅助学习 | [会话双语 Prompt 与英文语音](agent-english-learning.md) |
+| 插件与包 | [Plugin Runtime ABI](agent-spec-plugin-runtime-abi.md)、[Profile / Bundle / Patch 分层](agent-spec-profile-bundle-patch-layering.md)、[包结构与插件打包](agent-spec-package-layout-and-plugin-packaging.md)（含 Service 所有权与契约）、[包地图](../../../packages/README.md) |
+| Cordis 事件与 Loop 插入面 | [Cordis 事件 ABI 与 Agent Loop 插入面](agent-spec-cordis-event-abi-and-eventhub-retirement.md) |
+| Session 事件 | [Session 业务与存储后端边界](agent-spec-session-core-persistence-separation.md)（接纳、observer、durability barrier、checkpoint）、[Session Format v1](agent-spec-session-format-v1.md)、[DSH 事件模型](agent-spec-dsh-event-model.md)（当前事件词汇的唯一来源） |
+| 请求与流式 | [流式输出只走实时通道](agent-spec-live-assistant-stream.md)、[请求记录与上下文估算](agent-spec-request-record.md)、[对话内容只存一份](agent-spec-surface-derived.md)、[上下文引擎直接用日志视图](agent-spec-context-trusted-surface.md) |
+| 投影与读模型 | [Runtime Projection](agent-spec-runtime-projection.md)（Durable / Live / Diagnostics 三平面、Generic Tool DTO、当前读取实现与水位） |
+| Agent 与 Scope | [Agent Core 所有权](agent-target-agent-core.md)、[Agent 与 Subagent](agent-spec-agent-and-subagent.md)、[Agent Scope 模型](agent-spec-agent-scope-model.md) |
+| Tool | [Tool Runtime 内核与外壳](agent-spec-tool-runtime-boundary.md)、[Tool Runtime ABI](agent-spec-tool-runtime-abi.md)、[Tool Name 契约](agent-spec-tool-name-contract.md)、[Tool 插件边界与 Todo 领域事件](agent-tool-plugin-boundaries.md) |
+| Prompt 与上下文贡献 | [Prompt 与 Context Contributor](agent-spec-prompt-context-contributors.md) |
+| LLM | [LLM Adapter 目标](agent-target-llm-adapter.md)、[LLM Core Pi](agent-llm-core-pi.md)（含 pi-ai 内置服务商复用）、[多供应商与模型管理](../model-context/agent-multi-provider-llm.md) |
+| 契约矩阵 | [生成与检查边界](agent-spec-contract-matrix-generation.md)、[生成结果](agent-contract-matrix.generated.md)（审计视图，由脚本生成） |
+| Host 与插件 | [独立 Agent Host 指南](agent-host-guide.md)（启动、配对、WSS / SSH、附件、停机、[systemd 示例](actspace-host.service.example)）、[英语辅助学习插件](agent-english-learning.md) |
 
-Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧产品资料。早期逻辑语义与后续事件规范冲突时，以 DSH 事件模型和实际 codec 为准。
+Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧产品资料。早期逻辑语义与后续事件规范冲突时，以 DSH 事件模型和实际 codec 为准。写入 / 恢复先读存储边界，读取 / 投影先读 Runtime Projection。
 
-## 本轮清理与证据
+## 决策背景
 
-[第二轮清理计划](../../exec-plans/completed/20261004-agent-storage-and-cleanup/README.md)统一跟踪存储整体解耦、任务入口和文档校准；[执行摘要](../../exec-runs/20261004-agent-storage-and-cleanup/execution-summary.md)是本轮验证入口。
-
-写入/恢复先读[存储规范](agent-spec-session-core-persistence-separation.md)，读取/投影先读[投影架构](agent-spec-runtime-projection.md)。格式、Codec、三类读模型继续独立维护详细契约。
-
-六份早期后端计划的目标和独有欠账见[旧计划结算](../../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)。矩阵是审计视图，范围与未实现检查见[生成规范](agent-spec-contract-matrix-generation.md)。
-
-## 决策与研究背景
-
-以下材料用于理解取舍，不替代上面的当前实现入口：
-
-- [Harness 插件化与 Agent Host 分离讨论](agent-harness-host-refactor-decisions.md)：最终目标与决定；P1–P5 及最终收尾的批准范围已验收；自进化功能后续独立开发。
-
-- [Profile-first 决策](agent-harness-host-refactor-decisions.md)：Profile 与应用操作所有权的历史理由。
-- [v2 foundation 决策](agent-harness-host-refactor-decisions.md)、[Cordis 采用决定](agent-harness-host-refactor-decisions.md)：方向、适用范围和证据边界。
+[Harness 与 Host 重构：最终决定](agent-harness-host-refactor-decisions.md)汇总 Profile-first、v2 foundation、Cordis 采用范围与门禁的理由；它解释取舍，不替代上面的当前实现入口。重构过程的阶段记录在 [exec-runs/20261003-agent-harness-host-refactor](../../exec-runs/20261003-agent-harness-host-refactor/)，早期后端计划的独有欠账见[旧计划结算](../../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)。
 
 ## 验收边界
 
-已实现计划位于 [completed](../../exec-plans/completed/)，执行记录仍在 exec-runs。真实 Provider、Browser/Chrome Extension、Electron reload/quit/flush、签名公证和发行制品是否通过，以具体执行摘要为准；本页不将旧环境状态描述成当前实测结果。
+已实现计划位于 [completed](../../exec-plans/completed/)，执行记录在 exec-runs。真实 Provider、Browser / Chrome Extension、Electron reload / quit / flush、签名公证和发行制品是否通过，以具体执行摘要为准；本页不把旧环境状态描述成当前实测结果。

@@ -1,4 +1,4 @@
-import { ScopeDisposer, type AsyncDisposer } from "./disposer.js";
+import type { ScopeDisposer, AsyncDisposer } from "./disposer.js";
 import { scopeChainOf, type ScopeKey } from "./scope.js";
 
 export type RegistryEntry<T> = { readonly id: string; readonly value: T; readonly owner: string };

@@ -7,7 +7,7 @@ export type TrajectoryFixtureName = "complete" | "running" | "errors" | "long" |
 /** Reject malformed fixtures before their identities enter the renderer. */
 export function validateTrajectoryFixture(value: unknown): asserts value is RuntimeV2TrajectorySnapshot {
   const data = value as RuntimeV2TrajectorySnapshot | null;
-  if (!data || data.kind !== "trajectory" || data.schemaVersion !== 1 || typeof data.sessionId !== "string" || !Array.isArray(data.nodes)) throw new Error("Invalid trajectory fixture envelope");
+  if (data?.kind !== "trajectory" || data.schemaVersion !== 1 || typeof data.sessionId !== "string" || !Array.isArray(data.nodes)) throw new Error("Invalid trajectory fixture envelope");
   const keys = new Set<string>();
   let previous = -1;
   for (const node of data.nodes) {

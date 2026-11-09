@@ -236,7 +236,7 @@ function boundedInteger(value: number | undefined, fallback: number, maximum: nu
 
 function snapshotNode(nodes: Map<string, Element>, nodeId?: string): Element {
   const element = nodeId ? nodes.get(nodeId) : undefined;
-  if (!element || !element.isConnected) throw new Error(`node_snapshot_stale: ${nodeId ?? ""}`);
+  if (!element?.isConnected) throw new Error(`node_snapshot_stale: ${nodeId ?? ""}`);
   return element;
 }
 

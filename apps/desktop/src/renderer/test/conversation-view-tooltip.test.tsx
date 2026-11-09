@@ -189,7 +189,8 @@ describe("ConversationView tooltips", () => {
     const observe = vi.fn();
     const disconnect = vi.fn();
     const OriginalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = vi.fn((callback: ResizeObserverCallback) => {
+    // vitest 4 不允许用 new 调用箭头函数实现的 mock，构造器要用 function。
+    globalThis.ResizeObserver = vi.fn(function (callback: ResizeObserverCallback) {
       resizeCallback = callback;
       return { observe, unobserve: vi.fn(), disconnect };
     }) as unknown as typeof ResizeObserver;
@@ -231,7 +232,7 @@ describe("ConversationView tooltips", () => {
     const observe = vi.fn();
     const disconnect = vi.fn();
     const OriginalResizeObserver = globalThis.ResizeObserver;
-    const Observer = vi.fn(() => ({ observe, unobserve: vi.fn(), disconnect }));
+    const Observer = vi.fn(function () { return { observe, unobserve: vi.fn(), disconnect }; });
     globalThis.ResizeObserver = Observer as unknown as typeof ResizeObserver;
     try {
       const view = (blocks: MessageBlock[]) => (
@@ -257,7 +258,7 @@ describe("ConversationView tooltips", () => {
   it("keeps following the bottom when content grows past the threshold before the scroll event arrives", () => {
     let resizeCallback: ResizeObserverCallback | null = null;
     const OriginalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = vi.fn((callback: ResizeObserverCallback) => {
+    globalThis.ResizeObserver = vi.fn(function (callback: ResizeObserverCallback) {
       resizeCallback = callback;
       return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() };
     }) as unknown as typeof ResizeObserver;

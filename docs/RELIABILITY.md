@@ -42,7 +42,7 @@ Desktop 启动必须初始化：
 ## Projection 与可观测性
 
 - Durable Session、live progress 和 diagnostics 是三条不同投影：durable 数据可由 Journal 重建，live progress 允许进程结束后消失，diagnostics 不进入模型上下文。
-- Context 面板、Usage 与轨迹视图当前都从 `request/snapshot`、`llm/usage`、Turn、Tool 与 Compaction Journal event 派生，不读取独立 `context-state` 或 Trace sidecar。
+- Context 面板、Usage 与轨迹视图当前都从 `request/header` / `request/system-prompt` / `request/tools` / `request/context`、`assistant/message`、`step/end` / `turn/end`、Tool 与 Compaction Journal event 派生，不读取独立 `context-state` 或 Trace sidecar。事件目录见 [DSH 事件模型](design-docs/agent-plugin-runtime/agent-spec-dsh-event-model.md)。
 - `agentRunId -> turnId -> stepId -> requestId` 是运行层级。UI 可以使用 `llmCallId` 作为 request ID 的展示名称，但不得把一次 Agent Run、一次 Turn 和一次 provider request 合并成同一身份。
 - Runtime Projection 必须执行字段白名单、字符串上限、artifact 归一化与 secret redaction；renderer 不直接读取 Session 文件。
 

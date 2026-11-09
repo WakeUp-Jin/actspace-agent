@@ -1,6 +1,6 @@
 name: CI
 
-# 代码变更的常驻门禁。纯文档变更走 docs.yml；两边的 paths 过滤互补。
+# 代码变更的工程门禁。不带路径过滤、每个 PR 都跑的仓库卫生检查在 base-checks.yml。
 # 仓库是 public，标准 GitHub 托管 runner 不计费；这里的拆分只为缩短反馈时间。
 on:
   pull_request:
@@ -23,27 +23,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  repository-checks:
-    name: 仓库基础检查
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install ripgrep
-        # scripts/check-secrets.sh 依赖 rg；ubuntu-latest 镜像不预装。
-        run: sudo apt-get install -y --no-install-recommends ripgrep
-
-      - name: Run base CI checks
-        run: ./scripts/ci.sh
-
-      - name: Markdown lint
-        uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
-        with:
-          globs: |
-            **/*.md
-
   typecheck-test:
     name: 类型检查与测试
     runs-on: ubuntu-latest

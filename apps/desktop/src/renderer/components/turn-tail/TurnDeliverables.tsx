@@ -86,7 +86,7 @@ function PresentedFileCard({ file, sessionId, workspaceRoot }: {
   const [fading, setFading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const timers = useRef<number[]>([]);
-  useEffect(() => () => { timers.current.forEach((timer) => window.clearTimeout(timer)); }, []);
+  useEffect(() => () => { timers.current.forEach((timer) => { window.clearTimeout(timer); }); }, []);
 
   const name = basename(file.path);
   const pending = phase === "opening" || phase === "revealing";
@@ -95,7 +95,7 @@ function PresentedFileCard({ file, sessionId, workspaceRoot }: {
   const status = phase ? PHASE_TEXT[phase] : previewError;
 
   function settle(next: Phase) {
-    timers.current.forEach((timer) => window.clearTimeout(timer));
+    timers.current.forEach((timer) => { window.clearTimeout(timer); });
     setFading(false);
     setPhase(next);
     if (next !== "opened" && next !== "revealed") return;

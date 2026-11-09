@@ -205,7 +205,7 @@ describe("durable content queue", () => {
     expect(projectTasks("tasks", events).queue).toEqual([first.task.taskId, second.task.taskId]);
     await ledger.designate(second.task.taskId, null, ledger.snapshot().revision);
     const oldReader = createCoreCodecRegistry();
-    taskCodecs.filter(codec => codec.type !== QUEUE_RETURN_EVENT).forEach(codec => oldReader.register(codec));
+    taskCodecs.filter(codec => codec.type !== QUEUE_RETURN_EVENT).forEach(codec => { oldReader.register(codec); });
     expect(validateSessionEvents(session.journal.events, oldReader).accessState).toBe("browse-only");
   });
 

@@ -77,7 +77,7 @@ models.dev / OpenRouter public API
 
 ## 模型有效值（2026-10-21）
 
-> 2026-10-21 改：删掉连接级 `billingMode`（reference / token / manual）和「已乘倍率」开关，价格与能力统一按四层数据模型算。计划见 `docs/exec-plans/completed/20261021-model-provider-redesign.md`，页面见 `front-模型设置页面-Maka重做规范.md`。
+> 2026-10-21 改：删掉连接级 `billingMode`（reference / token / manual）和「已乘倍率」开关，价格与能力统一按四层数据模型算。计划见 `docs/exec-plans/completed/20261021-model-provider-redesign.md`，页面见 [设置页规范](../frontend/front-设置页规范.md)。
 
 每个模型字段（显示名称、上下文、最大输出、输入类型、思考档位、价格）的有效值按下面的顺序取第一个有值的，并记录来源（`EffectiveModel.sources`）：
 

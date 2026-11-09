@@ -29,3 +29,8 @@ docs/histories/
 - 本次主要代码与文档改动。
 - 设计动机，以及为什么这么做。
 - 最关键的受影响文件。
+
+## 链接与事后维护
+
+- history 里的链接和路径是写作当时的快照。被链接的 learnings、exec-runs 文件后来按规则合并或清理、包路径后来迁移，都不回头改 history；`pnpm check:current-docs` 也不检查 `docs/histories/`。读到断链时去 git 历史找，不要为了修链接改 history 正文。
+- 唯一例外：history 还在描述的任务本身又推进了（同一任务跨多轮），这时继续在同一份 history 里补写。

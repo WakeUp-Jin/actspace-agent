@@ -9,7 +9,7 @@ import { RuntimeSessionController } from "../session/session-controller.js";
 import { ManagedRuns } from "./managed-runs.js";
 
 it.each(["completed", "cancelled", "failed"] as const)("returns arbitrary %s Run values after disposal and lease release", async outcome => {
-  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => registry.register(codec));
+  const registry = createCoreCodecRegistry(); taskCodecs.forEach(codec => { registry.register(codec); });
   const storage = new MemorySessionStorage(registry);
   const sessions = new RuntimeSessionController({ dataRoot: "/unused", runtimeId: "test", registry, profileId: "test", manifestDigest: "test", plugins: [] }, new SessionStore({ registry }, storage));
   const order: string[] = [];

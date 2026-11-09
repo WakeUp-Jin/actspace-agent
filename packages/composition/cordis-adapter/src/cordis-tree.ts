@@ -123,7 +123,7 @@ export async function mountIsolatedCordisTree(options: {
     await tree.root.update([{ id: "harness", name: "cordis:group", group: true, isolate: Object.fromEntries([...provided, ...absentOptional].map(name => [name, true as const])), config: rows }]);
     await tree.await();
     for (const entry of tree.entries()) {
-      if (!entry.fiber || entry.fiber.state !== 2) throw new Error(`Harness entry not active: ${entry.id}`);
+      if (entry.fiber?.state !== 2) throw new Error(`Harness entry not active: ${entry.id}`);
       if (entry.options.id === "harness") continue;
       const declaration = options.entries.find(row => row.id === entry.options.id)!;
       for (const name of declaration.provides) if (entry.ctx.get(name) === undefined) throw new Error(`Harness service missing: ${entry.id}/${name}`);

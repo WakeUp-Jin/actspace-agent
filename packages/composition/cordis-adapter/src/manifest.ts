@@ -28,7 +28,7 @@ export function validatePluginManifest(value: PluginManifest): PluginManifest {
   for (const codec of value.codecs) for (const type of codec.eventTypes) eventTypeId(type);
   return Object.freeze(value);
 }
-function rejectSecretConfig(value: JsonValue, path = "config"): void { if (value === null || typeof value !== "object") return; if (Array.isArray(value)) { value.forEach((child, index) => rejectSecretConfig(child, `${path}[${index}]`)); return; } for (const [key, child] of Object.entries(value)) { if (/^(authorization|api[_-]?key|password|secret|token|cookie)$/i.test(key)) throw new Error(`Secret field ${path}.${key} is forbidden; use credentialRef.`); rejectSecretConfig(child, `${path}.${key}`); } }
+function rejectSecretConfig(value: JsonValue, path = "config"): void { if (value === null || typeof value !== "object") return; if (Array.isArray(value)) { value.forEach((child, index) => { rejectSecretConfig(child, `${path}[${index}]`); }); return; } for (const [key, child] of Object.entries(value)) { if (/^(authorization|api[_-]?key|password|secret|token|cookie)$/i.test(key)) throw new Error(`Secret field ${path}.${key} is forbidden; use credentialRef.`); rejectSecretConfig(child, `${path}.${key}`); } }
 function isJsonValue(value: unknown): boolean { if (value === null || typeof value === "string" || typeof value === "boolean") return true; if (typeof value === "number") return Number.isFinite(value); if (Array.isArray(value)) return value.every(isJsonValue); if (typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype) return false; return Object.values(value as Record<string, unknown>).every(isJsonValue); }
 
 function validateServiceDeclarations(manifest: PluginManifest): void {

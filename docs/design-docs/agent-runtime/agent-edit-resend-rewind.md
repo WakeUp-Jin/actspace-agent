@@ -1,7 +1,7 @@
 # 编辑提问重发（从某一轮重来）与空闲发送不进队列
 
 > 管：在消息流里改一条已发送的提问再发送，会话从这一轮重来；以及空闲会话发送时消息直接出现在消息流里，不经过排队托盘。
-> 状态：设计已确认（2026-11-07），待实现。执行计划：`docs/exec-plans/active/20261107-edit-resend-rewind.md`。
+> 状态：已实现。执行计划见 [20261107-edit-resend-rewind](../../exec-plans/completed/20261107-edit-resend-rewind.md)。
 
 ## 1. 为什么做
 

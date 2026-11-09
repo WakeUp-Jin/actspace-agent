@@ -56,5 +56,5 @@ function paths(value: unknown): void {
   if (!Array.isArray(value)) throw new Error("Context paths must be an array.");
   for (const item of value) { const path = record(item); string(path.path); string(path.owner); if (path.history !== undefined) history(path.history); }
 }
-function history(value: unknown): void { const item = record(value as RuntimeV2JsonValue); string(item.sessionId); if (!Array.isArray(item.sourceEventSeqs)) throw new Error("Invalid history source seqs."); item.sourceEventSeqs.forEach(seq => integer(seq)); }
+function history(value: unknown): void { const item = record(value as RuntimeV2JsonValue); string(item.sessionId); if (!Array.isArray(item.sourceEventSeqs)) throw new Error("Invalid history source seqs."); item.sourceEventSeqs.forEach(seq => { integer(seq); }); }
 function noSurface({ candidate }: import("@actspace/session-journal").EventCodecRelationContext): void { if (candidate.surface !== null) throw new Error("Context events cannot change Session Surface."); }
