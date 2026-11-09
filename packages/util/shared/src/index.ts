@@ -31,6 +31,7 @@ export * from "./session-locator";
 export * from "./usage-cost";
 export * from "./harness-stats";
 export * from "./visible-text";
+export * from "./trim-trailing";
 export * from "./session-selectors";
 export {
   createMessageBlocks,
