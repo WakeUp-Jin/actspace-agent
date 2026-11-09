@@ -203,6 +203,11 @@ export const desktopBridgeContract = {
   plugins: {
     list: invoke<void, S.PluginListItem[]>(CH.listPlugins),
   },
+  pythonRuntime: {
+    getStatus: invoke<void, S.PythonRuntimeStatus>(CH.getPythonRuntimeStatus),
+    /** Starts the extension download when it is not installed or installing; resolves with the status right after. */
+    installExtension: invoke<void, S.PythonRuntimeStatus>(CH.installPythonExtension),
+  },
   skills: {
     list: invokeWithDefault<S.SkillListInput, S.SkillListResult>(CH.listSkills, {}),
     install: invoke<void, S.SkillInstallResult>(CH.installSkill),

@@ -24,7 +24,7 @@ import { MOCK_CONTEXT_PATHS, MOCK_CONTEXT_PATHS_REVISION, mockContextPanelView }
 import { mockContextPathsPage } from "./context-paths-fixture";
 import { createModelConnectionsMock } from "./model-connections-fixture";
 import { MOCK_HARNESS_STATS_SYNC, mockHarnessStats } from "./harness-stats-fixture";
-import { mockPluginList } from "./plugins-fixture";
+import { mockPluginList, mockPythonRuntimeStatus } from "./plugins-fixture";
 import { mockUsageActivity } from "./usage-stats-fixture";
 import { mockListMarkdownFiles, mockReadMarkdown, mockStatMarkdown, mockWriteMarkdown } from "./docs-fixture";
 
@@ -255,6 +255,10 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
     englishLearning: { getState: async () => mockEnglishLearningState() },
     browserBridge: { getStatus: async () => mockBrowserBridgeStatus() },
     plugins: { list: async () => mockPluginList(db.settingsV4.settings) },
+    pythonRuntime: {
+      getStatus: async () => mockPythonRuntimeStatus(),
+      installExtension: async () => ({ ...mockPythonRuntimeStatus(), extension: { ...mockPythonRuntimeStatus().extension, state: "installing" as const, progress: { completed: 3, total: 22 } } }),
+    },
     skills: { list: async () => ({ items: [], warnings: [] }) },
     updates: { getState: async () => mockLocalUpdateState() },
     appearance: {
