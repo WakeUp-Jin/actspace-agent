@@ -8,7 +8,7 @@ import { DEFAULT_SPEECH_SETTINGS, SPEECH_MODELS } from "@actspace/shared";
 describe("English learning settings", () => {
   it("adds defaults to old v4, persists preferences, and keeps speech credentials out of snapshots", async () => {
     const root = await mkdtemp(join(tmpdir(), "english-learning-settings-"));
-    const create = () => new SettingsService({ dataRoot: root, crypto: { isAvailable: () => true, encrypt: (value) => Buffer.from(value), decrypt: (value) => value.toString() } });
+    const create = () => new SettingsService({ dataRoot: root, crypto: { isAvailable: async () => true, encrypt: async (value) => Buffer.from(value), decrypt: async (value) => value.toString() } });
     try {
       const initial = create(); await initial.load();
       const raw = initial.getV4().settings;

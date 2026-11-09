@@ -104,9 +104,9 @@ const approvalRegistry = new PendingApprovalRegistry({
 });
 
 const electronSecretCrypto: SecretCrypto = {
-  isAvailable: () => safeStorage.isEncryptionAvailable(),
-  encrypt: (plain) => safeStorage.encryptString(plain),
-  decrypt: (cipher) => safeStorage.decryptString(cipher),
+  isAvailable: () => safeStorage.isAsyncEncryptionAvailable(),
+  encrypt: (plain) => safeStorage.encryptStringAsync(plain),
+  decrypt: async (cipher) => (await safeStorage.decryptStringAsync(cipher)).result,
 };
 
 function configureAppPaths(): void {

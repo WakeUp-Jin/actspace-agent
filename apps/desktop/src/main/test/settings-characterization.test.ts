@@ -32,9 +32,9 @@ const ENV_KEYS = [
 type JsonWriter = NonNullable<SettingsServiceOptions["writeJson"]>;
 
 const fixtureCrypto: SecretCrypto = {
-  isAvailable: () => true,
-  encrypt: (plain) => Buffer.from(`enc:${plain}`, "utf8"),
-  decrypt: (cipher) => {
+  isAvailable: async () => true,
+  encrypt: async (plain) => Buffer.from(`enc:${plain}`, "utf8"),
+  decrypt: async (cipher) => {
     const text = cipher.toString("utf8");
     if (!text.startsWith("enc:")) throw new Error("not encrypted by the fixture crypto");
     return text.slice("enc:".length);

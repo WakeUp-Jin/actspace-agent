@@ -257,7 +257,7 @@ export class SettingsStore {
       if (!legacy) {
         return unavailableSecrets("invalid_format", "旧版凭据文件字段无效。为避免覆盖现有 Key，Actspace 已暂停凭据修改。");
       }
-      const migrated = this.decryptLegacySecrets(legacy.secrets);
+      const migrated = await this.decryptLegacySecrets(legacy.secrets);
       if (!migrated) {
         return unavailableSecrets("migration_failed", "旧版凭据无法解密。请使用最后一次能读取这些 Key 的 Actspace 版本启动后再迁移。");
       }
@@ -301,13 +301,13 @@ export class SettingsStore {
     }
   }
 
-  private decryptLegacySecrets(legacy: PersistedSecretsV1): PersistedSecrets | undefined {
+  private async decryptLegacySecrets(legacy: PersistedSecretsV1): Promise<PersistedSecrets | undefined> {
     const entries = secretEntries(legacy);
-    if (entries.length > 0 && !this.crypto.isAvailable()) return undefined;
+    if (entries.length > 0 && !(await this.crypto.isAvailable())) return undefined;
     const migrated = emptySecrets();
     try {
       for (const [id, cipher] of entries) {
-        const plain = this.crypto.decrypt(Buffer.from(cipher, "base64"));
+        const plain = await this.crypto.decrypt(Buffer.from(cipher, "base64"));
         if (!plain) return undefined;
         if (isProviderCredentialSecretId(id)) migrated.providerCredentials[id] = plain;
         else migrated[id as PersistedSecretProviderId] = plain;
