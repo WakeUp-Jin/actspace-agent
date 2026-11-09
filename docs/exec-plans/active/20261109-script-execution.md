@@ -6,7 +6,7 @@
 
 ## 状态
 
-2026-11-09 设计已拍板（用户：体积「核心随包加按需扩展」、管道与重定向「适当放开」、Windows「简单实现，后续单独做」、临时脚本「TMP 为主，工作区只放交付物」）。T1–T4 已实现（本分支）；下一步 T5。
+2026-11-09 设计已拍板（用户：体积「核心随包加按需扩展」、管道与重定向「适当放开」、Windows「简单实现，后续单独做」、临时脚本「TMP 为主，工作区只放交付物」）。T1–T9 已实现（本分支，待合入）；未在本环境完成的验证见「进度记录」：macOS / Windows 打包冒烟要等下一次 `release.yml` 跑（tag 或手动触发），Electron 窗口与真实模型的手工检查需要用户在本机做。
 
 ## 范围
 
@@ -131,11 +131,11 @@
 - [x] T2 解释器进入前缀授权。
 - [x] T3 设计文档、调研沉淀与文档同步。
 - [x] T4 会话临时目录（`HostWritableRoots` 由 tool-runtime 插件提供，tool-shell 登记 scratch 根；`ACTSPACE_SCRATCH`）。
-- [ ] T5 随包 Python 核心层。
-- [ ] T6 扩展层按需下载。
-- [ ] T7 提示词与官方 Skill。
-- [ ] T8 展示层。
-- [ ] T9 Windows 最简实现。
+- [x] T5 随包 Python 核心层（`@actspace/python-runtime`、`lock.json` 五目标、`prepare.mjs` / `verify-python-runtime.mjs`、`release-package.sh` 打包与签名、tool-shell 注入 shim / `ACTSPACE_PYTHON`）。本环境只跑了包测试与脚本语法；macOS 打包冒烟待 `release.yml`。
+- [x] T6 扩展层按需下载（`PythonRuntimeService`、`pythonRuntime.getStatus` / `installExtension` IPC、设置 › 扩展 › 插件 › 命令行 下的「脚本运行时」面板）。扩展层挂载改用 `sitecustomize.py`，不用 `.pth`。
+- [x] T7 提示词与官方 Skill（`coreScripting` + `host/scripting-facts`；`office-docx` / `office-xlsx` / `office-pptx` / `pdf` / `data-analysis`，`OFFICIAL_SKILLS_VERSION` 2）。
+- [x] T8 展示层（`detectScriptCommand` 放 shared 供 tool-shell 与 renderer 共用；`script` 资源元数据；`ScriptSourceBlock`；审批摘要；`?mock=script-execution` 场景，headless Chrome 截图已核对）。
+- [x] T9 Windows 最简实现：代码在 T5 已覆盖（`prepare.mjs` win-x64 + `.cmd` shim、`release.yml` windows-latest、`verify-python-runtime.mjs` Windows 分支）。`release.yml` 只在 tag / 手动触发时跑，Windows runner 上的打包与 verify 待下一次发布流程确认。
 
 ## 决策记录
 
@@ -144,6 +144,10 @@
 - 2026-11-09：核心随包 + 扩展按需；PDF 渲染用 pypdfium2，不用 PyMuPDF（AGPL）。
 - 2026-11-09：管道与重定向放开到"每段可分类、目标在工作区或临时目录"；`$`、反引号、子 shell 不放。
 - 2026-11-09：内联 `-c` / `-e` 不进可复用授权，脚本文件进；Windows 只做 shim，shell 选择另立设计。
+- 2026-11-09（T5）：markitdown 从核心层移到扩展层——它的依赖 magika 带 onnxruntime（mac-x64 还有 sympy），随包体积不可接受；pypdfium2 作为 pdfplumber 的依赖随核心层发，不再单列扩展层。Linux 目标删掉未引用的 `libpython3*.so*`（解释器静态链接）；macOS 保留 dylib 并逐个签名。
+- 2026-11-09（T6）：扩展层挂载用核心层 `site-packages/sitecustomize.py` 读 `ACTSPACE_PYTHON_EXT` 后 `site.addsitedir`，不用 `.pth`——shim 以 `-E -s` 启动，`.pth` 必须写进随包目录（签名后不可改），环境变量能让应用包保持只读。
+- 2026-11-09（T7）：官方 Skill 只移植 anthropics 的 SKILL.md 指导并改写为 `actspace-python` + 随包库，附各目录 `LICENSE.txt` 与根 `NOTICE`；上游依赖 LibreOffice / Node 库的脚本不移植，只带 `pdf/scripts/pdf_to_images.py`。pptx 的缩略图用 Pillow 画，不引入 matplotlib。
+- 2026-11-09（T8）：脚本命令识别器放 `@actspace/shared/runtime-v2`（`script-command.ts`）而不是 tool-shell 私有——renderer 需要对历史与实时的 `message.command` 做同样判断，审批事件不额外透传字段。识别只认简单命令（无管道、无 `$` 展开），拿不准的照普通 bash 显示。
 
 ## 执行模式
 

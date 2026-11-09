@@ -69,15 +69,17 @@
 
 | 层 | 内容 | 位置 |
 |---|---|---|
-| 核心层（随包） | 解释器；openpyxl、XlsxWriter、python-docx、python-pptx、lxml、Pillow；pypdf、pdfplumber（含 pdfminer.six）；markitdown | `Resources/app/runtime/python/` |
-| 扩展层（按需） | numpy、pandas；pypdfium2（PDF 页渲染成图，配 `inspect_image`） | `<dataRoot>/runtime/python-ext/`，首次用到时下载，sha256 校验；设置页可手动触发；离线可手动放置 |
+| 核心层（随包） | CPython 3.12.16（python-build-standalone `install_only_stripped`）；openpyxl、XlsxWriter、python-docx、python-pptx、lxml、Pillow；pypdf、pdfplumber（含 pdfminer.six、pypdfium2——PDF 页渲染成图，配 `inspect_image`） | macOS `Contents/Resources/app/runtime/python/`，Linux / Windows `resources/app/runtime/python/` |
+| 扩展层（按需） | numpy、pandas、markitdown | `<dataRoot>/runtime/python-ext/<digest>/`，sha256 校验；设置 › 扩展 › 插件 › 命令行 行下的「脚本运行时」面板手动下载；离线把 wheel 放到 `runtime/python-ext/wheels/` |
+
+实现与初稿的两处差异：markitdown 进扩展层（依赖 magika → onnxruntime，不适合随包）；pypdfium2 是 pdfplumber 的依赖，随核心层一起发。扩展层不用 `.pth`，由核心层 `site-packages/sitecustomize.py` 读 `ACTSPACE_PYTHON_EXT` 后 `site.addsitedir`（shim 以 `-E -s -X utf8` 启动，`PYTHON*` 变量被忽略，这个名字不受影响）。实现细节见 `packages/shell/python-runtime/README.md`。
 
 许可约束：**不用 PyMuPDF（AGPL）**；PDF 渲染用 pypdfium2（Apache / BSD）。包集与 anthropics `skills/pdf`（Apache 2.0）一致：pypdf 读写、pdfplumber 抽文本和表格。
 
 **暴露方式——不新增工具。** DSH 用 `load_workspace_dependencies` 工具返回路径；ActSpace 用两个更轻的手段：
 
 - `bash` 子进程环境：`ACTSPACE_PYTHON=<绝对路径>`，PATH 前置一个 shim 目录，里面只有 `actspace-python`（Windows 为 `actspace-python.cmd`）。不叫 `python3`，所以不遮蔽用户自己的解释器和 venv——这正是 DSH"不改 PATH"要守住的东西。
-- 系统提示词 model-fact 一行：`actspace-python: Python 3.12，含 openpyxl / python-docx / pypdf / pdfplumber / markitdown；numpy / pandas 按需`。
+- 系统提示词 model-fact（`host/scripting-facts`）：`actspace-python` 版本与核心包、数据扩展是否已装、`ACTSPACE_SCRATCH` 路径；没有随包运行时时退化为"写脚本文件后用系统 python3 执行"。
 
 Codex 没有打包 Python，靠系统 `python3` + 沙箱放行；DSH 打包但不带 PDF 库。ActSpace 两者都要：放行是前提，打包是保证。
 
@@ -106,13 +108,13 @@ Codex 没有打包 Python，靠系统 `python3` + 沙箱放行；DSH 打包但�
 - 需要复用、交付或超过约 20 行：`write_file` 到 `ACTSPACE_SCRATCH` 再执行；要留给用户的脚本写到工作区正式位置。
 - 工具输出只回头 8000 字符：大结果写文件再 `read_file` / `grep`，不要重跑。
 - 不要 `pip install`，不要找系统 Python；处理**用户项目**的代码时用项目自己的解释器 / venv。
-- PDF / Office 优先 `markitdown` 转 Markdown 读；要看版面时用 pypdfium2 渲染页面后 `inspect_image`。
+- PDF / Office 用随包库读（pdfplumber、python-docx、openpyxl）；要看版面时用 pypdfium2 渲染页面后 `inspect_image`；markitdown 在数据扩展里，装了再用。
 
-官方 Skill 放 `packages/skill/official-skills/skills/`：`office-docx`、`office-xlsx`、`office-pptx`、`pdf`、`data-analysis`，各带 `scripts/`。anthropics `skills/{docx,xlsx,pptx,pdf}` 是 Apache 2.0，可带 LICENSE 移植其脚本（`recalc.py`、`convert_pdf_to_images.py`、表单填写脚本等），把"预装了 openpyxl / markitdown"改成指向 `actspace-python`。Skill 脚本**不写、只执行**：`bash actspace-python <skill路径>/scripts/recalc.py book.xlsx`，不复制进工作区。现有机制（catalog 注入描述、模型用 `read_file` 按需读正文，无需 `load_skill`）直接复用，见 [Skill 加载](agent-skill-loading.md)。Chat 模式不注入工作区 Skill catalog，官方 Skill 的注入范围随现有规则。
+官方 Skill 放 `packages/skill/official-skills/skills/`：`office-docx`、`office-xlsx`、`office-pptx`、`pdf`、`data-analysis`。前四个改编自 anthropics `skills/{docx,xlsx,pptx,pdf}`（Apache 2.0，各目录带 `LICENSE.txt`，根 `NOTICE` 登记来源）：只移植 SKILL.md 的指导并改写为 `actspace-python` + 随包库、临时文件放 `$ACTSPACE_SCRATCH`、不 `pip install`；上游依赖 LibreOffice / Node 库的脚本（`recalc.py`、docx 的 OOXML 工具链）不移植，只有 `pdf/scripts/pdf_to_images.py`（pypdfium2 渲染）随 Skill 发布。Skill 脚本**不写、只执行**：`bash actspace-python <skill路径>/scripts/pdf_to_images.py in.pdf out/`，不复制进工作区。现有机制（catalog 注入描述、模型用 `read_file` 按需读正文，无需 `load_skill`）直接复用，见 [Skill 加载](agent-skill-loading.md)。Chat 模式不注入工作区 Skill catalog，官方 Skill 的注入范围随现有规则。
 
 ### 2.6 展示层
 
-`extractResources` 对识别出的脚本命令附带 `script: { language, source | path }` 元数据；bash 卡片据此把 `-c` / heredoc 正文渲染成带语言标签的代码块、超过阈值默认折叠；审批卡摘要写"运行 Python 脚本（12 行）"而不是一长串 shell；脚本文件名链到文件面板。按 `docs/design-docs/frontend/` 规范做。
+脚本命令的识别器 `detectScriptCommand` 放在 `@actspace/shared/runtime-v2`（`script-command.ts`），tool-shell 与 renderer 共用：只认 `python` / `python3` / `actspace-python` / `$ACTSPACE_PYTHON` / `node` 开头、`-c` / `-e` 带引号正文或带引号分隔符的 heredoc、或 `.py` / `.js` / `.mjs` / `.ts` 脚本文件的简单命令，后面只允许重定向；带管道、`$` 展开、多条命令的一律不认（照普通 bash 显示）。`extractResources` 对识别出的命令在 process 资源上附 `script: { language, source | path }`，经 `summarizeResource` 透传到审批摘要；renderer 按 `message.command` 再跑一次同一检测器，不依赖事件透传。展示规则（主行「Python 脚本（N 行）」、详情 `$` 行省略正文 + `ScriptSourceBlock` 代码块、超过 12 行折叠、`# script:` 文件名链到右侧面板、审批卡「运行 Python 脚本（N 行）」）写在 [中间消息区规范](../frontend/front-中间消息区规范.md) Bash 段；浏览器 mock 场景 `?mock=script-execution`。
 
 ### 2.7 安全层：零新权限域
 
@@ -128,7 +130,7 @@ Codex 没有打包 Python，靠系统 `python3` + 沙箱放行；DSH 打包但�
 
 - macOS：完整路径（nono / Seatbelt 沙箱、随包 Python、签名）。
 - Linux：随包 Python 可用；沙箱不合格时走审批，与现状一致。
-- Windows：本轮只做最简单的事——随包 `python.exe` 与 `actspace-python.cmd` shim；`bash` 工具在 Windows 上的 shell 选择（Git Bash `bash.exe` 还是 PowerShell）与沙箱另立设计，不在本文范围。
+- Windows：本轮只做最简单的事——`prepare.mjs --target win-x64` 产出随包 `python.exe` 与 `actspace-python.cmd` shim，`release.yml` 的 windows-latest 矩阵打包并跑 `verify-python-runtime.mjs`（.cmd 不能带 Python 源码做参数，Windows 上的导入检查直接调 `python.exe` 加 shim 的参数）；`bash` 工具在 Windows 上的 shell 选择（Git Bash `bash.exe` 还是 PowerShell）与沙箱另立设计，不在本文范围。
 
 ## 4. 与现有设计的关系
 
