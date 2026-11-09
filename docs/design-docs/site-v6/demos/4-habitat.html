@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 4 · 栖息地 — 色块与精灵</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<style>
+/* 方向 4：栖息地。Actor 是「专业又亲近的精灵」，那就让它们住进来：
+   大面积平涂色块（取自角色封面的八种底色）、通栏色带、32px 大圆角、粗壮无衬线。
+   空间 = 一片有不同气候的栖息地；每个 Actor 有自己的颜色和地盘。 */
+:root{
+  --cream:#fdf7ec;--ink:#20201d;--ink-2:#5c5a52;
+  --peach:#fddfcf;--blue:#6d91cd;--pine:#4a775d;--slate:#516889;--butter:#fdf5b7;--lilac:#b8a3f0;--lilac-deep:#6d4fc2;
+  --sans:"Bricolage Grotesque","Noto Sans CJK SC","PingFang SC",sans-serif;
+  --page:min(1320px,calc(100% - 2*clamp(16px,4.8vw,40px)));
+}
+*{box-sizing:border-box}
+html{background:var(--cream)}
+body{margin:0;color:var(--ink);font:16px/1.6 var(--sans);font-weight:500;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
+.wrap{width:var(--page);margin-inline:auto}
+h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.025em;line-height:1.02;text-wrap:balance}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:14px 24px;border-radius:999px;background:var(--ink);color:var(--cream);font-weight:700;font-size:16px;transition:transform .15s}
+.btn:hover{transform:translateY(-2px)}
+.btn.light{background:var(--cream);color:var(--ink)}
+
+.hd{height:72px}
+.hd .wrap{height:100%;display:flex;align-items:center;gap:32px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:22px;letter-spacing:-.02em}
+.brand img{width:44px;height:30px;object-fit:contain}
+nav{display:flex;gap:4px;font-weight:600;font-size:15px}
+nav a{padding:8px 14px;border-radius:999px}
+nav a[aria-current]{background:var(--ink);color:var(--cream)}
+.hd .r{margin-left:auto}
+.hd .btn{padding:10px 18px;font-size:15px}
+
+/* 首屏：大标题 + 四个有地盘的精灵 */
+.hero{padding:36px 0 32px}
+.hero h1{font-size:clamp(52px,7.2vw,104px)}
+.hero h1 .w{display:inline-block;padding:0 .18em;border-radius:.24em;background:var(--lilac);color:var(--ink);transform:rotate(-1.5deg)}
+.hero p{max-width:600px;font-size:20px;line-height:1.5;color:var(--ink-2);margin:28px 0 30px}
+.acts{display:flex;align-items:center;gap:18px}
+.acts a.t{font-weight:700;border-bottom:3px solid var(--ink)}
+
+.habitat{display:grid;grid-template-columns:repeat(12,1fr);grid-auto-rows:136px;gap:14px;padding:36px 0 0}
+.cell{position:relative;border-radius:32px;padding:26px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+.cell img{position:absolute;right:18px;top:18px;width:46%;max-width:260px;filter:drop-shadow(0 18px 30px rgba(0,0,0,.14))}
+.cell h3{font-size:30px;font-weight:800}
+.cell small{display:block;font-size:14px;font-weight:600;opacity:.75;margin-top:4px}
+.cell .tag{position:absolute;left:24px;top:22px;padding:5px 12px;border-radius:999px;font-size:13px;font-weight:700;background:rgba(32,32,29,.1)}
+.cell .tag.hot{background:var(--ink);color:var(--cream)}
+.c-peach{grid-column:span 5;grid-row:span 2;background:var(--peach)}
+.c-blue{grid-column:span 4;grid-row:span 2;background:var(--blue);color:#fff}
+.c-pine{grid-column:span 3;grid-row:span 3;background:var(--pine);color:#fff}
+.c-butter{grid-column:span 4;grid-row:span 1;background:var(--butter)}
+.c-hub{grid-column:span 5;grid-row:span 1;background:var(--ink);color:var(--cream)}
+.c-hub img{width:32%}
+.c-slate{grid-column:span 12;grid-row:span 3;background:var(--slate);color:#fff;justify-content:center;align-items:flex-start;padding:40px}
+.c-slate img{position:static;filter:none;width:100%;max-width:none;height:360px;object-fit:cover;object-position:top;border-radius:18px;box-shadow:0 30px 60px -30px rgba(0,0,0,.5)}
+.c-slate .row{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:32px;align-items:center;width:100%}
+.c-slate h3{font-size:40px}
+.c-slate p{color:rgba(255,255,255,.8);font-size:17px;margin:14px 0 0}
+.c-blue .tag,.c-pine .tag,.c-slate .tag{background:rgba(255,255,255,.2)}
+
+/* 通栏色带 */
+.band{margin-top:96px;padding:88px 0;background:var(--lilac-deep);color:#fff}
+.band h2{font-size:clamp(44px,6vw,84px);max-width:900px}
+.band h2 span{color:var(--butter)}
+.band .row{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:56px}
+.band .row div{padding-top:22px;border-top:3px solid rgba(255,255,255,.35)}
+.band .row b{display:block;font-size:24px;font-weight:800;margin-bottom:8px;letter-spacing:-.02em}
+.band .row p{margin:0;color:rgba(255,255,255,.8);font-size:16px}
+
+/* 能力瓷砖 */
+.tiles{padding:96px 0}
+.tiles h2{font-size:clamp(36px,4.4vw,60px);margin-bottom:36px}
+.tiles .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.tile{padding:24px;border-radius:24px;min-height:180px;display:flex;flex-direction:column;justify-content:space-between;font-weight:600}
+.tile b{font-size:21px;font-weight:800;letter-spacing:-.02em}
+.tile p{margin:0;font-size:14.5px;opacity:.78;line-height:1.55}
+.tile.a{background:var(--peach)}.tile.b{background:var(--butter)}.tile.c{background:#dfe8f5}.tile.d{background:#e2eee6}
+.tile.e{background:var(--ink);color:var(--cream)}.tile.f{background:var(--lilac)}.tile.g{background:#fff;box-shadow:inset 0 0 0 2px var(--ink)}.tile.h{background:var(--slate);color:#fff}
+
+.closing{padding:0 0 100px}
+.closing .box{border-radius:40px;background:var(--peach);padding:clamp(40px,6vw,80px);display:grid;grid-template-columns:1fr auto;align-items:center;gap:32px;position:relative;overflow:hidden}
+.closing h2{font-size:clamp(44px,6vw,84px)}
+.closing img{position:absolute;right:26%;bottom:-20px;width:220px;transform:rotate(8deg)}
+footer{padding:28px 0 40px;font-size:14px;color:var(--ink-2);font-weight:600;display:flex;justify-content:space-between}
+@media (max-width:760px){nav{display:none}.hero h1{font-size:46px}.hero p{font-size:17px}.habitat{grid-template-columns:1fr 1fr;grid-auto-rows:150px;gap:10px}.cell{border-radius:22px;padding:18px}.cell h3{font-size:22px}.cell img{width:40%}.c-peach,.c-blue,.c-pine{grid-column:span 1;grid-row:span 2}.c-butter,.c-hub{grid-column:span 1;grid-row:span 1}.c-hub h3,.c-butter h3{font-size:18px!important}.c-slate{grid-column:span 2;grid-row:span 3;padding:22px}.c-slate .row{grid-template-columns:1fr;gap:16px}.c-slate h3{font-size:26px}.c-slate img{height:200px}.band{margin-top:56px;padding:56px 0}.band .row{grid-template-columns:1fr;gap:18px;margin-top:32px}.tiles{padding:56px 0}.tiles .grid{grid-template-columns:1fr 1fr}.tile{min-height:140px;padding:18px}.closing .box{grid-template-columns:1fr;border-radius:26px}.closing img{display:none}}
+</style>
+</head>
+<body>
+<header class="hd"><div class="wrap">
+  <a class="brand" href="#"><img src="../../../../apps/site/src/assets/brand/actspace-mark.png" alt="">ActSpace</a>
+  <nav><a aria-current="page" href="#">产品</a><a href="#">文档</a><a href="#">博客</a><a href="#">更新</a></nav>
+  <div class="r"><a class="btn" href="#">下载</a></div>
+</div></header>
+
+<section class="wrap hero">
+  <h1>每一个问题，<br>都有它的 <span class="w">空间</span>。</h1>
+  <p>ActSpace 是一个会自我进化的 Agent 运行空间：一个协调者，一群各有专长、各有脾气的 Actor。它们在你的问题周围各占一块地盘，做事、停下来问你、把学到的留下来。</p>
+  <div class="acts"><a class="btn" href="#">下载桌面版 →</a><a class="t" href="#">看看它们怎么工作</a></div>
+
+  <div class="habitat">
+    <div class="cell c-peach"><span class="tag">有结果</span><img src="assets/sprite-01.png" alt=""><h3>性能分析</h3><small>慢查询找到了 · 记忆 12 条</small></div>
+    <div class="cell c-blue"><span class="tag">工作中 · 3/5</span><img src="assets/sprite-02.png" alt=""><h3>前端</h3><small>web 端报价缓存</small></div>
+    <div class="cell c-pine"><span class="tag hot">等你决定</span><img src="assets/sprite-03.png" alt="" style="width:70%"><h3>后端</h3><small>批准在 staging-2 建新索引？</small></div>
+    <div class="cell c-butter"><span class="tag">临时</span><img src="assets/sprite-05.png" alt="" style="width:30%"><h3 style="font-size:24px">环境巡检</h3><small>做完了，要不要留下它？</small></div>
+    <div class="cell c-hub"><span class="tag" style="background:rgba(255,255,255,.15)">协调 Agent</span><img src="assets/sprite-07.png" alt=""><h3 style="font-size:24px">支付链路提速</h3><small>第 3 轮 · 分工、汇总、交付</small></div>
+    <div class="cell c-slate"><div class="row"><div><span class="tag" style="position:static;display:inline-block;margin-bottom:18px">这是真实界面</span><h3>一屏看清<br>谁在做什么。</h3><p>右侧名册按状态分组：等你决定、工作中、有结果、空闲。会改环境的动作先停下来。</p></div><img src="../../../../apps/site/src/assets/screenshots/home/space.png" alt="Space 界面"></div></div>
+  </div>
+</section>
+
+<section class="band"><div class="wrap">
+  <h2>它们会<span>长大</span>。<br>空间也会。</h2>
+  <div class="row">
+    <div><b>场景</b><p>同一个问题换个项目，Actor 的组合也跟着变。</p></div>
+    <div><b>记忆</b><p>「压测只用 staging-2」记一次就够，下次不必再说。</p></div>
+    <div><b>去留</b><p>临时 Actor 做完活，留不留由你决定。</p></div>
+  </div>
+</div></section>
+
+<section class="wrap tiles">
+  <h2>今天就能用的能力</h2>
+  <div class="grid">
+    <div class="tile a"><b>读取与检索</b><p>先弄清项目再动手。</p></div>
+    <div class="tile b"><b>编辑与 Review</b><p>逐个检查差异再保留。</p></div>
+    <div class="tile c"><b>Bash</b><p>在当前项目跑命令、构建、测试。</p></div>
+    <div class="tile d"><b>审批策略</b><p>哪些直接做，哪些先问你。</p></div>
+    <div class="tile e"><b>Skills</b><p>把方法装进 Skill，带进下一个任务。</p></div>
+    <div class="tile f"><b>子 Agent</b><p>独立检索拆出去，主会话留全貌。</p></div>
+    <div class="tile g"><b>模型与推理</b><p>连自己的服务商，按任务选强度。</p></div>
+    <div class="tile h"><b>Browser Use</b><p>打开网页、点击、截图。</p></div>
+  </div>
+</section>
+
+<section class="wrap closing">
+  <div class="box"><h2>给下一个问题，<br>一个空间。</h2><img src="assets/sprite-08.png" alt=""><a class="btn" href="#">下载 ActSpace →</a></div>
+</section>
+<footer class="wrap"><span>© 2026 ActSpace</span><span>唯变所适</span></footer>
+</body>
+</html>

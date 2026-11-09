@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 0 · V4 精修 — 真实窗口与 Actor 名册</title>
+<style>
+/* 方向 0：保留 V4 纸本 token，不换气质。改三件事：
+   1) 首屏窗口换成真实 macOS 窗口 + 真实 Space 截图（不再手绘会话）；
+   2) 10 个插件开关 + 折线退到窗口下方一条安静的「能力条」；
+   3) Actor 名册卡从窗口里「拿出来」浮在舞台上，让 Space 这个核心第一眼可见。 */
+:root{
+  --canvas:#f2f1ed;--paper:#fbfaf7;--ink:#1d1c1a;--body:#5d5a53;--muted:#8a8780;--line:#dcd9d1;
+  --accent:#6d4fc2;--accent-soft:#f2eefb;--accent-line:#cdbdf0;--live:#2f6b4d;--live-soft:#dcebe0;--wip:#8a6420;--wip-soft:#efe5cf;
+  --peach:#efc3a6;--peach-soft:#f4d9c6;--peach-base:#e6cdbb;--slate:#8fa3b8;--slate-soft:#b7c5d3;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Noto Sans CJK SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --display:Charter,"Songti SC","Noto Serif CJK SC","Noto Serif SC",Georgia,serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --page:min(1360px,calc(100% - 2*clamp(16px,4.8vw,40px)));
+}
+*{box-sizing:border-box}
+html{background:var(--canvas)}
+body{margin:0;color:var(--ink);font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
+.wrap{width:var(--page);margin-inline:auto}
+h1,h2{font-family:var(--display);font-weight:500;margin:0;letter-spacing:0;text-wrap:balance}
+
+/* 页头 */
+.hd{position:sticky;top:0;z-index:20;height:64px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--canvas) 88%,transparent);backdrop-filter:blur(12px) saturate(1.4)}
+.hd .wrap{height:100%;display:flex;align-items:center;gap:32px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:17px}
+.brand img{width:42px;height:28px;object-fit:contain}
+nav{display:flex;gap:24px;font-size:14px;color:var(--body)}
+nav a[aria-current]{color:var(--ink);font-weight:500;position:relative}
+nav a[aria-current]::after{content:"";position:absolute;left:0;right:0;bottom:-21px;height:2px;border-radius:2px;background:var(--accent)}
+.hd-tools{margin-left:auto;display:flex;align-items:center;gap:14px}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:11px 20px;border-radius:999px;background:var(--ink);color:#fff;font-size:14px;font-weight:500;transition:background .15s}
+.btn:hover{background:var(--accent)}
+.hd .btn{padding:8px 16px;font-size:13.5px}
+.tlink{font-size:14.5px;border-bottom:1px solid var(--line);padding-bottom:1px}
+
+/* 首屏 */
+.hero{height:calc(100vh - 64px);min-height:780px;max-height:940px;display:flex}
+.hero .wrap{display:flex;flex-direction:column;padding:28px 0 24px}
+.hero-top{display:grid;grid-template-columns:1fr minmax(0,560px);gap:48px;align-items:end;margin-bottom:18px}
+.hero h1{font-size:46px;line-height:1.22}
+.hero h1 span{display:block}
+.lede{max-width:540px;margin:0;font-size:15px;line-height:1.75;color:var(--muted)}
+.lede b{color:var(--ink);font-weight:500}
+.acts{display:flex;align-items:center;gap:26px;margin-top:20px}
+
+.stage{position:relative;flex:1;min-height:0;overflow:hidden;border-radius:28px;isolation:isolate;
+  background:
+   radial-gradient(60% 80% at 12% 10%,var(--peach-soft) 0,transparent 60%),
+   radial-gradient(50% 70% at 88% 20%,var(--slate-soft) 0,transparent 65%),
+   radial-gradient(45% 60% at 70% 100%,var(--slate) 0,transparent 70%),
+   radial-gradient(40% 55% at 5% 95%,var(--peach) 0,transparent 70%),var(--peach-base)}
+.stage::after{content:"";position:absolute;inset:0;z-index:-1;opacity:.2;mix-blend-mode:multiply;
+  background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .2 0 0 0 0 .18 0 0 0 0 .15 0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+.note{position:absolute;top:18px;right:20px;z-index:3;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--paper) 80%,transparent);box-shadow:0 0 0 1px var(--line);font:11.5px var(--mono);color:var(--body)}
+
+/* 真实窗口：macOS 窗口框 + 真实截图。轻微透视，像产品发布图。 */
+.scene{position:absolute;inset:0;perspective:1800px}
+.mac{position:absolute;left:50%;top:44px;width:min(920px,calc(100% - 300px));transform:translateX(-50%) rotateX(3deg);transform-origin:50% 100%;
+  border-radius:12px;overflow:hidden;background:#fff;
+  box-shadow:0 0 0 1px rgba(29,28,26,.14),0 1px 2px rgba(29,28,26,.08),0 40px 90px -20px rgba(40,36,30,.45),0 90px 160px -60px rgba(40,36,30,.35)}
+.mac-bar{height:38px;display:flex;align-items:center;gap:8px;padding:0 14px;background:linear-gradient(#f7f6f4,#efeeeb);border-bottom:1px solid #dcdad5}
+.mac-bar i{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)}
+.mac-bar i:nth-child(1){background:#ff5f57}.mac-bar i:nth-child(2){background:#febc2e}.mac-bar i:nth-child(3){background:#28c840}
+.mac-bar b{margin:0 auto;font-size:12.5px;font-weight:500;color:#6f6d68;display:flex;align-items:center;gap:7px}
+.mac-bar b span{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:5px;background:#eae7f6}
+.mac-bar b span img{width:13px}
+.mac-view{aspect-ratio:3180/2400;background:#fafafa}
+.mac-view img{width:100%;height:100%;object-fit:cover}
+
+/* Actor 名册卡：从窗口里拿出来，压在窗口边缘。 */
+.card{position:absolute;z-index:4;display:grid;grid-template-columns:44px 1fr;gap:4px 12px;align-items:center;width:232px;padding:12px 14px 12px 12px;border-radius:14px;background:var(--paper);
+  box-shadow:0 0 0 1px rgba(29,28,26,.1),0 18px 40px -14px rgba(40,36,30,.35)}
+.card .av{grid-row:span 2;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;overflow:hidden}
+.card .av img{width:34px;height:34px;object-fit:contain}
+.card b{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+.card b i{font-style:normal;font-size:11px;font-weight:500;padding:1px 7px;border-radius:999px}
+.card b i.busy{background:var(--accent-soft);color:var(--accent)}
+.card b i.wait{background:var(--wip-soft);color:var(--wip)}
+.card b i.done{background:var(--live-soft);color:var(--live)}
+.card small{font:11.5px var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .bar{grid-column:2;height:3px;border-radius:2px;background:#e8e5df;overflow:hidden;margin-top:3px}
+.card .bar i{display:block;height:100%;background:var(--accent)}
+.c1{left:52px;top:112px}.c2{left:34px;top:232px}.c3{right:48px;top:150px}.c4{right:30px;top:290px}
+
+/* 能力条：代替左右两列插件开关和折线。 */
+.caps{display:flex;align-items:center;gap:6px;margin:0 0 14px;padding:0}
+.caps span{display:flex;align-items:center;gap:7px;padding:4px 10px;border-radius:999px;font:12px var(--mono);color:var(--body);white-space:nowrap;box-shadow:0 0 0 1px var(--line);background:var(--paper)}
+.caps span::before{content:"";width:6px;height:6px;border-radius:50%;background:#cfcabf}
+.caps span.on{background:var(--accent-soft);color:var(--ink);box-shadow:0 0 0 1px var(--accent-line)}
+.caps span.on::before{background:var(--accent)}
+.caps em{font:11.5px var(--mono);color:var(--muted);padding:0 10px 0 0;font-style:normal;white-space:nowrap}
+.caps hr{width:1px;height:16px;border:0;margin:0 2px;background:var(--line)}
+
+/* 现状 */
+.today{padding-top:112px}
+.today h2{font-size:40px;line-height:1.3;margin-bottom:36px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tcard{display:block;padding:20px 22px 22px;border-radius:16px;background:var(--paper);box-shadow:0 0 0 1px var(--line);transition:.2s}
+.tcard:hover{box-shadow:0 0 0 1px var(--accent-line),0 6px 18px -10px rgba(29,28,26,.2);transform:translateY(-2px)}
+.tcard h3{display:flex;justify-content:space-between;margin:0 0 6px;font-size:15px;font-weight:600}
+.tcard h3 span{color:var(--muted)}
+.tcard p{margin:0;font-size:13.5px;line-height:1.7;color:var(--body)}
+
+/* 功能块（真实截图） */
+.feature{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:56px;align-items:center;padding-top:112px}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:500;line-height:1.6}
+.pill.live{background:var(--live-soft);color:var(--live)}.pill.wip{background:var(--wip-soft);color:var(--wip)}
+.ftags{display:flex;align-items:center;gap:10px;margin:0 0 18px;font-size:13px;color:var(--muted)}
+.feature h2{font-size:40px;line-height:1.3;margin-bottom:16px}
+.feature p{margin:0 0 22px;line-height:1.8;color:var(--muted)}
+.pts{margin:0 0 24px;padding:0;list-style:none;border-top:1px solid var(--line)}
+.pts li{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.pts li span{font:12px var(--mono);color:var(--muted);padding-top:2px}
+.fstage{position:relative;border-radius:28px;padding:60px 32px 32px;overflow:hidden;isolation:isolate;
+  background:radial-gradient(60% 80% at 85% 10%,var(--slate-soft) 0,transparent 62%),radial-gradient(50% 70% at 10% 20%,#d9dfe4 0,transparent 66%),radial-gradient(45% 60% at 20% 105%,var(--slate) 0,transparent 70%),#c9d3dc}
+.fstage .mac{position:relative;left:auto;top:auto;width:100%;transform:none}
+.fstage .mac-view{aspect-ratio:2280/1410}
+
+/* 结尾 */
+.closing{padding:120px 0 112px}
+.cstage{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;padding:clamp(36px,5vw,64px);border-radius:28px;
+  background:radial-gradient(60% 80% at 12% 10%,var(--peach-soft) 0,transparent 60%),radial-gradient(50% 70% at 88% 20%,var(--slate-soft) 0,transparent 65%),var(--peach-base)}
+.cstage h2{font-size:40px;line-height:1.3}
+.cstage h2 span{display:block}
+footer{border-top:1px solid var(--line);padding:40px 0;font:12px var(--mono);color:var(--muted)}
+@media (min-height:1400px){.hero{height:auto;min-height:0;max-height:none}.stage{flex:none;height:620px}}
+@media (max-width:760px){nav,.hd-tools .tlink{display:none}.hero{height:auto;min-height:0;max-height:none}.hero-top{grid-template-columns:1fr;gap:16px;align-items:start}.hero h1{font-size:34px}.caps{flex-wrap:wrap;gap:6px}.caps hr{display:none}.stage{flex:none;height:560px;border-radius:20px}.mac{width:calc(100% - 32px);top:150px}.card{width:200px;transform:scale(.9);transform-origin:top left}.c1{left:12px;top:14px}.c2{left:auto;right:12px;top:14px}.c3{left:12px;right:auto;top:86px}.c4{left:auto;right:12px;top:86px}.grid4{grid-template-columns:1fr 1fr}.feature{grid-template-columns:1fr;gap:28px;padding-top:72px}.fstage{padding:48px 14px 14px}.today,.closing{padding-top:72px}.today h2,.feature h2,.cstage h2{font-size:30px}.cstage{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+<header class="hd"><div class="wrap">
+  <a class="brand" href="#"><img src="../../../../apps/site/src/assets/brand/actspace-mark.png" alt=""><span>ActSpace</span></a>
+  <nav><a aria-current="page" href="#">产品</a><a href="#">文档</a><a href="#">博客</a><a href="#">更新日志</a><a href="#">开发计划</a></nav>
+  <div class="hd-tools"><a class="btn" href="#">快速开始</a></div>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <div class="hero-top">
+    <h1><span>会自我进化的</span><span>Agent 运行空间</span></h1>
+    <div>
+      <p class="lede"><b>每一个问题，都有它的空间。</b>今天它在本地项目里读代码、调工具、交付可审阅的改动；接下来，会在不同场景里长成专业的 Actor。</p>
+      <div class="acts"><a class="btn" href="#">快速开始 →</a><a class="tlink" href="#">阅读产品理念 →</a></div>
+    </div>
+  </div>
+  <div class="caps">
+      <em>本任务启用 7 / 10</em>
+      <span class="on">读取</span><span class="on">编辑</span><span class="on">终端</span><span>Browser Use</span>
+      <hr><span class="on">Skills</span><span class="on">审批</span><span class="on">子 Agent</span>
+      <hr><span class="on">渐进披露</span><span class="on">压缩</span><span>上下文面板</span>
+    </div>
+  <div class="stage">
+    <span class="note">产品界面 · 示例数据</span>
+    <div class="scene">
+      <div class="mac">
+        <div class="mac-bar"><i></i><i></i><i></i><b><span><img src="../../../../apps/site/src/assets/brand/actspace-mark.png" alt=""></span>支付链路提速 — ActSpace</b></div>
+        <div class="mac-view"><img src="../../../../apps/site/src/assets/screenshots/home/space.png" alt="Space 界面"></div>
+      </div>
+      <div class="card c1"><span class="av" style="background:#fddfcf"><img src="assets/sprite-01.png" alt=""></span><b>性能分析 <i class="done">有结果</i></b><small>场景 慢查询 · 记忆 12 条</small><span class="bar"><i style="width:100%"></i></span></div>
+      <div class="card c2"><span class="av" style="background:#6d91cd"><img src="assets/sprite-02.png" alt=""></span><b>前端 <i class="busy">工作中</i></b><small>web 端报价缓存 · 3/5</small><span class="bar"><i style="width:60%"></i></span></div>
+      <div class="card c3"><span class="av" style="background:#4a775d"><img src="assets/sprite-03.png" alt=""></span><b>后端 <i class="wait">等你决定</i></b><small>批准新索引的迁移 · 4/6</small><span class="bar"><i style="width:66%"></i></span></div>
+      <div class="card c4"><span class="av" style="background:#fdf5b7"><img src="assets/sprite-05.png" alt=""></span><b>环境巡检 <i class="done">临时</i></b><small>这次做完了，要不要留下它？</small><span class="bar"><i style="width:100%;background:var(--live)"></i></span></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="wrap today">
+  <h2>基础功能</h2>
+  <div class="grid4">
+    <a class="tcard" href="#"><h3>读取与检索<span>→</span></h3><p>按需读取文件、搜索代码，先弄清项目再动手。</p></a>
+    <a class="tcard" href="#"><h3>编辑与 Review<span>→</span></h3><p>改动直接写进文件，逐个检查差异再决定保留。</p></a>
+    <a class="tcard" href="#"><h3>Bash<span>→</span></h3><p>让 Agent 在当前项目里运行命令、构建与测试。</p></a>
+    <a class="tcard" href="#"><h3>审批策略<span>→</span></h3><p>决定哪些操作直接执行，哪些先问你。</p></a>
+    <a class="tcard" href="#"><h3>Skills<span>→</span></h3><p>把常用的工作方法装进 Skill，带进下一项任务。</p></a>
+    <a class="tcard" href="#"><h3>子 Agent<span>→</span></h3><p>把独立的检索拆给子 Agent，主会话保留全貌。</p></a>
+    <a class="tcard" href="#"><h3>模型与推理<span>→</span></h3><p>连接自己的服务商，按任务选模型与思考强度。</p></a>
+    <a class="tcard" href="#"><h3>Browser Use<span>→</span></h3><p>需要浏览器的任务，打开网页、点击与截图。</p></a>
+  </div>
+</section>
+
+<section class="wrap feature">
+  <div>
+    <p class="ftags"><span class="pill live">已上线</span>审批策略</p>
+    <h2>动手前先问你</h2>
+    <p>会改变环境的操作先停下来等你确认，放行到什么程度由你定。</p>
+    <ul class="pts"><li><span>01</span>确认后才执行：命令原样列出，标明在沙盒还是真实环境里跑</li><li><span>02</span>按命令放行：同类命令可在本会话放行，换个会话重新问</li><li><span>03</span>权限模式：「完全权限」不再逐条确认，硬性安全检查照旧生效</li></ul>
+    <a class="tlink" href="#">了解工具与审批 →</a>
+  </div>
+  <div class="fstage">
+    <span class="note">产品界面 · 示例数据</span>
+    <div class="mac"><div class="mac-bar"><i></i><i></i><i></i><b>清理构建产物 — ActSpace</b></div><div class="mac-view"><img src="../../../../apps/site/src/assets/screenshots/home/approval.png" alt=""></div></div>
+  </div>
+</section>
+
+<section class="wrap closing">
+  <div class="cstage"><h2><span>给下一个问题，</span><span>一个空间。</span></h2><div class="acts"><a class="btn" href="#">快速开始 →</a><a class="tlink" href="#">在 GitHub 查看 ↗</a></div></div>
+</section>
+<footer><div class="wrap">© 2026 ActSpace · 唯变所适 · 会自我进化的 Agent 运行空间</div></footer>
+</body>
+</html>
