@@ -18,7 +18,7 @@
 | `agent-runtime/` | Agent 形态与工作模式、Journal 观测数据契约、会话记录 Markdown、渐进式会话加载 | [形态与模式](agent-runtime/agent-forms-and-modes.md)、[观测模型](agent-runtime/agent-observability-trace-model.md) |
 | `model-context/` | 多供应商、模型目录与费用、request snapshot、token usage、Context Projection | [多供应商](model-context/agent-multi-provider-llm.md)、[Context 模型事实](model-context/agent-context-model-facts-and-composer.md) |
 | `上下文管理引擎设计/` | 上下文管理引擎 V2：生命周期、物理拆包、Step 增量更新、渐进式披露、压缩、Context 面板与 SQLite 联合设计 | [专题 README](上下文管理引擎设计/README.md)、[V2 设计](上下文管理引擎设计/上下文管理引擎V2/README.md) |
-| `tool-system/` | Skill、Web / 图片工具、工具输出引用、工具预览契约、受控子进程 | [Skill 加载](tool-system/agent-skill-loading.md)、[工具预览契约](tool-system/agent-tool-preview-design-guidelines.md) |
+| `tool-system/` | Skill、Web / 图片工具、工具输出引用、工具预览契约、受控子进程、脚本执行 | [Skill 加载](tool-system/agent-skill-loading.md)、[工具预览契约](tool-system/agent-tool-preview-design-guidelines.md)、[脚本执行](tool-system/agent-script-execution.md) |
 | `execution-safety/` | Tool Runtime、权限模式、审批、Grant、Bash 硬防线、沙箱 | [README](execution-safety/README.md) |
 | `browser/` | Browser Bridge、ActSpace 集成与 canonical command | [入口](browser/agent-browser-use-index.md) |
 | `collaboration/` | 子智能体、后台 Bash 任务、侧边对话 | [子智能体](collaboration/agent-subagent-runtime.md)、[后台任务](collaboration/agent-background-tasks.md)、[侧边对话](collaboration/side-chat-design.md) |
@@ -57,7 +57,7 @@
 - [渐进式会话加载](agent-runtime/agent-progressive-session-loading.md)：会话浏览按需加载。
 - [会话记录 Markdown](agent-runtime/agent-session-transcript.md)：每个会话派生一份精简 `transcript.md`，Agent 据此读取历史会话，读取不弹审批。
 - [编辑提问重发](agent-runtime/agent-edit-resend-rewind.md)：从某一轮重来，日志截到它之前（旧日志存档），停掉在跑的后台任务和子 Agent。
-- [Skill 加载](tool-system/agent-skill-loading.md)、[Web 工具](tool-system/agent-web-tools.md)、[工具输出、文件引用与图片输入](tool-system/agent-tool-output-references.md)、[受控子进程](tool-system/agent-subprocess-runner-guidelines.md)、[图片检查工具](tool-system/agent-image-inspection-tool.md)、[图片生成工具](tool-system/agent-image-generation-tool.md)、[工具预览契约](tool-system/agent-tool-preview-design-guidelines.md)。
+- [Skill 加载](tool-system/agent-skill-loading.md)、[Web 工具](tool-system/agent-web-tools.md)、[工具输出、文件引用与图片输入](tool-system/agent-tool-output-references.md)、[受控子进程](tool-system/agent-subprocess-runner-guidelines.md)、[图片检查工具](tool-system/agent-image-inspection-tool.md)、[图片生成工具](tool-system/agent-image-generation-tool.md)、[工具预览契约](tool-system/agent-tool-preview-design-guidelines.md)、[脚本执行](tool-system/agent-script-execution.md)。
 
 ## Browser Use
 

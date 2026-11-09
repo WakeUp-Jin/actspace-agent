@@ -16,6 +16,7 @@
 
 | 计划 | 当前状态与下一步 |
 |---|---|
+| [脚本执行：bash 规则放宽、随包 Python、临时目录与提示词](active/20261109-script-execution.md) | 2026-11-09 设计拍板，T1–T3 已实现（分支 `cursor/script-execution-design-c53e`）；下一步 T4 会话临时目录与 `isHostWritablePath`。 |
 | [性能第三轮：高频路径不再整份读日志](active/20261108-perf-round3.md) | R1–R4 方案已拍板（自动审查、压缩摘要、子 Agent 面板、读旧事件深拷贝）；下一步按 spec → 代码执行。性能任务总表见 [性能待办](perf-backlog.md)。 |
 | [Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md) | 待拍板：2026-10-07 立项（来源：Desktop 前端重构 17 的特征测试），D1–D4 一直未决定；再不推进就降级回 [技术债](tech-debt-tracker.md)。 |
 | [Composer 文件引用与回复批注](active/20260928-composer-mentions-annotations/README.md) | P0、PA、PA2 已实施；PA2 真实 Electron 主要流程通过，边界项见实机逐项记录；PB（编辑器内 `@` 文件引用）待实施。 |

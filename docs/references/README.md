@@ -6,4 +6,5 @@
 
 - `dsh-self-modification-20261007.md`：DeepSeek Harness 自修改机制的源码级调研，是[自进化总体架构与 DSH 借鉴边界](../design-docs/自进化的方案设计/05-总体架构与DSH借鉴边界.md)的依据。
 - `sandbox-research-20261022/README.md`：沙箱调研原稿（nono / DSH / Windows 方案与 Mac 性能实验）；当前决策见[沙箱设计](../design-docs/execution-safety/agent-沙箱设计.md)。
+- `script-execution-harness-survey-20261109.md`：DSH、opencode、Kimi CLI、codex、Hermes、OpenHands、pi、goose、gemini-cli、anthropics skills、smolagents 如何让模型执行脚本的源码级调研；设计见[脚本执行](../design-docs/tool-system/agent-script-execution.md)。
 - `minecontext-architecture-analysis.md`：MineContext（字节跳动开源）上下文分类体系与主动推送机制的源码级分析：六种认知对齐的上下文类型、四大定时推送任务的级联信息流、双通道检索机制。

@@ -451,7 +451,7 @@ Session Journal 是 Session Grant 的唯一持久事实源，不增加独立 Hos
 - 不生成自由命令 pattern；符合既有前缀分析规则的命令可生成限定 workspace 的 Session Grant；
 - sandbox 或 executor 无法表达请求边界时 fail-closed。
 
-未来 Bash AST、命令 pattern 与跨平台 sandbox 必须另立设计和计划，不能扩展本轮类型后直接开放。
+未来 Bash AST、命令 pattern 与跨平台 sandbox 必须另立设计和计划，不能扩展本轮类型后直接开放。pipe / redirection / 内联脚本的放宽由[脚本执行设计](../tool-system/agent-script-execution.md)第 2.1、2.2 节承接：引号感知切词后只对未加引号的语法判断，管道按简单命令逐段分类，重定向目标限制在工作区或临时目录，解释器运行脚本文件进入前缀授权、内联源码保持单次审批。
 
 ## 17. Host 行为
 
