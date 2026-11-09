@@ -15,7 +15,7 @@ docs/exec-runs/
     └── execution-summary.md
 ```
 
-子文件夹命名规则：与 `docs/exec-plans/active/` 或 `completed/` 里的计划文件 slug 一致。比如计划文件是 `add-auth-module.md`，对应的执行记录目录就是 `docs/exec-runs/add-auth-module/`。
+子文件夹命名规则：与 `docs/exec-plans/active/` 或 `completed/` 里的计划文件 slug 一致。比如计划文件是 `add-auth-module.md`，对应的执行记录目录就是 `docs/exec-runs/add-auth-module/`。目录名与计划 slug 对不上时（一个计划目录拆成多个 run、纯验收轮次、计划已被合并改名），在 `execution-summary.md` 顶部第一行写明对应的计划路径。只剩被外部引用的证据文件、没有 `execution-summary.md` 的旧目录不要求补写摘要。
 
 ## 两份文档的用途
 

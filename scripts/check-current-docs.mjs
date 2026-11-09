@@ -61,9 +61,7 @@ export const currentTruthFiles = [
 ];
 
 /** Gitignored outputs that a demo builds locally (see its README); a fresh clone legitimately lacks them. */
-const BUILD_ARTIFACTS = new Set([
-  "docs/design-docs/frontend/md-render-demo/editor.bundle.js",
-]);
+const BUILD_ARTIFACTS = new Set([]);
 
 const forbiddenCurrentClaims = [
   { pattern: /\b(?:bootProfile\b\s*\(|BootedProfile\b|RunAgentInput\b)|context:compact|engine\/streaming-preview-extractors\.ts/g, message: "仍把退役的启动或任务 API 当作当前契约", allowHistoricalLine: true },

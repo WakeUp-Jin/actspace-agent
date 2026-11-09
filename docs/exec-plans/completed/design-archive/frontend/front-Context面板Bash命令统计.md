@@ -2,7 +2,7 @@
 
 > 归档：现行规则已并入 [Context 面板规范](../../../../design-docs/frontend/front-Context面板规范.md)；本文保留当时的决策表、存储设计与交接记录。
 
-更新：2026-11-04。状态：已实现（浏览器 mock 已验，Electron 真实会话待验）。执行计划见 [20261102-context-bash-stats](../../20261102-context-bash-stats.md)；视觉以 [context-bash-demo.html](../../../../design-docs/frontend/context-bash-demo.html) 为准。
+更新：2026-11-04。状态：已实现（浏览器 mock 已验，Electron 真实会话待验）。执行计划见 [20261102-context-bash-stats](../../20261102-context-bash-stats.md)；视觉以 `context-bash-demo.html`（已删除，结论见现行上下文面板规范） 为准。
 
 ## 1. 为什么做
 
