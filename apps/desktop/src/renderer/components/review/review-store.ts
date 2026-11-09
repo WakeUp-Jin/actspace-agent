@@ -231,14 +231,16 @@ export function useReviewWorkspaceStore(input: {
     });
   }, [loadSnapshot]);
 
+  // 只在换快照（id 变）或换选中文件时重新拉 diff；同一快照内的其他状态变化不触发，所以从 ref 读当前快照。
+  const snapshotId = state.snapshot?.id;
   useEffect(() => {
-    const snapshot = state.snapshot;
+    const snapshot = stateRef.current.snapshot;
     if (!snapshot) return;
     const requestIds = snapshot.loadPolicy.mode === "single-file"
       ? state.selectedFileId ? [state.selectedFileId] : []
       : snapshot.files.map((file) => file.id);
     void loadDiffs(requestIds);
-  }, [loadDiffs, state.selectedFileId, state.snapshot?.id]);
+  }, [loadDiffs, state.selectedFileId, snapshotId]);
 
   const setSelection = useCallback((selection: ReviewSelection) => void loadSnapshot(selection), [loadSnapshot]);
   const refresh = useCallback(() => void loadSnapshot(stateRef.current.selection, true), [loadSnapshot]);

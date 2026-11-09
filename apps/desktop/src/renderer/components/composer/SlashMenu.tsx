@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useState, type RefObject } from "react";
 import { Asterisk, BookOpen, Bot, ChartPie, Check, GitBranch, GitFork, ListTodo, Loader2, type LucideIcon } from "lucide-react";
 import type { ComposerMode, SkillCatalogItem } from "@actspace/shared";
 import {
@@ -175,8 +175,11 @@ export function useSlashMenu({ message, inputLocked, isChatForm, isStreaming, al
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只挂一次；composerRef 是稳定的 ref
-  }, []);
+  }, [composerRef]);
+
+  const dismiss = useCallback(() => setDismissed(true), []);
+  /** 输入框内容变了：允许菜单再次打开。 */
+  const reset = useCallback(() => setDismissed(false), []);
 
   return {
     menuId,
@@ -188,9 +191,8 @@ export function useSlashMenu({ message, inputLocked, isChatForm, isStreaming, al
     results,
     active,
     activeOptionId,
-    dismiss: () => setDismissed(true),
-    /** 输入框内容变了：允许菜单再次打开。 */
-    reset: () => setDismissed(false),
+    dismiss,
+    reset,
     move: (direction: 1 | -1) => setActiveIndex((current) => (current + direction + results.length) % results.length),
     /** 鼠标移到某一项上：高亮跟过去。 */
     highlight: (result: ComposerSlashResult) => {

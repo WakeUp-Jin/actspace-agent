@@ -49,8 +49,14 @@
       "correctness": {
         "noUnusedImports": "error",
         "noUnusedVariables": "error",
-        // 存量命中较多，先以 warning 暴露、不阻塞 CI；清零后再升 error。
-        "useExhaustiveDependencies": "warn",
+        "useExhaustiveDependencies": {
+          "level": "error",
+          "options": {
+            // `useEffect(fn, [refreshKey])` 这类「把 key / revision / tick 当触发器」的写法在仓库里是有意的成规模用法，
+            // React 官方的 exhaustive-deps 也不把 effect 的多余依赖当错误；这里只追「漏依赖」，不追「多依赖」。
+            "reportUnnecessaryDependencies": false
+          }
+        },
         // `case x: return this.handle();` 在 void 方法里是仓库惯用写法，tsc 已经约束返回类型。
         "noVoidTypeReturn": "off",
         // `useSourceExtension` 这类 use* 命名的普通 API 会被误判为 React hook。

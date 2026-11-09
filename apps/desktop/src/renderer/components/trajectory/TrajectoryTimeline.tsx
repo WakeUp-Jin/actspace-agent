@@ -91,12 +91,13 @@ export const TrajectoryTimeline = memo(function TrajectoryTimeline({
     if (model !== null && range !== null && (range.end < model.start || range.start > model.end)) onRange(null);
   }, [model, onRange, range]);
 
+  const drafting = draft !== null;
   useEffect(() => {
     setTip(null);
-    if (hoveredId === null || draft !== null) return;
+    if (hoveredId === null || drafting) return;
     const timer = window.setTimeout(() => setTip({ recordId: hoveredId, x: pointerX.current }), TOOLTIP_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [hoveredId, draft !== null]);
+  }, [hoveredId, drafting]);
 
   const showsEarlier = hasEarlier && (model === null || domainStart === model.start);
   const earlier = showsEarlier && <EarlierHistory loading={loadingEarlier} onLoad={onLoadEarlier} onHover={() => setHover(null)} />;

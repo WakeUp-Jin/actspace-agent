@@ -474,7 +474,7 @@ export function App() {
     setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
       sessionRecord?.meta.worktree?.sourceWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
     ));
-  }, [fallbackWorkspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot]);
+  }, [fallbackWorkspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot, sessionRecord?.meta.worktree?.sourceWorkspaceRoot]);
 
   useEffect(() => {
     const lockedWorktree = sessionRecord?.meta.worktree;
@@ -762,7 +762,7 @@ export function App() {
     }
     void bootstrapSession().catch(handleBootstrapError);
     return () => { disposed = true; if (timer) clearTimeout(timer); };
-  }, [listRetry, readSessionPage]);
+  }, [listRetry, readSessionPage, setActiveSessionId]);
 
   // 流式事件归并进 live run（规则在 live-run-store.ts）；steer 的正文取自任务队列缓存。
   const handleStreamEvent = useCallback((event: StreamEvent) => liveRuns.applyStreamEvent(event, (sessionId, messageId) => {
@@ -831,7 +831,7 @@ export function App() {
         });
       }
     });
-  }, [liveRuns, handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshReviewSummary, localStore, patchLocal, setLocalFlag, setCompactionFailureForSession]);
+  }, [liveRuns, handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshReviewSummary, localStore, patchLocal, setLocalFlag, setCompactionFailureForSession, readSidebarSessions, refreshTaskQueue]);
 
   const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
     const selectionRequest = messageRequestRef.current;
@@ -860,7 +860,7 @@ export function App() {
       if (input.runLocation) throw error;
       return null;
     }
-  }, [fallbackWorkspaceRoot, refreshWorkspaces]);
+  }, [fallbackWorkspaceRoot, refreshWorkspaces, readSidebarSessions, sessionStore, setActiveSessionId]);
 
   /** 首次发送保留结果兼容接口；执行与后续队列均由 Host 调度。 */
   const continueQueue = useCallback(async (sessionId: string, _outcome: SessionRunOutcome) => { await refreshTaskQueue(sessionId); }, [refreshTaskQueue]);
@@ -1173,7 +1173,7 @@ export function App() {
         restored?.meta.worktree?.sourceWorkspaceRoot ?? restored?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
       ));
     },
-    [fallbackWorkspaceRoot, refreshPendingApprovalStatuses, readSessionPage],
+    [fallbackWorkspaceRoot, refreshPendingApprovalStatuses, readSessionPage, setActiveSessionId],
   );
 
   useEffect(() => {
@@ -1418,6 +1418,9 @@ export function App() {
     refreshWorkspaces,
     setApprovalPendingForSession,
     setFailedForSession,
+    readSidebarSessions,
+    sessionStore,
+    setActiveSessionId,
   ]);
 
   const handleTogglePin = useCallback(
@@ -1430,7 +1433,7 @@ export function App() {
         console.error("Failed to toggle session pin", error);
       }
     },
-    [],
+    [readSidebarSessions],
   );
 
   const handleRenameSession = useCallback(
@@ -1451,7 +1454,7 @@ export function App() {
         console.error("Failed to rename session", error);
       }
     },
-    [],
+    [readSidebarSessions],
   );
 
   const handleArchiveSession = useCallback(
@@ -1554,7 +1557,7 @@ export function App() {
     if (normalizeWorkspaceRoot(selectedWorkspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)) {
       setSelectedWorkspaceRoot(firstVisibleWorkspaceRoot(refreshed, sessions));
     }
-  }, [activeSessionId, handleCreateSession, readSessionPage, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry, evictSession]);
+  }, [activeSessionId, handleCreateSession, readSessionPage, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry, evictSession, setActiveSessionId]);
 
   const handleArchivedSessionsChange = useCallback(async () => {
     try {
@@ -1563,7 +1566,7 @@ export function App() {
     } catch (error) {
       console.error("Failed to refresh sessions after archived chats changed", error);
     }
-  }, []);
+  }, [readSidebarSessions]);
 
   const handleRestoreSession = useCallback(async (sessionId: string) => {
     try {
