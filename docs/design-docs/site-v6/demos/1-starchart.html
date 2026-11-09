@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 1 · 星图 — 深色天文台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* 方向 1：星图。Space 当真当作「宇宙」来画：深色夜空、轨道、读数。
+   协调 Agent 在中心，Actor 在不同半径的轨道上运行；紫色只做星光与指针，不做大面积底色。 */
+:root{
+  --sky:#0c0e14;--sky-2:#121520;--panel:#151925;--line:rgba(255,255,255,.08);--line-2:rgba(255,255,255,.16);
+  --star:#f3ead6;--star-dim:#b9b2a4;--star-mute:#7b776d;
+  --lilac:#b8a3f0;--lilac-deep:#6d4fc2;--mint:#9fd8b4;--amber:#f0c47a;
+  --serif:Fraunces,"Noto Serif CJK SC","Songti SC",Georgia,serif;--mono:"IBM Plex Mono","SF Mono",Menlo,monospace;
+  --sans:-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;
+  --page:min(1320px,calc(100% - 2*clamp(16px,4.8vw,40px)));
+}
+*{box-sizing:border-box}
+html{background:var(--sky)}
+body{margin:0;color:var(--star);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased;
+ background:radial-gradient(1200px 600px at 70% -10%,#1b1a33 0,transparent 60%),radial-gradient(900px 500px at 0% 100%,#121a1a 0,transparent 60%),var(--sky)}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
+.wrap{width:var(--page);margin-inline:auto}
+h1,h2{font-family:var(--serif);font-weight:300;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.mono{font-family:var(--mono);font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--star-mute)}
+
+.hd{height:64px;border-bottom:1px solid var(--line)}
+.hd .wrap{height:100%;display:flex;align-items:center;gap:36px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-weight:400;font-size:19px}
+.brand img{width:40px;height:26px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(184,163,240,.45))}
+nav{display:flex;gap:26px;font-size:14px;color:var(--star-dim)}
+nav a[aria-current]{color:var(--star)}
+.hd-r{margin-left:auto;display:flex;align-items:center;gap:20px}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:11px 20px;border-radius:999px;background:var(--star);color:var(--sky);font-size:14px;font-weight:500}
+.btn.ghost{background:transparent;color:var(--star);box-shadow:inset 0 0 0 1px var(--line-2)}
+.hd .btn{padding:8px 16px;font-size:13px}
+
+/* 首屏：左文案 + 右星图 */
+.hero{min-height:calc(100vh - 64px);display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:40px;align-items:center;padding:40px 0 60px}
+.hero h1{font-size:clamp(44px,5.2vw,72px);line-height:1.08}
+.hero h1 em{font-style:italic;font-weight:300;color:var(--lilac)}
+.kicker{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.kicker::before{content:"";width:28px;height:1px;background:var(--lilac)}
+.lede{max-width:460px;margin:26px 0 34px;font-size:16px;line-height:1.8;color:var(--star-dim)}
+.acts{display:flex;align-items:center;gap:14px}
+.readouts{display:grid;grid-template-columns:repeat(3,auto);gap:28px;margin-top:56px;padding-top:24px;border-top:1px solid var(--line);justify-content:start}
+.readouts b{display:block;font:400 26px/1 var(--serif);margin-bottom:6px}
+.readouts b i{font-style:normal;color:var(--lilac)}
+
+.chart{position:relative;aspect-ratio:1;max-height:760px;margin-left:auto;width:100%}
+.chart svg{width:100%;height:100%;overflow:visible}
+.orbit{fill:none;stroke:var(--line-2);stroke-width:1}
+.orbit.dash{stroke-dasharray:2 6}
+.tick{stroke:var(--line-2)}
+.lbl{font:11px var(--mono);fill:var(--star-mute);letter-spacing:.06em}
+.lbl.on{fill:var(--lilac)}
+.ring{fill:none;stroke:var(--lilac);stroke-width:1.2;opacity:.9}
+.core{fill:#1a1830;stroke:var(--lilac);stroke-width:1}
+.actor{filter:drop-shadow(0 0 14px rgba(184,163,240,.25))}
+.actor-name{font:12px var(--sans);fill:var(--star)}
+.actor-sub{font:10.5px var(--mono);fill:var(--star-mute)}
+.status{font:10px var(--mono);letter-spacing:.06em}
+.s-wait{fill:var(--amber)}.s-busy{fill:var(--lilac)}.s-done{fill:var(--mint)}
+.spin{transform-origin:400px 400px;animation:spin 140s linear infinite}
+.spin.r{animation-direction:reverse;animation-duration:200s}
+@keyframes spin{to{transform:rotate(360deg)}}
+.msg{fill:var(--panel);stroke:var(--line-2)}
+.msg-t{font:11.5px var(--sans);fill:var(--star-dim)}
+
+/* 轨迹带（屏幕实录） */
+.band{padding:40px 0 100px}
+.band .mono{margin-bottom:14px}
+.band h2{font-size:clamp(32px,3.4vw,44px);line-height:1.2;max-width:720px;margin-bottom:40px}
+.obs{position:relative;border-radius:18px;padding:1px;background:linear-gradient(180deg,rgba(184,163,240,.35),rgba(255,255,255,.06) 40%,rgba(255,255,255,.04))}
+.obs-in{border-radius:17px;overflow:hidden;background:var(--panel)}
+.obs-bar{display:flex;align-items:center;gap:14px;height:40px;padding:0 16px;border-bottom:1px solid var(--line);font:12px var(--mono);color:var(--star-mute)}
+.obs-bar i{width:8px;height:8px;border-radius:50%;background:var(--lilac);box-shadow:0 0 10px var(--lilac)}
+.obs-bar span{margin-left:auto}
+.obs img{width:100%;filter:saturate(.9) contrast(1.02)}
+.obs-cap{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding:28px 0 0;color:var(--star-dim);font-size:14px;line-height:1.75}
+.obs-cap b{display:block;color:var(--star);font-weight:500;margin-bottom:4px}
+.obs-cap .mono{margin-bottom:10px}
+
+/* 三条信念 */
+.creed{padding:40px 0 120px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-block:1px solid var(--line)}
+.creed div{background:var(--sky);padding:40px 32px}
+.creed .mono{margin-bottom:22px}
+.creed h3{font:300 30px/1.2 var(--serif);margin:0 0 14px}
+.creed p{margin:0;color:var(--star-dim);line-height:1.8}
+
+.closing{padding:0 0 140px;text-align:center}
+.closing h2{font-size:clamp(40px,5vw,64px);line-height:1.1}
+.closing h2 em{font-style:italic;color:var(--lilac)}
+.closing p{color:var(--star-mute);margin:20px 0 36px;font-family:var(--mono);font-size:12px;letter-spacing:.08em}
+footer{border-top:1px solid var(--line);padding:32px 0;font:12px var(--mono);color:var(--star-mute);letter-spacing:.04em}
+@media (min-height:1400px){.hero{min-height:0;padding:60px 0}}
+@media (max-width:760px){nav,.hd-r .mono{display:none}.hero{grid-template-columns:1fr;padding:32px 0 40px;min-height:0;gap:24px}.hero h1{font-size:42px}.readouts{grid-template-columns:1fr 1fr;gap:18px;margin-top:36px}.chart{max-height:none}.acts{flex-wrap:wrap}.band h2{font-size:28px}.obs-cap{grid-template-columns:1fr}.creed{grid-template-columns:1fr}.creed div{padding:28px 20px}.closing h2{font-size:40px}}
+</style>
+</head>
+<body>
+<header class="hd"><div class="wrap">
+  <a class="brand" href="#"><img src="../../../../apps/site/src/assets/brand/actspace-mark.png" alt="">ActSpace</a>
+  <nav><a aria-current="page" href="#">产品</a><a href="#">文档</a><a href="#">博客</a><a href="#">更新日志</a><a href="#">开发计划</a></nav>
+  <div class="hd-r"><a class="mono" href="#">v0.9.4</a><a class="btn" href="#">快速开始</a></div>
+</div></header>
+
+<section class="wrap hero">
+  <div>
+    <p class="kicker mono">Agent runtime · local first</p>
+    <h1>每一个问题，<br>都有它的<em>空间</em>。</h1>
+    <p class="lede">ActSpace 是一个会自我进化的 Agent 运行空间。一个协调者，一群各有专长的 Actor，围着你的问题运转：读代码、跑命令、交付可审阅的改动，并把学到的东西留在空间里。</p>
+    <div class="acts"><a class="btn" href="#">下载桌面版 →</a><a class="btn ghost" href="#">阅读产品理念</a></div>
+    <div class="readouts">
+      <div><b>4<i>·</i>7</b><span class="mono">Actor · 启用能力</span></div>
+      <div><b>12</b><span class="mono">本空间沉淀的记忆</span></div>
+      <div><b>唯变所适</b><span class="mono">信念</span></div>
+    </div>
+  </div>
+  <div class="chart">
+    <svg viewBox="0 0 800 800" aria-label="Space 星图：协调 Agent 在中心，Actor 在轨道上">
+      <defs>
+        <radialGradient id="glow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#6d4fc2" stop-opacity=".5"/><stop offset="1" stop-color="#6d4fc2" stop-opacity="0"/></radialGradient>
+        <clipPath id="c1"><circle r="26"/></clipPath>
+      </defs>
+      <circle cx="400" cy="400" r="260" fill="url(#glow)"/>
+      <!-- 轨道 -->
+      <circle class="orbit" cx="400" cy="400" r="120"/>
+      <circle class="orbit dash" cx="400" cy="400" r="210"/>
+      <circle class="orbit" cx="400" cy="400" r="300"/>
+      <circle class="orbit dash" cx="400" cy="400" r="380"/>
+      <!-- 刻度 -->
+      <g class="tick" stroke-width="1">
+        <line x1="400" y1="12" x2="400" y2="28"/><line x1="400" y1="772" x2="400" y2="788"/><line x1="12" y1="400" x2="28" y2="400"/><line x1="772" y1="400" x2="788" y2="400"/>
+      </g>
+      <text class="lbl" x="412" y="22">N · 等你决定</text>
+      <text class="lbl" x="412" y="786">S · 空闲</text>
+      <text class="lbl" x="30" y="392">W · 有结果</text>
+      <text class="lbl on" x="770" y="392" text-anchor="end">E · 工作中</text>
+      <!-- 中心：协调 Agent -->
+      <circle class="core" cx="400" cy="400" r="54"/>
+      <circle cx="400" cy="400" r="40" fill="#241f44"/>
+      <image href="assets/sprite-07.png" x="372" y="376" width="56" height="48" preserveAspectRatio="xMidYMid meet"/>
+      <text class="actor-name" x="400" y="478" text-anchor="middle">协调 Agent</text>
+      <text class="actor-sub" x="400" y="494" text-anchor="middle">支付链路提速</text>
+      <!-- 轨道上的 Actor -->
+      <g class="spin">
+        <g class="actor" transform="translate(597 472)">
+          <circle r="30" fill="#6d91cd"/><image href="assets/sprite-02.png" x="-20" y="-20" width="40" height="40" preserveAspectRatio="xMidYMid meet"/>
+          <text class="actor-name" x="40" y="-2">前端</text><text class="status s-busy" x="40" y="14">WORKING · 3/5</text>
+        </g>
+      </g>
+      <g class="spin r">
+        <g class="actor" transform="translate(400 190)">
+          <circle r="30" fill="#4a775d"/><image href="assets/sprite-03.png" x="-20" y="-20" width="40" height="40" preserveAspectRatio="xMidYMid meet"/>
+          <text class="actor-name" x="40" y="-2">后端</text><text class="status s-wait" x="40" y="14">AWAITING YOU · 迁移审批</text>
+        </g>
+      </g>
+      <g class="spin">
+        <g class="actor" transform="translate(118 297)">
+          <circle r="30" fill="#fddfcf"/><image href="assets/sprite-01.png" x="-20" y="-20" width="40" height="40" preserveAspectRatio="xMidYMid meet"/>
+          <text class="actor-name" x="-40" y="-2" text-anchor="end">性能分析</text><text class="status s-done" x="-40" y="14" text-anchor="end">DONE · 慢查询</text>
+        </g>
+      </g>
+      <g class="spin r">
+        <g class="actor" transform="translate(620 620)">
+          <circle r="26" fill="#fdf5b7"/><image href="assets/sprite-05.png" x="-18" y="-18" width="36" height="36" preserveAspectRatio="xMidYMid meet"/>
+          <text class="actor-name" x="36" y="-2">环境巡检</text><text class="status s-done" x="36" y="14">EPHEMERAL · 要留下吗？</text>
+        </g>
+      </g>
+      <!-- 一条消息 -->
+      <g transform="translate(96 560)">
+        <rect class="msg" width="250" height="64" rx="10"/>
+        <text class="msg-t" x="14" y="26">后端 → 你</text>
+        <text class="msg-t" x="14" y="46" fill="#f3ead6">批准在 staging-2 建新索引？</text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<section class="wrap band">
+  <p class="mono">观测记录 · 01</p>
+  <h2>一次任务在空间里留下的轨迹：谁做了什么、停在哪里等你、最后交付了什么。</h2>
+  <div class="obs"><div class="obs-in">
+    <div class="obs-bar"><i></i>支付链路提速 · 第 3 轮<span>12:04 · 等你决定 1</span></div>
+    <img src="../../../../apps/site/src/assets/screenshots/home/space.png" alt="Space 界面">
+  </div></div>
+  <div class="obs-cap">
+    <div><p class="mono">01 · 协调</p><b>协调 Agent 分工</b>把慢查询交给性能分析，把缓存交给前端，把迁移交给后端。</div>
+    <div><p class="mono">02 · 停下</p><b>会改环境的动作先问你</b>新索引的迁移停在「等你决定」，命令原样列出。</div>
+    <div><p class="mono">03 · 留下</p><b>记忆沉淀回空间</b>「压测只用 staging-2」被记下来，下次不必再说。</div>
+  </div>
+</section>
+
+<section class="wrap creed">
+  <div><p class="mono">I · 变</p><h3>唯变所适</h3><p>场景会变，Actor 会增减，能力会进化。空间本身是活的。</p></div>
+  <div><p class="mono">II · 度</p><h3>有分寸</h3><p>该问的时候问，该放手的时候放手。放行到什么程度由你决定。</p></div>
+  <div><p class="mono">III · 留</p><h3>留下来的东西</h3><p>记忆、Skill、临时 Actor——每次任务都让空间比上一次更懂你。</p></div>
+</section>
+
+<section class="wrap closing">
+  <h2>给下一个问题<br>一个<em>空间</em>。</h2>
+  <p>macOS · Windows · 本地优先</p>
+  <a class="btn" href="#">下载 ActSpace →</a>
+</section>
+<footer><div class="wrap">© 2026 ActSpace · 唯变所适</div></footer>
+</body>
+</html>
