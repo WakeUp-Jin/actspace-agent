@@ -6,7 +6,7 @@
 
 ## 状态
 
-已完成。P1–P3 随第一个 PR（#48）合入；P4（release matrix）随 #57 合入，四平台 dry-run 已绿；P5（Electron 39 → 45）随 #58 合入。签名、notarization、远程自动更新按「不包含」留待单独立项。
+2026-11-08 立项。P1–P3（#48）、P4（#57）、P5（#58）三个 PR 已于 2026-11-09 全部合入 `main`，实现完成，计划归档。**尚未验证**：第一个 `v*` tag 的草稿 Release 实发、Windows zip 实机启动、Electron 45 在 macOS 实机走查（清单见 `docs/exec-runs/20261108-ci-pipelines/execution-summary.md` 人工验证第 4–6 项）。
 
 ## 范围
 

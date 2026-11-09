@@ -8,7 +8,7 @@
 
 | 日期 | 计划 | 一句话 |
 |---|---|---|
-| 2026-11-08 | [CI 重新上线与桌面发布流水线](20261108-ci-pipelines.md) | 修掉 CI 必红问题、工作流分层加缓存、Dependabot / CodeQL、tag 触发四平台 release 矩阵、Electron 39 → 45；签名与自动更新不含 |
+| 2026-11-08 | [CI 重新上线与桌面发布流水线](20261108-ci-pipelines.md) | P1–P5 随 #48 / #57 / #58 合入 main：CI 必红修掉并分层加缓存、Dependabot / CodeQL、`v*` tag 四平台打包 + 草稿 Release、Electron 39 → 45；首个 tag 实发、Windows 与 Electron 45 实机走查未做 |
 | 2026-11-08 | [上下文面板整理](20261108-context-panel-polish.md) | 上下文事件写清变化、明细分页并入「再显示」、去掉卡片边框；合入 main #45；Electron 实机检查未做 |
 | 2026-11-08 | [pi-ai 1.5.0 与复用内置服务商](20261108-pi-ai-builtin-providers.md) | 连接 Base URL 命中 pi-ai 内置服务商时复用其协议、思考参数与请求头，代理改走请求级 fetch；合入 main #41；真实 Key 与 Electron 实机检查未做 |
 | 2026-11-08 | [子智能体单行卡片、来信卡片与面板实时动态](20261108-subagent-compact-cards.md) | 派发卡片改单行，实时动态移到右侧列表，`agent_message` 改为来信卡片；合入 main #37；Electron 实机检查未做 |
