@@ -74,6 +74,68 @@ export function attachNavigationGuards(
   });
 }
 
+type HeadersReceivedDetails = {
+  readonly resourceType: string;
+  readonly responseHeaders?: Record<string, string[]>;
+};
+
+type HeadersReceivedCallback = (response: { responseHeaders?: Record<string, string[]> }) => void;
+
+type CspSession = {
+  readonly webRequest: {
+    onHeadersReceived(listener: (details: HeadersReceivedDetails, callback: HeadersReceivedCallback) => void): void;
+  };
+};
+
+/**
+ * 主文档 CSP。renderer 只通过 preload 的 bridge 和 main 通信，不直接联网；脚本只允许同源文件，
+ * 图片允许 data: / blob:（附件预览、mermaid 导出），字体允许 data:（第三方 CSS 内嵌）。
+ *
+ * `style-src` 保留 `'unsafe-inline'`：mermaid 输出靠 `style` 属性和内嵌 `<style>`，CodeMirror 的 style-mod
+ * 用 `<style>` 标签注入，去掉它要配 nonce 与 DOM 挂载，见 tech-debt-tracker「Desktop 安全遗留」。
+ *
+ * dev 下 Vite 的 react-refresh 预热脚本是内联的，HMR 走 WebSocket，所以放开 `script-src 'unsafe-inline'`
+ * 和 dev server 的 `connect-src`；生产策略不含这两项。
+ */
+export function buildContentSecurityPolicy(input: { devServerUrl?: string } = {}): string {
+  const devOrigin = input.devServerUrl ? safeUrl(input.devServerUrl) : undefined;
+  const devConnect = devOrigin ? ` ${devOrigin.origin} ${devOrigin.origin.replace(/^http/, "ws")}` : "";
+  return [
+    "default-src 'self'",
+    `script-src 'self'${devOrigin ? " 'unsafe-inline'" : ""}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    `connect-src 'self'${devConnect}`,
+    "media-src 'self' blob:",
+    "worker-src 'none'",
+    "object-src 'none'",
+    "frame-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ].join("; ");
+}
+
+/**
+ * 用响应头而不是 `<meta>` 下发 CSP：对 `file://` 和 dev server 都生效，且 `frame-ancestors` 只有响应头认。
+ * 只改文档响应（主框架 / 子框架），静态资源保持原样。
+ */
+export function installContentSecurityPolicy(session: CspSession, policy: string): void {
+  session.webRequest.onHeadersReceived((details, callback) => {
+    if (details.resourceType !== "mainFrame" && details.resourceType !== "subFrame") {
+      callback({ responseHeaders: details.responseHeaders });
+      return;
+    }
+    const headers: Record<string, string[]> = {};
+    for (const [name, value] of Object.entries(details.responseHeaders ?? {})) {
+      if (name.toLowerCase() !== "content-security-policy") headers[name] = value;
+    }
+    headers["Content-Security-Policy"] = [policy];
+    callback({ responseHeaders: headers });
+  });
+}
+
 /** 任何 webContents 都不允许挂 `<webview>`。 */
 export function blockWebviewAttachment(source: WebviewSource): void {
   source.on("web-contents-created", (_event, contents) => {

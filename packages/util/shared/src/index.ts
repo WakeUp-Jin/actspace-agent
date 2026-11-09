@@ -24,6 +24,7 @@ export * from "./settings";
 export * from "./context-buckets";
 export * from "./context-panel";
 export * from "./data-root";
+export * from "./child-process-env";
 export * from "./session";
 export * from "./subagent-labels";
 export * from "./session-transcript";
@@ -31,6 +32,7 @@ export * from "./session-locator";
 export * from "./usage-cost";
 export * from "./harness-stats";
 export * from "./visible-text";
+export * from "./trim-trailing";
 export * from "./session-selectors";
 export {
   createMessageBlocks,

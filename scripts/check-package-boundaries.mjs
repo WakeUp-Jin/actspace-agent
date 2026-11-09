@@ -51,6 +51,24 @@ async function assertPluginContract(name, manifest, dir) {
   if (manifest.exports?.["./codec"] && !hasCodec) failures.push(`${name}: './codec' export requires src/codec.ts`);
 }
 
+// pnpm-workspace.yaml `catalog:` 里的依赖只能在那一个文件里定版本，各包必须写 `catalog:`。
+async function readCatalogNames() {
+  let source;
+  try { source = await readFile(join(repoRoot, "pnpm-workspace.yaml"), "utf8"); } catch { return []; }
+  const block = source.match(/^catalog:\n((?:[ \t]+.*\n?)+)/m);
+  if (!block) return [];
+  return [...block[1].matchAll(/^[ \t]+"?([^"\s:]+)"?\s*:/gm)].map((match) => match[1]);
+}
+
+function assertCatalogVersions(name, manifest, catalogNames) {
+  for (const field of ["dependencies", "devDependencies", "optionalDependencies"]) {
+    for (const dependency of catalogNames) {
+      const spec = manifest[field]?.[dependency];
+      if (spec !== undefined && spec !== "catalog:") failures.push(`${name}: ${field}.${dependency} must be "catalog:" (version is pinned in pnpm-workspace.yaml), found ${spec}`);
+    }
+  }
+}
+
 async function fileExists(path) {
   try { await access(path); return true; } catch { return false; }
 }
@@ -148,6 +166,7 @@ function findCycles() {
 for (const workspaceRoot of workspaceRoots) await walk(workspaceRoot.path, workspaceRoot.kind);
 if (manifests.has("@actspace/harness") || manifests.has("@actspace/plugins")) failures.push("generic harness/plugins package is forbidden");
 const desktopIpcContractNames = await collectDesktopIpcContractNames();
+const catalogNames = await readCatalogNames();
 for (const [name, { manifest, dir, kind }] of manifests) {
   let guardsDesktopIpc = false;
   if (kind === "app" && manifest.private !== true) failures.push(`${name}: applications must remain private workspace packages`);
@@ -166,6 +185,7 @@ for (const [name, { manifest, dir, kind }] of manifests) {
     guardsDesktopIpc = segments.length === 2 && !desktopIpcConsumerCapabilities.has(segments[0]) && name !== "@actspace/shared";
   }
   assertExports(name, manifest);
+  assertCatalogVersions(name, manifest, catalogNames);
   await assertPluginContract(name, manifest, dir);
   await scanSource(join(dir, "src"), name, { desktopIpcContractNames: guardsDesktopIpc ? desktopIpcContractNames : undefined });
 }

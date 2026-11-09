@@ -1,19 +1,19 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { chmod, copyFile, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
+import pinned from "./nono-version.json" with { type: "json" };
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
-export const NONO_VERSION_FILE = join(root, "scripts", "sandbox", "nono-version.json");
 const CACHE_DIR = join(root, ".cache", "sandbox", "nono");
 
 /** `<process.platform>-<process.arch>`, the key used in nono-version.json and dist/sandbox-components. */
 export function nonoTarget(platform = process.platform, arch = process.arch) { return `${platform}-${arch}`; }
 
-export async function readNonoVersion(file = NONO_VERSION_FILE) {
-  const config = JSON.parse(await readFile(file, "utf8"));
+/** The pinned release is imported as a module, so the download URL never derives from a file read at runtime. */
+export async function readNonoVersion(config = pinned) {
   if (typeof config.version !== "string" || typeof config.releaseUrl !== "string" || !config.assets || typeof config.assets !== "object") {
     throw new Error("nono-version.json is invalid.");
   }
