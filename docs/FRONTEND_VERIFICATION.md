@@ -58,6 +58,7 @@ pnpm build
 | `side-chat` | 主会话三轮完成、第 4 轮流式运行；下有两个收起的侧边对话，另有一个普通会话 | 侧栏角标、右栏启动页「侧边对话」与「已收起」分组、继承分隔线、侧边对话内发送 / 停止 / 收起重开、`/side 问题`。不覆盖 Journal 复制、Plan 拦截、重启恢复 |
 | `markdown` | 一条全元素 Markdown 历史回复 + 一条按真实网络节奏流式回放的同款回复 | 「A 书页」排版、代码块头与折叠、点击路径、流式淡入与逐帧高度稳定。不覆盖真实模型节奏 |
 | `turn-deliverables` | 三轮：改动卡 / 交付卡的单文件、多文件、折叠形态，回复带用量（第 2 轮无价格）；`readFile` 只认识 `docs/report.md`、`docs/summary.csv` | 轮尾改动卡与交付卡、悬停 diff、打开方式菜单、「显示本轮代码改动」开关、用量胶囊与弹窗。不覆盖真实 `present` 调用与原生关联应用 |
+| `promo-draft` / `promo-demo` | 宣传片（`apps/promo-video`）的取景场景。`promo-draft`：两个旧会话，新会话还没开始。`promo-demo`：再加会话「补完登录页表单校验」，停在 `pnpm test` 的审批；点「运行」后补上命令结果、交付文件和带用量的回复 | 只给 `pnpm --filter @actspace/promo-video capture:ui` 截图用，数据是演示内容，不用来证明产品状态。改了这两个场景或它依赖的界面，要重新截图并核对片子里的镜头位置 |
 | `subagent-trajectory` | 父会话含一次 `agent` 委派；`getSubagents` 返回五个子 Agent（已完成 Explore、运行中、后台运行中、失败、已停止） | 父轨迹只留 `agent` 一行、对话里单行派发卡片与 Fork 来信卡片（状态跟着派发卡片）、不出子智能体完成通知行、右侧子 Agent 列表（无外框、运行中悬停换停止；「压测 SQLite 写入」第二行每 3 秒换一句动态，打开后第 8–14 秒显示「来信：」和蓝点）与详情顶栏、「查看轨迹」、窄面板。`getSubAgentTranscript` 返回空，运行中的实时轨迹需真实运行 |
 | `compaction` | 三个会话：已提交压缩、压缩进行中、压缩失败 | 压缩分隔线三态、「在轨迹中查看」、轨迹概述。不覆盖手动 `/compact` 与真实压缩 |
 | `background-tasks` | 一个会话三轮：后台 `pnpm test`、后台 `agent`、完成通知唤醒（无用户消息）、仍在运行的 `pnpm dev` | Bash / 子 Agent 卡片的「后台」标签与状态、Bash 唤醒分隔行（子 Agent 完成唤醒没有分隔行）、右侧后台任务面板。不覆盖真实唤醒调度与 `task_*` 输出 |

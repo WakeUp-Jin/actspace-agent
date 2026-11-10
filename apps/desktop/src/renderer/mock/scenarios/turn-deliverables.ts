@@ -10,29 +10,29 @@ import { seedSession } from "./seed";
  * 用来检查改动卡的折叠、悬停 diff、右侧「第 N 轮改动」和交付卡的网格、折叠、打开方式。
  */
 
-type FileEdit = { readonly tool: "write_file" | "edit_file"; readonly path: string; readonly diff: string };
+export type FileEdit = { readonly tool: "write_file" | "edit_file"; readonly path: string; readonly diff: string };
 
 const FILES: Record<string, string> = {
   "docs/report.md": "# 季度报告\n\n- 收入同比增长 18%\n- 新增客户 42 家\n",
   "docs/summary.csv": "month,revenue\n7,120\n8,135\n9,142\n",
 };
 
-function created(path: string, lines: readonly string[]): FileEdit {
+export function created(path: string, lines: readonly string[]): FileEdit {
   return { tool: "write_file", path, diff: [`--- a/${path}`, `+++ b/${path}`, `@@ -1,1 +1,${lines.length} @@`, "-", ...lines.map((line) => `+${line}`)].join("\n") };
 }
 
-function edited(path: string, start: number, context: string, removed: readonly string[], added: readonly string[]): FileEdit {
+export function edited(path: string, start: number, context: string, removed: readonly string[], added: readonly string[]): FileEdit {
   const oldLines = removed.length + 1;
   const newLines = added.length + 1;
   return { tool: "edit_file", path, diff: [`--- a/${path}`, `+++ b/${path}`, `@@ -${start},${oldLines} +${start},${newLines} @@`, ` ${context}`, ...removed.map((line) => `-${line}`), ...added.map((line) => `+${line}`)].join("\n") };
 }
 
-function appendTool(db: MockDb, session: MockSession, runId: string, name: string, args: Record<string, RuntimeV2JsonValue>, result: Record<string, RuntimeV2JsonValue>): void {
+export function appendTool(db: MockDb, session: MockSession, runId: string, name: string, args: Record<string, RuntimeV2JsonValue>, result: Record<string, RuntimeV2JsonValue>): void {
   const message = appendMockMessage(db, session, "tool", "", runId);
   session.messages[session.messages.length - 1] = { ...message, role: "tool", tool: { name, args, result } };
 }
 
-function appendEdit(db: MockDb, session: MockSession, runId: string, edit: FileEdit): void {
+export function appendEdit(db: MockDb, session: MockSession, runId: string, edit: FileEdit): void {
   const additions = edit.diff.split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).length;
   const deletions = edit.tool === "write_file" ? 0 : edit.diff.split("\n").filter((line) => line.startsWith("-") && !line.startsWith("---")).length;
   appendTool(db, session, runId, edit.tool, { path: edit.path }, {
@@ -43,7 +43,7 @@ function appendEdit(db: MockDb, session: MockSession, runId: string, edit: FileE
   });
 }
 
-function appendPresent(db: MockDb, session: MockSession, runId: string, files: readonly { path: string; description?: string }[]): void {
+export function appendPresent(db: MockDb, session: MockSession, runId: string, files: readonly { path: string; description?: string }[]): void {
   appendTool(db, session, runId, "present", { files: files as RuntimeV2JsonValue }, {
     status: "completed",
     summary: `Presented ${files.length} ${files.length === 1 ? "file" : "files"}`,
@@ -51,10 +51,10 @@ function appendPresent(db: MockDb, session: MockSession, runId: string, files: r
   });
 }
 
-const PRICING = { version: 1, basis: "estimated", reason: null, pricingSnapshot: { providerId: "deepseek", connectionId: "deepseek:default", modelKey: "deepseek:deepseek-flash", apiModel: "deepseek-flash", currency: "USD" } };
+export const PRICING = { version: 1, basis: "estimated", reason: null, pricingSnapshot: { providerId: "deepseek", connectionId: "deepseek:default", modelKey: "deepseek:deepseek-flash", apiModel: "deepseek-flash", currency: "USD" } };
 
 /** 最终回复带上本轮用量，回复尾部才会出现「用量 … tok」胶囊。 */
-function appendReply(db: MockDb, session: MockSession, runId: string, content: string, usage: Record<string, RuntimeV2JsonValue>): void {
+export function appendReply(db: MockDb, session: MockSession, runId: string, content: string, usage: Record<string, RuntimeV2JsonValue>): void {
   const message = appendMockMessage(db, session, "assistant", content, runId);
   session.messages[session.messages.length - 1] = { ...message, usage };
 }
