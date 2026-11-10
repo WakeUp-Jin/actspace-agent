@@ -34,7 +34,7 @@
 - [存储与可观测性边界](core-storage-and-observability.md)：本地存储、workspace root 和可观测性边界。
 - [数据存储结构与职责](core-data-storage-design.md)：Session 数据包为唯一事实源；接纳与落盘写入、按用途读取、Q1–Q14 决策记录、运行态实现落点、SQLite 查询读模型与查询 Worker。
 - [Review 设计规范](core-review-change-sources.md)：Git-first 只读 Review，覆盖五种 scope、结构化 diff、Review Options、刷新时机、Standard / capped 大 Diff 加载与虚拟渲染。
-- 官网：内容归属与静态部署边界见 [apps/site/CONTENT_SOURCES.md](../../apps/site/CONTENT_SOURCES.md)，视觉规范见 [apps/site/DESIGN.md](../../apps/site/DESIGN.md)。
+- 官网：内容归属与静态部署边界见 [apps/site/CONTENT_SOURCES.md](../../apps/site/CONTENT_SOURCES.md)，视觉规范见 [apps/site/DESIGN.md](../../apps/site/DESIGN.md)；候选视觉方向（V4 精修 + 五个新方向的可打开原型与截图）见 [site-v6/README.md](site-v6/README.md)，尚未定稿，不是现行规范。
 
 ## v2 插件化 Runtime（agent-plugin-runtime）
 

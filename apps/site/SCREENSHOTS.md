@@ -12,7 +12,7 @@
 | --- | --- |
 | `home/turn-deliverables.png` | `mock=turn-deliverables`，820×2000 CSS、DPR3、侧栏收起；从第二轮用户消息裁到第三轮用量胶囊下方 |
 | `home/trajectory.png` | `mock=long-session&trajectoryFixture=complete`，点「查看执行轨迹」，940×760、DPR3、侧栏收起；`docs/trajectory-inspector.png` 是同一张 |
-| `home/approval.png` | `mock=approval-prefix`，760×470、DPR3、侧栏收起，用 pointer 事件打开「会话权限模式」菜单 |
+| `home/approval.png` | `mock=approval-prefix`，760×470、DPR3（该宽度下侧栏自动隐藏），用 pointer 事件打开「会话权限模式」菜单。2026-11-10 在 Linux 上用 puppeteer-core 重拍：审批卡底栏的「真实环境」文字已改成执行环境图标，权限菜单多了「替我审批」；Linux 上要先用 fontconfig 把 `PingFang SC` → `Noto Sans CJK SC`、`-apple-system` → `Inter` 别名，否则字体和其他几张 macOS 截图对不上 |
 | `home/context-panel.png` | `mock=long-session`，localStorage `actspace.workbench.layout.v1` 设 `rightWidth: 440`，1440×1400 视口（矮了统计格会挤），折叠工具与会话内容分组，只裁右侧面板列；`docs/context-panel.png` 是它切成左右两栏 |
 | `home/space.png` | 点侧栏「支付链路提速」，1060×800、DPR3、侧栏收起 |
 | `docs/workspace-overview.png` | `mock=turn-deliverables`，1440×900、DPR2，侧栏展开 |

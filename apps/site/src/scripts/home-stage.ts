@@ -16,6 +16,28 @@ export interface PluginStage {
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
+// 折线拐角倒成圆角（半径 8，不够长时按可用长度缩小）。
+const CORNER = 8;
+const roundedPath = (points: [number, number][]) => {
+  let d = `M${points[0][0]} ${points[0][1]}`;
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const [px, py] = points[i - 1];
+    const [cx, cy] = points[i];
+    const [nx, ny] = points[i + 1];
+    const inLen = Math.hypot(cx - px, cy - py);
+    const outLen = Math.hypot(nx - cx, ny - cy);
+    const r = Math.min(CORNER, inLen / 2, outLen / 2);
+    if (r < 0.5) { d += `L${cx} ${cy}`; continue; }
+    const ax = cx - ((cx - px) / inLen) * r;
+    const ay = cy - ((cy - py) / inLen) * r;
+    const bx = cx + ((nx - cx) / outLen) * r;
+    const by = cy + ((ny - cy) / outLen) * r;
+    d += `L${ax} ${ay}Q${cx} ${cy} ${bx} ${by}`;
+  }
+  const [lx, ly] = points[points.length - 1];
+  return `${d}L${lx} ${ly}`;
+};
+
 export function createPluginStage(
   root: HTMLElement,
   target: HTMLElement,
@@ -55,13 +77,15 @@ export function createPluginStage(
         const sy = y(a.top + a.height / 2);
         ex = x(side === 'l' ? b.left : b.right);
         ey = clamp(sy, y(b.top) + 16, y(b.bottom) - 16);
-        d = Math.abs(sy - ey) < 1 ? `M${sx} ${sy}H${ex}` : `M${sx} ${sy}H${(sx + ex) / 2}V${ey}H${ex}`;
+        const mx = (sx + ex) / 2;
+        d = Math.abs(sy - ey) < 1 ? `M${sx} ${sy}H${ex}` : roundedPath([[sx, sy], [mx, sy], [mx, ey], [ex, ey]]);
       } else {
         const sx = x(a.left + a.width / 2);
         const sy = y(side === 'b' ? a.top : a.bottom);
         ex = clamp(sx, x(b.left) + 16, x(b.right) - 16);
         ey = y(side === 'b' ? b.bottom : b.top);
-        d = Math.abs(sx - ex) < 1 ? `M${sx} ${sy}V${ey}` : `M${sx} ${sy}V${(sy + ey) / 2}H${ex}V${ey}`;
+        const my = (sy + ey) / 2;
+        d = Math.abs(sx - ex) < 1 ? `M${sx} ${sy}V${ey}` : roundedPath([[sx, sy], [sx, my], [ex, my], [ex, ey]]);
       }
       const g = document.createElementNS(SVG_NS, 'g');
       g.dataset.m = m.dataset.m;
@@ -173,8 +197,15 @@ const LIMIT = 200;
 const fmt = (k: number) => `${Math.round(k * 10) / 10}K`;
 const icon = (d: string, size = 12) => `<svg class="i chev" viewBox="0 0 24 24" style="width:${size}px;height:${size}px"><path d="${d}"/></svg>`;
 const CHEV = icon('m9 18 6-6-6-6');
+// 上一轮对话：让窗口一开场就像用了一阵子的会话，而不是空白起步。
 const PREVIOUS = `<div class="prev"><div class="bubble">先把路由守卫修好，未登录跳回 /login。</div></div>
-  <div class="prev say">已修复。改动 1 个文件，guard 测试 6 个通过。</div><div class="gap"></div>`;
+  <div class="prev worked">Worked for 34s ${icon('m9 18 6-6-6-6', 13)}</div>
+  <div class="prev say">已修复。<code>requireAuth</code> 现在在 beforeEach 里读 session，未登录统一 redirect 到 /login 并带回 <code>?next=</code>。</div>
+  <div class="prev card chg"><div class="h"><span class="fi"><b>&lt;/&gt;</b></span><div>已编辑 1 个文件<small><u>+12</u> <s>-4</s></small></div></div>
+    <div class="f"><span>src/router/guard.ts</span><span><u>+12</u> <s>-4</s></span></div></div>
+  <div class="prev usage">${icon('M8 4h10a2 2 0 0 1 2 2v10M4 8h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z', 13)}
+    <b>${icon('M3 5c0-1.7 4-3 9-3s9 1.3 9 3-4 3-9 3-9-1.3-9-3M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3', 13)}用量 9.8K tok</b><span>09:38</span></div>
+  <div class="gap"></div>`;
 
 export function initializeHeroStage() {
   const root = document.querySelector<HTMLElement>('[data-hero-stage]');
@@ -283,7 +314,11 @@ export function initializeHeroStage() {
     scroll.scrollTop = scroll.scrollHeight;
     panel.classList.remove('open');
     panelBtn.classList.remove('on');
-    send.classList.remove('stop');
+    send.classList.remove('stop', 'ready', 'press');
+    ph.classList.remove('typing');
+    h('review-stat').innerHTML = '';
+    h('sum').hidden = true;
+    const sesTime = h('ses-time'); sesTime.textContent = '刚刚'; sesTime.classList.remove('pending');
     ph.textContent = '继续追问…';
     h('perm').textContent = on('approve') ? '自动' : '完全权限';
     h('ses-spin').hidden = false;
@@ -297,8 +332,21 @@ export function initializeHeroStage() {
     let r: HTMLElement | undefined;
     let started = 0;
 
+    // 先把这句话打进输入框，再发送——不是凭空蹦出一个气泡。
+    const ask = '把登录页的表单校验补完，跑一下测试。';
+    if (!reduced) {
+      const typeAt = t;
+      clock.at(typeAt, () => { ph.classList.add('typing'); ph.textContent = ''; });
+      for (let i = 1; i <= ask.length; i += 1) {
+        clock.at(typeAt + i * 55, () => { ph.textContent = ask.slice(0, i); if (i === 3) send.classList.add('ready'); });
+      }
+      t += ask.length * 55 + 350;
+      step(180, () => send.classList.add('press'));
+    }
     step(900, () => {
-      put('<div class="bubble">把登录页的表单校验补完，跑一下测试。</div>');
+      ph.classList.remove('typing');
+      send.classList.remove('ready', 'press');
+      put(`<div class="bubble">${ask}</div>`);
       send.classList.add('stop');
       ph.textContent = '继续追问，运行中发送会进入队列…';
       if (on('panel')) { panel.classList.add('open'); panelBtn.classList.add('on'); stage.light(['panel']); }
@@ -326,13 +374,11 @@ export function initializeHeroStage() {
     if (on('sub')) {
       let card: HTMLElement;
       step(1700, () => {
-        card = put(`<div class="card agent"><span class="av"></span><div class="who"><div class="nm">查找可复用的校验函数</div>
-          <div class="meta"><span>Explore</span>·<b>正在搜索 src/lib …</b></div></div><span class="st">运行中</span></div>`);
+        card = put(`<div class="card agent"><span class="av"></span><span class="nm">查找可复用的校验函数</span><span class="st"><i>Agent</i><em class="dot"></em>运行中</span></div>`);
         stage.light(['sub']);
       });
       step(900, () => {
-        card.querySelector('.meta b')!.textContent = '找到 emailSchema、passwordRule';
-        card.querySelector('.st')!.textContent = '已完成';
+        card.querySelector('.st')!.innerHTML = `<i>Agent</i>${icon('m5 12 5 5L20 7', 12)}已完成`;
         add('conv', 0.9);
         event('子 Agent 摘要', '+0.9K', '检索过程留在子 Agent，主会话只收结论', 'conv');
       });
@@ -370,11 +416,17 @@ export function initializeHeroStage() {
         step(1500, () => {
           card = put(`<div class="card appr"><div class="hd">${icon('M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 8 2-2-2-2m4 6h4', 14)}运行项目测试 pnpm</div>
             <div class="cmd"><i>$</i> <em>pnpm</em> test</div>
-            <div class="ft"><span>真实环境</span><b>拒绝</b><b class="al">本会话允许 pnpm</b><b class="go">运行</b></div></div>`);
+            <div class="ft">${icon('M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1zM4 4l16 16', 13)}<span></span><b>拒绝</b><b class="al">本会话允许 <code>pnpm</code></b><b class="go">运行</b></div></div>`);
           stage.light(['approve']);
+          h('ses-spin').hidden = true;
+          const pending = h('ses-time'); pending.hidden = false; pending.textContent = '待审批'; pending.classList.add('pending');
         });
         step(400, () => card.querySelector('.go')!.classList.add('press'));
-        step(2300, () => { card.remove(); runTest(); });
+        step(2300, () => {
+          card.remove(); runTest();
+          h('ses-spin').hidden = false;
+          const pending = h('ses-time'); pending.hidden = true; pending.textContent = '刚刚'; pending.classList.remove('pending');
+        });
       } else {
         step(2300, runTest);
       }
@@ -417,6 +469,9 @@ export function initializeHeroStage() {
       ph.textContent = '继续追问…';
       h('ses-spin').hidden = true;
       h('ses-time').hidden = false;
+      if (on('edit')) h('review-stat').innerHTML = '<u>+31</u> <s>-3</s>';
+      h('sum-tok').textContent = on('sub') ? '28.2K' : '51.0K';
+      h('sum').hidden = false;
     });
     step(2400, () => stage.settle());
     if (!reduced) clock.at(t + 4200, run);

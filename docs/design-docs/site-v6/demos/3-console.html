@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 3 · 控制台 — 空间站平面图</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* 方向 3：控制台。Space 当作一座空间站：冷灰底、网格、带角标的面板、单色标签。
+   首屏是一张「舱室平面图」：每个 Actor 一个工位，状态是实时读数；紫色只做 live 指示。 */
+:root{
+  --bg:#eef0f2;--bg-2:#e5e8ec;--panel:#fafbfc;--graphite:#1f2328;--g2:#4b535c;--g3:#7f8893;--line:#cfd5db;--line-2:#b9c1c9;
+  --live:#6d4fc2;--live-soft:#ebe5fb;--ok:#2f7d5a;--ok-soft:#dcefe4;--warn:#b7791f;--warn-soft:#f7ecd2;
+  --sans:"IBM Plex Sans","PingFang SC","Noto Sans CJK SC",sans-serif;--mono:"IBM Plex Mono","SF Mono",Menlo,monospace;
+  --page:min(1400px,calc(100% - 2*clamp(16px,4vw,32px)));
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;color:var(--graphite);font:14.5px/1.6 var(--sans);-webkit-font-smoothing:antialiased;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:48px 48px;background-position:-1px -1px}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
+.wrap{width:var(--page);margin-inline:auto}
+h1,h2,h3{margin:0;font-weight:500;letter-spacing:-.01em}
+.mono{font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--g3)}
+
+.hd{height:56px;background:var(--panel);border-bottom:1px solid var(--line)}
+.hd .wrap{height:100%;display:flex;align-items:center;gap:28px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px}
+.brand img{width:34px;height:22px;object-fit:contain}
+.brand span{font-family:var(--mono);font-weight:400;color:var(--g3);font-size:11.5px;margin-left:4px}
+nav{display:flex;gap:2px;font-size:13.5px}
+nav a{padding:6px 12px;border-radius:6px;color:var(--g2)}
+nav a[aria-current]{background:var(--bg-2);color:var(--graphite)}
+.hd .r{margin-left:auto;display:flex;align-items:center;gap:12px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:6px;background:var(--graphite);color:#fff;font-size:13.5px;font-weight:500}
+.btn.ghost{background:transparent;color:var(--graphite);box-shadow:inset 0 0 0 1px var(--line-2)}
+
+/* 面板通用：角标 */
+.panel{position:relative;background:var(--panel);border:1px solid var(--line)}
+.panel::before,.panel::after,.panel>.k::before,.panel>.k::after{content:"";position:absolute;width:10px;height:10px;border:1.5px solid var(--graphite)}
+.panel::before{left:-1px;top:-1px;border-right:0;border-bottom:0}
+.panel::after{right:-1px;top:-1px;border-left:0;border-bottom:0}
+.panel>.k::before{left:-1px;bottom:-1px;border-right:0;border-top:0}
+.panel>.k::after{right:-1px;bottom:-1px;border-left:0;border-top:0}
+.ph{display:flex;align-items:center;gap:12px;height:36px;padding:0 14px;border-bottom:1px solid var(--line)}
+.ph .mono{color:var(--g2)}
+.ph .sp{margin-left:auto}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--live);box-shadow:0 0 0 3px var(--live-soft)}
+
+/* 首屏 */
+.hero{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:24px;padding:40px 0 48px;align-items:stretch}
+.hero h1{font-size:clamp(36px,3.8vw,52px);line-height:1.12;font-weight:500;margin:18px 0 20px}
+.hero h1 b{font-weight:500;color:var(--live)}
+.hero .lede{max-width:420px;color:var(--g2);font-size:15px;line-height:1.75;margin:0 0 28px}
+.acts{display:flex;gap:10px}
+.stats{margin-top:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}
+.stats div{background:var(--panel);padding:14px 16px}
+.stats b{display:block;font:500 24px/1.1 var(--mono);margin-top:6px}
+.stats b i{font-style:normal;color:var(--live)}
+.left{display:flex;flex-direction:column}
+
+/* 平面图 */
+.floor{padding:0}
+.floor svg{width:100%;height:auto;display:block}
+.room{fill:#f3f5f7;stroke:var(--line-2);stroke-width:1}
+.room.hot{fill:var(--live-soft);stroke:var(--live)}
+.room.warn{fill:var(--warn-soft);stroke:var(--warn)}
+.room.ok{fill:var(--ok-soft);stroke:var(--ok)}
+.hall{fill:none;stroke:var(--graphite);stroke-width:1.2}
+.lbl{font:11px var(--mono);fill:var(--g3);letter-spacing:.06em;text-transform:uppercase}
+.name{font:500 13px var(--sans);fill:var(--graphite)}
+.sub{font:11px var(--mono);fill:var(--g2)}
+.dim{stroke:var(--g3);stroke-width:.8}
+.flow{fill:none;stroke:var(--live);stroke-width:1.2;stroke-dasharray:4 4;animation:flow 2s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-16}}
+.bar{fill:var(--line)}.bar-f{fill:var(--live)}
+
+/* 读数带 */
+.tape{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:0 0 48px}
+.tape .panel{padding:16px 16px 18px}
+.tape .mono{margin-bottom:10px}
+.tape b{display:block;font-size:15px;font-weight:600;margin-bottom:4px}
+.tape p{margin:0;color:var(--g2);font-size:13px;line-height:1.65}
+.tape .st{display:inline-block;margin-top:12px;padding:2px 8px;border-radius:4px;font:11px var(--mono);letter-spacing:.04em;text-transform:uppercase}
+.st.live{background:var(--live-soft);color:var(--live)}.st.ok{background:var(--ok-soft);color:var(--ok)}.st.warn{background:var(--warn-soft);color:var(--warn)}
+
+/* 实录 */
+.shot{padding:0 0 56px}
+.shot .panel{padding:0}
+.shot img{width:100%}
+.shot .row{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:24px;margin-top:20px}
+.shot h2{font-size:30px;line-height:1.2;margin-bottom:12px}
+.shot p{color:var(--g2);margin:0 0 10px}
+.spec{margin:0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.spec li{display:grid;grid-template-columns:140px 1fr;gap:16px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.spec li span{font-family:var(--mono);font-size:11.5px;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding-top:3px}
+
+.closing{padding:24px 0 80px}
+.closing .panel{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:36px 40px}
+.closing h2{font-size:34px;line-height:1.2}
+footer{border-top:1px solid var(--line);background:var(--panel);padding:20px 0;font:11.5px var(--mono);color:var(--g3);letter-spacing:.04em}
+@media (max-width:760px){nav,.hd .r .mono{display:none}body{background-size:32px 32px}.hero{grid-template-columns:1fr;padding:24px 0 32px}.hero h1{font-size:34px}.stats{margin-top:24px;margin-bottom:8px}.tape{grid-template-columns:1fr 1fr}.shot .row{grid-template-columns:1fr}.shot h2{font-size:26px}.spec li{grid-template-columns:96px 1fr}.closing .panel{flex-direction:column;align-items:flex-start;padding:28px 22px}.closing h2{font-size:28px}}
+</style>
+</head>
+<body>
+<header class="hd"><div class="wrap">
+  <a class="brand" href="#"><img src="../../../../apps/site/src/assets/brand/actspace-mark.png" alt="">ActSpace<span>v0.9.4</span></a>
+  <nav><a aria-current="page" href="#">产品</a><a href="#">文档</a><a href="#">博客</a><a href="#">更新日志</a><a href="#">开发计划</a></nav>
+  <div class="r"><span class="mono">● 本地运行中</span><a class="btn" href="#">下载</a></div>
+</div></header>
+
+<section class="wrap hero">
+  <div class="left">
+    <p class="mono">Agent runtime · 01 / 空间总览</p>
+    <h1>一个问题，<br>一个<b>运行空间</b>。</h1>
+    <p class="lede">ActSpace 把协调 Agent 与各有专长的 Actor 安排进同一个空间：谁在做、停在哪里等你、做完留下了什么，一屏看清。本地优先，会改变环境的动作先问你。</p>
+    <div class="acts"><a class="btn" href="#">下载桌面版</a><a class="btn ghost" href="#">阅读文档</a></div>
+    <div class="stats">
+      <div><span class="mono">Actor</span><b>4 <i>/ 1 临时</i></b></div>
+      <div><span class="mono">等你决定</span><b style="color:var(--warn)">1</b></div>
+      <div><span class="mono">启用能力</span><b>7 <i>/ 10</i></b></div>
+      <div><span class="mono">空间记忆</span><b>12</b></div>
+    </div>
+  </div>
+
+  <div class="panel floor"><span class="k"></span>
+    <div class="ph"><i class="dot"></i><span class="mono">Space · 支付链路提速</span><span class="mono sp">平面图 · 第 3 轮 · 12:04</span></div>
+    <svg viewBox="0 0 900 520" aria-label="空间站平面图：每个 Actor 一个工位">
+      <!-- 走廊 -->
+      <rect x="60" y="200" width="780" height="120" class="hall"/>
+      <text class="lbl" x="70" y="192">Corridor · 协调 Agent 的消息总线</text>
+      <!-- 中央舱 -->
+      <rect x="370" y="210" width="160" height="100" class="room"/>
+      <image href="assets/sprite-07.png" x="388" y="232" width="40" height="34"/>
+      <text class="name" x="438" y="252">协调 Agent</text><text class="sub" x="438" y="270">分工 · 汇总 · 交付</text>
+      <text class="lbl" x="376" y="300">Hub · 00</text>
+      <!-- 工位 -->
+      <g>
+        <rect x="60" y="40" width="220" height="130" class="room ok"/>
+        <image href="assets/sprite-01.png" x="76" y="58" width="40" height="40"/>
+        <text class="name" x="128" y="76">性能分析</text><text class="sub" x="128" y="94">有结果 · 慢查询</text>
+        <rect x="76" y="140" width="188" height="4" class="bar"/><rect x="76" y="140" width="188" height="4" class="bar-f" style="fill:var(--ok)"/>
+        <text class="lbl" x="66" y="60" fill="#7f8893">Bay 01</text>
+        <text class="sub" x="264" y="128" text-anchor="end">记忆 12 条</text>
+      </g>
+      <g>
+        <rect x="340" y="40" width="220" height="130" class="room hot"/>
+        <image href="assets/sprite-02.png" x="356" y="58" width="40" height="40"/>
+        <text class="name" x="408" y="76">前端</text><text class="sub" x="408" y="94">工作中 · 报价缓存</text>
+        <rect x="356" y="140" width="188" height="4" class="bar"/><rect x="356" y="140" width="113" height="4" class="bar-f"/>
+        <text class="lbl" x="346" y="60">Bay 02</text><text class="sub" x="544" y="128" text-anchor="end">3 / 5</text>
+      </g>
+      <g>
+        <rect x="620" y="40" width="220" height="130" class="room warn"/>
+        <image href="assets/sprite-03.png" x="636" y="58" width="40" height="40"/>
+        <text class="name" x="688" y="76">后端</text><text class="sub" x="688" y="94">等你决定 · 迁移审批</text>
+        <rect x="636" y="140" width="188" height="4" class="bar"/><rect x="636" y="140" width="125" height="4" class="bar-f" style="fill:var(--warn)"/>
+        <text class="lbl" x="626" y="60">Bay 03</text><text class="sub" x="824" y="128" text-anchor="end">4 / 6</text>
+      </g>
+      <g>
+        <rect x="60" y="350" width="220" height="130" class="room"/>
+        <image href="assets/sprite-05.png" x="76" y="368" width="40" height="40"/>
+        <text class="name" x="128" y="386">环境巡检</text><text class="sub" x="128" y="404">临时 · 这次做完了</text>
+        <text class="sub" x="76" y="452">要不要留下它？</text>
+        <text class="lbl" x="66" y="370">Bay 04 · ephemeral</text>
+      </g>
+      <g>
+        <rect x="340" y="350" width="220" height="130" class="room" stroke-dasharray="4 4"/>
+        <text class="name" x="356" y="386" fill="#7f8893">空位</text><text class="sub" x="356" y="404">按场景召集下一个 Actor</text>
+        <text class="lbl" x="346" y="370">Bay 05</text>
+      </g>
+      <g>
+        <rect x="620" y="350" width="220" height="130" class="room"/>
+        <text class="lbl" x="626" y="370">Memory · 空间记忆</text>
+        <text class="sub" x="636" y="398">「压测只用 staging-2」</text>
+        <text class="sub" x="636" y="418">「报价服务忽略 N+1 警告」</text>
+        <text class="sub" x="636" y="438">「迁移前先跑 dry-run」</text>
+        <text class="sub" x="636" y="466" fill="#7f8893">+ 9 条</text>
+      </g>
+      <!-- 连线 -->
+      <path class="flow" d="M170 170 V260 H370"/>
+      <path class="flow" d="M450 170 V210"/>
+      <path class="flow" d="M730 170 V260 H530"/>
+      <path class="flow" d="M170 350 V320"/>
+      <path class="flow" d="M730 350 V320"/>
+      <!-- 尺寸标注 -->
+      <g class="dim"><line x1="60" y1="505" x2="840" y2="505"/><line x1="60" y1="500" x2="60" y2="510"/><line x1="840" y1="500" x2="840" y2="510"/></g>
+      <text class="lbl" x="450" y="500" text-anchor="middle">1 task · 4 actors · 7 capabilities</text>
+    </svg>
+  </div>
+</section>
+
+<section class="wrap tape">
+  <div class="panel"><span class="k"></span><p class="mono">01 · 读 / 改</p><b>读取、编辑、Bash</b><p>按需读文件、搜代码、跑命令与测试，改动写进文件再逐个审阅。</p><span class="st ok">Stable</span></div>
+  <div class="panel"><span class="k"></span><p class="mono">02 · 停</p><b>审批策略</b><p>会改变环境的操作先停下来等你，放行到什么程度由你定。</p><span class="st ok">Stable</span></div>
+  <div class="panel"><span class="k"></span><p class="mono">03 · 分</p><b>子 Agent 与 Skill</b><p>独立检索拆给子 Agent；常用方法装进 Skill 带进下一项任务。</p><span class="st live">Live</span></div>
+  <div class="panel"><span class="k"></span><p class="mono">04 · 留</p><b>场景 · Actor · 记忆</b><p>任务结束后，什么留下、什么退场，空间比上一次更懂你。</p><span class="st warn">In progress</span></div>
+</section>
+
+<section class="wrap shot">
+  <div class="panel"><span class="k"></span>
+    <div class="ph"><i class="dot"></i><span class="mono">实录 · Space 视图</span><span class="mono sp">示例数据</span></div>
+    <img src="../../../../apps/site/src/assets/screenshots/home/space.png" alt="Space 界面">
+  </div>
+  <div class="row">
+    <div><h2>不是聊天框，是运行空间。</h2><p>会话只是空间的一个切面。右侧是 Actor 名册：等你决定、工作中、有结果、空闲；中间是协调 Agent 的交付；记忆沉淀在底部。</p></div>
+    <ul class="spec">
+      <li><span>Roster</span>Actor 按状态分组，一眼看出谁在等你。</li>
+      <li><span>Approval</span>命令原样列出，标明在沙盒还是真实环境里跑。</li>
+      <li><span>Memory</span>「压测只用 staging-2」被记住，下次不必再说。</li>
+      <li><span>Ephemeral</span>临时 Actor 做完后由你决定去留。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="wrap closing">
+  <div class="panel"><span class="k"></span><h2>给下一个问题，一个空间。</h2><div class="acts"><a class="btn" href="#">下载 ActSpace</a><a class="btn ghost" href="#">GitHub</a></div></div>
+</section>
+<footer><div class="wrap">ACTSPACE · 唯变所适 · LOCAL-FIRST AGENT RUNTIME · 2026</div></footer>
+</body>
+</html>
