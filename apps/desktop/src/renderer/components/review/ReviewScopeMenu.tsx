@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
 import type { ReviewBranch, ReviewCommit, ReviewSelection } from "@actspace/shared";
 import { reviewApi } from "../../api/review";
 
@@ -59,7 +59,7 @@ export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect 
       <div className="grid gap-1 p-1.5" role="menu" aria-label="最近提交">
         <button type="button" className={`${ITEM} text-text-muted`} onClick={() => setPicker(null)}><ChevronLeft size={13} />已提交</button>
         <div className="mx-1 border-t border-line" />
-        {loadingCommits ? <div className="flex min-h-12 items-center justify-center gap-2 text-act-xs text-text-faint"><Loader2 size={13} className="animate-spin" />正在加载提交…</div> : null}
+        {loadingCommits ? <div className="flex min-h-12 items-center justify-center gap-2 text-act-xs text-text-faint"><LoaderCircle size={13} className="animate-spin" />正在加载提交…</div> : null}
         {!loadingCommits && commitError ? <div className="px-2.5 py-3 text-act-xs leading-relaxed text-danger">{commitError}</div> : null}
         {!loadingCommits && !commitError && commits.length === 0 ? <div className="px-2.5 py-3 text-act-xs leading-relaxed text-text-faint">此工作区暂无提交。</div> : null}
         {!loadingCommits && !commitError && commits.length > 0 ? <div className="max-h-[min(360px,calc(100vh-120px))] overflow-y-auto">
@@ -80,7 +80,7 @@ export function ReviewScopeMenu({ selection, sessionId, workspaceRoot, onSelect 
       <div className="grid gap-1 p-1.5" role="menu" aria-label="已设置上游的分支">
         <button type="button" className={`${ITEM} text-text-muted`} onClick={() => setPicker(null)}><ChevronLeft size={13} />分支</button>
         <div className="mx-1 border-t border-line" />
-        {loadingBranches ? <div className="flex min-h-12 items-center justify-center gap-2 text-act-xs text-text-faint"><Loader2 size={13} className="animate-spin" />正在加载分支…</div> : null}
+        {loadingBranches ? <div className="flex min-h-12 items-center justify-center gap-2 text-act-xs text-text-faint"><LoaderCircle size={13} className="animate-spin" />正在加载分支…</div> : null}
         {!loadingBranches && branchError ? <div className="px-2.5 py-3 text-act-xs leading-relaxed text-danger">{branchError}</div> : null}
         {!loadingBranches && !branchError && branches.length === 0 ? <div className="px-2.5 py-3 text-act-xs leading-relaxed text-text-faint">没有本地分支设置了远程跟踪分支。</div> : null}
         {branches.map((branch) => (

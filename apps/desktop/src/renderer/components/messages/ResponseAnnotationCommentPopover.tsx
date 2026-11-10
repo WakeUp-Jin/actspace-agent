@@ -186,7 +186,7 @@ function CommentPopover({
             }}
           />
           <IconButton label="保存评论" variant="primary" size="sm" shape="round" disabled={tooLong} onClick={submit}>
-            <Check size={15} strokeWidth={2.4} aria-hidden="true" />
+            <Check size={15} aria-hidden="true" />
           </IconButton>
         </div>
         {tooLong ? (

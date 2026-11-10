@@ -24,14 +24,14 @@ export function SpaceFilesView({ roots }: { roots: string[] }) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className={HEADER_CLASS}>
         <label className={FILTER_WRAP_CLASS}>
-          <Search size={12} strokeWidth={2} className="shrink-0 text-text-faint" aria-hidden="true" />
+          <Search size={12} className="shrink-0 text-text-faint" aria-hidden="true" />
           <input
             className={FILTER_INPUT_CLASS} type="text" value={query} placeholder="过滤文件…" aria-label="过滤文件名"
             onChange={(event) => setFileQuery(event.target.value)}
           />
         </label>
         <IconButton label="刷新文件树" tooltip="刷新" size="xs" onClick={() => showNotice("演示里的文件树是固定的")}>
-          <RefreshCw size={13} strokeWidth={1.9} aria-hidden="true" />
+          <RefreshCw size={13} aria-hidden="true" />
         </IconButton>
       </div>
       <div className="scrollbar-none min-h-0 flex-1 overflow-auto py-1">

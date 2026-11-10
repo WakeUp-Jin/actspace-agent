@@ -8,7 +8,7 @@
  */
 
 import { useState } from "react";
-import { Loader2, SquareArrowOutUpRight } from "lucide-react";
+import { LoaderCircle, ExternalLink } from "lucide-react";
 import type { WorkspaceOpenTool, WorkspaceOpenToolId } from "@actspace/shared";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "../ui/Menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
@@ -80,9 +80,9 @@ export function OpenInAppMenu({
           <MenuTrigger asChild>
             <button type="button" className={TRIGGER_CLASS} aria-label="在外部应用中打开">
               {busy ? (
-                <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
               ) : (
-                <SquareArrowOutUpRight size={14} strokeWidth={1.8} aria-hidden="true" />
+                <ExternalLink size={14} aria-hidden="true" />
               )}
             </button>
           </MenuTrigger>

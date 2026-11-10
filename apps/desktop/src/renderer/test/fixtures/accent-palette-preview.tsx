@@ -28,7 +28,7 @@ function Sample() {
       <div className="flex items-center gap-2.5">
         <input readOnly value="focus 输入框" className="h-8 w-32 rounded-act-md border border-focus-ring bg-surface px-2.5 text-act-xs outline-none ring-2 ring-focus-ring/20" />
         <IconButton label="发送" tooltip={false} variant="accent" size="md" shape="round">
-          <ArrowUp size={16} strokeWidth={2.4} aria-hidden="true" />
+          <ArrowUp size={16} aria-hidden="true" />
         </IconButton>
         <Toggle checked onChange={() => {}} ariaLabel="开启" />
         <Toggle checked={false} onChange={() => {}} ariaLabel="关闭" />

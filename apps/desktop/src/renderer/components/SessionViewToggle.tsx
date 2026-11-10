@@ -25,9 +25,9 @@ export function SessionViewToggle({
           onClick={onToggle}
         >
           {showingTrajectory ? (
-            <MessageSquare size={15} strokeWidth={1.8} aria-hidden="true" />
+            <MessageSquare size={15} aria-hidden="true" />
           ) : (
-            <Activity size={15} strokeWidth={1.8} aria-hidden="true" />
+            <Activity size={15} aria-hidden="true" />
           )}
         </button>
       </TooltipTrigger>

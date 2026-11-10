@@ -169,11 +169,11 @@ export function SpeechSettingsSection() {
               />
               {playing ? (
                 <IconButton variant="secondary" label="停止播放" disabled={busy} onClick={() => void action(async () => { setState(await englishLearningApi.stopSpeech()); })}>
-                  <Square size={11} strokeWidth={2.4} aria-hidden="true" />
+                  <Square size={11} aria-hidden="true" />
                 </IconButton>
               ) : (
                 <IconButton variant="secondary" label="试听已保存配置" tooltip={state?.hasApiKey ? "试听已保存配置" : "需要先配置 Key"} disabled={!canPreview} onClick={() => void action(async () => { setState(await englishLearningApi.previewSpeech()); })}>
-                  <Play size={11} strokeWidth={2.4} aria-hidden="true" />
+                  <Play size={11} aria-hidden="true" />
                 </IconButton>
               )}
             </>

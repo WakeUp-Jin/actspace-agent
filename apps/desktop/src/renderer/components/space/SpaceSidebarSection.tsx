@@ -29,7 +29,7 @@ const STACK_IMG_CLASS = "h-3 w-3 rounded-act-xs object-cover ring-1 ring-sidebar
 export function NewSpaceAction({ className, labelClassName, onNewSpace }: { className: string; labelClassName: string; onNewSpace: () => void }) {
   return (
     <button className={className} type="button" onClick={onNewSpace}>
-      <Grid2x2Plus size={14} strokeWidth={1.9} />
+      <Grid2x2Plus size={14} />
       <span className={labelClassName}>新建 Space</span>
     </button>
   );
@@ -91,10 +91,10 @@ export function SpaceSidebarSection({ inSpace, onEnter, onNewSpace }: { inSpace:
         </button>
         <div className={NAV_SECTION_ACTIONS_CLASS}>
           <IconButton className={REVEAL_CLASS} size="xs" label="新建 Space" onClick={onNewSpace}>
-            <Plus size={13} strokeWidth={1.9} aria-hidden="true" />
+            <Plus size={13} aria-hidden="true" />
           </IconButton>
           <IconButton className={REVEAL_CLASS} size="xs" label={collapsed ? "展开 Space" : "收起 Space"} onClick={toggle}>
-            {collapsed ? <ChevronRight size={13} strokeWidth={1.9} aria-hidden="true" /> : <ChevronDown size={13} strokeWidth={1.9} aria-hidden="true" />}
+            {collapsed ? <ChevronRight size={13} aria-hidden="true" /> : <ChevronDown size={13} aria-hidden="true" />}
           </IconButton>
         </div>
       </div>

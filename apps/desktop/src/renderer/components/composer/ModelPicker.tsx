@@ -154,7 +154,7 @@ export function ModelPicker({ open, onOpenChange, triggerLabel, triggerTitle, di
       <PopoverTrigger asChild>
         <button className={MODEL_BUTTON_CLASS} type="button" disabled={disabled}>
           <span className={MODEL_BUTTON_TEXT_CLASS} title={triggerTitle}>{triggerLabel}</span>
-          <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
+          <ChevronDown size={14} aria-hidden="true" />
         </button>
       </PopoverTrigger>
       {open ? <ModelPickerMenu {...list} /> : null}
@@ -228,7 +228,7 @@ export function ModelPickerMenu({
     >
       <div className={MODEL_MENU_SCROLL_CLASS} ref={scrollRef} onScroll={() => setEditingModelId(null)}>
         <label className={MODEL_SEARCH_WRAP_CLASS}>
-          <Search size={14} strokeWidth={2} aria-hidden="true" />
+          <Search size={14} aria-hidden="true" />
           <input
             ref={searchInputRef}
             className={MODEL_SEARCH_INPUT_CLASS}
@@ -254,7 +254,7 @@ export function ModelPickerMenu({
                 <span className="block min-w-0 truncate">{spec.label}</span>
               </Button>
               <div className={`${MODEL_ROW_ACTIONS_CLASS} ${selected ? MODEL_ROW_ACTIONS_SELECTED_CLASS : ""}`}>
-                {selected ? <Check className={MODEL_CHECK_ICON_CLASS} size={14} strokeWidth={2.2} /> : null}
+                {selected ? <Check className={MODEL_CHECK_ICON_CLASS} size={14} /> : null}
               </div>
             </div>
           );
@@ -331,7 +331,7 @@ export function ModelPickerMenu({
                         编辑
                       </button>
                     ) : null}
-                    {selected ? <Check className={MODEL_CHECK_ICON_CLASS} size={14} strokeWidth={2.2} /> : null}
+                    {selected ? <Check className={MODEL_CHECK_ICON_CLASS} size={14} /> : null}
                   </div>
                 </div>
               );
@@ -406,7 +406,7 @@ function ModelOptionsBody({ spec, options }: { spec: ComposerModelOption; option
               onClick={() => options.onChange(spec.id, (previous) => ({ thinkingEnabled: previous.thinkingEnabled }))}
             >
               <span className={OPTION_CHOICE_LABEL_CLASS}>Auto</span>
-              {!current.reasoningEffort ? <Check size={14} strokeWidth={2.2} aria-hidden="true" /> : null}
+              {!current.reasoningEffort ? <Check size={14} aria-hidden="true" /> : null}
             </button>
           ) : null}
           {efforts.map((effort) => (
@@ -418,7 +418,7 @@ function ModelOptionsBody({ spec, options }: { spec: ComposerModelOption; option
               onClick={() => options.onChange(spec.id, (previous) => ({ ...previous, reasoningEffort: effort }))}
             >
               <span className={OPTION_CHOICE_LABEL_CLASS}>{reasoningEffortLabel(effort)}</span>
-              {current.reasoningEffort === effort ? <Check size={14} strokeWidth={2.2} aria-hidden="true" /> : null}
+              {current.reasoningEffort === effort ? <Check size={14} aria-hidden="true" /> : null}
             </button>
           ))}
         </>

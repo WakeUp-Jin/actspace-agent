@@ -76,7 +76,7 @@ export function ComposerBox({ value, onChange, onKeyDown, placeholder, ariaLabel
       <div className="composer-bar">
         {bar ?? (
           <>
-            <IconButton label="模式与添加" size="md" tone="faint" onClick={() => setPlusOpen(true)}><Plus size={18} strokeWidth={2.1} aria-hidden /></IconButton>
+            <IconButton label="模式与添加" size="md" tone="faint" onClick={() => setPlusOpen(true)}><Plus size={18} aria-hidden /></IconButton>
             {mode !== "agent" ? (
               <span className={cx("inline-flex h-[26px] flex-none items-center gap-1 rounded-act-pill pl-2 pr-0.5 text-act-sm font-medium", mode === "plan" ? "bg-warning-soft text-on-warning" : "bg-operational-soft text-operational")}>
                 <ModeIcon size={14} aria-hidden />{MODE_LABELS[mode]}
@@ -85,7 +85,7 @@ export function ComposerBox({ value, onChange, onKeyDown, placeholder, ariaLabel
             ) : null}
             {isStacked ? <span className="flex-1" /> : textarea}
             <Pressable onClick={onModelClick} disabled={modelDisabled} className="inline-flex h-8 w-auto max-w-[150px] flex-none items-center gap-1 rounded-act-pill px-1.5 text-act-sm font-medium text-text-muted disabled:opacity-45">
-              <span className="truncate">{modelLabel}</span><ChevronDown size={12} strokeWidth={2.2} aria-hidden className="flex-none" />
+              <span className="truncate">{modelLabel}</span><ChevronDown size={12} aria-hidden className="flex-none" />
             </Pressable>
             <SendButton tone={action === "stop" ? "stop" : mode} disabled={action === "disabled"} onClick={onSubmit} />
           </>

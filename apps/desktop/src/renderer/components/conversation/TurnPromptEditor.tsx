@@ -144,10 +144,10 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
         <div className={EDITOR_REFERENCES_CLASS}>
           {fileReferences.map((reference) => (
             <span key={reference.relativePath} className={FILE_REFERENCE_CLASS} title={reference.relativePath}>
-              <FileText size={14} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-text-faint" />
+              <FileText size={14} aria-hidden="true" className="shrink-0 text-text-faint" />
               <span className="truncate">{reference.displayName}</span>
               <IconButton label={`移除 ${reference.displayName}`} variant="ghost" size="xs" onClick={() => setFileReferences((current) => current.filter((item) => item !== reference))}>
-                <X size={12} strokeWidth={2.4} aria-hidden="true" />
+                <X size={12} aria-hidden="true" />
               </IconButton>
             </span>
           ))}
@@ -176,7 +176,7 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
           shape="round"
           onClick={() => void (acceptsFiles ? attachmentState.selectFiles() : attachmentState.selectImages())}
         >
-          <Plus size={17} strokeWidth={2.1} aria-hidden="true" />
+          <Plus size={17} aria-hidden="true" />
         </IconButton>
         <ModelPicker
           catalog={model.catalog}
@@ -200,7 +200,7 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
           aria-disabled={!canSend}
           onClick={submit}
         >
-          <ArrowUp size={15} strokeWidth={2.4} aria-hidden="true" />
+          <ArrowUp size={15} aria-hidden="true" />
         </IconButton>
       </div>
     </div>

@@ -45,9 +45,9 @@ export function ToolActivityGroup({
       >
         <span>{formatWorkedDuration(durationMs)}</span>
         {expanded ? (
-          <ChevronDown size={15} strokeWidth={2.2} aria-hidden="true" />
+          <ChevronDown size={15} aria-hidden="true" />
         ) : (
-          <ChevronRight size={15} strokeWidth={2.2} aria-hidden="true" />
+          <ChevronRight size={15} aria-hidden="true" />
         )}
       </button>
       {expanded ? <div className={DONE_FLOW_CLASS}>{children}</div> : null}

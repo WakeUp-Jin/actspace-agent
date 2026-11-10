@@ -1,4 +1,4 @@
-import { ListOrdered, MoreHorizontal, Trash2 } from "lucide-react";
+import { ListOrdered, Ellipsis, Trash } from "lucide-react";
 import type { ReactNode } from "react";
 import type { QueuedComposerMessage, SessionMessageQueue } from "../../session/message-queue";
 import { Button, cx } from "../ui/Button";
@@ -130,12 +130,12 @@ export function MessageQueueTray({ controls, inputEmpty }: { controls: MessageQu
               <span className={ROW_ACTIONS_CLASS}>
                 {renderSteerButton(item)}
                 <IconButton label={`删除排队消息 ${index + 1}`} tooltip="删除" size="xs" onClick={() => controls.onRemove(item.id)}>
-                  <Trash2 size={13} strokeWidth={2} aria-hidden="true" />
+                  <Trash size={13} aria-hidden="true" />
                 </IconButton>
                 <Menu>
                   <MenuTrigger asChild>
                     <IconButton label={`更多操作：排队消息 ${index + 1}`} tooltip="更多" size="xs">
-                      <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
+                      <Ellipsis size={14} aria-hidden="true" />
                     </IconButton>
                   </MenuTrigger>
                   <MenuContent align="end" className="w-40">

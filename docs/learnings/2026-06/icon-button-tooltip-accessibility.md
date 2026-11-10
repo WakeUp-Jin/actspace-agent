@@ -43,7 +43,7 @@
 <Tooltip>
   <TooltipTrigger asChild>
     <button aria-label="更多消息操作">
-      <MoreHorizontal aria-hidden="true" />
+      <Ellipsis aria-hidden="true" />
     </button>
   </TooltipTrigger>
   <TooltipContent>更多操作</TooltipContent>

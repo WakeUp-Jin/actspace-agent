@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { Archive, ChevronRight, CircleAlert } from "lucide-react";
+import { Archive, ChevronRight, CircleExclamationPoint } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import { formatTokenCount } from "../../context-format";
 import { useTrajectoryNavigation } from "../trajectory/TrajectoryNavigation";
@@ -104,7 +104,7 @@ export function CompactCommandBlock({
     return (
       <article className={blockClassName}>
         <Divider state="failed">
-          <CircleAlert size={14} strokeWidth={1.8} className={DIVIDER_ICON_CLASS} aria-hidden="true" />
+          <CircleExclamationPoint size={14} className={DIVIDER_ICON_CLASS} aria-hidden="true" />
           <span className={DIVIDER_TITLE_CLASS} role="alert">上下文压缩失败</span>
           {message.errorMessage ? <span className={DIVIDER_TEXT_CLASS} title={message.errorMessage}>{message.errorMessage}</span> : null}
           {retry ? <button type="button" className={RETRY_CLASS} onClick={retry}>重试</button> : null}
@@ -119,7 +119,7 @@ export function CompactCommandBlock({
   return (
     <article className={blockClassName}>
       <Divider state="completed">
-        <Archive size={14} strokeWidth={1.6} className={`${DIVIDER_ICON_CLASS} text-text-muted`} aria-hidden="true" />
+        <Archive size={14} className={`${DIVIDER_ICON_CLASS} text-text-muted`} aria-hidden="true" />
         <span className={`${DIVIDER_TITLE_CLASS} text-text-muted`} role="separator" aria-label={stats ? `${title} · ${stats}` : title}>{title}</span>
         {stats ? <span className="whitespace-nowrap">{stats}</span> : null}
         {navigation && compactionId ? (
@@ -127,7 +127,7 @@ export function CompactCommandBlock({
             <span aria-hidden="true">·</span>
             <button type="button" className={LINK_CLASS} onClick={() => navigation.revealInTrajectory({ compactionId })}>
               在轨迹中查看
-              <ChevronRight size={11} strokeWidth={2} aria-hidden="true" />
+              <ChevronRight size={11} aria-hidden="true" />
             </button>
           </>
         ) : null}

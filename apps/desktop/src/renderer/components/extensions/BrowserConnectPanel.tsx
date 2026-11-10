@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ChevronDown, Copy, ExternalLink, FolderOpen, Loader2 } from "lucide-react";
+import { ChevronDown, Copy, ExternalLink, FolderOpen, LoaderCircle } from "lucide-react";
 import type { BrowserBridgeStatus } from "@actspace/shared";
 import { Button } from "../ui/Button";
 import { browserBridgeApi } from "../../api/browser-bridge";
@@ -47,7 +47,7 @@ export function BrowserConnectPanel({ status, refresh }: { status: BrowserBridge
         </p>
       </div>
       {!status?.enabled && <Button className="justify-self-start" disabled={busy} onClick={() => void action(() => browserBridgeApi.connect())}>
-        {busy && <Loader2 size={14} className="mr-1.5 animate-spin" />}开始连接
+        {busy && <LoaderCircle size={14} className="mr-1.5 animate-spin" />}开始连接
       </Button>}
       {awaiting && status?.extensionDir && <div className="grid gap-2 rounded-act-md bg-surface-subtle p-3 text-act-xs text-text-muted">
         <p>在 Chrome 扩展程序页面开启“开发者模式”，点击“加载未打包的扩展程序”，选择下方目录。Chrome 的权限提示由你确认。</p>

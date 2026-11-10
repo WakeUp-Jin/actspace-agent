@@ -1,4 +1,4 @@
-import { BarChart3, Folder, Hash, Sparkles } from "lucide-react";
+import { ChartColumn, Folder, Hash, Sparkles } from "lucide-react";
 import { MODEL_REGISTRY, resolveModelSpecByApiModel } from "@actspace/shared";
 import type { ContextUsageSnapshot, SessionListItem } from "@actspace/shared";
 import { selectRequestContextEstimate } from "@actspace/client/sessions";
@@ -74,24 +74,24 @@ export function SessionHoverPreviewCard({
       {hasDetails ? (
         <div className={SESSION_HOVER_ROWS_CLASS}>
           <div className={SESSION_HOVER_ROW_CLASS}>
-            <Hash size={14} strokeWidth={1.8} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
+            <Hash size={14} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
             <span className={SESSION_HOVER_PATH_CLASS}>sessionId: {sessionId}</span>
           </div>
           {workspaceRoot ? (
             <div className={SESSION_HOVER_ROW_CLASS}>
-              <Folder size={14} strokeWidth={1.8} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
+              <Folder size={14} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
               <span className={SESSION_HOVER_PATH_CLASS}>{workspaceRoot}</span>
             </div>
           ) : null}
           {modelLabel ? (
             <div className={SESSION_HOVER_ROW_CLASS}>
-              <Sparkles size={14} strokeWidth={1.8} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
+              <Sparkles size={14} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
               <span className="min-w-0 text-text-muted">{modelLabel}</span>
             </div>
           ) : null}
           {snapshot?.cumulativeTokens !== undefined ? (
             <div className={SESSION_HOVER_ROW_CLASS}>
-              <BarChart3 size={14} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
+              <ChartColumn size={14} className={SESSION_HOVER_ICON_CLASS} aria-hidden="true" />
               <span>累计 Token：{formatTokenCount(snapshot.cumulativeTokens)}</span>
             </div>
           ) : null}

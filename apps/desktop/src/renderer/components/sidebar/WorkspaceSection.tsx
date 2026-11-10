@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Archive, ChevronDown, Folder, FolderOpen, MoreHorizontal, PanelLeftClose, Plus } from "lucide-react";
+import { Archive, ChevronDown, Folder, FolderOpen, Ellipsis, PanelLeftClose, Plus } from "lucide-react";
 import type { SessionListItem, WorkspaceEntry } from "@actspace/shared";
 import { IconButton } from "../ui/IconButton";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "../ui/ContextMenu";
@@ -103,8 +103,8 @@ export function WorkspaceSection({
               aria-label={collapsed ? `展开 ${group.label}` : `收起 ${group.label}`}
               aria-expanded={!collapsed}
             >
-              <FolderGlyph size={15} strokeWidth={1.8} className={`${WORKSPACE_FOLDER_GLYPH_CLASS} ${hasActive ? WORKSPACE_FOLDER_ACTIVE_CLASS : ""}`} aria-hidden="true" />
-              <ChevronDown size={14} strokeWidth={2} className={`${WORKSPACE_CHEVRON_GLYPH_CLASS} ${collapsed ? "-rotate-90" : ""}`} aria-hidden="true" />
+              <FolderGlyph size={15} className={`${WORKSPACE_FOLDER_GLYPH_CLASS} ${hasActive ? WORKSPACE_FOLDER_ACTIVE_CLASS : ""}`} aria-hidden="true" />
+              <ChevronDown size={14} className={`${WORKSPACE_CHEVRON_GLYPH_CLASS} ${collapsed ? "-rotate-90" : ""}`} aria-hidden="true" />
             </button>
             <button
               ref={labelRef}
@@ -130,7 +130,7 @@ export function WorkspaceSection({
                   openContextMenuAt(titleRowRef.current, event.currentTarget);
                 }}
               >
-                <MoreHorizontal size={14} strokeWidth={1.9} aria-hidden="true" />
+                <Ellipsis size={14} aria-hidden="true" />
               </IconButton>
               <IconButton
                 className={`workspace-add-button ${WORKSPACE_ACTION_REVEAL_CLASS}`}
@@ -142,7 +142,7 @@ export function WorkspaceSection({
                   onNewSession({ hostId: group.hostId, workspaceId: group.workspaceId, workspaceRoot: group.workspaceRoot, agentForm: "agent" });
                 }}
               >
-                <Plus size={14} strokeWidth={2} aria-hidden="true" />
+                <Plus size={14} aria-hidden="true" />
               </IconButton>
             </div>
           </div>
@@ -165,7 +165,7 @@ export function WorkspaceSection({
             disabled={!group.workspaceId || !onOpenWorkspace}
             onSelect={() => { if (group.workspaceId) onOpenWorkspace?.(group.workspaceId); }}
           >
-            <FolderOpen size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+            <FolderOpen size={16} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
             在 IDE 中打开
           </ContextMenuItem>
           <ContextMenuItem
@@ -173,7 +173,7 @@ export function WorkspaceSection({
             title={archiveTitle}
             onSelect={() => { onArchiveWorkspace?.(group.key, group.workspaceRoot); }}
           >
-            <Archive size={16} strokeWidth={1.9} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
+            <Archive size={16} className={SESSION_CONTEXT_MENU_ICON_CLASS} aria-hidden="true" />
             归档全部
           </ContextMenuItem>
           <ContextMenuSeparator />
@@ -183,7 +183,7 @@ export function WorkspaceSection({
             title="从侧栏移除"
             onSelect={() => { if (group.workspaceId) onRemoveWorkspace?.(group.workspaceId, group.workspaceRoot); }}
           >
-            <PanelLeftClose size={16} strokeWidth={1.9} className="h-4 w-4" aria-hidden="true" />
+            <PanelLeftClose size={16} className="h-4 w-4" aria-hidden="true" />
             从侧栏移除
           </ContextMenuItem>
         </ContextMenuContent>

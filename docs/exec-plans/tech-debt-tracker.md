@@ -14,6 +14,7 @@
 |---|---|---|---|
 | 2026-09-26 | renderer 间距 | 组件中仍有 `p-[7px]`、`gap-[9px]`、`py-[5px]` 等间距写死值，没有纳入 `check:frontend-tokens`。 | 先统计分布，决定是否收敛到 4px 网格或登记例外，再加检查规则。 |
 | 2026-09-26 | 内容边界 CSS | `styles/markdown.css`、`diff.css`、`tool-result.css`、`web-tool.css` 内部仍用 px 字号。 | 这些文件服务模型输出和第三方 DOM，改为 `var(--text-act-*)` 前需逐个对照渲染结果。 |
+| 2026-11-09 | 图标尺寸 | `front-视觉token规范.md` §12 定了图标尺寸档位（12 / 14 / 16 / 18 / 20 / 22），但 renderer 与 web 里仍有约 190 处 `size={11 / 13 / 15 / 17 / 19 / 21}` 等非档位值（15 约 100 处、13 约 85 处），没有纳入 `check:frontend-tokens`。 | 按区域在 Electron 里对照收敛到相邻档位（13→14、15→16），改完再给脚本加 `size` 档位规则；期间不新增非档位值。 |
 | 2026-09-26 | 未迁移的按钮形态 | 菜单项（Composer 命令菜单、模型列表）、下拉触发器（Composer 模式 / 模型选择器）、分段控件（预览 / 源码切换）仍是各自的样式常量；Composer 附件删除按钮、Sidebar 会话行置顶 / 归档等内联按钮未改为 `IconButton`。2026-10-06：消息操作菜单和 `SettingsSelect` 已由 Desktop 前端重构 16 改用 `ui/Menu`、`ui/Select`；原生按钮数由 `check:frontend-tokens` 的基线守住，不再增加。 | Composer 的随 09 迁移；分段控件随 `active/20260926-frontend-ui-components-foundation.md` 的 `Tabs`。 |
 
 ## Desktop 前端组件遗留

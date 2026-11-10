@@ -15,7 +15,7 @@ export function ScrollToBottomButton({ onClick }: { onClick: () => void }) {
             aria-label="滚动到底部"
             onClick={onClick}
           >
-            <ArrowDown size={18} strokeWidth={1.8} aria-hidden="true" />
+            <ArrowDown size={18} aria-hidden="true" />
           </button>
         </TooltipTrigger>
         <TooltipContent side="top">滚动到底部</TooltipContent>

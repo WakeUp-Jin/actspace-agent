@@ -11,7 +11,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Minus, Plus, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleExclamationPoint, Minus, Plus, RotateCcw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
@@ -302,7 +302,6 @@ export function SettingLinkRow({
         {trailing}
         <ChevronRight
           size={14}
-          strokeWidth={1.9}
           aria-hidden="true"
           className={cx("shrink-0 text-text-subtle transition-transform duration-(--motion-base)", expanded && "rotate-90")}
         />
@@ -447,7 +446,7 @@ export function InlineWarning({
 }) {
   return (
     <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-act-xs leading-relaxed text-warning">
-      <CircleAlert size={13} strokeWidth={2} aria-hidden="true" className="shrink-0" />
+      <CircleExclamationPoint size={13} aria-hidden="true" className="shrink-0" />
       <span>{children}</span>
       {actionLabel && onAction ? (
         <button
@@ -667,7 +666,6 @@ export function MultiSelect({
           </span>
           <ChevronDown
             size={14}
-            strokeWidth={1.9}
             className="shrink-0 text-text-faint transition-transform duration-(--motion-base) group-data-[state=open]:rotate-180 motion-reduce:transition-none"
             aria-hidden="true"
           />
@@ -768,7 +766,7 @@ export function Stepper({
           onClick={() => onChange(defaultValue)}
           className={cx(!canReset && "invisible")}
         >
-          <RotateCcw size={13} strokeWidth={2} aria-hidden="true" />
+          <RotateCcw size={13} aria-hidden="true" />
         </IconButton>
       ) : null}
       <div role="group" aria-label={ariaLabel} className={cx("inline-flex h-[30px] items-center rounded-act-sm border border-line bg-surface", disabled && "opacity-55")}>
@@ -784,7 +782,7 @@ export function Stepper({
               }}
               className={cx(stepButton, "rounded-l-act-sm")}
             >
-              <Minus size={14} strokeWidth={2.2} aria-hidden="true" />
+              <Minus size={14} aria-hidden="true" />
             </button>
           </TooltipTrigger>
           <TooltipContent>减小 {ariaLabel}</TooltipContent>
@@ -802,7 +800,7 @@ export function Stepper({
               }}
               className={cx(stepButton, "rounded-r-act-sm")}
             >
-              <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
+              <Plus size={14} aria-hidden="true" />
             </button>
           </TooltipTrigger>
           <TooltipContent>增大 {ariaLabel}</TooltipContent>
@@ -842,7 +840,7 @@ export function SettingsSaveNoticeProvider({ children }: { children: ReactNode }
       >
         {notice ? (
           <>
-            <Check size={13} strokeWidth={2.4} aria-hidden="true" />
+            <Check size={13} aria-hidden="true" />
             {notice.text}
           </>
         ) : null}

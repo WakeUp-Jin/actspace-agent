@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import { ChevronRight, FileText, Folder, FolderOpen, Loader2, RefreshCw, Search } from "lucide-react";
+import { ChevronRight, FileText, Folder, FolderOpen, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import { Button } from "../../ui/Button";
 import { IconButton } from "../../ui/IconButton";
 import { useRightPanel } from "../RightPanelContext";
@@ -93,15 +93,15 @@ export function DocsTree({
     <nav className={TREE_CLASS} aria-label="文档目录">
       <div className="flex shrink-0 flex-col gap-2 px-2.5 pb-1.5 pt-2.5">
         <div className="flex items-center gap-1.5 px-1 text-act-sm font-semibold text-text-main">
-          <Folder size={14} strokeWidth={1.8} className="shrink-0 text-text-faint" aria-hidden="true" />
+          <Folder size={14} className="shrink-0 text-text-faint" aria-hidden="true" />
           <span className="min-w-0 truncate" title={workspaceLabel}>{workspaceLabel}</span>
           <span className="ml-auto shrink-0 text-act-xs font-normal text-text-faint">{files ? `${total}${truncated ? "+" : ""} 篇` : ""}</span>
           <IconButton label="刷新文档列表" tooltip="刷新" size="xs" onClick={refreshDocs} disabled={status === "loading"}>
-            {status === "loading" ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={13} strokeWidth={1.9} aria-hidden="true" />}
+            {status === "loading" ? <LoaderCircle size={13} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={13} aria-hidden="true" />}
           </IconButton>
         </div>
         <label className={SEARCH_CLASS}>
-          <Search size={13} strokeWidth={2} className="shrink-0 text-text-faint" aria-hidden="true" />
+          <Search size={13} className="shrink-0 text-text-faint" aria-hidden="true" />
           <input
             className={SEARCH_INPUT_CLASS}
             type="text"
@@ -123,7 +123,7 @@ export function DocsTree({
       </div>
 
       <div className={BODY_CLASS} role="tree" aria-label="Markdown 文档">
-        {loading ? <div className={STATE_CLASS}><Loader2 size={13} className="animate-spin" aria-label="正在读取文档列表" /></div> : null}
+        {loading ? <div className={STATE_CLASS}><LoaderCircle size={13} className="animate-spin" aria-label="正在读取文档列表" /></div> : null}
         {status === "error" && files === null ? <div className={STATE_CLASS} role="alert">{error ?? "无法读取文档列表。"}</div> : null}
         {empty && total === 0 ? <div className={STATE_CLASS}>没有 Markdown 文档</div> : null}
         {empty && total > 0 ? (
@@ -143,8 +143,8 @@ export function DocsTree({
                 style={indent(depth)}
                 onClick={() => toggleDir(node.path)}
               >
-                <ChevronRight size={13} strokeWidth={1.8} className={`shrink-0 text-text-faint transition-transform ${expanded ? "rotate-90" : ""}`} aria-hidden="true" />
-                {expanded ? <FolderOpen size={14} strokeWidth={1.6} className="shrink-0 text-text-faint" aria-hidden="true" /> : <Folder size={14} strokeWidth={1.6} className="shrink-0 text-text-faint" aria-hidden="true" />}
+                <ChevronRight size={13} className={`shrink-0 text-text-faint transition-transform ${expanded ? "rotate-90" : ""}`} aria-hidden="true" />
+                {expanded ? <FolderOpen size={14} className="shrink-0 text-text-faint" aria-hidden="true" /> : <Folder size={14} className="shrink-0 text-text-faint" aria-hidden="true" />}
                 <span className="min-w-0 flex-1 truncate text-text-muted" title={node.path}><HighlightedName name={node.name} query={query} /></span>
                 <span className="shrink-0 text-act-xxs text-text-faint">{node.count}</span>
               </button>
@@ -164,7 +164,7 @@ export function DocsTree({
               title={node.path}
               onClick={() => selectDocsPath(node.path)}
             >
-              <FileText size={14} strokeWidth={1.6} className="shrink-0 text-text-faint" aria-hidden="true" />
+              <FileText size={14} className="shrink-0 text-text-faint" aria-hidden="true" />
               <span className="min-w-0 flex-1 truncate"><HighlightedName name={node.name} query={query} /></span>
               {edited ? <span className="size-1.5 shrink-0 rounded-full bg-operational" role="img" aria-label="本会话改过" /> : null}
             </button>

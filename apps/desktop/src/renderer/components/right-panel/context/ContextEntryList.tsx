@@ -52,7 +52,7 @@ export function ContextEntryList({ category, grandTotal }: { category: ContextCa
       {category.entries.length > FILTER_THRESHOLD ? (
         <div className="flex flex-wrap items-center gap-1.5 pb-1.5 pl-[31px] pr-3 pt-0.5">
           <label className="flex h-[30px] min-w-[120px] flex-1 items-center gap-1.5 rounded-act-sm border border-line bg-surface px-2 text-text-faint focus-within:border-focus-ring">
-            <Search size={12} strokeWidth={2.4} aria-hidden="true" />
+            <Search size={12} aria-hidden="true" />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`筛选${label}`} aria-label={`筛选${label}`}
               className="min-w-0 flex-1 border-0 bg-transparent text-act-xs text-text-main outline-none placeholder:text-text-subtle" />
           </label>
@@ -89,7 +89,7 @@ function EntryRow({ entry, category, grandTotal, open, onToggle }: {
   return (
     <div className={cn("ml-[23px] mr-2 rounded-act-sm", open && "bg-surface-subtle")}>
       <button type="button" aria-expanded={open} onClick={onToggle} className={cn(ITEM_ROW_CLASS, ROW_FOCUS_CLASS)}>
-        <ChevronRight size={10} strokeWidth={2.5} aria-hidden="true"
+        <ChevronRight size={10} aria-hidden="true"
           className={cn("shrink-0 text-text-faint transition-transform duration-(--motion-fast)", open && "rotate-90")} />
         {entry.source ? <span className={cn(KIND_CHIP_CLASS, "font-mono")}>{entry.source}</span> : null}
         <span className={ITEM_TITLE_CLASS} title={entry.title}>{entry.title}</span>
@@ -145,7 +145,7 @@ function CopyButton({ text }: { text: string }) {
   };
   return (
     <IconButton label={copied ? "已复制" : "复制预览"} size="xs" onClick={() => void copy()}>
-      {copied ? <Check size={12} strokeWidth={2.2} /> : <Copy size={12} strokeWidth={2} />}
+      {copied ? <Check size={12} /> : <Copy size={12} />}
     </IconButton>
   );
 }

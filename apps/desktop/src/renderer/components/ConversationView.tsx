@@ -1,6 +1,6 @@
 import { useRunTargetContext } from "../target/run-target-context";
 import { useSessionBrowse } from "../session/SessionBrowseContext";
-import { Loader2 } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, WheelEvent as ReactWheelEvent } from "react";
 import type { ComposerAttachment, ContextState, ContextUsageSnapshot } from "@actspace/shared";
@@ -396,7 +396,7 @@ export function ConversationView({
           >
               {browse?.messageLoading && <p role="status" className="px-5 py-3 text-act-md leading-5 text-text-muted">正在加载消息…</p>}
               {sessionError && <p role="alert" className="px-5 py-3 text-act-md leading-5 text-text-muted">{sessionError}{locatorError ? null : <> <button type="button" onClick={retrySession}>重试</button></>}</p>}
-              {browse?.earlierLoading && <p role="status" className="flex items-center justify-center gap-1.5 py-2 text-act-xs leading-4 text-text-faint"><Loader2 className="animate-spin" size={12} aria-hidden="true" />正在加载更早消息…</p>}
+              {browse?.earlierLoading && <p role="status" className="flex items-center justify-center gap-1.5 py-2 text-act-xs leading-4 text-text-faint"><LoaderCircle className="animate-spin" size={12} aria-hidden="true" />正在加载更早消息…</p>}
               {browse?.earlierError && <p role="alert" className="px-5 text-act-xs leading-4 text-text-muted">{browse.earlierError} <button type="button" onClick={requestEarlier}>重试</button></p>}
               {isInitialComposer ? null : (
                 <TurnEditContext.Provider value={turnEditing.value}>

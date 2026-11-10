@@ -37,7 +37,7 @@ export function TurnUsagePill({ usage }: { usage: TurnUsageSummary | undefined }
       <PopoverTrigger asChild>
         {/* 原生 button：和输入框状态栏的统计胶囊一样是纯文字入口，不要 Button 的边框和字重。 */}
         <button className={PILL_CLASS} type="button" aria-haspopup="dialog" aria-label={`${model.label}，查看本轮用量`} data-turn-usage="">
-          <Database className="shrink-0" size={15} strokeWidth={1.75} aria-hidden="true" />
+          <Database className="shrink-0" size={15} aria-hidden="true" />
           <span className={PILL_LABEL_CLASS}>{model.label}</span>
         </button>
       </PopoverTrigger>

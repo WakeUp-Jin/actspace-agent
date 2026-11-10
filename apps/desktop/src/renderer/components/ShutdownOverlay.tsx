@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import type { AppShutdownNotice } from "@actspace/shared";
 import { eventsApi } from "../api/events";
 
@@ -34,7 +34,7 @@ export function ShutdownOverlay() {
       className="fixed inset-0 z-(--act-z-system) flex items-center justify-center bg-app-bg/80 backdrop-blur-sm"
     >
       <div className="flex flex-col items-center gap-4 rounded-act-lg border border-line bg-surface px-9 py-8 text-center shadow-act-soft">
-        <Loader2 size={30} className="animate-spin text-operational" aria-hidden="true" />
+        <LoaderCircle size={30} className="animate-spin text-operational" aria-hidden="true" />
         <div className="flex flex-col gap-1.5">
           <p className="m-0 text-act-lg font-semibold text-text-main">
             {isLocalUpdate ? "Actspace 准备替换应用…" : "Actspace 正在安全关闭…"}

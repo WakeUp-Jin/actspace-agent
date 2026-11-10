@@ -62,7 +62,7 @@ export function MetricCard({ label, value, detail, tip, delta, onClick }: {
         {tip ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="inline-flex cursor-help text-text-subtle hover:text-text-main"><Info size={12} strokeWidth={2} aria-hidden="true" /></span>
+              <span className="inline-flex cursor-help text-text-subtle hover:text-text-main"><Info size={12} aria-hidden="true" /></span>
             </TooltipTrigger>
             <TooltipContent className="font-normal">{tip}</TooltipContent>
           </Tooltip>
@@ -115,7 +115,7 @@ export function StatsCard({ id, title, icon: Icon, aside, note, footer, span, fl
     <section id={id ? `stats-${id}` : undefined} aria-label={title}
       className={cn("stats-card stats-jump-target flex min-w-0 flex-col rounded-act-lg border border-line bg-surface px-4 pb-4 pt-3.5", SPAN_CLASS[span], flash && "stats-flash", className)}>
       <div className="mb-3 flex min-h-6 items-center gap-2">
-        {Icon ? <Icon size={15} strokeWidth={1.8} aria-hidden="true" className="shrink-0 text-text-faint" /> : null}
+        {Icon ? <Icon size={15} aria-hidden="true" className="shrink-0 text-text-faint" /> : null}
         <h3 className="m-0 whitespace-nowrap text-act-sm font-semibold text-text-main">{title}</h3>
         {aside ? <div className="ml-auto flex min-w-0 items-center gap-1.5 whitespace-nowrap text-act-xs text-text-faint">{aside}</div> : null}
       </div>
@@ -574,7 +574,7 @@ export function DataTable<T>({ columns, rows, rowKey, sort, onSortChange, defaul
                       <PlainButton onClick={() => setSort({ key: column.key, dir: active && current.dir === "desc" ? "asc" : "desc" })}
                         className={cn("inline-flex w-full items-center gap-0.5 px-3 py-[7px] hover:text-text-main", right && "justify-end", active && "text-text-main")}>
                         {column.label}
-                        {active ? (current.dir === "asc" ? <ArrowUp size={11} strokeWidth={2} aria-hidden="true" /> : <ArrowDown size={11} strokeWidth={2} aria-hidden="true" />) : null}
+                        {active ? (current.dir === "asc" ? <ArrowUp size={11} aria-hidden="true" /> : <ArrowDown size={11} aria-hidden="true" />) : null}
                       </PlainButton>
                     ) : <span className="block px-3 py-[7px]">{column.label}</span>}
                   </th>

@@ -129,7 +129,7 @@ export function ComposerStatsPills({ overlay }: { overlay?: ComposerStatsOverlay
 function PillContent({ icon: Icon, label }: { icon: LucideIcon; label: readonly string[] }) {
   return (
     <>
-      <Icon className={PILL_ICON_CLASS} size={14} strokeWidth={1.75} aria-hidden="true" />
+      <Icon className={PILL_ICON_CLASS} size={14} aria-hidden="true" />
       <span className={PILL_LABEL_CLASS}>
         {label.map((part, index) => (
           <Fragment key={index}>

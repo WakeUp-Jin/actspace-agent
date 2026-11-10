@@ -1,4 +1,4 @@
-import { ListOrdered, Trash2 } from "lucide-react";
+import { ListOrdered, Trash } from "lucide-react";
 import type { QueuedMessage } from "../../sessions/composer-state";
 import { IconButton } from "../../ui/IconButton";
 import { PillButton } from "../../ui/PillButton";
@@ -13,7 +13,7 @@ export function QueueTray({ items, onCancel, paused = false, onResume, resumeDis
         <div key={item.taskId} className="queue-row">
           <ListOrdered size={14} aria-hidden className="flex-none text-text-faint" />
           <span className="min-w-0 flex-1 truncate" title={item.text}>{item.text}</span>
-          <IconButton label="撤回" size="sm" tone="faint" onClick={() => onCancel(item.taskId)}><Trash2 size={14} aria-hidden /></IconButton>
+          <IconButton label="撤回" size="sm" tone="faint" onClick={() => onCancel(item.taskId)}><Trash size={14} aria-hidden /></IconButton>
         </div>
       ))}
     </div>

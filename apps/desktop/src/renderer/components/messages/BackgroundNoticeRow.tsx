@@ -54,9 +54,9 @@ export function BackgroundNoticeRow({ message, onOpenSubagent }: { message: Back
       <div className={DIVIDER_CLASS}>
         <span className={DIVIDER_LINE_CLASS} aria-hidden="true" />
         <button type="button" className={TOGGLE_CLASS} aria-expanded={expanded} title={label} onClick={() => setExpanded((value) => !value)}>
-          <RotateCcw size={12} strokeWidth={2.2} className="shrink-0" aria-hidden="true" />
+          <RotateCcw size={12} className="shrink-0" aria-hidden="true" />
           <span className={TEXT_CLASS}>{label}</span>
-          <ChevronRight size={12} strokeWidth={2.2} className={`${CHEVRON_CLASS}${expanded ? " rotate-90" : ""}`} aria-hidden="true" />
+          <ChevronRight size={12} className={`${CHEVRON_CLASS}${expanded ? " rotate-90" : ""}`} aria-hidden="true" />
         </button>
         <span className={DIVIDER_LINE_CLASS} aria-hidden="true" />
       </div>
