@@ -5,6 +5,6 @@
 - `desktop/`：Electron Desktop Host，package identity 为 `@actspace/desktop`。
 - `cli/`：CLI Host，package identity 为 `@actspace/agent-cli`。
 - `site/`：Astro 静态官网，package identity 为 `@actspace/site`。
-- `promo-video/`：产品宣传片的合成页与渲染脚本（真实界面版、动效图形版、品牌短片三个版本），package identity 为 `@actspace/promo-video`；产物是 MP4，不随应用发布。
+- `promo-video/`：产品宣传片的合成页与渲染脚本，package identity 为 `@actspace/promo-video`；产物是 MP4，不随应用发布。
 
 可复用的 Runtime、领域能力、Plugin ABI package 和共享契约继续放在 `packages/`。应用只能通过 package exports 消费这些能力，不能相对读取 sibling package 的 `src/`。

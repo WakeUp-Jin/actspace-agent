@@ -7,7 +7,7 @@
 1. `pnpm --filter @actspace/desktop dev:renderer`，打开 `http://127.0.0.1:5173/?mock=<场景>`。
 2. 用 Chrome DevTools 协议设视口与 DPR，截图后用 sharp 裁切。侧栏用「收起会话侧栏」按钮收起；窄视口下侧栏会自动隐藏，要先点一次「会话侧栏」按钮。
 3. 换图后重新量 `src/lib/home-features.ts` 里每个要点的 `rect`。
-4. 宣传片（`apps/promo-video`）不用这里的截图：它用同样的办法自己截（`?mock=promo-draft` / `promo-demo`，见它的 README），只引用 `src/assets/brand/actspace-mark.png`。
+4. 宣传片（`apps/promo-video`）引用了 `home/space.png`：换这张图后，核对 `apps/promo-video/src/scenes/outro.js` 里镜头取的两块区域。
 
 | 文件 | 场景与参数 |
 | --- | --- |

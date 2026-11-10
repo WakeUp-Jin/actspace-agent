@@ -19,7 +19,7 @@
 - `packages/util/shared`：IPC contracts、session schema、跨进程共享类型。桌面 IPC 契约集中在 `src/ipc/`，只允许 `apps/*`、`packages/client/*`、`packages/host/*` 引用，`pnpm check:packages` 把关；会话领域模型在 `src/session/`，前后端共用。目录划分见 [util 包地图](../packages/util/README.md)。
 - `apps/web`：浏览器 / PWA 客户端（React + Vite），手机和电脑浏览器经 WebSocket `/rpc` 连接一台 Agent Host，查看会话、审批与发送消息；可由 Host 的 `webRoot` 同源托管。设计见 [front-web-pwa客户端规范](design-docs/frontend/front-web-pwa客户端规范.md)。
 - `apps/site`：Astro 静态官网、公开文档、博客与从 release 文档生成的更新页。
-- `apps/promo-video`：产品宣传片（同一套引擎剪出几个版本）。一个可按时刻定位的网页合成（Vite），由无头 Chrome 逐帧截图、ffmpeg 编码成 MP4；用法见 [README](../apps/promo-video/README.md)。
+- `apps/promo-video`：产品宣传片。一个可按时刻定位的网页合成（Vite），由无头 Chrome 逐帧截图、ffmpeg 编码成 MP4；用法见 [README](../apps/promo-video/README.md)。
 - `browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层；对应插件 `browser-tools` 默认不加载，在 扩展 › 插件 中开启。
 - `scripts/`：正式自动化入口；人工诊断脚本在 `scripts/diagnostics/`，可复建验收环境在 `scripts/acceptance/`。
 - `docs/`：仓库知识库；规范、计划、验收证据、历史与参考资料按用途分区。
@@ -54,8 +54,8 @@
   - 不依赖桌面端运行时、用户数据、密钥或 Electron 构建产物
 
 - `apps/promo-video`
-  - 只读取 `apps/site/src/assets/brand` 里的品牌标志；产品画面在截图时访问本地的桌面端 renderer 开发服务器（浏览器 mock 模式的 `promo-draft` / `promo-demo` 场景），不 import 桌面端代码
-  - 不依赖任何 `@actspace/*` 包、Runtime 或用户数据；渲染需要本机的 Chrome 与 ffmpeg，成片、截图和配乐不入库
+  - 只读取 `apps/site/src/assets` 里的品牌标志和一张 Space 截图；产品界面是按视频尺寸重画的示意，不 import 桌面端代码
+  - 不依赖任何 `@actspace/*` 包、Runtime 或用户数据；渲染需要本机的 Chrome 与 ffmpeg；配乐是一首 CC0 曲子，渲染时下载；成片和配乐不入库
 
 - `browser-bridge`
   - 独立 Go 模块，不参与 pnpm workspace
