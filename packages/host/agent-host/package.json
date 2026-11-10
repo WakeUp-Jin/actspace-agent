@@ -44,6 +44,7 @@
     "@actspace/llm-service": "workspace:*",
     "@actspace/llm-pi-ai": "workspace:*",
     "@actspace/tool-runtime": "workspace:*",
+    "@actspace/python-runtime": "workspace:*",
     "@actspace/tool-web": "workspace:*",
     "@actspace/tool-image-generation": "workspace:*",
     "@actspace/tool-image-inspection": "workspace:*",

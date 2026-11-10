@@ -6,12 +6,12 @@ import { createLlmImageInspector, type SessionArtifactReader } from "@actspace/t
 import { createNodeSandboxHostPort, SANDBOX_HOST_PORT_ID } from "@actspace/sandbox";
 import { IMAGE_INSPECTION_CREDENTIAL_REF } from "./credential-resolver";
 import type { DesktopRuntimeV2ModelPort } from "./model-port";
-export function createDesktopToolHostServices(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly modelRuntime: DesktopRuntimeV2ModelPort; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tool-runtime").SessionArtifactResolver; readonly nonoPath?: string }) {
+export function createDesktopToolHostServices(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly modelRuntime: DesktopRuntimeV2ModelPort; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tool-runtime").SessionArtifactResolver; readonly nonoPath?: string; readonly python?: import("@actspace/python-runtime").PythonRuntimeForBash }) {
   return Object.freeze({
     [SANDBOX_HOST_PORT_ID]: createNodeSandboxHostPort({ nonoPath: options.nonoPath }),
-    // File and shell tools live in the Harness; Desktop only grants roots and artifact resolution.
+    // File and shell tools live in the Harness; Desktop only grants roots, artifact resolution and the bundled Python.
     [FILESYSTEM_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspaceRoot, resolveArtifact: options.resolveArtifact } satisfies FilesystemHostGrant),
-    [PROCESS_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspaceRoot, tmpRoot: options.tmpRoot } satisfies ProcessHostGrant),
+    [PROCESS_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspaceRoot, tmpRoot: options.tmpRoot, python: options.python } satisfies ProcessHostGrant),
     [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({
       // Ports live as long as the Harness; each search must observe settings changes.
       get deepseekFetchApiKey() { return options.modelRuntime.getToolEnvironment().deepseekFetchApiKey; },

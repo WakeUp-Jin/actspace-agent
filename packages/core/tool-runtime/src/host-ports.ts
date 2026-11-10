@@ -20,4 +20,19 @@ export type ProcessHostGrant = {
   readonly tmpRoot: string;
   /** Called once the Harness has process control; the Host uses it to kill stragglers on forced shutdown. */
   readonly onProcesses?: (control: { readonly forceTerminate: () => void }) => void;
+  /** The Python the app ships; absent when it does not, and then the prompt tells the model to use the system one. */
+  readonly python?: BundledPythonGrant;
+};
+/**
+ * What Bash and the prompt need to know about the bundled Python: the shim directory goes in front of `PATH` so
+ * the model's `actspace-python` resolves, `shim` becomes `ACTSPACE_PYTHON`, and the extension layer (read per
+ * command, so a download that finishes mid-Session takes effect on the next command) becomes `ACTSPACE_PYTHON_EXT`.
+ */
+export type BundledPythonGrant = {
+  readonly version: string;
+  readonly shimDirectory: string;
+  readonly shim: string;
+  readonly corePackages: readonly string[];
+  readonly extensionPackages: readonly string[];
+  readonly extensionSitePackages?: () => string | undefined;
 };

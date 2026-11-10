@@ -27,6 +27,8 @@ export type DesktopRuntimeV2BootOptions = {
   readonly pluginConfig?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   /** The bundled nono; absent when it was not found (see `resolveDesktopNonoPath`). */
   readonly nonoPath?: string;
+  /** The bundled Python for the bash tool; absent when this build ships none (see `resolveDesktopPythonRuntime`). */
+  readonly python?: import("@actspace/python-runtime").PythonRuntimeForBash;
   readonly disabledSkillIds?: () => readonly string[];
   readonly chatCompactionTriggerRatio: () => number;
   readonly invocationId: string;
@@ -129,7 +131,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
           defaults: {},
         }]),
       }),
-      ...createDesktopToolHostServices({ workspaceRoot: options.roots.workspaceRoot, tmpRoot: options.roots.tmpRoot, modelRuntime: options.models, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId), nonoPath: options.nonoPath }),
+      ...createDesktopToolHostServices({ workspaceRoot: options.roots.workspaceRoot, tmpRoot: options.roots.tmpRoot, modelRuntime: options.models, readArtifact: (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), resolveArtifact: (sessionId, artifactId) => artifacts.resolveForSession(sessionId, artifactId), nonoPath: options.nonoPath, ...(options.python === undefined ? {} : { python: options.python }) }),
       [options.module.PROMPT_HOST_PORT_ID]: Object.freeze({
         workspaceRoot: options.roots.workspaceRoot,
         resolveUserSource: () => options.module.prepareUserPromptSource(options.roots.dataRoot),

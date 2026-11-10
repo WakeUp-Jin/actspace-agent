@@ -14,7 +14,15 @@ describe("Bash prefix policy", () => {
     expect(analyze('pnpm test "" \'hello world\'')?.argv).toEqual(["pnpm", "test", "", "hello world"]);
     expect(analyze('\tpnpm\ttest')?.prefix).toEqual(["pnpm"]);
   });
-  it.each(["", "pnpmx test", "node x", "rm x", "git push", 'git "status"', '"pnpm" test', "/bin/pnpm test", "./pnpm test", "A=1 pnpm test", "env pnpm test", "pnpm dlx x", "pnpm exec x", "npm x x", "yarn npm publish", "pnpm add -g x", "npm install -ig x", "pnpm --filter x test", "pnpm test --registry=x", "pnpm test --prefix x", "pnpm test --userconfig=x", "git diff --output=x", 'pnpm test "unterminated', "pnpm\u00a0test"])("does not authorize %j", command => {
+  it("offers interpreter grants for script files and stdlib modules, scoped to the script path", () => {
+    expect(analyze("python3 scripts/run.py --input data.csv")).toEqual({ argv: ["python3", "scripts/run.py", "--input", "data.csv"], prefix: ["python3"], queryPaths: ["scripts/run.py"] });
+    expect(analyze("node build.mjs --watch")).toEqual({ argv: ["node", "build.mjs", "--watch"], prefix: ["node"], queryPaths: ["build.mjs"] });
+    expect(analyze("actspace-python convert.py in.pdf")?.prefix).toEqual(["actspace-python"]);
+    expect(analyze("python3 -m json.tool data.json")).toEqual({ argv: ["python3", "-m", "json.tool", "data.json"], prefix: ["python3"] });
+    expect(analyze("python -m http.server 8000")?.prefix).toEqual(["python"]);
+  });
+  it.each(["python3 -c 'print(1)'", "python3 -c print", "node -e code", "node -p 1", "python3 -i run.py", "python3 -u run.py", "python3", "python3 -m", "python3 -m pip install x", "python3 -m ensurepip", "python3 -m venv .venv", "node -m x", "python3 --version extra"])("keeps interpreter %s single-use", command => expect(analyze(command)).toBeUndefined());
+  it.each(["", "pnpmx test", "rm x", "git push", 'git "status"', '"pnpm" test', "/bin/pnpm test", "./pnpm test", "A=1 pnpm test", "env pnpm test", "pnpm dlx x", "pnpm exec x", "npm x x", "yarn npm publish", "pnpm add -g x", "npm install -ig x", "pnpm --filter x test", "pnpm test --registry=x", "pnpm test --prefix x", "pnpm test --userconfig=x", "git diff --output=x", 'pnpm test "unterminated', "pnpm\u00a0test"])("does not authorize %j", command => {
     expect(analyze(command)).toBeUndefined();
   });
   it.each([";", "&&", "||", "&", "|", "<", ">", "`", "$", "(", ")", "{", "}", "!", "\n", "\r", "\\", "~", "*", "?", "[", "]", "#"])("excludes syntax %j even inside quotes", syntax => {

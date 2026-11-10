@@ -3,7 +3,8 @@ import { reviewSessionAction } from "./review-session-action.js";
 import type { ContextCompactionCoordinator } from "@actspace/context-engine";
 import { CONTEXT_ASSEMBLY_SERVICE_ID, type ContextAgentRole, type ContextAssemblyService } from "@actspace/context-assembly";
 import type { ContributorRegistry, PromptContributor } from "@actspace/prompt";
-import type { PromptHostPort, PromptRuntimeService } from "@actspace/prompt";
+import type { PromptHostPort, PromptRuntimeService, ScriptingFacts } from "@actspace/prompt";
+import type { ShellToolsService } from "@actspace/tool-shell";
 import type { ContextEngine, ContextEngineOptions } from "@actspace/context-engine";
 import type { RunFactory } from "@actspace/agent-service";
 import { AgentLoop } from "@actspace/agent-loop";
@@ -19,7 +20,7 @@ import type { CordisContext } from "@actspace/cordis-adapter";
 import { resolveSessionWorkspaceRoot } from "@actspace/session-journal";
 import { isBashLogReadPath, isSessionTranscriptReadPath } from "@actspace/session-transcript";
 import type { SessionHandle } from "@actspace/session-persistence";
-import { HOST_READABLE_FILES_SERVICE_ID, HostReadableFiles } from "@actspace/tool-runtime";
+import { HOST_READABLE_FILES_SERVICE_ID, HOST_WRITABLE_ROOTS_SERVICE_ID, HostReadableFiles, type HostWritableRoots } from "@actspace/tool-runtime";
 import { projectPermissionMode, applySessionGrantEvent } from "@actspace/session-projection";
 import { isBackgroundWake } from "@actspace/shared/runtime-v2";
 import { AGENT_RUNTIME_HOST_PORT_ID, type AgentRuntimeHostPort } from "./agent-host-port.js";
@@ -85,8 +86,10 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
   const activeSessions = new Map<string, import("@actspace/session-persistence").SessionHandle>();
 
   // Which sources an agent gets, and which tool results feed context state, is what the context plugins registered for its role.
-  const createSources = (scope: AgentScope, agent: import("@actspace/agent").AgentDescriptor, workspaceRoot: string, role: AgentRole) =>
-    assembly.sourcesFor(role, { scope, scopeId: scope.identity.scopeId, agent, host: host.host, workspaceRoot, prompt });
+  const createSources = (scope: AgentScope, agent: import("@actspace/agent").AgentDescriptor, workspaceRoot: string, role: AgentRole) => {
+    const scripting = scriptingFacts(ctx.get?.("tools.shell-tools") as ShellToolsService | undefined);
+    return assembly.sourcesFor(role, { scope, scopeId: scope.identity.scopeId, agent, host: host.host, workspaceRoot, prompt, ...(scripting === undefined ? {} : { scripting }) });
+  };
   const observeContextToolResult = (session: SessionHandle, event: import("@actspace/session-journal").SessionEventEnvelopeV1) => assembly.observeToolResult(session, event);
   const extensions = (sessionId: string, scopeId: string, kind: "main" | "subagent") => () => (ctx.get?.("actspace.host.prompt") as PromptHostPort | undefined)?.extensions?.list(sessionId, scopeId, kind) ?? [];
   // A fork keeps its parent's system prompt (design 02 §8.4): the sections plugins registered for the parent main session,
@@ -100,12 +103,15 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
   const sessionDataRoot = (ctx.get?.("actspace.host.session") as { readonly dataRoot?: string } | undefined)?.dataRoot;
   const isHostReadablePath = composeHostReadablePath(sessionDataRoot, hostReadableFiles);
   const readableFor = composeSessionReadablePath(isHostReadablePath, id => sessions.getOpen(id));
+  // Resolved per call: shell-tools registers its scratch directory after this plugin is applied.
+  const isHostWritablePath = (canonicalPath: string) => (ctx.get?.(HOST_WRITABLE_ROOTS_SERVICE_ID) as HostWritableRoots | undefined)?.has(canonicalPath) === true;
   const toolEnvironmentFor = (session: import("@actspace/session-persistence").SessionHandle) => {
     activeSessions.set(session.header.sessionId, session);
     const configuredMode = host.toolEnvironment.permissionMode;
     return Object.freeze({
       ...host.toolEnvironment,
       isHostReadablePath: readableFor(session),
+      isHostWritablePath,
       autoReview: async (input: import("@actspace/tool-runtime").AutoReviewInput) => {
         const reviewer = ctx.get?.("approval.auto-review") as AutoReviewer | undefined;
         if (!reviewer) throw new Error("Auto reviewer unavailable");
@@ -170,7 +176,13 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
         },
       };
     };
-    if (role === "fork") registerMainTools(scope);
+    if (role === "fork") {
+      registerMainTools(scope);
+      // The parent's system prompt and conversation name the parent's scratch directory; the fork keeps both, so it works there.
+      const parentId = session.header.lineage?.parentSessionId;
+      const shared = parentId === undefined ? undefined : (ctx.get?.("tools.shell-tools") as ShellToolsService | undefined)?.shareScratchDirectory?.(session.header.sessionId, parentId);
+      if (shared !== undefined) scope.disposer.add(shared);
+    }
     const binding = tools.bindAgentScope(session.header.sessionId, subject.agentId, () => new Set(allowedToolNames ?? []));
     scope.disposer.add(binding.dispose);
     const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot, role), contextExtensions: role === "fork" ? forkExtensions(session, scope.identity.scopeId) : extensions(session.header.sessionId, scope.identity.scopeId, "subagent"), observeContextToolResult, createContextEngine: options => engine.create(options), descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), llm, tools, toolEnvironment: scopedToolEnvironment, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction: engine.compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });
@@ -319,4 +331,15 @@ function taskContent(content: import("@actspace/shared/runtime-v2").RuntimeV2Jso
 const SESSION_GRANTS = Symbol("session-grants");
 function activeGrants(session: import("@actspace/session-persistence").SessionHandle) {
   return session.journal.project(SESSION_GRANTS, () => [], applySessionGrantEvent).flatMap(item => item.grant && item.revokedAt === null ? [item.grant] : []);
+}
+
+/** The scripting guidance only applies when Bash is in this Harness and owns a scratch directory. */
+function scriptingFacts(shell: ShellToolsService | undefined): ScriptingFacts | undefined {
+  const scratchDirectory = shell?.scratchDirectory;
+  if (scratchDirectory === undefined) return undefined;
+  const python = shell?.python;
+  return Object.freeze({
+    scratchDirectory,
+    ...(python === undefined ? {} : { python: Object.freeze({ version: python.version, corePackages: python.corePackages, extensionPackages: python.extensionPackages, extensionInstalled: () => python.extensionSitePackages?.() !== undefined }) }),
+  });
 }

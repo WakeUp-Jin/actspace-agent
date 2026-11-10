@@ -1,22 +1,22 @@
-import { useEffect, useState } from "react";
-import { Check, GitBranch, LoaderCircle } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
+import { Check, GitBranch, LoaderCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import { getSessionToolDetail } from "../../api/sessions";
-import { messageFlowKind } from "../messages/messageFlowStyles";
-import { AssistantReply } from "../messages/AssistantReply";
 import { AgentRunBlock } from "../messages/AgentRunBlock";
+import { AssistantReply } from "../messages/AssistantReply";
+import { BackgroundNoticeRow } from "../messages/BackgroundNoticeRow";
 import { BashRunBlock } from "../messages/BashRunBlock";
 import { BrowserApprovalBlock } from "../messages/BrowserApprovalBlock";
-import { BackgroundNoticeRow } from "../messages/BackgroundNoticeRow";
-import { SubagentMessageCard } from "../messages/SubagentMessageCard";
 import { CompactCommandBlock } from "../messages/CompactCommandBlock";
 import { DeleteFileBlock } from "../messages/DeleteFileBlock";
 import { FileDiffBlock } from "../messages/FileDiffBlock";
+import { messageFlowKind } from "../messages/messageFlowStyles";
+import { SubagentMessageCard } from "../messages/SubagentMessageCard";
 import { ThinkingBlock } from "../messages/ThinkingBlock";
 import { TodoListBlock } from "../messages/TodoListBlock";
 import { ToolLogLine } from "../messages/ToolLogLine";
-import { getToolLogRunningTextAttrs, TOOL_LOG_LINE_TEXT_RUNNING_CLASS } from "../messages/toolLogStyles";
 import { ToolLogShimmer } from "../messages/ToolLogShimmer";
+import { getToolLogRunningTextAttrs, TOOL_LOG_LINE_TEXT_RUNNING_CLASS } from "../messages/toolLogStyles";
 import { UserMessage } from "../messages/UserMessage";
 
 export type ReadMessageBlock = Extract<MessageBlock, { kind: "read" }>;
@@ -27,25 +27,62 @@ const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-act-sm leadin
 const TURN_STATUS_LINE_ERROR_CLASS = "is-error text-on-danger";
 const MODEL_WAITING_DELAY_MS = 300;
 
-function DeferredToolMessage({ message, className, onOpenSubagent, replyCompleted, onOpenReadFile, onOpenWorkspaceFile }: {
-  message: MessageBlock; className?: string; onOpenSubagent?: SubagentOpenHandler; replyCompleted: boolean; onOpenReadFile?: (message: ReadMessageBlock) => void; onOpenWorkspaceFile?: (path: string, line?: number) => void;
+function DeferredToolMessage({
+  message,
+  className,
+  onOpenSubagent,
+  replyCompleted,
+  onOpenReadFile,
+  onOpenWorkspaceFile,
+}: {
+  message: MessageBlock;
+  className?: string;
+  onOpenSubagent?: SubagentOpenHandler;
+  replyCompleted: boolean;
+  onOpenReadFile?: (message: ReadMessageBlock) => void;
+  onOpenWorkspaceFile?: (path: string, line?: number) => void;
 }) {
   const [blocks, setBlocks] = useState<MessageBlock[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const load = async () => {
     if (loading || !message.deferredToolDetail) return;
-    setLoading(true); setError(null);
-    try { setBlocks(await getSessionToolDetail(message.deferredToolDetail)); }
-    catch (e) { setError(e instanceof Error ? e.message : '工具详情加载失败'); }
-    finally { setLoading(false); }
+    setLoading(true);
+    setError(null);
+    try {
+      setBlocks(await getSessionToolDetail(message.deferredToolDetail));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "工具详情加载失败");
+    } finally {
+      setLoading(false);
+    }
   };
   const visible = blocks ?? [{ ...message, deferredToolDetail: undefined }];
-  return <div className={className} aria-busy={loading}>
-    {visible.map(block => renderMessage({ ...block, renderKey: block.id === message.id ? message.renderKey : block.renderKey }, undefined, onOpenSubagent, replyCompleted, onOpenReadFile, onOpenWorkspaceFile, blocks ? undefined : () => { void load(); }))}
-    {loading && <p role="status">正在加载工具详情…</p>}
-    {error && <p role="alert" className="text-act-xs leading-4 text-text-muted">{error}（收起后重新展开可重试）</p>}
-  </div>;
+  return (
+    <div className={className} aria-busy={loading}>
+      {visible.map((block) =>
+        renderMessage(
+          { ...block, renderKey: block.id === message.id ? message.renderKey : block.renderKey },
+          undefined,
+          onOpenSubagent,
+          replyCompleted,
+          onOpenReadFile,
+          onOpenWorkspaceFile,
+          blocks
+            ? undefined
+            : () => {
+                void load();
+              },
+        ),
+      )}
+      {loading && <p role="status">正在加载工具详情…</p>}
+      {error && (
+        <p role="alert" className="text-act-xs leading-4 text-text-muted">
+          {error}（收起后重新展开可重试）
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function renderMessage(
@@ -59,7 +96,18 @@ export function renderMessage(
 ) {
   const renderKey = message.renderKey ?? message.id;
   // Child-session cards already have a compact summary and their own detail panel.
-  if (message.deferredToolDetail && message.kind !== "agent") return <DeferredToolMessage key={renderKey} message={message} className={className} onOpenSubagent={onOpenSubagent} replyCompleted={replyCompleted} onOpenReadFile={onOpenReadFile} onOpenWorkspaceFile={onOpenWorkspaceFile} />;
+  if (message.deferredToolDetail && message.kind !== "agent")
+    return (
+      <DeferredToolMessage
+        key={renderKey}
+        message={message}
+        className={className}
+        onOpenSubagent={onOpenSubagent}
+        replyCompleted={replyCompleted}
+        onOpenReadFile={onOpenReadFile}
+        onOpenWorkspaceFile={onOpenWorkspaceFile}
+      />
+    );
 
   switch (message.kind) {
     case "user":
@@ -71,14 +119,24 @@ export function renderMessage(
     case "agent":
       return <AgentRunBlock key={renderKey} message={message} className={className} onOpen={onOpenSubagent} />;
     case "bash":
-      return <BashRunBlock key={renderKey} message={message} replyCompleted={replyCompleted} onExpand={onExpand} />;
+      return (
+        <BashRunBlock
+          key={renderKey}
+          message={message}
+          replyCompleted={replyCompleted}
+          onExpand={onExpand}
+          onOpenWorkspaceFile={onOpenWorkspaceFile}
+        />
+      );
     case "context_compaction":
       return <CompactCommandBlock key={renderKey} message={message} className={className} />;
     case "background_notice":
       // 子智能体来信是卡片，Bash 通知仍是分隔行（front-子Agent与后台任务规范 §2.1）。
-      return message.taskKind === "agent_message"
-        ? <SubagentMessageCard key={renderKey} message={message} onOpenSubagent={onOpenSubagent} />
-        : <BackgroundNoticeRow key={renderKey} message={message} onOpenSubagent={onOpenSubagent} />;
+      return message.taskKind === "agent_message" ? (
+        <SubagentMessageCard key={renderKey} message={message} onOpenSubagent={onOpenSubagent} />
+      ) : (
+        <BackgroundNoticeRow key={renderKey} message={message} onOpenSubagent={onOpenSubagent} />
+      );
     case "workspace_preparation":
       return <WorkspacePreparationBlock key={renderKey} message={message} />;
     case "todo":
@@ -100,10 +158,23 @@ export function renderMessage(
       if (message.kind === "tool" && message.toolName?.startsWith("browser_") && message.status === "pending") {
         return <BrowserApprovalBlock key={renderKey} message={message} className={className} />;
       }
-      return <ToolLogLine key={renderKey} message={message} className={className} onOpenFile={onOpenReadFile} onExpand={onExpand} onOpenSubagent={onOpenSubagent} />;
+      return (
+        <ToolLogLine
+          key={renderKey}
+          message={message}
+          className={className}
+          onOpenFile={onOpenReadFile}
+          onExpand={onExpand}
+          onOpenSubagent={onOpenSubagent}
+        />
+      );
     case "error":
       // 运行失败：独立的错误状态行，不进工具过程。
-      return <div key={renderKey} className={`${TURN_STATUS_LINE_CLASS} ${TURN_STATUS_LINE_ERROR_CLASS}`}>{message.content || message.title}</div>;
+      return (
+        <div key={renderKey} className={`${TURN_STATUS_LINE_CLASS} ${TURN_STATUS_LINE_ERROR_CLASS}`}>
+          {message.content || message.title}
+        </div>
+      );
     case "status":
       if (message.id.endsWith(":model-wait") || message.id === "model-wait") {
         return <ModelWaitingStatus key={renderKey} content={message.content} />;
@@ -122,19 +193,20 @@ export function renderMessage(
   }
 }
 
-function WorkspacePreparationBlock({
-  message,
-}: {
-  message: Extract<MessageBlock, { kind: "workspace_preparation" }>;
-}) {
+function WorkspacePreparationBlock({ message }: { message: Extract<MessageBlock, { kind: "workspace_preparation" }> }) {
   const completed = message.status === "completed";
   return (
-    <details className="group/worktree rounded-act-md border border-line bg-surface-subtle/70 px-3 py-2 text-act-md leading-5 text-text-muted" open={!completed}>
+    <details
+      className="group/worktree rounded-act-md border border-line bg-surface-subtle/70 px-3 py-2 text-act-md leading-5 text-text-muted"
+      open={!completed}
+    >
       <summary className="flex cursor-pointer list-none items-center gap-2 text-text-main">
         {completed ? <Check size={15} aria-hidden="true" /> : <LoaderCircle className="animate-spin" size={15} aria-hidden="true" />}
         <span className="font-medium">{completed ? "已创建工作树" : "正在创建工作树"}</span>
         {completed && message.durationMs !== undefined ? (
-          <span className="text-act-xs leading-4 text-text-faint">{Math.max(0, message.durationMs / 1000).toFixed(1)}s</span>
+          <span className="text-act-xs leading-4 text-text-faint">
+            {Math.max(0, message.durationMs / 1000).toFixed(1)}s
+          </span>
         ) : null}
       </summary>
       <div className="mt-2 grid gap-1.5 border-t border-line pt-2 text-act-xs leading-5 text-text-faint">
@@ -168,10 +240,7 @@ function ModelWaitingStatus({ content }: { content: string }) {
       role="status"
       aria-live="polite"
     >
-      <span
-        className={TOOL_LOG_LINE_TEXT_RUNNING_CLASS}
-        {...getToolLogRunningTextAttrs(content)}
-      >
+      <span className={TOOL_LOG_LINE_TEXT_RUNNING_CLASS} {...getToolLogRunningTextAttrs(content)}>
         {content}
         <ToolLogShimmer text={content} />
       </span>
@@ -179,11 +248,23 @@ function ModelWaitingStatus({ content }: { content: string }) {
   );
 }
 
-export function renderMessageList(messages: MessageBlock[], onOpenSubagent?: SubagentOpenHandler, replyCompleted = false, onOpenReadFile?: (message: ReadMessageBlock) => void, onOpenWorkspaceFile?: (path: string, line?: number) => void) {
+export function renderMessageList(
+  messages: MessageBlock[],
+  onOpenSubagent?: SubagentOpenHandler,
+  replyCompleted = false,
+  onOpenReadFile?: (message: ReadMessageBlock) => void,
+  onOpenWorkspaceFile?: (path: string, line?: number) => void,
+) {
   // Preserve message/usage data, but do not give empty assistant text a prose gap.
-  return messages.filter((message) => message.kind !== "assistant" || message.content.trim().length > 0).map((message) =>
-    <div key={message.renderKey ?? message.id} className="message-flow-item" data-flow-kind={messageFlowKind(message)}>
-      {renderMessage(message, undefined, onOpenSubagent, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
-    </div>,
-  );
+  return messages
+    .filter((message) => message.kind !== "assistant" || message.content.trim().length > 0)
+    .map((message) => (
+      <div
+        key={message.renderKey ?? message.id}
+        className="message-flow-item"
+        data-flow-kind={messageFlowKind(message)}
+      >
+        {renderMessage(message, undefined, onOpenSubagent, replyCompleted, onOpenReadFile, onOpenWorkspaceFile)}
+      </div>
+    ));
 }

@@ -22,6 +22,9 @@
       "path": "./../../llm/llm-service/tsconfig.build.json"
     },
     {
+      "path": "./../../shell/python-runtime/tsconfig.build.json"
+    },
+    {
       "path": "./../../sandbox/sandbox/tsconfig.build.json"
     },
     {

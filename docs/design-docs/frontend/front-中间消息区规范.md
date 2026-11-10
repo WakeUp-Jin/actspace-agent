@@ -93,6 +93,7 @@
 - `sandboxed: false`（真实环境）、`notExecuted`（未执行）、后台运行状态在主行可见；`sandboxed: true` 的普通沙盒信息进执行详情。缺失 sandboxed 表示未知，不展示「沙盒」；缺失 exitCode / durationMs 不补 0；未执行不显示伪造输出或成功退出码。完整 summary / 错误在详情保留，不用正则猜退出码、环境或审批状态。
 - 状态：`pending` / `running` / `success` / `failed` / `denied` / `expired` / `cancelled`。审批通过后同一条工具调用转为 running / success / failed，不生成割裂的新块。
 - 实时与历史回读经共享 preview builder（`packages/client/client/src/sessions/tool-card.ts`）生成一致摘要；详情按需加载，不把大输出塞回列表快照。结构化事实不足以生成短原因时只显示状态与命令，不为凑文案扩大 Runtime 协议。
+- 脚本命令（`python -c '…'`、`python - <<'PY'` heredoc、`node -e`、`python x.py` / `node x.mjs`）由 `@actspace/shared/runtime-v2` 的 `detectScriptCommand` 识别，前端和 tool-shell 共用同一检测器，不自己写正则。内联正文时主行目标写 `Python 脚本（N 行）`（完整命令留在 `title`），详情里 `$` 行用 `elideScriptSource` 只留 `python3 -c '…'` 或 heredoc 首行，正文用 `ScriptSourceBlock` 按语言高亮成代码块（头部语言 + 行数，超过 12 行默认露出 8 行并给「展开全部 N 行」），代码块夹在命令头和 stdout 之间，同一段代码不重复出现两次。脚本文件形式命令照常显示，详情多一行 `# script:`：工作区相对路径链到右侧文件面板，`$ACTSPACE_SCRATCH` 与绝对路径只显示文件名。
 
 ## Edit / Write File
 
@@ -137,7 +138,7 @@
 | browser | 确认浏览器操作 | 本次工具标题 | 允许这次 |
 
 - 路径：目录淡色、过长时中段折叠为 `…`，文件名优先保留，`title` 为完整路径。编辑 / 写入默认不展示 diff；`+N -M` 后跟淡色箭头，整组是一个按钮，点开在卡内展开 diff（`aria-expanded`）。
-- Bash 审批：头行终端图标 + intent + 命令名摘要，下一条分割线；主体是带简单着色的 `$ command`（`shell-highlight.ts`，取 `.act-code-hl` 主题变量），过长在卡内滚动；底部左侧显示执行环境（沙盒 / 真实环境），cwd 只在不是工作区根目录时跟在后面，右侧「拒绝」「运行」。
+- Bash 审批：头行终端图标 + intent + 命令名摘要，下一条分割线；主体是带简单着色的 `$ command`（`shell-highlight.ts`，取 `.act-code-hl` 主题变量），过长在卡内滚动；脚本命令的摘要改写为「运行 Python 脚本（N 行）」/「运行 JavaScript 脚本 pack.mjs」，内联正文在 `$` 行下方用 `ScriptSourceBlock` 代码块展示（折叠规则同执行详情），脚本文件形式多一行 `# script: 文件名`；底部左侧显示执行环境（沙盒 / 真实环境），cwd 只在不是工作区根目录时跟在后面，右侧「拒绝」「运行」。
 - 按钮全是 xs 胶囊，固定三层：拒绝（ghost）→ 本会话允许（tonal，仅在有授权建议时出现，`title` 为建议说明）→ 主按钮（`accent` 跟随强调色，删除用 `danger-solid`）。提交中被点按钮前出现旋转图标、所有按钮禁用，Bridge 返回 `ok: false` 时恢复。
 - Bash 的「本会话允许 pnpm」只在后端返回正式 `process.execute` / `command_prefix` 建议时显示，前端不得从命令文本推导授权；建议与 requestId 绑定，切换审批或读取失败时不沿用旧建议；授权包含项目脚本、执行环境沿用现有设置，复杂语法与显式 no_sandbox 仍走单次审批。契约见 `docs/exec-plans/completed/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md`。
 - 「工作区外」「敏感文件」和通用审批提示不展示；未知原因收进 Info 图标 tooltip，不丢信息。不做键盘快捷键（Enter 与 Composer 发送冲突）；授权后工具行不再追加「本会话已授权」。

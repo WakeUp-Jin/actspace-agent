@@ -4,13 +4,14 @@
  * 每组里能关的插件放在最上面（开关），其余收进「内置插件 N 个，不能关闭」折叠行；有搜索词时自动展开。
  * 开关写 `tools.plugins[id]`，重启后生效：`enabled`（设置值）与 `loaded`（本次启动已加载）不同时显示提示。
  * 操控浏览器、英语学习开启并已加载时，行下展开原来的连接面板和学习设置；否则这些细节都不挂载，
- * 也就不会请求浏览器状态和英语学习状态。
+ * 也就不会请求浏览器状态和英语学习状态。内置的命令行插件行下挂「脚本运行时」面板（随包 Python 与数据扩展下载）。
  */
 import { useCallback, useEffect, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { PluginListItem, SettingsV4Tools } from "@actspace/shared";
 import { BrowserConnectPanel } from "./BrowserConnectPanel";
 import { EnglishLearningCapability } from "./EnglishLearningCapability";
+import { PythonRuntimePanel } from "./PythonRuntimePanel";
 import { useBrowserBridgeStatus } from "../settings/browser-bridge-settings-shared";
 import { SectionShell, SettingRow, SettingsSelect, Toggle } from "../settings/SettingsPrimitives";
 import { Button } from "../ui/Button";
@@ -66,7 +67,7 @@ function PluginRow({ item, pending, onToggle, onSettingsChange, onConfigureSpeec
   onConfigureSpeech?: () => void;
 }) {
   const restartHint = item.canDisable && item.enabled !== item.loaded ? (item.enabled ? "重启后开启" : "重启后关闭") : null;
-  const showDetail = item.canDisable && item.loaded && item.enabled;
+  const showDetail = (item.canDisable && item.loaded && item.enabled) || item.id === "shell-tools";
   return (
     <div>
       <div className="flex items-center gap-3.5 px-3.5 py-[11px]">
@@ -91,7 +92,8 @@ function PluginRow({ item, pending, onToggle, onSettingsChange, onConfigureSpeec
       {showDetail ? (
         <div className="mx-3.5 mb-3">
           {item.id === "browser-tools" ? <BrowserPluginDetail />
-            : item.id === "english-learning" ? <EnglishLearningCapability onConfigure={onConfigureSpeech} /> : null}
+            : item.id === "english-learning" ? <EnglishLearningCapability onConfigure={onConfigureSpeech} />
+            : item.id === "shell-tools" ? <PythonRuntimePanel /> : null}
         </div>
       ) : null}
     </div>

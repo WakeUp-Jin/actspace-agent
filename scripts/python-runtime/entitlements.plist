@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- The bundled interpreter runs under the hardened runtime. cffi (cryptography) and ctypes (pypdfium2)
+       build call trampolines at runtime, and extension modules are re-signed by us but may embed libraries
+       signed elsewhere; these two entitlements are what python.org's own installer grants. -->
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>

@@ -8,3 +8,10 @@ This product includes software from DeepSeek Harness (MIT License,
 Copyright (c) 2026 DeepSeek): the file-type icons, turn deliverable cards,
 diff view and native "open with" query in apps/desktop. See
 apps/desktop/src/renderer/components/files/DEEPSEEK_HARNESS_LICENSE.txt.
+
+This product includes material adapted from Anthropic Skills (Apache
+License 2.0, Copyright Anthropic, PBC): the docx, xlsx, pptx and pdf
+skills under packages/skill/official-skills/skills/{office-docx,
+office-xlsx, office-pptx, pdf}, rewritten for the bundled Python runtime.
+Each directory carries the upstream LICENSE.txt.
+https://github.com/anthropics/skills

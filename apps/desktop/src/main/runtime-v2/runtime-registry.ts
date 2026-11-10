@@ -44,6 +44,7 @@ export type DesktopRuntimeV2RegistryOptions = {
   /** Per plugin Entry id settings (startup values), merged over each manifest `config` at boot. */
   readonly pluginConfig?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   readonly nonoPath?: string;
+  readonly python?: import("@actspace/python-runtime").PythonRuntimeForBash;
   readonly disabledSkillIds?: () => readonly string[];
   readonly chatCompactionTriggerRatio?: () => number;
   readonly loadModule?: () => Promise<RuntimeV2Module>;
@@ -629,6 +630,7 @@ export class DesktopRuntimeV2Registry {
         disabledPlugins: this.options.disabledPlugins,
         pluginConfig: this.options.pluginConfig,
         nonoPath: this.options.nonoPath,
+        python: this.options.python,
         disabledSkillIds: this.options.disabledSkillIds,
         chatCompactionTriggerRatio: this.options.chatCompactionTriggerRatio ?? (() => 0.8),
         speech: this.options.speech,

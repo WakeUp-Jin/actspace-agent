@@ -182,6 +182,8 @@ Runtime 合同已暴露 `GrantLifetime`。Desktop 接受 `once | session | deny`
 
 Host 可读路径例外：工具环境可带 `isHostReadablePath`，命中的路径在读操作时跳过 workspace scope 审批，写和删除不受影响。当前唯一来源是会话记录：`<dataRoot>/sessions-v2/<id>/transcript.md`（不含 `sessions-v2` 目录本身，避免目录搜索读到 Journal），见[会话记录 Markdown](../agent-runtime/agent-session-transcript.md)。
 
+Host 可写目录例外：工具环境可带 `isHostWritablePath`，命中的路径在读和写操作时跳过 workspace scope 审批，删除仍 `ask`。来源是 `tool-runtime` 插件提供的服务 `actspace.host-writable-roots`（`HostWritableRoots`，目录级，只接受 Host 自建目录的 canonical 路径）；当前唯一登记方是 `tool-shell`，登记它的 scratch 根 `bash-v2/<process>/`，每个 Session 的脚本放在其下 `scripts/<sessionId>/`，由 Bash 以 `ACTSPACE_SCRATCH` 导出，见[脚本执行](../tool-system/agent-script-execution.md)。Bash 的工作区内路径授权同样接受这个目录里的脚本路径（`queryPathsWithinWorkspace` 的 `extraRoots`）。
+
 ## 8. 文件 canonicalization
 
 现有目标按以下顺序解析：
@@ -451,7 +453,7 @@ Session Journal 是 Session Grant 的唯一持久事实源，不增加独立 Hos
 - 不生成自由命令 pattern；符合既有前缀分析规则的命令可生成限定 workspace 的 Session Grant；
 - sandbox 或 executor 无法表达请求边界时 fail-closed。
 
-未来 Bash AST、命令 pattern 与跨平台 sandbox 必须另立设计和计划，不能扩展本轮类型后直接开放。
+未来 Bash AST、命令 pattern 与跨平台 sandbox 必须另立设计和计划，不能扩展本轮类型后直接开放。pipe / redirection / 内联脚本的放宽由[脚本执行设计](../tool-system/agent-script-execution.md)第 2.1、2.2 节承接：引号感知切词后只对未加引号的语法判断，管道按简单命令逐段分类，重定向目标限制在工作区或临时目录，解释器运行脚本文件进入前缀授权、内联源码保持单次审批。
 
 ## 17. Host 行为
 

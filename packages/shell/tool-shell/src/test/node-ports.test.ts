@@ -264,6 +264,52 @@ describe("shell-tools ports", () => {
     } finally { await ports.dispose(); }
   });
 
+  it("creates a per-Session scripts directory under the canonical scratch root and exports it as ACTSPACE_SCRATCH", async () => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot });
+    try {
+      expect(ports.scratchRoot).toBe(await realpath(ports.scratchRoot));
+      expect(ports.scratchRoot.startsWith(join(await realpath(tmpRoot), "bash-v2"))).toBe(true);
+      const result = await invoke(ports.bash, { command: "printf '%s' \"$ACTSPACE_SCRATCH\"", intent: "scratch env", blockMs: 5_000 }, "session-a");
+      const expected = join(ports.scratchRoot, "scripts", "session-a");
+      expect(result.status).toBe("completed");
+      expect(JSON.stringify(result.modelOutput)).toContain(expected);
+      expect(existsSync(expected)).toBe(true);
+    } finally { await ports.dispose(); }
+    expect(existsSync(ports.scratchRoot)).toBe(false);
+  });
+
+  it("runs a Session that shares another's scratch directory with the owner's ACTSPACE_SCRATCH", async () => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, scratchOwner: sessionId => sessionId === "fork" ? "parent" : sessionId });
+    try {
+      const result = await invoke(ports.bash, { command: "printf '%s' \"$ACTSPACE_SCRATCH\"", intent: "scratch env", blockMs: 5_000 }, "fork");
+      expect(JSON.stringify(result.modelOutput)).toContain(join(ports.scratchRoot, "scripts", "parent"));
+      expect(existsSync(join(ports.scratchRoot, "scripts", "fork"))).toBe(false);
+    } finally { await ports.dispose(); }
+  });
+
+  it("puts the bundled Python shim in front of PATH and exports ACTSPACE_PYTHON / ACTSPACE_PYTHON_EXT only when the layer is installed", async () => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    const shimDirectory = join(await workspace(), "shim");
+    await mkdir(shimDirectory);
+    await writeFile(join(shimDirectory, "actspace-python"), "#!/bin/sh\nprintf 'shim %s' \"$*\"\n", { mode: 0o755 });
+    let extension: string | undefined;
+    const python = { version: "3.12.16", shimDirectory, shim: join(shimDirectory, "actspace-python"), corePackages: ["openpyxl"], extensionPackages: ["numpy"], extensionSitePackages: () => extension };
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, python });
+    try {
+      expect(ports.python).toBe(python);
+      const first = await invoke(ports.bash, { command: "actspace-python -c 'x'; printf ' py=%s ext=%s' \"$ACTSPACE_PYTHON\" \"${ACTSPACE_PYTHON_EXT-unset}\"", intent: "python env", blockMs: 5_000 }, "session-a");
+      expect(first.status).toBe("completed");
+      const firstText = JSON.stringify(first.modelOutput);
+      expect(firstText).toContain("shim -c x");
+      expect(firstText).toContain(`py=${python.shim} ext=unset`);
+      extension = "/data/runtime/python-ext/abc/site-packages";
+      const second = await invoke(ports.bash, { command: "printf 'ext=%s' \"$ACTSPACE_PYTHON_EXT\"", intent: "python ext", blockMs: 5_000 }, "session-a");
+      expect(JSON.stringify(second.modelOutput)).toContain(`ext=${extension}`);
+    } finally { await ports.dispose(); }
+  });
+
   it("writes a background log into the Session directory, keeps it after dispose and removes only the scratch directory", async () => {
     const root = await workspace(); const tmpRoot = await workspace(); const dataRoot = await workspace();
     const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, dataRoot });

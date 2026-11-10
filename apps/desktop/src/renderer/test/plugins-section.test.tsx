@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { PythonRuntimeStatus } from "@actspace/shared";
 import { PluginsSection } from "../components/extensions/PluginsSection";
 import { extensionBrowserStatus, extensionPlugins } from "./fixtures/extensionsFixture";
 import { setupBridge } from "./helpers/bridge";
@@ -12,15 +13,26 @@ function setup(plugins = extensionPlugins()) {
   const getStatus = vi.fn(async () => extensionBrowserStatus);
   const getLearning = vi.fn(async () => learningState);
   const updateV4 = vi.fn(async () => ({ ok: true, snapshot: { revision: "r2" } }));
+  const getPython = vi.fn(async () => pythonStatus());
+  const installPython = vi.fn(async () => pythonStatus({ state: "installing", progress: { completed: 0, total: 3 } }));
   setupBridge({
     "plugins.list": list,
+    "pythonRuntime.getStatus": getPython,
+    "pythonRuntime.installExtension": installPython,
     "browserBridge.getStatus": getStatus,
     "englishLearning.getState": getLearning,
     "settings.getV4": vi.fn(async () => ({ version: 4, revision: "r1", settings: {} })),
     "settings.updateV4": updateV4,
     "sessions.list": vi.fn(async () => []),
   });
-  return { list, getStatus, getLearning, updateV4 };
+  return { list, getStatus, getLearning, updateV4, getPython, installPython };
+}
+
+function pythonStatus(extension: Partial<PythonRuntimeStatus["extension"]> = {}): PythonRuntimeStatus {
+  return {
+    runtime: { version: "3.12.16", root: "/app/runtime/python", corePackages: ["openpyxl", "pypdf"] },
+    extension: { packages: ["numpy", "pandas", "markitdown"], state: "missing", localWheelsDirectory: "/data/runtime/python-ext/wheels", ...extension },
+  };
 }
 
 describe("PluginsSection", () => {
@@ -131,5 +143,32 @@ describe("PluginsSection", () => {
     await userEvent.click(within(panel).getByRole("combobox", { name: "Codex 子智能体沙箱" }));
     await userEvent.click(await screen.findByRole("option", { name: /^read-only/ }));
     await waitFor(() => expect(updateV4).toHaveBeenCalledWith({ expectedRevision: "r1", namespace: "tools", patch: { externalSubagents: { codex: { sandbox: "read-only" } } } }));
+  });
+  it("mounts the script runtime panel under the 命令行 row only when the fold is open, and starts the extension download", async () => {
+    const { getPython, installPython } = setup();
+    render(<PluginsSection />);
+    const session = await screen.findByRole("region", { name: "会话插件" });
+    expect(getPython).not.toHaveBeenCalled();
+    await userEvent.click(within(session).getByRole("button", { name: "内置插件 2 个，不能关闭" }));
+    const panel = await screen.findByRole("region", { name: "脚本运行时" });
+    expect(within(panel).getByText("脚本运行时 · Python 3.12.16")).toBeVisible();
+    expect(within(panel).getByText(/核心包：openpyxl、pypdf/)).toBeVisible();
+    await userEvent.click(within(panel).getByRole("button", { name: "下载数据扩展" }));
+    expect(installPython).toHaveBeenCalledTimes(1);
+    expect(await within(panel).findByText(/下载中 0\/3/)).toBeVisible();
+    getPython.mockResolvedValue(pythonStatus({ state: "ready" }));
+    expect(await within(panel).findByText("已安装", {}, { timeout: 3_000 })).toBeVisible();
+    expect(within(panel).queryByRole("button", { name: "下载数据扩展" })).not.toBeInTheDocument();
+  });
+
+  it("shows the failure reason and offers a retry when the download failed", async () => {
+    const { getPython } = setup();
+    getPython.mockResolvedValue(pythonStatus({ state: "failed", error: "fetch failed" }));
+    render(<PluginsSection />);
+    const session = await screen.findByRole("region", { name: "会话插件" });
+    await userEvent.click(within(session).getByRole("button", { name: "内置插件 2 个，不能关闭" }));
+    const panel = await screen.findByRole("region", { name: "脚本运行时" });
+    expect(within(panel).getByRole("alert")).toHaveTextContent("下载失败：fetch failed");
+    expect(within(panel).getByRole("button", { name: "重新下载" })).toBeVisible();
   });
 });

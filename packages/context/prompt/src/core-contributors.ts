@@ -15,6 +15,23 @@ export type CoreContributorOptions = {
   readonly profile?: "agent" | "chat";
   /** Agent mode exposes `present`; its output-choice guidance is omitted elsewhere. */
   readonly deliverables?: boolean;
+  /** Script execution through Bash; absent when the Harness has no Bash tool. */
+  readonly scripting?: ScriptingFacts;
+};
+
+/**
+ * What the `tools.shell-tools` service knows about running scripts: where a Session's temporary scripts go, and the
+ * bundled Python (absent in a development build without `pnpm python-runtime:prepare`, when the system `python3`
+ * is the fallback). `extensionInstalled` is read on every assembly so a download that finishes mid-Session shows up.
+ */
+export type ScriptingFacts = {
+  readonly scratchDirectory: (sessionId: string) => string;
+  readonly python?: {
+    readonly version: string;
+    readonly corePackages: readonly string[];
+    readonly extensionPackages: readonly string[];
+    readonly extensionInstalled: () => boolean;
+  };
 };
 
 const HOST_INSTRUCTION_OWNER = "@actspace/prompt";
@@ -27,6 +44,14 @@ export function createCoreContributors(options: CoreContributorOptions): readonl
     contributor(options.scopeId, "core/agent-descriptor", "profile", 0, "model-fact", { agent: options.agent }),
   ];
   if (!chat && options.deliverables) contributors.push(contributor(options.scopeId, "core/output-choice", "core", 20, "prompt-section", coreOutputChoice()));
+  const scripting = options.scripting;
+  if (!chat && scripting) {
+    contributors.push(contributor(options.scopeId, "core/scripting", "core", 30, "prompt-section", coreScripting(scripting.python !== undefined)));
+    contributors.push(Object.freeze({
+      id: "host/scripting-facts", ownerPluginId: "@actspace/core", scopeId: options.scopeId, kind: "model-fact", layer: "host", order: 15, criticality: "required",
+      resolve: (input) => ({ value: scriptingFacts(scripting, input.sessionId), provenance: { contributorId: "host/scripting-facts", ownerPluginId: "@actspace/core", layer: "host", order: 15 } }),
+    } satisfies PromptContributor));
+  }
   if (!chat) contributors.push(
     contributor(options.scopeId, "host/workspace-facts", "host", 0, "model-fact", {
       workspaceRoot: options.workspaceRoot,
@@ -104,6 +129,37 @@ function coreOutputChoice(): string {
     "Avoid repeating results already shown inline unless the separate card adds useful access.",
     `${MERMAID_GUIDANCE} Use present for a diagram only when the user explicitly asks for a file.`,
   ].join(" ");
+}
+
+/**
+ * Kept to about ten lines: the two ways to run a script, where temporary files go, how to handle large output, and
+ * which interpreter to use. Package names live in the model fact, not here.
+ */
+function coreScripting(bundledPython: boolean): string {
+  const interpreter = bundledPython ? "actspace-python" : "python3";
+  return [
+    "Running scripts (Bash):",
+    `- One-off logic: \`${interpreter} -c '...'\` with the source in single quotes (the same for \`node -e\`). Scripts you will rerun, hand to the user, or that exceed about 20 lines: write the file into $ACTSPACE_SCRATCH with write_file, then run it.`,
+    "- $ACTSPACE_SCRATCH is this Session's temporary directory; it is cleaned up automatically, so write deliverables (converted files, charts, reports) into the workspace instead.",
+    "- Bash returns at most 8000 characters. For larger results write to a file and read_file / grep it; print summaries, not whole tables.",
+    bundledPython
+      ? "- actspace-python is ActSpace's own interpreter with the Office / PDF libraries listed in the runtime facts. Do not pip install into it or search for a system Python for ActSpace work. When the task is the user's own Python project, use that project's interpreter or venv."
+      : "- This build has no bundled Python; use the system python3 and tell the user when a library is missing instead of installing packages without asking.",
+    "- Office and PDF files: convert with markitdown when the data extension is installed, otherwise read with python-docx / openpyxl / pypdf; to see a page's layout render it with pypdfium2 and inspect_image. Data analysis needs the data extension (numpy, pandas); when it is not installed, say so and point the user to 设置 › 扩展 › 插件 › 命令行.",
+  ].join("\n");
+}
+
+function scriptingFacts(scripting: ScriptingFacts, sessionId: string): RuntimeV2JsonValue {
+  const python = scripting.python;
+  return {
+    scratchDirectory: scripting.scratchDirectory(sessionId),
+    python: python === undefined ? null : {
+      command: "actspace-python",
+      version: python.version,
+      corePackages: [...python.corePackages],
+      dataExtension: { packages: [...python.extensionPackages], installed: python.extensionInstalled() },
+    },
+  };
 }
 
 function chatIdentity(): string {

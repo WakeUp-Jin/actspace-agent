@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { createWriteStream } from "node:fs";
+import { createWriteStream, mkdirSync, realpathSync } from "node:fs";
 import { mkdir, open, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { sessionScratchDirectory } from "./scratch.js";
+export { sessionScratchDirectory } from "./scratch.js";
+import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
 import { toolChildEnv } from "@actspace/shared";
 import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { spawnHostProcess } from "@actspace/sandbox/node-ports";
@@ -10,7 +12,7 @@ import type { HostProcessSpec, SandboxExecution, SandboxRequest, SandboxResult, 
 import type { BackgroundTaskHost, BackgroundTaskTerminal } from "@actspace/background-tasks";
 import type { ToolBodyResult, ToolExecutionContext } from "@actspace/tool-runtime";
 import { redactToolText } from "@actspace/tool-runtime";
-import type { ToolPorts } from "./plugin.js";
+import type { BashPythonRuntime, ToolPorts } from "./plugin.js";
 import { SessionBashLogs, sweepStaleScratchDirectories } from "./bash-log.js";
 
 const INLINE_OUTPUT_CHARS = 8_000;
@@ -34,8 +36,10 @@ const SANDBOX_DENIAL_SIGNATURES = ["operation not permitted", "eperm"] as const;
 const SANDBOX_DENIAL_TAIL_BYTES = 8 * 1024;
 const SANDBOX_DENIAL_HINT = "The sandbox may have blocked this command: it ran in the sandbox and the output reports \"operation not permitted\". If it really needs to write outside the workspace or use the keychain, retry the same command once with sandbox_permissions: \"require_escalated\" and a one-sentence justification; the user will be asked to approve. If it should not need that, change the approach instead.";
 
-export type NodeBashToolPorts = Pick<ToolPorts, "bash"> & {
+export type NodeBashToolPorts = Pick<ToolPorts, "bash" | "python"> & {
   readonly hasRunningBackgroundTask: (sessionId: string) => boolean;
+  /** Canonical `bash-v2/<process>/`: the sandbox `TMPDIR`, and the root of every Session's `scripts/<sessionId>/`. */
+  readonly scratchRoot: string;
   readonly dispose: () => Promise<void>;
   readonly forceTerminate: () => void;
 };
@@ -52,6 +56,10 @@ type BashOptions = {
   readonly sessionLogCapBytes?: number;
   /** Tests only: how long a subagent's command may run. */
   readonly subagentTimeoutMs?: number;
+  /** The Python the app ships, when it does; absent in development without `pnpm python-runtime:prepare`. */
+  readonly python?: BashPythonRuntime;
+  /** Whose `scripts/<sessionId>/` a Session's commands use; a forked subagent uses its parent's. Defaults to its own. */
+  readonly scratchOwner?: (sessionId: string) => string;
 };
 
 /**
@@ -61,12 +69,16 @@ type BashOptions = {
  */
 export function createNodeBashToolPorts(options: BashOptions): NodeBashToolPorts {
   const bashRoot = join(options.tmpRoot, "bash-v2");
-  const scratchRoot = join(bashRoot, randomUUID());
+  // Created now and canonicalized, so the writable-roots registration and the sandbox name the same directory.
+  const ownScratch = join(bashRoot, randomUUID());
+  const scratchRoot = canonicalScratchRoot(ownScratch);
   const registry = new BashTaskRegistry(scratchRoot, new SessionBashLogs(options.dataRoot, options.sessionLogCapBytes), options.background);
-  void sweepStaleScratchDirectories(bashRoot, scratchRoot).catch((error: unknown) => console.warn("[shell-tools] scratch sweep failed", error));
+  void sweepStaleScratchDirectories(bashRoot, ownScratch).catch((error: unknown) => console.warn("[shell-tools] scratch sweep failed", error));
   return Object.freeze({
     bash: (args, context) => executeBash(args, context, options, registry),
     hasRunningBackgroundTask: (sessionId) => registry.running(sessionId) > 0,
+    scratchRoot,
+    ...(options.python === undefined ? {} : { python: options.python }),
     dispose: () => registry.dispose(),
     forceTerminate: () => registry.forceTerminate(),
   });
@@ -96,7 +108,9 @@ async function executeBash(
 
   // The scratch directory is recreated per command: another process's sweep may have taken an idle one.
   const scratchRoot = registry.scratchRoot;
-  await mkdir(scratchRoot, { recursive: true, mode: 0o700 });
+  const sessionScratch = sessionScratchDirectory(scratchRoot, options.scratchOwner?.(context.sessionId) ?? context.sessionId);
+  await mkdir(sessionScratch, { recursive: true, mode: 0o700 });
+  const env = commandEnvironment(sessionScratch, options.python);
   const log = await registry.logs.create(context.sessionId);
   // A log that never becomes a background task goes once the result exists; the artifact keeps long output.
   let keepLog = false;
@@ -105,10 +119,10 @@ async function executeBash(
     if (context.signal.aborted) return failed("TOOL_ABORTED", "Bash was cancelled before process creation.", true);
     const argv = [process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", "-lc", command];
     const run = !options.sandbox
-      ? directRun({ command: argv[0], args: argv.slice(1), cwd: realCwd, env: toolChildEnv(process.env) })
+      ? directRun({ command: argv[0], args: argv.slice(1), cwd: realCwd, env })
       : options.sandbox.run(noSandbox
-        ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env: toolChildEnv(process.env), scratchDir: scratchRoot }
-        : await sandboxedRequest(argv, realCwd, workspaceRoot, scratchRoot));
+        ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env, scratchDir: scratchRoot }
+        : await sandboxedRequest(argv, realCwd, workspaceRoot, scratchRoot, env));
     const sandboxed = !noSandbox;
     const monitor = new OutputMonitor(subscription);
     const processHandle = new ProcessHandle(run, log.path, monitor.handleChunk);
@@ -236,9 +250,31 @@ function directRun(spec: HostProcessSpec): BashRun {
 }
 
 /** Canonical paths, so the policy and TMPDIR name the same directory. The log is written by this process, not the command. The tool template adds the .git denies. */
-async function sandboxedRequest(argv: readonly string[], cwd: string, workspaceRoot: string, scratchRoot: string): Promise<SandboxRequest> {
+async function sandboxedRequest(argv: readonly string[], cwd: string, workspaceRoot: string, scratchRoot: string, env: NodeJS.ProcessEnv): Promise<SandboxRequest> {
   const scratch = await realpath(scratchRoot);
-  return { purpose: "tool", isolation: "sandboxed", argv, cwd, env: { ...toolChildEnv(process.env), TMPDIR: scratch }, scratchDir: scratch, filesystem: { readWrite: [await realpath(workspaceRoot), scratch, await realpath(tmpdir())] } };
+  return { purpose: "tool", isolation: "sandboxed", argv, cwd, env: { ...env, TMPDIR: scratch }, scratchDir: scratch, filesystem: { readWrite: [await realpath(workspaceRoot), scratch, await realpath(tmpdir())] } };
+}
+
+/**
+ * The tool child environment (credentials stripped) plus the Session's scratch directory for scripts, plus the
+ * bundled Python when the app ships one.
+ */
+export function commandEnvironment(sessionScratch: string, python: BashPythonRuntime | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...toolChildEnv(base), ACTSPACE_SCRATCH: sessionScratch };
+  if (python === undefined) return env;
+  // Windows spells the variable `Path`; keep whichever key the parent has so the shell sees one PATH.
+  const pathKey = Object.keys(env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
+  const current = env[pathKey];
+  env[pathKey] = current ? `${python.shimDirectory}${delimiter}${current}` : python.shimDirectory;
+  env.ACTSPACE_PYTHON = python.shim;
+  const extension = python.extensionSitePackages?.();
+  if (extension !== undefined) env.ACTSPACE_PYTHON_EXT = extension;
+  return env;
+}
+
+/** The scratch directory exists from the start so its canonical path can be registered as Host-writable. */
+function canonicalScratchRoot(path: string): string {
+  try { mkdirSync(path, { recursive: true, mode: 0o700 }); return realpathSync(path); } catch { return path; }
 }
 
 /** The admitted process resource is what the user approved; direct callers without one only get an explicit request. */

@@ -1,4 +1,4 @@
-import type { PluginListItem, SettingsV4Snapshot } from "@actspace/shared";
+import type { PluginListItem, PythonRuntimeStatus, SettingsV4Snapshot } from "@actspace/shared";
 
 type Row = readonly [id: string, title: string, description: string, directory: string];
 
@@ -79,4 +79,12 @@ function mockPluginSettings(id: string, settings: SettingsV4Snapshot["settings"]
   if (id === "subagent-codex") return { settings: { approvalPolicy: stored?.codex?.approvalPolicy ?? "never", sandbox: stored?.codex?.sandbox ?? "workspace-write" }, settingsPendingRestart: stored?.codex !== undefined };
   if (id === "subagent-claude-code") return { settings: { permissionMode: stored?.claudeCode?.permissionMode ?? "dontAsk" }, settingsPendingRestart: stored?.claudeCode !== undefined };
   return {};
+}
+
+/** 浏览器开发模式下的脚本运行时：核心层随包就绪，数据扩展未下载。 */
+export function mockPythonRuntimeStatus(): PythonRuntimeStatus {
+  return {
+    runtime: { version: "3.12.16", root: "/Applications/ActSpace.app/Contents/Resources/app/runtime/python", corePackages: ["openpyxl", "xlsxwriter", "python-docx", "python-pptx", "lxml", "pillow", "pypdf", "pdfplumber", "pypdfium2"] },
+    extension: { packages: ["numpy", "pandas", "markitdown"], state: "missing", localWheelsDirectory: "/Users/me/Library/Application Support/ActSpace/runtime/python-ext/wheels" },
+  };
 }

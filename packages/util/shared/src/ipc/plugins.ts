@@ -1,5 +1,29 @@
 // 扩展 › 插件 页 IPC（`plugins.*`）。
 
+/**
+ * The bundled Python the bash tool exposes as `actspace-python` (`pythonRuntime.getStatus`), shown under the
+ * 命令行 plugin row. `runtime` is null when this build ships none (development without `pnpm python-runtime:prepare`).
+ */
+export interface PythonRuntimeStatus {
+  runtime: {
+    version: string;
+    /** Absolute path of the runtime root, for the "where is it" line. */
+    root: string;
+    corePackages: string[];
+  } | null;
+  /** The on-demand data extension (numpy, pandas, markitdown …). */
+  extension: {
+    packages: string[];
+    state: "missing" | "installing" | "ready" | "failed";
+    /** Wheels done out of total while installing. */
+    progress?: { completed: number; total: number };
+    /** Why the last install failed; cleared when a new one starts. */
+    error?: string;
+    /** Where hand-placed wheels are picked up from on offline machines. */
+    localWheelsDirectory: string;
+  };
+}
+
 /** One row of the 扩展 › 插件 page (`plugins.list`), computed in main from the plugin catalog, the startup switches and settings. */
 export interface PluginListItem {
   /** Catalog Entry id; also the key of `settings.tools.plugins`. */

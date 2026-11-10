@@ -63,6 +63,8 @@ export type ToolPreparedEnvironment = {
   readonly workspaceRoot: string;
   /** Read-only paths outside the workspace that the Host lets tools read without a scope approval. */
   readonly isHostReadablePath?: (canonicalPath: string) => boolean;
+  /** Host-created scratch directories outside the workspace where tools may read and write without a scope approval. */
+  readonly isHostWritablePath?: (canonicalPath: string) => boolean;
   readonly contextGeneration?: number;
   readonly permissionMode?: PermissionMode | (() => PermissionMode);
   readonly permissionModeExplicit?: boolean;
@@ -201,7 +203,7 @@ export class PreparedToolExecution {
           workspaceRoot: this.environment.workspaceRoot,
           canonicalizeFile: (path, access) => canonicalizeFileResource(path, access, this.environment.workspaceRoot),
         }));
-        const global = evaluateGlobalBoundary(mode, this.environment.workspaceRoot, this.#resources, this.environment.isHostReadablePath);
+        const global = evaluateGlobalBoundary(mode, this.environment.workspaceRoot, this.#resources, this.environment.isHostReadablePath, this.environment.isHostWritablePath);
         const tool = await this.registration.permission.evaluate(this.#args, this.#resources, {
           mode,
           workspaceRoot: this.environment.workspaceRoot,
@@ -684,7 +686,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 function summarizeResource(resource: ToolResource): ApprovalResourceSummary {
   return resource.kind === "file"
     ? { kind: "file", access: resource.access, path: redactToolText(resource.canonicalPath), targetKind: resource.targetKind }
-    : { kind: "process", access: "execute", commandDigest: resource.commandDigest, cwd: redactToolText(resource.cwd), dynamic: resource.dynamic, ...(resource.noSandbox === undefined ? {} : { noSandbox: resource.noSandbox }) };
+    : { kind: "process", access: "execute", commandDigest: resource.commandDigest, cwd: redactToolText(resource.cwd), dynamic: resource.dynamic, ...(resource.noSandbox === undefined ? {} : { noSandbox: resource.noSandbox }), ...(resource.script === undefined ? {} : { script: resource.script }) };
 }
 
 function isOnceApproval(value: OnceApproval | ToolFailure): value is OnceApproval {

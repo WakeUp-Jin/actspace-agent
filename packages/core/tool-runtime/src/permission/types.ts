@@ -5,6 +5,7 @@ import type {
   GrantAudience,
   PermissionMode,
   RuntimeV2JsonValue,
+  ScriptCommand,
 } from "@actspace/shared/runtime-v2";
 
 export type ToolResource =
@@ -24,6 +25,8 @@ export type ToolResource =
       readonly grantPrefix?: readonly string[];
       readonly workspaceRoot?: string;
       readonly noSandbox?: boolean;
+      /** Set by Bash when the command is an interpreter running an inline body or a script file. */
+      readonly script?: ScriptCommand;
     };
 
 export type ResourceSensitivity =

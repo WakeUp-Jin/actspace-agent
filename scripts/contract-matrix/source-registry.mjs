@@ -154,6 +154,7 @@ export const PACKAGE_PATHS = Object.freeze([
   "packages/fs/tool-fs-read/package.json",
   "packages/fs/tool-fs-search/package.json",
   "packages/fs/tool-fs-write/package.json",
+  "packages/shell/python-runtime/package.json",
   "packages/shell/tool-shell/package.json",
   "packages/background-tasks/tool-background-tasks/package.json",
   "packages/web/tool-web/package.json",

@@ -6,6 +6,8 @@ import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
 import { BROWSER_PLUGIN_ID, disabledPluginIds, ENGLISH_LEARNING_PLUGIN_ID, resolvePluginSettings, resolvePluginSwitches } from "./plugins/plugin-switches";
 import { registerPluginsIpc } from "./plugins/plugins-ipc";
+import { registerPythonRuntimeIpc } from "./python-runtime/python-runtime-ipc";
+import { PythonRuntimeService, resolveDesktopPythonRuntime } from "./python-runtime/python-runtime-service";
 import { registerDisabledEnglishLearningIpc } from "./plugins/optional-plugin-stubs";
 import { loadRuntimeV2Module } from "./runtime-v2/runtime-loader";
 import { app, BrowserWindow, globalShortcut, safeStorage, screen, session } from "electron";
@@ -43,6 +45,8 @@ let runtimeV2Registry: DesktopRuntimeV2Registry | undefined;
 let disposePerformanceIpc: (() => void) | undefined;
 let disposeEnglishLearningIpc: (() => void) | undefined;
 let disposePluginsIpc: (() => void) | undefined;
+let disposePythonRuntimeIpc: (() => void) | undefined;
+let pythonRuntimeService: PythonRuntimeService | undefined;
 let speechPlayback: DesktopSpeechPlayback | undefined;
 let disposeRuntimeV2DesktopShell: (() => void) | undefined;
 let remoteDesktop: RemoteDesktopAdapter | undefined;
@@ -205,6 +209,9 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
   const packagedResources = app.isPackaged && !process.env.ACTSPACE_DEV_APP_ID;
   const nonoPath = resolveDesktopNonoPath({ packaged: packagedResources, resourcesPath: process.resourcesPath, repoRoot: join(roots.logRoot, ".."), env: process.env });
   await logMain("sandbox nono resolved", { nonoPath: nonoPath ?? null });
+  const pythonRuntime = resolveDesktopPythonRuntime({ packaged: packagedResources, resourcesPath: process.resourcesPath, repoRoot: join(roots.logRoot, ".."), env: process.env });
+  await logMain("python runtime resolved", { root: pythonRuntime?.root ?? null });
+  pythonRuntimeService = new PythonRuntimeService({ runtime: pythonRuntime, dataRoot: roots.dataRoot, log: (message, details) => void logMain(message, details) });
   const speech = englishLearningEnabled ? new DesktopSpeechPlayback(roots.tmpRoot, settingsService) : undefined;
   speechPlayback = speech;
   runtimeV2Registry = new DesktopRuntimeV2Registry({
@@ -216,6 +223,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     approvals: approvalRegistry,
     browser: browserBridgeService,
     nonoPath,
+    python: pythonRuntimeService.forBash(),
     disabledSkillIds: () => settingsService?.get().skills.disabled ?? [],
     chatCompactionTriggerRatio: () => settingsService?.getV4().settings.general.taskDefaults.chatCompactionTriggerRatio ?? 0.8,
     log: (message, details) => void logMain(message, details),
@@ -257,6 +265,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     ? registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow: getMainWindowOrNull })
     : registerDisabledEnglishLearningIpc({ getMainWindow: getMainWindowOrNull });
   disposePluginsIpc = registerPluginsIpc({ getMainWindow, catalog: runtimeModule.PLUGIN_CATALOG, startupSwitches, startupPluginSettings, settings: settingsService });
+  disposePythonRuntimeIpc = registerPythonRuntimeIpc({ getMainWindow, service: pythonRuntimeService });
   remoteHosts = new RemoteHostRegistry(roots.dataRoot);
   await remoteHosts.open();
   disposeRemoteHostIpc = registerRemoteHostIpc(remoteHosts, getMainWindowOrNull, async sessionId => { await remoteDesktop?.activate(sessionId); });
@@ -326,6 +335,7 @@ app.on("before-quit", (event) => {
       disposePerformanceIpc?.();
       disposeEnglishLearningIpc?.();
       disposePluginsIpc?.();
+      disposePythonRuntimeIpc?.();
       await speechPlayback?.dispose();
       clearTimeout(timeout);
       disposeRuntimeV2DesktopShell?.();
