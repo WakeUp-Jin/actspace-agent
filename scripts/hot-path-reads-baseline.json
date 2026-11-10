@@ -95,7 +95,6 @@
     "structured-clone": 2
   },
   "packages/subagent/subagent/src/manager.ts": {
-    "full-iterate": 2,
     "full-read": 1
   }
 }

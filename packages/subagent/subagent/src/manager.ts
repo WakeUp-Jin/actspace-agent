@@ -667,8 +667,7 @@ export function clock(iso: string): string {
 /** True while the child's last tool call of this activation was a message to its parent and no input was claimed since. */
 function closingOmitted(child: SessionHandle, startSeq: number, rootId: string): boolean {
   let omitted = false;
-  for (const event of child.journal.iterateEvents()) {
-    if (event.seq <= startSeq) continue;
+  for (const event of child.journal.iterateEvents(startSeq + 1)) {
     const data = record(event.data);
     if (event.type === "tool/call") omitted = data.name === "send_message" && record(data.args).agent_id === rootId;
     if (event.type === "agent/inbox/spliced" && data.operation === "claim") omitted = false;
@@ -704,8 +703,7 @@ async function waitForFile(path: string, settled: Promise<unknown>, timeoutMs: n
 
 /** The Agent mode of the Session's latest `turn/start`. */
 function latestTurnMode(session: SessionHandle): RuntimeV2AgentMode | undefined {
-  let mode: unknown;
-  for (const event of session.journal.iterateEvents()) if (event.type === "turn/start") mode = record(event.data).mode;
+  const mode = record(session.journal.latestEvent("turn/start")?.data).mode;
   return mode === "agent" || mode === "plan" || mode === "chat" ? mode : undefined;
 }
 
