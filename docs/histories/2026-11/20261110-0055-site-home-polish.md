@@ -23,6 +23,8 @@
 - **插件模块**：去掉圆点，每个插件带 15px 线性图标（path 写在 `Hero.astro` 的数组第 4 项），名字改无衬线 500，卡片加纸面阴影和悬停上浮；点亮时图标和开关转紫，关掉时图标变淡、名字划线。
 - **连线**：`home-stage.ts` 的折线拐角倒成半径 8 的圆角（`roundedPath`）。
 - **对话起点**：`PREVIOUS` 从两行扩成完整的上一轮（气泡、Worked、带 `code` 的回答、改动卡片、用量行），动画开场不再是空白窗口。
+- **输入框打字**：本轮任务先逐字打进输入框（光标闪烁、发送键变墨色并按下）再成为气泡；`reset()` 同步清理 `typing / ready / press` 状态。
+- **Harness 演示**：版本卡加编辑图标、名字改无衬线、版本号等宽，窗口加宽到 560px；功能块舞台也加一层浅暗角。
 - **基础功能卡片**：`Capability` 增加 `icon` 字段，`TodaySection.astro` 渲染 34px 画布色图标块，悬停转紫。
 - **文档同步**：`apps/site/DESIGN.md` 更新字体、首屏、功能块、基础功能和响应式描述。
 
@@ -34,6 +36,7 @@
 
 - `apps/site/src/components/home/Hero.astro`
 - `apps/site/src/components/home/TodaySection.astro`
+- `apps/site/src/components/home/HarnessBlock.astro`
 - `apps/site/src/lib/home-features.ts`
 - `apps/site/src/scripts/home-stage.ts`
 - `apps/site/src/styles/home.css`

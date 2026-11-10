@@ -314,7 +314,8 @@ export function initializeHeroStage() {
     scroll.scrollTop = scroll.scrollHeight;
     panel.classList.remove('open');
     panelBtn.classList.remove('on');
-    send.classList.remove('stop');
+    send.classList.remove('stop', 'ready', 'press');
+    ph.classList.remove('typing');
     ph.textContent = '继续追问…';
     h('perm').textContent = on('approve') ? '自动' : '完全权限';
     h('ses-spin').hidden = false;
@@ -328,8 +329,21 @@ export function initializeHeroStage() {
     let r: HTMLElement | undefined;
     let started = 0;
 
+    // 先把这句话打进输入框，再发送——不是凭空蹦出一个气泡。
+    const ask = '把登录页的表单校验补完，跑一下测试。';
+    if (!reduced) {
+      const typeAt = t;
+      clock.at(typeAt, () => { ph.classList.add('typing'); ph.textContent = ''; });
+      for (let i = 1; i <= ask.length; i += 1) {
+        clock.at(typeAt + i * 55, () => { ph.textContent = ask.slice(0, i); if (i === 3) send.classList.add('ready'); });
+      }
+      t += ask.length * 55 + 350;
+      step(180, () => send.classList.add('press'));
+    }
     step(900, () => {
-      put('<div class="bubble">把登录页的表单校验补完，跑一下测试。</div>');
+      ph.classList.remove('typing');
+      send.classList.remove('ready', 'press');
+      put(`<div class="bubble">${ask}</div>`);
       send.classList.add('stop');
       ph.textContent = '继续追问，运行中发送会进入队列…';
       if (on('panel')) { panel.classList.add('open'); panelBtn.classList.add('on'); stage.light(['panel']); }

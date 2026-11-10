@@ -229,6 +229,12 @@
   line-height: 1.5;
   color: var(--ink);
 }
+/* 功能块舞台也压一层更浅的暗角，和首屏一致。 */
+.feature-stage::after {
+  background:
+    radial-gradient(60% 40% at 50% 106%, rgba(40, 36, 30, 0.55), transparent 70%),
+    var(--stage-grain);
+}
 /* 首屏舞台：底部压一层暗角，窗口像放在桌面上而不是贴在色块上。 */
 .hero-stage::after {
   background:
@@ -370,7 +376,13 @@
 .app .composer .ph { flex: 1; overflow: hidden; color: var(--app-faint); white-space: nowrap; text-overflow: ellipsis; }
 .app .composer .md { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--app-muted); white-space: nowrap; }
 .app .composer .send { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%; background: #8e8c87; color: #fff; }
+.app .composer .ph.typing { color: var(--ink); }
+.app .composer .ph.typing::after { content: ""; display: inline-block; width: 1.5px; height: 13px; margin: 0 0 -2px 1px; background: var(--ink); animation: hero-caret 1s steps(1) infinite; }
+.app .composer .send { transition: background 0.3s, transform 0.12s; }
+.app .composer .send.ready { background: var(--ink); }
+.app .composer .send.press { transform: scale(0.88); }
 .app .composer .send.stop { background: var(--ink); }
+@keyframes hero-caret { 50% { opacity: 0; } }
 .app .composer .send.stop svg { display: none; }
 .app .composer .send.stop::after { content: ""; width: 9px; height: 9px; border-radius: 2px; background: #fff; }
 .app .meta-row { display: flex; align-items: center; gap: 14px; padding: 6px 8px 0; font-size: 11.5px; color: var(--app-muted); }
@@ -663,13 +675,16 @@
 }
 
 /* Harness 自进化示意 */
-.evo { width: min(520px, 94%); }
-.evo-body { display: flex; flex-direction: column; gap: 14px; padding: 16px 18px 18px; }
+.evo { width: min(560px, 94%); }
+.evo-body { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px 20px; }
 .evo-ask { display: flex; gap: 10px; margin: 0; padding: 9px 12px; border-radius: 10px; background: var(--site-canvas); font-size: 13px; }
 .evo-ask span { flex: none; font: 12px/21px var(--mono); color: var(--muted); }
 .evo-versions { display: grid; grid-template-columns: minmax(0, 0.8fr) auto minmax(0, 1.2fr); align-items: stretch; gap: 10px; }
 .ver { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--site-surface); box-shadow: 0 0 0 1px var(--line); transition: opacity 0.5s, box-shadow 0.5s; }
-.ver b { font: 500 12.5px var(--mono); }
+.ver b { display: flex; align-items: center; gap: 6px; font: 500 12.5px var(--sans); }
+.ver b .vi { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
+.ver.next b .vi { color: var(--site-accent); }
+.ver b span { font: 11.5px var(--mono); color: var(--muted); }
 .ver small { font-size: 11.5px; color: var(--muted); }
 .ver code { font: 11.5px/1.6 var(--mono); color: var(--body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ver code.del { color: #9a4630; background: #f9e7e2; border-radius: 4px; padding: 0 4px; }
