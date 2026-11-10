@@ -14,6 +14,12 @@ const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest(
 /** One writer per Host data root. Metadata is the acknowledged offset authority. */
 export class HostUploads {
   readonly #gate = new SerialGate();
+  /**
+   * Uploads no task has pinned yet: what a device's staging quota counts. Uploads are kept for as long
+   * as their Session, so reading every upload's state on each begin grows with everything ever attached.
+   * This instance is the only writer, so it keeps the set in step itself; undefined means "not read yet".
+   */
+  #staged: Map<string, { readonly deviceId: string; readonly size: number }> | undefined;
   #failed = false;
   constructor(private readonly root: string, private readonly now = Date.now) {}
   #directory(id: string) {
@@ -43,13 +49,9 @@ export class HostUploads {
     return this.#gate.run(async () => {
       if (!Number.isSafeInteger(input.size) || input.size < 0 || input.size > HOST_LIMITS.fileBytes || !/^[a-f0-9]{64}$/.test(input.sha256) || !input.name.trim() || input.name.length > 255 || /[\x00-\x1f/\\]/.test(input.name)) throw new HostRequestError("Invalid upload metadata");
       await mkdir(this.root, { recursive: true, mode: 0o700 });
+      const staged = this.#staged ??= await this.#scan();
       let reserved = 0;
-      for (const id of await readdir(this.root)) {
-        let item: Upload;
-        try { item = await this.#read(id); }
-        catch (error) { if (error instanceof HostError && error.kind === "NOT_FOUND") continue; throw error; }
-        if (item.deviceId === input.deviceId && item.pins.length === 0) reserved += item.size;
-      }
+      for (const item of staged.values()) if (item.deviceId === input.deviceId) reserved += item.size;
       if (reserved + input.size > 200 * 1024 * 1024) throw new HostError("LIMIT_EXCEEDED", "Device staging quota exceeded");
       const value: Upload = { ...input, version: 1, id: randomUUID(), offset: 0, createdAt: this.now(), complete: false, pins: [] };
       const directory = this.#directory(value.id);
@@ -57,8 +59,21 @@ export class HostUploads {
       const file = await open(join(directory, "content"), "wx", 0o600);
       try { await file.sync(); } finally { await file.close(); }
       await this.#save(value);
+      staged.set(value.id, { deviceId: value.deviceId, size: value.size });
       return this.#reference(value);
     });
+  }
+  /** Reads every upload's state. Removes what `expired` selects and returns the uploads still unpinned. */
+  async #scan(expired?: (id: string, value: Upload | undefined) => Promise<boolean>) {
+    const staged = new Map<string, { deviceId: string; size: number }>();
+    for (const id of await readdir(this.root)) {
+      let value: Upload | undefined;
+      try { value = await this.#read(id); }
+      catch (error) { if (!(error instanceof HostError) || error.kind !== "NOT_FOUND") throw error; }
+      if (await expired?.(id, value)) await rm(this.#directory(id), { recursive: true });
+      else if (value && !value.pins.length) staged.set(id, { deviceId: value.deviceId, size: value.size });
+    }
+    return staged;
   }
   status(deviceId: string, sessionId: string, id: string): Promise<UploadReference> {
     return this.#gate.run(async () => {
@@ -116,7 +131,7 @@ export class HostUploads {
       const values = await Promise.all(ids.map(id => this.#read(id)));
       for (const value of values) { this.#check(value, deviceId, sessionId); if (!value.complete) throw new HostError("CONFLICT", "Attachment incomplete"); }
       if (values.reduce((sum, value) => sum + value.size, 0) > HOST_LIMITS.messageBytes) throw new HostError("LIMIT_EXCEEDED", "Attachments exceed message limit");
-      for (const value of values) if (!value.pins.includes(submissionId)) await this.#save({ ...value, pins: [...value.pins, submissionId] });
+      for (const value of values) if (!value.pins.includes(submissionId)) { await this.#save({ ...value, pins: [...value.pins, submissionId] }); this.#staged?.delete(value.id); }
       return values.map(value => this.#reference(value));
     });
   }
@@ -124,7 +139,9 @@ export class HostUploads {
     return this.#gate.run(async () => {
       const value = await this.#read(id); this.#check(value, deviceId, sessionId);
       if (value.pins.length) throw new HostError("CONFLICT", "Task attachment cannot be deleted");
-      await rm(this.#directory(id), { recursive: true });
+      // A removal that fails part-way may or may not have taken the state file with it.
+      try { await rm(this.#directory(id), { recursive: true }); } catch (error) { this.#staged = undefined; throw error; }
+      this.#staged?.delete(id);
     });
   }
   describe(sessionId: string, id: string): Promise<UploadReference> {
@@ -166,6 +183,8 @@ export class HostUploads {
   reconcilePins(exists: (sessionId: string, submissionId: string) => Promise<boolean>): Promise<void> {
     return this.#gate.run(async () => {
       await mkdir(this.root, { recursive: true, mode: 0o700 });
+      // Dropping an upload's last pin stages it again.
+      this.#staged = undefined;
       for (const id of await readdir(this.root)) {
         let value: Upload;
         try { value = await this.#read(id); } catch (error) { if (error instanceof HostError && error.kind === "NOT_FOUND") continue; throw error; }
@@ -178,17 +197,12 @@ export class HostUploads {
   cleanup(): Promise<void> {
     return this.#gate.run(async () => {
       await mkdir(this.root, { recursive: true, mode: 0o700 });
-      for (const id of await readdir(this.root)) {
+      this.#staged = undefined;
+      this.#staged = await this.#scan(async (id, value) => {
         // An interrupted begin can leave a directory without metadata.
-        let value: Upload;
-        try { value = await this.#read(id); }
-        catch (error) {
-          if (!(error instanceof HostError) || error.kind !== "NOT_FOUND") throw error;
-          if (this.now() - (await stat(this.#directory(id))).mtimeMs > 86_400_000) await rm(this.#directory(id), { recursive: true });
-          continue;
-        }
-        if (!value.pins.length && this.now() - value.createdAt > 86_400_000) await rm(this.#directory(id), { recursive: true });
-      }
+        if (!value) return this.now() - (await stat(this.#directory(id))).mtimeMs > 86_400_000;
+        return !value.pins.length && this.now() - value.createdAt > 86_400_000;
+      });
     });
   }
 }

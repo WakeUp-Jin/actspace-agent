@@ -48,6 +48,34 @@ it("protects pinned content from cleanup and abort, rejects ownership and incomp
   await expect(store.abort("d", "s", item.id)).rejects.toThrow("cannot be deleted");
   expect((await store.read("s", item.id, 0, 1)).size).toBe(0);
 });
+it("counts only a device's unpinned uploads against its staging quota across pin, abort, restart, reconcile and cleanup", async () => {
+  const { root } = await fixture(); let now = 0;
+  const store = new HostUploads(root, () => now);
+  const big = (uploads: HostUploads, deviceId = "d") => uploads.begin({ deviceId, sessionId: "s", name: "big.bin", size: 20 * 1024 * 1024, sha256: hash("") });
+  const staged = [];
+  for (let index = 0; index < 9; index++) staged.push(await big(store));
+  const small = await store.begin({ deviceId: "d", sessionId: "s", name: "small.txt", size: 3, sha256: hash("abc") });
+  await expect(big(store)).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
+  await big(store, "other");
+
+  await store.write("d", "s", small.id, 0, Buffer.from("abc").toString("base64"), hash("abc"));
+  await store.finish("d", "s", small.id); await store.pin("d", "s", [small.id], "task");
+  const tenth = await big(store);
+  await expect(big(store)).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
+  await store.abort("d", "s", tenth.id);
+  await big(store);
+  await expect(big(store)).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
+
+  const reopened = new HostUploads(root, () => now);
+  await expect(big(reopened)).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
+  await reopened.abort("d", "s", staged[0]!.id);
+  // The task behind the pin never became durable, so the 3-byte upload is staged again.
+  await reopened.reconcilePins(async () => false);
+  await expect(big(reopened)).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
+  now = 90_000_000; await reopened.cleanup();
+  for (let index = 0; index < 10; index++) await big(reopened);
+  await expect(big(reopened)).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
+});
 it("reconciles orphan pins against durable tasks before staging cleanup", async () => {
   const { root } = await fixture(); let now = 0;
   const uploads = new HostUploads(root, () => now);
