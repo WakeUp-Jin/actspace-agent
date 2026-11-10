@@ -17,8 +17,8 @@ describe("ProviderNetworkService", () => {
     const result = await service.probeCustomConnection(anthropicDraft);
     expect(result).toMatchObject({ ok: true, resolvedAuth: "bearer", models: [{ id: "claude-sonnet-5", label: "Claude Sonnet 5" }, { id: "claude-opus-5" }] });
     expect(fetch).toHaveBeenCalledTimes(2);
-    expect(fetch.mock.calls[0]![0]).toBe("https://relay.example/v1/models?limit=1000");
-    const second = headersOf(fetch.mock.calls[1]![1]);
+    expect(fetch.mock.calls[0][0]).toBe("https://relay.example/v1/models?limit=1000");
+    const second = headersOf(fetch.mock.calls[1][1]);
     expect(second.get("authorization")).toBe(`Bearer ${KEY}`);
     expect(second.has("x-api-key")).toBe(false);
     expect(second.get("anthropic-version")).toBe("2023-06-01");
@@ -52,7 +52,7 @@ describe("ProviderNetworkService", () => {
     const result = await service.probeCustomConnection({ ...anthropicDraft, authMode: "x-api-key" });
     expect(result.models?.map((model) => model.id)).toEqual(["m1", "m2", "m3"]);
     expect(result).not.toHaveProperty("resolvedAuth");
-    expect(fetch.mock.calls[1]![0]).toBe("https://relay.example/v1/models?limit=1000&after_id=m2");
+    expect(fetch.mock.calls[1][0]).toBe("https://relay.example/v1/models?limit=1000&after_id=m2");
   });
 
   it("lists OpenAI-compatible models with Bearer only and never falls back", async () => {
@@ -61,9 +61,9 @@ describe("ProviderNetworkService", () => {
     const result = await service.probeCustomConnection({ protocol: "openai-completions", apiKey: KEY, baseUrl: "https://relay.example/v1", model: "", authMode: "auto" });
     expect(result).toMatchObject({ ok: true, models: [{ id: "gpt-5" }] });
     expect(result).not.toHaveProperty("resolvedAuth");
-    expect(fetch.mock.calls[0]![0]).toBe("https://relay.example/v1/models");
-    expect(headersOf(fetch.mock.calls[0]![1]).get("authorization")).toBe(`Bearer ${KEY}`);
-    expect(headersOf(fetch.mock.calls[0]![1]).has("x-api-key")).toBe(false);
+    expect(fetch.mock.calls[0][0]).toBe("https://relay.example/v1/models");
+    expect(headersOf(fetch.mock.calls[0][1]).get("authorization")).toBe(`Bearer ${KEY}`);
+    expect(headersOf(fetch.mock.calls[0][1]).has("x-api-key")).toBe(false);
   });
 
   it.each([

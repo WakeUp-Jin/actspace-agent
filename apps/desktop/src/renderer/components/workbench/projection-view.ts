@@ -27,7 +27,7 @@ export function contextRevisionOf(cell: ClientSessionCell): number | undefined {
   const events = cell.window?.events;
   if (events) {
     for (let index = events.length - 1; index >= 0; index--) {
-      const event = events[index]!;
+      const event = events[index];
       if (event.type !== "assistant/chunk") return event.seq;
     }
   }

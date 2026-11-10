@@ -561,7 +561,7 @@ function appendRuntimeContext(content: RuntimeV2JsonValue, mode: RuntimeV2AgentM
 }
 function currentAgentModeRevision(events: readonly { readonly type: string; readonly data: RuntimeV2JsonValue }[]): number {
   for (let index = events.length - 1; index >= 0; index--) {
-    const event = events[index]!;
+    const event = events[index];
     if (event.type === "agent/mode-set" && isRecord(event.data) && typeof event.data.revision === "number") return event.data.revision;
   }
   return 0;

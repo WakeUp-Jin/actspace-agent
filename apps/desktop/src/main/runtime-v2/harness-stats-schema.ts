@@ -146,9 +146,9 @@ export class HarnessAccumulator {
       for (const row of rows.values()) {
         const existing = select.get(...(row.key as (string | number)[])) as Record<string, unknown> | undefined;
         const merged: Record<string, unknown> = {};
-        if (existing) for (const name of columns) merged[name] = decode(spec.columns[name]!, existing[name]);
+        if (existing) for (const name of columns) merged[name] = decode(spec.columns[name], existing[name]);
         mergeValues(spec, merged, row.values);
-        insert.run(...(row.key as (string | number)[]), ...columns.map(name => encode(spec.columns[name]!, merged[name])) as (string | number | null)[]);
+        insert.run(...(row.key as (string | number)[]), ...columns.map(name => encode(spec.columns[name], merged[name])) as (string | number | null)[]);
       }
     }
     this.#rows.clear();

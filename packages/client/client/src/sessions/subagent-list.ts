@@ -76,7 +76,7 @@ export function subagentListChildrenWithoutModel(state: SubagentListState): { re
   }
   // New Sessions: the model is on each activation's start; one without a model follows the parent's request facts.
   for (const agentId of state.tree.order) {
-    const view = state.tree.agents[agentId]!;
+    const view = state.tree.agents[agentId];
     // External subagents have no ActSpace Session to read a request from.
     if (view.legacy || view.kind === "codex" || view.kind === "claude-code") continue;
     requested.add(view.agentId);
@@ -91,7 +91,7 @@ export function subagentListChildrenWithoutModel(state: SubagentListState): { re
 export function subagentListItems(state: SubagentListState, childModels: ReadonlyMap<string, string> = new Map()): SubagentListItem[] {
   return state.tree.order.map((agentId) => {
     const message = state.lastMessages.get(agentId);
-    const listed = item(state.tree.agents[agentId]!, childModels.get(agentId), state.legacyCallArgs);
+    const listed = item(state.tree.agents[agentId], childModels.get(agentId), state.legacyCallArgs);
     return message ? { ...listed, lastMessage: { text: message.text, at: message.at } } : listed;
   });
 }

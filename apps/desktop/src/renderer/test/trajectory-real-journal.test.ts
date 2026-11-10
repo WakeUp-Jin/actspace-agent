@@ -47,7 +47,7 @@ describe('real Journal → trajectory', () => {
     const snapshot = buildTrajectorySnapshot(projectTrajectory('session', journal.events));
     expect(snapshot.records.map(record => record.kind)).toEqual(['system', 'user', 'assistant', 'tool']);
     expect(snapshot.records[1]).toMatchObject({ summary: '真实用户内容', turnNumber: 1, messageSource: source });
-    const assistant = snapshot.records[2]!;
+    const assistant = snapshot.records[2];
     expect(assistant.id).toBe(partial.id);
     expect(assistant.assistantMetrics).toMatchObject({ ttftMs: 4000, generationMs: 1000 });
     expect(assistant.requestDetail).toMatchObject({ model: 'test-model', options: { temperature: 0.3 }, prompt: { systemPrompt: '真实系统提示' } });
@@ -75,7 +75,7 @@ it('closes observed chunks when a failed provider stream finalizes with a new me
   append('request/header', { turnId: 't', stepId: 'step', requestId: 'r' });
   append('request/context', { turnId: 't', stepId: 'step', requestId: 'r', snapshot: { schemaVersion: 3 } });
   append('assistant/chunk', { turnId: 't', requestId: 'r', messageId: 'stream-message', chunkIndex: 0, content: 'Partial' });
-  const before = buildTrajectorySnapshot(projectTrajectory('s', journal.events)).records[0]!;
+  const before = buildTrajectorySnapshot(projectTrajectory('s', journal.events)).records[0];
   append('assistant/message', { turnId: 't', requestId: 'r', messageId: 'failure-message', content: [], finishReason: 'failed' });
   append('step/end', { turnId: 't', stepId: 'step', reason: 'failed' });
   append('turn/end', { turnId: 't', reason: 'failed' });
@@ -111,13 +111,13 @@ describe('real Journal history window → system rows and schemas', () => {
     step('s2', 'm2', 'c2');
     step('s3', 'm3', 'c3');
     append('turn/end', { turnId: 't1', status: 'completed' });
-    const supplement = { ...journal.events[supplementAt - 1]!, type: 'plugin/actspace.context/supplement', data: { op: 'add', id: 'runtime-state', owner: 'actspace.context-runtime', text: '当前目录 /tmp', lifetime: 'turn' }, surface: null };
+    const supplement = { ...journal.events[supplementAt - 1], type: 'plugin/actspace.context/supplement', data: { op: 'add', id: 'runtime-state', owner: 'actspace.context-runtime', text: '当前目录 /tmp', lifetime: 'turn' }, surface: null };
     const events = [...journal.events.slice(0, supplementAt), supplement, ...journal.events.slice(supplementAt)].map((event, seq) => ({ ...event, seq }));
 
     const snapshot = buildTrajectorySnapshot(projectTrajectory('session', events));
     const systems = snapshot.records.filter(record => record.kind === 'system');
     expect(systems.map(record => record.summary)).toEqual(['初始系统提示词']);
-    expect(systems[0]!.promptDetail).toMatchObject({ systemPrompt: '系统提示', tools: [read] });
+    expect(systems[0].promptDetail).toMatchObject({ systemPrompt: '系统提示', tools: [read] });
     expect(snapshot.records.filter(record => record.kind === 'tool').map(record => record.schemaDetail)).toEqual([read, read, read]);
     expect(snapshot.records.find(record => record.kind === 'tool' && record.callId === 'c2')?.requestDetail).toMatchObject({ model: 'm2', prompt: { systemPrompt: '系统提示' } });
     expect(snapshot.records.find(record => record.kind === 'user')).toMatchObject({ summary: '读一下文件', turnId: 't1', turnNumber: 1 });

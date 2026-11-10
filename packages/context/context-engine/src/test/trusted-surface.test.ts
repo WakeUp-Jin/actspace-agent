@@ -54,7 +54,7 @@ describe("trusted Surface in the Context engine", () => {
     expect(first.content.conversation).toBe(value.surface);
     const reconciled = await engineFor(value, instances).reconcile({ ...request, requestId: "r2", stepId: "step-2" }, value.lastSeq);
     expect(reconciled.content.conversation).toBe(value.surface);
-    reconciled.content.conversation.entries.forEach((entry, index) => { expect(entry.node).toBe(value.surface.entries[index]!.node); });
+    reconciled.content.conversation.entries.forEach((entry, index) => { expect(entry.node).toBe(value.surface.entries[index].node); });
     expect(projectContext(reconciled).content.conversation).toBe(value.surface);
 
     const input = await engineFor(value, instances).toLlmInput(reconciled);
@@ -73,8 +73,8 @@ describe("trusted Surface in the Context engine", () => {
     const engine = new ContextEngine({ resolve: input => base(input, legacy, value.lastSeq) });
     const context = await engine.getContext(request);
     expect(context.content.conversation).not.toBe(legacy);
-    expect(context.content.conversation.entries[0]!.node).not.toBe(legacy.entries[0]!.node);
-    expect(Object.isFrozen(context.content.conversation.entries[0]!.node)).toBe(true);
+    expect(context.content.conversation.entries[0].node).not.toBe(legacy.entries[0].node);
+    expect(Object.isFrozen(context.content.conversation.entries[0].node)).toBe(true);
 
     const secret = { replaceGeneration: 0, entries: [{ node: { kind: "user", messageId: "u", content: { text: "x", apiKey: "sk-123" } }, sourceEventSeqs: [] }] } as unknown as SessionSurfaceView;
     await expect(new ContextEngine({ resolve: input => base(input, secret, 0) }).getContext(request)).rejects.toThrow(/forbidden field apiKey/);
@@ -86,7 +86,7 @@ describe("trusted Surface in the Context engine", () => {
     const impostor = Object.freeze({ replaceGeneration: real.replaceGeneration, entries: Object.freeze([...real.entries]) });
     const context = await new ContextEngine({ resolve: input => base(input, impostor, value.lastSeq) }).getContext(request);
     expect(context.content.conversation).not.toBe(impostor);
-    expect(context.content.conversation.entries[0]!.node).not.toBe(real.entries[0]!.node);
+    expect(context.content.conversation.entries[0].node).not.toBe(real.entries[0].node);
     expect(context.content.conversation).toEqual(impostor);
   });
 

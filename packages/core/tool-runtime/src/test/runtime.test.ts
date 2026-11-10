@@ -350,7 +350,7 @@ describe("Tool Runtime execution contract", () => {
     const broker: ApprovalBroker = { async requestApproval(request) {
       expect(request.supportedLifetimes).toEqual(["once", "session"]);
       expect(request.grantSuggestions).toHaveLength(1);
-      return { requestId: request.requestId, kind: "session", suggestionId: request.grantSuggestions[0]!.suggestionId, decidedAt: new Date().toISOString() };
+      return { requestId: request.requestId, kind: "session", suggestionId: request.grantSuggestions[0].suggestionId, decidedAt: new Date().toISOString() };
     } };
     const trustedGrantAudiences = new Set(["plugin.test\u0000filesystem-read\u00001"]);
     const env = environment([], { approvalBroker: broker, permissionRecords: records, sessionGrants: grants, sessionGrantCapability: true, trustedGrantAudiences });
@@ -623,7 +623,7 @@ describe("process Session Grant execution", () => {
     const broker: ApprovalBroker = { async requestApproval(request) {
       expect(request.grantSuggestions).toHaveLength(1);
       expect(request.resources).toMatchObject([{ kind: "process", noSandbox: false }]);
-      return { requestId: request.requestId, kind: "session", suggestionId: request.grantSuggestions[0]!.suggestionId, decidedAt: new Date().toISOString() };
+      return { requestId: request.requestId, kind: "session", suggestionId: request.grantSuggestions[0].suggestionId, decidedAt: new Date().toISOString() };
     } };
     const run = (id: string, value: string, env = environment([], options)) => runtime.executeBatch([call(id, { value })], env);
     expect((await run("first", "pnpm test", environment([], { ...options, approvalBroker: broker })))[0]?.status).toBe("completed");
@@ -646,7 +646,7 @@ describe("process Session Grant execution", () => {
     let calls = 0;
     runtime.register({ definition: definition(), executor: { concurrencySafe: true, async execute() { calls++; return success(); } }, permission: {
       grantAudience: audience,
-      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: "/workspace", workspaceRoot: "/workspace", noSandbox: false, dynamic: false, argv: String(args.value).split(" "), grantPrefix: [String(args.value).split(" ")[0]!] }],
+      extractResources: args => [{ kind: "process", access: "execute", commandDigest: String(args.value), cwd: "/workspace", workspaceRoot: "/workspace", noSandbox: false, dynamic: false, argv: String(args.value).split(" "), grantPrefix: [String(args.value).split(" ")[0]] }],
       evaluate: () => ({ kind: "ask", risk: "high", reason: "run", reusable: true }),
       suggestGrants: () => [{ action: "process.execute", access: "execute", selector: { kind: "command_prefix", prefix: ["ls"], cwdRoot: "/workspace" }, label: "ls" }],
     } });

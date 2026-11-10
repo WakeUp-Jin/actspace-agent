@@ -29,7 +29,7 @@ describe("filesystem-search output cap", () => {
     await Promise.all(Array.from({ length: 2_000 }, (_, i) => writeFile(join(root, `f${String(i).padStart(4, "0")}.ts`), `export const needle_${i} = "${"x".repeat(60)}";\n`)));
     const ports = createNodeToolPorts({ workspaceRoot: root });
     const result = await invoke(ports.grep, { pattern: "needle" });
-    const text = (result.modelOutput as { text: string }[])[0]!.text;
+    const text = (result.modelOutput as { text: string }[])[0].text;
     expect(text.length).toBeLessThan(66_000);
     expect(text).toContain("Output truncated");
     expect(text).toMatch(/narrow/i);

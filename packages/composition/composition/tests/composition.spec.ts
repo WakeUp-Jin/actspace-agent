@@ -17,7 +17,7 @@ describe("composition", () => {
   });
   it("fails closed when a required Host capability is absent", () => expect(() => composeRuntime({ profile, bundles: [bundle], hostCapabilities: [] })).toThrow("lacks Host capabilities"));
   it("rejects required plugin frontend code and warns for optional frontend metadata", () => {
-    const behavior = manifest.behaviors[0]!;
+    const behavior = manifest.behaviors[0];
     const required: Bundle = { ...bundle, manifests: [{ ...manifest, behaviors: [{ ...behavior, frontend: { required: true, rendererKeys: ["example.card"] } }] }] };
     expect(() => composeRuntime({ profile, bundles: [required], hostCapabilities: ["filesystem.read"] })).toThrow("requires plugin frontend code");
     const optional: Bundle = { ...bundle, manifests: [{ ...manifest, behaviors: [{ ...behavior, frontend: { required: false, rendererKeys: ["example.card"] } }] }] };
@@ -30,7 +30,7 @@ describe("composition", () => {
     expect(() => composeRuntime({ profile: requiredProfile, bundles: [bundle], hostCapabilities: ["filesystem.read"] })).toThrow("Target missing not found");
   });
   it("rejects two active providers for one Service ID", () => {
-    const secondManifest: PluginManifest = { ...manifest, pluginId: pluginId("example.second"), behaviors: [{ ...manifest.behaviors[0]!, entryId: entryId("example.second"), module: "./second.js" }] };
+    const secondManifest: PluginManifest = { ...manifest, pluginId: pluginId("example.second"), behaviors: [{ ...manifest.behaviors[0], entryId: entryId("example.second"), module: "./second.js" }] };
     const second: Bundle = { id: "second", version: "1", provenance: "second", manifests: [secondManifest] };
     const two: Profile = { ...profile, orderedBundleIds: ["base", "second"] };
     expect(() => composeRuntime({ profile: two, bundles: [bundle, second], hostCapabilities: ["filesystem.read"] })).toThrow("Multiple active providers");

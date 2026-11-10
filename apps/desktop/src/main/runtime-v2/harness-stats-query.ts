@@ -270,10 +270,10 @@ function disclosure(scope: Scope): HarnessStatsDisclosure {
   const cycles = scope.all("t.active AS active,t.active_read AS active_read,t.cap_hit AS cap_hit", "harness_disclosure_cycle");
   const finished = cycles.filter(row => row.active_read !== null && row.active_read !== undefined && n(row.active) > 0);
   const activeHistogram = Array.from({ length: 11 }, () => 0);
-  for (const row of cycles) activeHistogram[Math.min(10, Math.floor(n(row.active) / 10))]! += 1;
+  for (const row of cycles) activeHistogram[Math.min(10, Math.floor(n(row.active) / 10))] += 1;
   const rollup = scope.get(`SUM(t.mis_sleeps) AS mis,SUM(t.slept_paths) AS slept,SUM(t.index_reads) AS index_reads,SUM(t.index_conversions) AS conversions,GROUP_CONCAT(t.sleep_hist,'|') AS hists`, "harness_disclosure_rollup");
   const sleepHistogram = Array.from({ length: HARNESS_SLEEP_BUCKETS }, () => 0);
-  for (const value of String(rollup.hists ?? "").split("|")) { const values = parseArray(value); for (let index = 0; index < HARNESS_SLEEP_BUCKETS; index++) sleepHistogram[index]! += values[index] ?? 0; }
+  for (const value of String(rollup.hists ?? "").split("|")) { const values = parseArray(value); for (let index = 0; index < HARNESS_SLEEP_BUCKETS; index++) sleepHistogram[index] += values[index] ?? 0; }
   const compactions = scope.all("t.compaction_id AS id,t.time AS time,t.trigger AS trigger,t.ok AS ok,t.failure_code AS failure_code,t.duration_ms AS duration_ms,t.before_tokens AS before_tokens,t.after_tokens AS after_tokens,t.steps_since AS steps_since,t.window_ratio AS window_ratio,t.folded AS folded,t.folded_tokens AS folded_tokens,t.reread AS reread", "harness_compaction", "ORDER BY t.time DESC");
   const ok = compactions.filter(row => n(row.ok) === 1);
   const windows = ok.filter(row => row.window_ratio != null).map(row => n(row.window_ratio)).sort((a, b) => a - b);
@@ -294,7 +294,7 @@ function disclosure(scope: Scope): HarnessStatsDisclosure {
       count: ok.length, auto: ok.filter(row => row.trigger === "auto").length, manual: ok.filter(row => row.trigger === "manual").length, failed: compactions.length - ok.length,
       avgBeforeTokens: mean(ok, "before_tokens"), avgAfterTokens: mean(ok, "after_tokens"), avgDurationMs: mean(ok, "duration_ms"),
       rereadRate: ratio(ok.filter(row => n(row.reread) > 0).length, ok.length),
-      triggerWindowP50: windows.length ? windows[Math.max(0, Math.ceil(windows.length / 2) - 1)]! : null,
+      triggerWindowP50: windows.length ? windows[Math.max(0, Math.ceil(windows.length / 2) - 1)] : null,
       avgStepsBetween: mean(ok, "steps_since"),
       foldedOutputs: ok.reduce((total, row) => total + n(row.folded), 0), foldedTokens: ok.reduce((total, row) => total + n(row.folded_tokens), 0),
     },

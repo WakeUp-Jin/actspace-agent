@@ -23,7 +23,7 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
   const mounted: string[] = [];
   const onProcesses = vi.fn();
   const ports = {
-    ...Object.fromEntries(PLUGIN_CATALOG.filter(item => item.manifest.behaviors[0]!.injects?.some(id => String(id) === `actspace.host.tools.${item.id}`)).map(item => [
+    ...Object.fromEntries(PLUGIN_CATALOG.filter(item => item.manifest.behaviors[0].injects?.some(id => String(id) === `actspace.host.tools.${item.id}`)).map(item => [
       `actspace.host.tools.${item.id}`, { createPorts: () => { mounted.push(item.id); return {}; } },
     ])),
     "actspace.host.filesystem": { workspaceRoot: root },

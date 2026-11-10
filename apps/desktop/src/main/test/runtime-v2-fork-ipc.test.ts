@@ -39,7 +39,7 @@ it("forks from an assistant reply by passing its turnId to the Host instead of a
   const { registration, forkSession, fork } = setup();
   try {
     await fork({ sessionId: "parent", turnId: "turn-3" });
-    const input = forkSession.mock.calls[0]![0] as Record<string, unknown>;
+    const input = forkSession.mock.calls[0][0] as Record<string, unknown>;
     expect(input).toMatchObject({ parentSessionId: "parent", turnId: "turn-3" });
     expect("boundarySeq" in input).toBe(false);
   } finally { registration.dispose?.(); }

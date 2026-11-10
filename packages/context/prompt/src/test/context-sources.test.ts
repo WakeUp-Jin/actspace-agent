@@ -21,7 +21,7 @@ it("refreshes changed/deleted AGENTS between turns and keeps Chat outside worksp
     expect(await prompt.resolveForTurn(workspaceRoot, "t1", false)).toBe(first);
     const second = await prompt.resolveForTurn(workspaceRoot, "t2", false);
     expect(second.instructions.map(value => value.content)).toEqual(["User rule", "Second rule"]);
-    expect(second.instructions[1]!.contentDigest).not.toBe(first.instructions[1]!.contentDigest);
+    expect(second.instructions[1].contentDigest).not.toBe(first.instructions[1].contentDigest);
     await rm(join(workspaceRoot, "AGENTS.md"));
     expect((await prompt.resolveForTurn(workspaceRoot, "t3", false)).instructions.map(value => value.id)).toEqual(["host/user-instructions"]);
     const chat = await prompt.resolveForTurn(workspaceRoot, "t4", true);

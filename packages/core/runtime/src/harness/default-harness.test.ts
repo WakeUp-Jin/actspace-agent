@@ -142,7 +142,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       const childResult = await runtime.subagents.spawn({ sessionId: "conversation", callId: "child-call", scope: parentScope, description: "short result", prompt: "Report a short result", preset: "explore", background: false, parentToolNames: [], registeredToolNames: [], signal: new AbortController().signal });
       observeChild = undefined;
       expect(childResult).toMatchObject({ ok: true, text: expect.stringContaining("fixed loop result") });
-      const childSessionId = /Subagent (\S+) \(short result\) finished\./.exec(childResult.text)![1]!;
+      const childSessionId = /Subagent (\S+) \(short result\) finished\./.exec(childResult.text)![1];
       // A client reading the finished child's task queue gets it without taking the child over,
       // so the parent can still continue it (acceptance BUG-02).
       expect((await runtime.runs.service.snapshot(childSessionId)).runs).toEqual([expect.objectContaining({ state: "completed" })]);

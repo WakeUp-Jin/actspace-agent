@@ -145,7 +145,7 @@ export function reduceSubagentFacts(state: Readonly<Record<string, TranscriptSub
   const agentId = typeof data.agentId === "string" ? data.agentId : null;
   if (agentId === null) return state;
   if (event.type === "subagent/spawned" && typeof data.description === "string" && typeof data.kind === "string") {
-    return { ...state, [agentId]: { description: data.description, kind: data.kind, ...(typeof data.preset === "string" ? { preset: data.preset } : {}), ...(state[agentId]?.model ? { model: state[agentId]!.model } : {}) } };
+    return { ...state, [agentId]: { description: data.description, kind: data.kind, ...(typeof data.preset === "string" ? { preset: data.preset } : {}), ...(state[agentId]?.model ? { model: state[agentId].model } : {}) } };
   }
   const current = state[agentId];
   if (event.type === "subagent/activation" && data.op === "start" && current && typeof data.model === "string" && data.model && data.model !== current.model) return { ...state, [agentId]: { ...current, model: data.model } };
@@ -231,7 +231,7 @@ function tagText(text: string, tag: string): string | undefined {
 /** `<agent_message from=… relation=…>body</agent_message>` → body; other text is kept as is. */
 function unwrapAgentMessage(text: string): string {
   const match = /^\s*<agent_message\b[^>]*>\n?([\s\S]*?)\n?<\/agent_message>\s*$/.exec(text);
-  return (match ? match[1]! : text).trim();
+  return (match ? match[1] : text).trim();
 }
 
 function delegatedChild(data: Record<string, unknown>): string | null {
@@ -257,7 +257,7 @@ function resultText(data: Record<string, unknown>, event: SessionEventEnvelopeV1
   const lines = raw.split("\n").map(line => line.trim()).filter(Boolean);
   if (!lines.length) return "";
   const more = lines.length > 1 ? ` (+${lines.length - 1} more lines)` : "";
-  return `${clip(lines[0]!)}${more}`;
+  return `${clip(lines[0])}${more}`;
 }
 
 const ARG_KEYS = ["command", "path", "file_path", "pattern", "query", "url", "task", "description", "prompt", "name"] as const;

@@ -25,8 +25,9 @@ export function LocalUpdateSection() {
       });
   }, []);
 
+  const updateActive = isLocalUpdateActive(state);
   useEffect(() => {
-    if (!progressOpen && !isLocalUpdateActive(state)) return;
+    if (!progressOpen && !updateActive) return;
 
     let canceled = false;
     const refreshState = async () => {
@@ -49,7 +50,7 @@ export function LocalUpdateSection() {
       canceled = true;
       window.clearInterval(timer);
     };
-  }, [progressOpen, state?.running, state?.progress.phase]);
+  }, [progressOpen, updateActive, state?.running, state?.progress.phase]);
 
   const chooseSource = async () => {
     setBusy(true);

@@ -31,7 +31,7 @@ function validateState(data: RuntimeV2JsonValue): void {
   if (value.op === "index" || value.op === "applied") {
     if (value.indexPaths !== undefined) { if (!Array.isArray(value.indexPaths)) throw new Error("Invalid index paths."); value.indexPaths.forEach(string); }
     string(value.indexDigest);
-    if (value.index !== null) { const artifact = record(value.index!); string(artifact.artifactId); string(artifact.mediaType); string(artifact.sha256); integer(artifact.size); }
+    if (value.index !== null) { const artifact = record(value.index); string(artifact.artifactId); string(artifact.mediaType); string(artifact.sha256); integer(artifact.size); }
     if (value.op === "applied") { string(value.compactionId); integer(value.cycle); if (!Array.isArray(value.activeIds) || value.activeIds.length > 100 || value.activeIds.some(id => typeof id !== "string") || new Set(value.activeIds).size !== value.activeIds.length) throw new Error("Invalid active path IDs."); }
     return;
   }

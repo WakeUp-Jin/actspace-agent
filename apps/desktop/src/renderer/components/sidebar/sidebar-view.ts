@@ -198,7 +198,7 @@ export function timeBucketOf(updatedAt: string, now: Date): Omit<TimeBucket, "se
   const days = Math.round((startOfDay(now) - startOfDay(date)) / DAY_MS);
   if (days <= 0) return { key: "today", label: "今天" };
   if (days === 1) return { key: "yesterday", label: "昨天" };
-  if (days < 7) return { key: `day-${days}`, label: WEEKDAYS[date.getDay()]!, date: `${date.getMonth() + 1}月${date.getDate()}日` };
+  if (days < 7) return { key: `day-${days}`, label: WEEKDAYS[date.getDay()], date: `${date.getMonth() + 1}月${date.getDate()}日` };
   if (date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()) return { key: "month-earlier", label: "本月更早" };
   if (date.getFullYear() === now.getFullYear()) return { key: `month-${date.getMonth() + 1}`, label: `${date.getMonth() + 1}月` };
   return { key: `year-${date.getFullYear()}-${date.getMonth() + 1}`, label: `${date.getFullYear()}年${date.getMonth() + 1}月` };

@@ -35,7 +35,7 @@ function perEventMicros(size: number, batch = 400, rounds = 7): number {
     samples.push(((performance.now() - start) * 1000) / batch);
   }
   samples.sort((a, b) => a - b);
-  return samples[Math.floor(samples.length / 2)]!;
+  return samples[Math.floor(samples.length / 2)];
 }
 
 function surfaceEvent(seq: number, type: string, messageId?: string) {

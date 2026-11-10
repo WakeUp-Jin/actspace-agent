@@ -14,7 +14,7 @@ describe("Todo plugin event and projection", () => {
       [{ todoId: "a", revision: 1, text: "A", state: "pending", createdAt: "a", updatedAt: "a" }],
       [{ todoId: "b", revision: 1, text: "B", state: "pending", createdAt: "b", updatedAt: "b" }],
       [{ todoId: "a", revision: 2, text: "A2", state: "completed", updatedAt: "a2" }],
-    ]) journal.append({ type: TODO_EVENT_TYPE, eventVersion: 1, source: { ownerPluginId: TODO_PLUGIN_ID }, data: { items, revision: items[0]!.revision }, surface: null });
+    ]) journal.append({ type: TODO_EVENT_TYPE, eventVersion: 1, source: { ownerPluginId: TODO_PLUGIN_ID }, data: { items, revision: items[0].revision }, surface: null });
     const service = createSessionProjectionService();
     service.registerContributor(todoProjectionContributor);
     const projection = service.createRegistry();

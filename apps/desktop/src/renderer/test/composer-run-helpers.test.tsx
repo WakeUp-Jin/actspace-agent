@@ -7,7 +7,7 @@ import { composerSendOptions } from "../components/composer/use-composer-send";
 import { useComposerModel, type ComposerModelSource } from "../components/composer/use-composer-model";
 
 describe("composerSendOptions", () => {
-  const base = { model: MODEL_LIST[0]!.id, mode: "agent" as const, selectedSkills: [] };
+  const base = { model: MODEL_LIST[0].id, mode: "agent" as const, selectedSkills: [] };
 
   it("sends the reasoning effort only while thinking is on", () => {
     expect(composerSendOptions({ ...base, runtimeOptions: { thinkingEnabled: false, reasoningEffort: "high" } })).not.toHaveProperty("reasoningEffort");
@@ -52,7 +52,7 @@ describe("useComposerModel", () => {
     rerender({ defaultModelId: second });
     expect(result.current.selectedModelId).toBe(second);
 
-    act(() => result.current.selectModel(first!));
+    act(() => result.current.selectModel(first));
     rerender({ defaultModelId: third });
     expect(result.current.selectedModelId).toBe(first);
   });

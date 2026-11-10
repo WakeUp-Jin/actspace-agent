@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent } from "react";
 import { BookOpen, FileText, X } from "lucide-react";
 import type { ComposerAttachment } from "@actspace/shared";
 import { dialogsApi } from "../../api/dialogs";
@@ -101,13 +101,13 @@ export function useComposerAttachments({
   const [attachments, setAttachmentState] = useState<ComposerAttachment[]>(() => draftKey && readAttachmentDraft ? readAttachmentDraft(draftKey) : [...(initial ?? [])]);
   const attachmentsRef = useRef(attachments);
   // 附件改动同时写回当前 draftKey 的草稿（16 T14）。ref 同步更新，连续两次改动不会基于旧值。
-  const setAttachments = (update: ComposerAttachment[] | ((current: ComposerAttachment[]) => ComposerAttachment[])) => {
+  const setAttachments = useCallback((update: ComposerAttachment[] | ((current: ComposerAttachment[]) => ComposerAttachment[])) => {
     const next = typeof update === "function" ? update(attachmentsRef.current) : update;
     if (next === attachmentsRef.current) return;
     attachmentsRef.current = next;
     setAttachmentState(next);
     if (draftKey) writeAttachmentDraft?.(draftKey, next);
-  };
+  }, [draftKey, writeAttachmentDraft]);
   const persistsAttachmentsRef = useRef(false);
   persistsAttachmentsRef.current = Boolean(draftKey && writeAttachmentDraft);
   const [error, setError] = useState<string | null>(null);

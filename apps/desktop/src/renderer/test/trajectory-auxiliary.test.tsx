@@ -85,7 +85,7 @@ describe('auxiliary Journal → trajectory requests', () => {
     const requests = [...layout.requests.values()];
     expect(requests).toHaveLength(2);
     expect(requests[0]).toMatchObject({ purpose: 'assistant', provider: 'main-route', model: 'main-model', usage: { inputTokens: 100, outputTokens: 20 }, toolCalls: 1 });
-    const auxiliary = requests[1]!;
+    const auxiliary = requests[1];
     const parent = layout.cells.find(cell => cell.record.callId === 'image' && cell.kind === 'tool')!;
     expect(auxiliary).toMatchObject({ purpose: 'image-inspection', status: 'completed', usage: { inputTokens: 90, outputTokens: 10, cacheReadTokens: 20 }, parentRecordId: parent.recordId, startedAt: Date.parse(f.start.startedAt), completedAt: Date.parse('2026-10-23T00:00:08Z') });
     expect(runtime.records.filter(record => record.kind === 'assistant')).toHaveLength(1);

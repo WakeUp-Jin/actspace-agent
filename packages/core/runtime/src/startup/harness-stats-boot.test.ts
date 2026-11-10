@@ -35,7 +35,7 @@ it("writes the Harness inventory and tool owners to <dataRoot>/harness-stats whe
     const files = await readdir(join(root, "harness-stats"));
     expect(files).toHaveLength(1);
     expect(files[0]).toMatch(/^\d{4}-\d{2}\.jsonl$/);
-    const lines = (await readFile(join(root, "harness-stats", files[0]!), "utf8")).trimEnd().split("\n").map(line => JSON.parse(line) as { t: string; plugin?: string; tool?: string; revision?: string; source?: string; ok?: boolean });
+    const lines = (await readFile(join(root, "harness-stats", files[0]), "utf8")).trimEnd().split("\n").map(line => JSON.parse(line) as { t: string; plugin?: string; tool?: string; revision?: string; source?: string; ok?: boolean });
     const inventory = lines.filter(line => line.t === "inventory");
     expect(inventory.length).toBeGreaterThan(5);
     expect(inventory.every(line => line.revision === "main@1" && line.ok === true)).toBe(true);

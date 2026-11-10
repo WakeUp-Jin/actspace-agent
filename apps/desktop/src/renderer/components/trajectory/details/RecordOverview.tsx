@@ -69,7 +69,7 @@ function messageSourceLabel(source: unknown): string {
   const { kind, round } = source as Record<string, unknown>;
   if (kind === 'user') return T.sourceUser;
   if (kind === 'goal') return typeof round === 'number' && round > 0 ? `${T.sourceGoal} · Round ${round}` : T.sourceGoal;
-  return typeof kind === 'string' && kind !== '' ? `${kind[0]!.toUpperCase()}${kind.slice(1)}` : T.sourceUnknown;
+  return typeof kind === 'string' && kind !== '' ? `${kind[0].toUpperCase()}${kind.slice(1)}` : T.sourceUnknown;
 }
 
 function TokenRows({ cell }: { cell: TrajectoryCell }) {

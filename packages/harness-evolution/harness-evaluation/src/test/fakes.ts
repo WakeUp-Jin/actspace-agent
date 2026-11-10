@@ -30,7 +30,7 @@ export function fakeSandbox(candidate: FakeCandidate, status: Partial<SandboxSta
 }
 
 function flags(argv: readonly string[]): Record<string, string> {
-  return Object.fromEntries(argv.flatMap((arg, index) => arg.startsWith("--") && argv[index + 1] !== undefined && !argv[index + 1]!.startsWith("--") ? [[arg.slice(2), argv[index + 1]!]] : []));
+  return Object.fromEntries(argv.flatMap((arg, index) => arg.startsWith("--") && argv[index + 1] !== undefined && !argv[index + 1].startsWith("--") ? [[arg.slice(2), argv[index + 1]]] : []));
 }
 
 export const exited = (exitCode = 0): SandboxResult["outcome"] => ({ status: "exited", exitCode, signal: null });

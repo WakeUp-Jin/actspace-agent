@@ -102,7 +102,7 @@ export class HarnessStats {
       activated: finalRevision => {
         if (state !== "mounting") return;
         revision.key = harnessRevisionKey(identity.harnessId, finalRevision);
-        for (let index = 0; index < owners.length; index++) owners[index] = { ...owners[index]!, revision: revision.key };
+        for (let index = 0; index < owners.length; index++) owners[index] = { ...owners[index], revision: revision.key };
         writeInventory();
         state = "active";
       },

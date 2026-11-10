@@ -258,11 +258,12 @@ function ComposerPaletteContent({
   // 当前行不在列表里（搜索词变了、刚换页）时落到第一条可选的行。
   const activeRow = enabledRows.find((row) => row.key === activeKey) ?? enabledRows[0];
   const rowId = (row: PaletteRow) => `${listboxId}-${row.key}`;
+  const activeRowId = activeRow ? rowId(activeRow) : null;
 
   useEffect(() => {
-    if (!activeRow) return;
-    document.getElementById(rowId(activeRow))?.scrollIntoView?.({ block: "nearest" });
-  }, [activeRow?.key]);
+    if (!activeRowId) return;
+    document.getElementById(activeRowId)?.scrollIntoView?.({ block: "nearest" });
+  }, [activeRowId]);
 
   function move(delta: 1 | -1) {
     if (enabledRows.length === 0) return;

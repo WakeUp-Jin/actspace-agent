@@ -173,7 +173,7 @@ export const WorkbenchLayout = memo(function WorkbenchLayout({
     setCompactSidebarOpen(false);
     // 窄窗口里右栏是浮层，进 Space 时先收起，免得一进来就盖住对话。
     if (next === "space" && isCompactLayout) setSpacePanelOpen(false);
-  }, [isCompactLayout, setSpacePanelOpen]);
+  }, [isCompactLayout, setSpacePanelOpen, setCompactSidebarOpen]);
 
   const usageLoadSequence = useRef(0);
   const usageRequest = useRef<string>();

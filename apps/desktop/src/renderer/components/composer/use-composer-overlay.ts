@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { ComposerStat } from "./ComposerStatsPills";
 import type { RunTargetField } from "./RunTargetRow";
 
@@ -20,6 +20,8 @@ function overlayKey(overlay: ComposerOverlay): string | null {
 /** 09 T30：`+` 面板、模型菜单、上下文用量浮层、状态行统计胶囊面板和新建页运行位置选择器的开关。 */
 export function useComposerOverlay() {
   const [overlay, setOverlay] = useState<ComposerOverlay>(null);
+  // 稳定的引用：Composer 的 effect 把它列进依赖，不会因为每次渲染换函数而重跑。
+  const close = useCallback(() => setOverlay(null), []);
   return {
     overlay,
     paletteOpen: overlay?.kind === "palette",
@@ -27,7 +29,7 @@ export function useComposerOverlay() {
     contextOpen: overlay?.kind === "context",
     openStat: overlay?.kind === "stats" ? overlay.stat : null,
     runTargetField: overlay?.kind === "run-target" ? overlay.field : null,
-    close: () => setOverlay(null),
+    close,
     // 打开一个浮层就顶掉其他浮层；关闭只关它自己：晚到的关闭回调不会关掉刚打开的另一个。
     setOpen(next: NonNullable<ComposerOverlay>, open: boolean) {
       setOverlay((current) => (open ? next : overlayKey(current) === overlayKey(next) ? null : current));

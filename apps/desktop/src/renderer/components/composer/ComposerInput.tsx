@@ -117,7 +117,7 @@ export function useComposerLayout({ surface, mode, message, inputRef, hasExtras,
     });
     resizeObserver.observe(body);
     return () => resizeObserver.disconnect();
-  }, [message, inlineBodyClass, layout, remeasureKey, surface]);
+  }, [message, inlineBodyClass, layout, remeasureKey, surface, inputRef]);
 
   return {
     bodyRef,

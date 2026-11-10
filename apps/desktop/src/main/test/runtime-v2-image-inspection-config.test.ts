@@ -39,7 +39,7 @@ function fixture(initialModel?: string) {
   const run = (label: string, sessionId = "same-session") => {
     phase = label;
     const context = { sessionId, agentRunId: "run", turnId: "turn", stepId: "step", callId: label, signal: new AbortController().signal } as ToolExecutionContext;
-    return ports.inspect_image!({ artifact_id: "owned-image", question: "What is visible?" }, context);
+    return ports.inspect_image({ artifact_id: "owned-image", question: "What is visible?" }, context);
   };
   return { run, setModel: (value?: string) => { model = value; }, resolutions, readArtifact, prepare, start, finish, release };
 }

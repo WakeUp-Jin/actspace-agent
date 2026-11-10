@@ -133,7 +133,7 @@ describe("ReviewGitEngine", () => {
       workspaceId: "workspace-app",
       workspaceRoot: join(root, "app"),
       snapshot,
-      fileId: snapshot.files[0]!.id,
+      fileId: snapshot.files[0].id,
       generation: 1,
     });
     expect(diff.ok).toBe(true);
@@ -183,7 +183,7 @@ describe("ReviewGitEngine", () => {
     const diffResult = await engine.getFileDiff({
       ...workspace(root),
       snapshot,
-      fileId: snapshot.files[0]!.id,
+      fileId: snapshot.files[0].id,
       generation: 1,
     });
     expect(diffResult.ok).toBe(true);
@@ -194,7 +194,7 @@ describe("ReviewGitEngine", () => {
     const contents = await engine.getFileContents({
       ...workspace(root),
       snapshot,
-      fileIds: [snapshot.files[0]!.id],
+      fileIds: [snapshot.files[0].id],
       generation: 1,
       signal: new AbortController().signal,
     });

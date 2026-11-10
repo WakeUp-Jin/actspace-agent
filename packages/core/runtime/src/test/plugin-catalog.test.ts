@@ -3,7 +3,7 @@ import { DEFAULT_HARNESS_ENTRIES } from "../harness/default-harness-definition.j
 import { TRUSTED_LOADER_ENTRIES } from "../profiles/composition.js";
 import { harnessEntriesOffByDefault, PLUGIN_CATALOG, PLUGIN_PACKAGES_OUTSIDE_DEFAULT, pluginCatalogEntry } from "../plugin-catalog.js";
 
-const behavior = (id: string) => pluginCatalogEntry(id)!.manifest.behaviors[0]!;
+const behavior = (id: string) => pluginCatalogEntry(id)!.manifest.behaviors[0];
 
 /**
  * These derivations replaced hand-written tables. The expected values below were first asserted

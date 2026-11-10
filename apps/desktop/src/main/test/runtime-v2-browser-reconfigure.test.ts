@@ -129,7 +129,7 @@ describe("Browser Runtime restart admission", () => {
 
   it("boots and refreshes without a browser port when the plugin is off", async () => {
     const fixture = await setup(false, true);
-    expect(bootDesktopRuntimeV2.mock.calls[0]![0].browser).toBeUndefined();
+    expect(bootDesktopRuntimeV2.mock.calls[0][0].browser).toBeUndefined();
     expect(await fixture.registry.refreshBrowser()).toBe(false);
     expect(fixture.browser.getStatus).not.toHaveBeenCalled();
     expect(fixture.shutdown).not.toHaveBeenCalled();

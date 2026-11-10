@@ -45,7 +45,7 @@ export function removeHost(hostId: string, storage: Storage = localStorage): voi
   const saved = readSavedHosts(storage);
   if (!saved) return;
   const hosts = saved.hosts.filter(host => host.hostId !== hostId);
-  write(hosts.length ? { version: 1, activeHostId: hosts[0]!.hostId, hosts } : null, storage);
+  write(hosts.length ? { version: 1, activeHostId: hosts[0].hostId, hosts } : null, storage);
 }
 
 /** 「Safari · iPhone」这样的默认设备名。 */

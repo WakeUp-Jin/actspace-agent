@@ -77,7 +77,7 @@ describe("SessionRunManager", () => {
     await manager.submit("one", "one"); await entered.promise;
     await manager.submit("two", "two");
     expect(await manager.stop("old-run")).toBe(false);
-    expect(await manager.stop(ledger.snapshot().runs.find(run => run.state === "running")!.runId!)).toBe(true);
+    expect(await manager.stop(ledger.snapshot().runs.find(run => run.state === "running")!.runId)).toBe(true);
     await stopped.promise; await manager.waitForIdle();
     expect(order).toEqual(["dispose", "release"]);
     expect(ledger.snapshot()).toMatchObject({ paused: true, tasks: [{ state: "cancelled" }, { state: "pending" }] });
@@ -192,7 +192,7 @@ it("does not turn an execution settlement error into a successful cancellation",
     dispose: async () => {},
   }) });
   await manager.submit("one", "one"); await entered.promise;
-  await manager.stop(ledger.snapshot().runs.find(run => run.state === "running")!.runId!); await manager.waitForIdle();
+  await manager.stop(ledger.snapshot().runs.find(run => run.state === "running")!.runId); await manager.waitForIdle();
   expect(ledger.snapshot().runs[0]?.state).toBe("failed");
   expect(manager.failure).toBeInstanceOf(AggregateError);
   await manager.dispose(); await session.close();
@@ -207,7 +207,7 @@ it("reads updated model configuration only after the asynchronous Harness lease 
   setConfig("changed-while-waiting"); permit.resolve(); await manager.waitForIdle();
   expect(seen).toEqual([{ model: "changed-while-waiting", mode: "agent" }]);
   expect(ledger.snapshot().runs[0]?.configuration).toMatchObject({ harnessExecutionDigest: "stable-content" });
-  expect(Object.keys(ledger.snapshot().runs[0]!.harness).sort()).toEqual(["generationId", "harnessId", "revision"]);
+  expect(Object.keys(ledger.snapshot().runs[0].harness).sort()).toEqual(["generationId", "harnessId", "revision"]);
   await manager.dispose(); await session.close();
 });
 
@@ -281,7 +281,7 @@ describe("send after stop or failure", () => {
 
   it("resumes the first send of a recovered (forked) Session", async () => {
     const { manager, ledger, session } = await fixture(completes);
-    await ledger.submit("stale", "stale"); await ledger.cancel(ledger.snapshot().tasks[0]!.taskId, ledger.snapshot().revision);
+    await ledger.submit("stale", "stale"); await ledger.cancel(ledger.snapshot().tasks[0].taskId, ledger.snapshot().revision);
     await ledger.setPaused(true, ledger.snapshot().revision);
     await manager.submit("first-after-fork", "hello"); await manager.waitForIdle();
     expect(ledger.snapshot()).toMatchObject({ paused: false, tasks: [{ state: "cancelled" }, { state: "completed" }] });
