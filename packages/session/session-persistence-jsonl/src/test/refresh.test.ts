@@ -23,7 +23,7 @@ vi.mock("node:fs/promises", async importOriginal => {
         const value = Reflect.get(target, key) as unknown;
         if (key === "readFile") return async (...a: unknown[]) => { const buffer = await (value as Function).apply(target, a) as Buffer; reads.calls++; reads.bytes += buffer.length; return buffer; };
         if (key === "read") return async (...a: unknown[]) => { const result = await (value as Function).apply(target, a) as { bytesRead: number }; reads.calls++; reads.bytes += result.bytesRead; return result; };
-        if (key === "stat") return async (...a: unknown[]) => heldStat.value ?? await (value as Function).apply(target, a) as Stats;
+        if (key === "stat") return async () => heldStat.value ?? await target.stat();
         return typeof value === "function" ? value.bind(target) : value;
       } });
     },
