@@ -534,6 +534,55 @@ describe("Tool Runtime execution contract", () => {
     expect(JSON.stringify(result)).not.toContain('"secret"');
   });
 
+  it("bounds an oversized plugin tool result before commit and saves the full, redacted output for the call", async () => {
+    const runtime = new ToolRuntime();
+    const full = `first token-abcdefgh\n${"line of plugin output\n".repeat(20_000)}`;
+    runtime.register({ definition: definition(), executor: { async execute() { return { status: "failed", summary: "Plugin failed", modelOutput: [{ type: "text", text: full }], failure: { code: "PLUGIN_FAILED", message: "boom", retryable: false } }; } } });
+    const stored: Array<{ text: string; mediaType: string; owner: unknown }> = [];
+    const commits: ToolExecutionResult[] = [];
+    const [result] = await runtime.executeBatch([call("big")], {
+      ...environment([], { commits }),
+      createArtifact: async (input) => {
+        stored.push({ text: Buffer.from(input.bytes).toString("utf8"), mediaType: input.mediaType, owner: input.owner });
+        return { artifactId: "full-1", mediaType: input.mediaType, size: input.bytes.byteLength, sha256: "digest" };
+      },
+    });
+    expect(stored).toEqual([{ text: full.replace("token-abcdefgh", "[REDACTED]"), mediaType: "text/plain", owner: { sessionId: "session-1", callId: "big", pluginId: "plugin.test", name: "read" } }]);
+    // 结果是失败还是成功不变；截短的是提交进会话记录的那一份。
+    expect(result).toMatchObject({ status: "failed", failure: { code: "PLUGIN_FAILED", message: "boom" }, artifacts: [{ artifactId: "full-1" }] });
+    expect(commits).toEqual([result]);
+    expect(Buffer.byteLength(JSON.stringify(result?.modelOutput), "utf8")).toBeLessThanOrEqual(256 * 1024);
+    const [text, reference] = result!.modelOutput;
+    expect(text).toMatchObject({ type: "text" });
+    expect((text as { text: string }).text).toMatch(/^first \[REDACTED\]\nline of plugin output\n[\s\S]+\n\n\[Output truncated: this tool returned \d+ bytes, more than one result can hold\. The first \d+ bytes are shown\. The full output was saved as a file\.\]$/);
+    expect(reference).toEqual({ type: "artifact", artifact: { artifactId: "full-1", mediaType: "text/plain", size: Buffer.byteLength(full.replace("token-abcdefgh", "[REDACTED]")), sha256: "digest" }, label: "Full tool output" });
+  });
+
+  it("cuts a result to the per-call budget the Agent Loop passes for a nearly full context window", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { async execute(args) { return success(String(args.value).repeat(5_000)); } } });
+    const results = await runtime.executeBatch([call("a", { value: "aaaa" }), call("b", { value: "b" })], { ...environment([]), modelOutputChars: 6_000 });
+    const texts = results.map((result) => (result.modelOutput[0] as { text: string }).text);
+    expect(texts[0]).toMatch(/^a{4000,5600}\n\n\[Output truncated: this tool returned 20000 characters and the context window has room for about 6000\. The first \d+ characters are shown\. The full output was saved as a file\.\]$/);
+    expect(texts[0]!.length + 400).toBeLessThanOrEqual(6_000);
+    // 没超额度的那次调用原样返回。
+    expect(texts[1]).toBe("b".repeat(5_000));
+    expect(results.map((result) => result.modelOutput.length)).toEqual([2, 1]);
+  });
+
+  it("caps the message of a result that never reached the tool body", async () => {
+    const runtime = new ToolRuntime();
+    const execute = vi.fn(async () => success());
+    runtime.register({ definition: definition(), executor: { execute }, permission: { extractResources: () => [], evaluate: () => ({ kind: "deny", code: "POLICY_DENIED", reason: "n".repeat(100_000) }) } });
+    const [result] = await runtime.executeBatch([call("denied")], environment([]));
+    expect(execute).not.toHaveBeenCalled();
+    expect(result?.status).toBe("denied");
+    for (const text of [result!.summary, result!.failure!.message, (result!.modelOutput[0] as { text: string }).text]) {
+      expect(text.endsWith(" ...[truncated]")).toBe(true);
+      expect(text.length).toBeLessThanOrEqual(16 * 1024);
+    }
+  });
+
   it("rejects duplicate ids and invalid concurrency declarations", async () => {
     const runtime = new ToolRuntime();
     runtime.register({ definition: definition(), executor: { async execute() { return success(); } } });
