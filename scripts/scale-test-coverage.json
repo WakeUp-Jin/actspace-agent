@@ -29,6 +29,11 @@
       "path": "内存窗口外的事件从文件读回",
       "source": "packages/session/session-persistence-jsonl/src/event-history.ts",
       "tests": ["packages/session/session-persistence-jsonl/src/test/event-history.scale.test.ts"]
+    },
+    {
+      "path": "读一屏对话、翻页、展开工具详情（打开中的会话）",
+      "source": "packages/core/runtime/src/session/session-controller.ts",
+      "tests": ["packages/core/runtime/src/session/session-read-projection.scale.test.ts"]
     }
   ],
   "pending": {
@@ -36,7 +41,6 @@
     "packages/context/context-engine/src/supplements.ts": "补充条目投影用 journal.events；perf-backlog P6 待查",
     "packages/core/agent-service/src/task-ledger.ts": "任务账本整份读；低频（打开任务列表），待归入 perf-backlog",
     "packages/core/runtime/src/harness/managed-runs.ts": "托管运行恢复整份读；低频（启动），待归入 perf-backlog",
-    "packages/core/runtime/src/session/session-controller.ts": "inspectEvents / 冷会话读模型；perf-backlog P5 待查",
     "packages/session/session-journal/src/journal.ts": "journal.events 兼容入口与 latestEvent 的逐条读；perf-backlog P5 待查",
     "packages/session/session-persistence-jsonl/src/repair.ts": "修复流程整份读；低频（恢复）",
     "packages/session/session-persistence/src/recovery.ts": "恢复流程整份读；低频（恢复）",

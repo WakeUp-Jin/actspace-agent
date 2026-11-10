@@ -225,6 +225,7 @@ describe("production Session projections", () => {
     const controller = f.controller();
     const page = await controller.readProjection({ sessionId: "s" });
     expect(page.deferredToolCalls).toEqual(["c"]);
+    expect(page.window.support).toContainEqual({ kind: "tool-call", callId: "c", eventSeqs: [5, 6] });
     expect(page.snapshot.tools[0]?.state).toBe("failed");
     expect(JSON.stringify(page.window)).not.toContain(output);
     expect(JSON.stringify(page.window).length).toBeLessThan(24_000);
@@ -273,4 +274,22 @@ it("makes bounded progress through an oversized turn and keeps delta cursors exa
   expect(older.window.events.map(event => event.seq)).toEqual([1]);
   const delta = await controller.readProjection({ sessionId: "s", afterSeq: 0 });
   expect(delta.window.events.map(event => event.seq)).toEqual([1, 2]);
+});
+
+it("fits a window to its byte and event budgets exactly and always returns at least one event", async () => {
+  const f = await fixture(25);
+  f.journal.append({ type: "turn/start", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { turnId: "open" }, surface: null });
+  f.journal.append({ type: "user/message", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { messageId: "big", content: "x".repeat(5_000) }, surface: { kind: "append" } });
+  await appendFile(f.path, f.journal.events.slice(-2).map(event => JSON.stringify(event)).join("\n") + "\n");
+  const controller = f.controller();
+  const read = async (caps: { maxWindowBytes?: number; maxWindowEvents?: number }) => (await controller.readProjection({ sessionId: "s", afterSeq: -1, ...caps })).window.events;
+  const whole = await read({});
+  const bytes = JSON.stringify(whole).length;
+  expect(whole).toHaveLength(77);
+  expect(await read({ maxWindowBytes: bytes })).toEqual(whole);
+  expect(await read({ maxWindowBytes: bytes - 1 })).toEqual(whole.slice(1));
+  expect(await read({ maxWindowEvents: 76 })).toEqual(whole.slice(1));
+  // The last event alone is over the smallest budget; a reader still gets it and can move on.
+  expect(JSON.stringify(whole.slice(-1)).length).toBeGreaterThan(4_096);
+  expect(await read({ maxWindowBytes: 4_096 })).toEqual(whole.slice(-1));
 });

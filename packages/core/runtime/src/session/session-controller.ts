@@ -1,4 +1,4 @@
-import { GlobalSessionIndex, SessionProjectionCache, type ProjectionCacheRead } from "@actspace/session-projection-cache";
+import { GlobalSessionIndex, SessionProjectionCache, createHistoryIndex, indexHistoryEvent, indexHistoryEvents, type HistoryIndex, type ProjectionCacheRead } from "@actspace/session-projection-cache";
 import type { RuntimeV2DesktopSessionProjection, RuntimeV2SessionProjectionInput, RuntimeV2SessionUpdate, RuntimeV2ProjectionValues, RuntimeV2JsonValue, RuntimeV2SessionObservation, RuntimeV2ReadModelWatermarks, RuntimeV2WindowSupportFact } from "@actspace/shared/runtime-v2";
 import { randomUUID } from "node:crypto";
 import { agentFormComposition } from "@actspace/agent";
@@ -6,7 +6,7 @@ import { MAIN_AGENT_FORM } from "../main-agent-form.js";
 import type { RuntimeV2SessionListItem, RuntimeV2SessionSnapshot } from "@actspace/shared/runtime-v2";
 import type { MainAgentForm } from "@actspace/shared/runtime-v2";
 import { surfaceNode } from "@actspace/shared/runtime-v2";
-import type { EventCodecRegistry } from "@actspace/session-journal";
+import type { EventCodecRegistry, SessionJournal } from "@actspace/session-journal";
 import type { SessionHandle } from "@actspace/session-persistence";
 import { SessionHandle as RuntimeSessionHandle } from "@actspace/session-persistence";
 import { createSessionHeader } from "@actspace/session-journal";
@@ -24,6 +24,8 @@ export class RuntimeSessionController {
   readonly #external = new Map<string, SessionHandle>();
   readonly #ephemeral = new Set<string>();
   readonly #models = new Map<string, SessionReadModel>();
+  /** 打开中的会话的位置索引（见 `liveIndex`），按日志对象存：重写或重新打开后的会话是另一份日志，旧索引跟着旧日志一起回收。 */
+  readonly #liveIndexes = new WeakMap<SessionJournal, { readonly index: HistoryIndex; through: number }>();
   readonly #changes = new Map<string, Map<number, RuntimeV2ProjectionValues>>();
   readonly #projectionListeners = new Set<(update: RuntimeV2SessionUpdate) => void>();
   /** Recency of open Sessions, oldest first; a touch moves a Session to the end. */
@@ -53,7 +55,18 @@ export class RuntimeSessionController {
 
   private liveModel(session: SessionHandle): SessionReadModel {
     let model = this.#models.get(session.header.sessionId);
-    if (!model) { model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService).replay(session.journal.readEvents()); this.#models.set(session.header.sessionId, model); return model; }
+    if (!model) {
+      const events = session.journal.readEvents();
+      model = new SessionReadModel(session.header, this.options.registry, this.options.rendererAllowlist, this.options.projectionService).replay(events);
+      this.#models.set(session.header.sessionId, model);
+      // 位置索引用同一份事件建好，不为它再读一遍日志。
+      if (!this.#liveIndexes.has(session.journal)) {
+        const index = createHistoryIndex();
+        indexHistoryEvents(events, index);
+        this.#liveIndexes.set(session.journal, { index, through: events.at(-1)?.seq ?? -1 });
+      }
+      return model;
+    }
     const seq = model.projections.throughSeq(session.header.sessionId);
     // `#changes` 留给 onEvent 推送时取用；子 Agent 会话的事件不经过这里的 onEvent，记下来只会越攒越多。
     const pushes = this.#open.get(session.header.sessionId) === session;
@@ -64,6 +77,17 @@ export class RuntimeSessionController {
       changes.set(event.seq, values); this.#changes.set(session.header.sessionId, changes);
     }
     return model;
+  }
+
+  /**
+   * 打开中的会话的位置索引：轮次、请求、提示词与工具记录、每次工具调用各在日志的哪些 seq。
+   * 就地追加，每次只折叠上次之后新写入的事件；进度逐条记，中途读失败后重来不会重复折叠。
+   */
+  private liveIndex(session: SessionHandle): HistoryIndex {
+    let entry = this.#liveIndexes.get(session.journal);
+    if (!entry) { entry = { index: createHistoryIndex(), through: -1 }; this.#liveIndexes.set(session.journal, entry); }
+    for (const event of session.journal.iterateEvents(entry.through + 1)) { indexHistoryEvent(entry.index, event); entry.through = event.seq; }
+    return entry.index;
   }
 
   private async readModel(sessionId: string): Promise<{ model: SessionReadModel; snapshot: RuntimeV2SessionSnapshot; read?: ProjectionCacheRead }> {
@@ -112,60 +136,72 @@ export class RuntimeSessionController {
     const source = await this.readModel(input.sessionId);
     const { model, snapshot, read } = source;
     const live = this.liveSession(input.sessionId);
-    const boundaries = live?.journal.project(HISTORY_BOUNDARIES, () => ({ floor: 0, starts: [] as number[], requests: [] as number[], prompts: [] as number[], toolSets: [] as number[] }), (state, event) => {
-      if (event.type === "turn/start") return { ...state, starts: [...state.starts, state.floor] };
-      if (event.type === "turn/end") return { ...state, floor: event.seq + 1 };
-      if (event.type === "request/header" || event.type === "llm/auxiliary-start") return { ...state, requests: [...state.requests, event.seq] };
-      if (event.type === "request/system-prompt") return { ...state, prompts: [...state.prompts, event.seq] };
-      if (event.type === "request/tools") return { ...state, toolSets: [...state.toolSets, event.seq] };
-      return state;
-    });
+    // 轮次、请求、提示词与工具记录各在哪些 seq：冷会话用缓存建好的索引，打开中的会话用就地维护的那份。
+    const { starts, requests, prompts, toolSets } = read ?? (live ? this.liveIndex(live) : createHistoryIndex());
     const end = snapshot.throughJournalSeq + 1;
-    const starts = read?.starts ?? boundaries?.starts ?? [];
-    const requestSeqs = read?.requests ?? boundaries?.requests ?? [];
     const before = input.beforeSeq ?? end;
     if (!Number.isSafeInteger(before) || before < 0 || before > end || (input.afterSeq !== undefined && (!Number.isSafeInteger(input.afterSeq) || input.afterSeq < -1 || input.afterSeq >= end))) throw new Error("Invalid history cursor.");
-    const candidates = starts.filter(seq => seq < before);
-    const from = input.afterSeq !== undefined ? input.afterSeq + 1 : candidates.length <= HISTORY_PAGE_TURNS ? 0 : candidates[candidates.length - HISTORY_PAGE_TURNS];
+    const turnsBefore = countBelow(starts, before);
+    const from = input.afterSeq !== undefined ? input.afterSeq + 1 : turnsBefore <= HISTORY_PAGE_TURNS ? 0 : starts[turnsBefore - HISTORY_PAGE_TURNS];
     const until = input.afterSeq !== undefined ? end : before;
     let journal = live ? live.journal.readEvents(from, until) : await this.#cache.events(read!, from, until);
     if (input.afterSeq === undefined && !input.includeToolDetails) journal = slimHistoryWindow(journal);
     const maxEvents = Math.max(1, Math.min(input.maxWindowEvents ?? 2_000, 2_000));
     const maxBytes = Math.max(4_096, Math.min(input.maxWindowBytes ?? 2_000_000, 2_000_000));
-    // 与 JSON.stringify(journal).length 等价的累计字节数（元素长度 + 逗号 + 方括号），从头部逐条裁剪，避免每轮重新序列化。
-    const sizes = journal.map(event => JSON.stringify(event).length);
-    let bytes = sizes.reduce((sum, size) => sum + size, 0) + journal.length + 1;
-    let trimmed = 0;
-    while (journal.length - trimmed > 1 && (journal.length - trimmed > maxEvents || bytes > maxBytes)) {
-      bytes -= sizes[trimmed] + 1;
-      trimmed += 1;
+    // 每条事件最多序列化一次，大小记下来，后面判断工具详情要不要延后时接着用。
+    const sizes = new Map<SessionEventEnvelopeV1, number>();
+    const sizeOf = (event: SessionEventEnvelopeV1): number => {
+      let size = sizes.get(event);
+      if (size === undefined) { size = JSON.stringify(event).length; sizes.set(event, size); }
+      return size;
+    };
+    // 窗口超出预算时裁掉头部。从尾部往前量，量到装不下为止，裁掉的那些不用序列化；至少留一条。
+    // `bytes` 与 JSON.stringify(留下的事件).length 等价（元素长度 + 逗号 + 方括号）。
+    let bytes = 1;
+    let trimmed = journal.length;
+    while (trimmed > 0 && journal.length - trimmed < maxEvents) {
+      const next = bytes + sizeOf(journal[trimmed - 1]) + 1;
+      if (next > maxBytes && trimmed < journal.length) break;
+      bytes = next;
+      trimmed -= 1;
     }
     if (trimmed > 0 && input.afterSeq === undefined) {
       // Start a history page at the next whole turn when one fits the budget.
       // The cursor retains the omitted fragment for the preceding page. A single
       // oversized turn still makes bounded progress instead of returning empty.
-      const nextStart = starts.find(seq => seq >= journal[trimmed].seq && seq < until);
-      const aligned = nextStart === undefined ? -1 : journal.findIndex(event => event.seq >= nextStart);
-      if (aligned >= trimmed) trimmed = aligned;
+      const nextStart = starts[countBelow(starts, journal[trimmed].seq)];
+      if (nextStart !== undefined && nextStart < until) {
+        let aligned = trimmed;
+        while (aligned < journal.length && journal[aligned].seq < nextStart) aligned += 1;
+        if (aligned < journal.length) trimmed = aligned;
+      }
     }
     if (trimmed > 0) journal = journal.slice(trimmed);
     const windowFrom = journal[0]?.seq ?? until;
+    // 打开中的会话的索引会就地增长，下面还有 await：两个偏移现在就算好，不让中途写入的新一轮挪动它们。
+    const turnOffset = countBelow(starts, windowFrom);
+    const requestOffset = countBelow(requests, windowFrom);
     // 提示词与工具定义只在变化时记一次（agent-spec-request-record.md §4.3）。窗口不从头开始时，补上起点之前最近的一条，
     // 让窗口内每次请求都能找到自己生效的提示词与工具；它们不计入窗口的事件数/字节预算。
-    const carried = [latestBefore(read?.prompts ?? boundaries?.prompts ?? [], windowFrom), latestBefore(read?.toolSets ?? boundaries?.toolSets ?? [], windowFrom)].filter((seq): seq is number => seq !== null).sort((a, b) => a - b);
+    const carried = [latestBefore(prompts, windowFrom), latestBefore(toolSets, windowFrom)].filter((seq): seq is number => seq !== null).sort((a, b) => a - b);
     if (carried.length > 0) {
       const records = (await Promise.all(carried.map(seq => live ? live.journal.readEvents(seq, seq + 1) : this.#cache.events(read!, seq, seq + 1)))).flat();
       journal = [...records, ...journal];
     }
-    const messageIds = new Set(journal.flatMap(event => { const node = surfaceNode(event); return node ? [node.messageId] : []; }));
-    const callIds = new Set(journal.flatMap(event => {
-      const data = eventData(event);
-      return data && typeof data.callId === "string" ? [data.callId] : [];
-    }));
-    const deferredToolCalls = input.includeToolDetails ? [] : [...callIds].filter(callId => journal.some(event => {
-      const data = eventData(event);
-      return data?.callId === callId && JSON.stringify(event).length > DEFERRED_DETAIL_BYTES;
-    }));
+    // 窗口只扫一遍：对话里出现的消息、每次工具调用的事件 seq、哪些调用带着超过延后阈值的事件。
+    const messageIds = new Set<string>();
+    const calls = new Map<string, { readonly eventSeqs: number[]; oversized: boolean }>();
+    for (const event of journal) {
+      const node = surfaceNode(event);
+      if (node) messageIds.add(node.messageId);
+      const callId = eventData(event)?.callId;
+      if (typeof callId !== "string") continue;
+      let call = calls.get(callId);
+      if (!call) { call = { eventSeqs: [], oversized: false }; calls.set(callId, call); }
+      call.eventSeqs.push(event.seq);
+      if (!input.includeToolDetails && !call.oversized && sizeOf(event) > DEFERRED_DETAIL_BYTES) call.oversized = true;
+    }
+    const deferredToolCalls = [...calls].flatMap(([callId, call]) => call.oversized ? [callId] : []);
     const deferred = new Set(deferredToolCalls);
     const boundedJournal = journal.map(event => {
       const data = eventData(event);
@@ -173,18 +209,18 @@ export class RuntimeSessionController {
     });
     const windowSnapshot = { ...snapshot,
       messages: snapshot.messages.filter(message => messageIds.has(message.messageId)).map(message => message.kind === "tool-result" && message.callId && deferred.has(message.callId) ? { ...message, content: "" } : message),
-      tools: snapshot.tools.filter(tool => callIds.has(tool.callId)).map(tool => deferred.has(tool.callId) ? { ...tool, modelOutput: null, detail: [] } : tool),
+      tools: snapshot.tools.filter(tool => calls.has(tool.callId)).map(tool => deferred.has(tool.callId) ? { ...tool, modelOutput: null, detail: [] } : tool),
     };
     const projectionValues = model.projections.snapshot(input.sessionId).values;
     const values = publicValues(projectionValues);
     const support: RuntimeV2WindowSupportFact[] = [];
     const surface = projectionValues.surface;
     if (surface && typeof surface === "object" && !Array.isArray(surface) && typeof (surface as Record<string, unknown>).replaceGeneration === "number") support.push({ kind: "surface", replaceGeneration: (surface as Record<string, number>).replaceGeneration });
-    for (const callId of callIds) support.push({ kind: "tool-call", callId, eventSeqs: journal.filter(event => eventData(event)?.callId === callId).map(event => event.seq) });
+    for (const [callId, call] of calls) support.push({ kind: "tool-call", callId, eventSeqs: call.eventSeqs });
     return { kind: "session-projection", schemaVersion: 1, sessionId: input.sessionId, throughJournalSeq: snapshot.throughJournalSeq,
       snapshot: windowSnapshot, values, activeMessageIds: snapshot.messages.map(message => message.messageId), deferredToolCalls,
       watermarks: watermarksFor(live, snapshot.throughJournalSeq, until - 1),
-      window: { events: boundedJournal, fromSeq: windowFrom, throughJournalSeq: until - 1, beforeSeq: windowFrom > 0 ? windowFrom : null, turnOffset: starts.filter(seq => seq < windowFrom).length, requestOffset: requestSeqs.filter(seq => seq < windowFrom).length, support, deferredDetails: deferredToolCalls.map(callId => ({ sessionId: input.sessionId, callId, kind: "tool" as const })) } };
+      window: { events: boundedJournal, fromSeq: windowFrom, throughJournalSeq: until - 1, beforeSeq: windowFrom > 0 ? windowFrom : null, turnOffset, requestOffset, support, deferredDetails: deferredToolCalls.map(callId => ({ sessionId: input.sessionId, callId, kind: "tool" as const })) } };
   }
 
   async readObservation(input: RuntimeV2SessionProjectionInput): Promise<RuntimeV2SessionObservation> {
@@ -198,7 +234,9 @@ export class RuntimeSessionController {
     const tool = source.snapshot.tools.find(item => item.callId === callId);
     if (!tool) throw new Error("Tool detail is unavailable.");
     const sequences = source.read?.calls[callId];
-    const journal = sequences ? (await Promise.all(sequences.map(seq => this.#cache.events(source.read!, seq, seq + 1)))).flat() : (this.liveSession(sessionId)?.journal.readEvents() ?? []).filter(event => event.data && typeof event.data === "object" && !Array.isArray(event.data) && (event.data as Record<string, unknown>).callId === callId);
+    const live = sequences ? undefined : this.liveSession(sessionId);
+    // 打开中的会话按索引只读这次调用自己的事件，不把整份日志读出来再按 callId 过滤。
+    const journal = sequences ? (await Promise.all(sequences.map(seq => this.#cache.events(source.read!, seq, seq + 1)))).flat() : live ? eventsAt(live.journal, this.liveIndex(live).calls[callId] ?? []) : [];
     return { snapshot: { ...source.snapshot, tools: [tool] }, journal, history: { before: null, throughJournalSeq: source.snapshot.throughJournalSeq } };
   }
 
@@ -589,14 +627,28 @@ function jsonRecord(value: RuntimeV2JsonValue | undefined): Readonly<Record<stri
 function eventData(event: SessionEventEnvelopeV1): Readonly<Record<string, RuntimeV2JsonValue>> | null {
   return event.data !== null && typeof event.data === "object" && !Array.isArray(event.data) ? event.data as Readonly<Record<string, RuntimeV2JsonValue>> : null;
 }
-/** 有序 seq 列表里小于 `seq` 的最后一个。 */
-function latestBefore(seqs: readonly number[], seq: number): number | null {
+/** 有序 seq 列表里小于 `seq` 的有几个（也就是第一个不小于 `seq` 的下标）。 */
+function countBelow(seqs: readonly number[], seq: number): number {
   let low = 0, high = seqs.length;
   while (low < high) { const mid = (low + high) >> 1; if (seqs[mid] < seq) low = mid + 1; else high = mid; }
-  return low > 0 ? seqs[low - 1] : null;
+  return low;
+}
+/** 有序 seq 列表里小于 `seq` 的最后一个。 */
+function latestBefore(seqs: readonly number[], seq: number): number | null {
+  const count = countBelow(seqs, seq);
+  return count > 0 ? seqs[count - 1] : null;
+}
+/** 日志里这些 seq（升序）上的事件；连着的 seq 合成一段读一次。 */
+function eventsAt(journal: SessionJournal, seqs: readonly number[]): SessionEventEnvelopeV1[] {
+  const events: SessionEventEnvelopeV1[] = [];
+  for (let first = 0; first < seqs.length;) {
+    let last = first;
+    while (last + 1 < seqs.length && seqs[last + 1] === seqs[last] + 1) last += 1;
+    for (const event of journal.readEvents(seqs[first], seqs[last] + 1)) events.push(event);
+    first = last + 1;
+  }
+  return events;
 }
 function watermarksFor(session: SessionHandle | undefined, projectionThroughSeq: number, windowThroughSeq: number): RuntimeV2ReadModelWatermarks {
   return { acceptedThroughSeq: session?.acceptedSeq ?? projectionThroughSeq, durableThroughSeq: session?.durableSeq ?? projectionThroughSeq, projectionThroughSeq, windowThroughSeq, indexGeneration: null };
 }
-
-const HISTORY_BOUNDARIES = Symbol("history-boundaries");
