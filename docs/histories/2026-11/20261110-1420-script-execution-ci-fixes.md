@@ -18,7 +18,7 @@
 
 - **fork 提示词缓存**：`host/scripting-facts` 里的 scratch 绝对路径带 sessionId，fork 子智能体的系统提示词因此和父会话不一致，`host-subagent-fork-cache-process.test.mjs` 失败。`tool-shell` 新增 `ScratchOwners` 与服务方法 `shareScratchDirectory`，Agent 工厂创建 fork 时让它用父会话的 scratch 目录；model-fact 与 `ACTSPACE_SCRATCH` 同时跟随。
 - **Windows 打包**：`prepare.mjs` 在 Windows 主机上改用系统自带的 `System32\tar.exe`（Git Bash 的 GNU tar 把 `D:\…` 当成远程主机）；`lib/` 下的 tcl / tk 剪裁只在非 Windows 目标做——Windows 文件系统不分大小写，`lib` 就是标准库 `Lib`，原规则会删掉 `threading.py`。
-- **CodeQL**：`elideScriptSource` 的 heredoc 判断从跨行正则改成只匹配 heredoc 开头那一行，消掉多项式回溯告警。
+- **CodeQL**：`scriptLineCount` 修剪首尾空行的 `/^\n+|\n+$/g` 是多项式回溯（一长串换行后跟其他字符时），改成手写计数。第一次误改了相邻的 `elideScriptSource`，已还原。
 - **文档**：设计文档 2.4 节与 `tool-shell/README.md` 补 fork 共用父会话 scratch 目录。
 
 ### 🧠 Design Intent (Why)

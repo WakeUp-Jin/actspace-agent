@@ -94,16 +94,23 @@ export function elideScriptSource(command: string, script: ScriptCommand): strin
   if (script.source === undefined) return trimmed;
   const index = trimmed.indexOf(script.source);
   if (index < 0) return trimmed;
-  // A heredoc body starts on the line after its opener; only that one line is matched, so the cost stays linear.
-  const before = trimmed.slice(0, index);
-  if (before.endsWith("\n") && /<<-?[ \t]*['"]?\w/.test(before.slice(before.lastIndexOf("\n", before.length - 2) + 1)))
+  if (/<<-?\s*['"]?\w+['"]?[^\n]*\n$/.test(trimmed.slice(0, index)))
     return `${trimmed.slice(0, trimmed.indexOf("\n"))} …`;
   return `${trimmed.slice(0, index)}…${trimmed.slice(index + script.source.length)}`;
 }
 
+/** Lines of the source without its leading and trailing blank lines; counted by hand so the cost stays linear in a long script. */
 export function scriptLineCount(source: string): number {
-  return source.replace(/^\n+|\n+$/g, "").split("\n").length;
+  let start = 0;
+  let end = source.length;
+  while (start < end && source.charCodeAt(start) === NEWLINE) start += 1;
+  while (end > start && source.charCodeAt(end - 1) === NEWLINE) end -= 1;
+  let lines = 1;
+  for (let index = start; index < end; index += 1) if (source.charCodeAt(index) === NEWLINE) lines += 1;
+  return lines;
 }
+
+const NEWLINE = 10;
 
 export function scriptLanguageLabel(language: ScriptLanguage): string {
   return language === "python" ? "Python" : "JavaScript";

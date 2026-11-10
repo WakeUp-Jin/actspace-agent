@@ -76,5 +76,8 @@ describe("elideScriptSource / scriptLineCount", () => {
   it("counts lines without surrounding blank lines", () => {
     expect(scriptLineCount("\nimport x\nprint(x)\n")).toBe(2);
     expect(scriptLineCount("print(1)")).toBe(1);
+    expect(scriptLineCount("")).toBe(1);
+    expect(scriptLineCount("\n\n")).toBe(1);
+    expect(scriptLineCount("\n\na\n\nb\n\n")).toBe(3);
   });
 });
