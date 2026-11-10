@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { appendFile, mkdtemp, readFile, rename, rm, truncate, writeFile } from "node:fs/promises";
+import type { Stats } from "node:fs";
+import { appendFile, mkdtemp, readFile, rename, rm, stat, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -7,8 +8,11 @@ import { createCoreCodecRegistry, createSessionHeader, SessionJournal, type Sess
 import type { SessionStorageSnapshot } from "@actspace/session-storage";
 import { JsonlSessionStorage } from "../storage.js";
 
-// Count what the Journal reader really pulls from disk, so "unchanged reads nothing" is a measured property.
+// Count what the Journal reader really pulls from disk, so "unchanged reads a bounded tail" is a measured property.
 const reads = vi.hoisted(() => ({ calls: 0, bytes: 0 }));
+// When set, every stat of an opened Journal answers this instead: what the reader sees when a write
+// lands in the same timestamp tick as the previous read (size and timestamps do not move).
+const heldStat = vi.hoisted(() => ({ value: null as Stats | null }));
 vi.mock("node:fs/promises", async importOriginal => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   return {
@@ -19,6 +23,7 @@ vi.mock("node:fs/promises", async importOriginal => {
         const value = Reflect.get(target, key) as unknown;
         if (key === "readFile") return async (...a: unknown[]) => { const buffer = await (value as Function).apply(target, a) as Buffer; reads.calls++; reads.bytes += buffer.length; return buffer; };
         if (key === "read") return async (...a: unknown[]) => { const result = await (value as Function).apply(target, a) as { bytesRead: number }; reads.calls++; reads.bytes += result.bytesRead; return result; };
+        if (key === "stat") return async (...a: unknown[]) => heldStat.value ?? await (value as Function).apply(target, a) as Stats;
         return typeof value === "function" ? value.bind(target) : value;
       } });
     },
@@ -34,6 +39,7 @@ beforeEach(async () => {
   storage = new JsonlSessionStorage({ dataRoot, runtimeId: "test", registry });
   journal = new SessionJournal({ registry });
   reads.calls = 0; reads.bytes = 0;
+  heldStat.value = null;
 });
 afterEach(async () => { await storage.close(); await rm(dataRoot, { recursive: true, force: true }); });
 
@@ -66,18 +72,26 @@ async function expectSameAsFresh(id: string, snapshot: SessionStorageSnapshot): 
   expect(snapshot.validated).toEqual(fresh.validated);
 }
 
-it("unchanged Journal: refresh returns the same snapshot and reads no file content", async () => {
-  const path = await createSession("same", ["a", "b"]);
+it("unchanged Journal: refresh returns the same snapshot and re-reads only the 4 KiB tail, however large the file is", async () => {
+  const path = await createSession("same", Array.from({ length: 200 }, (_, i) => `${i}${bigTitle(500)}`));
   const base = await storage.inspect("same");
-  expect(reads.bytes).toBeGreaterThan(0); // control: the spy sees a full read
+  expect(reads.bytes).toBeGreaterThan(100_000); // control: the spy sees a full read
   reads.calls = 0; reads.bytes = 0;
   const result = await storage.refresh("same", base);
   expect(result).toEqual({ kind: "unchanged", snapshot: base });
   expect(result.snapshot).toBe(base);
-  expect(reads).toEqual({ calls: 0, bytes: 0 });
+  expect(reads.bytes).toBe(4096);
   // Still refreshable afterwards: an unchanged answer must not consume the resume state.
   await appendEvents(path, ["c"]);
   expect((await storage.refresh("same", base)).kind).toBe("appended");
+});
+
+it("unchanged Journal smaller than the tail window: the comparison covers the whole file", async () => {
+  const path = await createSession("small", ["a", "b"]);
+  const base = await storage.inspect("small");
+  reads.calls = 0; reads.bytes = 0;
+  expect((await storage.refresh("small", base)).kind).toBe("unchanged");
+  expect(reads.bytes).toBe((await stat(path)).size);
 });
 
 it("append: reads only the new bytes, parses only new events, and matches a full read exactly (revision is still the file sha256)", async () => {
@@ -135,6 +149,18 @@ it("same-size rewrite falls back to a full read", async () => {
   expect(result.kind).toBe("replaced");
   expect(JSON.stringify(result.snapshot.events)).toContain("zzzz");
   expect(result.snapshot.revision).not.toBe(base.revision);
+});
+
+it("same-size rewrite whose stamp did not move (same timestamp tick as the read) still falls back to a full read", async () => {
+  const path = await createSession("same-tick", ["aaaa", "bbbb"]);
+  const base = await storage.inspect("same-tick");
+  heldStat.value = await stat(path);
+  await writeFile(path, (await readFile(path, "utf8")).replace("aaaa", "zzzz"));
+  const result = await storage.refresh("same-tick", base);
+  expect(result.kind).toBe("replaced");
+  expect(JSON.stringify(result.snapshot.events)).toContain("zzzz");
+  expect(result.snapshot.revision).not.toBe(base.revision);
+  expect(result.snapshot.revision).toBe(await sha(path));
 });
 
 it("growth combined with an in-place edit of already-consumed bytes falls back to a full read", async () => {
