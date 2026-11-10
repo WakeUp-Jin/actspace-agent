@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { AppDataRoots } from "../agent-run";
+import type { AppDataRoots } from "../app-paths";
 import type { GitRunner } from "../git/run-git";
 import {
   getWorkspaceGitContext,

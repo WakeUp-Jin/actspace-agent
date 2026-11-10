@@ -19,9 +19,6 @@
       "path": "./../../composition/cordis-adapter/tsconfig.build.json"
     },
     {
-      "path": "./../../session/session-persistence/tsconfig.build.json"
-    },
-    {
       "path": "./../../session/session-persistence-jsonl/tsconfig.build.json"
     }
   ]

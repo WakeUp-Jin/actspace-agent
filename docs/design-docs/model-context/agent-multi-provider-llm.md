@@ -712,7 +712,7 @@ Desktop 通配路由的 `desktop:default` 只表示由 Host 适配器负责解�
 
 自定义服务的显示名称、协议格式和稳定 connectionId 分离；详情页提供服务名称编辑入口。重命名不改变连接 ID 或已有模型绑定。服务地址必须是供应商提供的完整 API base（例如包含 `/v1`），不对任意中转服务盲目追加路径。
 
-`@actspace/llm-service` 显式声明 `undici` 生产依赖。Desktop/CLI 生产 deploy 后运行 `scripts/check-provider-proxy-package.mjs <deploy-root>`，从产物自身解析依赖并初始化 ProxyAgent，不发送网络请求；失败阻断打包。初始化失败归类为代理错误，内部异常仅通过 cause 保留。
+`@actspace/llm-service` 显式声明 `undici` 生产依赖。Desktop/CLI 生产 deploy 后运行 `scripts/check-provider-proxy-package.mjs <deploy-root>`，从产物自身沿 `@actspace/runtime` 的依赖链解析 `@actspace/llm-service` 并初始化 ProxyAgent（应用不必把它列为直接依赖），不发送网络请求；失败阻断打包。初始化失败归类为代理错误，内部异常仅通过 cause 保留。
 
 ## 自定义模型推理能力（2026-09-12）
 

@@ -44,7 +44,7 @@
 
 - `apps/web`
   - 只依赖 `packages/util/shared` 与 `@actspace/client`（`host`、`sessions`、`live` 子入口），通过 Host 协议访问 `packages/host/agent-host`，不加载 Runtime、不访问文件系统
-  - 不依赖 `apps/desktop` 源码；与 desktop 共用的实时流折叠逻辑在 `@actspace/client/live`，desktop 侧只保留 re-export
+  - 不依赖 `apps/desktop` 源码；与 desktop 共用的实时流折叠逻辑在 `@actspace/client/live`，desktop 渲染层直接从它 import，不再保留本地 re-export 壳
   - 构建产物是静态文件，由 Host 静态托管（`webRoot`）或 Vite 开发服务器提供
 
 - `apps/site`

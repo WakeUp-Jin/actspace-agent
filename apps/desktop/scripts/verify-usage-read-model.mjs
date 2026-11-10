@@ -11,7 +11,7 @@ if (datasets.length) {
     if (!(dataset in sizes)) throw new Error(`Unknown dataset: ${dataset}`);
     const [rows, sessions] = sizes[dataset];
     const tasks = [["benchmark-usage-read-model.mjs", "worker"]];
-    if (dataset === "S" || dataset === "M") tasks.push(["benchmark-usage-json-baseline.mjs", "json"], ["benchmark-usage-journal.mjs", "journal"]);
+    if (dataset === "S" || dataset === "M") tasks.push(["benchmark-usage-journal.mjs", "journal"]);
     for (const [script, scope] of tasks) {
       const code = await new Promise((resolve, reject) => {
         const child = spawn(process.execPath, [join(import.meta.dirname, script), `--rows=${rows}`, `--sessions=${sessions}`, "--iterations=20", `--out=artifacts/usage-read-model/${dataset.toLowerCase()}-${scope}.json`], { stdio: "inherit" });

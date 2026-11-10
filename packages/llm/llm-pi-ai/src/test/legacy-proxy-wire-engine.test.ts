@@ -3,7 +3,7 @@ import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import type { LlmStreamEvent } from "@actspace/llm-service";
 import { LegacyProxyWireEngine, type LegacyProxySdkLoader } from "../legacy-proxy-wire-engine.js";
 import { ProviderProxyError, ProviderProxyPool } from "@actspace/llm-service";
-import type { PiAiWireRoute } from "../pi-ai-wire-engine.js";
+import type { PiAiWireRoute } from "../pi-ai-stream.js";
 
 const routes: readonly PiAiWireRoute[] = ["openai-completions", "openai-responses", "anthropic-messages"];
 

@@ -4,7 +4,7 @@ import type { RuntimeV2LiveEvent, SessionEventEnvelopeV1 } from "@actspace/share
 import { createDesktopSessionBridge } from "../session/desktop-session-bridge";
 import { createFrameScheduler } from "../session/frame-batch";
 import { createLiveRunStore } from "../session/live-runs/live-run-store";
-import { createEmptyStreamingState } from "../session/session-run-state";
+import { createEmptyStreamingState } from "@actspace/client/live";
 import { useChatSessionRecord } from "../session/session-store";
 import { projectionFixture } from "./projection-fixture";
 

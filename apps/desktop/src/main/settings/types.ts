@@ -13,7 +13,6 @@ import type {
   ModelKey,
   ModelOverrides,
   ProviderConnectionSettings,
-  ProviderConnectionState,
   ProviderProxySettings,
   SearchProviderId,
   SettingsV4,
@@ -24,14 +23,6 @@ import type {
   ShortcutsSettings,
   TaskModelSettings,
 } from "@actspace/shared";
-
-export type ProviderConnectionProbeResult = {
-  readonly ok: boolean;
-  readonly checkedAt: string;
-  readonly errorKind?: ProviderConnectionState["errorKind"];
-  readonly message?: string;
-  readonly resolvedAuth?: CustomConnectionResolvedAuth;
-};
 
 export type ProviderRuntimeConfig = {
   readonly provider: LlmProviderId;

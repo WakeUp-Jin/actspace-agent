@@ -28,7 +28,7 @@ Headless runner: create/resume → agent.followup → durable inbox → flush
 
 ## 常见陷阱
 
-1. 新增插件包后没有重新生成 workspace link，Loader 会报 “Cannot find package”；先执行离线 `pnpm install`。
+1. 新增插件包后没有重新生成 workspace link，Loader 会报 “Cannot find package”；先执行离线 `pnpm install`。`cordis.yml` 里的裸包名（`@actspace/xxx/plugin`）由 Cordis Loader 从 `node_modules/.pnpm/node_modules`（pnpm 的隐藏 hoist 目录）解析，不走 `@actspace/runtime` 自己的 `dependencies`；一次只做删减的 `pnpm install` 可能不会把包重新 hoist 进去，再跑一次 `pnpm install` 即可。不要为了绕过它把插件加进根 `package.json` 的 `dependencies`——那只是把 hoist 换成根 `node_modules` 直链，掩盖了同一个问题。
 2. 插件向 Context 提供同一个 service id 两次，会在 Include 阶段失败；bridge service 应只由一个 Behavior 或 Bootstrap 发布。
 3. Host fallback 与 plugin-owned service 同时存在时，RuntimeHandle 可能悄悄使用旧对象；默认路径应验证 required service 并优先 Context lookup。
 4. Session metadata/title 事件仍需使用核心 owner，不能因为事件由 headless runner 触发就改 owner。

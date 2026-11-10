@@ -14,9 +14,6 @@
     },
     {
       "path": "./../session-storage/tsconfig.build.json"
-    },
-    {
-      "path": "./../../util/shared/tsconfig.build.json"
     }
   ]
 }

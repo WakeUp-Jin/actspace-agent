@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { attachLiveBaseline } from "../session/live-runs/live-baseline";
 import { createLiveRunStore } from "../session/live-runs/live-run-store";
-import { createEmptyStreamingState } from "../session/session-run-state";
+import { createEmptyStreamingState } from "@actspace/client/live";
 
 // 渲染进程重载后：恢复的 run 从主进程实时底稿接着显示（规范 agent-spec-live-assistant-stream §6）。
 function recovered() {

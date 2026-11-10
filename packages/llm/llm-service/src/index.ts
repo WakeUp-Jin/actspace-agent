@@ -7,7 +7,6 @@ export * from "./auxiliary-request.js";
 export * from "./auxiliary-text.js";
 export * from "./credential-port.js";
 export * from "./failure.js";
-export * from "./legacy-transport-adapter.js";
 export * from "./message.js";
 export * from "./model-catalog.js";
 export * from "./prepared-call.js";
