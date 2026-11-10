@@ -57,6 +57,21 @@ describe("prose structure plugins", () => {
     ]);
   });
 
+  it("marks Chinese-numeral heading numbers so the blog can style them like digits", async () => {
+    const { code, metadata } = await render("## 一、发现\n\n### 1.1、定义\n", new URL("file:///site/src/content/blog/a.md"));
+    expect(code).toContain('<span class="hn hn-cjk">一<span class="hn-sep">、</span></span><span class="ht">发现</span>');
+    expect(code).toContain('<span class="hn">1.1<span class="hn-sep">、</span></span><span class="ht">定义</span>');
+    expect(metadata.headings.map((heading) => heading.text)).toEqual(["一、发现", "1.1、定义"]);
+  });
+
+  it("recovers bold that CommonMark leaves as literal asterisks next to CJK punctuation", async () => {
+    const { code } = await render("将**元信息（名称+描述）**加载到上下文中\n\n- 要**查找子目录，**这个才有效\n\n算式 2 ** 3 ** 4 不动，`a**b**c` 也不动\n");
+    expect(code).toContain("<p>将<strong>元信息（名称+描述）</strong>加载到上下文中</p>");
+    expect(code).toContain("<li>要<strong>查找子目录，</strong>这个才有效</li>");
+    expect(code).toContain("算式 2 ** 3 ** 4 不动");
+    expect(code).toContain("<code>a**b**c</code>");
+  });
+
   it("drops empty paragraphs inside blockquotes", async () => {
     const { code } = await render("> 第一段\n>\n> &nbsp;\n>\n> 第二段\n");
     expect(code.match(/<p>/g)).toHaveLength(2);

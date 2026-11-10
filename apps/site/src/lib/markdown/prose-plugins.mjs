@@ -15,7 +15,9 @@ const LANGUAGE_LABELS = {
   plaintext: "Text", text: "Text", txt: "Text", plain: "Text",
 };
 const EMOJI_START = /^\s*(\p{Extended_Pictographic}️?)\s*/u;
-const HEADING_NUMBER = /^(\s*)(\d+(?:\.\d+)*)([、.．]\s*)/;
+const HEADING_NUMBER = /^(\s*)(\d+(?:\.\d+)*|[一二三四五六七八九十]+)([、.．]\s*)/;
+// CommonMark 不把紧贴中文标点的 ** 当成强调定界符（「将**元信息（名称）**加载」），原文会漏出星号。
+const STRANDED_STRONG = /\*\*(?!\s)([^*\n]+?)(?<!\s)\*\*/g;
 
 /** @param {string} tagName @param {Record<string, unknown>} properties @param {any[]} children */
 const h = (tagName, properties, children) => ({ type: "element", tagName, properties, children });
@@ -52,7 +54,28 @@ function toCallout(node) {
   ]);
 }
 
-/** 标题里手写的「2、」「3.1.」编号拆出来；原分隔符留在 .hn-sep 里，标题文字（锚点 slug）不变。 */
+/** 文本节点里没被解析的 **粗体** 补成 strong；只看单个文本节点，不跨行内元素。 */
+function strandedStrong(node) {
+  if (!node.children.some((child) => child.type === "text" && child.value.includes("**"))) return undefined;
+  let changed = false;
+  const children = node.children.flatMap((child) => {
+    if (child.type !== "text") return [child];
+    const parts = [];
+    let last = 0;
+    for (const match of child.value.matchAll(STRANDED_STRONG)) {
+      if (match.index > last) parts.push(text(child.value.slice(last, match.index)));
+      parts.push(h("strong", {}, [text(match[1])]));
+      last = match.index + match[0].length;
+    }
+    if (!parts.length) return [child];
+    changed = true;
+    if (last < child.value.length) parts.push(text(child.value.slice(last)));
+    return parts;
+  });
+  return changed ? h(node.tagName, node.properties ?? {}, children) : undefined;
+}
+
+/** 标题里手写的「2、」「3.1.」「一、」编号拆出来；原分隔符留在 .hn-sep 里，标题文字（锚点 slug）不变。 */
 function splitHeadingNumber(node) {
   const [first, ...rest] = node.children;
   if (first?.type !== "text") return undefined;
@@ -60,7 +83,7 @@ function splitHeadingNumber(node) {
   if (!match) return undefined;
   const remainder = first.value.slice(match[0].length);
   return h(node.tagName, node.properties ?? {}, [
-    h("span", { className: ["hn"] }, [text(match[1] + match[2]), h("span", { className: ["hn-sep"] }, [text(match[3])])]),
+    h("span", { className: /\d/.test(match[2]) ? ["hn"] : ["hn", "hn-cjk"] }, [text(match[1] + match[2]), h("span", { className: ["hn-sep"] }, [text(match[3])])]),
     h("span", { className: ["ht"] }, [...(remainder ? [text(remainder)] : []), ...rest]),
   ]);
 }
@@ -92,16 +115,20 @@ export function proseStructure() {
   return {
     name: "site-prose-structure",
     element: {
-      filter: ["p", "h2", "h3", "pre"],
+      filter: ["p", "li", "h2", "h3", "pre"],
       visit(node, ctx) {
         if (node.tagName === "pre") return toCodeCard(node);
+        if (node.tagName === "li") return strandedStrong(node);
         if (node.tagName !== "p") return splitHeadingNumber(node);
         const parent = ctx.parent(node);
         if (parent?.type === "element" && parent.tagName === "blockquote" && !plainText(node).trim() && !node.children.some((c) => c.type === "element")) {
           ctx.removeNode(node);
           return undefined;
         }
-        return toFigure(node) ?? (parent?.type === "root" ? toCallout(node) : undefined);
+        const figure = toFigure(node);
+        if (figure) return figure;
+        const fixed = strandedStrong(node);
+        return (parent?.type === "root" ? toCallout(fixed ?? node) : undefined) ?? fixed;
       },
     },
   };
