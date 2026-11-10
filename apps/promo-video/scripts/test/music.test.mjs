@@ -5,18 +5,26 @@ import { composeMusic, encodeWav, scoreFor } from "../lib/music.mjs";
 const film = {
   duration: 12,
   scenes: [
-    { id: "hook", start: 0 },
-    { id: "feature-context", start: 4 },
-    { id: "closing", start: 8 },
+    { id: "hook", start: 0, music: 0 },
+    {
+      id: "workbench",
+      start: 4,
+      music: [
+        [0, 2],
+        [2, 3],
+      ],
+    },
+    { id: "closing", start: 8, music: 1 },
   ],
 };
 
-test("分镜映射成配乐强度：特点分镜最满，开头和收尾最轻", () => {
+test("分镜的强度展开成配乐分段，长分镜可以中途换强度", () => {
   assert.deepEqual(
     scoreFor(film).sections.map(({ at, level }) => [at, level]),
     [
       [0, 0],
-      [4, 3],
+      [4, 2],
+      [6, 3],
       [8, 1],
     ],
   );

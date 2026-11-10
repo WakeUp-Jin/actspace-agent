@@ -1,12 +1,14 @@
 /**
  * 程序合成的配乐：不依赖任何音频素材，同样的输入永远得到同样的波形。
  *
- * 四层声音按分镜的「强度」逐层进出：铺底和弦一直在，往上依次加拨弦、低音、沙锤。
- * 每个分镜开始时敲一声钟，最后一个分镜回到主和弦并淡出。
+ * 几层声音按「强度」逐层进出：铺底和弦一直在，往上依次加拨弦、低音和底鼓、沙锤。
+ * 每换一段敲一声钟，最后一段回到主和弦并淡出。
+ *
+ * 速度 120 拍/分：一拍 0.5 秒、一小节 2 秒。分镜时长取 2 秒的整数倍，切换就落在小节线上。
  */
 
 const RATE = 44_100;
-const BEAT = 60 / 96;
+const BEAT = 60 / 120;
 const BAR = BEAT * 4;
 const EIGHTH = BEAT / 2;
 
@@ -31,7 +33,7 @@ function createNoise(seed) {
 
 /**
  * @param {{ duration: number, sections: Array<{ at: number, level: 0 | 1 | 2 | 3 }> }} score
- *   level：0 只有铺底，1 加稀疏拨弦，2 加琶音和低音，3 再加沙锤。
+ *   level：0 只有铺底，1 加稀疏拨弦，2 加琶音、低音和底鼓，3 再加沙锤。
  * @returns {{ left: Float32Array, right: Float32Array, sampleRate: number }}
  */
 export function composeMusic({ duration, sections }) {
@@ -40,13 +42,13 @@ export function composeMusic({ duration, sections }) {
   const echoed = [new Float32Array(length), new Float32Array(length)];
   const finale = sections.at(-1)?.at ?? duration;
 
-  /** 强度在分镜切换后的两秒内平滑过渡，层的进出就不会突兀。 */
+  /** 强度在换段后的一小节内平滑过渡，层的进出就不会突兀。 */
   const levelAt = (time) => {
     let level = sections[0]?.level ?? 0;
     for (let index = 1; index < sections.length; index += 1) {
       const { at, level: next } = sections[index];
       if (time < at) break;
-      level += (next - level) * Math.min(1, (time - at) / 2);
+      level += (next - level) * Math.min(1, (time - at) / BAR);
     }
     return level;
   };
@@ -101,6 +103,14 @@ export function composeMusic({ duration, sections }) {
     });
   };
 
+  // 底鼓：一个从 120 Hz 快速滑到 46 Hz 的正弦，只给节拍一个轻的落点。
+  const kick = (start, gain) => {
+    add(dry, start, 0.3, 0, (t) => {
+      const phase = 2 * Math.PI * (46 * t + ((120 - 46) * 0.03) * (1 - Math.exp(-t / 0.03)));
+      return gain * Math.min(1, t / 0.003) * Math.exp(-t / 0.085) * Math.sin(phase);
+    });
+  };
+
   const noise = createNoise(20261110);
   const shaker = (start, gain, pan) => {
     let previous = 0;
@@ -138,13 +148,14 @@ export function composeMusic({ duration, sections }) {
       if (full > 0.02 && !closing) {
         if (step === 0) bass(time, chord.root, BEAT * 1.8, 0.17 * full);
         if (step === 5) bass(time, chord.root, BEAT * 0.9, 0.11 * full);
+        if (step === 0 || step === 4) kick(time, 0.2 * full);
       }
       const shake = layer(time, 2);
       if (shake > 0.02 && step % 2 === 1 && !closing) shaker(time, 0.05 * shake, step % 4 === 1 ? 0.5 : -0.5);
     }
   }
 
-  // 每个分镜开始时敲一声钟，音高取当时和弦的五音。
+  // 每换一段敲一声钟，音高取当时和弦的五音。
   for (const { at } of sections.slice(1)) pluck(at, chordAt(at).tones[2] + 24, 0.085, 0, 1.1);
 
   // 拨弦和钟声过一条左右交叉的附点八分延迟，给干声留出空间感。
@@ -197,15 +208,15 @@ export function encodeWav({ left, right, sampleRate }) {
   return buffer;
 }
 
-/** 各分镜的配乐强度；没列出的分镜按 2 处理。 */
-const LEVELS = { hook: 0, brand: 1, work: 2, plugins: 3, howto: 2, next: 3, closing: 1 };
-
+/**
+ * 把时间线换成配乐的分段。分镜的 music 是一个强度，或者一组 [分镜内时刻, 强度]（长分镜中途换强度时用）。
+ * @param {{ duration: number, scenes: Array<{ start: number, music: number | number[][] }> }} film
+ */
 export function scoreFor(film) {
   return {
     duration: film.duration,
-    sections: film.scenes.map(({ id, start }) => ({
-      at: start,
-      level: LEVELS[id] ?? (id.startsWith("feature-") ? 3 : 2),
-    })),
+    sections: film.scenes.flatMap(({ start, music }) =>
+      (Array.isArray(music) ? music : [[0, music]]).map(([offset, level]) => ({ at: start + offset, level })),
+    ),
   };
 }

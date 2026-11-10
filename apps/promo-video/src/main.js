@@ -1,24 +1,25 @@
 import "./styles/fonts.css";
 import "./styles/base.css";
 import "./styles/scenes.css";
+import "./styles/motion.css";
+import "./styles/short.css";
 import "./styles/player.css";
-import { FPS, HEIGHT, scenes, WIDTH } from "./film.js";
+import { DEFAULT_FILM, FPS, films, HEIGHT, WIDTH } from "./films/index.js";
 import { createTimeline } from "./timeline.js";
 
 const params = new URLSearchParams(location.search);
 const rendering = params.has("render");
 const film = document.querySelector("#film");
+const filmId = params.get("film") ?? DEFAULT_FILM;
 
-/** 录好的首屏演示帧序列；没录过时对应分镜会显示提示，其余分镜照常。 */
-async function loadFootage() {
-  try {
-    const response = await fetch("/hero/meta.json");
-    if (!response.ok) return {};
-    const meta = await response.json();
-    return { hero: { base: "/hero/", fps: meta.fps, frames: meta.frames } };
-  } catch {
-    return {};
+/** capture:ui 截下来的产品画面和各个按钮的位置；只有用到真实界面的版本才需要。 */
+async function loadUi() {
+  const response = await fetch("/ui/meta.json");
+  // 文件不存在时开发服务器会回退到首页 HTML，所以还要看内容类型。
+  if (!response.ok || !response.headers.get("content-type")?.includes("json")) {
+    throw new Error("还没有截取产品画面。先运行：pnpm --filter @actspace/promo-video capture:ui");
   }
+  return response.json();
 }
 
 /** 中文字体按 unicode-range 切成了上百片，等它们全部就绪再出第一帧，否则前几帧会用回退字体。 */
@@ -30,7 +31,8 @@ async function loadFonts() {
 
 async function decodeImages() {
   // 分镜默认是 display:none，里面的图不会自己加载；逐个解码一遍，seek 到那一帧时才不会空着。
-  const images = [...film.querySelectorAll("img")].filter((image) => image.getAttribute("src"));
+  // 按时刻切换的整幅画面（data-at）由时间线在换上来时解码，不在这里一次占满内存。
+  const images = [...film.querySelectorAll("img:not([data-at])")].filter((image) => image.getAttribute("src"));
   await Promise.all(images.map((image) => image.decode().catch(() => {})));
 }
 
@@ -41,7 +43,7 @@ function startPreview(timeline) {
   const scrub = document.querySelector("#scrub");
   const clock = document.querySelector("#clock");
   const sceneName = document.querySelector("#scene-name");
-  const audio = new Audio("/music.wav");
+  const audio = new Audio(`/music-${filmId}.wav`);
   audio.preload = "auto";
 
   document.body.classList.add("is-preview");
@@ -106,13 +108,19 @@ function startPreview(timeline) {
 }
 
 const ready = (async () => {
-  const [footage] = await Promise.all([loadFootage(), loadFonts()]);
-  const timeline = createTimeline(film, scenes, { footage });
+  const definition = films[filmId];
+  if (!definition) throw new Error(`没有「${filmId}」这个版本。可选：${Object.keys(films).join("、")}`);
+  const [ui] = await Promise.all([definition.needs === "ui" ? loadUi() : null, loadFonts()]);
+  const timeline = createTimeline(film, definition.scenes({ ui }));
   await decodeImages();
   if (rendering) await timeline.seek(0);
   else await startPreview(timeline);
   return timeline;
 })();
+
+ready.catch((error) => {
+  film.innerHTML = `<p class="film-error">${error.message}</p>`;
+});
 
 // 渲染脚本的入口：等 ready，再按帧调用 seek。
 window.__promo = {

@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "capture:hero": "node scripts/capture-hero.mjs",
+    "capture:ui": "node scripts/capture-ui.mjs",
     "render": "node scripts/render.mjs",
     "test": "node --test scripts/test/*.test.mjs"
   },

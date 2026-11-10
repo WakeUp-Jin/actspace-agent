@@ -1,17 +1,17 @@
 /**
- * 把宣传片逐帧渲染成 MP4。
+ * 把宣传片的一个版本逐帧渲染成 MP4。
  *
- *   node scripts/render.mjs                    渲染整片到 out/actspace-promo.mp4
+ *   node scripts/render.mjs --film real        渲染「真实界面」版到 out/actspace-real.mp4
+ *   node scripts/render.mjs --film motion      其它版本见 src/films/index.js
  *   node scripts/render.mjs --no-audio         不合成、不混入配乐
  *   node scripts/render.mjs --from 20 --to 30  只渲染一段，调某个分镜时用
- *   node scripts/render.mjs --stills 3,12.5    只导出这些时刻的 PNG 到 out/stills/
+ *   node scripts/render.mjs --stills 3,12.5    只导出这些时刻的 PNG 到 out/stills/<版本>/
  *
  * 做法：无头 Chrome 打开合成页，每一帧先 seek 到对应时刻再截图，图片顺序喂给 ffmpeg。
  * 画面完全由时刻决定，所以渲染多慢都不会掉帧。
  */
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -21,18 +21,14 @@ import { packageRoot, startComposition } from "./lib/servers.mjs";
 
 const { values: options } = parseArgs({
   options: {
-    out: { type: "string", default: "out/actspace-promo.mp4" },
+    film: { type: "string", default: "real" },
+    out: { type: "string" },
     from: { type: "string" },
     to: { type: "string" },
     stills: { type: "string" },
     "no-audio": { type: "boolean", default: false },
   },
 });
-
-if (!existsSync(resolve(packageRoot, ".cache/hero/meta.json"))) {
-  // 少了这段素材，「一次任务」分镜只会显示一句提示，不该悄悄编进成片。
-  throw new Error("还没有录制首屏演示。先运行：pnpm --filter @actspace/promo-video capture:hero");
-}
 
 const composition = await startComposition();
 const chrome = await launchChrome({ width: 1920, height: 1080 });
@@ -42,9 +38,9 @@ try {
   page.onConsole((type, text) => {
     if (type === "error" || type === "warning") console.warn(`[页面 ${type}] ${text}`);
   });
-  await page.goto(`${composition.url}?render=1`);
+  await page.goto(`${composition.url}?render=1&film=${encodeURIComponent(options.film)}`);
   const film = await page.evaluate("window.__promo.ready.then((info) => ({ ...info, fps: window.__promo.fps }))");
-  console.log(`成片 ${film.duration.toFixed(2)} 秒，${film.fps} 帧/秒，${film.scenes.length} 个分镜`);
+  console.log(`「${options.film}」版 ${film.duration.toFixed(2)} 秒，${film.fps} 帧/秒，${film.scenes.length} 个分镜`);
   for (const scene of film.scenes) console.log(`  ${scene.start.toFixed(2).padStart(6)} 秒  ${scene.id}`);
 
   const frameAt = async (time) => {
@@ -53,7 +49,7 @@ try {
   };
 
   if (options.stills) {
-    const directory = resolve(packageRoot, "out/stills");
+    const directory = resolve(packageRoot, "out/stills", options.film);
     await mkdir(directory, { recursive: true });
     for (const value of options.stills.split(",")) {
       const time = Number(value);
@@ -66,8 +62,8 @@ try {
     const to = Math.min(film.duration, Number(options.to ?? film.duration));
     const first = Math.round(from * film.fps);
     const count = Math.round((to - from) * film.fps);
-    const output = resolve(packageRoot, options.out);
-    const music = resolve(packageRoot, ".cache/music.wav");
+    const output = resolve(packageRoot, options.out ?? `out/actspace-${options.film}.mp4`);
+    const music = resolve(packageRoot, `.cache/music-${options.film}.wav`);
     const withAudio = !options["no-audio"];
     if (withAudio) {
       // 配乐跟着分镜时刻走，所以每次渲染都按当前时间线重新合成；预览页也读这个文件。

@@ -9,3 +9,5 @@ body.is-preview #film { position: absolute; left: 50%; top: 50%; transform: tran
 #player input { flex: 1; accent-color: #a892e6; }
 #player output { font-variant-numeric: tabular-nums; color: rgba(242, 241, 237, 0.7); }
 #scene-name { min-width: 150px; }
+
+.film-error { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 120px; font: 500 44px/1.6 var(--sans); color: var(--body); text-align: center; }
