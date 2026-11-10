@@ -113,7 +113,7 @@ describe("SettingsPage", () => {
         <Dialog open modal={modal}>
           <DialogContent>
             <DialogTitle>Existing layer</DialogTitle>
-            <button>Layer action</button>
+            <button type="button">Layer action</button>
           </DialogContent>
         </Dialog>
         {showSettings && <SettingsPage onBack={() => {}} initialSection="appearance" />}

@@ -30,6 +30,7 @@
 | 2026-10-06 | renderer / 占位按钮 | Composer 的「更多审查操作」`⋯`（`review-overflow-button`）没有 `onClick`，点了没有反应，16 之前就是这样。 | 补上菜单内容，或先隐藏。09（2026-10-07）只把它搬进 `composer/ReviewStrip.tsx`，行为未改。 |
 | 2026-10-06 | renderer / 窄窗 | 窗口最小宽度 480 时打开侧栏覆盖层，会话右键菜单的「复制」子菜单（208px）左右都放不下，翻到左侧后左边约 52px 出界。Radix 只翻转，不在水平方向挪。 | 子菜单加 `max-w-[calc(100vw-16px)]` 并允许文字截断，或窄窗下把两个复制项平铺到主菜单。 |
 | 2026-10-06 | renderer / Composer 跨会话状态 | Composer 不按会话重挂（16 之前两个有消息的会话之间也不重挂）：远端会话 A 发送中切到 B，B 的发送按钮也被 `sending` 禁用，直到 A 的请求结束；A 里选的模型运行时选项会带到 B。A 发送中切走、随后失败时，附件只靠 App 的恢复草稿（不带预览）找回，原来的预览 URL 不释放。 | `sending` 按 `draftKey` 记；运行时选项按会话存；失败时把附件写回 A 的附件草稿，和 `draftRestore` 的顺序一起定。09（2026-10-07）只把这部分搬进 `composer/use-composer-send.ts`、`use-composer-model.ts`，行为未改，建议单独做一个「Composer 草稿按会话隔离」小计划。 |
+| 2026-11-10 | renderer / 无障碍 | Biome a11y 组已按 `recommended` 打开（零命中的进 error、8 条共 22 处为 warn），但存量几十处、修法等于重做交互语义的 6 条仍关着：`useSemanticElements` 44、`useAriaPropsSupportedByRole` 39、`noStaticElementInteractions` 30、`noNoninteractiveElementInteractions` 30、`noNoninteractiveTabindex` 11、`useFocusableInteractive` 11，主要是 `div` / `tr` 上的 `onClick` 和手写 `role`。分层与各条原因见 `docs/coding-standards/lint-conventions.md`。 | 先清 22 处 warn 并升 error（`useKeyWithClickEvents` 的 6 处多数可以直接换 `PlainButton`）；6 条 off 的规则等桌面端 a11y 专题，按 `right-panel/`、`trajectory/`、`settings/` 分批打开。 |
 
 ## Desktop 安全遗留
 
