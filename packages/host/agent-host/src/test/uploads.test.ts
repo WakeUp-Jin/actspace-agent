@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from "vitest";
-import { mkdtemp, rm, appendFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, appendFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -101,4 +101,18 @@ it("reconciles orphan pins against durable tasks before staging cleanup", async 
   await uploads.reconcilePins(async (_session, id) => id === "committed"); now = 90_000_000; await uploads.cleanup();
   expect((await uploads.describe("s", committed.id)).complete).toBe(true);
   await expect(uploads.describe("s", orphan.id)).rejects.toThrow("not found");
+});
+it("leaves entries it did not create in the uploads directory alone, however old", async () => {
+  const { root } = await fixture(); let now = 0;
+  const uploads = new HostUploads(root, () => now);
+  const stale = await uploads.begin({ deviceId: "d", sessionId: "s", name: "file", size: 1, sha256: hash("a") });
+  // A file manager leaves files like this in any directory it shows.
+  await writeFile(join(root, ".DS_Store"), "x");
+  await mkdir(join(root, "notes"));
+  now = Date.now() + 90_000_000;
+  await uploads.cleanup();
+  await uploads.reconcilePins(async () => true);
+  expect((await readdir(root)).sort()).toEqual([".DS_Store", "notes"]);
+  await expect(uploads.status("d", "s", stale.id)).rejects.toThrow("not found");
+  expect((await uploads.begin({ deviceId: "d", sessionId: "s", name: "file", size: 1, sha256: hash("a") })).offset).toBe(0);
 });

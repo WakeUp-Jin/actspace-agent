@@ -12,6 +12,7 @@ type Upload = {
 };
 export type UploadReference = Pick<Upload, "id" | "name" | "size" | "sha256" | "offset" | "complete">;
 const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+const UPLOAD_ID = /^[0-9a-f-]{36}$/;
 /** One writer per Host data root. Metadata is the acknowledged offset authority. */
 export class HostUploads {
   readonly #gate = new SerialGate();
@@ -25,7 +26,7 @@ export class HostUploads {
   #failed = false;
   constructor(private readonly root: string, private readonly now = Date.now) {}
   #directory(id: string) {
-    if (!/^[0-9a-f-]{36}$/.test(id)) throw new HostError("NOT_FOUND", "Upload not found");
+    if (!UPLOAD_ID.test(id)) throw new HostError("NOT_FOUND", "Upload not found");
     return join(this.root, id);
   }
   async #read(id: string): Promise<Upload> {
@@ -69,6 +70,8 @@ export class HostUploads {
   async #scan(expired?: (id: string, value: Upload | undefined) => Promise<boolean>) {
     const staged = new Map<string, { deviceId: string; size: number }>();
     for (const id of await readdir(this.root)) {
+      // Not an upload: something else put it here (a file manager's `.DS_Store`), and it is not ours to judge or remove.
+      if (!UPLOAD_ID.test(id)) continue;
       let value: Upload | undefined;
       try { value = await this.#read(id); }
       catch (error) { if (!(error instanceof HostError) || error.kind !== "NOT_FOUND") throw error; }
