@@ -2,7 +2,7 @@
 import type {ImageMetadata} from 'astro';
 import {Image} from 'astro:assets';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import {blogHref,getPublicPosts} from '../../lib/blog';
+import {blogHref,getPublicPosts,readingTime} from '../../lib/blog';
 import {coverColors,presentationFor} from '../../lib/blog-presentation';
 import {spaceCjk} from '../../lib/markdown/cjk-spacing.mjs';
 import {sitePath} from '../../lib/site-path';
@@ -34,7 +34,11 @@ const images=import.meta.glob<{default:ImageMetadata}>('../../assets/blog/covers
 <div class="blog-tile-top"><span>{categoryOf(post)}</span><time datetime={date}>{date.slice(5)}</time></div>
 <div class="blog-tile-key" aria-hidden="true">{meta?.key??''}</div>
 </div>
+<div class="blog-item-text">
 <h2>{spaceCjk(post.data.title)}</h2>
+<p class="blog-item-desc">{spaceCjk(post.data.description)}</p>
+<p class="blog-item-meta">约 {readingTime(post.body??'')} 分钟阅读</p>
+</div>
 </a>})}
 </div>
 </main>

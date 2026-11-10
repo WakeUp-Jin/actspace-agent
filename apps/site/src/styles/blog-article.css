@@ -7,9 +7,11 @@
 .post-hero-in { width: min(1120px, calc(100% - 40px)); margin: 0 auto; min-height: 420px; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 40px; align-items: center; }
 .post-back { font-size: 13px; color: inherit; opacity: .72; text-decoration: none; transition: opacity 120ms; }
 .post-back:hover { opacity: 1; }
-.post-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; opacity: .78; margin: 28px 0 14px; }
+.post-meta { display: flex; flex-wrap: wrap; gap: 4px 0; font-size: 13px; opacity: .78; margin: 28px 0 14px; }
+.post-meta > :not(:last-child)::after { content: "·"; margin: 0 9px; opacity: .6; }
 .post-hero h1 { font: 650 44px/1.28 var(--sans); letter-spacing: -.012em; margin: 0 0 16px; text-wrap: pretty; }
-.post-desc { font-size: 18.5px; line-height: 1.75; margin: 0; opacity: .82; max-width: 34em; }
+/* 摘要有的是整段开场白，头部只留三行，全文在正文里 */
+.post-desc { font-size: 18.5px; line-height: 1.75; margin: 0; opacity: .82; max-width: 34em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .post-hero-character { width: 420px; max-width: none; height: auto; margin: -20px -20px -20px 0; justify-self: end; -webkit-mask-image: radial-gradient(closest-side, #000 74%, transparent); mask-image: radial-gradient(closest-side, #000 74%, transparent); }
 
 .post-body { width: min(720px, calc(100% - 40px)); margin: 0 auto; padding: 64px 0 160px; }
@@ -20,16 +22,20 @@
 .md-m2 p { margin: 0 0 1.2em; }
 .md-m2 h2 { font: 650 27px/1.35 var(--sans); letter-spacing: -.012em; color: var(--site-ink); margin: 2.4em 0 .7em; scroll-margin-top: 96px; }
 .md-m2 h3 { font: 600 20px/1.45 var(--sans); color: var(--site-ink); margin: 1.9em 0 .6em; scroll-margin-top: 96px; }
-.md-m2 .hn { color: var(--site-accent); margin-right: .1em; }
+.md-m2 .hn { color: var(--site-accent); margin-right: .4em; }
 .md-m2 .hn-sep { display: none; }
 .md-m2 .hn::after { content: "."; }
+/* 「一、」这类中文编号保留顿号，不换成点 */
+.md-m2 .hn-cjk { margin-right: 0; }
+.md-m2 .hn-cjk .hn-sep { display: inline; }
+.md-m2 .hn-cjk::after { content: none; }
 .md-m2 ul, .md-m2 ol { margin: 0 0 1.3em; padding-left: 0; list-style: none; }
 .md-m2 ol { counter-reset: n; }
 .md-m2 li { position: relative; padding-left: 2em; margin: .55em 0; }
 .md-m2 li > p { margin: 0; }
 .md-m2 ol > li { counter-increment: n; }
 .md-m2 ol > li::before { content: counter(n, decimal-leading-zero); position: absolute; left: 0; top: .12em; font: 500 .8em/1.85 var(--mono); color: var(--site-accent); }
-.md-m2 ul > li::before { content: ""; position: absolute; left: .45em; top: .78em; width: 6px; height: 6px; border-radius: 2px; background: var(--site-accent-line); }
+.md-m2 ul > li::before { content: ""; position: absolute; left: .45em; top: .78em; width: 6px; height: 6px; border-radius: 2px; background: var(--site-accent); opacity: .5; }
 .md-m2 strong { color: var(--site-ink); font-weight: 600; }
 .md-m2 a { color: var(--site-ink); text-decoration: underline; text-decoration-color: var(--site-accent-line); text-underline-offset: 4px; transition: text-decoration-color 150ms ease; }
 .md-m2 a:hover { text-decoration-color: var(--site-accent); }
@@ -38,9 +44,10 @@
 .md-m2 blockquote p { margin: 0; }
 .md-m2 blockquote p + p { margin-top: .8em; }
 .md-m2 hr { border: 0; border-top: 1px solid var(--site-line); margin: 2.4em 0; }
-.md-m2 table { display: block; overflow: auto; width: 100%; border-collapse: collapse; font-size: 15px; margin: 1.6em 0; }
-.md-m2 th { text-align: left; font: 600 13px var(--sans); color: var(--site-ink); padding: 0 14px 10px 0; border-bottom: 1px solid var(--site-line-strong); }
-.md-m2 td { padding: 10px 14px 10px 0; border-bottom: 1px solid var(--site-line); }
+/* 表格内不用 anywhere：它会把列的最小宽度压到一个字符，窄屏下行内代码被拦腰折断；放不下时表格自身横向滚动 */
+.md-m2 table { display: block; overflow: auto; width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.65; overflow-wrap: break-word; margin: 1.6em 0; }
+.md-m2 th { text-align: left; font: 600 13px var(--sans); color: var(--site-ink); padding: 0 14px 10px 0; border-bottom: 1px solid var(--site-line-strong); white-space: nowrap; }
+.md-m2 td { padding: 10px 14px 10px 0; border-bottom: 1px solid var(--site-line); vertical-align: top; }
 .md-m2 figure { margin: 2em 0; }
 .md-m2 img { display: block; max-width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--site-line); background: #fff; }
 .md-m2 .prose-image-frame { margin-inline: auto; border-radius: 14px; box-shadow: 0 0 0 1px var(--site-line); background: #fff; }
@@ -67,7 +74,9 @@
 .post-next-card:last-child { flex-direction: row-reverse; text-align: right; }
 .post-next-card:hover { border-color: var(--site-line-strong); }
 .post-next-cover { flex: none; width: 56px; height: 56px; border-radius: 10px; overflow: hidden; }
-.post-next-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.post-next-cover.is-light { box-shadow: 0 0 0 1px var(--site-line); }
+/* 插画四周留白多，放大到角色占满缩略图 */
+.post-next-cover img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1.6); }
 .post-next-card small { display: block; font-size: 12px; color: var(--site-muted); margin-bottom: 2px; }
 .post-next-card b { font: 500 14.5px/1.5 var(--sans); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 

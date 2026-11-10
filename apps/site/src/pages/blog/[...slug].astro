@@ -84,7 +84,7 @@ const neighbours = [
   const thumb = coverOf(post);
   const thumbImage = imageOf(thumb);
   return <a class="post-next-card" href={sitePath(blogHref(post))}>
-<span class="post-next-cover" style={`background:${coverColors[thumb].bg}`}>{thumbImage && <Image src={thumbImage} alt="" format="webp" width={112} height={112} loading="lazy" />}</span>
+<span class:list={["post-next-cover", { "is-light": coverColors[thumb].light }]} style={`background:${coverColors[thumb].bg}`}>{thumbImage && <Image src={thumbImage} alt="" format="webp" width={112} height={112} loading="lazy" />}</span>
 <span><small>{label}</small><b>{spaceCjk(post.data.title)}</b></span>
 </a>;
 })}
