@@ -20,6 +20,15 @@ describe("directory result counts", () => {
     expect(directoryPreview(output)).toMatchObject({ kind: "directory_list", entryCount });
   });
 
+  it("prefers the entry count the tool reports over counting a truncated listing", () => {
+    const output = "[file] a.txt\n[file] b.txt\n\n[Showing first 2 of 5000 entries (stopped at the 64,000-character output limit). Use glob with a pattern, or list a subdirectory, to see the rest.]";
+    const data = { status: "completed", summary: "Listed many", modelOutput: [{ type: "text", text: output }] };
+    expect(toolPreview("list_directory", undefined, { ...data, detail: [{ label: "result", value: { entryCount: 5000, shownCount: 2 } }] }, { args: { path: "many" } }, undefined, "session", "run"))
+      .toMatchObject({ kind: "directory_list", entryCount: 5000 });
+    expect(toolPreview("list_directory", undefined, { ...data, detail: [{ label: "result", value: { entryCount: 0, shownCount: 0 } }] }, { args: { path: "many" } }, undefined, "session", "run"))
+      .toMatchObject({ kind: "directory_list", entryCount: 0 });
+  });
+
   it("does not count failure diagnostics as entries", () => {
     expect(directoryPreview("The requested filesystem resource does not exist.", "failed"))
       .toMatchObject({ kind: "directory_list", entryCount: undefined });
