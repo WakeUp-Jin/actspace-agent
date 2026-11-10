@@ -97,7 +97,7 @@ export async function runToolStreamFixture(options: {
     assembler: new RequestAssembler({ prepare: () => { throw new Error("not used"); } }),
     llm: new LlmService(routes, { resolve: async () => options.credential ?? ({ apiKey: "fixture" }) }),
     compositionDigest: "test", hostCapabilityDigest: "test", host: { hostKind: "desktop", capabilityCeiling: [], runtimeContract: "actspace.runtime.v2", invocationId: "test", workspaceRef: "/fixture" },
-    toolEnvironment: () => ({ ...options.toolEnvironment, resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: async () => { throw new Error("not used"); } }),
+    toolEnvironment: () => ({ ...options.toolEnvironment, resolveArtifact: options.resolveArtifact, workspaceRoot: "/fixture", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw new Error("not used"); } }, createArtifact: options.toolEnvironment?.createArtifact ?? (async () => { throw new Error("not used"); }) }),
     onLiveEvent: (event) => { events.push(event); options.onLiveEvent?.(event); },
     context: options.context,
     compaction: options.compaction,
