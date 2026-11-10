@@ -44,8 +44,30 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
-      // 桌面端 a11y 是独立专题，先不进门禁。
-      "a11y": { "preset": "none" },
+      // a11y 分三层（2026-11-10 按 recommended 预设逐条点过命中数）：
+      // - 预设默认（error）：当前零命中的规则，直接进门禁，如 useAltText、useValidAriaProps、noPositiveTabindex、useButtonType。
+      // - warn：命中 1–8 处、每处都要看上下文才知道是改标记还是改交互的规则，`pnpm lint:report` 可看存量；新代码不要再加，清零后升 error。
+      // - off：存量几十处、修法等于重做交互语义（div 换 button、补 tabIndex / 键盘事件）的规则，留给桌面端 a11y 专题整体做。
+      "a11y": {
+        "preset": "recommended",
+        "useKeyWithClickEvents": "warn",
+        "useKeyWithMouseEvents": "warn",
+        "noAriaHiddenOnFocusable": "warn",
+        "useAriaPropsForRole": "warn",
+        "useValidAnchor": "warn",
+        "noLabelWithoutControl": "warn",
+        "noNoninteractiveElementToInteractiveRole": "warn",
+        // 命中的是 assets/ 下的装饰性品牌 svg 和 ProviderLogo 的 aria-hidden 占位图；装饰图不该有 title，等规则认 aria-hidden 再说。
+        "noSvgWithoutTitle": "warn",
+        // 对话框和行内编辑态打开时把焦点放到第一个输入是组件规范要求的行为，autoFocus 是有意的。
+        "noAutofocus": "off",
+        "useSemanticElements": "off",
+        "useAriaPropsSupportedByRole": "off",
+        "noStaticElementInteractions": "off",
+        "noNoninteractiveElementInteractions": "off",
+        "noNoninteractiveTabindex": "off",
+        "useFocusableInteractive": "off"
+      },
       "correctness": {
         "noUnusedImports": "error",
         "noUnusedVariables": "error",
