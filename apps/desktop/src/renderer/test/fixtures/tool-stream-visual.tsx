@@ -25,10 +25,10 @@ function ToolStreamVisual() {
     <div style={{ maxWidth: 850, margin: "auto" }}>
       <h1 style={{ fontSize: 22, marginBottom: 16 }}>工具流式渲染 · 显式测试样例</h1>
       <div style={{ display: "flex", gap: 16, marginBottom: 30 }}>
-        <button onClick={() => setPhase("streaming")}>参数生成</button>
-        <button onClick={() => setPhase("running")}>工具执行</button>
-        <button onClick={() => setPhase("finished")}>结果完成</button>
-        <button onClick={() => setDark(!dark)}>{dark ? "浅色" : "深色"}</button>
+        <button type="button" onClick={() => setPhase("streaming")}>参数生成</button>
+        <button type="button" onClick={() => setPhase("running")}>工具执行</button>
+        <button type="button" onClick={() => setPhase("finished")}>结果完成</button>
+        <button type="button" onClick={() => setDark(!dark)}>{dark ? "浅色" : "深色"}</button>
       </div>
       <p style={{ marginBottom: 24 }}>我先读取文件并查看目录。合法正文 JSON：{'{"valid":true}'}</p>
       <div style={{ display: "grid", gap: 22 }}>

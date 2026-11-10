@@ -33,9 +33,9 @@ function Preview() {
     <div className="flex h-screen flex-col bg-app-bg text-text-main">
       <div className="flex shrink-0 items-center gap-4 border-b border-line p-3">
         <span>开发验收样例</span>
-        <button onClick={() => setPhase("thinking")}>重新思考</button>
-        <button onClick={() => setPhase("replying")}>输出正文</button>
-        <button onClick={() => setPhase("completed")}>回复结束</button>
+        <button type="button" onClick={() => setPhase("thinking")}>重新思考</button>
+        <button type="button" onClick={() => setPhase("replying")}>输出正文</button>
+        <button type="button" onClick={() => setPhase("completed")}>回复结束</button>
         <select aria-label="Git 状态" value={git} onChange={(event) => setGit(event.target.value)}>
           <option value="folder">普通目录</option><option value="branch">正常分支</option><option value="detached">Detached HEAD</option>
         </select>

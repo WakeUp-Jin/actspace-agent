@@ -67,7 +67,7 @@ const TextButton = forwardRef<HTMLButtonElement, TextButtonProps>(({ icon, label
     {icon}
     <span className="min-w-0 truncate">{label}</span>
     {trailing}
-    <ChevronDown className={CHEVRON_CLASS} size={12} strokeWidth={2.2} aria-hidden="true" />
+    <ChevronDown className={CHEVRON_CLASS} size={12} aria-hidden="true" />
   </button>
 ));
 TextButton.displayName = "TextButton";
@@ -91,7 +91,7 @@ export function RunTargetRow({
       {!locationOnly && !remote && local.branchLabel ? (
         <Menu {...openProps("branch")}>
           <MenuTrigger asChild>
-            <TextButton aria-label="选择分支" icon={<GitBranch className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />} label={local.branchLabel} />
+            <TextButton aria-label="选择分支" icon={<GitBranch className={ICON_CLASS} size={14} aria-hidden="true" />} label={local.branchLabel} />
           </MenuTrigger>
           <MenuContent className="max-h-[320px] w-[300px]">
             <MenuLabel>分支</MenuLabel>
@@ -123,10 +123,10 @@ export function RunTargetRow({
         <TextButton
           aria-label="选择运行位置"
           icon={remote
-            ? <Server className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
+            ? <Server className={ICON_CLASS} size={14} aria-hidden="true" />
             : local.runLocation === "worktree"
-              ? <GitFork className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />
-              : <Laptop className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />}
+              ? <GitFork className={ICON_CLASS} size={14} aria-hidden="true" />
+              : <Laptop className={ICON_CLASS} size={14} aria-hidden="true" />}
           label={remote ? remote.hostName || "远端机器" : local.runLocation === "worktree" ? "新建工作树" : "本机"}
           trailing={notReady?.tone && notReady.label ? (
             <span className="inline-flex shrink-0 items-center gap-1 text-act-xs text-text-faint">
@@ -161,7 +161,7 @@ function LocalWorkspaceMenu({ open, onOpenChange, local }: { open: boolean; onOp
   return (
     <Menu open={open} onOpenChange={changeOpen}>
       <MenuTrigger asChild>
-        <TextButton aria-label="选择工作区" icon={<Folder className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />} label={local.workspaceLabel} />
+        <TextButton aria-label="选择工作区" icon={<Folder className={ICON_CLASS} size={14} aria-hidden="true" />} label={local.workspaceLabel} />
       </MenuTrigger>
       <MenuContent className="w-[260px]">
         <MenuLabel>最近使用</MenuLabel>
@@ -235,7 +235,7 @@ function RemoteWorkspaceMenu({ open, onOpenChange, target, description, onSelect
   return (
     <Menu open={open} onOpenChange={onOpenChange}>
       <MenuTrigger asChild>
-        <TextButton aria-label="选择工作区" icon={<Folder className={ICON_CLASS} size={14} strokeWidth={2} aria-hidden="true" />} label={label} />
+        <TextButton aria-label="选择工作区" icon={<Folder className={ICON_CLASS} size={14} aria-hidden="true" />} label={label} />
       </MenuTrigger>
       <MenuContent className="w-[280px]">
         <MenuLabel>{`${target.hostName || "远端机器"} 上的工作区`}</MenuLabel>

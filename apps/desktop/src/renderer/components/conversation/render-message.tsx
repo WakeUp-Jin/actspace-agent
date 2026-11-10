@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, GitBranch, Loader2 } from "lucide-react";
+import { Check, GitBranch, LoaderCircle } from "lucide-react";
 import type { MessageBlock } from "@actspace/shared";
 import { getSessionToolDetail } from "../../api/sessions";
 import { messageFlowKind } from "../messages/messageFlowStyles";
@@ -131,7 +131,7 @@ function WorkspacePreparationBlock({
   return (
     <details className="group/worktree rounded-act-md border border-line bg-surface-subtle/70 px-3 py-2 text-act-md leading-5 text-text-muted" open={!completed}>
       <summary className="flex cursor-pointer list-none items-center gap-2 text-text-main">
-        {completed ? <Check size={15} aria-hidden="true" /> : <Loader2 className="animate-spin" size={15} aria-hidden="true" />}
+        {completed ? <Check size={15} aria-hidden="true" /> : <LoaderCircle className="animate-spin" size={15} aria-hidden="true" />}
         <span className="font-medium">{completed ? "已创建工作树" : "正在创建工作树"}</span>
         {completed && message.durationMs !== undefined ? (
           <span className="text-act-xs leading-4 text-text-faint">{Math.max(0, message.durationMs / 1000).toFixed(1)}s</span>

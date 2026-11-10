@@ -5,7 +5,7 @@
  * 另支持从目录安装（复制到用户数据目录）与卸载（仅从应用安装的）。
  */
 import { useCallback, useEffect, useState } from "react";
-import { CircleAlert, FolderDown, Trash2 } from "lucide-react";
+import { CircleExclamationPoint, FolderDown, Trash } from "lucide-react";
 import type { AppSettings, SettingsUpdateInput, SkillCatalogItem } from "@actspace/shared";
 import { SectionShell, SettingGroup, Toggle } from "../settings/SettingsPrimitives";
 import { Button } from "../ui/Button";
@@ -111,7 +111,7 @@ export function SkillsSection({
         <div className="flex gap-2">
           <Button variant="secondary" disabled={loading} onClick={() => { setMessage(null); void refresh(); }}>刷新</Button>
           <Button variant="secondary" onClick={() => void install()}>
-            <FolderDown size={14} strokeWidth={2} className="mr-1.5" />
+            <FolderDown size={14} className="mr-1.5" />
             安装 Skill
           </Button>
         </div>
@@ -143,7 +143,7 @@ export function SkillsSection({
                     </span>
                     {item.status === "warning" ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-act-xxs font-medium text-on-danger">
-                        <CircleAlert size={11} strokeWidth={2.2} /> 异常
+                        <CircleExclamationPoint size={11} /> 异常
                       </span>
                     ) : null}
                   </div>
@@ -160,7 +160,7 @@ export function SkillsSection({
                     aria-label={`卸载 Skill ${item.name}`}
                     onClick={() => void uninstall(item)}
                   >
-                    <Trash2 size={14} strokeWidth={2} />
+                    <Trash size={14} />
                   </button>
                 ) : null}
               </div>

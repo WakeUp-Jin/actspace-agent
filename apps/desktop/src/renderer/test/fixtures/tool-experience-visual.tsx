@@ -35,9 +35,9 @@ function Fixture() {
   const messages: MessageBlock[] = [{ kind: "user", id: "user", content: "检查工具渲染和子智能体执行", createdAt: now }, { kind: "assistant", id: "reply", content: "我会先核对参数、运行状态和执行记录。", createdAt: now }, ...agents];
   return <div className="h-screen bg-app-bg text-text-main">
     <nav className="flex h-12 items-center gap-5 border-b border-line px-5 text-[13px]">
-      <span>显式测试样例</span><button onClick={() => setView(view === "chat" ? "trajectory" : "chat")}>{view === "chat" ? "轨迹" : "会话"}</button>
-      <button onClick={() => setTheme(theme === "light" ? "dark" : "light")}>{theme === "light" ? "深色" : "浅色"}</button>
-      <button onClick={() => openTab({ id: "subagents", kind: "subagents", title: "Subagents", sessionId: "fixture" })}>Subagents</button>
+      <span>显式测试样例</span><button type="button" onClick={() => setView(view === "chat" ? "trajectory" : "chat")}>{view === "chat" ? "轨迹" : "会话"}</button>
+      <button type="button" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>{theme === "light" ? "深色" : "浅色"}</button>
+      <button type="button" onClick={() => openTab({ id: "subagents", kind: "subagents", title: "Subagents", sessionId: "fixture" })}>Subagents</button>
     </nav>
     <div className="grid h-[calc(100vh-48px)] grid-cols-[minmax(0,1fr)_420px]">
       <TestConversationView messages={messages} contextSnapshot={null} sessionId="fixture" activeView={view} isStreaming onAbort={() => {}} />

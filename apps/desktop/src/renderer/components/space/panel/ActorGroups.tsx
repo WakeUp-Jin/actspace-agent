@@ -63,7 +63,7 @@ const ActorRow = /* @__PURE__ */ memo(function ActorRow({ member: m, actor, curr
         {name}
       </span>
       <span className={`inline-flex min-w-0 flex-1 items-center gap-1 text-act-xs ${d.faint ? "text-text-faint" : "text-text-muted"}`}>
-        {d.check ? <Check size={12} strokeWidth={2.2} className="shrink-0 text-operational" aria-hidden="true" /> : null}
+        {d.check ? <Check size={12} className="shrink-0 text-operational" aria-hidden="true" /> : null}
         <span className="overflow-hidden text-ellipsis whitespace-nowrap">{d.text}</span>
       </span>
       {m.unread ? <span className="size-1.5 shrink-0 rounded-full bg-accent" role="img" aria-label="未读" /> : null}
@@ -89,7 +89,7 @@ function GroupHead({ status, count, closed, onToggle }: { status: MemberStatus; 
       aria-expanded={!closed} onClick={() => onToggle(status)}
     >
       <ChevronDown
-        size={13} strokeWidth={2} aria-hidden="true"
+        size={13} aria-hidden="true"
         className={`shrink-0 transition-transform duration-(--motion-base) ${closed ? "-rotate-90" : ""} ${wait ? "" : "text-text-faint"}`}
       />
       <span>{STATUS_LABEL[status]}</span>
@@ -110,7 +110,7 @@ export function ActorGroups() {
   const fresh = useFlipRows(rootRef, revision);
   const groups = groupMembers(space.members);
 
-  if (!groups.length) return <PanelEmpty icon={<Users size={22} strokeWidth={1.6} />}>这个 Space 还没有成员。</PanelEmpty>;
+  if (!groups.length) return <PanelEmpty icon={<Users size={22} />}>这个 Space 还没有成员。</PanelEmpty>;
 
   return (
     <div ref={rootRef}>

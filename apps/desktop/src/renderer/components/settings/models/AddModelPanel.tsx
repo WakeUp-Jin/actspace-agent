@@ -73,13 +73,13 @@ export function AddModelPanel({ connectionId, onAdd, onCancel }: { connectionId:
     else if (effective.aliased && effective.catalog) {
       fill = (
         <p className="flex flex-wrap items-center gap-1.5 text-operational">
-          <Check size={13} strokeWidth={2.2} aria-hidden="true" />
+          <Check size={13} aria-hidden="true" />
           按 {effective.catalog.name} 填好了
           <Button variant="ghost" size="xs" onClick={() => { setNoAlias(true); change("canonical", undefined); }}>不是它</Button>
         </p>
       );
     } else if (effective.catalog?.exact) {
-      fill = <p className="flex items-center gap-1.5 text-operational"><Check size={13} strokeWidth={2.2} aria-hidden="true" />认出来了：{effective.catalog.name}</p>;
+      fill = <p className="flex items-center gap-1.5 text-operational"><Check size={13} aria-hidden="true" />认出来了：{effective.catalog.name}</p>;
     } else fill = <p>没认出来：填上上下文和价格，用量和费用才算得准</p>;
   }
 

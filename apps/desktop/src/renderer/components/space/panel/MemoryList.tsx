@@ -1,4 +1,4 @@
-import { BookOpen, Brain, Pencil, Trash2 } from "lucide-react";
+import { BookOpen, Brain, Pencil, Trash } from "lucide-react";
 import { Button } from "../../ui/Button";
 import { IconButton } from "../../ui/IconButton";
 import { currentSpace } from "../model/selectors";
@@ -47,11 +47,11 @@ export function MemoryList() {
               className="opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
               onClick={() => forgetMemory(m.id)}
             >
-              <Trash2 size={12} aria-hidden="true" />
+              <Trash size={12} aria-hidden="true" />
             </IconButton>
           </div>
         ))}
-        {space.memory.length ? null : <PanelEmpty icon={<Brain size={22} strokeWidth={1.6} />}>还没有记忆。</PanelEmpty>}
+        {space.memory.length ? null : <PanelEmpty icon={<Brain size={22} />}>还没有记忆。</PanelEmpty>}
       </section>
     </div>
   );

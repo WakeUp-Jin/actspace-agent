@@ -23,7 +23,7 @@
 4. 数据色不接管 CTA、选中和导航；蓝色只留给 info 和数据，不回流成按钮或焦点。
 5. 文字层级：`text-main` 标题与正文；`text-muted` 说明和次要正文；`text-faint` 时间戳、元信息、默认图标；`text-subtle` 箭头、占位符等装饰，对比度低，不承载必须读到的信息。
 6. focus、selected、running 是三个状态，不共用同一个彩色 token。
-7. 图标用线性图标（lucide），默认 `currentColor`；普通功能图标保持中性，不按功能类型染色，只有真实状态（运行、warning、danger）才用语义色；装饰图标加 `aria-hidden`。
+7. 图标用线性图标（lucide），默认 `currentColor`；普通功能图标保持中性，不按功能类型染色，只有真实状态（运行、warning、danger）才用语义色；装饰图标加 `aria-hidden`。尺寸、线宽和命名见 §12。
 
 ## 2. 色板
 
@@ -184,8 +184,38 @@ Tailwind v4 + Preflight，入口 `styles/index.css`，层序 `theme, base, chrom
 - className 过长就提成 React 组件或局部常量，不回到大 CSS 文件。
 - 任意值（`w-[…]`）只用于大数字 `clamp()`、特殊 grid、窗口尺寸等确实需要的地方。
 
-## 12. 检查命令
+## 12. 图标
 
-- `pnpm check:frontend-tokens`：禁止 `text-[Npx]`、Tailwind 默认字号、`rounded-[…]`、`z-[N≥3]`、`duration-[…]` / `duration-N`、Tailwind 调色板色名、彩色焦点环、旧冷色阴影；确认引用的 `text-act-*`、`rounded-act-*`、`shadow-act-*`、`--act-*`、`--motion-*` 都有定义；原生 `<button>` 数量不得超过基线；间距任意值（§6）数量不得超过 `scripts/spacing-literal-baseline.json`；`createPortal`、`role="dialog"` 只能在 `components/ui/`。例外按「文件 + 精确匹配串」登记在脚本的 `LITERAL_ALLOWLIST`。
+只用 `lucide-react`，颜色规则见 §1.7。
+
+- **尺寸**只用这些档位：12（行内标签、`IconButton` xs）/ 14（列表行、菜单项、按钮里的图标）/ 16（`IconButton` sm、md）/ 18（`IconButton` lg、工具栏主操作）/ 20、22（面板空态、对话框标题）。更大的只有空态插画和 Logo 用 28 / 40 / 56。存量的 11 / 13 / 15 / 17 等非档位值记在 `exec-plans/tech-debt-tracker.md`，评审时顺手收敛，不新增。
+- **线宽**：业务组件不传 `strokeWidth`，统一用 lucide 默认 2；粗细差异靠尺寸和颜色表达，不靠线宽。需要和 lucide 风格一致的手绘 SVG 用 16 或 24 viewBox，线宽按文件登记在检查脚本的 `LITERAL_ALLOWLIST`。
+- **命名**：导入 lucide 的规范名，不用别名（别名只是 re-export，渲染出的 `class` 仍是规范名，在测试和样式里对不上）。本仓库同一含义只用一个图标，首选如下，脚本会拦截左列：
+
+| 不要用 | 用 | 说明 |
+|---|---|---|
+| `AlertCircle`、`CircleAlert` | `CircleExclamationPoint` | 行内提醒、错误 |
+| `AlertTriangle`、`TriangleAlert` | `TriangleExclamationPoint` | 警告 |
+| `ShieldAlert` | `ShieldExclamationPoint` | 权限 / 安全警告 |
+| `CheckCircle2` | `CircleCheck` | 完成 |
+| `CircleHelp` | `CircleQuestionMark` | 帮助 |
+| `Loader2` | `LoaderCircle` | 加载中，配 `animate-spin` |
+| `MoreHorizontal` | `Ellipsis` | 更多操作菜单 |
+| `Trash2` | `Trash` | 删除 |
+| `Code2` | `CodeXml` | 源码 |
+| `FileCode2` | `FileCodeCorner` | 代码文件 |
+| `BarChart3` | `ChartColumn` | 统计 |
+| `AlignLeft` | `TextAlignStart` | 文本对齐 |
+| `WrapText` | `TextWrap` | 自动换行 |
+| `ArchiveRestore` | `ArchiveArrowUp` | 取消归档 |
+| `Terminal`、`TerminalSquare` | `SquareTerminal` | 终端、Bash 命令 |
+| `SquareArrowOutUpRight` | `ExternalLink` | 在外部打开 |
+| `RotateCw` | `RefreshCw` | 刷新、重试；`RotateCcw` 保留给「重置」 |
+
+- **例外**：`components/trajectory/kind-icons.tsx` 是对标 DSH 轨迹的 16px viewBox、1px 线宽手绘图标，`components/files/FileTypeIcon.tsx`、`components/settings/ProviderLogo.tsx` 是文件类型和品牌 glyph，`components/stats/stats-ui.tsx` 的环形图不是图标；这些文件的线宽按「文件 + 精确匹配串」登记。
+
+## 13. 检查命令
+
+- `pnpm check:frontend-tokens`：禁止 `text-[Npx]`、Tailwind 默认字号、`rounded-[…]`、`z-[N≥3]`、`duration-[…]` / `duration-N`、Tailwind 调色板色名、彩色焦点环、旧冷色阴影、JSX 里的 `strokeWidth=`、§12 表格左列的 lucide 导入名；确认引用的 `text-act-*`、`rounded-act-*`、`shadow-act-*`、`--act-*`、`--motion-*` 都有定义；原生 `<button>` 数量不得超过基线；间距任意值（§6）数量不得超过 `scripts/spacing-literal-baseline.json`；`createPortal`、`role="dialog"` 只能在 `components/ui/`。例外按「文件 + 精确匹配串」登记在脚本的 `LITERAL_ALLOWLIST`。
 - `pnpm check:frontend-theme`：token 的浅 / 深 / system 三个分支完整，强调色调色板与 CSS 块一一对应并满足对比度，组件无黑白与任意值颜色字面量。
 - 两个命令都同时扫描 `apps/web/src`，web 没有字面量例外。

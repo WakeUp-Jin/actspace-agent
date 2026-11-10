@@ -40,7 +40,7 @@ const MenuCheckboxItem = React.forwardRef<React.ElementRef<typeof MenuPrimitive.
   className, children, ...props
 }, ref) => (
   <MenuPrimitive.CheckboxItem ref={ref} className={cn(MENU_ITEM_CLASS, className)} {...props}>
-    <span className={MENU_INDICATOR_SLOT_CLASS}><MenuPrimitive.ItemIndicator><Check size={14} strokeWidth={2.4} aria-hidden="true" /></MenuPrimitive.ItemIndicator></span>
+    <span className={MENU_INDICATOR_SLOT_CLASS}><MenuPrimitive.ItemIndicator><Check size={14} aria-hidden="true" /></MenuPrimitive.ItemIndicator></span>
     {children}
   </MenuPrimitive.CheckboxItem>
 ));

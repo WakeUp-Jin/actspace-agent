@@ -162,13 +162,13 @@ export function SidebarSessions({
         {empty ? (
           options.archived === "only" ? (
             <div className={LIST_EMPTY_CLASS}>
-              <Archive size={22} strokeWidth={1.6} aria-hidden="true" />
+              <Archive size={22} aria-hidden="true" />
               <span>暂无已归档会话</span>
               <Button variant="ghost" size="xs" onClick={() => store.setArchived("hide")}>查看其他会话</Button>
             </div>
           ) : (
             <div className={LIST_EMPTY_CLASS}>
-              <MessagesSquare size={22} strokeWidth={1.6} aria-hidden="true" />
+              <MessagesSquare size={22} aria-hidden="true" />
               <span>暂无会话</span>
             </div>
           )
@@ -241,7 +241,7 @@ export function SidebarSessions({
               tooltip="添加工作区"
               onClick={(event) => { event.stopPropagation(); onAddWorkspace?.(); }}
             >
-              <FolderPlus size={14} strokeWidth={1.9} aria-hidden="true" />
+              <FolderPlus size={14} aria-hidden="true" />
             </IconButton>
           </>}
         />

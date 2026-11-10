@@ -1,4 +1,4 @@
-import { Image as ImageIcon, Loader2 } from "lucide-react";
+import { Image as ImageIcon, LoaderCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 import { useRightPanel } from "../right-panel/RightPanelContext";
@@ -146,7 +146,7 @@ export function TurnOutputArtifacts({
                 aria-label={`Open ${artifact.name}`}
               >
                 <span className="grid h-5 w-5 shrink-0 place-items-center text-text-faint" aria-hidden="true">
-                  {loadingId === artifact.id ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+                  {loadingId === artifact.id ? <LoaderCircle size={14} className="animate-spin" /> : <ImageIcon size={14} />}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-act-xs text-text-muted">
                   {artifact.displayPath}

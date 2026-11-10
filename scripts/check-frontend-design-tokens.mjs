@@ -4,6 +4,7 @@
 // 颜色契约（tokens、强调色、黑白与任意值颜色）由 check-frontend-theme-colors.mjs 负责；这里只拦 Tailwind 调色板色名和旧的彩色焦点环。
 // 基础组件约束（16 S8）：原生 <button> 按文件不超过基线；createPortal 和 role="dialog" 只能写在 components/ui/。
 // 间距任意值（p-[7px] / gap-[3px] 等）按文件不超过 scripts/spacing-literal-baseline.json 的基线，desktop 与 web 各一组。
+// 图标约束（token 规范 §12）：JSX 里不写 strokeWidth（lucide 统一默认线宽，手绘 SVG 按文件登记）；lucide 导入不用别名和同义图标（LUCIDE_ICON_RENAMES）。
 // 扫描根是一个列表（SCAN_PROFILES）：desktop = apps/desktop/src/renderer，web = apps/web/src（目录不存在时静默跳过）。
 // 每个根读自己的 token 定义；web 的原生 <button>、createPortal、role="dialog" 只允许在 apps/web/src/ui/，其余基线为 0，没有字面量例外。
 // 规范见 docs/design-docs/frontend/front-视觉token规范.md 和 front-web-pwa客户端规范.md §1。
@@ -24,6 +25,36 @@ export const LITERAL_ALLOWLIST = new Map([
   ["components/review/ReviewDiffCanvas.tsx", ["rounded-[2px]"]],
   ["components/ContextPopup.tsx", ["rounded-[3px]"]],
   ["components/workspace/workspaceOpenTool.tsx", ["rounded-[3px]"]],
+  // 手绘 SVG 的线宽：轨迹 kind 图标对标 DSH 的 16px viewBox / 1px 线；文件类型和品牌 glyph 有自己的几何；环形图不是图标。
+  ["components/trajectory/kind-icons.tsx", ["strokeWidth={strokeWidth}", "strokeWidth={1}", "strokeWidth={1.4}", 'strokeWidth="1.8"', "strokeWidth={2}"]],
+  ["components/files/FileTypeIcon.tsx", ['strokeWidth="2.38"', 'strokeWidth="1.2"', 'strokeWidth="1.35"']],
+  ["components/settings/ProviderLogo.tsx", ['strokeWidth="1.8"']],
+  ["components/stats/stats-ui.tsx", ['strokeWidth="15"', "strokeWidth={highlighted === index ? 18 : 15}"]],
+]);
+
+// lucide 图标：别名 → 规范名（别名只是 re-export，渲染出的 class 仍是规范名），以及同义图标 → 本仓库首选。见 token 规范 §12。
+export const LUCIDE_ICON_RENAMES = new Map([
+  ["AlertCircle", "CircleExclamationPoint"],
+  ["CircleAlert", "CircleExclamationPoint"],
+  ["AlertTriangle", "TriangleExclamationPoint"],
+  ["TriangleAlert", "TriangleExclamationPoint"],
+  ["ShieldAlert", "ShieldExclamationPoint"],
+  ["CheckCircle2", "CircleCheck"],
+  ["CircleHelp", "CircleQuestionMark"],
+  ["Loader2", "LoaderCircle"],
+  ["MoreHorizontal", "Ellipsis"],
+  ["Trash2", "Trash"],
+  ["Code2", "CodeXml"],
+  ["FileCode2", "FileCodeCorner"],
+  ["BarChart3", "ChartColumn"],
+  ["AlignLeft", "TextAlignStart"],
+  ["WrapText", "TextWrap"],
+  ["ArchiveRestore", "ArchiveArrowUp"],
+  // 同义图标
+  ["Terminal", "SquareTerminal"],
+  ["TerminalSquare", "SquareTerminal"],
+  ["SquareArrowOutUpRight", "ExternalLink"],
+  ["RotateCw", "RefreshCw"],
 ]);
 
 export const RULES = [
@@ -47,6 +78,11 @@ export const RULES = [
     id: "focus-ring-legacy",
     pattern: /focus(?:-visible|-within)?:(?:border|ring|outline)-(?:blue|green|sky|emerald)-/g,
     hint: "焦点环用 ring-focus-ring / outline-focus-ring，不用彩色焦点环",
+  },
+  {
+    id: "icon-stroke-width-literal",
+    pattern: /(?<![\w-])strokeWidth=(?:\{[^}]*\}|"[^"]*"|'[^']*')/g,
+    hint: "lucide 图标不传 strokeWidth，统一用默认线宽；手绘 SVG 的线宽按文件登记在 LITERAL_ALLOWLIST",
   },
 ];
 
@@ -158,6 +194,22 @@ export function checkUiOnly(relative, source, profile = DESKTOP_PROFILE) {
     if (allowed.includes(rule.id)) continue;
     for (const match of code.matchAll(rule.pattern)) {
       violations.push({ rule: rule.id, match: match[0], line: lineOf(code, match.index), hint: rule.hint.replaceAll(UI_PRIMITIVES_DIR, profile.primitivesDir) });
+    }
+  }
+  return violations;
+}
+
+/** `import { … } from "lucide-react"` 里是否用了别名或同义图标；返回 { rule, match, line, hint }[]。 */
+export function checkLucideImports(relative, source, renames = LUCIDE_ICON_RENAMES) {
+  if (!/\.tsx?$/.test(relative)) return [];
+  const code = stripComments(source);
+  const violations = [];
+  for (const statement of code.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["']lucide-react["']/g)) {
+    for (const specifier of statement[1].split(",")) {
+      const imported = specifier.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim();
+      const replacement = renames.get(imported);
+      if (!replacement) continue;
+      violations.push({ rule: "lucide-icon-rename", match: imported, line: lineOf(code, statement.index), hint: `lucide 图标用 ${replacement}（见 token 规范 §12 的图标表）` });
     }
   }
   return violations;
@@ -356,6 +408,7 @@ export function runCheck(
     for (const v of checkSource(relative, source, profile)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
     for (const m of checkTokenReferences(relative, source, defined)) problems.push(`${relative}:${m.line} ${m.match} — 未定义的 token ${m.variable}`);
     for (const v of checkUiOnly(relative, source, profile)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
+    for (const v of checkLucideImports(relative, source)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
   }
   const buttons = checkNativeButtons(collectNativeButtonCounts(root, profile.primitivesDir), baseline, profile.primitivesDir);
   problems.push(...buttons.errors);

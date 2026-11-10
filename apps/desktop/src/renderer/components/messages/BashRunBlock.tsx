@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, MoreHorizontal, ShieldCheck, ShieldOff, TerminalSquare } from "lucide-react";
+import { ChevronDown, ChevronRight, Ellipsis, ShieldCheck, ShieldOff, SquareTerminal } from "lucide-react";
 import { createContext, useContext, useState } from "react";
 import type { MessageBlock } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
@@ -81,7 +81,7 @@ export function EnvironmentIcon({ sandboxed, className = "" }: { sandboxed: bool
       aria-label={sandboxed ? "沙盒" : "真实环境"}
       title={title}
     >
-      <Icon size={14} strokeWidth={2} aria-hidden="true" />
+      <Icon size={14} aria-hidden="true" />
     </span>
   );
 }
@@ -98,7 +98,7 @@ function EnvironmentBadge({ sandboxed, notExecuted, status }: Pick<BashMessage, 
 
 function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { message: BashMessage; replyCompleted?: boolean; onExpand?: () => void }) {
   const [expanded, setExpanded] = useState(!replyCompleted && message.status === "failed");
-  const chevron = expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />;
+  const chevron = expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />;
   const summary = getExecutionSummary(message);
   const target = message.commandPreview || message.command || "Bash command";
   // 前台执行中 / 后台仍在跑：标题走 shimmer 高光，让用户看出命令正在执行
@@ -155,7 +155,7 @@ function BashExecutionBlock({ message, replyCompleted = false, onExpand }: { mes
           <Tooltip>
             <TooltipTrigger asChild>
               <button className={BASH_OUTPUT_MENU_CLASS} type="button" aria-label="Open Bash output actions">
-                <MoreHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
+                <Ellipsis size={16} aria-hidden="true" />
               </button>
             </TooltipTrigger>
             <TooltipContent>更多 Bash 输出操作</TooltipContent>
@@ -204,7 +204,7 @@ function BashApprovalBlock({ message }: { message: BashMessage }) {
   const heads = getShellCommandHeads(message.command).join(", ");
   return (
     <ApprovalCard
-      icon={<TerminalSquare size={14} strokeWidth={2} />}
+      icon={<SquareTerminal size={14} />}
       target={<>
         <span className={BASH_APPROVAL_INTENT_CLASS} title={message.intent}>{message.intent || "Bash 命令"}</span>
         {heads ? <span className={BASH_APPROVAL_HEADS_CLASS}>{heads}</span> : null}

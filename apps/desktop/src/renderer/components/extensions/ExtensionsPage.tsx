@@ -93,7 +93,7 @@ export function ExtensionsPage({ onSettingsChange, onConfigureSpeech }: { onSett
           </section>
           <section role="tabpanel" id="extension-panel-mcp" aria-labelledby="extension-tab-mcp" hidden={tab !== "mcp"}>
             <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <Unplug size={25} strokeWidth={1.5} className="text-text-faint" />
+              <Unplug size={25} className="text-text-faint" />
               <h2 className="text-act-md font-medium">MCP 暂未接入</h2>
               <p className="max-w-[34ch] text-act-sm leading-relaxed text-text-faint">接入后，你可以在这里管理 MCP 服务。</p>
             </div>

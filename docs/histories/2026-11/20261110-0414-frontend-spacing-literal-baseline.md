@@ -20,7 +20,7 @@
 - **决定**：不一次性全量替换，改为按文件计数的基线「只减不增」。
 - **脚本**：`check-frontend-design-tokens.mjs` 新增 `countSpacingLiterals` / `checkSpacingLiterals` / `collectSpacingLiteralCounts` / `loadSpacingLiteralBaseline` 和 `--update-spacing-baseline`；原生按钮的基线比较抽成通用 `checkCountBaseline`，两个基线共用。新文件 `scripts/spacing-literal-baseline.json` 按扫描根分组（`desktop` / `web`）。`runCheck` 多一个 `spacingBaseline` 参数，`runAllChecks` 多一个 `spacingBaselines` 参数。
 - **测试**：`frontend-design-tokens.test.mjs` 加 4 个用例（计数边界、基线对比、基线文件与代码精确一致、web 根走自己的分组），现 24 个。
-- **文档**：token 规范 §6 写明刻度对应（`p-0.5`=2px 起）、存量分布和收紧流程，§12 检查命令加一句；新功能开发清单 §2 加「间距走 4px 网格」一行；技术债表 2026-09-26 行改为已统计、已入基线，后续动作改为按文件顺手收 + 三个目录可整批收。
+- **文档**：token 规范 §6 写明刻度对应（`p-0.5`=2px 起）、存量分布和收紧流程，§13 检查命令加一句；新功能开发清单 §2 加「间距走 4px 网格」一行；技术债表 2026-09-26 行改为已统计、已入基线，后续动作改为按文件顺手收 + 三个目录可整批收。
 
 ### 🧠 Design Intent (Why)
 

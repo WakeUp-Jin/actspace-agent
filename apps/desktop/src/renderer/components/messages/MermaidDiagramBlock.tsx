@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Code2, Copy, Download, Maximize2, Workflow } from "lucide-react";
+import { TriangleExclamationPoint, Check, CodeXml, Copy, Download, Maximize2, Workflow } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { MermaidThemeId } from "../../appearance/types";
 import { IconButton } from "../ui/IconButton";
@@ -115,7 +115,7 @@ export function MermaidDiagramBlock({ source, themeId, sourceView }: {
               aria-pressed={showSource}
               onClick={() => setShowSource((value) => !value)}
             >
-              {showSource ? <Workflow size={13} aria-hidden="true" /> : <Code2 size={13} aria-hidden="true" />}
+              {showSource ? <Workflow size={13} aria-hidden="true" /> : <CodeXml size={13} aria-hidden="true" />}
             </IconButton>
           ) : null}
           <IconButton size="xs" label={copied ? "已复制源码" : "复制 Mermaid 源码"} onClick={() => void copySource()}>
@@ -132,7 +132,7 @@ export function MermaidDiagramBlock({ source, themeId, sourceView }: {
 
       {state.status === "error" ? (
         <p role="alert" className="m-0 flex items-center gap-1.5 border-b border-line px-3 py-2 font-sans text-act-xs text-text-muted">
-          <AlertTriangle size={13} aria-hidden="true" className="shrink-0 text-warning" />
+          <TriangleExclamationPoint size={13} aria-hidden="true" className="shrink-0 text-warning" />
           无法渲染图表：{state.message}，已显示源码。
         </p>
       ) : null}

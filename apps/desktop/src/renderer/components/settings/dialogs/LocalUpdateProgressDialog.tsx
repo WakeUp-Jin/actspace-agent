@@ -1,4 +1,4 @@
-import { CheckCircle2, CircleAlert, Loader2, X } from "lucide-react";
+import { CircleCheck, CircleExclamationPoint, LoaderCircle, X } from "lucide-react";
 import type { LocalUpdateProgressPhase, LocalUpdateState } from "@actspace/shared";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
@@ -66,11 +66,11 @@ export function LocalUpdateProgressDialog({
               aria-hidden="true"
             >
               {isFailed ? (
-                <CircleAlert size={21} strokeWidth={2.2} />
+                <CircleExclamationPoint size={21} />
               ) : isSucceeded ? (
-                <CheckCircle2 size={21} strokeWidth={2.2} />
+                <CircleCheck size={21} />
               ) : (
-                <Loader2 size={21} strokeWidth={2.2} className="animate-spin" />
+                <LoaderCircle size={21} className="animate-spin" />
               )}
             </span>
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -85,7 +85,7 @@ export function LocalUpdateProgressDialog({
               aria-label="关闭更新进度"
               onClick={onClose}
             >
-              <X size={16} strokeWidth={2} />
+              <X size={16} />
             </button>
           ) : null}
         </div>

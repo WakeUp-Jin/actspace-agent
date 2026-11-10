@@ -25,6 +25,7 @@
 | 字号、圆角、阴影、层级、动效时长只用 token（`text-act-*`、`rounded-act-*`、`shadow-act-*`、`z-(--act-z-*)`、`duration-(--motion-*)`），不写死数值 | [视觉 token](front-视觉token规范.md) §5、§7–§10 | `pnpm check:frontend-tokens` |
 | 颜色只用随主题翻转的语义类或变量，不写 `text-black`、`bg-white`、`#hex`、`rgba()`、Tailwind 调色板色 | [视觉 token](front-视觉token规范.md) §3 | `pnpm check:frontend-theme` |
 | 间距走 4px 网格的 Tailwind 刻度，不写 `p-[7px]`、`gap-[3px]` 这类任意值；改到有存量的文件顺手收到相邻刻度 | [视觉 token](front-视觉token规范.md) §6 | `pnpm check:frontend-tokens`（间距任意值数只许减） |
+| 图标只用 lucide 规范名（不用 `Loader2`、`Trash2`、`AlertTriangle` 这类别名），同一含义只用一个图标，`size` 用档位，业务组件不传 `strokeWidth` | [视觉 token](front-视觉token规范.md) §12 | `pnpm check:frontend-tokens`（命名与线宽）；尺寸靠评审 |
 | 普通 UI 样式写在组件的 Tailwind utility 里，不往全局 CSS 加；新增全局样式先确认归属和 cascade layer | [视觉 token](front-视觉token规范.md) §11 | 评审 |
 
 ## 3. 组件与弹层

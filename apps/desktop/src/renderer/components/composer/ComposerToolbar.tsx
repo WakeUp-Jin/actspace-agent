@@ -120,7 +120,7 @@ export function ComposerToolbar({ mode, isStreaming, paletteOpen, onTogglePalett
           aria-haspopup="dialog"
           onClick={onTogglePalette}
         >
-          <Plus size={17} strokeWidth={2.1} aria-hidden="true" />
+          <Plus size={17} aria-hidden="true" />
         </IconButton>
       </div>
       {mode !== "agent" && modeMeta && ModeIcon ? (
@@ -132,7 +132,7 @@ export function ComposerToolbar({ mode, isStreaming, paletteOpen, onTogglePalett
             onExitMode();
           }}
         >
-          <ModeIcon size={14} strokeWidth={2} aria-hidden="true" />
+          <ModeIcon size={14} aria-hidden="true" />
           <span>{modeMeta.label}</span>
           <IconButton
             className="mode-chip-exit"
@@ -144,7 +144,7 @@ export function ComposerToolbar({ mode, isStreaming, paletteOpen, onTogglePalett
             disabled={isStreaming}
             onClick={onExitMode}
           >
-            <X size={13} strokeWidth={2.2} aria-hidden="true" />
+            <X size={13} aria-hidden="true" />
           </IconButton>
         </span>
       ) : null}
@@ -171,9 +171,9 @@ export function ComposerToolbar({ mode, isStreaming, paletteOpen, onTogglePalett
           }}
         >
           {sendButton.showStop ? (
-            <Square size={10} strokeWidth={2.6} fill="currentColor" aria-hidden="true" />
+            <Square size={10} fill="currentColor" aria-hidden="true" />
           ) : (
-            <ArrowUp size={15} strokeWidth={2.4} aria-hidden="true" />
+            <ArrowUp size={15} aria-hidden="true" />
           )}
         </IconButton>
       </div>

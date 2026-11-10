@@ -71,7 +71,7 @@ export function ContextPaths({ sessionId, disclosure, workspaceRoot, onStale }: 
             {/* 列表开关是一行小字，和明细分类行同类的原生按钮。 */}
             <button type="button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}
               className={cn("-ml-1.5 inline-flex items-center gap-1 rounded-act-sm border-0 bg-transparent py-0.5 pl-1 pr-1.5 text-act-xxs text-text-muted [cursor:pointer] hover:bg-hover-overlay hover:text-text-main", ROW_FOCUS_CLASS)}>
-              <ChevronRight size={12} strokeWidth={2.5} aria-hidden="true" className={cn("shrink-0 text-text-faint transition-transform duration-(--motion-fast)", expanded && "rotate-90")} />
+              <ChevronRight size={12} aria-hidden="true" className={cn("shrink-0 text-text-faint transition-transform duration-(--motion-fast)", expanded && "rotate-90")} />
               <span className="tabular-nums">{expanded ? `${LABEL[visibility]} · 已显示 ${shown.length} / ${total.toLocaleString()}` : `显示${LABEL[visibility]}路径 · ${count.toLocaleString()} 条`}</span>
             </button>
           </div>

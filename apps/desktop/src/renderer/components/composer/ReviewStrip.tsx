@@ -1,4 +1,4 @@
-import { MoreHorizontal } from "lucide-react";
+import { Ellipsis } from "lucide-react";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 
@@ -49,7 +49,7 @@ export function ReviewStrip({ summary, onOpenReview }: ReviewStripProps) {
       </Button>
       {/* 技术债：还没有菜单内容，按钮没有 onClick（见 09 执行记录）。 */}
       <IconButton className="review-overflow-button" label="更多审查操作" variant="secondary" shape="round">
-        <MoreHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
+        <Ellipsis size={16} aria-hidden="true" />
       </IconButton>
     </div>
   );

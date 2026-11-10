@@ -102,7 +102,7 @@ export function PurposePicker({
               {summary.level && !purpose.noThinking ? <span className="text-text-muted">· {summary.level}</span> : null}
             </>
           ) : <span className="text-text-faint">{followLabel}</span>}
-          <ChevronDown size={13} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-text-subtle" />
+          <ChevronDown size={13} aria-hidden="true" className="shrink-0 text-text-subtle" />
         </button>
       </PopoverTrigger>
       {open ? (
@@ -139,7 +139,7 @@ function ThinkingOptions({ model, level, onLevel, onGoToModel }: { model: Connec
             >
               <span className={OPTION_CHOICE_LABEL_CLASS}>{levelName(thinking.levels, item)}</span>
               {thinking.default === item ? <span className="mr-2 text-act-xxs text-text-faint">默认</span> : null}
-              <span className="grid w-3.5 place-items-center">{level === item ? <Check size={14} strokeWidth={2.2} aria-hidden="true" /> : null}</span>
+              <span className="grid w-3.5 place-items-center">{level === item ? <Check size={14} aria-hidden="true" /> : null}</span>
             </button>
           ))}
         </div>

@@ -14,6 +14,7 @@
 |---|---|---|---|
 | 2026-09-26 | renderer 间距 | 组件中仍有 `p-[7px]`、`gap-[9px]`、`py-[5px]` 等间距写死值。2026-11-10 统计：desktop 45 文件 99 处、web 6 文件 8 处，共 107；值集中在 `7px`（32）、`3px`（18）、`5px`（10）、`18px`（10），工具类集中在 `gap`（24）、`py`（20）、`pl`（15）。已按文件计数写入 `scripts/spacing-literal-baseline.json`，`check:frontend-tokens` 守住只减不增；`w-[…]` / `h-[…]` / `max-w-[…]` 等尺寸任意值（约 230 处）不在此列。 | 不做一次性全量替换（会改 50 个文件的视觉，无法逐个复看）。改到哪个文件就把它的任意值收到相邻刻度并收紧基线，规则见 token 规范 §6；存量集中的 `right-panel/`（24）、`space/`（18）、`messages/`（17）可以各开一个小任务整批收。 |
 | 2026-09-26 | 内容边界 CSS | `styles/markdown.css`、`diff.css`、`tool-result.css`、`web-tool.css` 内部仍用 px 字号。 | 这些文件服务模型输出和第三方 DOM，改为 `var(--text-act-*)` 前需逐个对照渲染结果。 |
+| 2026-11-09 | 图标尺寸 | `front-视觉token规范.md` §12 定了图标尺寸档位（12 / 14 / 16 / 18 / 20 / 22），但 renderer 与 web 里仍有约 190 处 `size={11 / 13 / 15 / 17 / 19 / 21}` 等非档位值（15 约 100 处、13 约 85 处），没有纳入 `check:frontend-tokens`。 | 按区域在 Electron 里对照收敛到相邻档位（13→14、15→16），改完再给脚本加 `size` 档位规则；期间不新增非档位值。 |
 | 2026-09-26 | 未迁移的按钮形态 | 菜单项（Composer 命令菜单、模型列表）、下拉触发器（Composer 模式 / 模型选择器）、分段控件（预览 / 源码切换）仍是各自的样式常量；Composer 附件删除按钮、Sidebar 会话行置顶 / 归档等内联按钮未改为 `IconButton`。2026-10-06：消息操作菜单和 `SettingsSelect` 已由 Desktop 前端重构 16 改用 `ui/Menu`、`ui/Select`；原生按钮数由 `check:frontend-tokens` 的基线守住，不再增加。 | Composer 的随 09 迁移；分段控件随 `active/20260926-frontend-ui-components-foundation.md` 的 `Tabs`。 |
 
 ## Desktop 前端组件遗留
@@ -22,12 +23,14 @@
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
-| 2026-10-06 | renderer / 文件行数 | `settings/SettingsPrimitives.tsx` 856 行、`workspace/WorkspaceChromeControls.tsx` 662 行，超过 500 行（RightPanel 已拆到 `right-panel/`，不再超标）。SettingsPrimitives 剩下的组件都被两个以上设置文件使用，再降要拆成多个文件。 | SettingsPrimitives 按行 / 表单控件 / 菜单拆成 `settings/primitives/`；WorkspaceChromeControls 按控件拆。 |
+| 2026-10-06 | renderer / 文件行数 | `settings/SettingsPrimitives.tsx` 856 行、`workspace/WorkspaceChromeControls.tsx` 663 行，超过 500 行（RightPanel 已拆到 `right-panel/`，不再超标）。SettingsPrimitives 剩下的组件都被两个以上设置文件使用，再降要拆成多个文件。 | SettingsPrimitives 按行 / 表单控件 / 菜单拆成 `settings/primitives/`；WorkspaceChromeControls 按控件拆。 |
+| 2026-11-10 | renderer / 文件行数 | 2026-11-10 复查 `main`，超过 500 行且未登记的还有 5 个：`App.tsx` 1670（11 `useState`、18 `useEffect`、65 `useCallback`、12 `useRef`，会话列表、工作区、队列、发送、evict、侧边对话全在一个函数里）、`trajectory/builder.ts` 791、`stats/stats-ui.tsx` 617、`harness-stats/HarnessStatsCards.tsx` 523、`components/Composer.tsx` 507。 | `App.tsx` 走 [App 装配层拆分计划](active/20261110-app-assembly-split.md)；`builder.ts` 按事件种类拆成 `trajectory/builders/`（纯函数，带单测）；`stats-ui.tsx` 把 `DataTable`、环形图、`StatsCard` 各自成文件；`HarnessStatsCards.tsx` 按卡片拆；`Composer.tsx` 刚过线，随 09 的 Composer 收尾一起看。 |
 | 2026-10-06 | renderer / 手写弹层 | `right-panel/RightPanelTabStrip.tsx` 的标签溢出菜单（菜单项里嵌「关闭标签」按钮）没有迁到 `components/ui/`，仍自己监听 Escape 和外部点击（`ModelMultiSelector` 已随模型页重做删除）。 | 先改交互（关闭按钮挪出菜单项或改子菜单）再换 `ui/Menu`。 |
 | 2026-10-06 | renderer / 死入口 | `ProviderKeyModal` 打不开：`SettingsPage` 传下去的 `onConnectProvider` 在 `settings/sections/` 里没有调用方（16 之前的 `ProvidersSection` 也只解构不调用）。 | 确认 Provider Key 是否已全部改由模型连接向导录入；是就删掉 `ProviderKeyModal` 和这条 prop，否则补上入口。 |
 | 2026-10-06 | renderer / 占位按钮 | Composer 的「更多审查操作」`⋯`（`review-overflow-button`）没有 `onClick`，点了没有反应，16 之前就是这样。 | 补上菜单内容，或先隐藏。09（2026-10-07）只把它搬进 `composer/ReviewStrip.tsx`，行为未改。 |
 | 2026-10-06 | renderer / 窄窗 | 窗口最小宽度 480 时打开侧栏覆盖层，会话右键菜单的「复制」子菜单（208px）左右都放不下，翻到左侧后左边约 52px 出界。Radix 只翻转，不在水平方向挪。 | 子菜单加 `max-w-[calc(100vw-16px)]` 并允许文字截断，或窄窗下把两个复制项平铺到主菜单。 |
 | 2026-10-06 | renderer / Composer 跨会话状态 | Composer 不按会话重挂（16 之前两个有消息的会话之间也不重挂）：远端会话 A 发送中切到 B，B 的发送按钮也被 `sending` 禁用，直到 A 的请求结束；A 里选的模型运行时选项会带到 B。A 发送中切走、随后失败时，附件只靠 App 的恢复草稿（不带预览）找回，原来的预览 URL 不释放。 | `sending` 按 `draftKey` 记；运行时选项按会话存；失败时把附件写回 A 的附件草稿，和 `draftRestore` 的顺序一起定。09（2026-10-07）只把这部分搬进 `composer/use-composer-send.ts`、`use-composer-model.ts`，行为未改，建议单独做一个「Composer 草稿按会话隔离」小计划。 |
+| 2026-11-10 | renderer / 无障碍 | Biome a11y 组已按 `recommended` 打开（零命中的进 error、8 条共 22 处为 warn），但存量几十处、修法等于重做交互语义的 6 条仍关着：`useSemanticElements` 44、`useAriaPropsSupportedByRole` 39、`noStaticElementInteractions` 30、`noNoninteractiveElementInteractions` 30、`noNoninteractiveTabindex` 11、`useFocusableInteractive` 11，主要是 `div` / `tr` 上的 `onClick` 和手写 `role`。分层与各条原因见 `docs/coding-standards/lint-conventions.md`。 | 先清 22 处 warn 并升 error（`useKeyWithClickEvents` 的 6 处多数可以直接换 `PlainButton`）；6 条 off 的规则等桌面端 a11y 专题，按 `right-panel/`、`trajectory/`、`settings/` 分批打开。 |
 
 ## Desktop 安全遗留
 

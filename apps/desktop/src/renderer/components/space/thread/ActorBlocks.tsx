@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Check, ShieldAlert, X } from "lucide-react";
+import { Check, ShieldExclamationPoint, X } from "lucide-react";
 import { Button } from "../../ui/Button";
 import type { ActorBlock, SpaceMember } from "../model/types";
 import { useSpaceDemoActions } from "../model/use-space-demo";
@@ -22,7 +22,7 @@ function ApprovalBlock({ member }: { member: SpaceMember }) {
     return (
       <section aria-label="审批" className="overflow-hidden rounded-act-md border border-line bg-surface shadow-act-soft">
         <h2 className="flex items-center gap-2 px-3.5 pb-1.5 pt-2.5 text-act-sm font-semibold text-text-main">
-          <ShieldAlert size={14} className="shrink-0 text-warning" aria-hidden="true" />想运行一条命令
+          <ShieldExclamationPoint size={14} className="shrink-0 text-warning" aria-hidden="true" />想运行一条命令
         </h2>
         <pre className="mx-3.5 whitespace-pre-wrap break-words rounded-act-sm bg-surface-subtle px-2.5 py-2 font-mono text-act-xs text-text-main">{member.approval.cmd}</pre>
         <p className="mx-3.5 mt-2 text-act-xs leading-relaxed text-text-faint">{member.approval.why}</p>

@@ -15,7 +15,7 @@ export function SpaceObjectMenu() {
       <Menu>
         <MenuTrigger asChild>
           <button className="chrome-button" type="button" aria-label="新建右侧面板对象" title="新建对象">
-            <Plus size={15} strokeWidth={1.8} />
+            <Plus size={15} />
           </button>
         </MenuTrigger>
         <MenuContent align="end" className="w-[188px]">

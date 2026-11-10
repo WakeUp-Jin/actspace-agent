@@ -1,4 +1,4 @@
-import { Check, Copy, FileText, WrapText } from "lucide-react";
+import { Check, Copy, FileText, TextWrap } from "lucide-react";
 import { useContext, useEffect, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { loadAppearance } from "../../../appearance/storage";
 import { parseInlinePath, resolveWorkspacePath } from "../../markdown-common/paths";
@@ -115,7 +115,7 @@ export function CodeBlock({ children, node: _node, ...rest }: PreProps) {
         ) : (
           <span className="md-code-actions">
             <PlainButton className="md-code-btn" aria-label="自动换行" aria-pressed={wrap} title="自动换行" onClick={() => setWrap((value) => !value)}>
-              <WrapText size={13} aria-hidden="true" /><span>换行</span>
+              <TextWrap size={13} aria-hidden="true" /><span>换行</span>
             </PlainButton>
             <PlainButton className="md-code-btn" aria-label="复制代码" title="复制" onClick={() => void copy()}>
               {copied ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}

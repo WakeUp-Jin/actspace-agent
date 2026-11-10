@@ -10,7 +10,7 @@ import { Children, type ReactNode } from "react";
  * 第一个子节点不是文字时（流式末尾的渐显 span 等），只包图标。
  */
 export function withFileIcon(children: ReactNode): ReactNode {
-  const icon = <FileText className="md-path-icon" size={12} strokeWidth={2} aria-hidden="true" />;
+  const icon = <FileText className="md-path-icon" size={12} aria-hidden="true" />;
   const list = Children.toArray(children);
   const first = list[0];
   if (typeof first !== "string" || !first) {
