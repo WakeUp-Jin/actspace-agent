@@ -49,6 +49,9 @@ const categories = [['sys', '系统提示词'], ['tools', '工具'], ['rules', '
           <div class="app-nav"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M17.5 3v7M14 6.5h7"/></svg>新建 Space</div>
           <div class="app-nav"><svg class="i" viewBox="0 0 24 24"><rect x="14" y="3" width="7" height="7" rx="1"/><path d="M10 21V8a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H3"/></svg>扩展</div>
           <div class="app-nav"><span class="avatar" style={`background-image:url(${avatar.src})`}></span>Actor 名册<small>8</small></div>
+          <h6>Space <small>演示</small></h6>
+          <div class="app-nav"><span class="sp-ic sp-a"></span>支付链路提速<small class="hot">1</small></div>
+          <div class="app-nav"><span class="sp-ic sp-b"></span>结算页重构</div>
           <h6>工作区</h6>
           <div class="app-nav"><svg class="i" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>acme-web</div>
           <div class="ses on"><span>把登录页的表单校验补完</span><i class="spin" data-h="ses-spin"></i><small data-h="ses-time" hidden>刚刚</small></div>
@@ -69,7 +72,7 @@ const categories = [['sys', '系统提示词'], ['tools', '工具'], ['rules', '
             <div class="conv">
               <div class="scroll" data-h="scroll"><div class="feed" data-h="feed"></div></div>
               <div class="dock">
-                <div class="chips"><span>Review</span><span class="dots">•••</span></div>
+                <div class="chips"><span>Review<b class="stat" data-h="review-stat"></b></span><span class="dots">•••</span></div>
                 <div class="composer">
                   <svg class="i faint" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></svg>
                   <span class="ph" data-h="ph">继续追问…</span>
@@ -77,8 +80,10 @@ const categories = [['sys', '系统提示词'], ['tools', '工具'], ['rules', '
                   <span class="send" data-h="send"><svg class="i s14" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7M12 19V5"/></svg></span>
                 </div>
                 <div class="meta-row">
+                  <span><svg class="i s13" viewBox="0 0 24 24"><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 15V9a3 3 0 0 1 3-3h6"/></svg>master</span>
                   <span><svg class="i s13" viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.3 2.6a1 1 0 0 1-.9 1.4H3.6a1 1 0 0 1-.9-1.4L4 16"/></svg>本机</span>
                   <span><svg class="i s13" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg><span data-h="perm">自动</span></span>
+                  <span class="sum" data-h="sum" hidden><svg class="i s13" viewBox="0 0 24 24"><path d="M3 5c0-1.7 4-3 9-3s9 1.3 9 3-4 3-9 3-9-1.3-9-3M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>累计 <span data-h="sum-tok">0K</span> tok</span>
                   <span class="ring" data-h="ring"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="6" stroke-dasharray="37.7" stroke-dashoffset="37.7" data-h="ring-arc"/></svg><span data-h="ring-txt">0%</span></span>
                 </div>
               </div>

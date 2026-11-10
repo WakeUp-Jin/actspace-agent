@@ -316,6 +316,9 @@ export function initializeHeroStage() {
     panelBtn.classList.remove('on');
     send.classList.remove('stop', 'ready', 'press');
     ph.classList.remove('typing');
+    h('review-stat').innerHTML = '';
+    h('sum').hidden = true;
+    const sesTime = h('ses-time'); sesTime.textContent = '刚刚'; sesTime.classList.remove('pending');
     ph.textContent = '继续追问…';
     h('perm').textContent = on('approve') ? '自动' : '完全权限';
     h('ses-spin').hidden = false;
@@ -371,13 +374,11 @@ export function initializeHeroStage() {
     if (on('sub')) {
       let card: HTMLElement;
       step(1700, () => {
-        card = put(`<div class="card agent"><span class="av"></span><div class="who"><div class="nm">查找可复用的校验函数</div>
-          <div class="meta"><span>Explore</span>·<b>正在搜索 src/lib …</b></div></div><span class="st">运行中</span></div>`);
+        card = put(`<div class="card agent"><span class="av"></span><span class="nm">查找可复用的校验函数</span><span class="st"><i>Agent</i><em class="dot"></em>运行中</span></div>`);
         stage.light(['sub']);
       });
       step(900, () => {
-        card.querySelector('.meta b')!.textContent = '找到 emailSchema、passwordRule';
-        card.querySelector('.st')!.textContent = '已完成';
+        card.querySelector('.st')!.innerHTML = `<i>Agent</i>${icon('m5 12 5 5L20 7', 12)}已完成`;
         add('conv', 0.9);
         event('子 Agent 摘要', '+0.9K', '检索过程留在子 Agent，主会话只收结论', 'conv');
       });
@@ -415,11 +416,17 @@ export function initializeHeroStage() {
         step(1500, () => {
           card = put(`<div class="card appr"><div class="hd">${icon('M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 8 2-2-2-2m4 6h4', 14)}运行项目测试 pnpm</div>
             <div class="cmd"><i>$</i> <em>pnpm</em> test</div>
-            <div class="ft"><span>真实环境</span><b>拒绝</b><b class="al">本会话允许 pnpm</b><b class="go">运行</b></div></div>`);
+            <div class="ft">${icon('M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1zM4 4l16 16', 13)}<span></span><b>拒绝</b><b class="go">运行</b></div></div>`);
           stage.light(['approve']);
+          h('ses-spin').hidden = true;
+          const pending = h('ses-time'); pending.hidden = false; pending.textContent = '待审批'; pending.classList.add('pending');
         });
         step(400, () => card.querySelector('.go')!.classList.add('press'));
-        step(2300, () => { card.remove(); runTest(); });
+        step(2300, () => {
+          card.remove(); runTest();
+          h('ses-spin').hidden = false;
+          const pending = h('ses-time'); pending.hidden = true; pending.textContent = '刚刚'; pending.classList.remove('pending');
+        });
       } else {
         step(2300, runTest);
       }
@@ -462,6 +469,9 @@ export function initializeHeroStage() {
       ph.textContent = '继续追问…';
       h('ses-spin').hidden = true;
       h('ses-time').hidden = false;
+      if (on('edit')) h('review-stat').innerHTML = '<u>+31</u> <s>-3</s>';
+      h('sum-tok').textContent = on('sub') ? '28.2K' : '51.0K';
+      h('sum').hidden = false;
     });
     step(2400, () => stage.settle());
     if (!reduced) clock.at(t + 4200, run);
