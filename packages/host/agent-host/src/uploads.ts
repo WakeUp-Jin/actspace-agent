@@ -3,6 +3,7 @@ import { mkdir, open, readFile, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { HOST_LIMITS, HostError, HostRequestError } from "@actspace/shared/host-protocol";
 import { SerialGate, writeDurableJson } from "./storage.js";
+import { VerifiedContent } from "./verified-content.js";
 
 type Upload = {
   version: 1; id: string; deviceId: string; sessionId: string; name: string;
@@ -14,6 +15,7 @@ const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest(
 /** One writer per Host data root. Metadata is the acknowledged offset authority. */
 export class HostUploads {
   readonly #gate = new SerialGate();
+  readonly #verified = new VerifiedContent();
   /**
    * Uploads no task has pinned yet: what a device's staging quota counts. Uploads are kept for as long
    * as their Session, so reading every upload's state on each begin grows with everything ever attached.
@@ -156,9 +158,12 @@ export class HostUploads {
       const value = await this.#read(id);
       if (value.sessionId !== sessionId || !value.complete || !value.pins.length) throw new HostError("NOT_FOUND", "Session artifact not found");
       const path = join(this.#directory(id), "content");
-      const bytes = await readFile(path);
-      if (bytes.length !== value.size || digest(bytes) !== value.sha256) throw new HostError("RECOVERY_BLOCKED", "Artifact integrity check failed");
-      return { path, mediaType: detectMediaType(bytes) };
+      const file = await open(path, "r");
+      try {
+        if (!await this.#verified.matches(id, file, value)) throw new HostError("RECOVERY_BLOCKED", "Artifact integrity check failed");
+        const head = Buffer.alloc(12);
+        return { path, mediaType: detectMediaType(head.subarray(0, (await file.read(head, 0, head.length, 0)).bytesRead)) };
+      } finally { await file.close(); }
     });
   }
   async readForSession(sessionId: string, id: string): Promise<{ bytes: Uint8Array; mediaType: string }> {
@@ -173,6 +178,7 @@ export class HostUploads {
       if (!Number.isSafeInteger(offset) || offset < 0 || offset > value.size || !Number.isSafeInteger(length) || length < 1 || length > HOST_LIMITS.chunkBytes) throw new HostRequestError("Invalid artifact range");
       const file = await open(join(this.#directory(id), "content"), "r");
       try {
+        if (!await this.#verified.matches(id, file, value)) throw new HostError("RECOVERY_BLOCKED", "Artifact integrity check failed");
         const bytes = Buffer.alloc(Math.min(length, value.size - offset));
         const result = await file.read(bytes, 0, bytes.length, offset);
         if (result.bytesRead !== bytes.length) throw new HostError("RECOVERY_BLOCKED", "Artifact content missing");

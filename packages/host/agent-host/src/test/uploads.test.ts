@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from "vitest";
-import { mkdtemp, rm, appendFile } from "node:fs/promises";
+import { mkdtemp, rm, appendFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -75,6 +75,20 @@ it("counts only a device's unpinned uploads against its staging quota across pin
   now = 90_000_000; await reopened.cleanup();
   for (let index = 0; index < 10; index++) await big(reopened);
   await expect(big(reopened)).rejects.toMatchObject({ kind: "LIMIT_EXCEEDED" });
+});
+it("blocks a pinned upload whose content was altered after it was verified", async () => {
+  const { root, store } = await fixture();
+  const item = await store.begin({ deviceId: "d", sessionId: "s", name: "note.txt", size: 6, sha256: hash("abcdef") });
+  await store.write("d", "s", item.id, 0, Buffer.from("abcdef").toString("base64"), hash("abcdef"));
+  await store.finish("d", "s", item.id); await store.pin("d", "s", [item.id], "task");
+  expect(await store.resolve("s", item.id)).toEqual({ path: join(root, item.id, "content"), mediaType: "application/octet-stream" });
+  expect(Buffer.from((await store.read("s", item.id, 2, 3)).data, "base64").toString()).toBe("cde");
+  await writeFile(join(root, item.id, "content"), "abcdeX");
+  await expect(store.read("s", item.id, 2, 3)).rejects.toMatchObject({ kind: "RECOVERY_BLOCKED" });
+  await expect(store.resolve("s", item.id)).rejects.toMatchObject({ kind: "RECOVERY_BLOCKED" });
+  await expect(store.readForSession("s", item.id)).rejects.toMatchObject({ kind: "RECOVERY_BLOCKED" });
+  await writeFile(join(root, item.id, "content"), "abcdef");
+  expect(Buffer.from((await store.readForSession("s", item.id)).bytes).toString()).toBe("abcdef");
 });
 it("reconciles orphan pins against durable tasks before staging cleanup", async () => {
   const { root } = await fixture(); let now = 0;
