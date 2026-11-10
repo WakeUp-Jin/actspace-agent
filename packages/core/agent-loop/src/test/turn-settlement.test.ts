@@ -62,6 +62,28 @@ describe("AgentLoop turn settlement after a record cannot be written", () => {
     expect(result).toMatchObject({ reason: "completed", finalText: "Done." });
   });
 
+  it("keeps the session usable after an assistant message too large for one record", async () => {
+    let turns = 0;
+    let firstTurn: unknown;
+    const oversized = "x".repeat(1_100_000);
+    const { result, journal } = await runToolStreamFixture({
+      stream: () => (async function* (): AsyncGenerator<LlmStreamEvent> {
+        const text = turns === 1 ? oversized : "Done.";
+        yield { type: "done", stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text }] };
+      })(),
+      onLoop: async (loop) => { turns = 1; firstTurn = await loop.runTurn({ content: "Write a very long answer" }).catch((error: unknown) => error); turns = 2; } });
+
+    expect(firstTurn).toBeInstanceOf(Error);
+    expect((firstTurn as Error).message).toContain("1 MiB");
+    const types = journal.map((event) => event.type);
+    const settled = types.indexOf("recovery/start");
+    expect(types.slice(settled, settled + 5)).toEqual(["recovery/start", "assistant/message", "recovery/committed", "step/end", "turn/end"]);
+    // 了结用的助手消息是空的，那条超大的消息没有进会话。
+    expect(JSON.stringify(journal).length).toBeLessThan(100_000);
+    expect(journal[settled + 4].data).toMatchObject({ reason: "failed" });
+    expect(result).toMatchObject({ reason: "completed", finalText: "Done." });
+  });
+
   it("ends the turn when a hook throws while a request is open", async () => {
     let turns = 0;
     let firstTurn: unknown;
