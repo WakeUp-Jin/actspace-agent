@@ -44,7 +44,7 @@ export const trajectoryPoints: FocusPoint[] = [
 export const approvalPoints: FocusPoint[] = [
   { title: '确认后才执行', detail: '命令原样列出，标明在沙盒还是真实环境里跑。', rect: [0.05, 0.255, 0.89, 0.26] },
   { title: '按命令放行', detail: '同类命令可在本会话放行，换个会话重新问。', rect: [0.645, 0.425, 0.29, 0.08] },
-  { title: '权限模式', detail: '「完全权限」不再逐条确认，硬性安全检查照旧生效。', rect: [0.125, 0.72, 0.205, 0.245] },
+  { title: '权限模式', detail: '「替我审批」让模型先把关，「完全权限」不再逐条确认，硬性安全检查照旧生效。', rect: [0.125, 0.655, 0.185, 0.245] },
 ];
 
 export const contextPoints: FocusPoint[] = [

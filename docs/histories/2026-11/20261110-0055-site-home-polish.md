@@ -30,6 +30,7 @@
 - **审批卡二次校对**：对照渲染进程 `ApprovalActions`（拒绝 → 有授权建议时的「本会话允许 <前缀>」→ 工具动词）和 `?mock=approval-prefix` 场景，把「本会话允许 `pnpm`」加回首屏审批卡；底栏左侧仍是执行环境图标。之前真实运行里没出现这颗按钮是因为那次命令没有授权建议，不是产品去掉了。
 - **收起侧栏的标题栏**：1400px 以下侧栏收起后，标题前补上桌面端的「展开侧栏」和前进后退图标（`.nav-ic`）。
 - **方向卡图标**：`Direction` 新增 `icon` 字段，`DirectionStrip.astro` 在状态行下渲染 38px 纸面图标块（层叠 / 分支 / 多人），和基础功能卡同一套画法。
+- **重拍过期截图**：`home/approval.png` 还是旧版审批卡（底栏「真实环境」文字、权限菜单只有两项），按 `SCREENSHOTS.md` 的参数用 puppeteer-core 从 `?mock=approval-prefix` 重拍（Linux 上先用 fontconfig 把 PingFang / -apple-system 别名到 Noto Sans CJK SC / Inter，和其他 macOS 截图字体一致），重新量了「权限模式」要点的 `rect`，文案补上「替我审批」。文档页的 `docs/tool-approval.png` 原是英文旧界面，改为从新图裁出的审批卡，`tools-and-approvals.md` 图注同步。其他四张（交付、轨迹、上下文、Space）和当前渲染进程逐帧比对后没有差异，不换。
 - **文档同步**：`apps/site/DESIGN.md` 更新字体、首屏（含真实界面校对后的窗口内容）、功能块、基础功能和响应式描述。
 
 ### 🧠 Design Intent (Why)
@@ -45,3 +46,7 @@
 - `apps/site/src/scripts/home-stage.ts`
 - `apps/site/src/styles/home.css`
 - `apps/site/DESIGN.md`
+- `apps/site/SCREENSHOTS.md`、`apps/site/src/assets/screenshots/README.md`
+- `apps/site/src/assets/screenshots/home/approval.png`、`apps/site/src/assets/screenshots/docs/tool-approval.png`
+- `apps/site/src/content/docs/tools-and-approvals.md`
+- `apps/site/src/components/home/DirectionStrip.astro`
