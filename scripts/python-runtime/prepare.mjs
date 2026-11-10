@@ -37,7 +37,7 @@ async function prepareCore() {
   await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
   // The archive has a single top-level `python/` directory.
-  execFileSync("tar", ["-xzf", archive, "-C", output, "--strip-components=1"], { stdio: "inherit" });
+  execFileSync(tarCommand(), ["-xzf", archive, "-C", output, "--strip-components=1"], { stdio: "inherit" });
   const sitePackages = join(output, ...layout.sitePackages.split("/"));
   await installWheels(target.core, sitePackages, pickPip(join(output, ...layout.executable.split("/"))));
   await prune(output);
@@ -100,7 +100,8 @@ async function prune(root) {
   ] : [];
   for (const path of removals) await rm(path, { recursive: true, force: true });
   if (options.layer === "core") {
-    await removeMatching(join(root, "lib"), (name) => /^(tcl|tk|itcl|thread|tdbc|Tix|libtcl|libtk|pkgconfig)/.test(name));
+    // Not on Windows: there `lib` is the standard library itself (`Lib`, case-insensitive), and this would take `threading.py`.
+    if (!windows) await removeMatching(join(root, "lib"), (name) => /^(tcl|tk|itcl|thread|tdbc|Tix|libtcl|libtk|pkgconfig)/.test(name));
     // The Linux interpreter is statically linked; the 32 MB shared library only serves embedders. macOS links it.
     if (target.platform === "linux") await removeMatching(join(root, "lib"), (name) => /^libpython3.*\.so/.test(name));
     await removeMatching(join(stdlib, "lib-dynload"), (name) => name.startsWith("_tkinter"));
@@ -180,6 +181,14 @@ function hostTarget() {
   if (platform === "linux") return arch === "arm64" ? "linux-arm64" : "linux-x64";
   if (platform === "win32") return "win-x64";
   return undefined;
+}
+
+/**
+ * On a Windows host `tar` on PATH is usually Git Bash's GNU tar, which reads `D:\…` as a remote `host:path`;
+ * the bsdtar Windows ships takes native paths.
+ */
+function tarCommand() {
+  return process.platform === "win32" ? join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
 }
 
 function minor(version) { return version.split(".").slice(0, 2).join("."); }
