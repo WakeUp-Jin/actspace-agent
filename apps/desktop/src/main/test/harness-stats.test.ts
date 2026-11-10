@@ -190,7 +190,7 @@ describe("Harness 统计投影", () => {
       ...call("c1", { path: "a" }, "     1|ok"),
       ...call("c2", { path: "b" }, "     1|x\n\n[Showing lines 1-200 of 900. Use offset=201 to continue.]"),
       ...call("c3", { path: "c" }, "     1|xxx ...[line truncated: 3000000 bytes]"),
-      ...call("c4", { path: "d" }, "head\n\n[Output truncated: this tool returned 400000 bytes, over the 262144-byte limit for one result.]"),
+      ...call("c4", { path: "d" }, "head\n\n[Output truncated: this tool returned 400000 bytes, more than one result can hold. The first 261120 bytes are shown. The full output was saved as a file.]"),
       ...call("c5", { path: "e", offset: 201 }, "   201|x\n\n[Showing lines 201-400 of 900. Use offset=401 to continue.]"),
     ]);
     expect(query(db, "usage-vs").tools.find(row => row.name === "read_file")).toMatchObject({ calls: 5, truncated: 3 });
