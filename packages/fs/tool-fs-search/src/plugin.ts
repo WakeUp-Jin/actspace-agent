@@ -1,24 +1,27 @@
 import { dirname, resolve } from "node:path";
 import { homedir } from "node:os";
 import type { GrantAudience } from "@actspace/shared/runtime-v2";
-import { isPathWithin, type ToolGrantSuggestion } from "@actspace/tool-runtime";
+import { FILESYSTEM_HOST_PORT_ID, isPathWithin, type FilesystemHostGrant, type ToolGrantSuggestion } from "@actspace/tool-runtime";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolBodyResult, ToolExecutionContext, ToolDefinition, ToolRuntime, ToolPermissionContract } from "@actspace/tool-runtime";
 import type { CordisContext } from "@actspace/cordis-adapter";
+import { createNodeToolPorts } from "./node-ports.js";
 import { FILESYSTEM_SEARCH_PLUGIN_ID, type FILESYSTEM_SEARCH_TOOLS } from "./manifest.js";
 
 export type ToolName = (typeof FILESYSTEM_SEARCH_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & { readonly dispose?: () => Promise<void> };
-export const FILESYSTEM_SEARCH_HOST_PORT_ID = "actspace.host.tools.filesystem-search" as const;
-export type HostPort = { readonly createPorts: () => ToolPorts | Promise<ToolPorts> };
 export type ToolRegistration = { readonly name: string; readonly localName: ToolName; readonly handle: ReturnType<ToolRuntime["register"]> };
 
+/**
+ * The Host grants the filesystem (roots, artifact resolution); this plugin owns the tool implementation. Without the
+ * grant every tool reports CAPABILITY_UNAVAILABLE instead of failing the Harness.
+ */
 export async function apply(ctx: CordisContext): Promise<void> {
   const runtime = ctx.get?.("tools.runtime") as ToolRuntime | undefined;
-  const host = ctx.get?.(FILESYSTEM_SEARCH_HOST_PORT_ID) as HostPort | undefined;
-  if (!runtime || !host) throw new Error("filesystem-search requires tools.runtime and actspace.host.tools.filesystem-search.");
-  const ports = await host.createPorts();
+  if (!runtime) throw new Error("filesystem-search requires tools.runtime.");
+  const grant = ctx.get?.(FILESYSTEM_HOST_PORT_ID) as FilesystemHostGrant | undefined;
+  const ports: ToolPorts = grant ? createNodeToolPorts(grant) : {};
   let registrations: readonly ToolRegistration[];
   try { registrations = registerTools(runtime, ports); }
   catch (error) { await ports.dispose?.(); throw error; }
@@ -67,11 +70,11 @@ function isSafeSubtreeCandidate(path: string, workspaceRoot: string): boolean { 
 type DefinitionEntry = { readonly localName: ToolName; readonly definition: ToolDefinition };
 const READ = ["filesystem.read"] as const;
 export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
-  definition("grep", "Search file contents using a regular expression. Use glob to find paths by name.", READ, "read-only", objectSchema({ pattern: stringSchema("Regular expression."), path: stringSchema("Directory or file; defaults to workspace root."), glob: stringSchema("Optional file-name glob filter.") }, ["pattern"])),
-  definition("glob", "Find workspace files by name pattern, sorted by modification time.", READ, "read-only", objectSchema({ pattern: stringSchema("Glob pattern, for example **/*.ts."), path: stringSchema("Search directory; defaults to workspace root.") }, ["pattern"])),
+  definition("grep", ["plan", "agent"], "Search file contents using a regular expression. Use glob to find paths by name.", READ, "read-only", objectSchema({ pattern: stringSchema("Regular expression."), path: stringSchema("Directory or file; defaults to workspace root."), glob: stringSchema("Optional file-name glob filter.") }, ["pattern"])),
+  definition("glob", ["plan", "agent"], "Find workspace files by name pattern, sorted by modification time.", READ, "read-only", objectSchema({ pattern: stringSchema("Glob pattern, for example **/*.ts."), path: stringSchema("Search directory; defaults to workspace root.") }, ["pattern"])),
 ]);
-function definition(localName: ToolName, description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
-  return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: FILESYSTEM_SEARCH_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
+function definition(localName: ToolName, modes: ToolDefinition["modes"], description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
+  return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: FILESYSTEM_SEARCH_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), modes, concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
 }
 function objectSchema(properties: Readonly<Record<string, unknown>>, required: readonly string[]) { return Object.freeze({ type: "object", properties, required, additionalProperties: false }); }
 function stringSchema(description: string) { return Object.freeze({ type: "string", description, minLength: 1 }); }

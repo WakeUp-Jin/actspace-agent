@@ -1,7 +1,4 @@
-import { createNodeToolPorts as createFilesystemread, FILESYSTEM_READ_HOST_PORT_ID } from "@actspace/tool-fs-read";
-import { createNodeToolPorts as createFilesystemsearch, FILESYSTEM_SEARCH_HOST_PORT_ID } from "@actspace/tool-fs-search";
-import { createNodeToolPorts as createFilesystemwrite, FILESYSTEM_WRITE_HOST_PORT_ID } from "@actspace/tool-fs-write";
-import { createNodeBashToolPorts as createShelltools, SHELL_TOOLS_HOST_PORT_ID } from "@actspace/tool-shell";
+import { FILESYSTEM_HOST_PORT_ID, PROCESS_HOST_PORT_ID, type FilesystemHostGrant, type ProcessHostGrant } from "@actspace/tool-runtime";
 import { createNodeWebToolPorts as createWebtools, WEB_TOOLS_HOST_PORT_ID } from "@actspace/tool-web";
 import { createNodeToolPorts as createImagegeneration, IMAGE_GENERATION_HOST_PORT_ID } from "@actspace/tool-image-generation";
 import { createNodeToolPorts as createImageinspection, IMAGE_INSPECTION_HOST_PORT_ID } from "@actspace/tool-image-inspection";
@@ -12,10 +9,9 @@ import type { DesktopRuntimeV2ModelPort } from "./model-port";
 export function createDesktopToolHostServices(options: { readonly workspaceRoot: string; readonly tmpRoot: string; readonly modelRuntime: DesktopRuntimeV2ModelPort; readonly readArtifact: SessionArtifactReader; readonly resolveArtifact?: import("@actspace/tool-runtime").SessionArtifactResolver; readonly nonoPath?: string }) {
   return Object.freeze({
     [SANDBOX_HOST_PORT_ID]: createNodeSandboxHostPort({ nonoPath: options.nonoPath }),
-    [FILESYSTEM_READ_HOST_PORT_ID]: { createPorts: () => createFilesystemread(options) },
-    [FILESYSTEM_SEARCH_HOST_PORT_ID]: { createPorts: () => createFilesystemsearch(options) },
-    [FILESYSTEM_WRITE_HOST_PORT_ID]: { createPorts: () => createFilesystemwrite(options) },
-    [SHELL_TOOLS_HOST_PORT_ID]: { createPorts: (background: Parameters<typeof createShelltools>[0]["background"], sandbox: Parameters<typeof createShelltools>[0]["sandbox"], session: { readonly dataRoot: string }) => createShelltools({ ...options, dataRoot: session.dataRoot, background, sandbox }) },
+    // File and shell tools live in the Harness; Desktop only grants roots and artifact resolution.
+    [FILESYSTEM_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspaceRoot, resolveArtifact: options.resolveArtifact } satisfies FilesystemHostGrant),
+    [PROCESS_HOST_PORT_ID]: Object.freeze({ workspaceRoot: options.workspaceRoot, tmpRoot: options.tmpRoot } satisfies ProcessHostGrant),
     [WEB_TOOLS_HOST_PORT_ID]: { createPorts: () => createWebtools({
       // Ports live as long as the Harness; each search must observe settings changes.
       get deepseekFetchApiKey() { return options.modelRuntime.getToolEnvironment().deepseekFetchApiKey; },

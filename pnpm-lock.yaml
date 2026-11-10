@@ -718,11 +718,42 @@ importers:
         specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
+  packages/context/context-assembly:
+    dependencies:
+      '@actspace/context-engine':
+        specifier: workspace:*
+        version: link:../context-engine
+      '@actspace/cordis-adapter':
+        specifier: workspace:*
+        version: link:../../composition/cordis-adapter
+      '@actspace/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+      '@actspace/session-journal':
+        specifier: workspace:*
+        version: link:../../session/session-journal
+    devDependencies:
+      '@actspace/scope':
+        specifier: workspace:*
+        version: link:../../core/scope
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.2
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+
   packages/context/context-background-tasks:
     dependencies:
       '@actspace/background-tasks':
         specifier: workspace:*
         version: link:../../background-tasks/background-tasks
+      '@actspace/context-assembly':
+        specifier: workspace:*
+        version: link:../context-assembly
       '@actspace/context-engine':
         specifier: workspace:*
         version: link:../context-engine
@@ -776,6 +807,9 @@ importers:
 
   packages/context/context-conversation:
     dependencies:
+      '@actspace/context-assembly':
+        specifier: workspace:*
+        version: link:../context-assembly
       '@actspace/context-engine':
         specifier: workspace:*
         version: link:../context-engine
@@ -795,6 +829,9 @@ importers:
 
   packages/context/context-disclosure:
     dependencies:
+      '@actspace/context-assembly':
+        specifier: workspace:*
+        version: link:../context-assembly
       '@actspace/context-engine':
         specifier: workspace:*
         version: link:../context-engine
@@ -845,6 +882,9 @@ importers:
 
   packages/context/context-rules:
     dependencies:
+      '@actspace/context-assembly':
+        specifier: workspace:*
+        version: link:../context-assembly
       '@actspace/context-engine':
         specifier: workspace:*
         version: link:../context-engine
@@ -867,6 +907,9 @@ importers:
 
   packages/context/context-runtime:
     dependencies:
+      '@actspace/context-assembly':
+        specifier: workspace:*
+        version: link:../context-assembly
       '@actspace/context-engine':
         specifier: workspace:*
         version: link:../context-engine
@@ -889,6 +932,9 @@ importers:
 
   packages/context/context-skills:
     dependencies:
+      '@actspace/context-assembly':
+        specifier: workspace:*
+        version: link:../context-assembly
       '@actspace/context-engine':
         specifier: workspace:*
         version: link:../context-engine
@@ -911,6 +957,9 @@ importers:
 
   packages/context/context-subagents:
     dependencies:
+      '@actspace/context-assembly':
+        specifier: workspace:*
+        version: link:../context-assembly
       '@actspace/context-engine':
         specifier: workspace:*
         version: link:../context-engine
@@ -936,6 +985,9 @@ importers:
 
   packages/context/context-system:
     dependencies:
+      '@actspace/context-assembly':
+        specifier: workspace:*
+        version: link:../context-assembly
       '@actspace/context-engine':
         specifier: workspace:*
         version: link:../context-engine
@@ -958,6 +1010,9 @@ importers:
 
   packages/context/context-tools:
     dependencies:
+      '@actspace/context-assembly':
+        specifier: workspace:*
+        version: link:../context-assembly
       '@actspace/context-engine':
         specifier: workspace:*
         version: link:../context-engine
@@ -1164,6 +1219,9 @@ importers:
       '@actspace/composition':
         specifier: workspace:*
         version: link:../../composition/composition
+      '@actspace/context-assembly':
+        specifier: workspace:*
+        version: link:../../context/context-assembly
       '@actspace/context-background-tasks':
         specifier: workspace:*
         version: link:../../context/context-background-tasks
@@ -1623,15 +1681,6 @@ importers:
       '@actspace/shared':
         specifier: workspace:*
         version: link:../../util/shared
-      '@actspace/tool-fs-read':
-        specifier: workspace:*
-        version: link:../../fs/tool-fs-read
-      '@actspace/tool-fs-search':
-        specifier: workspace:*
-        version: link:../../fs/tool-fs-search
-      '@actspace/tool-fs-write':
-        specifier: workspace:*
-        version: link:../../fs/tool-fs-write
       '@actspace/tool-image-generation':
         specifier: workspace:*
         version: link:../../image/tool-image-generation
@@ -1641,9 +1690,6 @@ importers:
       '@actspace/tool-runtime':
         specifier: workspace:*
         version: link:../../core/tool-runtime
-      '@actspace/tool-shell':
-        specifier: workspace:*
-        version: link:../../shell/tool-shell
       '@actspace/tool-web':
         specifier: workspace:*
         version: link:../../web/tool-web

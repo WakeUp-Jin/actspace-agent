@@ -1,7 +1,7 @@
 import type { CordisContext } from "@actspace/cordis-adapter";
 import type { ContextSource } from "@actspace/context-engine";
 import type { BackgroundTaskHost, BackgroundTaskRecord } from "@actspace/background-tasks";
-import { publish } from "@actspace/prompt/source-support";
+import { publish } from "@actspace/context-assembly";
 
 export const BACKGROUND_TASKS_CONTEXT_OWNER = "actspace.context-background-tasks";
 
@@ -39,5 +39,6 @@ function localIso(ms: number): string {
 
 export function apply(ctx: CordisContext): void {
   const tasks = ctx.get?.("actspace.host.background-tasks") as BackgroundTaskHost | undefined;
-  publish(ctx, "background-tasks", () => createBackgroundTasksSource(tasks ?? { list: () => [] }));
+  // 只给主 Agent：子智能体（含 fork）不能发起后台任务，清单对它们没有意义。
+  publish(ctx, "background-tasks", () => createBackgroundTasksSource(tasks ?? { list: () => [] }), ["main"]);
 }

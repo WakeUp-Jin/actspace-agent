@@ -14,7 +14,7 @@ vi.mock("./default-harness.js", async importOriginal => {
 import { defaultHarnessSharedModules } from "./default-harness.js";
 import { createCordisRoot, publishPluginArtifact, pluginId } from "@actspace/cordis-adapter";
 import { AgentRuntimeService } from "./agent-runtime-plugin.js";
-import { AgentRegistry } from "@actspace/agent";
+import { AgentRegistry, allowedAgentModeTools } from "@actspace/agent";
 import { AgentService, TaskLedger, taskCodecs } from "@actspace/agent-service";
 import { createCoreCodecRegistry } from "@actspace/session-journal";
 import { EMPTY_LLM_USAGE } from "@actspace/llm-service";
@@ -23,7 +23,11 @@ import { ManagedRuns } from "./managed-runs.js";
 import { RuntimeSessionController } from "../session/session-controller.js";
 import { createAuxiliaryRequestRecorder } from "../session/auxiliary-request-recorder.js";
 import { createNodeSandboxHostPort, type SandboxStatus } from "@actspace/sandbox";
-import { DEFAULT_HARNESS_ENTRIES } from "./default-harness-definition.js";
+import { DEFAULT_HARNESS_ENTRIES, DEFAULT_HARNESS_KERNEL_ID } from "./default-harness-definition.js";
+import { MAIN_AGENT_FORM } from "../main-agent-form.js";
+import { harnessToolPluginEntries } from "../plugin-catalog.js";
+import { ACTSPACE_SERVICE_DEFINITIONS, ACTSPACE_SERVICE_ROLE_METADATA } from "@actspace/cordis-adapter";
+import { checkHarnessCompatibility, resolveHarnessPatch } from "@actspace/composition";
 
 it("executes the default Loop from its fixed closure with Harness-owned policies", async () => {
   const directory = await mkdtemp(join(tmpdir(), "actspace-default-harness-"));
@@ -42,13 +46,13 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   const ports = {
     "actspace.host.sandbox": createNodeSandboxHostPort(),
     "agent.registry": agentRegistry,
-    ...Object.fromEntries(["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }])),
+    ...Object.fromEntries(["web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }])),
     "session.runtime": sessions,
     "llm.auxiliary-requests": createAuxiliaryRequestRecorder(sessions),
     "session.journal": { registry },
     "session.projection": {},
     "actspace.host.session": { dataRoot: directory, runtimeId: "test" },
-    "actspace.host.agent": { authorizeHarness: async (r: import("@actspace/harness-control").AuthorizationRequest) => ({ ...r, actor: "test-host", decisionId: "approved", expiresAt: Date.now() + 10000 }), disabledHarnessEntries: ["browser-tools"], onSandboxStatus: reportSandbox, contextDisclosure: createContextHost(() => sessions, toolEnvironment), host, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
+    "actspace.host.agent": { authorizeHarness: async (r: import("@actspace/harness-control").AuthorizationRequest) => ({ ...r, actor: "test-host", decisionId: "approved", expiresAt: Date.now() + 10000 }), disabledHarnessEntries: ["browser-tools"], onSandboxStatus: reportSandbox, contextDisclosure: createContextHost(() => sessions, toolEnvironment), host, agentForm: MAIN_AGENT_FORM, toolEnvironment, workspaceRoot: directory, compositionDigest: "test", hostCapabilityDigest: "test", plugins: [] },
     "actspace.host.prompt": { workspaceRoot: directory, resolveSource: async () => emptyRuntimePromptSource() },
     "actspace.host.llm": { credentials: { resolve: async () => ({}) }, routes: [{ routeId: "default", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async (input: { signal?: AbortSignal }) => (async function* () {
       if (holdRequest) {
@@ -84,6 +88,13 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     expect(harnesses.inspect().instances[0].users).toBe(0);
     // Keep a parent generation pinned while its child inherits the same generation.
     const parentLease = await harnesses.acquire("main");
+    // Mode policy is assembled from the tool definitions the Harness registered (agent-forms-and-modes.md §5).
+    const definitions = parentLease.getService<import("@actspace/tool-runtime").ToolRuntime>("tools.runtime")!.registry.listDefinitions();
+    const visible = (mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode) => [...allowedAgentModeTools(mode, definitions)].sort();
+    expect(visible("chat")).toEqual(["generate_image", "web"]);
+    expect(visible("plan")).toEqual(["agent", "agent_fork", "glob", "grep", "inspect_image", "interrupt_agent", "list_agents", "list_directory", "list_subagent_models", "read_file", "send_message", "task_list", "task_output", "task_stop", "task_wait", "todo_read", "todo_write", "wait_agent", "web_fetch", "web_search"]);
+    expect(visible("agent")).toEqual(expect.arrayContaining(["bash", "edit_file", "present", "generate_image", "plugin_manager", "harness_inspect"]));
+    expect(visible("agent")).not.toContain("web");
     const reviewer = parentLease.getService<import("@actspace/auto-review").AutoReviewer>("approval.auto-review");
     expect(reviewer).toBeDefined();
     const reviewRoute = parentLease.getService<import("@actspace/llm-service").LlmService>("llm.service")!.routes.register({ routeId: "auto-review", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async input => {
@@ -195,6 +206,20 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
   }
 }, 20_000);
 
+it("derives the main Agent form from the catalog entries that declare tools", () => {
+  const members = new Map(MAIN_AGENT_FORM.members.map(member => [member.id, member]));
+  expect([...members.keys()]).toEqual([
+    "actspace.filesystem-read", "actspace.filesystem-search", "actspace.filesystem-write", "actspace.web-tools", "actspace.image-generation",
+    "actspace.shell-tools", "actspace.image-inspection", "actspace.todo", "actspace.browser-tools", "actspace.background-tasks",
+    "actspace.subagent-tools", "actspace.subagent-codex", "actspace.subagent-claude-code", "actspace.plugin-manager",
+  ]);
+  expect(members.get("actspace.filesystem-read")).toMatchObject({ version: 2, required: true, toolNames: ["read_file", "list_directory", "present"] });
+  expect(members.get("actspace.browser-tools")?.required).toBe(false);
+  expect(members.get("actspace.subagent-codex")).toMatchObject({ version: 1, required: false, toolNames: ["agent_codex"] });
+  expect(members.get("actspace.plugin-manager")).toMatchObject({ required: true, toolNames: ["plugin_manager", "harness_inspect"] });
+  expect(MAIN_AGENT_FORM.members.every(member => !member.id.startsWith("actspace.context"))).toBe(true);
+});
+
 it("keeps Host compatibility modules in the persisted artifact canonical order", async () => {
   const modules = await defaultHarnessSharedModules();
   expect(modules.map(module => module.specifier)).toEqual(modules.map(module => module.specifier).sort((a, b) => a.localeCompare(b)));
@@ -205,6 +230,62 @@ it("registers the sandbox manager and both backends as replaceable Harness entri
   expect(rows.get("sandbox")).toEqual(["sandbox", ["sandbox"], ["actspace.host.sandbox"]]);
   expect(rows.get("sandbox-nono")).toEqual(["sandbox-nono", [], ["sandbox", "actspace.host.sandbox"]]);
   expect(rows.get("sandbox-seatbelt")).toEqual(["sandbox-seatbelt", [], ["sandbox", "actspace.host.sandbox"]]);
+});
+
+it("publishes every tool plugin as its own artifact so a patch replaces one plugin without touching the kernel", async () => {
+  const { prepareDefaultHarnessArtifact, DEFAULT_HARNESS_SHARED_SERVICES } = await import("./default-harness.js");
+  const artifactRoot = await mkdtemp(join(tmpdir(), "actspace-tool-artifacts-"));
+  try {
+    const request = await prepareDefaultHarnessArtifact({ artifactRoot, hostCapabilities: ["process"] });
+    const toolPlugins = harnessToolPluginEntries();
+    expect(toolPlugins.map(entry => entry.id)).toEqual(["filesystem-read", "filesystem-search", "filesystem-write", "web-tools", "image-generation", "shell-tools", "image-inspection", "todo-tools", "browser-tools", "background-tasks", "subagent-tools", "subagent-codex", "subagent-claude-code", "plugin-manager"]);
+    expect(request.artifacts.size).toBe(toolPlugins.length + 1);
+    expect(request.composition.manifests.map(manifest => manifest.pluginId)).toEqual([DEFAULT_HARNESS_KERNEL_ID, ...toolPlugins.map(entry => entry.manifest.pluginId)]);
+    // The kernel keeps the loop, context and tools runtime; it no longer carries any tool plugin.
+    const kernel = request.composition.manifests.find(manifest => manifest.pluginId === DEFAULT_HARNESS_KERNEL_ID)!;
+    expect(kernel.behaviors.map(behavior => behavior.entryId)).toEqual(expect.arrayContaining(["agent-factory", "tools-runtime", "context-engine", "llm-service"]));
+    expect(kernel.behaviors.some(behavior => toolPlugins.some(entry => entry.id === behavior.entryId))).toBe(false);
+    // A tool plugin keeps its catalog identity and its single behavior points at the bundled `plugin.js`.
+    const fsRead = request.composition.manifests.find(manifest => manifest.pluginId === "actspace.filesystem-read")!;
+    expect(fsRead).toMatchObject({ version: "2.0.0", source: { kind: "builtin", reference: "builtin:actspace.filesystem-read" }, contributions: { tools: ["read_file", "list_directory", "present"] } });
+    expect(fsRead.behaviors).toHaveLength(1);
+    expect(fsRead.behaviors[0]).toMatchObject({ entryId: "filesystem-read", module: "./plugin.js", provides: ["tools.filesystem-read"] });
+    // Entries keep the catalog order and each one names the artifact it loads from.
+    expect(request.composition.entries.map(entry => entry.entryId)).toEqual(DEFAULT_HARNESS_ENTRIES.map(([id]) => id));
+    expect(request.composition.entries.every(entry => typeof entry.artifactId === "string" && entry.provenance.startsWith("builtin:"))).toBe(true);
+    const entry = (id: string) => request.composition.entries.find(row => row.entryId === id)!;
+    expect(entry("agent-factory")).toMatchObject({ pluginId: DEFAULT_HARNESS_KERNEL_ID, artifactId: request.artifacts.get(pluginId(DEFAULT_HARNESS_KERNEL_ID))!.artifactId });
+    expect(entry("filesystem-read")).toMatchObject({ pluginId: "actspace.filesystem-read", pluginVersion: "2.0.0", artifactId: request.artifacts.get(pluginId("actspace.filesystem-read"))!.artifactId });
+
+    // Replace the file-reading plugin with an independently published build of the same plugin id.
+    const sourceRoot = join(artifactRoot, "alternative-fs-read"); await mkdir(sourceRoot);
+    await writeFile(join(sourceRoot, "plugin.js"), "export function apply(ctx) { ctx.provide('tools.filesystem-read', Object.freeze({ definitions: [], registrations: [] })); }\n");
+    const alternative = await publishPluginArtifact({ sourceRoot, artifactRoot, files: ["plugin.js"], plugin: { ...fsRead, version: "2.0.1", source: { kind: "builtin", reference: "builtin:actspace.filesystem-read" } } });
+    const patch = { id: "alternative-fs-read", provenance: "test", operations: [{ id: "replace", kind: "replace" as const, target: "filesystem-read", artifactId: alternative.artifactId, manifestEntryId: "filesystem-read" }] };
+    const patched = resolveHarnessPatch(request.composition, patch, [...request.artifacts.values(), alternative]);
+    const replaced = patched.entries.find(row => row.entryId === "filesystem-read")!;
+    expect(replaced).toMatchObject({ pluginId: "actspace.filesystem-read", pluginVersion: "2.0.1", artifactId: alternative.artifactId, module: "./plugin.js" });
+    expect(patched.entries.filter(row => row.entryId !== "filesystem-read").map(row => row.artifactId)).toEqual(request.composition.entries.filter(row => row.entryId !== "filesystem-read").map(row => row.artifactId));
+    expect(patched.entries.some(row => row.artifactId === request.artifacts.get(pluginId("actspace.filesystem-read"))!.artifactId)).toBe(false);
+    const host = { capabilities: ["process"], services: DEFAULT_HARNESS_SHARED_SERVICES.map(id => ({ id, version: 1 })), events: [], sharedModules: await defaultHarnessSharedModules(), codecArtifacts: [] };
+    expect(checkHarnessCompatibility(patched, [...request.artifacts.values(), alternative], host)).toEqual([]);
+    expect(patched.digest).not.toBe(request.composition.digest);
+  } finally { await rm(artifactRoot, { recursive: true, force: true }); }
+});
+
+it("keeps the service contract's owner table in step with the tool plugin manifests", () => {
+  // `service-contract.ts` is audit metadata for the contract matrix; the catalog is the source of truth.
+  const definitions = Object.values(ACTSPACE_SERVICE_DEFINITIONS);
+  const roles = Object.values(ACTSPACE_SERVICE_ROLE_METADATA);
+  for (const entry of harnessToolPluginEntries()) {
+    const packageName = entry.module.split("/").slice(0, 2).join("/");
+    for (const serviceId of entry.manifest.behaviors[0]!.provides ?? []) {
+      const definition = definitions.find(item => item.id === serviceId);
+      if (!definition) continue;
+      expect(definition.owner, `${serviceId} owner`).toBe(packageName);
+      expect(roles.find(role => role.definitionId === serviceId), `${serviceId} role`).toMatchObject({ providerOwner: packageName, providerId: `${entry.manifest.behaviors[0]!.entryId}:default` });
+    }
+  }
 });
 
 it("puts the Host's plugin settings over each manifest's config defaults", async () => {

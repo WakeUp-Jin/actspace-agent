@@ -6,6 +6,8 @@ export const manifest = defineBuiltinPluginManifest({
   pluginId: FILESYSTEM_SEARCH_PLUGIN_ID, version: "2.0.0", name: "ActSpace Filesystem Search",
   entry: { entryId: "tools.filesystem-search", behavior: "./plugin.js" },
   host: { required: ["filesystem.read"], optional: [] }, frontend: null,
-  injects: ["tools.runtime", "actspace.host.tools.filesystem-search"],
+  injects: ["tools.runtime"],
+  // Without the grant the tools register but report the capability as unavailable.
+  optionalInjects: ["actspace.host.filesystem"],
   contributions: { services: ["tools.filesystem-search"], tools: FILESYSTEM_SEARCH_TOOLS, prompts: [], events: [] },
 });

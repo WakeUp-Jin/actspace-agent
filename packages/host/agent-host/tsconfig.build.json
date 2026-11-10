@@ -31,15 +31,6 @@
       "path": "./../../util/shared/tsconfig.build.json"
     },
     {
-      "path": "./../../fs/tool-fs-read/tsconfig.build.json"
-    },
-    {
-      "path": "./../../fs/tool-fs-search/tsconfig.build.json"
-    },
-    {
-      "path": "./../../fs/tool-fs-write/tsconfig.build.json"
-    },
-    {
       "path": "./../../image/tool-image-generation/tsconfig.build.json"
     },
     {
@@ -47,9 +38,6 @@
     },
     {
       "path": "./../../core/tool-runtime/tsconfig.build.json"
-    },
-    {
-      "path": "./../../shell/tool-shell/tsconfig.build.json"
     },
     {
       "path": "./../../web/tool-web/tsconfig.build.json"

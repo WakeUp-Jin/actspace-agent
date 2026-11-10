@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CordisContextClass } from "@actspace/cordis-adapter";
 import type { RunningSubagent } from "@actspace/subagent";
-import { apply } from "../plugin.js";
 import { createSubagentsSource } from "../source.js";
 
 const agent = (agentId: string, label = "general"): RunningSubagent => ({ agentId, description: `task ${agentId}`, label, startedAt: "2026-11-03T06:02:11.000Z", transcriptPath: `/data/sessions-v2/${agentId}/transcript.md` });
@@ -34,13 +32,5 @@ describe("running subagents context source", () => {
     running = [];
     expect(run(source, "t3")).toEqual([]);
     expect(asked).toEqual(["s", "s", "s"]);
-  });
-
-  it("publishes and disposes its source factory", async () => {
-    const ctx = new CordisContextClass();
-    await ctx.plugin({ apply: inner => apply(inner as never) });
-    expect(ctx.get("context.source.subagents")).toHaveProperty("create");
-    await ctx.fiber.dispose();
-    expect(ctx.get("context.source.subagents")).toBeUndefined();
   });
 });

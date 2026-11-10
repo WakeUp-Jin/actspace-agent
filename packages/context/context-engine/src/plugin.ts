@@ -14,8 +14,9 @@ export type ContextProjectionService = {
 export function apply(ctx: CordisContext): void {
   const instances = new ContextInstanceRegistry();
   const reducers = new ContextReducerRegistry();
+  const compaction = new ContextCompactionCoordinator();
   ctx.provide?.("context.engine", Object.freeze({
-    compaction: new ContextCompactionCoordinator(),
+    compaction,
     instances,
     reducers,
     getProjection: (sessionId: string, logicalAgentScopeId = "main", basis: ContextProjection["basis"] = "current-context") => {
@@ -27,6 +28,7 @@ export function apply(ctx: CordisContext): void {
       if (!instance || instance.revision !== revision || instance.view.status.instanceGeneration !== generation) throw new Error("Context revision stale; reload the panel.");
       return describeContextContent(instance.view).text.get(key) ?? null;
     },
-    create: (options: ContextEngineOptions) => new ContextEngine({ ...options, instances: options.instances ?? instances, reducers: options.reducers ?? reducers }),
+    // The disclosure registered on the coordinator hydrates every engine; the loop needs no reference to the strategy.
+    create: (options: ContextEngineOptions) => new ContextEngine({ ...options, disclosure: options.disclosure ?? compaction.hydrator(), instances: options.instances ?? instances, reducers: options.reducers ?? reducers }),
   }));
 }

@@ -53,7 +53,7 @@ H2: slot csv → artifact C，parent = H0
 会话甲选择 H1，会话乙选择 H2，默认基座仍为 H0。
 ```
 
-当前 [Patch 解析](../../../packages/composition/composition/src/harness-patch.ts) 不允许同一 composition 对同一 pluginId 混用多个 artifact。默认内置产物又可能包含多个 behavior，因此首版从内置多条目包派生单个工具时推荐赋予派生插件独立 pluginId，以原 entryId 作为替换槽位；用来源记录表达与原插件的关系。不能复制整个 manifest 却留下重复服务或无关行为。
+当前 [Patch 解析](../../../packages/composition/composition/src/harness-patch.ts) 不允许同一 composition 对同一 pluginId 混用多个 artifact。默认 Harness 的产物分两层（`prepareDefaultHarnessArtifact`）：Loop、上下文、工具运行时、沙箱、审批等内核条目共用一个产物 `actspace.default-harness`；每个贡献工具的插件（`isHarnessToolPlugin`）用自己 manifest 里的 pluginId、版本和来源单独发布一个产物，条目 id 仍是 catalog id。所以替换一个内置工具插件只需一条 `replace` 操作指向该条目，带上同 pluginId 的新产物，内核与其余插件的产物保持不变；派生版本若保留原 pluginId，`agent.form` 的必需成员照常匹配。首版进化工具（`actspace.evolved.*`）仍赋予独立 pluginId、以原 entryId 作为替换槽位，用来源记录表达与原插件的关系。不能复制整个 manifest 却留下重复服务或无关行为。
 
 同一插件条目可能提供多个工具。替换必须保留承诺保留的工具和依赖契约；不是只实现目标工具就视为兼容。必需服务缺失、冲突注册或不支持的 Host / Codec 变化在准备时拒绝。
 

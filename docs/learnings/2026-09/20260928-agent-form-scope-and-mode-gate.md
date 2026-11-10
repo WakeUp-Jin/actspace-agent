@@ -24,3 +24,5 @@ AgentScope 拥有工具贡献、prompt contributor、订阅及 disposer。多个
 - 排队或审批恢复时，是否重新校验当前策略，并证明被拒绝调用没有进入 executor body？
 
 对应实现见 `packages/core/agent/src/agent-form.ts`、`packages/core/agent/src/agent-mode-policy.ts` 和 `packages/core/tool-runtime/src/`；变更记录见 `docs/histories/2026-09/20260928-forms-and-modes-design.md`。
+
+2026-11 起这两份清单不再手写：形态成员由 `packages/core/runtime/src/main-agent-form.ts` 从插件目录推导，模式可见性由每个 `ToolDefinition.modes` 自己声明；上面两个问题的答案因此变成「插件 manifest 声明了 `contributions.tools` 就进入形态」「工具不声明 `modes` 就注册失败」。Harness 侧为什么不能自己 import 目录见 `docs/learnings/2026-11/harness-entry-takes-host-data-through-ports.md`。

@@ -46,6 +46,7 @@ export function registerTodoTools(runtime: ToolRuntime, resolveSession: (session
       description,
       inputSchema,
       effects: [],
+      modes: ["plan", "agent"] as const,
       concurrency,
       sensitiveArgumentPaths: [],
       resultSchemaVersion: 1,

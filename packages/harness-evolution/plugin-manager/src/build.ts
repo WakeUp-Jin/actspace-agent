@@ -5,6 +5,8 @@ import { artifactHash, publishPluginArtifact, pluginId, entryId, serviceId, type
 import { normalizeToolDefinition } from "@actspace/tool-runtime";
 import { validateInputSchema } from "./schema.js";
 export type ToolSource = { metadata: { name: string; description: string; inputSchema: Record<string, unknown> }; implementation: string };
+/** Evolved tools run in Agent mode only; the source metadata cannot widen this (the mode policy checks it again). */
+export const EVOLVED_TOOL_MODES = Object.freeze(["agent"] as const);
 export async function readSource(directory: string): Promise<ToolSource> {
   for (const name of ["", "tool.json", "implementation.ts"]) {
     const info = await lstat(join(directory, name));
@@ -43,7 +45,7 @@ export async function buildTool(source: ToolSource, artifactRoot: string): Promi
     await writeFile(join(directory, "tool.json"), JSON.stringify(source.metadata));
     await writeFile(join(directory, "source.json"), JSON.stringify({ schemaVersion: 1, digest: sourceDigest(source), contract: "json-tool-v1" }));
     const id = `actspace.evolved.${source.metadata.name}`;
-    const definition = normalizeToolDefinition({ abiVersion: 2, pluginId: id, name: source.metadata.name, description: source.metadata.description, inputSchema: source.metadata.inputSchema, definitionVersion: 1, effects: [{ capabilityId: "process", mode: "execute", resourceScope: "workspace" }], concurrency: "exclusive", sensitiveArgumentPaths: [], resultSchemaVersion: 1 });
+    const definition = normalizeToolDefinition({ abiVersion: 2, pluginId: id, name: source.metadata.name, description: source.metadata.description, inputSchema: source.metadata.inputSchema, definitionVersion: 1, effects: [{ capabilityId: "process", mode: "execute", resourceScope: "workspace" }], modes: EVOLVED_TOOL_MODES, concurrency: "exclusive", sensitiveArgumentPaths: [], resultSchemaVersion: 1 });
     await writeFile(join(directory, "plugin.js"), `import { execute } from './implementation.js';
 export function apply(ctx) {
   const tools = ctx.get('tools.runtime');

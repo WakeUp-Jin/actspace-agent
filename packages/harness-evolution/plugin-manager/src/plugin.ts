@@ -12,7 +12,7 @@ export function apply(ctx: CordisContext): void {
     definition: { abiVersion: 2, pluginId: "actspace.plugin-manager", name, definitionVersion: 1,
       description: name === "harness_inspect" ? "Inspect the current Run Harness, selected session version, editable plugins, tools and official development contract. Read-only." : "Develop a session-local tool ONLY on explicit user request. Read actspace-plugin-development first. Actions: create (purpose, toolName or entryId), build/prepare/apply/status/discard (workspaceId), rollback (workspaceId, executionDigest). Changes apply to the next user message, never this Run. Preparation executes trusted code and activation requires Host approval.",
       inputSchema: name === "harness_inspect" ? { type: "object", properties: {}, additionalProperties: false } : { type: "object", properties: { action: { type: "string", enum: ["create", "build", "prepare", "apply", "status", "discard", "rollback"] }, purpose: { type: "string" }, toolName: { type: "string" }, entryId: { type: "string" }, workspaceId: { type: "string" }, executionDigest: { type: "string" } }, required: ["action"], additionalProperties: false },
-      effects: name === "harness_inspect" ? [] : [{ capabilityId: "process", mode: "execute", resourceScope: "workspace" }], concurrency: "exclusive", sensitiveArgumentPaths: [], resultSchemaVersion: 1 },
+      effects: name === "harness_inspect" ? [] : [{ capabilityId: "process", mode: "execute", resourceScope: "workspace" }], modes: ["agent"], concurrency: "exclusive", sensitiveArgumentPaths: [], resultSchemaVersion: 1 },
     executor: { execute: async (args, context) => {
       if (!host.evolution) throw new Error("Harness evolution is unavailable on this Host");
       try {

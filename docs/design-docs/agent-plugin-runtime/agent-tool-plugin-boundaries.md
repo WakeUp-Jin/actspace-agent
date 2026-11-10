@@ -4,14 +4,16 @@
 
 ## 领域包
 
-Tool Runtime 只拥有注册、参数验证、权限准入、prepared execution、调度、checkpoint 和有序结果提交。具体工具定义、permission contract、Node Host 实现与清理逻辑由各工具包拥有。Runtime 的 Profile composition 依赖各包的 Static Manifest，公开 Runtime API 不再转导出具体 executor。
+Tool Runtime 只拥有注册、参数验证、权限准入、prepared execution、调度、checkpoint 和有序结果提交，另外定义两份能力授予的形状（`src/host-ports.ts`）：`actspace.host.filesystem`（`FilesystemHostGrant`：工作区根、artifact 解析、ripgrep 路径）和 `actspace.host.process`（`ProcessHostGrant`：工作区根、临时目录、强制结束钩子）。具体工具定义、permission contract、Node 实现与清理逻辑由各工具包拥有。Runtime 的 Profile composition 依赖各包的 Static Manifest，公开 Runtime API 不再转导出具体 executor。
 
-| 包 | 工具 | Host port |
+文件和 Shell 工具的实现随 Harness 产物打包（插件 `apply` 用授予里的根目录创建自己的 `node-ports`），Host 只保留能力门禁、审批和授予；授予是可选注入，没有时工具注册但返回 `CAPABILITY_UNAVAILABLE`。网页和图片工具仍由 Host 端口构造实现（凭据和模型绑定在 Host）。
+
+| 包 | 工具 | Host 侧 |
 |---|---|---|
-| `@actspace/tool-fs-read` | read_file、list_directory | `actspace.host.tools.filesystem-read` |
-| `@actspace/tool-fs-search` | grep、glob | `actspace.host.tools.filesystem-search` |
-| `@actspace/tool-fs-write` | edit_file、write_file、delete_file | `actspace.host.tools.filesystem-write` |
-| `@actspace/tool-shell` | bash | `actspace.host.tools.shell-tools`、`actspace.host.background-tasks` |
+| `@actspace/tool-fs-read` | read_file、list_directory、present | 授予 `actspace.host.filesystem`（可选） |
+| `@actspace/tool-fs-search` | grep、glob | 授予 `actspace.host.filesystem`（可选） |
+| `@actspace/tool-fs-write` | edit_file、write_file、delete_file | 授予 `actspace.host.filesystem`（可选） |
+| `@actspace/tool-shell` | bash | 授予 `actspace.host.process`（可选）、`actspace.host.background-tasks`、`actspace.host.session` |
 | `@actspace/tool-background-tasks` | task_list、task_output、task_stop、task_wait | `actspace.host.background-tasks` |
 | `@actspace/tool-web` | web、web_search、web_fetch | `actspace.host.tools.web-tools` |
 | `@actspace/tool-image-generation` | generate_image | `actspace.host.tools.image-generation` |
@@ -26,7 +28,7 @@ Tool Runtime 只拥有注册、参数验证、权限准入、prepared execution�
 2. Boot 仅加载启用插件的 Codec。内置 Codec 根据已准入的 transport/package 元数据从公开 `./codec` export 加载。
 3. checked-in `cordis.yml`（由插件清单 `PLUGIN_CATALOG` 生成）与可信 transport inventory 校验一致，再由 Include 的启动 patches 将禁用结果应用到真实插件树。
 4. Todo Behavior 注册 Contributor；SessionReadModel 在创建 registry、安装通用事实 projection 后统一应用 Contributor，再 ensureSession / restore / replay。
-5. 工具 Behavior 从专用 Host port 创建资源，注册工具，并在 Context effect 清理时 drain/dispose registrations 和 Host 资源。注册失败回滚本次已注册项。
+5. 工具 Behavior 创建资源（文件 / Shell 用能力授予自己建 Node 实现，网页 / 图片从专用 Host port 取），注册工具，并在 Context effect 清理时 drain/dispose registrations 和这些资源。注册失败回滚本次已注册项。
 
 Host/codec 变更仍需受控重启；执行工具由独立 Harness 装配，新选择只影响后续 Run，旧 Run 的工具树保留至租约释放。启动 patches 不原位修改已运行的树。
 

@@ -21,9 +21,14 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
   } });
   const env = { workspaceRoot: root, hostCapabilities: new Set<string>(host.capabilityCeiling), capabilitySet: { ids: host.capabilityCeiling, has: () => true, get: <T>() => ({}) as T }, createArtifact: async () => { throw new Error("unused"); } };
   const mounted: string[] = [];
-  const ports = Object.fromEntries(PLUGIN_CATALOG.filter(item => item.manifest.behaviors[0].injects?.some(id => String(id) === `actspace.host.tools.${item.id}`)).map(item => [
-    `actspace.host.tools.${item.id}`, { createPorts: () => { mounted.push(item.id); return {}; } },
-  ]));
+  const onProcesses = vi.fn();
+  const ports = {
+    ...Object.fromEntries(PLUGIN_CATALOG.filter(item => item.manifest.behaviors[0].injects?.some(id => String(id) === `actspace.host.tools.${item.id}`)).map(item => [
+      `actspace.host.tools.${item.id}`, { createPorts: () => { mounted.push(item.id); return {}; } },
+    ])),
+    "actspace.host.filesystem": { workspaceRoot: root },
+    "actspace.host.process": { workspaceRoot: root, tmpRoot: join(root, "tmp"), onProcesses },
+  };
   let profile: Awaited<ReturnType<typeof bootProfileRuntime>> | undefined;
   try {
     const cleanup = vi.fn(async () => {});
@@ -43,7 +48,12 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
     expect(names).toContain("read_file");
     expect(names).not.toContain("bash");
     expect(names).not.toContain("todo_read");
-    expect(mounted).not.toContain("shell-tools");
+    expect(mounted).toContain("web-tools");
+    expect(onProcesses).not.toHaveBeenCalled();
+    const assembly = lease.getService<import("@actspace/context-assembly").ContextAssemblyService>("context.assembly")!;
+    expect(assembly.kinds("main")).toEqual(expect.arrayContaining(["system", "rules", "skills", "runtime", "conversation", "tools", "background-tasks", "subagents"]));
+    expect(assembly.kinds("subagent")).not.toContain("background-tasks");
+    expect(assembly.kinds("subagent")).not.toContain("subagents");
     expect(profile.context.get!("session.journal")).toMatchObject({ registry: expect.objectContaining({ digest: expect.any(String) }) });
     const journal = profile.context.get!("session.journal") as { registry: { list(): readonly { type: string }[] } };
     expect(journal.registry.list().some(codec => codec.type === "plugin/actspace.todo/todo-write")).toBe(false);

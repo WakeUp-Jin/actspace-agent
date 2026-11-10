@@ -19,9 +19,9 @@ kind: "package-group"
 
 三个包结构相同，互不依赖，都只依赖 `tool-runtime`：
 
-- inject `tools.runtime`（工具注册与执行）和各自的 Host 端口 `actspace.host.tools.filesystem-read` / `-search` / `-write`。端口的 `createPorts()` 返回真正读写文件的实现；包里的 `node-ports.ts` 是 Node 实现，由 Host 装配时传入。
+- inject `tools.runtime`（工具注册与执行）；**可选** inject 能力授予 `actspace.host.filesystem`（类型 `FilesystemHostGrant`，定义在 `tool-runtime/src/host-ports.ts`：`workspaceRoot`、`resolveArtifact`、`ripgrepPath`）。真正读写文件的实现是包里自己的 `node-ports.ts`，插件 `apply` 用授予里的根目录创建它，随 Harness 产物一起打包；Host 没给授予时（例如 CLI `--mock`）工具照常注册，但每次调用返回 `CAPABILITY_UNAVAILABLE`。
 - 插件 `apply` 把工具注册到 `tools.runtime`，卸载 Harness 时撤销注册。
-- manifest 声明所需 Host 能力：`filesystem.read`（读、搜索）、`filesystem.write`（写）；Host 没有这个能力时 Harness 装配会失败而不是悄悄少工具。
+- manifest 声明所需 Host 能力：`filesystem.read`（读、搜索）、`filesystem.write`（写）；Host 没有这个能力时 Harness 装配会失败而不是悄悄少工具。能力门禁和审批留在 Host / `tool-runtime`，文件怎么读写由本目录的包决定，Harness 换掉一个包不需要动 Host。
 
 ## 入口与测试
 
@@ -31,4 +31,4 @@ kind: "package-group"
 
 ## 怎么扩展
 
-新增一个文件类工具：先看它该归入已有的哪个包；需要新的 Host 能力或权限形状时，新建 `fs/tool-fs-<名>`，照 `tool-fs-read` 的结构写 manifest、plugin 和 `node-ports`，并在 `core/runtime/src/plugin-catalog.ts` 加一行、在 `agent-runtime` 的 Host 端口里补 `actspace.host.tools.<名>`。通用步骤见[总地图](../README.md)。
+新增一个文件类工具：先看它该归入已有的哪个包；需要新的 Host 能力或权限形状时，新建 `fs/tool-fs-<名>`，照 `tool-fs-read` 的结构写 manifest、plugin 和 `node-ports`（可选 inject `actspace.host.filesystem` 拿根目录），并在 `core/runtime/src/plugin-catalog.ts` 加一行；Host 侧不用加端口。通用步骤见[总地图](../README.md)。
