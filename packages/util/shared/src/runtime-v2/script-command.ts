@@ -94,7 +94,9 @@ export function elideScriptSource(command: string, script: ScriptCommand): strin
   if (script.source === undefined) return trimmed;
   const index = trimmed.indexOf(script.source);
   if (index < 0) return trimmed;
-  if (/<<-?\s*['"]?\w+['"]?[^\n]*\n$/.test(trimmed.slice(0, index)))
+  // A heredoc body starts on the line after its opener; only that one line is matched, so the cost stays linear.
+  const before = trimmed.slice(0, index);
+  if (before.endsWith("\n") && /<<-?[ \t]*['"]?\w/.test(before.slice(before.lastIndexOf("\n", before.length - 2) + 1)))
     return `${trimmed.slice(0, trimmed.indexOf("\n"))} …`;
   return `${trimmed.slice(0, index)}…${trimmed.slice(index + script.source.length)}`;
 }
