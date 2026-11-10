@@ -35,7 +35,7 @@ const TITLES: Record<string, string> = { "annotated-a": "批注甲", "annotated-
 function createAnsweredSession(sessionId: string): SessionRecord {
   const now = "2026-09-28T00:00:00.000Z";
   return {
-    meta: { schemaVersion: 2, id: sessionId, title: TITLES[sessionId]!, createdAt: now, updatedAt: now, agentRunCount: 1, agentForm: "chat", workspaceRoot: "/tmp/workspace" },
+    meta: { schemaVersion: 2, id: sessionId, title: TITLES[sessionId], createdAt: now, updatedAt: now, agentRunCount: 1, agentForm: "chat", workspaceRoot: "/tmp/workspace" },
     events: [
       { id: "u", sessionId, agentRunId: "run-0", type: "user_message", timestamp: now, schemaVersion: 2, payload: { content: "问题" } },
       { id: "a", sessionId, agentRunId: "run-0", type: "assistant_message", timestamp: now, schemaVersion: 2, payload: { content: `${sessionId} 第一段内容\n\n第二段的正文` } },
@@ -132,7 +132,7 @@ it("sends an annotation-only message and clears the pill once the run is submitt
 
   await userEvent.click(screen.getByRole("button", { name: "发送消息" }));
   await waitFor(() => expect(runAgent).toHaveBeenCalledTimes(1));
-  expect(runAgent.mock.calls[0]![0].responseAnnotations).toEqual([
+  expect(runAgent.mock.calls[0][0].responseAnnotations).toEqual([
     expect.objectContaining({ assistantMessageId: "v2-1", selectedText: "第二段", prefixContext: "annotated-a 第一段内容\n", suffixContext: "的正文" }),
   ]);
   expect(document.querySelector(".composer-annotations")).toBeNull();

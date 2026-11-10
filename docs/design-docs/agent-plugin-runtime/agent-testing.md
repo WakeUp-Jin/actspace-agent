@@ -121,6 +121,11 @@ src/test/golden/
 
 跨 Host 的 process smoke 放在 `scripts/test/` 或对应 app 的 `src/test/`。不要建立一个能直接访问所有 package 私有实现的中央测试大包。
 
+`scripts/test/` 里的每个文件都必须挂在 `package.json` 的某个 `test:*` 脚本上，并由 `pnpm test` 或某个 workflow 跑到；没有入口的测试等于没有测试。需要特殊环境的用例用 `skip` 自守，而不是从入口里摘掉：
+
+- `host-upload-disk-full.test.mjs`：只在设置了 `ACTSPACE_UPLOAD_FAULT_DIR`（一块隔离的小 tmpfs）和 `ACTSPACE_HOST_TEST_PACKAGE`（指向 `@actspace/agent-host` 的测试安装）时运行，验证上传在磁盘写满后能保住已确认的 offset 并恢复。
+- `electron-runtime-integrity.test.mjs`：只在 macOS 上运行，其它平台整体 skip。
+
 ## 默认验证顺序
 
 ```sh

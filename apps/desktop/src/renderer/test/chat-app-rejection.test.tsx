@@ -132,6 +132,6 @@ it("restores the draft with a readable message when references are rejected", as
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("引用的回复已不在当前会话中"));
   expect(screen.getByRole("textbox")).toHaveValue("引用那段话");
   expect(submitTask).toHaveBeenCalledTimes(1);
-  expect(submitTask.mock.calls[0]![0]).toHaveProperty("fileReferences", undefined);
-  expect(submitTask.mock.calls[0]![0]).toHaveProperty("responseAnnotations", undefined);
+  expect(submitTask.mock.calls[0][0]).toHaveProperty("fileReferences", undefined);
+  expect(submitTask.mock.calls[0][0]).toHaveProperty("responseAnnotations", undefined);
 });

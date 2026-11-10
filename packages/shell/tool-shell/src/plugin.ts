@@ -1,7 +1,7 @@
 import { realpath } from "node:fs/promises";
 import { analyzeCommandPrefixGrant } from "./command-prefix.js";
 import { queryPathsWithinWorkspace } from "./query-paths.js";
-import { isPathWithin } from "@actspace/tool-runtime";
+import { isPathWithin, PROCESS_HOST_PORT_ID, type ProcessHostGrant } from "@actspace/tool-runtime";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { getBashHardRejectReason } from "./command-rules.js";
@@ -11,25 +11,32 @@ import type { CordisContext } from "@actspace/cordis-adapter";
 import type { BackgroundTaskHost } from "@actspace/background-tasks";
 import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
 import { SHELL_TOOLS_PLUGIN_ID, type SHELL_TOOLS_TOOLS } from "./manifest.js";
+import { createNodeBashToolPorts } from "./node-ports.js";
+
+function createGrantedPorts(grant: ProcessHostGrant, background: BackgroundTaskHost | undefined, sandbox: SandboxService | undefined, dataRoot: string): ToolPorts {
+  const ports = createNodeBashToolPorts({ workspaceRoot: grant.workspaceRoot, tmpRoot: grant.tmpRoot, dataRoot, sandbox, background });
+  grant.onProcesses?.(ports);
+  return ports;
+}
 
 export type ToolName = (typeof SHELL_TOOLS_TOOLS)[number];
 export type ToolHandler = (args: Readonly<Record<string, RuntimeV2JsonValue>>, context: ToolExecutionContext) => Promise<ToolBodyResult>;
 export type ToolPorts = Partial<Readonly<Record<ToolName, ToolHandler>>> & { readonly hasRunningBackgroundTask?: (sessionId: string) => boolean; readonly dispose?: () => Promise<void> };
-export const SHELL_TOOLS_HOST_PORT_ID = "actspace.host.tools.shell-tools" as const;
-/**
- * `sandbox` is absent when the sandbox plugin is not loaded; the ports then only run commands approved for outside the sandbox.
- * `session.dataRoot` holds `sessions-v2/<id>/bash-log/`, where command logs go.
- */
-export type HostPort = { readonly createPorts: (background: BackgroundTaskHost | undefined, sandbox: SandboxService | undefined, session: { readonly dataRoot: string }) => ToolPorts | Promise<ToolPorts> };
 export type ToolRegistration = { readonly name: string; readonly localName: ToolName; readonly handle: ReturnType<ToolRuntime["register"]> };
 
+/**
+ * The Host grants process execution (roots, shutdown hook); this plugin owns Bash itself. `sandbox` is absent when
+ * the sandbox plugin is not loaded; commands then only run after approval for outside the sandbox. Without the
+ * process grant, `bash` registers but reports CAPABILITY_UNAVAILABLE. `session.dataRoot` holds
+ * `sessions-v2/<id>/bash-log/`, where command logs go.
+ */
 export async function apply(ctx: CordisContext): Promise<void> {
   const runtime = ctx.get?.("tools.runtime") as ToolRuntime | undefined;
-  const host = ctx.get?.(SHELL_TOOLS_HOST_PORT_ID) as HostPort | undefined;
   const dataRoot = (ctx.get?.("actspace.host.session") as { readonly dataRoot?: string } | undefined)?.dataRoot;
-  if (!runtime || !host || !dataRoot) throw new Error("shell-tools requires tools.runtime, actspace.host.tools.shell-tools and actspace.host.session.");
+  if (!runtime || !dataRoot) throw new Error("shell-tools requires tools.runtime and actspace.host.session.");
   const sandbox = ctx.get?.(SANDBOX_SERVICE_ID) as SandboxService | undefined;
-  const ports = await host.createPorts(ctx.get?.("actspace.host.background-tasks") as BackgroundTaskHost | undefined, sandbox, { dataRoot });
+  const grant = ctx.get?.(PROCESS_HOST_PORT_ID) as ProcessHostGrant | undefined;
+  const ports: ToolPorts = grant ? createGrantedPorts(grant, ctx.get?.("actspace.host.background-tasks") as BackgroundTaskHost | undefined, sandbox, dataRoot) : {};
   let registrations: readonly ToolRegistration[];
   try { registrations = registerTools(runtime, ports, sandbox); }
   catch (error) { await ports.dispose?.(); throw error; }
@@ -100,10 +107,10 @@ function escalation(args: Readonly<Record<string, RuntimeV2JsonValue>>): "none" 
 type DefinitionEntry = { readonly localName: ToolName; readonly definition: ToolDefinition };
 const SHELL = ["process"] as const;
 export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
-  definition("bash", "Run one non-interactive command in the workspace. Large output returns a bounded head plus a full output file reference. Read the resolved output path with read_file offset/limit or grep; do not rerun the command with head to recover output. Use dedicated file and search tools instead of shell equivalents. Unless the session is in full-access, the command runs in a sandbox: the workspace and the temp directory are writable; writes outside the workspace or to .git/hooks and .git/config are blocked, and so is the keychain (git push over HTTPS, gh); credential directories are not readable; the network is open.", SHELL, "exclusive", objectSchema({ command: stringSchema("Shell command."), cwd: stringSchema("Working directory."), blockMs: { type: "integer", minimum: 0, maximum: 600_000, default: 30_000 }, intent: { type: "string", minLength: 1, maxLength: 120 }, notifyOnOutput: { type: "object", properties: { pattern: stringSchema("Regular expression matched against output lines."), reason: { type: "string", minLength: 1, maxLength: 80 }, debounceMs: { type: "integer", minimum: 5_000, default: 5_000 } }, required: ["pattern", "reason"], additionalProperties: false }, sandbox_permissions: { type: "string", enum: ["require_escalated"], description: "Run this command outside the sandbox. Requires justification and asks the user to approve this one run. Request it only after the sandbox blocked the command, or when the command clearly must write outside the workspace or use the keychain (git push over HTTPS, gh; in the sandbox gh misreports its token as invalid). Do not request it up front." }, justification: { type: "string", minLength: 1, maxLength: 200, description: "One sentence shown to the user on the approval card: why this command must run outside the sandbox. Only with sandbox_permissions." } }, ["command", "intent"]), ["/command"]),
+  definition("bash", ["agent"], "Run one non-interactive command in the workspace. Large output returns a bounded head plus a full output file reference. Read the resolved output path with read_file offset/limit or grep; do not rerun the command with head to recover output. Use dedicated file and search tools instead of shell equivalents. Unless the session is in full-access, the command runs in a sandbox: the workspace and the temp directory are writable; writes outside the workspace or to .git/hooks and .git/config are blocked, and so is the keychain (git push over HTTPS, gh); credential directories are not readable; the network is open.", SHELL, "exclusive", objectSchema({ command: stringSchema("Shell command."), cwd: stringSchema("Working directory."), blockMs: { type: "integer", minimum: 0, maximum: 600_000, default: 30_000 }, intent: { type: "string", minLength: 1, maxLength: 120 }, notifyOnOutput: { type: "object", properties: { pattern: stringSchema("Regular expression matched against output lines."), reason: { type: "string", minLength: 1, maxLength: 80 }, debounceMs: { type: "integer", minimum: 5_000, default: 5_000 } }, required: ["pattern", "reason"], additionalProperties: false }, sandbox_permissions: { type: "string", enum: ["require_escalated"], description: "Run this command outside the sandbox. Requires justification and asks the user to approve this one run. Request it only after the sandbox blocked the command, or when the command clearly must write outside the workspace or use the keychain (git push over HTTPS, gh; in the sandbox gh misreports its token as invalid). Do not request it up front." }, justification: { type: "string", minLength: 1, maxLength: 200, description: "One sentence shown to the user on the approval card: why this command must run outside the sandbox. Only with sandbox_permissions." } }, ["command", "intent"]), ["/command"]),
 ]);
-function definition(localName: ToolName, description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
-  return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: SHELL_TOOLS_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
+function definition(localName: ToolName, modes: ToolDefinition["modes"], description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
+  return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: SHELL_TOOLS_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), modes, concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
 }
 function objectSchema(properties: Readonly<Record<string, unknown>>, required: readonly string[]) { return Object.freeze({ type: "object", properties, required, additionalProperties: false }); }
 function stringSchema(description: string) { return Object.freeze({ type: "string", description, minLength: 1 }); }

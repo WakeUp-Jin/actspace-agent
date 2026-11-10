@@ -110,12 +110,12 @@ export function useRemoteModel(sessionId: string | null, hostId: string | null):
   const sessionRemote = sessionId !== null && locateSession(sessionId).kind === "remote";
   const recorded = useSyncExternalStore(
     !hostId ? noop : sessionRemote ? remoteSessionPrefs.subscribe : newSessionModels.subscribe,
-    () => !hostId ? undefined : sessionRemote ? remoteSessionPrefs.get(sessionId!)?.modelId : newSessionModels.get(hostId),
+    () => !hostId ? undefined : sessionRemote ? remoteSessionPrefs.get(sessionId)?.modelId : newSessionModels.get(hostId),
   );
   const hostDefault = useSyncExternalStore(sessionRemote && hostId ? newSessionModels.subscribe : noop, () => sessionRemote && hostId ? newSessionModels.get(hostId) : undefined);
   const selectModel = useCallback((modelId: string) => {
     if (!hostId) return;
-    if (sessionRemote) remoteSessionPrefs.set(sessionId!, { modelId });
+    if (sessionRemote) remoteSessionPrefs.set(sessionId, { modelId });
     else newSessionModels.set(hostId, modelId);
   }, [hostId, sessionId, sessionRemote]);
   return { modelId: hostId ? resolveRemoteModel(recorded ?? hostDefault, description) : "", selectModel };

@@ -239,9 +239,11 @@ function DefaultThinking({ effective, onChange }: { effective: EffectiveModel; o
  * 显示的是已经乘过倍率的价格；手填的就是实际价格。
  */
 function RatePair({ rates, onCommit }: { rates: ModelRates | null; onCommit: (rates: ModelRates | null) => void }) {
-  const initial = { input: formatRateInput(rates?.input), output: formatRateInput(rates?.output) };
+  const initialInput = formatRateInput(rates?.input);
+  const initialOutput = formatRateInput(rates?.output);
+  const initial = { input: initialInput, output: initialOutput };
   const [text, setText] = useState(initial);
-  useEffect(() => setText(initial), [initial.input, initial.output]);
+  useEffect(() => setText({ input: initialInput, output: initialOutput }), [initialInput, initialOutput]);
   const commit = () => {
     if (text.input === initial.input && text.output === initial.output) return;
     const input = parseRate(text.input);

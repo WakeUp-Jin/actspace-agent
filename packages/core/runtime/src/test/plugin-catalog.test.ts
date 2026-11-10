@@ -3,7 +3,7 @@ import { DEFAULT_HARNESS_ENTRIES } from "../harness/default-harness-definition.j
 import { TRUSTED_LOADER_ENTRIES } from "../profiles/composition.js";
 import { harnessEntriesOffByDefault, PLUGIN_CATALOG, PLUGIN_PACKAGES_OUTSIDE_DEFAULT, pluginCatalogEntry } from "../plugin-catalog.js";
 
-const behavior = (id: string) => pluginCatalogEntry(id)!.manifest.behaviors[0]!;
+const behavior = (id: string) => pluginCatalogEntry(id)!.manifest.behaviors[0];
 
 /**
  * These derivations replaced hand-written tables. The expected values below were first asserted
@@ -25,15 +25,19 @@ describe("plugin catalog", () => {
   it("derives the default Harness rows from the manifests", () => {
     expect(DEFAULT_HARNESS_ENTRIES.map(row => row[0])).toEqual([
       "llm-service", "auto-review", "tools-approval", "sandbox", "sandbox-nono", "sandbox-seatbelt", "tools-runtime", "context-engine", "prompt-runtime",
-      "context-system", "context-rules", "context-skills", "context-runtime", "context-conversation", "context-tools", "context-background-tasks", "context-subagents",
+      "context-assembly", "context-system", "context-rules", "context-skills", "context-runtime", "context-conversation", "context-tools", "context-background-tasks", "context-subagents",
       "context-disclosure", "compaction-runtime", "filesystem-read", "filesystem-search", "filesystem-write", "web-tools", "image-generation", "shell-tools",
       "image-inspection", "todo-tools", "browser-tools", "background-tasks", "subagent-tools", "subagent-codex", "subagent-claude-code", "plugin-manager", "agent-factory",
     ]);
     const rows = new Map(DEFAULT_HARNESS_ENTRIES.map(row => [row[0], row]));
     expect(rows.get("llm-service")).toEqual(["llm-service", ["llm.service", "llm.routes", "llm.service.types"], ["actspace.host.llm"]]);
-    expect(rows.get("shell-tools")).toEqual(["shell-tools", ["tools.shell-tools"], ["tools.runtime", "actspace.host.tools.shell-tools", "actspace.host.background-tasks", "actspace.host.session"], [{ id: "sandbox", fallback: "bash runs outside the sandbox after approval" }]]);
+    expect(rows.get("shell-tools")).toEqual(["shell-tools", ["tools.shell-tools"], ["tools.runtime", "actspace.host.background-tasks", "actspace.host.session"], [{ id: "sandbox", fallback: "bash runs outside the sandbox after approval" }, { id: "actspace.host.process", fallback: "bash registers but reports the capability as unavailable" }]]);
+    expect(rows.get("filesystem-read")).toEqual(["filesystem-read", ["tools.filesystem-read"], ["tools.runtime"], [{ id: "actspace.host.filesystem", fallback: "file tools register but report the capability as unavailable" }]]);
     expect(rows.get("todo-tools")).toEqual(["todo-tools", ["tools.todo"], ["tools.runtime", "session.runtime"]]);
-    expect(rows.get("context-system")).toEqual(["context-system", ["context.source.system"], []]);
+    expect(rows.get("context-assembly")).toEqual(["context-assembly", ["context.assembly"], []]);
+    expect(rows.get("context-system")).toEqual(["context-system", ["context.source.system"], ["context.assembly"]]);
+    expect(rows.get("agent-factory")![2]).not.toContain("context.source.system");
+    expect(rows.get("agent-factory")![2]).toContain("context.assembly");
     expect(rows.get("subagent-codex")).toEqual(["subagent-codex", ["tools.subagent-codex"], ["tools.runtime", "agent.registry", "actspace.host.subagents"]]);
     expect(rows.get("agent-factory")![1]).toEqual(["actspace.agent.factory", "agent.run-factory", "actspace.host-readable-files"]);
   });
@@ -45,8 +49,8 @@ describe("plugin catalog", () => {
     for (const entry of PLUGIN_CATALOG) expect(entry.module, entry.id).toMatch(/^@actspace\/[a-z-]+\/[a-z-]+$/);
   });
 
-  it("carries Harness behavior config in the manifest (browser-tools and the external subagents have one)", () => {
-    const configs: Record<string, unknown> = { "browser-tools": { disposeHost: false }, "subagent-codex": { approvalPolicy: "never", sandbox: "workspace-write" }, "subagent-claude-code": { permissionMode: "dontAsk" } };
+  it("carries Harness behavior config in the manifest (context-assembly, browser-tools and the external subagents have one)", () => {
+    const configs: Record<string, unknown> = { "context-assembly": { required: ["system", "conversation"] }, "browser-tools": { disposeHost: false }, "subagent-codex": { approvalPolicy: "never", sandbox: "workspace-write" }, "subagent-claude-code": { permissionMode: "dontAsk" } };
     for (const entry of PLUGIN_CATALOG.filter(item => item.loaders.includes("harness"))) {
       expect(behavior(entry.id).config, entry.id).toEqual(configs[entry.id] ?? {});
     }

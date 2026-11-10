@@ -72,10 +72,6 @@ export function hourOf(time: string): string {
   return Number.isFinite(value) ? new Date(value - (value % 3_600_000)).toISOString().slice(0, 13) : "unknown";
 }
 
-export function clearHarnessSession(db: ProjectionDatabase, sessionId: string): void {
-  prepare(db, `DELETE FROM ${HARNESS_STATE_TABLE} WHERE session_id=?`).run(sessionId);
-}
-
 /**
  * 增量投影一个批次；已处理过的 seq 会被跳过，所以重复投递同一批次是安全的。
  * `inheritedThroughSeq`：分叉 / 侧边对话从父会话复制来的前缀（seq ≤ 它）。这些事件在父会话里执行和记账，
@@ -473,7 +469,7 @@ function entryKind(key: string): string {
 }
 function trim<T>(map: Record<string, T>, limit: number): void {
   const keys = Object.keys(map);
-  for (let index = 0; index < keys.length - limit; index++) delete map[keys[index]!];
+  for (let index = 0; index < keys.length - limit; index++) delete map[keys[index]];
 }
 function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "";

@@ -16,7 +16,7 @@ describe("trajectory projection", () => {
     expect(second.nodes[0]).toBe(first.nodes[0]);
     expect(second.nodes[1]).toMatchObject({ eventSeq: 1, eventType: "assistant/chunk", state: "updated", data: { messageId: "m", delta: "a" } });
     // The node keeps its own copy of the event data.
-    expect(second.nodes[1]!.data).not.toBe(chunk.data);
+    expect(second.nodes[1].data).not.toBe(chunk.data);
     expect(projectTrajectoryWindow("other", window([start])).nodes[0]).toMatchObject({ sessionId: "other", key: "other:0" });
   });
 });

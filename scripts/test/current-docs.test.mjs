@@ -145,6 +145,30 @@ test("current docs must name code paths that exist, unless the line marks them a
   }
 });
 
+test("learnings check code and doc paths without policing claims; placeholders and labelled history are exempt", async () => {
+  const root = await mkdtemp(join(tmpdir(), "actspace-current-docs-"));
+  try {
+    await mkdir(join(root, "docs/learnings/2026-05"), { recursive: true });
+    await mkdir(join(root, "scripts"), { recursive: true });
+    await writeFile(join(root, "scripts", "real.sh"), "");
+    await writeFile(join(root, "docs/learnings/2026-05/lesson.md"), [
+      "Still uses `packages/agent-runtime/src/index.ts`.",
+      "Script: `scripts/real.sh`; gone: `scripts/gone.sh`.",
+      "Spec moved: `docs/design-docs/gone.md`.",
+      "Monthly dirs: `docs/learnings/YYYY-MM/`.",
+      "`packages/shared/src/session.ts`（历史：已移除，现为 `packages/util/shared`）。",
+    ].join("\n"));
+    const failures = await checkMarkdownFiles(root, ["docs/learnings/2026-05/lesson.md"], { checkClaims: false, checkCodePaths: true });
+    assert.deepEqual(failures, [
+      "docs/learnings/2026-05/lesson.md:1: code path does not exist: packages/agent-runtime/src/index.ts",
+      "docs/learnings/2026-05/lesson.md:2: code path does not exist: scripts/gone.sh",
+      "docs/learnings/2026-05/lesson.md:3: code path does not exist: docs/design-docs/gone.md",
+    ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("drifted facts (old event names, schema 9, billingMode, personal paths) need historical labels", async () => {
   const root = await mkdtemp(join(tmpdir(), "actspace-current-docs-"));
   try {

@@ -49,7 +49,7 @@ export function useChatSessionRecord(store: ClientSessionStore, sessionId: strin
     const sameInputs = previous !== null && previous.workspaceRoot === workspaceRoot
       && previous.cell.sessionId === cell.sessionId && previous.cell.snapshot === cell.snapshot && previous.cell.window === cell.window
       && previous.cell.projectionValues === cell.projectionValues && previous.cell.deferredToolCalls === cell.deferredToolCalls;
-    const sessionRecord = sameInputs ? previous!.state.sessionRecord : selectChatSession(cell, workspaceRoot);
+    const sessionRecord = sameInputs ? previous.state.sessionRecord : selectChatSession(cell, workspaceRoot);
     const historyBefore = cell.window?.beforeSeq ?? null;
     const state = previous !== null && previous.state.sessionRecord === sessionRecord && previous.state.historyBefore === historyBefore
       ? previous.state

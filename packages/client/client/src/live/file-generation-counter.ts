@@ -16,7 +16,7 @@ export class FileGenerationCounter {
 
   accept(delta: string): void {
     for (let i = 0; i < delta.length; i++) {
-      const char = delta[i]!;
+      const char = delta[i];
       if (this.inString) {
         if (this.unicode !== undefined) {
           this.unicode += char;

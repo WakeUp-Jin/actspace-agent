@@ -16,7 +16,11 @@ export function DetailHeader({ sessionId, title }: { readonly sessionId: string;
   const item = sessions?.find(session => session.sessionId === sessionId);
   const workspace = workspaceOf(item?.workspaceRoot ?? null, workspaces);
   // 打开着的会话随更新一直记为已读
-  useEffect(() => { if (item) markSeen(item.sessionId, item.updatedAt); }, [item?.sessionId, item?.updatedAt]);
+  const itemSessionId = item?.sessionId;
+  const itemUpdatedAt = item?.updatedAt;
+  useEffect(() => {
+    if (itemSessionId !== undefined && itemUpdatedAt !== undefined) markSeen(itemSessionId, itemUpdatedAt);
+  }, [itemSessionId, itemUpdatedAt]);
   const shown = title?.trim() || item?.metadata.title?.trim() || UNTITLED;
   return (
     <PageHeader

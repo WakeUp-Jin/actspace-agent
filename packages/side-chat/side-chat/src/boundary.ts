@@ -36,7 +36,7 @@ export function resolveSideChatBoundary(events: readonly SessionEventEnvelopeV1[
   // Checked newest first; the idle tail keeps trailing mode or title events.
   const candidates = runningTurnExcluded ? turnEnds : [...turnEnds, events.length - 1];
   for (let index = candidates.length - 1; index >= 0; index--) {
-    const boundarySeq = candidates[index]!;
+    const boundarySeq = candidates[index];
     if (boundarySeq < 0 || !isQuietPrefix(events.slice(0, boundarySeq + 1), registry)) continue;
     const inheritedTurnCount = turnEnds.filter(seq => seq <= boundarySeq).length;
     if (inheritedTurnCount === 0) break;

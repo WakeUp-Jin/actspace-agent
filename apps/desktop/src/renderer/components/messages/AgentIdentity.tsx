@@ -42,8 +42,6 @@ export function AgentAvatar({ identity, size = 32 }: { identity: string; size?: 
 
 const labels: Record<AgentMessage["status"], string> = { running: "运行中", completed: "已完成", failed: "失败", aborted: "已停止" };
 
-export function agentStatusLabel(status: AgentMessage["status"]): string { return labels[status]; }
-
 const spinClass = "animate-spin text-operational motion-reduce:animate-none";
 
 /** 只有图标的状态：运行中转圈（绿色），其余跟随外层文字颜色。 */

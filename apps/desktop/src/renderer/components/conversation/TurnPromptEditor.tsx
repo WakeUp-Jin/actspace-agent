@@ -63,10 +63,12 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
   });
   const onCancelRef = useRef(onCancel);
   onCancelRef.current = onCancel;
+  const attachmentsRef = useRef(attachments);
+  attachmentsRef.current = attachments;
 
-  // 原提问里的图片已经存在会话里：按 artifactId 读出预览。
+  // 原提问里的图片已经存在会话里：按 artifactId 读出预览。只在打开编辑器时读一次，之后附件变化不重读。
   useEffect(() => {
-    const pending = attachments.filter((attachment) => attachment.kind === "image" && !attachment.previewUrl && (attachment.artifactId || attachment.remoteArtifact));
+    const pending = attachmentsRef.current.filter((attachment) => attachment.kind === "image" && !attachment.previewUrl && (attachment.artifactId || attachment.remoteArtifact));
     if (pending.length === 0) return;
     let active = true;
     void Promise.all(pending.map(async (attachment) => {
@@ -79,8 +81,7 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
       setAttachments((current) => current.map((attachment) => previews.has(attachment.id) && !attachment.previewUrl ? { ...attachment, previewUrl: previews.get(attachment.id) } : attachment));
     });
     return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只在打开编辑器时读一次
-  }, [sessionId]);
+  }, [sessionId, setAttachments]);
 
   useLayoutEffect(() => {
     const input = inputRef.current;

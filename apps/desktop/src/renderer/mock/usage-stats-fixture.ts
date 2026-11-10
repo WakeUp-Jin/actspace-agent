@@ -89,7 +89,7 @@ function aggregate(key: string, label: string, providerId: string, seeds: ModelS
 function requestRows(models: ModelSeed[], count: number, now: number): UsageActivityRow[] {
   const random = rng(3);
   return Array.from({ length: count }, (_, index) => {
-    const seed = models[Math.floor(random() * models.length)] ?? MODELS[0]!;
+    const seed = models[Math.floor(random() * models.length)] ?? MODELS[0];
     const total = Math.round(18_000 + random() * 42_000);
     const cacheRead = index % 9 === 0 ? 0 : Math.round(total * (0.7 + random() * 0.15));
     const cacheWrite = index % 9 === 0 ? Math.round(total * 0.82) : index % 4 === 0 ? Math.round(total * 0.06) : 0;

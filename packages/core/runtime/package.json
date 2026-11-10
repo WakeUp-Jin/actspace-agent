@@ -72,6 +72,7 @@
     "@actspace/llm-service": "workspace:*",
     "@actspace/llm-pi-ai": "workspace:*",
     "@actspace/context-engine": "workspace:*",
+    "@actspace/context-assembly": "workspace:*",
     "@actspace/context-system": "workspace:*",
     "@actspace/context-background-tasks": "workspace:*",
     "@actspace/context-runtime": "workspace:*",
@@ -115,9 +116,9 @@
     "@actspace/subagent-claude-code": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.0.3",
-    "typescript": "^5.8.3",
-    "vitest": "^4.1.12",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
     "esbuild": "0.28.2",
     "@actspace/session-storage": "workspace:*"
   }

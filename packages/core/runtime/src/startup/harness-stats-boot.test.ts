@@ -16,7 +16,7 @@ async function bootAndStop(options: { readonly harnessStats?: boolean } = {}): P
   const host = { hostKind: "cli-run" as const, capabilityCeiling: ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const, runtimeContract: "actspace.runtime.v2" as const, invocationId: "test" };
   const composition = createProfileComposition(RUNTIME_PROFILE_IDS.headless, host);
   const env = { workspaceRoot: root, hostCapabilities: new Set<string>(host.capabilityCeiling), capabilitySet: { ids: host.capabilityCeiling, has: () => true, get: <T>() => ({}) as T }, createArtifact: async () => { throw new Error("unused"); } };
-  const ports = Object.fromEntries(["filesystem-read", "filesystem-search", "filesystem-write", "shell-tools", "web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }]));
+  const ports = Object.fromEntries(["web-tools", "image-generation", "image-inspection"].map(id => [`actspace.host.tools.${id}`, { createPorts: () => ({}) }]));
   const profile = await bootProfileRuntime({ host, dataRoot: root, toolEnvironment: env, composition,
     hostServices: createRuntimeHostServices({ descriptor: host, dataRoot: root, workspaceRoot: root, toolEnvironment: env, services: {
       ...ports, "actspace.host.llm": { credentials: { resolve: async () => ({}) }, routes: [{ routeId: "test", providerId: "test", modelPattern: "*", credentialRef: "test", defaults: {}, adapter: { adapterVersion: "test", dispatch: async () => { throw new Error("No model calls in this test."); } } }] },
@@ -35,7 +35,7 @@ it("writes the Harness inventory and tool owners to <dataRoot>/harness-stats whe
     const files = await readdir(join(root, "harness-stats"));
     expect(files).toHaveLength(1);
     expect(files[0]).toMatch(/^\d{4}-\d{2}\.jsonl$/);
-    const lines = (await readFile(join(root, "harness-stats", files[0]!), "utf8")).trimEnd().split("\n").map(line => JSON.parse(line) as { t: string; plugin?: string; tool?: string; revision?: string; source?: string; ok?: boolean });
+    const lines = (await readFile(join(root, "harness-stats", files[0]), "utf8")).trimEnd().split("\n").map(line => JSON.parse(line) as { t: string; plugin?: string; tool?: string; revision?: string; source?: string; ok?: boolean });
     const inventory = lines.filter(line => line.t === "inventory");
     expect(inventory.length).toBeGreaterThan(5);
     expect(inventory.every(line => line.revision === "main@1" && line.ok === true)).toBe(true);

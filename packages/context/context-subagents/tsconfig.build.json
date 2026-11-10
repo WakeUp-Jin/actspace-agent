@@ -7,6 +7,9 @@
   },
   "references": [
     {
+      "path": "./../context-assembly/tsconfig.build.json"
+    },
+    {
       "path": "./../context-engine/tsconfig.build.json"
     },
     {

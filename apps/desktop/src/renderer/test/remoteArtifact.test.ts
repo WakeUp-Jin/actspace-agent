@@ -10,7 +10,7 @@ it("previews remote text without invoking local file APIs or enabling HTML", asy
   expect(await openRemoteFile(key, "result.html", open)).toBe(true);
   expect(call).toHaveBeenCalledWith({ hostId: "host", method: "files.reference", params: { sessionId: "session", path: "result.html" } });
   expect(open).toHaveBeenCalledWith(expect.objectContaining({ kind: "text", content: "<script>unsafe()</script>" }));
-  expect(open.mock.calls[0]![0]).not.toHaveProperty("relativePath");
+  expect(open.mock.calls[0][0]).not.toHaveProperty("relativePath");
   expect(localRead).not.toHaveBeenCalled();
 });
 it("downloads remote binary through its authenticated Session identity", async () => {

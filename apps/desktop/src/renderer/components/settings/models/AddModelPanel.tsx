@@ -43,9 +43,10 @@ export function AddModelPanel({ connectionId, onAdd, onCancel }: { connectionId:
 
   // 变体（例如带日期后缀）：自动按最接近的目录模型填。
   const near = preview && !preview.effective.aliased && preview.effective.catalog && !preview.effective.catalog.exact ? preview.effective.catalog : null;
+  const nearApiModel = near?.apiModel;
   useEffect(() => {
-    if (near && !noAlias && !overrides?.canonical) setOverrides((current) => ({ ...(current ?? {}), canonical: near.apiModel }));
-  }, [near?.apiModel, noAlias, overrides?.canonical]);
+    if (nearApiModel !== undefined && !noAlias && !overrides?.canonical) setOverrides((current) => ({ ...(current ?? {}), canonical: nearApiModel }));
+  }, [nearApiModel, noAlias, overrides?.canonical]);
 
   const changeId = (next: string) => {
     setApiModel(next);

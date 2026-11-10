@@ -2,7 +2,7 @@
 
 > 管流式回复时，聊天区 Markdown 多久重新解析一次尾部、两次解析之间怎样显示新到的字、解析器怎样复用。现行渲染规则见[聊天区 Markdown 渲染规范](front-聊天区Markdown渲染规范.md)，本文只改该规范的 §2「架构」和 §6「分块与性能」，§5 的流式视觉效果不变。
 
-状态：已实现（执行计划 [20261107-markdown-stream-throttle](../../exec-plans/completed/20261107-markdown-stream-throttle.md)）。实机观感待用户在 Electron 里确认。
+状态：已实现（执行计划 [20261107-markdown-stream-throttle](../../exec-plans/completed/20261107-markdown-stream-throttle.md)）；实测效果见[性能待办](../../exec-plans/perf-backlog.md)「已完成」。
 
 ## 1. 为什么改
 

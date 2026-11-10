@@ -49,10 +49,10 @@ function permissionContract(): ToolPermissionContract {
 }
 type DefinitionEntry = { readonly localName: ToolName; readonly definition: ToolDefinition };
 export const TOOL_DEFINITIONS: readonly DefinitionEntry[] = Object.freeze([
-  definition("inspect_image", "Inspect an image artifact already owned by this Session and answer a specific visual question.", ["network"] as const, "read-only", objectSchema({ artifact_id: stringSchema("Session-owned image artifact id."), question: stringSchema("Specific visual question.") }, ["artifact_id", "question"])),
+  definition("inspect_image", ["plan", "agent"], "Inspect an image artifact already owned by this Session and answer a specific visual question.", ["network"] as const, "read-only", objectSchema({ artifact_id: stringSchema("Session-owned image artifact id."), question: stringSchema("Specific visual question.") }, ["artifact_id", "question"])),
 ]);
-function definition(localName: ToolName, description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
-  return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: IMAGE_INSPECTION_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
+function definition(localName: ToolName, modes: ToolDefinition["modes"], description: string, capabilities: readonly string[], concurrency: ToolDefinition["concurrency"], inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = []): DefinitionEntry {
+  return Object.freeze({ localName, definition: Object.freeze({ abiVersion: 2, pluginId: IMAGE_INSPECTION_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: capabilities.map((capabilityId) => ({ capabilityId, mode: capabilityId === "filesystem.write" ? "write" as const : capabilityId === "process" ? "execute" as const : "use" as const, resourceScope: "workspace" })), modes, concurrency, sensitiveArgumentPaths, resultSchemaVersion: 1 }) });
 }
 function objectSchema(properties: Readonly<Record<string, unknown>>, required: readonly string[]) { return Object.freeze({ type: "object", properties, required, additionalProperties: false }); }
 function stringSchema(description: string) { return Object.freeze({ type: "string", description, minLength: 1 }); }

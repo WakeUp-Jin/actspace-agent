@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TaskSnapshot } from "@actspace/shared/runtime-v2";
 import { createBoundedSet, createLiveRunStore, TERMINAL_RUN_LIMIT } from "../session/live-runs/live-run-store";
-import { createEmptyStreamingState, type SessionRunState } from "../session/session-run-state";
+import { createEmptyStreamingState, type SessionRunState } from "@actspace/client/live";
 import { applyTaskSnapshot, createTaskQueueStore } from "../session/task-queue";
 
 // 14 T16：live run 与任务队列缓存从 App 迁出后的行为。

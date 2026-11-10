@@ -18,9 +18,9 @@ describe("package-level Plugin ABI", () => {
   it("validates a JSON-safe trusted static manifest", () => expect(validatePluginManifest(manifest()).pluginId).toBe("example.plugin"));
   it("fails closed for URL sources, plaintext secrets and duplicate entries", () => {
     expect(() => validatePluginManifest(manifest({ source: { kind: "local-path", reference: "https://example.test/plugin" } }))).toThrow("untrusted source");
-    expect(() => validatePluginManifest(manifest({ behaviors: [{ ...manifest().behaviors[0]!, config: { apiKey: "secret" } }] }))).toThrow("credentialRef");
-    expect(() => validatePluginManifest(manifest({ behaviors: [manifest().behaviors[0]!, manifest().behaviors[0]!] }))).toThrow("Duplicate Entry");
-    expect(() => validatePluginManifest(manifest({ behaviors: [{ ...manifest().behaviors[0]!, injects: [serviceId("store")], optionalInjects: [serviceId("store")] }] }))).toThrow("repeats inject");
-    expect(() => validatePluginManifest(manifest({ behaviors: [{ ...manifest().behaviors[0]!, optionalInjects: ["Not A Service" as never] }] }))).toThrow();
+    expect(() => validatePluginManifest(manifest({ behaviors: [{ ...manifest().behaviors[0], config: { apiKey: "secret" } }] }))).toThrow("credentialRef");
+    expect(() => validatePluginManifest(manifest({ behaviors: [manifest().behaviors[0], manifest().behaviors[0]] }))).toThrow("Duplicate Entry");
+    expect(() => validatePluginManifest(manifest({ behaviors: [{ ...manifest().behaviors[0], injects: [serviceId("store")], optionalInjects: [serviceId("store")] }] }))).toThrow("repeats inject");
+    expect(() => validatePluginManifest(manifest({ behaviors: [{ ...manifest().behaviors[0], optionalInjects: ["Not A Service" as never] }] }))).toThrow();
   });
 });

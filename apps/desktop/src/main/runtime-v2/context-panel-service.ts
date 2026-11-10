@@ -126,9 +126,9 @@ export class ContextPanelService {
     const text = await this.runtime.readContextEntryText(input.sessionId, projection.identity.logicalAgentScopeId, input.key, projection.contextRevision, projection.instanceGeneration ?? "legacy");
     if (text === null) throw new Error("Context entry text unavailable.");
     const bytes = Buffer.from(text); const offset = input.offset ?? 0;
-    if (!Number.isSafeInteger(offset) || offset < 0 || offset > bytes.length || (offset < bytes.length && (bytes[offset]! & 0xc0) === 0x80)) throw new Error("Invalid Context text offset.");
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > bytes.length || (offset < bytes.length && (bytes[offset] & 0xc0) === 0x80)) throw new Error("Invalid Context text offset.");
     let end = Math.min(bytes.length, offset + 64 * 1024);
-    while (end < bytes.length && (bytes[end]! & 0xc0) === 0x80) end--;
+    while (end < bytes.length && (bytes[end] & 0xc0) === 0x80) end--;
     return { revision: input.revision, key: input.key, text: bytes.subarray(offset, end).toString("utf8"), ...(end < bytes.length ? { nextOffset: end } : {}) };
   }
   async #current(id: string, revision: string): Promise<Current> {

@@ -59,7 +59,7 @@ describe("useContextPaths", () => {
     hook.rerender({ enabled: true });
     await waitFor(() => expect(hook.result.current.list?.loaded).toBe(true));
     expect(handler).toHaveBeenCalledTimes(1);
-    expect(handler.mock.calls[0]![0]).toMatchObject({ sessionId: SESSION, revision: "r1", visibility: "active" });
+    expect(handler.mock.calls[0][0]).toMatchObject({ sessionId: SESSION, revision: "r1", visibility: "active" });
     expect(hook.result.current.list?.total).toBe(READY.status === "ready" ? READY.activeCount : 0);
   });
 
@@ -78,7 +78,7 @@ describe("useContextPaths", () => {
     const handler = vi.fn(async (input: ContextPathsInput) => {
       const page = mockContextPathsPage(PATHS, input);
       // 第二页带回一条第一页已有的路径，应当被去掉。
-      return input.cursor ? { ...page, paths: [PATHS.paths.filter(path => path.visibility === "active")[0]!, ...page.paths] } : page;
+      return input.cursor ? { ...page, paths: [PATHS.paths.filter(path => path.visibility === "active")[0], ...page.paths] } : page;
     });
     setupBridge({ "sessions.listContextPaths": handler });
     const hook = renderHook(() => useContextPaths({ sessionId: SESSION, disclosure: READY, visibility: "active", enabled: true, onStale: () => {} }));
@@ -156,11 +156,11 @@ describe("ContextPaths", () => {
     renderCard();
     const card = screen.getByRole("region", { name: "路径" });
     await userEvent.click(within(card).getByRole("button", { name: /显示活跃路径/ }));
-    const first = (await within(card).findAllByRole("listitem"))[0]!;
-    await userEvent.click(within(first).getAllByRole("button")[0]!);
+    const first = (await within(card).findAllByRole("listitem"))[0];
+    await userEvent.click(within(first).getAllByRole("button")[0]);
     expect(within(first).getByText("本周期读取")).toBeInTheDocument();
     const calls = handler.mock.calls.length;
-    await userEvent.click(within(first).getAllByRole("button", { name: "复制完整路径" })[1]!);
+    await userEvent.click(within(first).getAllByRole("button", { name: "复制完整路径" })[1]);
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining(MOCK_WORKSPACE_ROOT));
     expect(handler).toHaveBeenCalledTimes(calls);
   });

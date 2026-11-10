@@ -35,7 +35,7 @@ describe("trajectory runtime builder", () => {
     index.update(deriveLayout(result).cells);
     const matches = index.search("read_file README");
     expect(matches?.size).toBe(1);
-    const detail = buildTrajectoryDetail(result, [...matches!][0]!);
+    const detail = buildTrajectoryDetail(result, [...matches!][0]);
     expect(detail?.sourceNodes.map(node => node.eventSeq)).toEqual([5, 6, 7, 8]);
   });
 
@@ -70,12 +70,12 @@ describe("trajectory runtime builder", () => {
   });
 
   it("projects prompt and tool record changes as SYSTEM records only", () => {
-    const at = (seq: number, eventType: string, data: Record<string, RuntimeV2JsonValue>) => ({ ...snapshot.nodes[1]!, key: `s:${seq}`, eventSeq: seq, eventType, kind: "request" as const, data });
+    const at = (seq: number, eventType: string, data: Record<string, RuntimeV2JsonValue>) => ({ ...snapshot.nodes[1], key: `s:${seq}`, eventSeq: seq, eventType, kind: "request" as const, data });
     const prompt = (requestId: string, content: string) => ({ turnId: "t1", stepId: "st1", requestId, digest: content, sections: [{ id: "model-prompt", owner: "actspace.context-system", order: 0, content }], modelFacts: [], contributorProvenance: [] });
     const context = (requestId: string) => ({ turnId: "t1", stepId: "st1", requestId, snapshot: { schemaVersion: 3, requestOptions: { model: "same" } } });
     const nodes = [
-      snapshot.nodes[0]!,
-      snapshot.nodes[1]!,
+      snapshot.nodes[0],
+      snapshot.nodes[1],
       at(10, "request/system-prompt", prompt("r1", "initial")),
       at(11, "request/tools", { turnId: "t1", stepId: "st1", requestId: "r1", digest: "t", tools: [{ name: "read_file", description: "Read" }] }),
       at(12, "request/context", context("r1")),
@@ -91,7 +91,7 @@ describe("trajectory runtime builder", () => {
   });
 
   it("keeps the system row and tool schema when the history window starts after the prompt records", () => {
-    const at = (seq: number, eventType: string, data: Record<string, RuntimeV2JsonValue>) => ({ ...snapshot.nodes[1]!, key: `s:${seq}`, eventSeq: seq, eventType, kind: "other" as const, callId: typeof data.callId === "string" ? data.callId : null, data });
+    const at = (seq: number, eventType: string, data: Record<string, RuntimeV2JsonValue>) => ({ ...snapshot.nodes[1], key: `s:${seq}`, eventSeq: seq, eventType, kind: "other" as const, callId: typeof data.callId === "string" ? data.callId : null, data });
     const ids = { turnId: "t9", stepId: "st9", requestId: "r9" };
     const nodes = [
       // session-controller 把窗口起点（seq 40）之前最近的提示词与工具记录补进窗口。
@@ -126,10 +126,10 @@ describe("trajectory runtime builder", () => {
   });
   it("projects task notifications and context supplements as CONTEXT records with their source", () => {
     const nodes = [
-      snapshot.nodes[0]!,
-      { ...snapshot.nodes[1]!, key: "s:20", eventSeq: 20, eventType: "agent/inbox/spliced", kind: "user" as const, data: { operation: "claim", messageId: "n1", target: "current-turn", source: "task_notification", content: [{ type: "text", text: "后台任务完成" }, { type: "runtime-context", context: { agentMode: "agent" } }] }, surface: { kind: "append" } },
-      { ...snapshot.nodes[1]!, key: "s:21", eventSeq: 21, eventType: "plugin/actspace.context/supplement", kind: "other" as const, data: { op: "add", id: "runtime-state", owner: "actspace.context-runtime", text: "当前目录 /tmp", afterEventSeq: 20, lifetime: "turn", turnId: "t1" } },
-      { ...snapshot.nodes[1]!, key: "s:22", eventSeq: 22, eventType: "plugin/actspace.context/supplement", kind: "other" as const, data: { op: "remove", id: "runtime-state", owner: "actspace.context-runtime" } },
+      snapshot.nodes[0],
+      { ...snapshot.nodes[1], key: "s:20", eventSeq: 20, eventType: "agent/inbox/spliced", kind: "user" as const, data: { operation: "claim", messageId: "n1", target: "current-turn", source: "task_notification", content: [{ type: "text", text: "后台任务完成" }, { type: "runtime-context", context: { agentMode: "agent" } }] }, surface: { kind: "append" } },
+      { ...snapshot.nodes[1], key: "s:21", eventSeq: 21, eventType: "plugin/actspace.context/supplement", kind: "other" as const, data: { op: "add", id: "runtime-state", owner: "actspace.context-runtime", text: "当前目录 /tmp", afterEventSeq: 20, lifetime: "turn", turnId: "t1" } },
+      { ...snapshot.nodes[1], key: "s:22", eventSeq: 22, eventType: "plugin/actspace.context/supplement", kind: "other" as const, data: { op: "remove", id: "runtime-state", owner: "actspace.context-runtime" } },
     ] as RuntimeV2TrajectorySnapshot["nodes"];
     const result = buildTrajectorySnapshot({ ...snapshot, nodes });
     const contexts = result.records.filter(record => record.kind === "context");
@@ -141,9 +141,9 @@ describe("trajectory runtime builder", () => {
   });
 
   it("keeps streamed tool arguments out of the message text and reuses the request identity", () => {
-    const chunk = (seq: number, data: Record<string, string>) => ({ ...snapshot.nodes[2]!, key: `s:${seq}`, eventSeq: seq, data: { turnId: "t1", stepId: "st1", requestId: "r1", ...data } });
+    const chunk = (seq: number, data: Record<string, string>) => ({ ...snapshot.nodes[2], key: `s:${seq}`, eventSeq: seq, data: { turnId: "t1", stepId: "st1", requestId: "r1", ...data } });
     const streaming = [
-      snapshot.nodes[0]!,
+      snapshot.nodes[0],
       chunk(2, { kind: "text-delta", content: "先读文件" }),
       chunk(3, { kind: "tool-call-delta", content: "{\"path\":", callId: "c9", name: "read_file" }),
       chunk(4, { kind: "tool-call-delta", content: "\"a.md\"}", callId: "c9", name: "read_file" }),
@@ -151,7 +151,7 @@ describe("trajectory runtime builder", () => {
     const partial = buildTrajectorySnapshot({ ...snapshot, nodes: streaming }).partial!;
     expect(partial.summary).toBe("先读文件");
     expect(partial.sourceBlocks?.find(block => block.type === "tool-call")).toMatchObject({ callId: "c9", toolName: "read_file", content: "{\"path\":\"a.md\"}" });
-    const final = { ...snapshot.nodes[4]!, key: "s:5", eventSeq: 5, data: { turnId: "t1", stepId: "st1", requestId: "r1", messageId: "m9", finishReason: "failed", content: [] } };
+    const final = { ...snapshot.nodes[4], key: "s:5", eventSeq: 5, data: { turnId: "t1", stepId: "st1", requestId: "r1", messageId: "m9", finishReason: "failed", content: [] } };
     const done = buildTrajectorySnapshot({ ...snapshot, nodes: [...streaming, final] as RuntimeV2TrajectorySnapshot["nodes"] });
     expect(done.records.find(record => record.kind === "assistant")?.id).toBe(partial.id);
   });

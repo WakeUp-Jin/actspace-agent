@@ -16,7 +16,7 @@
 - `packages/fs/tool-fs-read/`、`packages/fs/tool-fs-search/`、`packages/fs/tool-fs-write/`、`packages/shell/tool-shell/`、`packages/web/tool-web/`、`packages/image/tool-image-generation/`、`packages/image/tool-image-inspection/`：文件、Bash、Web、图片等 concrete capability；
 - `packages/approval/approval/`：Host-neutral ApprovalBroker 契约；
 - `apps/desktop/src/main/runtime-v2/approval-broker.ts`：Desktop 审批适配；
-- `apps/cli/src/runtime-v2/approval.ts`：CLI 交互式和非交互式审批适配。
+- `apps/cli/src/runtime-v2/approval.ts`：CLI 审批适配。CLI 没有交互式审批面（stdin 整段作为提示词读完即关闭），需要审批时直接拒绝并在结果里报告 `APPROVAL_REQUIRED`。
 
 ## 执行顺序
 

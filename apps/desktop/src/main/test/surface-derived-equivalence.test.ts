@@ -38,8 +38,8 @@ it("derives the same conversation, model request, transcript, estimate and chat 
 
   const journal = project(header, events);
   const surface = journal.surface;
-  // 1) 折叠出的对话。
-  expect(JSON.parse(JSON.stringify(surface.entries))).toEqual(expected.entries);
+  // 1) 折叠出的对话。条目上的 compactionId 是 1a300840 之后才记的，不进 messages 与投影规则，golden 里没有。
+  expect(JSON.parse(JSON.stringify(surface.entries, (key, value) => key === "compactionId" ? undefined : value))).toEqual(expected.entries);
 
   // 2) 上下文引擎发给模型的 messages。
   const request = { sessionId: header.sessionId, requestId: "golden", routeId: "default", model: "golden", options: {} };

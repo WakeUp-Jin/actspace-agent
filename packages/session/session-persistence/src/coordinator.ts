@@ -17,7 +17,7 @@ export class SessionPersistenceCoordinator {
     seed: readonly SessionEventEnvelopeV1[],
     reportBackgroundFailure: (error: unknown) => void = () => undefined,
   ) {
-    this.#durableSeq = seed.length === 0 ? -1 : seed[seed.length - 1]!.seq;
+    this.#durableSeq = seed.length === 0 ? -1 : seed[seed.length - 1].seq;
     this.#writes = new SessionWriteBehind({
       write: async (events) => {
         await this.driver.append(events);

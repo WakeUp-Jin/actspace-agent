@@ -36,12 +36,11 @@
     "@actspace/composition": "workspace:*",
     "@actspace/bundle": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*",
-    "@actspace/session-persistence": "workspace:*",
     "@actspace/session-persistence-jsonl": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.0.3",
-    "typescript": "^5.8.3",
-    "vitest": "^4.1.12"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

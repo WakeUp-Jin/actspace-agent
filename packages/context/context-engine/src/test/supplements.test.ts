@@ -14,7 +14,7 @@ it("puts an anchored supplement after all results in a multi-call batch", async 
   const engine = new ContextEngine({ resolve: () => context });
   const input = await engine.toLlmInput(context);
   expect(input.messages.map(message => message.role)).toEqual(["assistant", "tool", "tool", "user", "user"]);
-  expect(input.messages[3]!.content).toContain('owner="runtime"');
-  expect(input.messages[4]!.content).toBe("next");
+  expect(input.messages[3].content).toContain('owner="runtime"');
+  expect(input.messages[4].content).toBe("next");
   expect(context.content.conversation.entries).toHaveLength(4);
 });

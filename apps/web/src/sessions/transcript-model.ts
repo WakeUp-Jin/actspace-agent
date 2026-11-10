@@ -66,7 +66,7 @@ export function exploreSummary(blocks: readonly ExploreBlock[]): { files: number
 /** 工具块的 callId：durable 的 renderKey 和 live 的 id 都是 `turn:<run>:tool:<callId>`。 */
 export function blockCallId(block: MessageBlock): string | null {
   const match = /:tool:(.+)$/.exec(blockKey(block));
-  return match ? match[1]! : null;
+  return match ? match[1] : null;
 }
 
 export function itemBlocks(item: TranscriptItem): readonly MessageBlock[] { return item.type === "block" ? [item.block] : item.blocks; }

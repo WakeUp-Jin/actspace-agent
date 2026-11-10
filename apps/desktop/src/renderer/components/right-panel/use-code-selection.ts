@@ -74,11 +74,12 @@ export function useCodeSelection(
   useLayoutEffect(() => {
     const root = scrollRef.current;
     return () => {
-      stopDrag();
+      if (drag.current) cancelAnimationFrame(drag.current.frame);
+      drag.current = null;
       const selection = root?.ownerDocument.getSelection();
       if (selection?.anchorNode && root?.contains(selection.anchorNode)) selection.removeAllRanges();
     };
-  }, [source]);
+  }, [source, scrollRef]);
 
   return {
     onPointerDown(event: PointerEvent<HTMLDivElement>) {

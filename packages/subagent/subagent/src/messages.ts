@@ -1,3 +1,4 @@
+import { trimTrailing } from "@actspace/shared";
 import { SUBAGENT_RESULT_LIMIT_BYTES, type SubagentActivationStatus } from "@actspace/shared/runtime-v2";
 
 /**
@@ -187,7 +188,7 @@ export function truncateUtf8(text: string, limitBytes = SUBAGENT_RESULT_LIMIT_BY
   const bytes = Buffer.from(text, "utf8");
   if (bytes.length <= limitBytes) return { text, truncated: false };
   let end = limitBytes;
-  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end -= 1;
+  while (end > 0 && (bytes[end] & 0xc0) === 0x80) end -= 1;
   return { text: bytes.subarray(0, end).toString("utf8"), truncated: true };
 }
 
@@ -198,9 +199,9 @@ function resultBody(text: string, truncated: boolean): string {
 /** One sentence of an error message, without its own final period (the template adds one). */
 function sentence(error: string | undefined): string {
   const line = (error ?? "").split("\n").map(value => value.trim()).find(Boolean) ?? "unknown error";
-  return line.replace(/[.。]+$/u, "");
+  return trimTrailing(line, ".。");
 }
 
 function escapeXml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

@@ -44,11 +44,15 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
   const [stopError, setStopError] = useState<string>();
   // 运行中的耗时用 Date.now() 现算；列表没变化时不 setState，所以靠这个每秒一次的计数让耗时继续走。
   const [, setTick] = useState(0);
+  // revision 每次点击递增：同一个 agentId 再点一次也要重新定位。
+  const focusRevision = focus?.revision;
+  const focusAgentId = focus?.agentId;
+  const focusView = focus?.view;
   useEffect(() => {
-    if (!focus) return;
-    setPendingAgent(focus.agentId);
-    setView(focus.view);
-  }, [focus?.revision]);
+    if (focusAgentId === undefined || focusView === undefined) return;
+    setPendingAgent(focusAgentId);
+    setView(focusView);
+  }, [focusRevision, focusAgentId, focusView]);
   useEffect(() => {
     if (!pendingAgent || !loaded) return;
     const found = agents.some((item) => item.agentId === pendingAgent);

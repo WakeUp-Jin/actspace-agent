@@ -49,8 +49,6 @@ export const SETTINGS_GROUPS: { label: string; sections: { id: SettingsSectionId
   },
 ];
 
-export const SETTINGS_SECTIONS = SETTINGS_GROUPS.flatMap((group) => group.sections);
-
 const NAV_GROUP_LABEL_CLASS = "px-2.5 pb-1 pt-3.5 text-act-xxs font-medium text-text-faint first:pt-1 max-[820px]:hidden";
 
 const NAV_ITEM_CLASS =

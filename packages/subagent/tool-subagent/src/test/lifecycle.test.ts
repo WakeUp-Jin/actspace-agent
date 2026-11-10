@@ -16,13 +16,13 @@ function setup() {
     workspaceRoot: "/workspace", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw Error("unused"); } },
     journal: { recordDispatch: async () => {}, checkpointBeforeBody: async () => {}, commitResult: async () => {} }, createArtifact: async () => { throw Error("unused"); },
   };
-  const run = async (name: string, args: unknown) => (await tools.executeBatch([{ name, callId: `${name}-1`, arguments: args, sessionId: "s", agentRunId: "r", turnId: "t", stepId: "step" }], env))[0]!;
+  const run = async (name: string, args: unknown) => (await tools.executeBatch([{ name, callId: `${name}-1`, arguments: args, sessionId: "s", agentRunId: "r", turnId: "t", stepId: "step" }], env))[0];
   return { provided, run, calls, tools, cleanup: () => cleanup!() };
 }
 
 describe("subagent tools plugin lifecycle", () => {
   it("declares the Entry and the injects it consumes", () => {
-    const behavior = manifest.behaviors[0]!;
+    const behavior = manifest.behaviors[0];
     expect(behavior.entryId).toBe("subagent-tools");
     expect([...(behavior.injects ?? [])]).toEqual(inject);
   });

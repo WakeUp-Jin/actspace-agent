@@ -85,16 +85,16 @@ describe("useSlashMenu", () => {
   it("moves the highlight back to the first result when the results change", () => {
     const { result, rerender } = renderSlash();
     act(() => result.current.move(1));
-    expect(functionIds([result.current.active!])).toEqual(["agent"]);
+    expect(functionIds([result.current.active])).toEqual(["agent"]);
 
     rerender({ skills: [skill("lint")] });
 
-    expect(functionIds([result.current.active!])).toEqual(["plan"]);
+    expect(functionIds([result.current.active])).toEqual(["plan"]);
   });
 
   it("follows the pointer when hovering a result", () => {
     const { result } = renderSlash();
-    const third = result.current.results[2]!;
+    const third = result.current.results[2];
 
     act(() => result.current.highlight(third));
 

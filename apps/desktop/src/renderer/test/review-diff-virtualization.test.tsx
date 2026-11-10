@@ -64,7 +64,7 @@ describe("Review diff virtualization", () => {
     const code = await waitFor(() => {
       const element = container.querySelector("code");
       expect(element).not.toBeNull();
-      return element!;
+      return element;
     });
 
     expect(canvas).toHaveClass("overflow-auto");
@@ -83,7 +83,7 @@ describe("Review diff virtualization", () => {
     const code = await waitFor(() => {
       const element = container.querySelector("code");
       expect(element).not.toBeNull();
-      return element!;
+      return element;
     });
 
     expect(content?.dataset.reviewContentWidth).toBe("100%");

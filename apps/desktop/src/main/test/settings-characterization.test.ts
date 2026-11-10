@@ -32,9 +32,9 @@ const ENV_KEYS = [
 type JsonWriter = NonNullable<SettingsServiceOptions["writeJson"]>;
 
 const fixtureCrypto: SecretCrypto = {
-  isAvailable: () => true,
-  encrypt: (plain) => Buffer.from(`enc:${plain}`, "utf8"),
-  decrypt: (cipher) => {
+  isAvailable: async () => true,
+  encrypt: async (plain) => Buffer.from(`enc:${plain}`, "utf8"),
+  decrypt: async (cipher) => {
     const text = cipher.toString("utf8");
     if (!text.startsWith("enc:")) throw new Error("not encrypted by the fixture crypto");
     return text.slice("enc:".length);
@@ -262,14 +262,15 @@ describe("legacy v1 secrets", () => {
       tavily: "legacy-tavily-key",
     });
     expect(tree["secrets.json mode"]).toBe("600");
-    expect(process.env.TAVILY_API_KEY).toBe("legacy-tavily-key");
+    // 凭据不再进 env：搜索 Key 由 getToolEnvironment() 直接注给工具端口。
+    expect(process.env.TAVILY_API_KEY).toBeUndefined();
     expect(process.env.DEEPSEEK_API_KEY).toBeUndefined();
   });
 
   it.each([
-    ["crypto is unavailable", { ...fixtureCrypto, isAvailable: () => false }],
-    ["decryption throws", { ...fixtureCrypto, decrypt: () => { throw new Error("keychain locked"); } }],
-    ["decryption returns an empty string", { ...fixtureCrypto, decrypt: () => "" }],
+    ["crypto is unavailable", { ...fixtureCrypto, isAvailable: async () => false }],
+    ["decryption throws", { ...fixtureCrypto, decrypt: async () => { throw new Error("keychain locked"); } }],
+    ["decryption returns an empty string", { ...fixtureCrypto, decrypt: async () => "" }],
   ])("keeps the legacy file untouched and blocks credential edits when %s", async (_label, crypto: SecretCrypto) => {
     const root = await makeRoot({ "secrets.json": "secrets-v1-legacy.json" });
     const raw = await readFile(join(root, "secrets.json"), "utf8");
@@ -379,7 +380,7 @@ describe("rollback when settings.json fails after secrets.json was written", () 
   });
 
   it("stops restoring secrets.json when restoring settings.json also fails (best effort)", async () => {
-    const testCase = ROLLBACK_CASES[0]!;
+    const testCase = ROLLBACK_CASES[0];
     const { root, writer, service, before } = await seeded(testCase);
     writer.failOn(2, "after");
     writer.failOn(3, "after");
@@ -471,9 +472,11 @@ describe("applyToEnv", () => {
     process.env.DEEPSEEK_API_KEY = "stale-deepseek";
     process.env.KIMI_API_KEY = "stale-kimi";
     process.env.EXA_API_KEY = "stale-exa";
+    process.env.TAVILY_API_KEY = "stale-tavily";
     const reloadEnv = vi.fn(() => {
-      // reloadEnv 在所有键写完之后调用。
-      expect(process.env.TAVILY_API_KEY).toBe("stored-tavily-key");
+      // reloadEnv 在所有键写完之后调用；凭据键只清不写。
+      expect(process.env.TAVILY_API_KEY).toBeUndefined();
+      expect(process.env.LLM_TEMPERATURE).toBe("1.2");
     });
     const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto, reloadEnv });
     await service.load();
@@ -482,8 +485,8 @@ describe("applyToEnv", () => {
     expect(envSnapshot()).toEqual({
       DEEPSEEK_API_KEY: undefined,
       KIMI_API_KEY: undefined,
-      ZHIPU_API_KEY: "stored-zhipu-key",
-      TAVILY_API_KEY: "stored-tavily-key",
+      ZHIPU_API_KEY: undefined,
+      TAVILY_API_KEY: undefined,
       TINYFISH_API_KEY: undefined,
       EXA_API_KEY: undefined,
       IMAGE_GENERATION_BASE_URL: "https://images.example/v4",
@@ -544,7 +547,7 @@ describe("applyToEnv", () => {
       ["setProviderKey(speech-minimax)", 0],
       ["writeAgentSystemPrompt", 0],
     ]);
-    expect(env["setProviderKey(tavily)"]).toEqual({ TAVILY_API_KEY: "tavily-key", LLM_TEMPERATURE: "1.2", IMAGE_GENERATION_MODEL: "m5" });
+    expect(env["setProviderKey(tavily)"]).toEqual({ TAVILY_API_KEY: undefined, LLM_TEMPERATURE: "1.2", IMAGE_GENERATION_MODEL: "m5" });
     expect(env["clearProviderKey(tavily)"]?.TAVILY_API_KEY).toBeUndefined();
     expect(env.load?.LLM_TEMPERATURE).toBe("1.2");
     // 现有行为：updateV2 把 temperature 清成 null，env 随之删掉；但下一次 updateNamespaceV4 从 v4 文件里的

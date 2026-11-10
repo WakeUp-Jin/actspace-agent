@@ -23,7 +23,7 @@ describe("contextEstimate fold", () => {
       at("request/header", { requestId: "r1", contextWindow: 1000 }), prompt("core prompt"), tools(["read", "write"]),
       supplement({ op: "add", owner: "paths", id: "active", text: "a.ts", lifetime: "persistent", afterEventSeq: -1 }),
       ...nodes.map(node => node.kind === "tool-result"
-        ? at("tool/result", { callId: node.callId!, status: "completed", modelOutput: node.content }, { kind: "append" })
+        ? at("tool/result", { callId: node.callId, status: "completed", modelOutput: node.content }, { kind: "append" })
         : at(`${node.kind}/message`, { messageId: node.messageId, content: node.content }, { kind: "append" })),
     ]);
     // Supplements anchored on the empty conversation disappear once a message lands, like the engine's `retained`.
@@ -110,6 +110,6 @@ describe("contextEstimate fold", () => {
     seq = 0;
     expect(viewContextEstimate(initialContextEstimate())).toMatchObject({ totalEstimatedTokens: 0, contextWindow: null, percentUsed: 0, requestId: null, throughJournalSeq: -1 });
     const state = fold([supplement({ op: "add", owner: "p", id: "x", text: "t", lifetime: "persistent", afterEventSeq: -1 })]);
-    expect(state.supplements[0]!.entry.key).toBe(contextEntryKey("supplement", "p", "x"));
+    expect(state.supplements[0].entry.key).toBe(contextEntryKey("supplement", "p", "x"));
   });
 });

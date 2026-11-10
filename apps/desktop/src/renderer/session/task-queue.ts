@@ -2,10 +2,8 @@ import { isBackgroundWake, taskOperation, type SubmitTaskInput, type TaskContent
 import type { ComposerSendOptions } from "../components/Composer";
 import type { SessionLocalState } from "./session-local-store";
 import { projectTaskQueue, taskAttachments, type QueuedComposerMessage } from "./message-queue";
-import { createEmptyStreamingState } from "./session-run-state";
 import type { LiveRunStore } from "./live-runs/live-run-store";
-import { createCompactionBlock } from "./live-runs/stream-blocks";
-import { upsertCompactionSegment } from "./live-runs/stream-state";
+import { createCompactionBlock, createEmptyStreamingState, upsertCompactionSegment } from "@actspace/client/live";
 
 // Host 任务队列在 renderer 的缓存（14 S6，从 App 的 taskSnapshotsRef / submittedOptionsRef / steerContentRef 迁入）。
 // 每项都记下所属会话，归档 / 移除会话时整体释放。

@@ -13,7 +13,7 @@ import type { ProviderNetworkService } from "../runtime-v2/provider-network-serv
 import { thinkingLevelOptions } from "../runtime-v2/legacy-llm-adapter";
 
 const roots: string[] = [];
-const crypto: SecretCrypto = { isAvailable: () => true, encrypt: (text) => Buffer.from(text), decrypt: (data) => data.toString() };
+const crypto: SecretCrypto = { isAvailable: async () => true, encrypt: async (text) => Buffer.from(text), decrypt: async (data) => data.toString() };
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 
 const entry = (over: Partial<ModelCatalogEntry> & Pick<ModelCatalogEntry, "apiModel" | "sourceProviderId">): ModelCatalogEntry => ({
@@ -57,7 +57,7 @@ it("adds a relay with /models facts that beat the catalog, and user changes that
   expect(probed).toMatchObject({ ok: true, listSource: "provider" });
   // 中转不和目录取交集：目录里没有的模型也列出来。
   expect(probed.models.map((model) => model.apiModel)).toEqual(["claude-sonnet-5", "relay-coder-v2"]);
-  expect(probed.models[0]!.effective).toMatchObject({ contextWindow: 1_000_000, sources: { contextWindow: "provider", maxOutput: "catalog" } });
+  expect(probed.models[0].effective).toMatchObject({ contextWindow: 1_000_000, sources: { contextWindow: "provider", maxOutput: "catalog" } });
 
   const created = await service.create({ ...draft, multiplier: 0.5, resolvedAuth: "bearer", models: probed.models.map((model) => ({ apiModel: model.apiModel, providerFacts: model.providerFacts })) });
   if (!created.ok) throw new Error(created.error.message);
@@ -71,7 +71,7 @@ it("adds a relay with /models facts that beat the catalog, and user changes that
 
   const edited = await service.updateModel({ key: sonnet.key, overrides: { contextWindow: 500_000, rates: { input: 4, output: 20, cacheRead: null, cacheWrite: null } } });
   if (!edited.ok) throw new Error(edited.error.message);
-  const after = edited.view.connections[0]!.models.find((model) => model.key === sonnet.key)!;
+  const after = edited.view.connections[0].models.find((model) => model.key === sonnet.key)!;
   expect(after.overrides).toMatchObject({ contextWindow: 500_000 });
   expect(after.effective).toMatchObject({ contextWindow: 500_000, rates: { input: 4 }, ratesScaled: false, sources: { contextWindow: "user", rates: "user" } });
 
@@ -82,7 +82,7 @@ it("adds a relay with /models facts that beat the catalog, and user changes that
   expect(runtime.resolvePricing(resolved.model, "claude-sonnet-5")).toMatchObject({ rates: { input: 4, output: 20 } });
 
   const reset = await service.updateModel({ key: sonnet.key, overrides: null });
-  expect(reset.ok && reset.view.connections[0]!.models.find((model) => model.key === sonnet.key)!.overrides).toBeNull();
+  expect(reset.ok && reset.view.connections[0].models.find((model) => model.key === sonnet.key)!.overrides).toBeNull();
 });
 
 it("filters an official /models list to the catalog and falls back to catalog models when the list is missing", async () => {
@@ -110,13 +110,13 @@ it("puts the first DeepSeek key on the built-in connection with an empty model l
   if (!first.ok) throw new Error(first.error.message);
   expect(first.connectionId).toBe("deepseek:default");
   expect(settings.getStoredKey("deepseek")).toBe("ds-one");
-  const builtin = first.view.connections[0]!;
+  const builtin = first.view.connections[0];
   expect(builtin).toMatchObject({ templateId: "deepseek", label: "DeepSeek", balance: true, relay: false, defaultBaseUrl: "https://api.deepseek.com" });
   // 新连接从空列表开始：预装的内置模型被清掉，由用户自己挑。
   expect(builtin.models).toEqual([]);
   const added = await service.addModels({ connectionId: "deepseek:default", models: [{ apiModel: "deepseek-flash" }] });
   if (!added.ok) throw new Error(added.error.message);
-  const flash = added.view.connections[0]!.models.find((model) => model.key === "deepseek:deepseek-flash")!;
+  const flash = added.view.connections[0].models.find((model) => model.key === "deepseek:deepseek-flash")!;
   expect(flash).toBeDefined();
   expect(runtime.resolveMainModel("deepseek:deepseek-flash")).toMatchObject({ ok: true, model: { providerRuntime: { apiKey: "ds-one" } } });
 
@@ -125,7 +125,7 @@ it("puts the first DeepSeek key on the built-in connection with an empty model l
   expect(second.connectionId).toMatch(/^deepseek-/);
   const team = second.view.connections.find((item) => item.connectionId === second.connectionId)!;
   expect(team).toMatchObject({ label: "DeepSeek 团队", templateId: "deepseek", balance: true });
-  const teamFlash = team.models[0]!;
+  const teamFlash = team.models[0];
   expect(runtime.resolveMainModel(teamFlash.key)).toMatchObject({ ok: true, model: { providerRuntime: { apiKey: "ds-two", baseUrl: "https://api.deepseek.com" } } });
   await expect(service.getBalance({ connectionId: second.connectionId! })).resolves.toMatchObject({ isConfigured: true });
 
@@ -142,23 +142,23 @@ it("removes models and connections together with their purpose bindings and keys
   const { settings, service } = await fixture({ ok: true, models: [{ id: "relay-a" }, { id: "relay-b" }] });
   const created = await service.create({ templateId: "custom", apiKey: "relay-secret", baseUrl: "https://relay.example/v1", models: [{ apiModel: "relay-a" }, { apiModel: "relay-b" }] });
   if (!created.ok) throw new Error(created.error.message);
-  const [a, b] = created.view.connections[0]!.models;
-  const bound = await service.updatePurposes({ utility: { model: a!.key, thinking: "high" }, vision: { model: b!.key, thinking: null } });
+  const [a, b] = created.view.connections[0].models;
+  const bound = await service.updatePurposes({ utility: { model: a.key, thinking: "high" }, vision: { model: b.key, thinking: null } });
   if (!bound.ok) throw new Error(bound.error.message);
-  expect(bound.view.purposes).toMatchObject({ utility: { model: a!.key, thinking: "high" }, vision: { model: b!.key, thinking: null } });
-  expect(bound.view.connections[0]!.models.find((model) => model.key === a!.key)!.usedBy).toEqual(["utility"]);
+  expect(bound.view.purposes).toMatchObject({ utility: { model: a.key, thinking: "high" }, vision: { model: b.key, thinking: null } });
+  expect(bound.view.connections[0].models.find((model) => model.key === a.key)!.usedBy).toEqual(["utility"]);
   expect(await service.updatePurposes({ vision: { model: "openrouter:missing" as ModelKey, thinking: null } })).toMatchObject({ ok: false, error: { code: "model_missing" } });
 
-  const removed = await service.removeModel({ key: a!.key });
+  const removed = await service.removeModel({ key: a.key });
   if (!removed.ok) throw new Error(removed.error.message);
   expect(removed.view.purposes.utility).toEqual({ model: null, thinking: "high" });
-  expect(settings.getV4().settings.models.definitions[a!.key]).toBeUndefined();
+  expect(settings.getV4().settings.models.definitions[a.key]).toBeUndefined();
 
   const gone = await service.remove({ connectionId: created.connectionId! });
   if (!gone.ok) throw new Error(gone.error.message);
   expect(gone.view.connections).toEqual([]);
   expect(gone.view.purposes.vision.model).toBeNull();
-  expect(settings.getV4().settings.models.installed[b!.key]).toBeUndefined();
+  expect(settings.getV4().settings.models.installed[b.key]).toBeUndefined();
   expect(settings.hasConnectionKey(created.connectionId!, "openrouter")).toBe(false);
 });
 
@@ -173,7 +173,7 @@ it("updates a connection and forgets the tested auth when the address changes", 
   if (!moved.ok) throw new Error(moved.error.message);
   expect(settings.getV4().settings.models.connections[id]).not.toHaveProperty("resolvedAuth");
   expect(moved.view.connections[0]).toMatchObject({ baseUrl: "https://other.example", multiplier: 2, protocol: "openai-completions", lastConnection: { status: "untested" } });
-  expect(settings.getV4().settings.models.definitions[moved.view.connections[0]!.models[0]!.key]).toMatchObject({ api: "openai-completions" });
+  expect(settings.getV4().settings.models.definitions[moved.view.connections[0].models[0].key]).toMatchObject({ api: "openai-completions" });
 
   // 再次添加已有的模型：只刷新服务商数据；新模型直接在用。
   const refreshed = await service.addModels({ connectionId: id, models: [
@@ -181,7 +181,7 @@ it("updates a connection and forgets the tested auth when the address changes", 
     { apiModel: "relay-new" },
   ] });
   if (!refreshed.ok) throw new Error(refreshed.error.message);
-  const rows = refreshed.view.connections[0]!.models;
+  const rows = refreshed.view.connections[0].models;
   expect(rows.find((model) => model.apiModel === "claude-sonnet-5")).toMatchObject({ effective: { contextWindow: 900_000, sources: { contextWindow: "provider" } } });
   expect(settings.getV4().settings.models.installed[rows.find((model) => model.apiModel === "relay-new")!.key]).toMatchObject({ enabled: true });
   expect(await service.update({ connectionId: id, baseUrl: "ftp://bad" })).toMatchObject({ ok: false, error: { code: "invalid_base_url" } });
@@ -202,12 +202,12 @@ it("resolves vision from the purpose table, then the chat model, then the first 
   expect(runtime.resolveImageInspectionModel()).toMatchObject({ ok: false });
   const created = await service.create({ templateId: "custom", apiKey: "k", baseUrl: "https://relay.example/v1", models: [{ apiModel: "text-only", providerFacts: { input: ["text"] } }, { apiModel: "seeing", providerFacts: { input: ["text", "image"] } }] });
   if (!created.ok) throw new Error(created.error.message);
-  const keys = Object.fromEntries(created.view.connections[0]!.models.map((model) => [model.apiModel, model.key]));
-  await service.updatePurposes({ chat: { model: keys["text-only"]!, thinking: null } });
+  const keys = Object.fromEntries(created.view.connections[0].models.map((model) => [model.apiModel, model.key]));
+  await service.updatePurposes({ chat: { model: keys["text-only"], thinking: null } });
   expect(runtime.resolveImageInspectionModel()).toMatchObject({ ok: true, model: { key: keys.seeing, source: "fallback" } });
-  await service.updatePurposes({ chat: { model: keys.seeing!, thinking: null } });
+  await service.updatePurposes({ chat: { model: keys.seeing, thinking: null } });
   expect(runtime.resolveImageInspectionModel()).toMatchObject({ ok: true, model: { key: keys.seeing } });
-  await service.updatePurposes({ vision: { model: keys["text-only"]!, thinking: "off" } });
+  await service.updatePurposes({ vision: { model: keys["text-only"], thinking: "off" } });
   // 用途表指定了不能看图的模型：明确报错，不悄悄换模型。
   expect(runtime.resolveImageInspectionModel()).toMatchObject({ ok: false });
   expect(runtime.purposeThinking("vision")).toBe("off");
@@ -218,7 +218,7 @@ it("saves the subagent purpose as taskModels.subagentDefaultModel without a thin
   const { service, runtime, settings } = await fixture();
   const created = await service.create({ templateId: "custom", apiKey: "k", baseUrl: "https://relay.example/v1", models: [{ apiModel: "m1" }] });
   if (!created.ok) throw new Error(created.error.message);
-  const key = created.view.connections[0]!.models[0]!.key;
+  const key = created.view.connections[0].models[0].key;
   expect(runtime.subagentDefaultModel()).toBeNull();
   const saved = await service.updatePurposes({ subagent: { model: key, thinking: "high" } });
   if (!saved.ok) throw new Error(saved.error.message);

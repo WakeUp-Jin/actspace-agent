@@ -15,7 +15,7 @@ kind: "package-group"
 
 ## 包之间怎么连
 
-- inject `tools.runtime`、Host 端口 `actspace.host.tools.shell-tools`（真正启动进程的实现，`node-ports.ts`）和 `actspace.host.background-tasks`（后台任务登记）。
+- inject `tools.runtime`、`actspace.host.background-tasks`（后台任务登记）和 `actspace.host.session`（命令日志目录）；**可选** inject 能力授予 `actspace.host.process`（类型 `ProcessHostGrant`，定义在 `tool-runtime/src/host-ports.ts`：`workspaceRoot`、`tmpRoot`、`onProcesses` 强制结束钩子）。真正启动进程的实现是本包的 `node-ports.ts`，随 Harness 产物打包；没有授予时 `bash` 照常注册，但每次调用返回 `CAPABILITY_UNAVAILABLE`。
 - **可选** inject `sandbox`：有沙箱服务时命令进沙箱；没有（例如沙箱插件被移除）时，Bash 改走审批。依赖的是接口包 `sandbox`，不是 `sandbox-nono` / `sandbox-seatbelt`。
 - manifest 声明 Host 能力 `process`。
 - 转后台的进程仍归本包持有，卸载 Harness 会结束进程；完成通知、输出匹配通知、`task_output` / `task_stop` 由 Host 登记表负责，对应工具在 `background-tasks/tool-background-tasks`。

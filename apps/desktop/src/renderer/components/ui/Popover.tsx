@@ -19,7 +19,6 @@ const RADIUS_CLASS: Record<PopoverRadius, string> = {
 const Popover = PopoverPrimitive.Root;
 const PopoverTrigger = PopoverPrimitive.Trigger;
 const PopoverAnchor = PopoverPrimitive.Anchor;
-const PopoverClose = PopoverPrimitive.Close;
 
 type PopoverContentProps = React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> & {
   radius?: PopoverRadius;
@@ -81,4 +80,4 @@ const PopoverContent = React.forwardRef<React.ElementRef<typeof PopoverPrimitive
 });
 PopoverContent.displayName = "PopoverContent";
 
-export { Popover, PopoverTrigger, PopoverAnchor, PopoverClose, PopoverContent };
+export { Popover, PopoverTrigger, PopoverAnchor, PopoverContent };

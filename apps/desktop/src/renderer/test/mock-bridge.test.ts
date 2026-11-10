@@ -132,7 +132,7 @@ describe("mock bridge", () => {
     bridge.events.agentStream((event) => events.push(event));
     const [pending] = await bridge.approvals.listPending();
 
-    await expect(bridge.approvals.submit({ requestId: pending!.requestId, decision: "deny" })).resolves.toEqual({ ok: true });
+    await expect(bridge.approvals.submit({ requestId: pending.requestId, decision: "deny" })).resolves.toEqual({ ok: true });
 
     expect(events.map((event) => event.type)).toEqual(["tool_approval_resolved", "agent_run_finished"]);
     expect(await bridge.approvals.listPending()).toEqual([]);
@@ -147,10 +147,10 @@ describe("mock bridge", () => {
     expect(events).toEqual([]);
 
     const [latest] = (await bridge.sessions.listPage()).items;
-    await bridge.sessions.getPage({ sessionId: latest!.id });
+    await bridge.sessions.getPage({ sessionId: latest.id });
     await vi.advanceTimersByTimeAsync(2000);
 
-    expect(events[0]).toMatchObject({ type: "agent_run_started", sessionId: latest!.id });
+    expect(events[0]).toMatchObject({ type: "agent_run_started", sessionId: latest.id });
     expect(events.some((event) => event.type === "agent_run_finished")).toBe(false);
   });
 

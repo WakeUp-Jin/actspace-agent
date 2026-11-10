@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { hostChildEnv } from "@actspace/shared";
 
 export type GitRunOptions = {
   cwd: string;
@@ -30,6 +31,7 @@ export type GitRunner = (args: string[], options: GitRunOptions) => Promise<GitR
 /**
  * 01 S9：main 里 git 子进程的统一入口。
  * 总是带 `-C cwd`，并设置 `GIT_TERMINAL_PROMPT=0`，避免 git 在没有终端时等凭据输入。
+ * 环境变量只给 `hostChildEnv` 的白名单，不继承 main 进程的其余变量。
  */
 export const runGitCommand: GitRunner = (args, options) => new Promise((resolveResult) => {
   let settled = false;
@@ -47,7 +49,7 @@ export const runGitCommand: GitRunner = (args, options) => new Promise((resolveR
       maxBuffer: options.maxOutputChars,
       windowsHide: true,
       encoding: "utf8",
-      env: { ...process.env, ...options.env, GIT_TERMINAL_PROMPT: "0" },
+      env: hostChildEnv(process.env, { ...options.env, GIT_TERMINAL_PROMPT: "0" }),
     },
     (error, out, err) => {
       const stdout = String(out ?? "");

@@ -21,6 +21,8 @@ export async function runToolStreamFixture(options: {
   contextSources?: import("@actspace/context-engine").ContextSourceRegistry;
   inputSource?: import("./loop.js").LoopInputSource;
   seedSession?: (session: SessionHandle) => Promise<void>;
+  /** 用调用方准备好的会话（例如带归档历史的长会话）代替默认的内存会话；fixture 结束时同样关闭它。 */
+  session?: SessionHandle;
   followup?: boolean;
   extraToolCall?: boolean;
   onTools?: (tools: readonly import("@actspace/llm-service").LlmToolDefinition[]) => void;
@@ -49,7 +51,7 @@ export async function runToolStreamFixture(options: {
   wake?: boolean;
 } = {}) {
   const registry = createCoreCodecRegistry();
-  const session = SessionHandle.createEphemeral({ registry, header: createSessionHeader({
+  const session = options.session ?? SessionHandle.createEphemeral({ registry, header: createSessionHeader({
     sessionId: options.sessionId ?? "tool-stream-test", createdAt: "2026-09-06T00:00:00.000Z", lineage: options.subagent ? { origin: "delegation", parentSessionId: "parent", parentCallId: "delegate", parentBoundarySeq: 0, seedDigest: "fixture", delegationDepth: 1 } : null,
     createdWith: { profileId: "test", runtimeContractVersion: "1", manifestDigest: "test", plugins: [], codecSetDigest: registry.digest },
   }) });
@@ -57,7 +59,7 @@ export async function runToolStreamFixture(options: {
   const tools = new ToolRuntime();
   tools.register({ definition: { abiVersion: 2, pluginId: "test.tools", name: "read_file", definitionVersion: 1,
     description: "Read fixture", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false },
-    effects: [], concurrency: "read-only", sensitiveArgumentPaths: [], resultSchemaVersion: 1 },
+    effects: [], modes: ["plan", "agent"], concurrency: "read-only", sensitiveArgumentPaths: [], resultSchemaVersion: 1 },
     permission: options.permission,
     executor: { concurrencySafe: true, execute: options.execute ?? (async () => ({ status: "completed", summary: "Read fixture.txt", modelOutput: [{ type: "text", text: "fixture content" }] })) } });
   let requests = 0;

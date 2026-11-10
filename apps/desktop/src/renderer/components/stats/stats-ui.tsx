@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Info, type LucideIcon } from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../ui/HoverCard";
 import { PlainButton } from "../ui/PlainButton";
@@ -481,8 +481,8 @@ export function Heatmap({ values, unit, ariaLabel, formatValue = fmtInt, now = n
   const max = Math.max(0, ...cells.map((cell) => cell.value));
   const level = (value: number) => (value <= 0 || max <= 0 ? 0 : Math.min(4, Math.ceil((value / max) * 4)));
   const months = Array.from({ length: weeks }, (_, week) => {
-    const first = cells[week * 7]!.date;
-    const previous = week > 0 ? cells[(week - 1) * 7]!.date : null;
+    const first = cells[week * 7].date;
+    const previous = week > 0 ? cells[(week - 1) * 7].date : null;
     return !previous || previous.getMonth() !== first.getMonth() ? `${first.getMonth() + 1}月` : "";
   });
   const hovered = hover != null ? cells[hover] : undefined;
@@ -568,13 +568,13 @@ export function DataTable<T>({ columns, rows, rowKey, sort, onSortChange, defaul
                 const active = current?.key === column.key;
                 const right = column.align === "right";
                 return (
-                  <th key={column.key} scope="col" aria-sort={active ? (current!.dir === "asc" ? "ascending" : "descending") : undefined}
+                  <th key={column.key} scope="col" aria-sort={active ? (current.dir === "asc" ? "ascending" : "descending") : undefined}
                     className={cn("whitespace-nowrap border-b border-line p-0 font-medium text-text-faint", right ? "text-right" : "text-left", column.className)}>
                     {column.sortValue ? (
-                      <PlainButton onClick={() => setSort({ key: column.key, dir: active && current!.dir === "desc" ? "asc" : "desc" })}
+                      <PlainButton onClick={() => setSort({ key: column.key, dir: active && current.dir === "desc" ? "asc" : "desc" })}
                         className={cn("inline-flex w-full items-center gap-0.5 px-3 py-[7px] hover:text-text-main", right && "justify-end", active && "text-text-main")}>
                         {column.label}
-                        {active ? (current!.dir === "asc" ? <ArrowUp size={11} aria-hidden="true" /> : <ArrowDown size={11} aria-hidden="true" />) : null}
+                        {active ? (current.dir === "asc" ? <ArrowUp size={11} aria-hidden="true" /> : <ArrowDown size={11} aria-hidden="true" />) : null}
                       </PlainButton>
                     ) : <span className="block px-3 py-[7px]">{column.label}</span>}
                   </th>
@@ -612,13 +612,6 @@ export function Pager({ page, totalPages, totalRows, onPageChange, busy }: { pag
       <Button size="xs" disabled={page >= totalPages || busy} onClick={() => onPageChange(page + 1)}>下一页</Button>
     </nav>
   );
-}
-
-// ---------------------------------------------------------------- 其他
-
-/** 色块 + 名称的小图例（堆叠条下方用）。 */
-export function SwatchLabel({ color, children }: { color: string; children: ReactNode }) {
-  return <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><i aria-hidden="true" className="block size-[7px] stats-swatch" style={{ background: color } as CSSProperties} />{children}</span>;
 }
 
 export { DASH };

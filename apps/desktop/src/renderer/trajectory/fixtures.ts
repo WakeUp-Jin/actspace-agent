@@ -71,7 +71,7 @@ function errorsFixture(): RuntimeV2TrajectorySnapshot {
   // 上下文行的两种来源：Context 插件的补充（op=add）和后台任务通知（inbox claim）。
   const extra = (after: (node: RuntimeV2TrajectoryNode) => boolean, eventType: string, data: Record<string, RuntimeV2JsonValue>, surface?: RuntimeV2JsonValue) => {
     const index = nodes.findIndex(after);
-    const anchor = nodes[index]!;
+    const anchor = nodes[index];
     nodes.splice(index + 1, 0, { ...anchor, eventType, kind: "other", state: "observed", callId: null, data, ...(surface === undefined ? {} : { surface }) });
   };
   // 第 2 轮第 2 次请求换了提示词：提示词只在变化时记一条 request/system-prompt（agent-spec-request-record.md §3）。
@@ -127,7 +127,7 @@ export type TrajectoryFixtureFrame = { readonly snapshot: RuntimeV2TrajectorySna
 const isRunningChunk = (node: RuntimeV2TrajectoryNode) => node.eventType === "assistant/chunk" && String((node.data as Record<string, RuntimeV2JsonValue>).messageId).endsWith("assistant-running");
 const liveOf = (node: RuntimeV2TrajectoryNode, text: string): ReadonlyMap<string, RequestLiveOutput> => {
   const data = node.data as Record<string, string>;
-  return text === "" ? new Map() : new Map([[data.requestId!, { messageId: data.messageId!, text, thinking: "", calls: new Map() }]]);
+  return text === "" ? new Map() : new Map([[data.requestId, { messageId: data.messageId, text, thinking: "", calls: new Map() }]]);
 };
 
 /**

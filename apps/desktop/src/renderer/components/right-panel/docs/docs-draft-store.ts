@@ -32,10 +32,6 @@ export function takeDocsDraft(workspaceRoot: string, relativePath: string): Stas
   return value;
 }
 
-export function clearDocsDraft(workspaceRoot: string, relativePath: string): void {
-  store.delete(keyOf(workspaceRoot, relativePath));
-}
-
 /** 这个根下最近暂存的一篇（不取走）：切回这个工作区时据此重新选中它。 */
 export function latestStashedDocsPath(workspaceRoot: string): string | null {
   let found: string | null = null;

@@ -96,9 +96,9 @@ describe("trajectory layout", () => {
 
   it("chooses detail tabs by kind and present fields", () => {
     const { cells } = layout();
-    expect(detailTabs(cells[0]!).map(tab => tab.label)).toEqual(["系统提示词", "工具"]);
-    expect(detailTabs(cells[1]!).map(tab => tab.label)).toEqual(["概述", "预览", "原始内容"]);
-    expect(detailTabs(cells[3]!).map(tab => tab.label)).toEqual(["概述", "参数", "结果", "Schema", "计时"]);
+    expect(detailTabs(cells[0]).map(tab => tab.label)).toEqual(["系统提示词", "工具"]);
+    expect(detailTabs(cells[1]).map(tab => tab.label)).toEqual(["概述", "预览", "原始内容"]);
+    expect(detailTabs(cells[3]).map(tab => tab.label)).toEqual(["概述", "参数", "结果", "Schema", "计时"]);
   });
 });
 
@@ -128,14 +128,14 @@ describe("trajectory timeline", () => {
 
 describe("trajectory status and format", () => {
   const base = layout().cells;
-  const variant = (index: number, change: Partial<TrajectoryCell>): TrajectoryCell => ({ ...base[index]!, ...change });
+  const variant = (index: number, change: Partial<TrajectoryCell>): TrajectoryCell => ({ ...base[index], ...change });
 
   it("applies the five DSH status rules", () => {
     expect(cellStatus(variant(3, { isError: true }))).toBe("failed");
     expect(cellStatus(variant(2, { kind: "compacted", durationMs: null }))).toBe("running");
-    expect(cellStatus(variant(2, { record: { ...base[2]!.record, partial: true } }))).toBe("running");
-    expect(cellStatus(variant(3, { record: { ...base[3]!.record, outputDetail: null, result: null } }))).toBe("running");
-    expect(cellStatus(base[3]!)).toBe("completed");
+    expect(cellStatus(variant(2, { record: { ...base[2].record, partial: true } }))).toBe("running");
+    expect(cellStatus(variant(3, { record: { ...base[3].record, outputDetail: null, result: null } }))).toBe("running");
+    expect(cellStatus(base[3])).toBe("completed");
   });
 
   it("formats durations like DSH", () => {

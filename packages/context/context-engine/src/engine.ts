@@ -1,6 +1,6 @@
 import { contextEvents } from "./supplements.js";
 import { renderContextSupplement, sortSystemSections } from "@actspace/shared";
-import type { CompactionSession } from "./compaction.js";
+import type { CompactionSession, ContextHydrator } from "./compaction.js";
 import { ContextSupplements, type ContextSession } from "./supplements.js";
 import type { ContextSourceRegistry, ContextSource } from "./registry.js";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
@@ -17,7 +17,7 @@ import { renderSystemPrompt } from "./system.js";
 
 export type ContextEngineOptions = {
   readonly resolve: (request: ContextRequest) => Context | Promise<Context>;
-  readonly disclosure?: { hydrate(context: Context, session: CompactionSession): Promise<Context> };
+  readonly disclosure?: ContextHydrator;
   readonly extensions?: () => readonly ContextSource[];
   readonly session?: ContextSession;
   readonly sources?: ContextSourceRegistry;

@@ -8,7 +8,7 @@ import { gapNote, rangeDays, tokenTypeSegments } from "../components/usage/usage
 
 const NOW = new Date("2026-11-07T12:00:00.000Z");
 const data = mockUsageActivity({ range: "month" }, NOW);
-const metric = (label: string) => within(screen.getByRole("region", { name: "使用概览" })).getByText(label).closest("button, div")!.parentElement!;
+const metric = (label: string) => within(screen.getByRole("region", { name: "使用概览" })).getByText(label).closest("button, div")!.parentElement;
 const card = (label: string) => screen.getByRole("region", { name: label });
 const withSummary = (patch: Partial<UsageActivitySnapshot["summary"]>, extra: Partial<UsageActivitySnapshot> = {}): UsageActivitySnapshot => ({ ...data, ...extra, summary: { ...data.summary, ...patch } });
 const known = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, total: 0 };
@@ -113,13 +113,13 @@ describe("使用统计", () => {
     const unpriced: UsageActivityRow = { ...row, activityId: "x", costUsd: null, costAmount: null, costCurrency: null, costBasis: "unavailable", costProvenance: { version: 1, basis: "unknown", reason: "model-price-unavailable", pricingSnapshot: null } };
     render(<UsageStatisticsPage activitySnapshot={{ ...data, rows: [row, unpriced] }} />);
     const table = screen.getByRole("table", { name: "请求明细" });
-    await userEvent.hover(within(table).getAllByRole("button", { name: "Token 明细" })[0]!);
+    await userEvent.hover(within(table).getAllByRole("button", { name: "Token 明细" })[0]);
     const tokens = await screen.findByRole("region", { name: "Token 明细" });
     expect(tokens).toHaveTextContent("缓存读取");
     expect(tokens).toHaveTextContent(row.tokens.totalTokens!.toLocaleString("zh-CN"));
-    await userEvent.unhover(within(table).getAllByRole("button", { name: "Token 明细" })[0]!);
-    await userEvent.hover(within(table).getAllByRole("button", { name: /单价/ })[1]!);
-    expect(await screen.findByRole("region", { name: row.model! })).toHaveTextContent("暂无单价");
+    await userEvent.unhover(within(table).getAllByRole("button", { name: "Token 明细" })[0]);
+    await userEvent.hover(within(table).getAllByRole("button", { name: /单价/ })[1]);
+    expect(await screen.findByRole("region", { name: row.model })).toHaveTextContent("暂无单价");
     expect(within(table).getByText("未知")).toHaveAttribute("title", "该模型未配置价格");
   });
 

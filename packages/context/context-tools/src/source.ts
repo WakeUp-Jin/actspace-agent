@@ -1,6 +1,7 @@
 import type { CordisContext } from "@actspace/cordis-adapter";
+import { publish } from "@actspace/context-assembly";
 import type { ContextSource } from "@actspace/context-engine";
 export function createToolsSource(): ContextSource {
   return { id: "context-tools", owner: "actspace.context-tools", order: 50, criticality: "required", fields: ["tools"], cacheKey: context => JSON.stringify(context.content.tools), get: (context, write) => write({ tools: context.content.tools }) };
 }
-export function apply(ctx: CordisContext): void { ctx.provide?.("context.source.tools", Object.freeze({ create: createToolsSource })); }
+export function apply(ctx: CordisContext): void { publish(ctx, "tools", createToolsSource); }

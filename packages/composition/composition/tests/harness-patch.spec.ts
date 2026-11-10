@@ -19,13 +19,13 @@ describe("fixed Harness patches", () => {
   });
   it("rejects missing artifact and forged behavior identities", () => {
     expect(() => resolveHarnessPatch(base, patch, [old])).toThrow("Missing artifact");
-    expect(() => resolveHarnessPatch(base, { ...patch, operations: [{ ...patch.operations[0]!, manifestEntryId: "forged" }] }, [next])).toThrow("Missing manifest entry");
+    expect(() => resolveHarnessPatch(base, { ...patch, operations: [{ ...patch.operations[0], manifestEntryId: "forged" }] }, [next])).toThrow("Missing manifest entry");
   });
   it("rejects ambiguous versions instead of guessing a source", () => {
     expect(() => resolveHarnessPatch(base, { ...patch, operations: [] }, [old, make("old", "other-content")])).toThrow("Ambiguous");
   });
   it("ignores caller-supplied module and service claims for artifact-backed insertion", () => {
-    const result = resolveHarnessPatch(base, { ...patch, operations: [{ id: "remove", kind: "remove", target: "old" }, { id: "insert", kind: "insert", entry: { ...base.entries[0]!, artifactId: next.artifactId, manifestEntryId: "next", module: "./forged.js", provides: ["admin"] } }] }, [old, next]);
+    const result = resolveHarnessPatch(base, { ...patch, operations: [{ id: "remove", kind: "remove", target: "old" }, { id: "insert", kind: "insert", entry: { ...base.entries[0], artifactId: next.artifactId, manifestEntryId: "next", module: "./forged.js", provides: ["admin"] } }] }, [old, next]);
     expect(result.entries[0]?.module).toBe("./tool.js");
     expect(result.entries[0]?.provides).toEqual(["search"]);
   });

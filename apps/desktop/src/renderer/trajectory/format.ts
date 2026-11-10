@@ -7,12 +7,6 @@ export function formatDurationMs(milliseconds: number | null | undefined): strin
   return `${(milliseconds / 1_000).toFixed(milliseconds < 10_000 ? 2 : 1)} 秒`;
 }
 
-/** Timeline tooltip duration: integer milliseconds with thousands separators. */
-export function formatMillis(milliseconds: number | null | undefined): string {
-  if (milliseconds == null || !Number.isFinite(milliseconds)) return "—";
-  return `${String(Math.round(milliseconds)).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} 毫秒`;
-}
-
 export const formatTokens = (value: number) => `${value} tok`;
 export const formatThroughput = (value: number) => `${value.toFixed(1)} tok/s`;
 

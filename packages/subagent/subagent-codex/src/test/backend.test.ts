@@ -116,7 +116,7 @@ describe("Codex backend", () => {
   });
 
   it("is an optional plugin, off by default, with the design's settings", () => {
-    const behavior = manifest.behaviors[0]!;
+    const behavior = manifest.behaviors[0];
     expect(manifest.display).toMatchObject({ scope: "session", defaultEnabled: false, canDisable: true });
     expect(behavior).toMatchObject({ required: false, config: { approvalPolicy: "never", sandbox: "workspace-write" }, host: { required: ["process"] } });
   });

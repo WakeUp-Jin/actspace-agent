@@ -29,11 +29,11 @@
 - 使用 `contextIsolation: true` + `nodeIntegration: false`，renderer 不能直接访问 Node.js API。主窗口还显式写出 `sandbox: true`、`webviewTag: false`（`main/window-security.ts`）；preload 是单文件 bundle，只能 `require("electron")`，由 `runtime-v2-preload-bundle.test.ts` 守住。
 - preload 通过 `contextBridge` 只暴露最小、类型化的 bridge API。
 - **IPC sender 校验 fail-closed**：所有 `ipcMain.handle` / `on` 注册点都调用 `main/ipc/trusted-sender.ts` 的 `assertTrustedSender`。没有主窗口、窗口已销毁、sender 不是主窗口的 webContents、或 senderFrame 不是 mainFrame，任一成立就拒绝。
-- **IPC channel 审计**：`pnpm check:ipc-channels` 核对 shared 中的 channel 常量、main 的注册 / 发送、preload 的引用三者一致；main 不能用常量表之外的字面量注册或发送 channel。
+- **IPC channel 审计**：`pnpm check:ipc-channels` 以 `desktopBridgeContract` 为来源核对 channel 常量、main 的注册 / 发送方向、preload 的引用三者一致；main 不能用常量表之外的字面量注册或发送 channel，也不能在 `main/ipc/registry.ts` 之外直接调用 `ipcMain.handle / on`（统一注册器是 `assertTrustedSender` 和输入 guard 的唯一入口）。
 - **IPC 入参 guard 全覆盖**：契约里每个 invoke 都在 `main/ipc/guards.ts` 登记形状 guard（无入参的登记 `NO_INPUT`），注册器查不到 guard 就拒绝注册，`ipc-guards.test.ts` 断言登记表等于契约全集。guard 只做类型 / 形状 / 枚举检查，路径归属、会话存在性等业务校验仍在 handler。
 - **导航防护**：主窗口拒绝一切新窗口（`setWindowOpenHandler` 返回 `deny`），顶层导航到非应用 URL 时取消（`will-navigate`）；两种情况都把 URL 交给 `openExternalSafely`。应用 URL 在生产是 dist 下 `index.html` 的精确 file URL，dev 是 dev server 的同源 URL。任何 webContents 都不允许挂 `<webview>`。
 - **外部打开白名单**：main 中打开外部 URL 一律经 `main/platform-actions.ts` 的 `openExternalSafely`，只放行 `https:`、`http:`、`mailto:`；`file:`、`javascript:`、自定义协议和无法解析的字符串直接丢弃。「在 Cursor 中打开」等平台动作也收在同一文件，只接受 main 已 realpath 校验过的本机路径。
-- **主文档 CSP**：目前没有。严格 CSP 会拦掉 mermaid SVG 内的 `<style>`，见「待补强」。
+- **主文档 CSP**：main 在 `app.whenReady` 时用 `session.defaultSession.webRequest.onHeadersReceived` 给主框架 / 子框架响应加 `Content-Security-Policy`（`main/window-security.ts` 的 `buildContentSecurityPolicy`，对 `file://` 与 dev server 都生效）。生产策略：`default-src 'self'`、`script-src 'self'`、`img-src 'self' data: blob:`、`font-src 'self' data:`、`connect-src 'self'`、`media-src 'self' blob:`，`worker-src` / `object-src` / `frame-src` / `frame-ancestors` / `base-uri` / `form-action` 全部 `'none'`；dev 只额外放开 Vite react-refresh 的内联脚本和 dev server 的 http / ws 连接。`style-src` 暂保留 `'unsafe-inline'`：mermaid 输出靠 `style` 属性与内嵌 `<style>`，CodeMirror 的 style-mod 用 `<style>` 标签注入，去掉它需要 nonce 与 DOM 挂载，见「待补强」。
 - **生命周期**：退出时 dispose Browser Bridge（终止在途子进程）和本地更新服务（只清定时器，更新脚本必须比应用活得久）；`uncaughtExceptionMonitor` / `unhandledRejection` 写入主进程日志，不改变 Electron 的默认处理。
 - Desktop 的 provider Key 只在 main 进程凭据存储和短生命周期 Runtime credential 中可见，不会泄露到 renderer。CLI 环境变量只属于 CLI Host 进程。
 - 本地更新只通过 main 进程 IPC 暴露结构化操作：选择源码目录、读取状态、启动更新。renderer 不传 shell 命令；main 会验证所选目录是 `name: "actspace"` 且包含 `package:desktop:dmg` 与 `scripts/release-package.sh`，并确认当前进程路径解析出的目标是 `Actspace.app` / `actspace.app` 且不是 `node_modules` 下的 Electron 开发 runtime 后，才写入 helper 脚本。helper 位于 `<userData>/tmp/local-update/`，日志写同目录 `update.log`，阶段状态写 `status.json`；main 只在 helper 报告 `ready_to_replace` / `waiting_for_exit` / `replacing` 后触发 app 退出，避免构建阶段提前关闭当前应用。helper 默认对本地更新构建启用 ad-hoc signing，并在替换前验证新 `.app` 的 bundle 元数据、主可执行文件和 code signature；替换后如果系统无法打开新 app，会尝试恢复旧版本。
@@ -49,7 +49,7 @@
 - v2 Session 数据存储在统一的 `<dataRoot>/sessions-v2/<sessionId>/journal.jsonl`；macOS 默认 `<dataRoot>` 为 `~/Library/Application Support/ActSpace`，CLI 与 Electron 共用；旧 lowercase data root 和 `<dataRoot>/sessions/` 仅作为用户历史数据原位保留，v2 不混读或自动迁移。
 - 本地更新源码目录路径存储在 `<userData>/local-update.json`，不存密钥；该路径可暴露用户本机目录结构，日志或截图外发前应按需脱敏。
 - Agent 文件工具的工作区由 `ACTSPACE_WORKSPACE_ROOT` 或当前仓库根目录确定，不使用 `userData` 作为代码文件读取目录，避免把应用数据目录和用户工作区混淆。
-- Bash 工具当前以当前进程的 `process.env` 启动子进程，因此命令执行不会把密钥提交到 Git，但允许被执行命令读取运行时环境变量。后续如要开放更高风险命令，应改为白名单环境变量或显式脱敏环境。
+- **子进程环境**：Desktop 不把任何凭据写进 `process.env`（搜索 Key 由 `ModelRuntimeService.getToolEnvironment()` 直接注给工具端口）。子进程 env 由 `@actspace/shared` 的两个构造函数决定：`toolChildEnv` 继承用户 env 但剥离名字像凭据的变量（`API_KEY` / `ACCESS_KEY` / `PRIVATE_KEY` / `SECRET` / `TOKEN` / `PASSWORD` / `CREDENTIAL`），用于 bash、`rg`、Browser Bridge 编译和本地更新脚本这类需要用户工具链的进程；`hostChildEnv` 只放行 `PATH` / `HOME` / 代理 / locale 等基础白名单，用于 main 自己拼参数的 git 与 ssh。这是「不把 Desktop 持有的 Key 交给子进程」的保证，不是对用户 shell 里自带变量的穷举过滤。
 - Bash 大输出和工具 artifact 由 v2 Tool Runtime 按 Session-owned artifact policy 管理，不写进 workspace；具体落盘和回收边界以 `agent-plugin-runtime/agent-spec-tool-runtime-abi.md` 为准。
 - `generate_image` 只允许 Host 注入的 Session artifact root，图片位于 `<userData>/sessions-v2/<sessionId>/artifacts/` 下的受管子树；远程 URL 必须先通过 HTTPS/公网地址检查并下载到本地，不能直接作为 renderer 成功产物。
 - `inspect_image` 只允许读取 workspace 内普通文件、当前轮显式注册的图片附件，或当前 session `artifacts/` 子树；执行器对目标与允许根目录做 `realpath` 复验，拒绝符号链接逃逸、目录、设备、远程 URL 和未登记的工作区外路径。只接受文件签名匹配的 JPEG / PNG / WebP，单张上限 20 MiB。
@@ -134,9 +134,8 @@ git grep -n -I -E '(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{36}|g
 - 数据分级、脱敏与保留策略。
 - 对外 API、Webhook、文件上传和沙箱执行的规则。
 - API Key 轮换与更完整的错误脱敏策略。
-- 子进程环境变量白名单。设置服务会把搜索服务 Key 等写进 `process.env`（`applyToEnv`），bash 工具、`rg`、git / gh、ssh、Browser Bridge、更新脚本等子进程都继承完整环境。清单见 `docs/exec-plans/tech-debt-tracker.md`。
-- Browser Bridge「从源码目录安装」：`installBrowserBridgeFromRepo` 接受 renderer 传来的 `repoRoot`，只校验扩展 manifest 后就在该目录运行构建脚本。应改为由 main 弹系统对话框选目录，renderer 不再传路径。
-- 主文档 CSP。实测（Electron 39）：严格策略（`script-src 'self'; style-src 'self'`）下应用启动正常，但 mermaid SVG 内的 `<style>` 会被拦。需要先给 mermaid 样式找到 nonce / hash 或隔离方案，再由 main 用 `session.webRequest.onHeadersReceived` 注入 CSP（实测对 file:// 生效，与 meta 等效）。
+- 主文档 CSP 的 `style-src` 去掉 `'unsafe-inline'`：需要 mermaid SVG 改为 DOM 挂载并把 `<style>` 转成 `adoptedStyleSheets`、CodeMirror 走 `EditorView.cspNonce`、Vite dev 配 `html.cspNonce`。headless Chrome 实测见 `docs/exec-runs/20261109-desktop-security-debt/execution-process.md`。
+- `hostChildEnv` 白名单之外的非敏感偏好 env（`ACTSPACE_DISABLED_TOOLS` 等）仍由 `settings/env.ts` 写进 main 自己的 `process.env`，退役时机见 `docs/exec-plans/tech-debt-tracker.md`。
 - 读类工具放开 workspace 边界后的「敏感路径 blocklist + 按需读审核」（见 `docs/exec-plans/tech-debt-tracker.md`）。
 
 ## 独立 Agent Host

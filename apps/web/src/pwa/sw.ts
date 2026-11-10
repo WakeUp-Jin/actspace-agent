@@ -16,6 +16,7 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("message", event => {
+  if (event.origin !== self.location.origin) return;
   if ((event.data as { type?: string } | null)?.type === "skip-waiting") void self.skipWaiting();
 });
 

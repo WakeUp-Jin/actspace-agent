@@ -23,7 +23,7 @@ export function ContextTrend({ points }: { points: readonly ContextPanelTrendPoi
   }, [points.length]);
 
   if (columns.length === 0) return null;
-  const active = (columns[hovered ?? columns.length - 1] ?? columns.at(-1)!).point;
+  const active = (columns[hovered ?? columns.length - 1] ?? columns.at(-1)).point;
   const lastCompaction = [...columns].reverse().find((column) => column.compactedBefore)?.point.compactedBefore;
 
   return (

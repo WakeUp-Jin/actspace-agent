@@ -49,7 +49,7 @@ describe("chat projection identity", () => {
     const pending = { ...snapshot([]), tools: [{ callId: "pending", name: "bash", state: "running", artifacts: [], failure: null }] } as RuntimeV2SessionSnapshot;
     const command = `printf '%s' '${"long command ".repeat(400)}'`;
     const journal = [envelope(8, "tool/call", { agentRunId: "run-1", callId: "pending", name: "bash", args: { command, cwd: "/w" } })];
-    const blocks = projectChatSession(pending, journal, "/w").messageBlocks!;
+    const blocks = projectChatSession(pending, journal, "/w").messageBlocks;
     expect(blocks).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "bash", command, status: "running" })]));
     expect(projectSubagentTranscript(pending, journal).filter(event => event.type === "tool_result")).toHaveLength(1);
   });

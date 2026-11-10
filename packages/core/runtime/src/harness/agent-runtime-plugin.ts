@@ -15,13 +15,13 @@ import type { RuntimeSessionController } from "../session/session-controller.js"
 import type { AgentFactoryService } from "./agent-factory-plugin.js";
 import { PinnedHarnessError, type AgentRuntimeHostPort, type PinnedHarness } from "./agent-host-port.js";
 import type { RuntimeSessionHostPort } from "../session/session-plugin.js";
-import { prepareDefaultHarnessArtifact, defaultHarnessSharedModules, DEFAULT_HARNESS_SHARED_SERVICES } from "./default-harness.js";
+import { prepareDefaultHarnessArtifact, defaultHarnessSharedModules, DEFAULT_HARNESS_SHARED_SERVICES, OPTIONAL_HOST_SHARED_SERVICES } from "./default-harness.js";
 import { TaskLedger } from "@actspace/agent-service";
 import { BackgroundTaskRegistry } from "@actspace/background-tasks";
 import { ManagedRuns } from "./managed-runs.js";
 import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
 
-export const inject = Object.freeze(DEFAULT_HARNESS_SHARED_SERVICES.filter(name => name !== "actspace.host.tools.browser"));
+export const inject = Object.freeze(DEFAULT_HARNESS_SHARED_SERVICES.filter(name => !OPTIONAL_HOST_SHARED_SERVICES.includes(name)));
 
 /** Host owns scheduling and lifetime; execution services live in isolated Harness trees. */
 export class AgentRuntimeService {
@@ -109,7 +109,8 @@ export class AgentRuntimeService {
       builtin: pinned ? () => pinnedMount(artifactRoot, pinned.description) : () => prepareDefaultHarnessArtifact({ artifactRoot, hostCapabilities: host.host.capabilityCeiling, disabledEntries: host.disabledHarnessEntries ?? [], ...(host.harnessEntryConfig ? { entryConfig: host.harnessEntryConfig } : {}) }), sharedServices: DEFAULT_HARNESS_SHARED_SERVICES,
       compatibility: { capabilities: host.host.capabilityCeiling, requiredServices: [{ id: "agent.run-factory", version: 1 }, { id: "actspace.agent.factory", version: 1 }], services: DEFAULT_HARNESS_SHARED_SERVICES.map(id => ({ id, version: 1 })), events: [],
         sharedModules, codecArtifacts: [] },
-      ...(pinned ? {} : { upgradePristineBuiltin: (record: import("@actspace/harness-control").SelectionRecord) => record.description.composition.entries.every(entry => entry.pluginId === "actspace.default-harness") }),
+      // Pristine = every entry still comes from a builtin artifact (kernel or an unreplaced tool plugin); a patched plugin is user state.
+      ...(pinned ? {} : { upgradePristineBuiltin: (record: import("@actspace/harness-control").SelectionRecord) => record.description.composition.entries.every(entry => entry.provenance.startsWith("builtin:")) }),
       authorize: approval.authorize,
       onSelection: record => { emitNotification(ctx, "harness/selection-updated", record); },
       onDiagnostic: error => { host.onHarnessDiagnostic?.(error); },

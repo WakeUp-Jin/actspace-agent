@@ -19,7 +19,10 @@ export function BackgroundTasksPanel({ sessionId, focus }: { sessionId: string |
   // 从消息里的「后台」标签进来：等列表到了再按 taskId 选中，找不到时回到列表并说明。
   const [pendingTask, setPendingTask] = useState(focus?.taskId);
   const [missingTask, setMissingTask] = useState(false);
-  useEffect(() => { if (focus) setPendingTask(focus.taskId); }, [focus?.revision]);
+  // revision 每次点击递增：同一个 taskId 再点一次也要重新定位。
+  const focusRevision = focus?.revision;
+  const focusTaskId = focus?.taskId;
+  useEffect(() => { if (focusTaskId !== undefined) setPendingTask(focusTaskId); }, [focusRevision, focusTaskId]);
   useEffect(() => {
     if (!pendingTask || !loaded) return;
     const found = tasks.some((task) => task.taskId === pendingTask);

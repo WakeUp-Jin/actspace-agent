@@ -1,4 +1,5 @@
 import type { ModelApi } from "./model-config";
+import { trimTrailing } from "./trim-trailing";
 
 // shared 只带 ES2022 lib；URL 在 Node 和浏览器里都是全局对象，这里只声明用到的字段。
 declare const URL: new (input: string) => {
@@ -63,7 +64,7 @@ export function normalizeCustomConnectionAddress(raw: string, protocol: ModelApi
 
 /** 连接测试和模型调用实际请求的接口地址。 */
 export function customConnectionRequestUrl(baseUrl: string, protocol: ModelApi): string {
-  const base = baseUrl.replace(/\/+$/, "");
+  const base = trimTrailing(baseUrl, "/");
   if (protocol === "anthropic-messages") return `${base}/v1/messages`;
   return protocol === "openai-responses" ? `${base}/responses` : `${base}/chat/completions`;
 }

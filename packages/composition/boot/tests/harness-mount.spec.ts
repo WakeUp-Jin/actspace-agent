@@ -27,10 +27,10 @@ it("routes listeners by scope and disposes registrations", async () => {
   const scopes = [new AgentScope("a"), new AgentScope("b")];
   const trees = [];
   for (const scope of scopes) trees.push(await mountIsolatedCordisTree({ parent: root.context, sharedServices: [], decorate: ctx => scopeContext(ctx, scope.scopeKey, scope.disposer), entries: [{ id: "listener", provides: [], injects: [], config: {}, module: { apply: (ctx: any) => { ctx.on("probe", () => { heard.push(scope.agentId); }); } } }] }));
-  root.context.emit!(scopeTarget(root.context, scopes[0]!.scopeKey), "probe");
+  root.context.emit!(scopeTarget(root.context, scopes[0].scopeKey), "probe");
   expect(heard).toEqual(["a"]);
   expect(observed).toBe(1);
-  for (let i = 0; i < trees.length; i++) { await trees[i]!.dispose(); await scopes[i]!.dispose(); }
+  for (let i = 0; i < trees.length; i++) { await trees[i].dispose(); await scopes[i].dispose(); }
 });
 it("rejects missing dependencies and undeclared service publication without disposing Host", async () => {
   const root = await host();
@@ -51,12 +51,12 @@ it("keeps parallel, serial and waterfall dispatch scoped with their original sem
     ctx.on("probe/serial", () => scope.agentId);
     ctx.on("probe/waterfall", async (next: () => Promise<string>) => scope.agentId + await next());
   } } }] }));
-  const target = scopeTarget(root.context, scopes[0]!.scopeKey);
+  const target = scopeTarget(root.context, scopes[0].scopeKey);
   await root.context.parallel!(target, "probe/parallel"); expect(heard).toEqual(["a"]);
   expect(await root.context.serial!(target, "probe/serial")).toBe("a");
   expect(await root.context.waterfall!(target, "probe/waterfall", async () => "end")).toBe("aend");
-  await trees[0]!.dispose(); await scopes[0]!.dispose();
-  const b = scopeTarget(root.context, scopes[1]!.scopeKey);
+  await trees[0].dispose(); await scopes[0].dispose();
+  const b = scopeTarget(root.context, scopes[1].scopeKey);
   expect(await root.context.serial!(b, "probe/serial")).toBe("b");
-  await trees[1]!.dispose(); await scopes[1]!.dispose();
+  await trees[1].dispose(); await scopes[1].dispose();
 });

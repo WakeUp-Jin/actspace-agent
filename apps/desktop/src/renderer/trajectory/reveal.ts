@@ -17,7 +17,7 @@ export function findRevealRecord(records: readonly TrajectoryRecord[], target: T
   if ("compactionId" in target) return visible.find((record) => record.kind === "compaction" && record.compaction?.compactionId === target.compactionId) ?? null;
   const kind = target.latest === "tool-call" || target.latest === "tool-result" ? "tool" : target.latest;
   for (let index = visible.length - 1; index >= 0; index -= 1) {
-    const record = visible[index]!;
+    const record = visible[index];
     if (kind === null || record.kind === kind) return record;
   }
   return null;

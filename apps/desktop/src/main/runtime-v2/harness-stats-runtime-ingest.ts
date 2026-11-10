@@ -80,7 +80,7 @@ function applyLine(db: DatabaseSync, line: HarnessStatsFileLine): boolean {
     if (typeof line.plugin !== "string") return false;
     const existing = prepare(db, "SELECT loads,failures,last_error,load_hist,first_seen,last_seen FROM harness_plugin_inventory WHERE revision=? AND plugin=?").get(line.revision, line.plugin) as { loads: number; failures: number; last_error: string | null; load_hist: string; first_seen: string; last_seen: string } | undefined;
     const histogram = existing ? safeHistogram(existing.load_hist) : emptyHarnessHistogram();
-    if (typeof line.loadMs === "number") histogram[harnessHistogramIndex(line.loadMs, HARNESS_DURATION_BASE_MS)]! += 1;
+    if (typeof line.loadMs === "number") histogram[harnessHistogramIndex(line.loadMs, HARNESS_DURATION_BASE_MS)] += 1;
     prepare(db, "INSERT OR REPLACE INTO harness_plugin_inventory(revision,plugin,source,provides,loads,failures,last_error,load_hist,first_seen,last_seen) VALUES(?,?,?,?,?,?,?,?,?,?)").run(
       line.revision, line.plugin, line.source ?? "unknown", JSON.stringify(Array.isArray(line.provides) ? line.provides : []), (existing?.loads ?? 0) + 1, (existing?.failures ?? 0) + (line.ok ? 0 : 1),
       line.ok ? existing?.last_error ?? null : line.error ?? "unknown", JSON.stringify(histogram), minString(existing?.first_seen, line.at), maxString(existing?.last_seen, line.at));

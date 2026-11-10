@@ -765,7 +765,7 @@ Usage UI
 - [`models/`](../../../../../apps/desktop/src/renderer/components/settings/models)（「模型」页：用途、连接与模型，见 [模型页规范](front-模型设置页面-Maka重做规范.md)）
 - [`UsageStatisticsPage.tsx`](../../../../../apps/desktop/src/renderer/components/UsageStatisticsPage.tsx)
 - [`packages/util/shared/src/settings.ts`](../../../../../packages/util/shared/src/settings.ts)
-- [`packages/util/shared/src/ipc.ts`](../../../../../packages/util/shared/src/ipc.ts)
+- [`packages/util/shared/src/ipc/`](../../../../../packages/util/shared/src/ipc/)（原 `ipc.ts`，2026-11-09 按通道拆成目录）
 - [`durable-session.ts`](../../../../../packages/core/runtime/src/projection/durable-session.ts) 与 `usage-aggregates.ts`（2026-11-07 统计页重做时删除）
 
 ### Maka 参考实现

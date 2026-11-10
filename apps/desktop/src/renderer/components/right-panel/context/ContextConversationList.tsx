@@ -43,7 +43,7 @@ export function ContextConversationList({ category, total, paging = false, onLoa
   const hasKinds = category.entries.some((entry) => entry.kind !== undefined);
   const rows = conversationRows(category.entries, filters);
   const shown = rows.slice(0, limit);
-  const single = filters.length === 1 ? filters[0]! : null;
+  const single = filters.length === 1 ? filters[0] : null;
 
   const toggle = (filter: ConversationFilter) =>
     setFilters((current) => (current.includes(filter) ? current.filter((value) => value !== filter) : [...current, filter]));

@@ -12,7 +12,7 @@ const TASK_ID = { type: "string", description: "Background Bash task id (bash_â€
 export function registerBackgroundTaskTools(runtime: ToolRuntime, tasks: BackgroundTaskHost): readonly BackgroundTaskToolRegistration[] {
   const handles: ReturnType<ToolRuntime["register"]>[] = [];
   const register = (name: string, description: string, properties: Record<string, RuntimeV2JsonValue>, required: string[], concurrency: ToolDefinition["concurrency"], execute: (args: Args, context: ToolExecutionContext) => Promise<ToolBodyResult>): BackgroundTaskToolRegistration => {
-    const definition: ToolDefinition = Object.freeze({ abiVersion: 2, pluginId: BACKGROUND_TASK_TOOLS_PLUGIN_ID, name, definitionVersion: 1, description, inputSchema: { type: "object", properties, required, additionalProperties: false }, effects: [], concurrency, sensitiveArgumentPaths: [], resultSchemaVersion: 1 });
+    const definition: ToolDefinition = Object.freeze({ abiVersion: 2, pluginId: BACKGROUND_TASK_TOOLS_PLUGIN_ID, name, definitionVersion: 1, description, inputSchema: { type: "object", properties, required, additionalProperties: false }, effects: [], modes: ["plan", "agent"] as const, concurrency, sensitiveArgumentPaths: [], resultSchemaVersion: 1 });
     const handle = runtime.register({ definition, executor: { concurrencySafe: concurrency !== "exclusive", execute: (args, context) => execute(args, context).catch(failed) } });
     handles.push(handle);
     return Object.freeze({ name, dispose: () => handle.dispose() });

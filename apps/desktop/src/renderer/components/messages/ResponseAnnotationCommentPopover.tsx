@@ -33,7 +33,7 @@ export function ResponseAnnotationCommentPopover({
   const context = useResponseAnnotations();
   const editingId = context?.editingAnnotationId ?? null;
   const index = context?.drafts.findIndex((annotation) => annotation.annotationId === editingId) ?? -1;
-  const draft = index >= 0 ? context!.drafts[index]! : null;
+  const draft = index >= 0 ? context!.drafts[index] : null;
   if (!context || !draft) return null;
   return (
     <CommentPopover

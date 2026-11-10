@@ -1,29 +1,13 @@
 import type { ApprovalRequest } from "@actspace/approval";
 import { describe, expect, it } from "vitest";
 import { CliV2ApprovalBroker } from "../runtime-v2/approval";
-import { ScriptedLineInput } from "./terminal-test-input";
 
 describe("Runtime v2 CLI approval broker", () => {
-  it("prompts an interactive host until it receives an explicit allow decision", async () => {
-    const input = new ScriptedLineInput(["maybe", "y"]);
-    let output = "";
-    const decision = await new CliV2ApprovalBroker(input, (text) => { output += text; })
-      .requestApproval(request(), new AbortController().signal);
-
-    expect(decision).toMatchObject({ requestId: "approval-1", kind: "once" });
-    expect(input.prompts).toEqual([
-      "Approve? [y] once / [n] deny: ",
-      "Approve? [y] once / [n] deny: ",
-    ]);
-    expect(output).toContain("Approval required");
-    expect(output).toContain("Please enter y or n.");
-  });
-
-  it("fails closed without an interactive input surface", async () => {
+  it("fails closed and records the request so the run result can report APPROVAL_REQUIRED", async () => {
     const broker = new CliV2ApprovalBroker();
-    const decision = await broker.requestApproval(request(), new AbortController().signal);
+    const decision = await broker.requestApproval(request());
 
-    expect(decision).toMatchObject({ kind: "deny", code: "broker-unavailable" });
+    expect(decision).toMatchObject({ requestId: "approval-1", kind: "deny", code: "broker-unavailable" });
     expect(broker.approvalRequired).toEqual(request());
   });
 });

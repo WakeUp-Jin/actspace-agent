@@ -38,12 +38,11 @@
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/tool-runtime": "workspace:*",
     "@actspace/bundle": "workspace:*",
-    "@actspace/shared": "workspace:*",
-    "typescript": "^5.8.3"
+    "typescript": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^24.0.3",
-    "typescript": "^5.8.3",
-    "vitest": "^4.1.12"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

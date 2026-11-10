@@ -60,9 +60,9 @@ Journal → Projection → Desktop / Headless
 
 Session 与存储服务由 Host 持有；LLM、工具注册表、Prompt 与 Loop 随 Harness 独立装配。每次 Run 从所选 Harness 创建 AgentScope，绑定工具贡献、上下文与监听，结束后释放实例；同一 Session 不持有长寿命 Loop。
 
-首版组合包括现有 Prompt/Skills、Filesystem Read/Search/Write、Shell、Web、Image Generation/Inspection、Todo、Subagent、Compaction 的 Agent 行为；Browser 在 Profile 已装载时作为可选成员，英语辅助插件保持现有显式启用规则。基础 Loop、Inbox、Session 仍复用现有领域服务。形态清单引用已有插件/entry 身份，不把字符串标签冒充独立插件。
+形态成员不再手写：`@actspace/agent` 的 `defineMainAgentForm(members)` 只负责校验（成员 id 唯一、版本 ≥ 1、每个成员至少一个工具、同一工具不能被两个成员认领），`@actspace/runtime` 的 `main-agent-form.ts` 从插件目录（`PLUGIN_CATALOG`）里 `loaders` 含 `harness` 且 manifest `contributions.tools` 非空的条目推导成员（id = `pluginId`，version = 主版本号且至少为 1，required 取自 manifest 的 `required`）。Prompt、Compaction 等不贡献工具的插件不再是成员；Browser、外部 Subagent 后端等 `required: false` 的条目缺席时跳过而不报错。Host 把算好的形态通过 `actspace.host.agent.agentForm` 交给 Harness 内的 `agent-factory`，Harness bundle 本身不 import 插件目录。基础 Loop、Inbox、Session 仍复用现有领域服务。形态清单引用已有插件/entry 身份，不把字符串标签冒充独立插件。
 
-工具名称来自已选插件的贡献，再由模式白名单收紧。未选插件不得给当前 Agent 注册 prompt、监听器或工具贡献。新增插件默认不进入形态；新增工具默认不进入模式。
+工具名称来自已选插件的贡献，再由模式门禁收紧。未选插件不得给当前 Agent 注册 prompt、监听器或工具贡献。新增插件只要 manifest 声明了 `contributions.tools` 就进入形态；新增工具默认不进入任何模式——`ToolDefinition.modes` 是必填字段，工具只对它声明的模式可见，`core/agent` 不再维护任何工具名清单。
 
 ### 4.2 生命周期约束
 
@@ -83,7 +83,7 @@ Session 与存储服务由 Host 持有；LLM、工具注册表、Prompt 与 Loop
 | Plan（建议） | 探索、分析并产出可执行计划 | `read_file`、`list_directory`、`grep`、`glob`、`web_search`、`web_fetch`、`inspect_image`、`explore`、`todo_read`、`todo_write`、`task_list`、`task_output`、`task_stop`、`task_wait` |
 | Agent（建议） | 在权限允许范围内执行任务 | 当前 Core Tools 除 `web` 的工具；现有 Todo、后台任务工具、`agent`/`explore` 与已装载 Browser 工具 |
 
-Agent 的当前 Core Tools 清单为：`read_file`、`list_directory`、`grep`、`glob`、`edit_file`、`write_file`、`delete_file`、`bash`、`web_search`、`web_fetch`、`generate_image`、`inspect_image`。Todo 名单固定为 `todo_read`、`todo_write`。后台任务名单固定为 `task_list`、`task_output`、`task_stop`、`task_wait`。Browser 名单固定为 `browser_cua`、`browser_dom`、`browser_locator`、`browser_navigation`、`browser_tabs`、`browser_user`、`browser_wait`、`browser_io`、`browser_debug`、`browser_help`、`browser_run`，实际仍与 Profile 已注册集合取交集。新增工具需显式更新策略及集合测试，不能自动放行。
+上表是当前各工具插件在自己的 `ToolDefinition.modes` 里声明的结果，不是 `core/agent` 里的常量：`web` 声明 `["chat"]`、`generate_image` 声明 `["chat", "agent"]`、文件探索/Web 查询/图片分析/Todo/后台任务/内部 Subagent 工具声明 `["plan", "agent"]`、文件修改/`bash`/`present`/Browser/外部 Subagent 后端/`plugin_manager`/`harness_inspect` 声明 `["agent"]`。自进化产出的 `actspace.evolved.*` 工具由 `plugin-manager/build.ts` 统一钉死为 `["agent"]`，`allowedAgentModeTools` 再按 pluginId 前缀兜底一次，候选插件自己声明的 modes 不生效。实际可见集合仍与 Profile 已注册集合取交集。新增工具必须声明 `modes`（`normalizeToolDefinition` 拒绝缺失或未知值），`packages/core/runtime/src/harness/default-harness.test.ts` 对三种模式的实际集合做快照断言，改动 modes 要同步改那里。
 
 Plan 的限制不依赖 `read-only` 标记推断：禁用 Shell 工具 `bash`；禁用文件修改、Browser、生图及通用 `agent` 委派。允许 Todo 是有意允许写入会话规划状态，不表示允许修改工作区；允许后台任务工具是为了管理后台 `explore`，Plan 下没有后台 Bash 来源。计划正文作为回复持久化；本版不增加计划文件写入例外。
 
@@ -93,7 +93,7 @@ Chat 生图可产生费用和 Session Artifact，因此不是“完全只读”�
 
 ### 5.1 统一工具门禁
 
-有效工具集合为：Host 已注册能力 ∩ 形态成员贡献 ∩ 模式白名单 ∩ Agent scope/委派上限。
+有效工具集合为：Host 已注册能力 ∩ 形态成员贡献 ∩ 工具自声明的模式 ∩ Agent scope/委派上限。
 
 同一份不可变策略快照供 Request Assembly 与 Tool Runtime 使用，至少包含 Session/Agent 身份、形态版本、模式和策略修订号。Runtime 从可信 AgentScope 绑定取得策略，不能相信模型参数或 renderer 自报的 allowed tools。
 

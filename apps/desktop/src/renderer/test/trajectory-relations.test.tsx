@@ -43,7 +43,7 @@ describe('trajectory content and call relations', () => {
   it('preserves block order and resolves owners and historical schemas by identity', () => {
     const runtime = buildTrajectorySnapshot(snapshot);
     const assistant = runtime.records.find(record => record.messageId === 'a')!;
-    const tool = runtime.records.find(record => record.callId === 'c1')!;
+    const tool = runtime.records.find(record => record.callId === 'c1');
     expect(tool).toMatchObject({ assistantRecordId: assistant.id, result: 'first output', schemaDetail: { description: 'Execute a shell command.' } });
     expect(runtime.records.find(record => record.callId === 'child')).toMatchObject({ assistantRecordId: assistant.id, parentCallId: 'c2', schemaDetail: { description: 'Execute a shell command.' } });
     expect(runtime.records.find(record => record.callId === 'orphan')?.assistantRecordId).toBeNull();

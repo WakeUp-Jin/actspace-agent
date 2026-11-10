@@ -85,7 +85,7 @@ export class JsonlSessionStorage implements SessionStorage {
       integrity: complete ? "complete" as const : "repair-required" as const,
       ...(!complete ? { problem: inspection.diagnostics.map(item => item.message).join("; ") } : {}),
       ...(inspection.bytes !== undefined ? { bytes: inspection.bytes } : {}),
-      ...(complete ? { validated: Object.freeze({ codecDigest: this.options.registry.digest, accessState: inspection.accessState, result: inspection.validation! }) } : {}),
+      ...(complete ? { validated: Object.freeze({ codecDigest: this.options.registry.digest, accessState: inspection.accessState, result: inspection.validation }) } : {}),
     });
     if (resume !== null && complete) this.#resumes.set(snapshot, resume);
     return snapshot;

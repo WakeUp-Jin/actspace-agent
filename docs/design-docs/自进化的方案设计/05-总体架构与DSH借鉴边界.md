@@ -99,6 +99,6 @@ Skill、查询、编辑解释“怎样产生候选”；Manager 解释“怎样�
 
 支持新增与修改受支持的工具插件，参数处理、组合调用、输出加工等应落在允许修改的 Harness 范围内。Host 端口、凭据、权限裁决、持久化 Codec、管理服务自身不作为自进化对象。
 
-工具执行逻辑可能委托给 Host；例如 [filesystem-read](../../../packages/fs/tool-fs-read/src/plugin.ts) 的文件读取由 Host port 提供。修改 Harness 包不能自动改变 Host 能力。inspect 应明确哪些源码可编辑、哪些需求超出范围。
+部分工具执行逻辑仍委托给 Host：网页和图片工具的实现由 Host port 提供（凭据、模型绑定在 Host）。文件和 Shell 工具的实现已在 Harness 树内（例如 [filesystem-read](../../../packages/fs/tool-fs-read/src/plugin.ts) 自带 `node-ports`），Host 只给能力授予 `actspace.host.filesystem` / `actspace.host.process`。修改 Harness 包不能自动改变 Host 能力或授予。inspect 应明确哪些源码可编辑、哪些需求超出范围。
 
 不建立后台全量失败挖掘、完整自动评估平台、Actor 名册或多智能体协作。最脆弱的前提是可编辑源码与依赖可完整交付；若某插件只有不可重建产物，保留其可调用能力并拒绝“原插件修改”，允许用户另行提出基于公开接口的扩展。

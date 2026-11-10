@@ -7,6 +7,7 @@ export * from "./core-guards.js";
 export * from "./definition.js";
 export * from "./errors.js";
 export * from "./executor.js";
+export * from "./host-ports.js";
 export * from "./ordered-commit.js";
 export * from "./permission/index.js";
 export * from "./prepared-execution.js";

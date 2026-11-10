@@ -1,5 +1,6 @@
 import type { CordisContext } from "@actspace/cordis-adapter";
-import { contribute, publish, promptSourceKey, type SourceOptions } from "@actspace/prompt/source-support";
+import { publish } from "@actspace/context-assembly";
+import { contribute, promptSourceKey, type SourceOptions } from "@actspace/prompt/source-support";
 import type { ContextSource } from "@actspace/context-engine";
 export function createSystemSource(options: SourceOptions): ContextSource {
   return { id: "context-system", owner: "actspace.context-system", order: 0, criticality: "required", fields: ["system"],

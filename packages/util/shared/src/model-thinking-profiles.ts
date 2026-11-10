@@ -1,3 +1,4 @@
+import { stripModelTag } from "./model-catalog-match";
 import type { ModelApi } from "./model-config";
 
 /** 设置页统一的思考档位词表。顺序即从低到高。 */
@@ -35,7 +36,7 @@ const PROTOCOL_FALLBACK: Record<ModelApi, ModelThinking> = {
 };
 
 export function thinkingProfileFor(apiModel: string, protocol: ModelApi): ModelThinking {
-  const id = apiModel.split("/").pop()!.toLowerCase().replace(/:.*$/, "");
+  const id = stripModelTag(apiModel.split("/").pop()!).toLowerCase();
   const hit = PROFILES.find(([pattern]) => pattern.test(id))?.[1] ?? PROTOCOL_FALLBACK[protocol];
   return cloneThinking(hit);
 }

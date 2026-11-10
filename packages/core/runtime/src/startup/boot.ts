@@ -9,6 +9,7 @@ import { sandboxStatusDiagnostic } from "./sandbox-status.js";
 import { SESSION_CODEC_HOST_PORT_ID } from "@actspace/session-journal";
 import { hostTransportPatches, loadBuiltinToolCodec, toolTransportPatches } from "../profiles/composition.js";
 import { harnessEntriesMissingHostCapabilities, harnessEntriesOffByDefault } from "../plugin-catalog.js";
+import { MAIN_AGENT_FORM } from "../main-agent-form.js";
 import type { EventCodec } from "@actspace/session-journal";
 import type { ToolPreparedEnvironment } from "@actspace/tool-runtime";
 import type { LlmService } from "@actspace/llm-service";
@@ -172,6 +173,7 @@ async function bootDshClaimedRuntime(options: BootRuntimeOptions): Promise<Boote
       onHarnessDiagnostic: (error: unknown) => diagnostics.record({ severity: "error", source: "boot", code: "HARNESS_RECOVERY_BLOCKED", message: error instanceof Error ? error.message : String(error) }),
       onSandboxStatus: (status: import("@actspace/sandbox").SandboxStatus | undefined) => diagnostics.record(sandboxStatusDiagnostic(status)),
       host: options.host,
+      agentForm: MAIN_AGENT_FORM,
       toolEnvironment: options.toolEnvironment,
       contextDisclosure: createContextHost(() => runtimeContext?.get?.("session.runtime") as RuntimeSessionController | undefined, options.toolEnvironment),
       workspaceRoot: options.toolEnvironment.workspaceRoot,

@@ -29,7 +29,7 @@ const metrics = () => screen.getByRole("region", { name: "Harness 指标" });
 const metric = (label: string) => within(metrics()).getByText(label).closest("button")!;
 const detailTab = (name: RegExp) => within(screen.getByRole("tablist", { name: "Harness 明细" })).getByRole("tab", { name });
 const header = (table: HTMLElement, label: string) => within(table).getAllByRole("columnheader").find((cell) => cell.textContent === label)!;
-const firstCell = (table: HTMLElement) => within(within(table).getAllByRole("row")[1]!).getAllByRole("cell")[0]!.textContent;
+const firstCell = (table: HTMLElement) => within(within(table).getAllByRole("row")[1]).getAllByRole("cell")[0].textContent;
 
 async function ready() {
   render(<HarnessStatsPage />);
@@ -227,7 +227,7 @@ describe("Harness 统计页", () => {
     }
     // 压缩记录默认时间倒序：第一行是最近的一次。
     const records = screen.getByRole("table", { name: "压缩记录" });
-    const times = within(records).getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0]!.textContent ?? "");
+    const times = within(records).getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0].textContent ?? "");
     expect([...times].sort().reverse()).toEqual(times);
 
     await userEvent.click(detailTab(/^工具/));
@@ -271,7 +271,7 @@ describe("Harness 统计页", () => {
     render(<HarnessStatsPage />);
     expect(await screen.findByText(/统计同步失败：磁盘已满/)).toBeInTheDocument();
     const calls = retry.mock.calls.length;
-    await userEvent.click(screen.getAllByRole("button", { name: "重试" })[0]!);
+    await userEvent.click(screen.getAllByRole("button", { name: "重试" })[0]);
     await waitFor(() => expect(retry.mock.calls.length).toBeGreaterThan(calls));
   });
 });

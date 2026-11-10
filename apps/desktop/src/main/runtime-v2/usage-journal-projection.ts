@@ -20,11 +20,6 @@ export function createUsageJournalSchema(db: ProjectionDatabase): void {
   `);
 }
 
-export function clearUsageJournal(db: ProjectionDatabase, sessionId: string): void {
-  for (const table of ["events", "requests", "groups", "turns"]) prepare(db, `DELETE FROM usage_projection_${table} WHERE session_id=?`).run(sessionId);
-  prepare(db, "DELETE FROM index_state WHERE key=?").run(`cursor:${sessionId}`);
-}
-
 /** Persist only fields used by the existing Usage projection, never transcript/tool bodies.
  * Reproject affected step/call groups, so retries and terminal events can cross read batches. */
 export async function projectUsageJournalBatch(db: ProjectionDatabase, source: UsageJournalSource, events: readonly SessionEventEnvelopeV1[], write: (rows: UsageActivityRow[]) => Promise<void>): Promise<void> {

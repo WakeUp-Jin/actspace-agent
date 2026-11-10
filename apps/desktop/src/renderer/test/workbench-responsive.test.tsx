@@ -53,6 +53,11 @@ function renderWorkbench(overrides: Partial<WorkbenchProps> = {}) {
   return render(<WorkbenchFixture {...overrides} />);
 }
 
+// SettingsPage 是 React.lazy：本文件第一次打开设置要等 vite 转译整棵设置树，CI 冷缓存下超过 findBy 默认的 1 s。
+function findSettingsBackButton() {
+  return screen.findByRole("button", { name: "返回应用" }, { timeout: 10_000 });
+}
+
 function StatefulWorkbench({ sessions }: { sessions: WorkbenchProps["sessions"] }) {
   const [activeSessionId, setActiveSessionId] = useState(sessions[0]?.id ?? null);
   const activeTitle = sessions.find((session) => session.id === activeSessionId)?.title ?? "New chat";
@@ -195,7 +200,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
       messages: [{ kind: "user", id: "message-1", renderKey: "message-1", content: "你好", createdAt: "2026-10-06T00:00:00.000Z" }],
     });
     await user.click(screen.getByRole("button", { name: "打开面板" }));
-    const usage = screen.getAllByRole("button", { name: /^上下文用量 / })[0]!;
+    const usage = screen.getAllByRole("button", { name: /^上下文用量 / })[0];
 
     await user.click(usage);
     expect(screen.getByRole("dialog", { name: "上下文用量" })).toHaveFocus();
@@ -239,7 +244,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
 
     await user.type(screen.getByLabelText("消息输入框"), "keep this draft");
     await user.click(screen.getByRole("button", { name: "设置" }));
-    await user.click(await screen.findByRole("button", { name: "返回应用" }));
+    await user.click(await findSettingsBackButton());
 
     expect(screen.getByLabelText("消息输入框")).toHaveValue("keep this draft");
   });
@@ -470,7 +475,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
     expect(screen.queryByRole("button", { name: "分析观测" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "使用统计" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "归档会话" })).toBeInTheDocument();
-    await user.click(await screen.findByRole("button", { name: "返回应用" }));
+    await user.click(await findSettingsBackButton());
     expect(screen.getByLabelText("消息输入框")).toBeInTheDocument();
   });
 });

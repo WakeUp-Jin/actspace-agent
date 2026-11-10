@@ -63,9 +63,9 @@ it("records each request's buckets from the shared fold and drops the total afte
     expect(point.estimatedTokens).toBe(expected(point.requestId).totalEstimatedTokens);
     expect(point.buckets).toEqual(expected(point.requestId).buckets);
   }
-  expect(result.trend[1]!.buckets.tools).toBeGreaterThan(result.trend[0]!.buckets.tools!);
-  expect(result.trend[2]!.estimatedTokens).toBeLessThan(result.trend[1]!.estimatedTokens);
-  expect(result.trend[2]!.buckets.summarizedConversation).toBeGreaterThan(0);
+  expect(result.trend[1].buckets.tools).toBeGreaterThan(result.trend[0].buckets.tools!);
+  expect(result.trend[2].estimatedTokens).toBeLessThan(result.trend[1].estimatedTokens);
+  expect(result.trend[2].buckets.summarizedConversation).toBeGreaterThan(0);
   expect(result.previous?.entries.every(entry => entry.bucket !== "conversation")).toBe(true);
 });
 

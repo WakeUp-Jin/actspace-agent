@@ -21,7 +21,7 @@ async function bootToolNames(capabilities: readonly string[], disabledPlugins?: 
   const host = { hostKind: "cli-run" as const, capabilityCeiling: capabilities as typeof BASE_CAPABILITIES, runtimeContract: "actspace.runtime.v2" as const, invocationId: "test" };
   const composition = createProfileComposition(RUNTIME_PROFILE_IDS.headless, host);
   const env = { workspaceRoot: root, hostCapabilities: new Set<string>(capabilities), capabilitySet: { ids: capabilities, has: () => true, get: <T>() => ({}) as T }, createArtifact: async () => { throw new Error("unused"); } };
-  const ports = Object.fromEntries(PLUGIN_CATALOG.filter(item => item.manifest.behaviors[0]!.injects?.some(id => String(id) === `actspace.host.tools.${item.id}`)).map(item => [`actspace.host.tools.${item.id}`, { createPorts: () => ({}) }]));
+  const ports = Object.fromEntries(PLUGIN_CATALOG.filter(item => item.manifest.behaviors[0].injects?.some(id => String(id) === `actspace.host.tools.${item.id}`)).map(item => [`actspace.host.tools.${item.id}`, { createPorts: () => ({}) }]));
   let profile: Awaited<ReturnType<typeof bootProfileRuntime>> | undefined;
   try {
     profile = await bootProfileRuntime({

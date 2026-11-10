@@ -11,7 +11,6 @@ import {
 
 const Menu = ({ modal = false, ...props }: React.ComponentPropsWithoutRef<typeof MenuPrimitive.Root>) => <MenuPrimitive.Root modal={modal} {...props} />;
 const MenuTrigger = MenuPrimitive.Trigger;
-const MenuGroup = MenuPrimitive.Group;
 const MenuSub = MenuPrimitive.Sub;
 const MenuRadioGroup = MenuPrimitive.RadioGroup;
 
@@ -92,6 +91,6 @@ function MenuShortcut({ className, ...props }: React.HTMLAttributes<HTMLSpanElem
 }
 
 export {
-  Menu, MenuTrigger, MenuContent, MenuGroup, MenuItem, MenuCheckboxItem, MenuRadioGroup, MenuRadioItem,
+  Menu, MenuTrigger, MenuContent, MenuItem, MenuCheckboxItem, MenuRadioGroup, MenuRadioItem,
   MenuSub, MenuSubTrigger, MenuSubContent, MenuSeparator, MenuLabel, MenuShortcut,
 };

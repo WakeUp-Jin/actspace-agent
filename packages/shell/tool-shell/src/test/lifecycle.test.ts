@@ -1,8 +1,9 @@
 import { mkdtemp, mkdir, realpath, symlink, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
-import { materializeToolArguments, ToolRuntime } from "@actspace/tool-runtime";
+import { describe, expect, it, vi } from "vitest";
+import { CordisContextClass } from "@actspace/cordis-adapter";
+import { materializeToolArguments, PROCESS_HOST_PORT_ID, ToolRuntime, type ProcessHostGrant } from "@actspace/tool-runtime";
 import type { SandboxService } from "@actspace/sandbox/types";
 import { apply, registerTools, TOOL_DEFINITIONS } from "../plugin.js";
 import { manifest } from "../manifest.js";
@@ -85,10 +86,34 @@ describe("shell-tools lifecycle", () => {
     for (const item of registrations) await item.handle.dispose();
     for (const item of TOOL_DEFINITIONS) expect(() => runtime.registry.capture(item.localName)).toThrow(/not active/);
   });
-  it("rejects a missing Host port before registering", async () => {
+  it("rejects a tree without tools.runtime or actspace.host.session before registering", async () => {
     const runtime = new ToolRuntime();
-    await expect(apply({ get: (id: string) => id === "tools.runtime" ? runtime : undefined } as never)).rejects.toThrow(/requires/);
+    await expect(apply({ get: (id: string) => id === "tools.runtime" ? runtime : undefined } as never)).rejects.toThrow(/requires tools.runtime and actspace.host.session/);
     expect(runtime.registry.listDefinitions()).toEqual([]);
+  });
+  it("registers an unavailable bash without the process grant and hands the Host process control with it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bash-grant-"));
+    try {
+      const root = await realpath(dir);
+      const onProcesses = vi.fn();
+      for (const grant of [undefined, { workspaceRoot: root, tmpRoot: join(root, "tmp"), onProcesses } satisfies ProcessHostGrant | undefined]) {
+        const ctx = new CordisContextClass(); const runtime = new ToolRuntime();
+        ctx.provide("tools.runtime", runtime); ctx.provide("actspace.host.session", { dataRoot: join(root, "data") });
+        if (grant) ctx.provide(PROCESS_HOST_PORT_ID, grant);
+        await ctx.plugin({ apply: inner => apply(inner as never) });
+        expect(runtime.registry.listDefinitions().map(item => item.name)).toEqual(["bash"]);
+        const service = ctx.get("tools.shell-tools") as { hasRunningBackgroundTask(sessionId: string): boolean };
+        expect(service.hasRunningBackgroundTask("s")).toBe(false);
+        if (grant) expect(onProcesses).toHaveBeenCalledWith(expect.objectContaining({ forceTerminate: expect.any(Function) }));
+        else {
+          expect(onProcesses).not.toHaveBeenCalled();
+          const context = { pluginId: manifest.pluginId, name: "bash", callId: "c", sessionId: "s", workspaceRoot: root, agentRunId: "r", turnId: "t", stepId: "s", signal: new AbortController().signal, capabilities: { ids: [], has: () => true, get: () => undefined as never }, reportProgress: () => undefined, createArtifact: async () => { throw new Error("unused"); }, defer: () => undefined };
+          expect(await runtime.registry.capture("bash").executor.execute({ command: "true" }, context)).toMatchObject({ status: "failed", failure: { code: "CAPABILITY_UNAVAILABLE" } });
+        }
+        await ctx.fiber.dispose();
+        expect(runtime.registry.listDefinitions()).toEqual([]);
+      }
+    } finally { await rm(dir, { recursive: true, force: true }); }
   });
 });
 

@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { RuntimeV2AgentMode, RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { RuntimeV2HostDescriptor } from "@actspace/shared/runtime-v2";
-import { surfaceNode } from "@actspace/shared/runtime-v2";
 import { ContextEngine, surfaceMessage, requestRecords, describeContextContent, type RequestRecords, type ContextEngineOptions, type ContextSourceRegistry, type ContextSource } from "@actspace/context-engine";
 import { contextFromCandidate } from "@actspace/prompt";
 import { estimateRequestInput } from "@actspace/shared";
@@ -275,7 +274,7 @@ export class AgentLoop {
         if (output.toolCalls.length > 0) await this.runTools(output.toolCalls, { agentRunId, turnId, stepId, requestId }, controller.signal, visibleToolNames, requestModel);
         await this.options.session.append(core("step/end", { turnId, stepId, reason: output.toolCalls.length > 0 ? "tool-use" : "completed", usage: output.usage }));
         await this.checkpoint("before-next-step");
-        let updated = await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
+        const updated = await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
         if (compaction !== undefined && !controller.signal.aborted) {
           // Include this Step's tool bodies: the previous Provider usage cannot
           // account for results produced after that request completed.
@@ -289,7 +288,7 @@ export class AgentLoop {
           const compacted = await this.autoCompact(compaction, usage, { agentRunId, turnId }, controller.signal);
           if (compacted || this.options.session.lastSeq !== before) {
             await this.checkpoint("before-next-step");
-            updated = await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
+            await this.publishContext(converted.engine, converted.context.request, { agentRunId, turnId, stepId });
           }
         }
         controller.signal.throwIfAborted();
@@ -352,7 +351,7 @@ export class AgentLoop {
       resolve: input => this.options.contextSources ? {
         request: input,
         content: { system: { sections: [], modelFacts: [] }, conversation: this.options.session.journal.surface, supplements: [], tools: candidate.tools as unknown as readonly LlmToolDefinition[] },
-        status: { throughJournalSeq: this.options.session.lastSeq, cycle: 0, paths: [], facts: candidate.facts, plugins: { "actspace.loop": { ...runtime, hostFacts: candidate.facts[0] ?? {} }, "actspace.context.compaction": { summaries: this.options.session.journal.surface.entries.flatMap(entry => { const seq = entry.sourceEventSeqs.reduce((a, b) => Math.max(a, b), -1); return this.options.session.journal.readEvents(seq, seq + 1); }).filter(event => event.type === "surface/replaced" && event.surface?.kind === "replace").map(event => { const messageId = surfaceNode(event)!.messageId; return { messageId, compactionId: (event.data as { compactionId?: string }).compactionId ?? messageId }; }) } } },
+        status: { throughJournalSeq: this.options.session.lastSeq, cycle: 0, paths: [], facts: candidate.facts, plugins: { "actspace.loop": { ...runtime, hostFacts: candidate.facts[0] ?? {} }, "actspace.context.compaction": { summaries: compactionSummaries(this.options.session.journal.surface) } } },
       } : contextFromCandidate(input, candidate, this.options.session.journal.surface, this.options.session.lastSeq),
       session: this.options.contextSources ? this.options.session : undefined,
       sources: this.options.contextSources,
@@ -370,7 +369,7 @@ export class AgentLoop {
     const available = this.options.tools.registry.listDefinitions();
     const modeTools = this.options.descriptor.kind === "subagent"
       ? new Set(available.map(definition => definition.name))
-      : allowedAgentModeTools(mode, available.map(definition => definition.name), available.filter(definition => definition.pluginId.startsWith("actspace.evolved.")).map(definition => definition.name));
+      : allowedAgentModeTools(mode, available);
     return available
       .filter((definition) => modeTools.has(definition.name)
         && (this.options.toolScopeToken === undefined || this.options.descriptor.kind === "subagent" || this.options.scope.tools.get(definition.name)?.value === definition.pluginId)
@@ -562,7 +561,7 @@ function appendRuntimeContext(content: RuntimeV2JsonValue, mode: RuntimeV2AgentM
 }
 function currentAgentModeRevision(events: readonly { readonly type: string; readonly data: RuntimeV2JsonValue }[]): number {
   for (let index = events.length - 1; index >= 0; index--) {
-    const event = events[index]!;
+    const event = events[index];
     if (event.type === "agent/mode-set" && isRecord(event.data) && typeof event.data.revision === "number") return event.data.revision;
   }
   return 0;
@@ -577,6 +576,12 @@ function compactionUsage(value: RuntimeV2JsonValue, contextWindow: number | null
   const cacheWrite = typeof record.cacheWriteTokens === "number" ? record.cacheWriteTokens : 0;
   if (![inputTokens, outputTokens, cacheRead, cacheWrite].every(value => Number.isFinite(value) && value >= 0)) return null;
   return { inputTokens: inputTokens + cacheRead + cacheWrite, outputTokens, contextWindow };
+}
+/** 压缩摘要清单直接来自 surface 条目上记的 compactionId（每次请求都跑，不能回头读 surface/replaced 事件）。 */
+function compactionSummaries(surface: import("@actspace/session-journal").SessionSurfaceView): readonly { readonly messageId: string; readonly compactionId: string }[] {
+  const summaries: { messageId: string; compactionId: string }[] = [];
+  for (const entry of surface.entries) if (entry.compactionId !== undefined) summaries.push({ messageId: entry.node.messageId, compactionId: entry.compactionId });
+  return summaries;
 }
 const USER_MESSAGE_IDS = Symbol("user-message-ids");
 function hasUserMessage(session: SessionHandle, messageId: string): boolean {

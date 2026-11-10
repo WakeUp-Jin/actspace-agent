@@ -27,4 +27,4 @@
 - 当前实现以源码和公开契约为准；文档注明部分实施时，不能把目标当作已交付事实。
 - 代码或流程变更让文档过期时，在同一轮里改掉；失效文档删除，需要时查 git 历史。
 - 多智能体协作（Space、Actor 名册）见 `design-docs/多智能体协作/`，当前只做前端演示，不代表 v2 已实现对应 Runtime。
-- 链接用相对路径，不链接 gitignored 或 `tmp/` 下的文件；`pnpm check:docs` 校验必需文件、现行文档的事实口径（退役 API、旧包名、旧事件名、`schema 9`、`billingMode`、个人绝对路径等）、`docs/` 顶层与 design-docs / exec-plans / exec-runs / learnings / coding-standards 的链接，以及 learnings 索引的计数与覆盖；`docs/histories/` 不检查。
+- 链接用相对路径，不链接 gitignored 或 `tmp/` 下的文件；`pnpm check:docs` 校验必需文件、现行文档的事实口径（退役 API、旧包名、旧事件名、`schema 9`、`billingMode`、个人绝对路径等）、反引号里 `packages/`、`apps/`、`scripts/`、`docs/` 路径是否存在（现行文档与 learnings；标注「历史」「已删除」的行除外）、`docs/` 顶层与 design-docs / exec-plans / exec-runs / learnings / coding-standards 的链接，以及 learnings 索引的计数与覆盖；`docs/histories/` 不检查。

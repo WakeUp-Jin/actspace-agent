@@ -131,7 +131,7 @@ const taskCommand: IpcGuard = input => {
     resume: { revision: integer(0) },
     stop: { runId: "string" },
   };
-  return check(command, byOp[command.op as string]!, `Invalid task command (${command.op as string})`);
+  return check(command, byOp[command.op as string], `Invalid task command (${command.op as string})`);
 };
 
 const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> = [
@@ -309,9 +309,10 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
   [contract.modelConnections.getBalance, connectionIdInput],
   // 插件
   [contract.englishLearning.setTarget, shape({ enabled: "boolean", sessionId: nullable(value => typeof value === "string") }, "Invalid English learning target")],
-  [contract.browserBridge.useSourceExtension, input => input === null || typeof input === "string" ? null : "Invalid source root"],
+  [contract.browserBridge.selectSourceExtension, NO_INPUT],
+  [contract.browserBridge.useBundledExtension, NO_INPUT],
   [contract.browserBridge.selectInstance, input => typeof input === "string" ? null : "Invalid browser instance"],
-  [contract.browserBridge.installFromRepo, shape({ repoRoot: "string" }, "Invalid source root")],
+  [contract.browserBridge.installFromRepo, NO_INPUT],
   [contract.skills.list, workspaceRootOnly],
   [contract.skills.uninstall, shape({ directory: "string" }, "Invalid skill directory")],
   // Host 配对与调用

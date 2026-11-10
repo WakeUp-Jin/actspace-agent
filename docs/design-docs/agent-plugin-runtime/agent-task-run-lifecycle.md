@@ -12,7 +12,7 @@ Session 新建、恢复、fork 只打开存储和任务投影。实际执行才�
 
 ## 默认固定产物
 
-`packages/core/runtime/scripts/build-default-harness.mjs` 用仓库已有 esbuild 生成可枚举 ESM 闭包，发布前校验产物和共享模块摘要。默认 Loop、Prompt、工具注册、执行 LLM、compaction 都由 Harness 提供。Host 保留 Session writer/codec/projection、配置和凭据解析、工具底层能力、Agent registry，以及用于标题等辅助操作的 LLM。
+`packages/core/runtime/scripts/build-default-harness.mjs` 用仓库已有 esbuild 生成可枚举 ESM 闭包，发布前校验产物和共享模块摘要。产物分两层：内核条目（Loop、上下文、工具运行时、沙箱、审批）共用一个代码分割闭包，发布为 `actspace.default-harness`；每个贡献工具的插件单独打成自包含的 `plugins/<entry>/plugin.js`，以自己的 pluginId 发布，替换一个工具插件不动内核产物。工具插件只经服务与内核交互，分开打包不会复制依赖模块身份的代码（`instanceof`、Symbol、WeakMap）。默认 Loop、Prompt、工具注册、执行 LLM、compaction 都由 Harness 提供。Host 保留 Session writer/codec/projection、配置和凭据解析、工具底层能力、Agent registry，以及用于标题等辅助操作的 LLM。
 
 Todo projection 只在 Host 注册一次；工具定义随 Harness 装载。Browser Host 的连接由 Host 释放，单个 Harness 的清理只注销工具。子智能体从自己的当前 Harness 租约创建策略 scope，不沿父策略 scope 继承；父权限上限、workspace 和取消通过显式输入传入。子会话也保存接纳、领取、Harness 身份和终态。
 
