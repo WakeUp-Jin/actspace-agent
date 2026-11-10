@@ -28,6 +28,7 @@ kind: "package-group"
 - 每个包：`src/manifest.ts`（工具名、Host 能力）、`src/plugin.ts`（工具定义、权限与注册）、`src/node-ports.ts`。
 - 测试在各包 `src/test/`（`lifecycle.test.ts`、`node-ports.test.ts`）：`pnpm --filter @actspace/tool-fs-read test`，其他包同理。
 - 工具边界见[Tool 插件边界](../../docs/design-docs/agent-plugin-runtime/agent-tool-plugin-boundaries.md)。
+- 输出上限（64,000 字符、单行 2,000 字符）和超出时怎么提示模型，见[工具输出与引用](../../docs/design-docs/tool-system/agent-tool-output-references.md)的「工具结果的体积上限」。
 
 ## 怎么扩展
 
