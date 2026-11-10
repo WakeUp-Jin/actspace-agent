@@ -1,0 +1,154 @@
+/* 「激活」区间：要点在 --on 到 --off 之间亮起，前后都压暗。 */
+@keyframes active-text { 0%, 100% { opacity: 0.5; } 14%, 86% { opacity: 1; } }
+@keyframes active-bar { 0%, 100% { transform: scaleY(0); } 14%, 86% { transform: scaleY(1); } }
+@keyframes active-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ── 01 开场 ─────────────────────────────────────────── */
+.hook-copy { position: absolute; left: 120px; top: 318px; width: 900px; }
+.hook-copy .eyebrow { margin-bottom: 44px; }
+.hook-line { position: absolute; left: 0; top: 64px; font-size: 96px; white-space: nowrap; }
+.hook-field { position: absolute; right: 90px; top: 132px; width: 816px; height: 816px; }
+.hook-catchall { position: absolute; inset: 0; border: 2px dashed var(--faint); border-radius: 36px; }
+.hook-catchall span { position: absolute; left: 34px; bottom: 28px; font: 500 19px/1 var(--mono); letter-spacing: 0.1em; color: var(--muted); }
+.problem { position: absolute; display: grid; place-items: center; }
+.problem-space { position: absolute; inset: 0; animation: pop 1s var(--ease-out) var(--at) both; }
+.problem-space::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--grain); opacity: 0.22; mix-blend-mode: multiply; }
+.tile-peach { background: var(--peach); }
+.tile-peach-soft { background: var(--peach-soft); }
+.tile-mint { background: var(--mint); }
+.tile-lemon { background: var(--lemon); }
+.tile-slate { background: var(--slate-soft); }
+.tile-violet { background: var(--accent-line); }
+.problem-glyph { position: relative; width: 78px; height: 78px; background: var(--ink); animation: pop 0.8s var(--ease-out) var(--at) both; }
+.glyph-circle { border-radius: 50%; }
+.glyph-square { border-radius: 8px; }
+.glyph-triangle { clip-path: polygon(50% 6%, 100% 94%, 0 94%); }
+.glyph-ring { border-radius: 50%; background: none; border: 17px solid var(--ink); }
+.glyph-bars { background: linear-gradient(var(--ink) 0 22%, transparent 22% 39%, var(--ink) 39% 61%, transparent 61% 78%, var(--ink) 78% 100%); width: 96px; }
+.glyph-diamond { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); width: 90px; height: 90px; }
+
+/* ── 02 品牌 ─────────────────────────────────────────── */
+.scene-brand { animation-name: scene-iris; animation-timing-function: var(--ease-in-out); }
+.brand { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 20px; }
+.brand-mark { height: 128px; width: auto; margin-bottom: 18px; }
+.brand-word { font: 600 176px/1.1 var(--serif); letter-spacing: -0.01em; color: var(--ink); }
+.brand-formula { display: flex; align-items: center; gap: 22px; margin-top: 52px; }
+.token { padding: 14px 30px; border-radius: 999px; background: rgba(251, 250, 247, 0.72); box-shadow: 0 0 0 1px rgba(29, 28, 26, 0.1); font: 500 32px/1.2 var(--mono); color: var(--ink); }
+.token-accent { background: var(--accent); color: #fff; box-shadow: none; font-family: var(--sans); font-weight: 600; letter-spacing: 0.06em; }
+.op { font: 400 36px/1 var(--mono); color: var(--body); }
+.brand-tagline { margin-top: 64px; font: 560 62px/1.3 var(--serif); color: var(--ink); }
+.brand-sub { display: flex; align-items: center; gap: 22px; margin-top: 26px; font-size: 28px; color: var(--body); }
+.brand-sub i { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+
+/* ── 03 一次任务 ─────────────────────────────────────── */
+.work-footage { position: absolute; inset: 0; background: var(--peach-base); }
+.work-footage img { width: 100%; height: 100%; object-fit: cover; }
+.work-missing { display: none; position: absolute; inset: 0; place-content: center; text-align: center; font-size: 26px; color: var(--body); }
+.work-missing code { display: block; margin-top: 14px; font: 500 22px/1.4 var(--mono); color: var(--ink); }
+.work-footage.is-missing img { display: none; }
+.work-footage.is-missing .work-missing { display: grid; }
+.work-title { position: absolute; left: 50px; top: 392px; width: 286px; }
+.work-title .eyebrow { font-size: 17px; gap: 12px; }
+.work-title .eyebrow i { width: 30px; background: rgba(29, 28, 26, 0.35); }
+.work-title .display-s { margin-top: 26px; font-size: 50px; line-height: 1.24; }
+.work-lead { margin-top: 26px; font-size: 20px; line-height: 1.7; color: #4a4741; }
+.work-hint { margin-top: 30px; padding-top: 22px; border-top: 1px solid rgba(29, 28, 26, 0.2); font-size: 17px; line-height: 1.75; color: #5d5a53; }
+.work-steps { position: absolute; left: 1592px; top: 304px; width: 290px; display: grid; gap: 12px; }
+.work-step { position: relative; padding: 13px 16px 14px 20px; border-radius: 14px; background: rgba(251, 250, 247, 0.74); box-shadow: 0 0 0 1px rgba(29, 28, 26, 0.07), 0 14px 30px -20px rgba(29, 28, 26, 0.4); }
+.work-step::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: var(--accent); transform-origin: 50% 50%; animation: active-bar calc(var(--off) - var(--on)) linear var(--on) both; }
+.work-step b { display: block; font: 600 21px/1.35 var(--sans); color: var(--ink); }
+.work-step span { display: block; margin-top: 4px; font-size: 16px; line-height: 1.5; color: var(--body); }
+.work-step b, .work-step span { animation: active-text calc(var(--off) - var(--on)) linear var(--on) both; }
+
+/* ── 04 核心特点 ─────────────────────────────────────── */
+.feature-copy { position: absolute; left: 120px; top: 190px; width: 590px; }
+.feature-copy .display-m { margin-top: 30px; }
+.feature-copy .lead { margin-top: 30px; }
+.points { margin-top: 44px; border-top: 1px solid var(--line); }
+.point { position: relative; padding: 20px 0 20px 26px; border-bottom: 1px solid var(--line); }
+.point::before { content: ""; position: absolute; left: 0; top: 22px; bottom: 22px; width: 4px; border-radius: 2px; background: var(--accent); animation: active-bar calc(var(--off) - var(--on)) linear var(--on) both; }
+.point b { display: block; font: 600 30px/1.35 var(--sans); color: var(--ink); }
+.point span { display: block; margin-top: 6px; font-size: 23px; line-height: 1.55; color: var(--body); }
+.point b, .point span { animation: active-text calc(var(--off) - var(--on)) linear var(--on) both; }
+.feature-stage { position: absolute; left: 770px; top: 132px; right: 80px; bottom: 76px; }
+.feature-stage .cam { inset: 54px; }
+
+/* ── 05 一切皆插件 ───────────────────────────────────── */
+.plugins-copy { position: absolute; left: 120px; top: 190px; width: 560px; }
+.plugins-copy .display-m { margin-top: 30px; }
+.plugins-copy .lead { margin-top: 30px; }
+.harness { position: absolute; left: 740px; top: 176px; right: 96px; height: 590px; display: flex; align-items: center; }
+.harness-core { flex: none; width: 244px; height: 244px; border-radius: 50%; display: grid; place-content: center; justify-items: center; gap: 8px; background: var(--paper); box-shadow: 0 0 0 2px var(--ink), 0 0 0 14px rgba(29, 28, 26, 0.05); }
+.harness-core img { height: 58px; width: auto; }
+.harness-core b { font: 560 44px/1.1 var(--serif); color: var(--ink); }
+.harness-core span { font: 400 17px/1 var(--mono); letter-spacing: 0.04em; color: var(--muted); }
+.harness-wires { flex: none; width: 130px; height: 590px; overflow: visible; }
+.wire { fill: none; stroke: var(--faint); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-dasharray: 1; stroke-dashoffset: 1; animation: wire 0.8s var(--ease-in-out) var(--at) both; }
+@keyframes wire { to { stroke-dashoffset: 0; } }
+.racks { flex: 1; height: 590px; display: grid; grid-template-rows: repeat(3, 1fr); gap: 16px; }
+.rack { display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 0 30px; border-radius: 22px; background: var(--paper); box-shadow: 0 0 0 1px var(--line); }
+.rack-name { display: flex; align-items: baseline; gap: 16px; }
+.rack-name b { font: 560 38px/1.2 var(--serif); color: var(--ink); }
+.rack-name span { font: 400 19px/1 var(--mono); letter-spacing: 0.06em; color: var(--muted); }
+.rack-slots { display: flex; gap: 12px; }
+.plug { display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px 10px 14px; border-radius: 999px; background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent-line); font: 500 23px/1.2 var(--sans); color: #4a3596; white-space: nowrap; }
+.plug i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.local { position: absolute; left: 120px; right: 96px; top: 842px; display: flex; align-items: center; gap: 30px; padding-top: 40px; border-top: 1px solid var(--line); }
+.local b { font: 560 44px/1.2 var(--serif); color: var(--ink); }
+.local span { font-size: 26px; color: var(--body); }
+.local code { margin-left: auto; padding: 14px 22px; border-radius: 12px; background: var(--paper); box-shadow: 0 0 0 1px var(--line); font: 500 22px/1.2 var(--mono); color: var(--ink); }
+
+/* ── 06 怎么用 ───────────────────────────────────────── */
+.how-copy { position: absolute; left: 120px; top: 190px; width: 580px; }
+.how-copy .display-s { margin-top: 30px; }
+.how-rail { margin-top: 54px; display: grid; gap: 14px; }
+.how-step { position: relative; display: flex; gap: 24px; padding: 24px 26px; border-radius: 20px; overflow: hidden; }
+.how-step::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); animation: active-card calc(var(--off) - var(--on)) linear var(--on) both; }
+.how-step::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--accent); transform-origin: 0 50%; animation: active-progress calc(var(--off) - var(--on)) linear var(--on) both, step-progress-off 0.01s linear var(--off) forwards; }
+@keyframes active-card { 0%, 100% { opacity: 0; } 8%, 92% { opacity: 1; } }
+@keyframes step-progress-off { to { opacity: 0; } }
+.how-step > * { position: relative; }
+.how-step i { flex: none; font: 600 22px/1.5 var(--mono); font-style: normal; color: var(--accent); }
+.how-step b { display: block; font: 560 34px/1.3 var(--serif); color: var(--ink); }
+.how-step span { display: block; margin-top: 8px; font-size: 21px; line-height: 1.6; color: var(--body); }
+.how-step i, .how-step b, .how-step span { animation: active-text calc(var(--off) - var(--on)) linear var(--on) both; }
+.how-visual { position: absolute; left: 770px; top: 132px; right: 80px; bottom: 76px; }
+.how-panel, .how-stage { position: absolute; inset: 0; }
+.how-stage .cam { left: 54px; right: 54px; top: 50%; transform: translateY(-50%); }
+.how-stage .cam[data-cam="model"] { height: 574px; }
+.how-stage .cam[data-cam="workspace"] { height: 602px; }
+.term { position: absolute; left: 54px; right: 54px; top: 50%; transform: translateY(-50%); border-radius: 18px; background: #1f1e1b; box-shadow: 0 34px 70px -28px rgba(29, 28, 26, 0.6); overflow: hidden; }
+.term-bar { display: flex; align-items: center; gap: 9px; height: 52px; padding: 0 22px; border-bottom: 1px solid rgba(251, 250, 247, 0.08); }
+.term-bar i { width: 13px; height: 13px; border-radius: 50%; background: rgba(251, 250, 247, 0.18); }
+.term-bar span { margin-left: 14px; font: 400 16px/1 var(--mono); letter-spacing: 0.08em; color: rgba(251, 250, 247, 0.45); }
+.term-body { padding: 48px 44px 50px; min-height: 500px; font: 400 24px/1.5 var(--mono); color: #f2f1ed; }
+.term-line { display: flex; gap: 16px; margin-bottom: 30px; white-space: nowrap; }
+.term-line i { font-style: normal; color: #a892e6; }
+.term-line .is-typing::after { content: ""; display: inline-block; width: 12px; height: 26px; margin-left: 3px; vertical-align: -5px; background: #f2f1ed; }
+.term-out { margin-top: 40px; padding-top: 30px; border-top: 1px dashed rgba(251, 250, 247, 0.16); color: #9fd3b4; font-family: var(--sans); font-size: 24px; }
+.term-out::before { content: "✓"; margin-right: 14px; }
+
+/* ── 07 接下来 ───────────────────────────────────────── */
+.next-copy { position: absolute; left: 120px; top: 190px; width: 600px; }
+.next-copy .display-s { margin-top: 30px; font-size: 66px; }
+.next-copy .lead { margin-top: 28px; font-size: 26px; }
+.directions { margin-top: 44px; border-top: 1px solid var(--line); }
+.direction { display: grid; grid-template-columns: 96px 1fr; align-items: center; column-gap: 20px; row-gap: 6px; padding: 19px 0; border-bottom: 1px solid var(--line); }
+.direction .status { justify-self: start; }
+.direction b { font: 600 26px/1.3 var(--sans); color: var(--ink); }
+.direction span { grid-column: 2; font-size: 19px; line-height: 1.5; color: var(--body); }
+.next-stage { position: absolute; left: 790px; top: 132px; right: 80px; bottom: 76px; }
+.next-stage .cam { left: 50px; right: 50px; top: 96px; bottom: 50px; }
+.demo-note { position: absolute; left: 50px; top: 38px; padding: 9px 16px; border-radius: 999px; background: rgba(251, 250, 247, 0.78); font: 500 17px/1 var(--mono); letter-spacing: 0.06em; color: var(--wip); }
+
+/* ── 08 收尾 ─────────────────────────────────────────── */
+.scene-closing { animation-name: scene-lift; animation-timing-function: var(--ease-in-out); }
+.closing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding-bottom: 30px; }
+.closing-mark { height: 104px; width: auto; }
+.closing-line { margin-top: 34px; font-size: 128px; line-height: 1.24; }
+.closing-links { display: flex; gap: 22px; margin-top: 62px; }
+.closing-links p { display: flex; align-items: center; gap: 16px; padding: 18px 30px 18px 22px; border-radius: 999px; background: rgba(251, 250, 247, 0.8); box-shadow: 0 0 0 1px rgba(29, 28, 26, 0.1); }
+.closing-links span { padding: 6px 12px; border-radius: 999px; background: var(--ink); color: var(--paper); font: 500 17px/1.2 var(--sans); letter-spacing: 0.08em; }
+.closing-links b { font: 500 29px/1.2 var(--mono); color: var(--ink); }
+.closing-foot { position: absolute; left: 0; right: 0; bottom: 64px; display: flex; align-items: center; justify-content: center; gap: 18px; font-size: 21px; letter-spacing: 0.04em; color: var(--body); }
+.closing-foot i { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }

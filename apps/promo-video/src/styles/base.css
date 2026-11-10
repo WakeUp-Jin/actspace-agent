@@ -1,0 +1,145 @@
+/* 颜色与字体沿用官网的视觉语言（apps/site/DESIGN.md）：暖纸底、单一紫色强调、带颗粒的色块舞台、衬线标题。 */
+:root {
+  --canvas: #f2f1ed;
+  --paper: #fbfaf7;
+  --ink: #1d1c1a;
+  --body: #5d5a53;
+  --muted: #8a8780;
+  --faint: #b3afa6;
+  --line: #dcd9d1;
+  --accent: #6d4fc2;
+  --accent-soft: #f2eefb;
+  --accent-line: #cdbdf0;
+  --live: #2f6b4d;
+  --live-soft: #dcebe0;
+  --wip: #8a6420;
+  --wip-soft: #efe5cf;
+
+  --peach: #efc3a6;
+  --peach-soft: #f4d9c6;
+  --peach-base: #e6cdbb;
+  --slate: #8fa3b8;
+  --slate-soft: #b7c5d3;
+  --mint: #b9d9c7;
+  --mint-deep: #9cc5ae;
+  --mint-base: #cfe3d2;
+  --lemon: #efe3a0;
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .2  0 0 0 0 .18  0 0 0 0 .15  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+
+  --serif: "Noto Serif SC Variable", serif;
+  --sans: "Noto Sans SC Variable", sans-serif;
+  --mono: "JetBrains Mono Variable", "Noto Sans SC Variable", monospace;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: #151412; color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+h1, h2, p, ol { margin: 0; padding: 0; }
+ol { list-style: none; }
+img { display: block; }
+
+/* 画布固定 1920×1080；预览时整体缩放，渲染时原尺寸截图。 */
+#film { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--canvas); }
+
+.scene { position: absolute; inset: 0; display: none; overflow: hidden; background: var(--canvas); animation: scene-fade var(--enter) ease both; }
+.scene.is-on { display: block; }
+@keyframes scene-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scene-iris { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(75% at 50% 50%); } }
+@keyframes scene-lift { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+
+/* 入场动画：延时用 --at，可选的离场时刻用 --out（都以所在分镜的开始为零点）。 */
+.rise { animation: rise 0.9s var(--ease-out) var(--at, 0s) both, leave 0.5s var(--ease-in) var(--out, 9999s) forwards; }
+.fade { animation: fade 0.7s ease var(--at, 0s) both, fade-out 0.45s ease var(--out, 9999s) forwards; }
+.pop { animation: pop 0.8s var(--ease-out) var(--at, 0s) both, leave 0.5s var(--ease-in) var(--out, 9999s) forwards; }
+.mask { display: block; overflow: hidden; padding: 0.1em 0 0.16em; margin: -0.1em 0 -0.16em; }
+.up { display: block; animation: up 1s var(--ease-out) var(--at, 0s) both, up-out 0.6s var(--ease-in) var(--out, 9999s) forwards; }
+@keyframes rise { from { opacity: 0; transform: translateY(34px); } to { opacity: 1; transform: none; } }
+@keyframes leave { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-26px); } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }
+@keyframes up { from { transform: translateY(135%); } to { transform: none; } }
+@keyframes up-out { from { transform: none; } to { transform: translateY(-135%); } }
+
+/* 字阶 */
+.display, .display-m, .display-s { font-family: var(--serif); font-weight: 560; letter-spacing: 0.005em; color: var(--ink); }
+.display { font-size: 104px; line-height: 1.24; }
+.display-m { font-size: 92px; line-height: 1.2; }
+.display-s { font-size: 60px; line-height: 1.26; }
+.display em, .display-m em, .display-s em { font-style: normal; color: var(--accent); }
+.lead { font-size: 29px; line-height: 1.62; color: var(--body); text-wrap: balance; }
+.eyebrow { display: flex; align-items: center; gap: 16px; font: 500 20px/1 var(--mono); letter-spacing: 0.14em; color: var(--muted); }
+.eyebrow i { width: 52px; height: 1px; background: var(--faint); }
+.eyebrow b { font-weight: 600; color: var(--accent); letter-spacing: 0.06em; }
+
+/* 色块舞台：渐变色场加一层颗粒。 */
+.stage { position: relative; overflow: hidden; border-radius: 28px; isolation: isolate; }
+.stage::before, .stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.stage::before { z-index: -2; }
+.stage::after { z-index: -1; background: var(--grain); opacity: 0.2; mix-blend-mode: multiply; }
+.stage-full { position: absolute; inset: 0; border-radius: 0; }
+.stage-peach::before {
+  background:
+    radial-gradient(60% 80% at 12% 10%, var(--peach-soft) 0, transparent 60%),
+    radial-gradient(50% 70% at 88% 20%, var(--slate-soft) 0, transparent 65%),
+    radial-gradient(45% 60% at 70% 100%, var(--slate) 0, transparent 70%),
+    radial-gradient(40% 55% at 5% 95%, var(--peach) 0, transparent 70%),
+    var(--peach-base);
+}
+.stage-mint::before {
+  background:
+    radial-gradient(55% 75% at 90% 5%, var(--lemon) 0, transparent 62%),
+    radial-gradient(50% 70% at 10% 30%, var(--mint) 0, transparent 66%),
+    radial-gradient(45% 60% at 60% 105%, var(--mint-deep) 0, transparent 70%),
+    radial-gradient(35% 45% at 100% 85%, #e8d98a 0, transparent 70%),
+    var(--mint-base);
+}
+.stage-slate::before {
+  background:
+    radial-gradient(60% 80% at 85% 10%, var(--slate-soft) 0, transparent 62%),
+    radial-gradient(50% 70% at 10% 20%, #d9dfe4 0, transparent 66%),
+    radial-gradient(45% 60% at 20% 105%, var(--slate) 0, transparent 70%),
+    radial-gradient(35% 45% at 100% 95%, var(--peach-soft) 0, transparent 70%),
+    #c9d3dc;
+}
+.stage-lemon::before {
+  background:
+    radial-gradient(55% 75% at 8% 8%, #f5eebc 0, transparent 62%),
+    radial-gradient(50% 70% at 94% 26%, var(--mint) 0, transparent 66%),
+    radial-gradient(45% 60% at 28% 105%, #e8d98a 0, transparent 70%),
+    radial-gradient(40% 50% at 100% 96%, var(--peach-soft) 0, transparent 70%),
+    #ece6c6;
+}
+.grain { position: absolute; inset: 0; background: var(--grain); opacity: 0.1; mix-blend-mode: multiply; pointer-events: none; }
+
+/* 分镜角标 */
+.chrome { position: absolute; top: 54px; left: 120px; right: 110px; display: flex; align-items: center; justify-content: space-between; }
+.chrome-brand { display: flex; align-items: center; gap: 12px; font: 560 26px/1 var(--serif); color: var(--ink); }
+.chrome-brand img { height: 30px; width: auto; }
+.chrome-chapter { display: flex; align-items: center; gap: 14px; font: 500 19px/1 var(--mono); letter-spacing: 0.14em; color: var(--muted); }
+.chrome-chapter b { font-weight: 600; color: var(--accent); letter-spacing: 0.06em; }
+
+/* 截图镜头与聚光框 */
+.cam { position: absolute; overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 34px 70px -28px rgba(29, 28, 26, 0.42), 0 0 0 1px rgba(29, 28, 26, 0.08); }
+.cam-layer { position: absolute; left: 0; top: 0; transform-origin: 0 0; --inv: 1; }
+.cam-layer img { width: 100%; height: 100%; }
+.focus {
+  position: absolute;
+  left: calc(var(--x) * 100%);
+  top: calc(var(--y) * 100%);
+  width: calc(var(--w) * 100%);
+  height: calc(var(--h) * 100%);
+  border-radius: calc(12px * var(--inv));
+  box-shadow: 0 0 0 calc(3px * var(--inv)) var(--accent), 0 0 0 calc(9px * var(--inv)) rgba(109, 79, 194, 0.2), 0 0 0 6000px rgba(29, 28, 26, 0.24);
+  animation: window-fade calc(var(--off) - var(--on)) linear var(--on) both;
+}
+@keyframes window-fade { 0% { opacity: 0; } 22% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* 状态标签 */
+.status { font: 500 16px/1 var(--mono); font-style: normal; padding: 7px 12px; border-radius: 999px; white-space: nowrap; }
+.status-live { background: var(--live-soft); color: var(--live); }
+.status-wip { background: var(--wip-soft); color: var(--wip); }

@@ -1,0 +1,11 @@
+/* 预览播放器。渲染模式（?render=1）下不显示，画布按原尺寸贴在左上角。 */
+body.is-preview { display: flex; flex-direction: column; overflow: hidden; }
+body.is-preview #viewport { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+body.is-preview #film { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--fit, 1)); box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7); }
+
+#player { flex: none; display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: #1f1e1b; color: #f2f1ed; font: 500 13px/1 var(--mono); }
+#player[hidden] { display: none; }
+#player button { min-width: 64px; padding: 8px 14px; border: 0; border-radius: 8px; background: #f2f1ed; color: #1d1c1a; font: 600 13px/1 var(--sans); cursor: pointer; }
+#player input { flex: 1; accent-color: #a892e6; }
+#player output { font-variant-numeric: tabular-nums; color: rgba(242, 241, 237, 0.7); }
+#scene-name { min-width: 150px; }
