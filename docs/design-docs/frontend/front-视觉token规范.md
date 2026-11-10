@@ -108,7 +108,8 @@
 
 ## 6. 间距与密度
 
-- 4px 网格，用 Tailwind 间距刻度（`p-1` = 4px），不写 `p-[13px]` 这类零散值；历史写死值记在 `exec-plans/tech-debt-tracker.md`。
+- 4px 网格，用 Tailwind 间距刻度（`p-0.5` = 2px、`p-1` = 4px、`p-1.5` = 6px、`p-2` = 8px），不写 `p-[7px]`、`gap-[3px]`、`mt-[13px]` 这类零散值；margin / padding / gap / space / inset 的 `-[Npx]` 任意值按文件计数，不得超过 `scripts/spacing-literal-baseline.json` 的基线（desktop 与 web 各一组）。
+- 存量约 107 处（2026-11 统计：`7px` 32、`3px` 18、`5px` 10、`18px` 10，其余零散）只减不增：改到某个文件就把它的任意值收到相邻刻度（7→6 或 8，3→2 或 4，5→4 或 6，18→16 或 20），在 Electron 里复看一眼，再跑 `node scripts/check-frontend-design-tokens.mjs --update-spacing-baseline` 收紧基线。确实要和某个像素对齐（例如和图标基线、字形对齐）的，PR 里说明原因再更新基线。
 - 列表行高：侧栏 32–40px；设置行最小 52px（紧凑 44px）；表格行约 36px。
 - 图标按钮视觉可以小，点击区接近 32px；尺寸只用 `IconButton` 的档位。
 - 设置内容列保持阅读宽度，大窗口不横向铺满；中间消息区保护行长（`--conversation-content-width` 880px）和 Composer 宽度。
@@ -215,6 +216,6 @@ Tailwind v4 + Preflight，入口 `styles/index.css`，层序 `theme, base, chrom
 
 ## 13. 检查命令
 
-- `pnpm check:frontend-tokens`：禁止 `text-[Npx]`、Tailwind 默认字号、`rounded-[…]`、`z-[N≥3]`、`duration-[…]` / `duration-N`、Tailwind 调色板色名、彩色焦点环、旧冷色阴影、JSX 里的 `strokeWidth=`、§12 表格左列的 lucide 导入名；确认引用的 `text-act-*`、`rounded-act-*`、`shadow-act-*`、`--act-*`、`--motion-*` 都有定义；原生 `<button>` 数量不得超过基线；`createPortal`、`role="dialog"` 只能在 `components/ui/`。例外按「文件 + 精确匹配串」登记在脚本的 `LITERAL_ALLOWLIST`。
+- `pnpm check:frontend-tokens`：禁止 `text-[Npx]`、Tailwind 默认字号、`rounded-[…]`、`z-[N≥3]`、`duration-[…]` / `duration-N`、Tailwind 调色板色名、彩色焦点环、旧冷色阴影、JSX 里的 `strokeWidth=`、§12 表格左列的 lucide 导入名；确认引用的 `text-act-*`、`rounded-act-*`、`shadow-act-*`、`--act-*`、`--motion-*` 都有定义；原生 `<button>` 数量不得超过基线；间距任意值（§6）数量不得超过 `scripts/spacing-literal-baseline.json`；`createPortal`、`role="dialog"` 只能在 `components/ui/`。例外按「文件 + 精确匹配串」登记在脚本的 `LITERAL_ALLOWLIST`。
 - `pnpm check:frontend-theme`：token 的浅 / 深 / system 三个分支完整，强调色调色板与 CSS 块一一对应并满足对比度，组件无黑白与任意值颜色字面量。
 - 两个命令都同时扫描 `apps/web/src`，web 没有字面量例外。
