@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, Plus, X } from "lucide-react";
 import {
   PROTOCOL_LABELS,
@@ -64,12 +64,12 @@ export function ConnectionDetailPage({ connectionId, initialExpanded, initialPro
   runRef.current = controller.run;
   const undoTimer = useRef<number | undefined>(undefined);
   const flashTimer = useRef<number | undefined>(undefined);
-  const commitRemoval = (item: PendingRemoval) => void runRef.current(() => modelConnectionsApi.removeModel({ key: item.model.key }), null);
+  const commitRemoval = useCallback((item: PendingRemoval) => void runRef.current(() => modelConnectionsApi.removeModel({ key: item.model.key }), null), []);
   useEffect(() => () => {
     window.clearTimeout(undoTimer.current);
     window.clearTimeout(flashTimer.current);
     if (pendingRef.current) commitRemoval(pendingRef.current);
-  }, []);
+  }, [commitRemoval]);
 
   const flash = (keys: string[]) => {
     window.clearTimeout(flashTimer.current);

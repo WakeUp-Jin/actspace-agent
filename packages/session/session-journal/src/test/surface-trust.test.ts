@@ -71,7 +71,7 @@ describe("trusted Surface view", () => {
     expect(replaced.replaceGeneration).toBe(1);
     expect(surfaceViewVersion(replaced)).toBe("1:4:4");
     expect(isTrustedSurfaceView(replaced)).toBe(true);
-    expect(Object.isFrozen(replaced.entries[0]!.node)).toBe(true);
+    expect(Object.isFrozen(replaced.entries[0].node)).toBe(true);
     // 替换条目记下所属压缩 id，追加条目没有；每次请求列压缩摘要时直接读条目，不回头读 surface/replaced 事件。
     expect(replaced.entries[0]).toMatchObject({ compactionId: "compact-1", node: { messageId: "summary-1" } });
     expect(replaced.entries.slice(1).every(entry => entry.compactionId === undefined)).toBe(true);

@@ -152,7 +152,7 @@ export class SessionProjectionRegistry {
     const cell = this.#cells.get(sessionId) ?? this.#createCell();
     for (let index = 0; index < events.length; index++) {
       const expected = cell.lastSeq + index + 1;
-      if (events[index]!.seq !== expected) throw new Error(`Projection event gap for ${sessionId}: expected ${expected}, received ${events[index]!.seq}.`);
+      if (events[index].seq !== expected) throw new Error(`Projection event gap for ${sessionId}: expected ${expected}, received ${events[index].seq}.`);
     }
     const candidate = [...cell.pending, ...events];
     const effective = effectiveSessionEvents(candidate);
@@ -230,7 +230,7 @@ export class SessionProjectionRegistry {
       cell.states.set(key, state);
     }
     for (let index = 0; index < checkpoint.pending.length; index++) {
-      if (checkpoint.pending[index]!.seq !== checkpoint.throughJournalSeq - checkpoint.pending.length + index + 1) throw new Error("Invalid pending projection transaction.");
+      if (checkpoint.pending[index].seq !== checkpoint.throughJournalSeq - checkpoint.pending.length + index + 1) throw new Error("Invalid pending projection transaction.");
     }
     cell.lastSeq = checkpoint.throughJournalSeq;
     cell.pending = structuredClone(checkpoint.pending);
@@ -286,7 +286,7 @@ function validateSessionId(sessionId: string): void {
 
 function validateEventSequence(events: readonly SessionEventEnvelopeV1[]): void {
   for (let index = 0; index < events.length; index += 1) {
-    if (events[index]!.seq !== index) throw new Error(`Projection Journal prefix must be contiguous at seq ${index}.`);
+    if (events[index].seq !== index) throw new Error(`Projection Journal prefix must be contiguous at seq ${index}.`);
   }
 }
 

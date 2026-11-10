@@ -18,20 +18,20 @@ export function useTrajectorySelection(layout: TrajectoryLayout | null, streamin
   const cellsRef = useRef(cells);
   cellsRef.current = cells;
 
-  const remember = (tab: DetailTab) => { history.current = [...history.current.filter(item => item !== tab), tab]; };
-  const setTab = useCallback((tab: DetailTab) => { remember(tab); setActiveTab(tab); }, []);
+  const remember = useCallback((tab: DetailTab) => { history.current = [...history.current.filter(item => item !== tab), tab]; }, []);
+  const setTab = useCallback((tab: DetailTab) => { remember(tab); setActiveTab(tab); }, [remember]);
   const selectRecord = useCallback((recordId: string, options: { readonly scroll?: boolean; readonly tab?: DetailTab } = {}) => {
     const cell = cellsRef.current.get(recordId);
     setSelection({ kind: 'record', recordId });
     if (options.tab) { remember(options.tab); setActiveTab(options.tab); }
     else setActiveTab(pickTab(cell ? detailTabs(cell) : [], history.current));
     if (options.scroll) setScrollToId(recordId);
-  }, []);
+  }, [remember]);
   const selectRequest = useCallback((key: string) => {
     setSelection({ kind: 'request', key });
     remember('overview');
     setActiveTab('overview');
-  }, []);
+  }, [remember]);
   const clear = useCallback(() => setSelection(null), []);
   const scrolled = useCallback(() => setScrollToId(null), []);
 

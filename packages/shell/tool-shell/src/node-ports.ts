@@ -105,7 +105,7 @@ async function executeBash(
     if (context.signal.aborted) return failed("TOOL_ABORTED", "Bash was cancelled before process creation.", true);
     const argv = [process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", "-lc", command];
     const run = !options.sandbox
-      ? directRun({ command: argv[0]!, args: argv.slice(1), cwd: realCwd, env: toolChildEnv(process.env) })
+      ? directRun({ command: argv[0], args: argv.slice(1), cwd: realCwd, env: toolChildEnv(process.env) })
       : options.sandbox.run(noSandbox
         ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env: toolChildEnv(process.env), scratchDir: scratchRoot }
         : await sandboxedRequest(argv, realCwd, workspaceRoot, scratchRoot));
@@ -385,9 +385,9 @@ export async function readLog(path: string, since?: number): Promise<{ readonly 
     return { text: `[Earlier output omitted; read the output file for the full log]\n${redactToolText(bytes.subarray(-OUTPUT_PREVIEW_BYTES).toString("utf8").replace(/^[^\n]*\n/, ""))}`, logSize, nextOffset: logSize };
   }
   let start = Math.min(since, logSize);
-  while (start < logSize && isContinuationByte(bytes[start]!)) start += 1;
+  while (start < logSize && isContinuationByte(bytes[start])) start += 1;
   let end = Math.min(start + OUTPUT_PREVIEW_BYTES, logSize);
-  if (end < logSize) while (end > start && isContinuationByte(bytes[end]!)) end -= 1;
+  if (end < logSize) while (end > start && isContinuationByte(bytes[end])) end -= 1;
   return { text: redactToolText(bytes.subarray(start, end).toString("utf8")), logSize, nextOffset: end };
 }
 

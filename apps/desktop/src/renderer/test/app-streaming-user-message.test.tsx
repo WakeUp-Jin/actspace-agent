@@ -3120,7 +3120,7 @@ sessionId: input.sessionId,
       await userEvent.click(screen.getByLabelText('发送消息'));
     };
     const select = async (id: string) => {
-      const row = document.querySelector(`[data-session-id="${id}"]`)!;
+      const row = document.querySelector(`[data-session-id="${id}"]`);
       await userEvent.click(within(row as HTMLElement).getByRole('button', { name: id === 'background-a' ? 'Background A' : 'Background B' }));
     };
     const event = (id: string, value: Record<string, unknown>) => {

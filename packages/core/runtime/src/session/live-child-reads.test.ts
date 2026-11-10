@@ -55,7 +55,7 @@ it("reads live child sessions from memory instead of re-reading their journals",
     expect({ fullReads, refreshes }).toEqual({ fullReads: 0, refreshes: 0 });
 
     // 子 Agent 结束、取消登记后，内存里的读模型一起释放：之后再读走磁盘，读到的仍是完整内容。
-    releases[0]!();
+    releases[0]();
     const released = await sessions.inspect("child-0");
     expect(released.metadata.title).toBe("t4");
     expect(fullReads).toBeGreaterThan(0);

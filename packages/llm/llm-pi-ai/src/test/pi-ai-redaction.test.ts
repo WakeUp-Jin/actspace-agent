@@ -21,7 +21,7 @@ it.each(["openai-completions", "openai-responses", "anthropic-messages"] as cons
   const events: LlmStreamEvent[] = [];
   for await (const event of await adapter.dispatch(request({ apiKey: secret }))) events.push(event);
   expect(seen).toHaveLength(1);
-  expect(seen[0]!.get(route === "anthropic-messages" ? "x-api-key" : "authorization")).toBe(route === "anthropic-messages" ? secret : `Bearer ${secret}`);
+  expect(seen[0].get(route === "anthropic-messages" ? "x-api-key" : "authorization")).toBe(route === "anthropic-messages" ? secret : `Bearer ${secret}`);
   expect(events.at(-1)).toMatchObject({ type: "error", failure: { kind: "authentication", httpStatus: 401, message: expect.stringContaining("DIAGNOSTIC") } });
   expect(JSON.stringify(events)).toContain("[REDACTED]");
   expect(JSON.stringify(events)).not.toContain(secret);

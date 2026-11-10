@@ -142,7 +142,7 @@ describe("LlmService", () => {
     const preparing = service.prepareAsync({ routeId: "async", model: "model", messages: [] });
     old.beginDrain();
     await Promise.resolve();
-    resolvePreparation!({ request: { requestId: "prepared", routeId: "async", model: "model", messages: [], tools: [], options: {}, credentialRef: "credential" }, dispatch: async () => completedStream() });
+    resolvePreparation({ request: { requestId: "prepared", routeId: "async", model: "model", messages: [], tools: [], options: {}, credentialRef: "credential" }, dispatch: async () => completedStream() });
     const prepared = await preparing;
     expect(prepared.registration.registrationId).toBe(old.registration.registrationId);
     prepared.release();

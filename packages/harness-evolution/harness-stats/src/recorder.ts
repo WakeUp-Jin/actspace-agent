@@ -53,7 +53,7 @@ export class HarnessStatsRecorder {
     if (sample.error) cell.errors++;
     const ms = Number.isFinite(sample.ms) && sample.ms > 0 ? sample.ms : 0;
     cell.totalMs += ms;
-    cell.histogram[harnessHistogramIndex(ms, HARNESS_DURATION_BASE_MS)]!++;
+    cell.histogram[harnessHistogramIndex(ms, HARNESS_DURATION_BASE_MS)]++;
     if (this.#cells.size >= this.#maxKeys) this.#onFull();
   }
 
@@ -72,7 +72,7 @@ export class HarnessStatsRecorder {
       current.calls += cell.calls;
       current.errors += cell.errors;
       current.totalMs += cell.totalMs;
-      for (let index = 0; index < current.histogram.length; index++) current.histogram[index]! += cell.histogram[index] ?? 0;
+      for (let index = 0; index < current.histogram.length; index++) current.histogram[index] += cell.histogram[index] ?? 0;
     }
   }
 }

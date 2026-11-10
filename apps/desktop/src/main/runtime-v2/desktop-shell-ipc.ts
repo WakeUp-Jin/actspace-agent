@@ -62,7 +62,7 @@ export function registerRuntimeV2DesktopShell(options: ShellOptions): { dispose(
   });
 
   ipc.handle(contract.workspaces.list, () => readWorkspaceRegistry(registryOptions));
-  ipc.handle(contract.workspaces.listMarkdownFiles, async (input) => listWorkspaceMarkdownFiles((await withWorkspaceAccess(input)).workspaceRoot!, undefined, { expanded: input.expanded === true }));
+  ipc.handle(contract.workspaces.listMarkdownFiles, async (input) => listWorkspaceMarkdownFiles((await withWorkspaceAccess(input)).workspaceRoot, undefined, { expanded: input.expanded === true }));
   ipc.handle(contract.workspaces.readFile, async (input) => readWorkspaceFile(await withWorkspaceAccess(input), options.roots));
   ipc.handle(contract.workspaces.statFile, async (input) => statWorkspaceFile(await withWorkspaceAccess(input), options.roots));
   ipc.handle(contract.workspaces.writeMarkdownFile, async (input) => writeWorkspaceMarkdownFile(await withWorkspaceAccess(input)));

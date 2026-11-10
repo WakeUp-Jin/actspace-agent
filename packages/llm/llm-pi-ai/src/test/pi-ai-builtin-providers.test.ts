@@ -59,37 +59,37 @@ it("lets the built-in DeepSeek model own thinking fields and the token field", a
   await send({ route: "openai-completions", providerId: "deepseek", baseUrl: "https://api.deepseek.com" }, request("deepseek-flash", { reasoning: true, reasoningEffort: "medium" }));
   expect(seen).toHaveLength(1);
   // deepseek-flash maps medium to nothing; pi-ai rounds up to the next supported level.
-  expect(seen[0]!.body).toMatchObject({ model: "deepseek-flash", thinking: { type: "enabled" }, reasoning_effort: "high", max_tokens: 16 });
-  expect(seen[0]!.body).not.toHaveProperty("max_completion_tokens");
+  expect(seen[0].body).toMatchObject({ model: "deepseek-flash", thinking: { type: "enabled" }, reasoning_effort: "high", max_tokens: 16 });
+  expect(seen[0].body).not.toHaveProperty("max_completion_tokens");
 });
 
 it("disables DeepSeek thinking through pi-ai when reasoning is off", async () => {
   const seen = capture();
   await send({ route: "openai-completions", providerId: "deepseek", baseUrl: "https://api.deepseek.com" }, request("deepseek-flash", { reasoning: false }));
-  expect(seen[0]!.body).toMatchObject({ thinking: { type: "disabled" } });
-  expect(seen[0]!.body).not.toHaveProperty("reasoning_effort");
+  expect(seen[0].body).toMatchObject({ thinking: { type: "disabled" } });
+  expect(seen[0].body).not.toHaveProperty("reasoning_effort");
 });
 
 it("sends no thinking fields on a built-in route when the user left reasoning on auto", async () => {
   const seen = capture();
   await send({ route: "openai-completions", providerId: "deepseek", baseUrl: "https://api.deepseek.com" }, request("deepseek-flash"));
-  expect(seen[0]!.body).not.toHaveProperty("thinking");
-  expect(seen[0]!.body).not.toHaveProperty("reasoning_effort");
+  expect(seen[0].body).not.toHaveProperty("thinking");
+  expect(seen[0].body).not.toHaveProperty("reasoning_effort");
 });
 
 it("borrows the built-in implementation for an id pi-ai does not know", async () => {
   const seen = capture();
   await send({ route: "openai-completions", providerId: "kimi", baseUrl: "https://api.moonshot.cn/v1", modelFacts: { contextWindow: 128_000, maxTokens: 8_192, input: ["text"], reasoning: true } }, request("kimi-next-preview", { reasoning: true, reasoningEffort: "high" }));
-  expect(seen[0]!.url).toBe("https://api.moonshot.cn/v1/chat/completions");
+  expect(seen[0].url).toBe("https://api.moonshot.cn/v1/chat/completions");
   // pi-ai detects Moonshot by address (max_tokens); thinking keeps ActSpace's Kimi rule since pi-ai has no map for this id.
-  expect(seen[0]!.body).toMatchObject({ model: "kimi-next-preview", thinking: { type: "enabled" }, max_tokens: 16 });
-  expect(seen[0]!.body).not.toHaveProperty("reasoning_effort");
+  expect(seen[0].body).toMatchObject({ model: "kimi-next-preview", thinking: { type: "enabled" }, max_tokens: 16 });
+  expect(seen[0].body).not.toHaveProperty("reasoning_effort");
 });
 
 it("keeps the custom relay thinking rewrite off built-in addresses", async () => {
   const seen = capture();
   await send({ route: "openai-completions", providerId: "custom", baseUrl: "https://relay.example/v1" }, request("vendor/model", { reasoning: true, reasoningEffort: "high" }));
-  expect(seen[0]!.body).toMatchObject({ reasoning_effort: "high" });
+  expect(seen[0].body).toMatchObject({ reasoning_effort: "high" });
 });
 
 it("routes each OpenCode Go model to its own protocol and adds the session header", async () => {
@@ -109,7 +109,7 @@ it("routes each OpenCode Go model to its own protocol and adds the session heade
 it("keeps ActSpace capacity facts over the built-in model's", async () => {
   const seen = capture();
   await send({ route: "anthropic-messages", providerId: "anthropic", baseUrl: "https://api.anthropic.com", modelFacts: { contextWindow: 200_000, maxTokens: 4_096, input: ["text"], reasoning: true } }, request("claude-sonnet-5", { maxTokens: undefined }));
-  expect(seen[0]!.body).toMatchObject({ model: "claude-sonnet-5", max_tokens: 4_096 });
+  expect(seen[0].body).toMatchObject({ model: "claude-sonnet-5", max_tokens: 4_096 });
 });
 
 it("keeps same-model reasoning signatures when the history replays to a built-in provider", async () => {
@@ -120,7 +120,7 @@ it("keeps same-model reasoning signatures when the history replays to a built-in
     { role: "user", content: "again" },
   ];
   await send({ route: "anthropic-messages", providerId: "anthropic", baseUrl: "https://api.anthropic.com" }, request("claude-sonnet-5", { reasoning: true, reasoningEffort: "high" }, history));
-  const assistant = (seen[0]!.body.messages as Array<{ role: string; content: Array<{ type: string; signature?: string }> }>).find((message) => message.role === "assistant")!;
+  const assistant = (seen[0].body.messages as Array<{ role: string; content: Array<{ type: string; signature?: string }> }>).find((message) => message.role === "assistant")!;
   expect(assistant.content[0]).toMatchObject({ type: "thinking", signature: "sig-1" });
 });
 
@@ -151,6 +151,6 @@ it("classifies a proxy connection failure on the pi-ai path as proxy", async () 
 it("does not let a built-in model fall back to another model server-side", async () => {
   const seen = capture();
   await send({ route: "anthropic-messages", providerId: "anthropic", baseUrl: "https://api.anthropic.com" }, request("claude-fable-5"));
-  expect(seen[0]!.body).toMatchObject({ model: "claude-fable-5" });
-  expect(seen[0]!.body).not.toHaveProperty("fallbacks");
+  expect(seen[0].body).toMatchObject({ model: "claude-fable-5" });
+  expect(seen[0].body).not.toHaveProperty("fallbacks");
 });

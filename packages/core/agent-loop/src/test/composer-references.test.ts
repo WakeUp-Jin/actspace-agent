@@ -19,7 +19,7 @@ it("renders file references once and excerpts as readable text, and records them
     ],
     onMessages: (messages) => requests.push(messages),
   });
-  const user = requests[0]!.find((message) => message.role === "user")!;
+  const user = requests[0].find((message) => message.role === "user")!;
   const texts = (user.content as readonly { type: string; text?: string }[]).filter((block) => block.type === "text").map((block) => block.text);
   expect(texts.slice(0, 3)).toEqual([
     "看一下",

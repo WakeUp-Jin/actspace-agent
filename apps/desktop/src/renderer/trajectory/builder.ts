@@ -55,7 +55,7 @@ const duration = (start: string | null, end: string | null): number | null => {
 /** Bind navigation and schemas after call/result merging; all links use identities. */
 function associateCalls(records: readonly TrajectoryRecord[]): TrajectoryRecord[] {
   const assistants = records.filter(record => record.kind === "assistant");
-  const calls = new Map(records.filter(record => record.kind === "tool" && record.callId).map(record => [record.callId!, record]));
+  const calls = new Map(records.filter(record => record.kind === "tool" && record.callId).map(record => [record.callId, record]));
   const owners = new Map<string, Set<TrajectoryRecord>>();
   for (const assistant of assistants) {
     for (const block of assistant.sourceBlocks ?? []) {
@@ -71,7 +71,7 @@ function associateCalls(records: readonly TrajectoryRecord[]): TrajectoryRecord[
     const messageId = pick(asRecord(call.raw), ["assistantMessageId"]);
     const candidates = new Set(owners.get(call.callId));
     if (messageId) assistants.filter(record => record.messageId === messageId).forEach(record => { candidates.add(record); });
-    if (candidates.size > 0) return candidates.size === 1 ? [...candidates][0]! : null;
+    if (candidates.size > 0) return candidates.size === 1 ? [...candidates][0] : null;
     const parent = call.parentCallId ? calls.get(call.parentCallId) : undefined;
     return parent ? ownerFor(parent, seen) : null;
   };
@@ -615,7 +615,7 @@ function assignGroups(
   const contexts = buildEventContexts(rawRecords.map(record => ({
     key: `${record.id}`,
     sessionId: "raw",
-    eventSeq: record.sourceSequences[0]!,
+    eventSeq: record.sourceSequences[0],
     eventType: record.eventType,
     time: record.startedAt ?? record.completedAt ?? "",
     kind: record.kind as RuntimeV2TrajectoryNode["kind"],
@@ -626,7 +626,7 @@ function assignGroups(
   const turnNumbers = new Map<string, number>();
   const stepNumbers = new Map<string, number>();
   let nextTurn = turnOffset + 1;
-  for (const record of [...rawRecords].sort((a, b) => a.sourceSequences[0]! - b.sourceSequences[0]!)) {
+  for (const record of [...rawRecords].sort((a, b) => a.sourceSequences[0] - b.sourceSequences[0])) {
     if (record.turnId !== null && !turnNumbers.has(record.turnId)) turnNumbers.set(record.turnId, record.turnNumber ?? nextTurn++);
     if (record.turnId !== null && record.stepId !== null) {
       const key = `${record.turnId}\u0000${record.stepId}`;

@@ -9,7 +9,7 @@ export function parseRoute(pathname: string): Route {
   if (path === "/settings") return { name: "settings" };
   const session = /^\/sessions\/([^/]+)$/.exec(path);
   if (session) {
-    try { return { name: "session", sessionId: decodeURIComponent(session[1]!) }; } catch { return { name: "home" }; }
+    try { return { name: "session", sessionId: decodeURIComponent(session[1]) }; } catch { return { name: "home" }; }
   }
   return { name: "home" };
 }

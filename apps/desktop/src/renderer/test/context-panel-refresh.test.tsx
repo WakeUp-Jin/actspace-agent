@@ -20,7 +20,7 @@ it("refreshes settled history without a new message, sends a conditional token a
   expect(hook.result.current.data?.view.history?.status).toBe("syncing");
   await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
   expect(hook.result.current.data?.view.history?.status).toBe("ready");
-  expect(handler.mock.calls[1]![0].versionToken).toBe("syncing");
+  expect(handler.mock.calls[1][0].versionToken).toBe("syncing");
   Object.defineProperty(document, "hidden", { configurable: true, value: true });
   act(() => document.dispatchEvent(new Event("visibilitychange")));
   const count = handler.mock.calls.length;

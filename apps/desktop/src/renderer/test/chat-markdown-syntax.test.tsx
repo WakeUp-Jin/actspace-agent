@@ -44,7 +44,7 @@ describe("提示框（T20）", () => {
 
   it("普通引用不受影响", () => {
     const { root } = reply("> 就是一句引用");
-    const box = root.querySelector("blockquote")!;
+    const box = root.querySelector("blockquote");
     expect(box).not.toHaveClass("md-callout");
     expect(box).not.toHaveAttribute("data-callout-label");
   });

@@ -164,6 +164,6 @@ export class PluginManager {
   async close() { this.#closed = true; await Promise.allSettled(this.#gates.values()); }
 }
 function patchFor(workspace: Workspace, artifact: PluginArtifact): Patch {
-  const row = artifact.manifest.plugin.behaviors[0]!;
+  const row = artifact.manifest.plugin.behaviors[0];
   return { id: `evolution-${workspace.workspaceId}`, provenance: `source:${workspace.sourceDigest}`, operations: [workspace.entryId ? { id: "replace", kind: "replace", target: workspace.entryId, artifactId: artifact.artifactId, manifestEntryId: row.entryId } : { id: "insert", kind: "insert", entry: { entryId: row.entryId, artifactId: artifact.artifactId, manifestEntryId: row.entryId, pluginId: artifact.manifest.plugin.pluginId, pluginVersion: artifact.manifest.plugin.version, module: row.module, required: true, enabled: true, config: {}, requiredCapabilities: ["process"], optionalCapabilities: [], provides: row.provides ?? [], injects: row.injects ?? [], frontendRequired: false, provenance: artifact.manifest.plugin.source.reference, state: "candidate" } }] };
 }

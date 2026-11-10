@@ -56,7 +56,7 @@ describe("runGitCommand", () => {
     const cwd = await tempDir();
     calls.length = 0;
     await runGitCommand(["--version"], { ...options(cwd), env: { LC_ALL: "C", GIT_TERMINAL_PROMPT: "1" } });
-    const execOptions = calls[0]![2] as { env: NodeJS.ProcessEnv };
+    const execOptions = calls[0][2] as { env: NodeJS.ProcessEnv };
     expect(execOptions.env.LC_ALL).toBe("C");
     expect(execOptions.env.GIT_TERMINAL_PROMPT).toBe("0");
   });

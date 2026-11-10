@@ -41,7 +41,7 @@ describe("trajectory streaming placeholder", () => {
     const [placeholder] = placeholders(head, new Map([["r1", "m1"]]));
     expect(placeholder).toMatchObject({ id: "s:record:assistant:m1", messageId: "m1", requestDetail: expect.objectContaining({ requestId: "r1" }) });
     const settled = buildTrajectorySnapshot(snap([...head, node(4, "assistant/message", { requestId: "r1", messageId: "m1", content: "ab" })]));
-    expect(settled.records.find(record => record.kind === "assistant")).toMatchObject({ id: placeholder!.id, summary: "ab", partial: false });
+    expect(settled.records.find(record => record.kind === "assistant")).toMatchObject({ id: placeholder.id, summary: "ab", partial: false });
   });
 
   it("leaves an old Session's unfinished chunks to the builder instead of a placeholder", () => {
@@ -86,10 +86,10 @@ describe("trajectory streaming placeholder", () => {
       layout ??= view.layout;
       expect(view.layout.cells.map(cell => cell.recordId)).toEqual(layout.cells.map(cell => cell.recordId));
       expect(view.live.size).toBe(1);
-      rowId ??= [...view.live.keys()][0]!;
+      rowId ??= [...view.live.keys()][0];
       lengths.push(view.live.get(rowId)!.record.summary.length);
     }
-    expect(lengths.every((length, index) => index === 0 || length > lengths[index - 1]!)).toBe(true);
+    expect(lengths.every((length, index) => index === 0 || length > lengths[index - 1])).toBe(true);
     expect(rowId).toMatch(/:record:assistant:assistant-running$/);
   });
 

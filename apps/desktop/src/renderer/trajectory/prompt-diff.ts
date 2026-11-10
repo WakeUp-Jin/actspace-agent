@@ -22,18 +22,18 @@ function lineOps(before: readonly string[], after: readonly string[]): Op[] {
     const table = new Uint32Array((a.length + 1) * width);
     for (let i = a.length - 1; i >= 0; i -= 1) {
       for (let j = b.length - 1; j >= 0; j -= 1) {
-        table[i * width + j] = a[i] === b[j] ? table[(i + 1) * width + j + 1]! + 1 : Math.max(table[(i + 1) * width + j]!, table[i * width + j + 1]!);
+        table[i * width + j] = a[i] === b[j] ? table[(i + 1) * width + j + 1] + 1 : Math.max(table[(i + 1) * width + j], table[i * width + j + 1]);
       }
     }
     let i = 0;
     let j = 0;
     while (i < a.length && j < b.length) {
-      if (a[i] === b[j]) { ops.push({ sign: " ", text: a[i]! }); i += 1; j += 1; }
-      else if (table[(i + 1) * width + j]! >= table[i * width + j + 1]!) { ops.push({ sign: "-", text: a[i]! }); i += 1; }
-      else { ops.push({ sign: "+", text: b[j]! }); j += 1; }
+      if (a[i] === b[j]) { ops.push({ sign: " ", text: a[i] }); i += 1; j += 1; }
+      else if (table[(i + 1) * width + j] >= table[i * width + j + 1]) { ops.push({ sign: "-", text: a[i] }); i += 1; }
+      else { ops.push({ sign: "+", text: b[j] }); j += 1; }
     }
-    for (; i < a.length; i += 1) ops.push({ sign: "-", text: a[i]! });
-    for (; j < b.length; j += 1) ops.push({ sign: "+", text: b[j]! });
+    for (; i < a.length; i += 1) ops.push({ sign: "-", text: a[i] });
+    for (; j < b.length; j += 1) ops.push({ sign: "+", text: b[j] });
   }
   ops.push(...after.slice(after.length - tail).map((text): Op => ({ sign: " ", text })));
   return ops;
@@ -66,8 +66,8 @@ export function promptDiffLines(before: string, after: string): readonly PromptD
     const slice = ops.slice(from, to + 1);
     const oldLines = slice.filter(op => op.sign !== "+").length;
     const newLines = slice.filter(op => op.sign !== "-").length;
-    const oldStart = oldLines === 0 ? oldAt[from]! - 1 : oldAt[from]!;
-    const newStart = newLines === 0 ? newAt[from]! - 1 : newAt[from]!;
+    const oldStart = oldLines === 0 ? oldAt[from] - 1 : oldAt[from];
+    const newStart = newLines === 0 ? newAt[from] - 1 : newAt[from];
     const lines = slice.map((op): PromptDiffLine => ({
       kind: op.sign === "+" ? "added" : op.sign === "-" ? "removed" : "context",
       text: `${op.sign}${op.text}`,

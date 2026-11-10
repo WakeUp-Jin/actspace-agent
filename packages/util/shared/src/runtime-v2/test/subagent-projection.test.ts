@@ -16,10 +16,10 @@ describe("subagent tree projection", () => {
     ]);
     expect(tree.order).toEqual(["a", "b", "c", "d"]);
     expect(tree.agents.a).toMatchObject({ status: "running", toolNames: ["read_file", "send_message"], activations: [{ activationId: "a1", model: "m1", settle: { status: "completed" } }, { activationId: "a2", trigger: "message", senderId: "main" }] });
-    expect(tree.agents.c!.status).toBe("closed");
-    expect(tree.agents.d!.status).toBe("inactive");
+    expect(tree.agents.c.status).toBe("closed");
+    expect(tree.agents.d.status).toBe("inactive");
     expect(runningSubagentCount(tree)).toBe(2);
-    expect(lastActivationModel(tree.agents.a!)).toBe("m1");
+    expect(lastActivationModel(tree.agents.a)).toBe("m1");
   });
 
   it("ignores duplicate and orphan events", () => {

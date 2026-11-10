@@ -125,7 +125,7 @@ export class RuntimeSessionController {
     const before = input.beforeSeq ?? end;
     if (!Number.isSafeInteger(before) || before < 0 || before > end || (input.afterSeq !== undefined && (!Number.isSafeInteger(input.afterSeq) || input.afterSeq < -1 || input.afterSeq >= end))) throw new Error("Invalid history cursor.");
     const candidates = starts.filter(seq => seq < before);
-    const from = input.afterSeq !== undefined ? input.afterSeq + 1 : candidates.length <= HISTORY_PAGE_TURNS ? 0 : candidates[candidates.length - HISTORY_PAGE_TURNS]!;
+    const from = input.afterSeq !== undefined ? input.afterSeq + 1 : candidates.length <= HISTORY_PAGE_TURNS ? 0 : candidates[candidates.length - HISTORY_PAGE_TURNS];
     const until = input.afterSeq !== undefined ? end : before;
     let journal = live ? live.journal.readEvents(from, until) : await this.#cache.events(read!, from, until);
     if (input.afterSeq === undefined && !input.includeToolDetails) journal = slimHistoryWindow(journal);
@@ -136,14 +136,14 @@ export class RuntimeSessionController {
     let bytes = sizes.reduce((sum, size) => sum + size, 0) + journal.length + 1;
     let trimmed = 0;
     while (journal.length - trimmed > 1 && (journal.length - trimmed > maxEvents || bytes > maxBytes)) {
-      bytes -= sizes[trimmed]! + 1;
+      bytes -= sizes[trimmed] + 1;
       trimmed += 1;
     }
     if (trimmed > 0 && input.afterSeq === undefined) {
       // Start a history page at the next whole turn when one fits the budget.
       // The cursor retains the omitted fragment for the preceding page. A single
       // oversized turn still makes bounded progress instead of returning empty.
-      const nextStart = starts.find(seq => seq >= journal[trimmed]!.seq && seq < until);
+      const nextStart = starts.find(seq => seq >= journal[trimmed].seq && seq < until);
       const aligned = nextStart === undefined ? -1 : journal.findIndex(event => event.seq >= nextStart);
       if (aligned >= trimmed) trimmed = aligned;
     }
@@ -231,7 +231,7 @@ export class RuntimeSessionController {
         const settled = await Promise.allSettled(batch.map(read));
         sources = settled.flatMap((item, index) => {
           if (item.status === "fulfilled") return [item.value];
-          failedSessionIds.push(batch[index]!); return [];
+          failedSessionIds.push(batch[index]); return [];
         });
       }
       for (const source of sources) result.push(this.queryBoundary(source));
@@ -473,7 +473,7 @@ export class RuntimeSessionController {
     const live = this.liveSession(sessionId);
     if (live !== undefined) return live.journal.latestEvent(type);
     const events = await this.inspectEvents(sessionId);
-    for (let index = events.length - 1; index >= 0; index -= 1) if (events[index]!.type === type) return events[index];
+    for (let index = events.length - 1; index >= 0; index -= 1) if (events[index].type === type) return events[index];
     return undefined;
   }
   async list(): Promise<readonly RuntimeV2SessionListItem[]> { return (await this.browseSessions()).items; }
@@ -591,8 +591,8 @@ function eventData(event: SessionEventEnvelopeV1): Readonly<Record<string, Runti
 /** 有序 seq 列表里小于 `seq` 的最后一个。 */
 function latestBefore(seqs: readonly number[], seq: number): number | null {
   let low = 0, high = seqs.length;
-  while (low < high) { const mid = (low + high) >> 1; if (seqs[mid]! < seq) low = mid + 1; else high = mid; }
-  return low > 0 ? seqs[low - 1]! : null;
+  while (low < high) { const mid = (low + high) >> 1; if (seqs[mid] < seq) low = mid + 1; else high = mid; }
+  return low > 0 ? seqs[low - 1] : null;
 }
 function watermarksFor(session: SessionHandle | undefined, projectionThroughSeq: number, windowThroughSeq: number): RuntimeV2ReadModelWatermarks {
   return { acceptedThroughSeq: session?.acceptedSeq ?? projectionThroughSeq, durableThroughSeq: session?.durableSeq ?? projectionThroughSeq, projectionThroughSeq, windowThroughSeq, indexGeneration: null };

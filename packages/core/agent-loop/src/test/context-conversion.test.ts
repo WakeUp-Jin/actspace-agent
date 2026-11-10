@@ -38,7 +38,7 @@ it("preserves historical summaries, signed reasoning, attachments and runtime bl
 it("keeps a rejected batch's multiple tool results paired in the next input", async () => {
   const requests: (readonly LlmMessage[])[] = [];
   await runToolStreamFixture({ extraToolCall: true, onMessages: value => requests.push(value) });
-  const next = requests[1]!;
+  const next = requests[1];
   expect(next.map(message => message.role)).toEqual(["user", "assistant", "tool", "tool"]);
   expect(next.slice(-2).map(message => message.callId)).toEqual(["read-1", "unknown-2"]);
   expect(JSON.stringify(next.slice(-2))).toContain("No tools in this batch were executed");

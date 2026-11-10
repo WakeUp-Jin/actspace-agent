@@ -94,7 +94,7 @@ describe("ResponseSelectionMenu", () => {
     ["a streaming reply that has no durable sourceSeq yet", [{ id: "turn:run-1:assistant:0", content: "流式中的回复", live: true }], "流式中的回复"],
   ])("does not offer the menu for %s", async (_name, replies, text) => {
     setup(replies);
-    selectText(screen.getByTestId(replies[0]!.id), text);
+    selectText(screen.getByTestId(replies[0].id), text);
     await act(async () => { await new Promise((resolve) => window.requestAnimationFrame(resolve)); });
     expect(screen.queryByRole("menu")).toBeNull();
   });

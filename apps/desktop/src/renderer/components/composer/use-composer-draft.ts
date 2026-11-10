@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import type { ComposerDraftReader, ComposerDraftRestore, ComposerDraftWriter } from "./composer-types";
 
 export type ComposerDraftOptions = {
@@ -20,26 +20,29 @@ export type ComposerDraftOptions = {
  */
 export function useComposerDraft({ draftKey, readDraft, writeDraft, draftRestore, focusRequestId, inputRef, onSwitched, onRestored }: ComposerDraftOptions) {
   const [message, setMessage] = useState(() => draftKey && readDraft ? readDraft(draftKey) : "");
+  // 两个回调是事件而不是依赖：只在换会话 / 恢复草稿时调用最新的那一份，调用方每次渲染换函数也不触发 effect。
+  const callbacksRef = useRef({ onSwitched, onRestored });
+  callbacksRef.current = { onSwitched, onRestored };
 
   useEffect(() => {
     if (!draftKey || !readDraft) return;
     setMessage(readDraft(draftKey));
-    onSwitched();
+    callbacksRef.current.onSwitched();
   }, [draftKey, readDraft]);
 
   useEffect(() => {
     if (!draftRestore || draftRestore.sessionId !== draftKey) return;
     setMessage(draftRestore.text);
     if (draftKey) writeDraft?.(draftKey, draftRestore.text);
-    onRestored(draftRestore);
+    callbacksRef.current.onRestored(draftRestore);
     window.requestAnimationFrame(() => inputRef.current?.focus());
-  }, [draftKey, draftRestore, writeDraft]);
+  }, [draftKey, draftRestore, writeDraft, inputRef]);
 
   useEffect(() => {
     if (focusRequestId <= 0) return;
     const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
     return () => window.cancelAnimationFrame(frame);
-  }, [focusRequestId]);
+  }, [focusRequestId, inputRef]);
 
   return {
     message,

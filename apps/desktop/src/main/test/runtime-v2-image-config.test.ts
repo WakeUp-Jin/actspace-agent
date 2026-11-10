@@ -17,7 +17,7 @@ it("uses current image configuration for each call, including removal and reconf
   vi.stubGlobal("fetch", fetchImpl);
   const ports = await createDesktopToolHostServices({ workspaceRoot: "/workspace", tmpRoot: "/tmp", modelRuntime, readArtifact: async () => { throw new Error("unused"); } })[IMAGE_GENERATION_HOST_PORT_ID].createPorts();
   const ctx = { signal: new AbortController().signal, createArtifact: async () => ({ artifactId: "image", mediaType: "image/png", size: 9, sha256: "sha" }) } as unknown as ToolExecutionContext;
-  const run = () => ports.generate_image!({ prompt: "circle" }, ctx);
+  const run = () => ports.generate_image({ prompt: "circle" }, ctx);
   try {
     expect(await run()).toMatchObject({ failure: { code: "IMAGE_GENERATION_NOT_CONFIGURED" } });
     generation = { apiKey: "key-one", model: "image-one", baseUrl: "https://one.example/v1" };

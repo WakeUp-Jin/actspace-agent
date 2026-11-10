@@ -94,7 +94,7 @@ describe("context events projection", () => {
       { kind: "files", label: "活跃文件清单更新", detail: "本轮连续 3 次，合并显示；共 3 个", count: 3, tokenDelta: nav("src/a.ts", "src/b.ts", "src/c.ts"), turnIndex: 1, stepIndex: null },
       { kind: "runtime", label: "运行状态更新", detail: "模式 agent · 日期 2026-11-08", count: undefined, tokenDelta: tokens(RUNTIME, "runtime-state", runtime("agent")), turnIndex: 1, stepIndex: 1 },
     ]);
-    expect(events[0]!.tokenDelta).toBeLessThan(0);
+    expect(events[0].tokenDelta).toBeLessThan(0);
   });
 
   it("gives the same events when the journal is indexed in small batches", async () => {

@@ -49,12 +49,24 @@
       "correctness": {
         "noUnusedImports": "error",
         "noUnusedVariables": "error",
-        // 存量命中较多，先以 warning 暴露、不阻塞 CI；清零后再升 error。
-        "useExhaustiveDependencies": "warn",
+        "useExhaustiveDependencies": {
+          "level": "error",
+          "options": {
+            // `useEffect(fn, [refreshKey])` 这类「把 key / revision / tick 当触发器」的写法在仓库里是有意的成规模用法，
+            // React 官方的 exhaustive-deps 也不把 effect 的多余依赖当错误；这里只追「漏依赖」，不追「多依赖」。
+            "reportUnnecessaryDependencies": false
+          }
+        },
         // `case x: return this.handle();` 在 void 方法里是仓库惯用写法，tsc 已经约束返回类型。
         "noVoidTypeReturn": "off",
         // `useSourceExtension` 这类 use* 命名的普通 API 会被误判为 React hook。
         "useHookAtTopLevel": "off"
+      },
+      "style": {
+        // 2026-11-09 已用 tsc 逐处核对：删掉所有「去掉也不报错」的 `!`，剩下的每一处都在表达 tsc 看不见的不变量
+        // （`if (map.has(k)) map.get(k)!`、`length > 0 ? arr.shift()!`、闭包里已经赋值的局部变量等），改成 `?.` / 抛错是改行为。
+        // 仓库没开 noUncheckedIndexedAccess，`arr[i]!` 不需要也不要写；新增 `!` 只能用于上述不变量。
+        "noNonNullAssertion": "off"
       },
       "suspicious": {
         // 产品代码用 `unknown` 加收窄；测试里的 mock / 响应体允许 `any`，见下方 overrides。

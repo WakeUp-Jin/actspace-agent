@@ -74,13 +74,13 @@ describe("session transcript plugin", () => {
 
       const written: unknown[] = [];
       const write = (value: unknown) => { written.push(value); };
-      await sources("s-main")[0]!.get({ request: { sessionId: "s-main" }, status: { plugins: { "actspace.loop": { mode: "agent" } } } } as never, write as never);
+      await sources("s-main")[0].get({ request: { sessionId: "s-main" }, status: { plugins: { "actspace.loop": { mode: "agent" } } } } as never, write as never);
       expect(JSON.stringify(written)).toContain(join(dataRoot, "sessions-v2"));
       written.length = 0;
-      await sources("s-main")[0]!.get({ request: { sessionId: "s-main" }, status: { plugins: { "actspace.loop": { mode: "chat" } } } } as never, write as never);
+      await sources("s-main")[0].get({ request: { sessionId: "s-main" }, status: { plugins: { "actspace.loop": { mode: "chat" } } } } as never, write as never);
       expect(written).toEqual([]);
 
-      emitNotification(root.context, "session/event", sessions["s-main"]!.events[3], { sessionId: "s-main" });
+      emitNotification(root.context, "session/event", sessions["s-main"].events[3], { sessionId: "s-main" });
       await service.render("s-main");
       const main = await readFile(transcriptPath(dataRoot, "s-main"), "utf8");
       expect(main).toContain("帮我调研");
@@ -102,7 +102,7 @@ describe("session transcript plugin", () => {
       await service.render("s-main");
       expect(await readFile(transcriptPath(dataRoot, "s-main"), "utf8")).not.toContain("Side chat opened here");
       await mkdir(join(dataRoot, "sessions-v2", "s-side"), { recursive: true });
-      await writeFile(join(dataRoot, "sessions-v2", "s-side", "journal.jsonl"), `${JSON.stringify(sessions["s-side"]!.header)}\n`);
+      await writeFile(join(dataRoot, "sessions-v2", "s-side", "journal.jsonl"), `${JSON.stringify(sessions["s-side"].header)}\n`);
       emitNotification(root.context, "session/created", { sessionId: "s-side" });
       await vi.waitFor(async () => expect(await readFile(transcriptPath(dataRoot, "s-main"), "utf8")).toContain("> Side chat opened here → session s-side"));
     } finally { await root.dispose(); }
@@ -131,8 +131,8 @@ describe("session transcript plugin", () => {
       await new Promise(resolve => setImmediate(resolve));
       expect(existsSync(transcriptPath(dataRoot, "s-title"))).toBe(false);
 
-      emitNotification(root.context, "session/event", fixture.events[0]!, { sessionId: "s-title" });
-      emitNotification(root.context, "session/event", fixture.events[2]!, { sessionId: "s-title" });
+      emitNotification(root.context, "session/event", fixture.events[0], { sessionId: "s-title" });
+      emitNotification(root.context, "session/event", fixture.events[2], { sessionId: "s-title" });
       await service.render("s-title");
       expect((await transcript()).split("\n")[0]).toBe("# 太早");
 

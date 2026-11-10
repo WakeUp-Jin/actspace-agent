@@ -185,7 +185,7 @@ it("persists ignored index reads across restart and fork before another compacti
   await disclosure.observe(session, result);
   const recorded = session.journal.events.filter(event => event.type === STATE_EVENT && (event.data as any).op === "fact" && (event.data as any).sourceSeq === result.seq);
   expect(recorded).toHaveLength(1);
-  expect((recorded[0]!.data as any).paths).toEqual([]);
+  expect((recorded[0].data as any).paths).toEqual([]);
   const child = fixture(session.journal.events, "child");
   const childPort = { ...port, resolveArtifact: async (_id: string, id: string) => ({ path: `/child-index/${id}`, mediaType: "text/plain" }) };
   const replay = new ProgressiveDisclosure(childPort);
@@ -242,7 +242,7 @@ it("does not regenerate an index for read counts and removes navigation owned on
   await disclosure.hydrate(context(session), session);
   await fact(session, Array.from({ length: 101 }, (_, i) => `/file/${i}.ts`), false);
   const first = await disclosure.hydrate(context(session), session); const artifact = first.status.sleepingDirectory!.artifactId;
-  await fact(session, [first.status.paths[0]!.path]);
+  await fact(session, [first.status.paths[0].path]);
   expect((await disclosure.hydrate(context(session), session)).status.sleepingDirectory!.artifactId).toBe(artifact);
   expect(port.createIndex).toHaveBeenCalledTimes(1);
   const base = context(session); const hidden = { ...base, status: { ...base.status, plugins: { "actspace.context.owners": ["actspace.context-disclosure"] } } };
@@ -255,14 +255,14 @@ it("stores 10000 references in bounded batches while rendering at most 100 activ
   const value = new ContextCompactionCoordinator(); value.registerDisclosure(disclosure);
   value.register({ shouldCompact: () => true, select: () => ({ start: 0, end: 3 }), summarize: async () => ({ content: "summary", pathlist: Array.from({ length: 10000 }, (_, i) => `/file/${String(i).padStart(6, "0")}.ts`) }) });
   await value.compact(session); const view = await disclosure.hydrate(context(session), session);
-  let text = ""; await createDisclosureSource().get(view, output => { text = output.supplements![0]!.text; });
+  let text = ""; await createDisclosureSource().get(view, output => { text = output.supplements![0].text; });
   expect(text.split("\n").filter(line => line.startsWith("- "))).toHaveLength(100);
   expect(text.match(/Sleeping references index/g)).toHaveLength(1);
-  expect([...indexes.values()][0]!.split("\n").filter(line => line.startsWith("- "))).toHaveLength(9904); // 10000 explicit refs + three original-message files + raw Journal - 100 active.
+  expect([...indexes.values()][0].split("\n").filter(line => line.startsWith("- "))).toHaveLength(9904); // 10000 explicit refs + three original-message files + raw Journal - 100 active.
   const candidates = session.journal.events.filter(event => event.type === STATE_EVENT && (event.data as {op?:string}).op === "candidate");
   expect(candidates.length).toBeGreaterThan(1);
-  const partial = emptyDisclosureState(); applyStateEvent(partial, candidates[0]!);
-  expect(candidatePaths(partial, (candidates[0]!.data as { compactionId: string }).compactionId)).toBeUndefined();
+  const partial = emptyDisclosureState(); applyStateEvent(partial, candidates[0]);
+  expect(candidatePaths(partial, (candidates[0].data as { compactionId: string }).compactionId)).toBeUndefined();
   for (const event of candidates) expect(Buffer.byteLength(JSON.stringify(event))).toBeLessThan(256 * 1024);
 });
 
@@ -306,7 +306,7 @@ it("registers trace files from any plugin's completed result with their descript
     ["/file/logs/bash_2.log", "Bash log: pnpm test", 0, "active"],
   ]);
   let navigation = "";
-  await createDisclosureSource().get(view, value => { navigation = (value.supplements as readonly { text: string }[])[0]!.text; });
+  await createDisclosureSource().get(view, value => { navigation = (value.supplements as readonly { text: string }[])[0].text; });
   expect(navigation).toContain('"/file/agents/child.md" — Subagent transcript: review the diff');
   // A fresh disclosure over the same Journal (restart) folds the durable facts into the same paths.
   const replayed = await new ProgressiveDisclosure(port).hydrate(context(session), session);

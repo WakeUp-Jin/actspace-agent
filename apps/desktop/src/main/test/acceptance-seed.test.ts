@@ -11,9 +11,9 @@ it("seeds two effective models idempotently and binds purposes through the curre
     const first = await seedSettings(root, "http://127.0.0.1:12345/v1");
     const second = await seedSettings(root, "http://127.0.0.1:12346/v1");
     expect(second.connections).toHaveLength(1);
-    expect(second.connections[0]!.connectionId).toBe(first.connections[0]!.connectionId);
-    expect(second.connections[0]!.models.map(model => model.apiModel)).toEqual(["fixture-alternate", "fixture-main"]);
-    expect(second.connections[0]!.models[0]!.effective).toMatchObject({ contextWindow: 32768, maxOutput: 4096, input: ["text", "image"] });
+    expect(second.connections[0].connectionId).toBe(first.connections[0].connectionId);
+    expect(second.connections[0].models.map(model => model.apiModel)).toEqual(["fixture-alternate", "fixture-main"]);
+    expect(second.connections[0].models[0].effective).toMatchObject({ contextWindow: 32768, maxOutput: 4096, input: ["text", "image"] });
     expect(second.purposes.chat.model).toBe(second.purposes.utility.model);
     expect(await readFile(join(root, "settings.json"), "utf8")).not.toContain("synthetic-acceptance-credential");
   } finally { await rm(root, { recursive: true, force: true }); }

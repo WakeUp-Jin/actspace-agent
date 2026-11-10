@@ -73,7 +73,7 @@ export class SessionJournal {
       surface: candidate.surface,
       provenance: candidate.provenance ?? defaultSessionProvenance(),
     }) as SessionEventEnvelopeV1;
-    return this.#commit([event])[0]!;
+    return this.#commit([event])[0];
   }
 
   appendMany(candidates: readonly SessionEventCandidateV1[]): readonly SessionEventEnvelopeV1[] {
@@ -127,7 +127,7 @@ export class SessionJournal {
     if (latest <= before) return this.readEvents(latest, latest + 1)[0];
     for (let end = Math.min(before + 1, this.lastSeq + 1); end > 0; end -= 128) {
       const events = this.readEvents(Math.max(0, end - 128), end);
-      for (let index = events.length - 1; index >= 0; index--) if (events[index]!.type === type) return events[index];
+      for (let index = events.length - 1; index >= 0; index--) if (events[index].type === type) return events[index];
     }
     return undefined;
   }
@@ -151,8 +151,8 @@ export class SessionJournal {
   releaseDurable(throughSeq: number): void {
     if (!this.#history) return;
     let remove = 0, bytes = this.#bytes;
-    while (remove < this.#events.length && this.#events[remove]!.seq <= throughSeq &&
-      (this.#events.length - remove > this.#retainedEvents || bytes > this.#retainedBytes)) bytes -= this.#sizes[remove++]!;
+    while (remove < this.#events.length && this.#events[remove].seq <= throughSeq &&
+      (this.#events.length - remove > this.#retainedEvents || bytes > this.#retainedBytes)) bytes -= this.#sizes[remove++];
     if (!remove) return;
     this.#events.splice(0, remove); this.#sizes.splice(0, remove); this.#firstSeq += remove; this.#bytes = bytes;
   }

@@ -1,5 +1,5 @@
 import type { CSSProperties, KeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 type SplitSide = "left" | "right";
 
@@ -81,19 +81,19 @@ export function SplitView({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const rightOpen = right !== undefined;
 
-  function getAvailableMaxWidth(side: SplitSide): number {
+  const getAvailableMaxWidth = useCallback((side: SplitSide): number => {
     const otherPanelWidth = side === "left" ? (rightOpen ? rightWidth : 0) : leftWidth;
     const containerLimit = containerWidth > 0 ? containerWidth - otherPanelWidth - minMainWidth : Number.POSITIVE_INFINITY;
     const bounds = side === "left" ? leftBounds : rightBounds;
     return Math.max(bounds.minWidth, Math.min(bounds.maxWidth, containerLimit));
-  }
+  }, [containerWidth, leftBounds, leftWidth, minMainWidth, rightBounds, rightOpen, rightWidth]);
 
-  function getBoundedWidth(side: SplitSide, width: number): number {
+  const getBoundedWidth = useCallback((side: SplitSide, width: number): number => {
     const bounds = side === "left" ? leftBounds : rightBounds;
     return clamp(width, bounds.minWidth, getAvailableMaxWidth(side));
-  }
+  }, [getAvailableMaxWidth, leftBounds, rightBounds]);
 
-  function resizeSide(side: SplitSide, width: number) {
+  const resizeSide = useCallback((side: SplitSide, width: number) => {
     const nextWidth = getBoundedWidth(side, width);
     if (side === "left") {
       onLeftResize(nextWidth);
@@ -101,7 +101,7 @@ export function SplitView({
     }
 
     onRightResize(nextWidth);
-  }
+  }, [getBoundedWidth, onLeftResize, onRightResize]);
 
   function handleSeparatorKeyDown(side: SplitSide, event: KeyboardEvent<HTMLDivElement>) {
     const step = event.shiftKey ? 40 : 16;
@@ -220,19 +220,7 @@ export function SplitView({
       window.removeEventListener("pointercancel", endDrag);
       window.removeEventListener("blur", handleBlur);
     };
-  }, [
-    dragState,
-    leftBounds,
-    leftWidth,
-    minMainWidth,
-    onLeftResize,
-    onLeftResizeEnd,
-    onRightResize,
-    onRightResizeEnd,
-    rightBounds,
-    rightOpen,
-    rightWidth
-  ]);
+  }, [dragState, onLeftResizeEnd, onRightResizeEnd, resizeSide]);
 
   const effectiveLeftWidth = leftHidden ? 0 : leftWidth;
   const expanded = rightExpanded && rightOpen;

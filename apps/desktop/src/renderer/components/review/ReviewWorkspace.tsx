@@ -27,7 +27,7 @@ export function ReviewWorkspace({ workspaceRoot, sessionId, refreshKey }: {
       lastRefreshKey.current = refreshKey;
       refresh();
     }
-  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refreshKey, refresh]);
 
   useLayoutEffect(() => {
     const root = rootRef.current;

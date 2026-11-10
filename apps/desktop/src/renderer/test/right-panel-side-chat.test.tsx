@@ -51,7 +51,7 @@ it("opens a side chat from the right panel, answers there, and keeps it out of t
   const sideChats = [...db.sessions.values()].filter((session) => session.sideChat);
   expect(sideChats).toHaveLength(3);
   expect(sideChats.at(-1)?.messages.some((message) => message.content === "插件之间能共享状态吗？")).toBe(true);
-  expect(db.sessions.get(sideChats[0]!.sideChat!.parentId)?.messages.some((message) => message.content === "插件之间能共享状态吗？")).toBe(false);
+  expect(db.sessions.get(sideChats[0].sideChat!.parentId)?.messages.some((message) => message.content === "插件之间能共享状态吗？")).toBe(false);
   // tab 标题换成第一条问题；侧栏里还是只有两个主会话。
   expect(await screen.findByRole("tab", { name: /插件之间能共享状态吗？/ })).toBeInTheDocument();
   expect(document.querySelectorAll("[data-session-id]")).toHaveLength(2);

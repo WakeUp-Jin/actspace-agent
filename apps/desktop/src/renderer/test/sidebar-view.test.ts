@@ -114,7 +114,7 @@ describe("time buckets", () => {
       ["今天", ["today", "today-2"]],
       ["昨天", ["yesterday"]],
     ]);
-    expect(buckets[0]!.attention).toBe(true);
+    expect(buckets[0].attention).toBe(true);
   });
 });
 

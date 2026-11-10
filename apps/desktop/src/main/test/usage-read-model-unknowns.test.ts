@@ -46,7 +46,7 @@ it("keeps running requests and token-less failures out of the unknown counts", a
   expect(result.summary.unknownTokenRequestCounts).toMatchObject({ input: 1, output: 1, total: 1 });
   expect(result.costSummary).toMatchObject({ knownCostRequestCount: 1, unknownCostRequestCount: 1 });
   expect(result.summary.costUnavailableCount).toBe(1);
-  const model = result.aggregates!.models[0]!;
+  const model = result.aggregates!.models[0];
   expect(model.unknownTokenRequestCount).toBe(1);
   expect(model.costSummary.unknownCostRequestCount).toBe(1);
 });

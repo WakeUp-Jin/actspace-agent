@@ -22,7 +22,7 @@ export function trajectoryDelegations(snapshot: RuntimeV2TrajectorySnapshot | nu
   const tree = foldSubagentTree((snapshot?.nodes ?? []).map(node => ({ type: node.eventType, time: node.time, data: node.data })));
   const result = new Map<string, TrajectoryDelegation>();
   for (const agentId of tree.order) {
-    const agent = tree.agents[agentId]!;
+    const agent = tree.agents[agentId];
     if (agent.legacy && agent.agentId === sessionId) continue;
     const kindLabel = agent.legacy
       ? subagentKindLabel({ agentKind: agent.preset === 'explore' ? 'explore' : 'agent' })

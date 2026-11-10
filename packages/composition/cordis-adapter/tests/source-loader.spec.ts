@@ -18,7 +18,7 @@ describe("explicit plugin source loading", () => {
     const loaded = await loadConfiguredPlugins(join(root, "plugins.json")); expect(await discoverPluginCodecs(loaded.manifests, loaded.codecLoader)).toHaveLength(1); await expect(access(marker)).rejects.toThrow();
     const ctx = new CordisContextClass();
     try {
-      const behavior = await loadCordisBehavior(manifest.behaviors[0]!.module, specifier => loaded.behaviorLoader(specifier, manifest));
+      const behavior = await loadCordisBehavior(manifest.behaviors[0].module, specifier => loaded.behaviorLoader(specifier, manifest));
       await expect(access(marker)).rejects.toThrow();
       await ctx.plugin(behavior);
       expect(await readFile(marker, "utf8")).toBe("active");

@@ -51,7 +51,7 @@ it("keeps a letter outside the folded Worked group, before the reply", () => {
   const bash = { kind: "bash", id: "b", command: "ls", status: "completed", createdAt: "2026-11-08T10:00:01.000Z" } as unknown as MessageBlock;
   const reply = { kind: "assistant", id: "a", content: "改好了。", createdAt: "2026-11-08T10:00:09.000Z" } as MessageBlock;
   const [turn] = buildTurns([item(user), item(bash), item(letterBlock()), item(reply)]);
-  render(<TurnView turn={turn!} sessionId="s" active={false} approvalsAfter={new Map()} renderApproval={() => null} />);
+  render(<TurnView turn={turn} sessionId="s" active={false} approvalsAfter={new Map()} renderApproval={() => null} />);
   const worked = screen.getByRole("button", { name: /Worked/ });
   expect(worked).toHaveAttribute("aria-expanded", "false");
   const card = screen.getByText("来信");

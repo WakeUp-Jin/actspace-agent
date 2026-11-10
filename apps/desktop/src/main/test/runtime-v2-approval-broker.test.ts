@@ -38,7 +38,7 @@ describe("DesktopApprovalBroker", () => {
     const broker = new DesktopApprovalBroker({ waitForDecision: async () => ({ requestId: "approval", decision: "once", decidedAt: Date.now() }), onApprovalRequired });
     const resource = { kind: "process" as const, access: "execute" as const, commandDigest: "digest", cwd: "/workspace", dynamic: false, ...(noSandbox === undefined ? {} : { noSandbox }) };
     await broker.requestApproval({ schemaVersion: 1, requestId: "approval", pluginId: "plugin", toolName: "bash", callId: "call", sessionId: "session", agentRunId: "run", agentId: "main:session", definitionDigest: "definition", normalizedArgsDigest: "args", reasons: [{ code: "TEST", message: "run", risk: "high" }], resources: [resource], grantSuggestions: [], supportedLifetimes: ["once"], requestedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString() }, new AbortController().signal);
-    expect(onApprovalRequired.mock.calls[0]![0].executionEnvironment).toBe(environment);
+    expect(onApprovalRequired.mock.calls[0][0].executionEnvironment).toBe(environment);
   });
 
   it("returns the Runtime suggestion id without accepting scope fields from Renderer", async () => {

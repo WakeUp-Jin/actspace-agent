@@ -88,9 +88,9 @@ describe("TrajectoryView", () => {
     const richSnapshot: RuntimeV2TrajectorySnapshot = {
       ...snapshot,
       nodes: [
-        { ...snapshot.nodes[0]!, data: { turnId: "turn-1", stepId: "step-1" } },
-        { ...snapshot.nodes[1]!, eventType: "tool/call", data: { turnId: "turn-1", stepId: "step-1", name: "read_file", path: "src/App.tsx" } },
-        { ...snapshot.nodes[2]!, data: { turnId: "turn-1", status: "completed" } },
+        { ...snapshot.nodes[0], data: { turnId: "turn-1", stepId: "step-1" } },
+        { ...snapshot.nodes[1], eventType: "tool/call", data: { turnId: "turn-1", stepId: "step-1", name: "read_file", path: "src/App.tsx" } },
+        { ...snapshot.nodes[2], data: { turnId: "turn-1", status: "completed" } },
       ],
     };
 
@@ -142,7 +142,7 @@ describe("TrajectoryView", () => {
     await user.click(screen.getByRole("button", { name: "收起所有调用" }));
     expect(screen.queryByRole("row", { name: /工具，read_file/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "展开所有调用" })).toBeInTheDocument();
-    await user.click(screen.getAllByRole("row", { name: /^已收起的助手概述/ })[0]!);
+    await user.click(screen.getAllByRole("row", { name: /^已收起的助手概述/ })[0]);
     expect(screen.getByRole("row", { name: /工具，read_file.*core-codecs/ })).toBeInTheDocument();
     expect(screen.getByRole("row", { name: /工具，bash.*session-journal/ })).toBeInTheDocument();
 
@@ -177,7 +177,7 @@ describe("TrajectoryView", () => {
     expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual(["概述", "选项", "用量", "计时"]);
     await user.click(screen.getByRole("button", { name: "关闭详情" }));
 
-    await user.click(screen.getAllByRole("row", { name: /系统，系统提示词已更新/ })[0]!);
+    await user.click(screen.getAllByRole("row", { name: /系统，系统提示词已更新/ })[0]);
     expect(screen.getByRole("tab", { name: "差异" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tabpanel")).toHaveTextContent("本轮只检查文件，不修改。");
     await user.click(screen.getByRole("button", { name: "关闭详情" }));

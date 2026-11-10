@@ -43,10 +43,10 @@ const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
 function base64UrlEncode(bytes: readonly number[]): string {
   let out = "";
   for (let index = 0; index < bytes.length; index += 3) {
-    const a = bytes[index]!, b = bytes[index + 1], c = bytes[index + 2];
-    out += ALPHABET[a >> 2]! + ALPHABET[((a & 3) << 4) | ((b ?? 0) >> 4)]!;
-    if (b !== undefined) out += ALPHABET[((b & 15) << 2) | ((c ?? 0) >> 6)]!;
-    if (c !== undefined) out += ALPHABET[c & 63]!;
+    const a = bytes[index], b = bytes[index + 1], c = bytes[index + 2];
+    out += ALPHABET[a >> 2] + ALPHABET[((a & 3) << 4) | ((b ?? 0) >> 4)];
+    if (b !== undefined) out += ALPHABET[((b & 15) << 2) | ((c ?? 0) >> 6)];
+    if (c !== undefined) out += ALPHABET[c & 63];
   }
   return out;
 }
@@ -80,12 +80,12 @@ function utf8Encode(text: string): number[] {
 function utf8Decode(bytes: readonly number[]): string {
   let out = "";
   for (let index = 0; index < bytes.length;) {
-    const first = bytes[index]!;
+    const first = bytes[index];
     const length = first < 0x80 ? 1 : first >= 0xf0 && first < 0xf8 ? 4 : first >= 0xe0 ? 3 : first >= 0xc0 ? 2 : 0;
     if (!length || index + length > bytes.length) throw new Error();
     let code = length === 1 ? first : first & (0xff >> (length + 1));
     for (let offset = 1; offset < length; offset++) {
-      const next = bytes[index + offset]!;
+      const next = bytes[index + offset];
       if ((next & 0xc0) !== 0x80) throw new Error();
       code = (code << 6) | (next & 63);
     }

@@ -34,7 +34,7 @@ export function playReply(clock: MockClock, options: ReplyOptions): ReplyPlaybac
   clock.emit("agentStream", { type: "agent_run_started", sessionId, agentRunId });
   const step = (index: number) => {
     if (index < chunks.length) {
-      clock.emit("agentStream", { type: "assistant_text_delta", ...base, messageId, delta: chunks[index]! });
+      clock.emit("agentStream", { type: "assistant_text_delta", ...base, messageId, delta: chunks[index] });
       cancel = clock.schedule(() => step(index + 1), delayBefore(index + 1));
       return;
     }

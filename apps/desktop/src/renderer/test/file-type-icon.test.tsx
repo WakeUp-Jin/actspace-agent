@@ -23,7 +23,7 @@ describe("file type icon", () => {
     for (const [type, artwork] of Object.entries(CODE_FILE_ARTWORK)) {
       expect(artwork).not.toMatch(/<(?:script|style|foreignObject)\b|\son[a-z]+\s*=/iu);
       expect(artwork).not.toMatch(/(?:href|xlink:href)="(?!#)/iu);
-      const ids = [...artwork.matchAll(/\bid="([^"]+)"/gu)].map((match) => match[1]!);
+      const ids = [...artwork.matchAll(/\bid="([^"]+)"/gu)].map((match) => match[1]);
       expect(new Set(ids).size, `${type} has duplicate SVG ids`).toBe(ids.length);
       for (const id of ids) expect(id.startsWith(CODE_FILE_ICON_ID_TOKEN)).toBe(true);
     }

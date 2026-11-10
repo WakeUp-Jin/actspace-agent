@@ -115,7 +115,7 @@ export function dedupeMacApplications(applications: readonly MacApplication[]): 
       order.push(app);
       continue;
     }
-    const held = order[index]!;
+    const held = order[index];
     if (held.default) continue;
     if (app.default || compareVersions(app.version, held.version) > 0) order[index] = app;
   }

@@ -283,7 +283,7 @@ async function commitChangesInWorkspace(
   }
 
   let branchCreated = false;
-  const commitBranch = branchName || state.branch!;
+  const commitBranch = branchName || state.branch;
   if (branchName) {
     const created = await runGit(runner, ["switch", "-c", branchName], workspaceRoot);
     if (!isGitRunSuccess(created)) {
