@@ -1,14 +1,13 @@
 name: CI
 
-# 代码变更的工程门禁。不带路径过滤、每个 PR 都跑的仓库卫生检查在 base-checks.yml。
+# 代码变更的工程门禁。每个 PR 都跑的仓库卫生检查在 base-checks.yml。
 # 仓库是 public，标准 GitHub 托管 runner 不计费；这里的拆分只为缩短反馈时间。
+#
+# 工作流级不带路径过滤：每个 PR 都会触发，末尾的 ci-gate（「CI 汇总」）因此每次都报告结果，
+# 可以设为 main ruleset 的 required status check。纯文档 PR 由 changes job 判定后跳过全部工程 job，
+# 只跑 changes 与 ci-gate 两个几秒钟的 job。
 on:
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/PULL_REQUEST_TEMPLATE.md'
   push:
     branches:
       - main
@@ -22,11 +21,51 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# 下面四个 job 互不依赖，各自 install → 恢复 tsc 缓存 → pnpm build:deps，总时长取最长的那个。
-# 共用步骤在 .github/actions/setup-workspace；build:deps 走 tsc -b 项目引用图，缓存命中时只重编改动过的包。
 jobs:
+  # 判断这次 PR 是否只改了文档。忽略的路径与原先工作流级 paths-ignore 相同；
+  # push 到 main 和手动触发不做判断，全部 job 照常跑。
+  changes:
+    name: 变更范围
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      # PR 触发时检出的是 merge commit：第一父提交是 base，第二父提交是 PR head，取两层就能比较。
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Detect code changes
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "${EVENT_NAME}" != "pull_request" ]; then
+            echo "code=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          code=false
+          # -z 原样输出路径（中文文件名不转义）；--no-renames 让「代码文件改名成文档」也算代码改动。
+          while IFS= read -r -d '' file; do
+            case "${file}" in
+              docs/* | *.md | .github/ISSUE_TEMPLATE/* | .github/PULL_REQUEST_TEMPLATE.md) ;;
+              *)
+                echo "非文档改动：${file}"
+                code=true
+                break
+                ;;
+            esac
+          done < <(git diff --name-only --no-renames -z HEAD^1 HEAD)
+          echo "code=${code}" >> "${GITHUB_OUTPUT}"
+
+  # 下面四个 job 互不依赖，各自 install → 恢复 tsc 缓存 → pnpm build:deps，总时长取最长的那个。
+  # 共用步骤在 .github/actions/setup-workspace；build:deps 走 tsc -b 项目引用图，缓存命中时只重编改动过的包。
   lint-typecheck:
     name: Lint 与类型检查
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,6 +90,8 @@ jobs:
 
   test-process:
     name: 仓库脚本与进程级测试
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -75,6 +116,8 @@ jobs:
 
   test-packages:
     name: 包测试
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -97,6 +140,8 @@ jobs:
 
   test-desktop:
     name: 桌面端测试 (${{ matrix.shard }}/2)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -122,6 +167,8 @@ jobs:
 
   build:
     name: 构建
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -157,6 +204,8 @@ jobs:
 
   site:
     name: 官网
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -187,6 +236,8 @@ jobs:
 
   browser-bridge:
     name: Browser Bridge
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -224,3 +275,31 @@ jobs:
         run: |
           GOOS=windows GOARCH=amd64 go build -o /dev/null .
           GOOS=darwin GOARCH=arm64 go build -o /dev/null .
+
+  # 汇总 job：每个 PR 都会运行并报告一次结果，是 ci.yml 里唯一适合设为 required status check 的 job。
+  # 被 changes 判定跳过的 job 结果是 skipped，算通过；任何一个 failure 或 cancelled 都让它失败。
+  # 用 always() 而不是 !cancelled()：运行被取消时这个 job 也要跑并失败，否则 skipped 会被 ruleset 当成通过。
+  ci-gate:
+    name: CI 汇总
+    needs:
+      - changes
+      - lint-typecheck
+      - test-process
+      - test-packages
+      - test-desktop
+      - build
+      - site
+      - browser-bridge
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report job results
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: echo "${NEEDS}"
+
+      - name: Fail when any job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "::error::有 job 失败或被取消，见本次运行的 job 列表"
+          exit 1
