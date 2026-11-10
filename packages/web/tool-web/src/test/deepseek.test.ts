@@ -39,7 +39,7 @@ describe("DeepSeek web integration", () => {
   it("does not pay for fetch with a search key alone and isolates local/remote caches on live toggles", async () => {
     let key: string | undefined;
     const fetchImpl = vi.fn(async (url: string | URL | Request) => String(url).includes("api.deepseek") ? json({ title: "remote", content: "remote body" }) : new Response("local body"));
-    const ports = createNodeWebToolPorts({ credentials: { deepseek: "ds" }, get deepseekFetchApiKey() { return key; }, fetchImpl, resolveHostname: async () => ["93.184.216.34"] });
+    const ports = createNodeWebToolPorts({ credentials: { deepseek: "ds" }, get deepseekFetchApiKey() { return key; }, fetchImpl, requestPage: (url) => fetchImpl(url), resolveHostname: async () => ["93.184.216.34"] });
     const args = { url: "https://example.com/page" };
     expect(JSON.stringify(await ports.web_fetch!(args, context()))).toContain("local body");
     key = "ds";
@@ -52,7 +52,7 @@ describe("DeepSeek web integration", () => {
 
   it.each([401, 402, 404, 429, 500])("falls back to local for HTTP %i without leaking credentials", async (status) => {
     const fetchImpl = vi.fn(async (url: string | URL | Request) => String(url).includes("api.deepseek") ? json({ error: "secret-ds-key" }, status) : new Response("local body"));
-    const ports = createNodeWebToolPorts({ deepseekFetchApiKey: "secret-ds-key", fetchImpl, resolveHostname: async () => ["93.184.216.34"] });
+    const ports = createNodeWebToolPorts({ deepseekFetchApiKey: "secret-ds-key", fetchImpl, requestPage: (url) => fetchImpl(url), resolveHostname: async () => ["93.184.216.34"] });
     const output = JSON.stringify(await ports.web_fetch!({ url: "https://example.com" }, context()));
     expect(output).toContain("local body"); expect(output).toContain("DeepSeek fallback"); expect(output).not.toContain("secret-ds-key");
     expect(fetchImpl).toHaveBeenCalledTimes(2);
@@ -60,7 +60,7 @@ describe("DeepSeek web integration", () => {
 
   it("does not fall back on safety rejection, private targets or cancellation", async () => {
     const fetchImpl = vi.fn(async () => json({}, 403));
-    const ports = createNodeWebToolPorts({ deepseekFetchApiKey: "ds", fetchImpl, resolveHostname: async () => ["93.184.216.34"] });
+    const ports = createNodeWebToolPorts({ deepseekFetchApiKey: "ds", fetchImpl, requestPage: () => fetchImpl(), resolveHostname: async () => ["93.184.216.34"] });
     expect(await ports.web_fetch!({ url: "https://example.com" }, context())).toMatchObject({ status: "failed", failure: { code: "WEB_FETCH_URL_DENIED" } });
     expect(fetchImpl).toHaveBeenCalledTimes(1); fetchImpl.mockClear();
     await ports.web_fetch!({ url: "http://127.0.0.1" }, context()); expect(fetchImpl).not.toHaveBeenCalled();
