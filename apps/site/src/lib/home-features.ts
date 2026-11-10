@@ -1,19 +1,20 @@
 // 首页 V4 文案数据。首屏插件与任务演示在 components/home/Hero.astro 里，这里只放可复用的列表。
-export interface Capability { title: string; description: string; slug: string; }
+// icon 是 24 viewBox 的线性图标 path，首页基础功能卡片用。
+export interface Capability { title: string; description: string; slug: string; icon: string; }
 export interface Direction { id: string; status: 'live' | 'wip'; name: string; summary: string; done: string; next: string; }
 
 export const statusLabel = { live: '已上线', wip: '进行中' } as const;
 
 // 「现状」：今天就能用的 Coding Agent 能力，每项链到对应文档。
 export const todayCapabilities: Capability[] = [
-  { title: '读取与检索', description: '按需读取文件、搜索代码，先弄清项目再动手。', slug: 'files-and-search' },
-  { title: '编辑与 Review', description: '改动直接写进文件，逐个检查差异再决定保留。', slug: 'review' },
-  { title: 'Bash', description: '让 Agent 在当前项目里运行命令、构建与测试，输出回到对话。', slug: 'bash' },
-  { title: '审批策略', description: '决定哪些操作直接执行，哪些先问你。', slug: 'tools-and-approvals' },
-  { title: 'Skills', description: '把常用的工作方法装进 Skill，带进下一项任务。', slug: 'skills' },
-  { title: '子 Agent', description: '把独立的检索拆给子 Agent，主会话保留全貌。', slug: 'subagents' },
-  { title: '模型与推理', description: '连接自己的服务商，按任务选模型与思考强度。', slug: 'model-selection' },
-  { title: 'Browser Use', description: '需要浏览器的任务，打开网页、点击与截图。', slug: 'browser' },
+  { title: '读取与检索', description: '按需读取文件、搜索代码，先弄清项目再动手。', slug: 'files-and-search', icon: 'M14 3v5h5M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM9 13h6M9 17h6' },
+  { title: '编辑与 Review', description: '改动直接写进文件，逐个检查差异再决定保留。', slug: 'review', icon: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z' },
+  { title: 'Bash', description: '让 Agent 在当前项目里运行命令、构建与测试，输出回到对话。', slug: 'bash', icon: 'M4 17l6-5-6-5M12 19h8' },
+  { title: '审批策略', description: '决定哪些操作直接执行，哪些先问你。', slug: 'tools-and-approvals', icon: 'M12 3l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6zM9 12l2 2 4-4' },
+  { title: 'Skills', description: '把常用的工作方法装进 Skill，带进下一项任务。', slug: 'skills', icon: 'M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM5 18l.7 1.8L7.5 20.5l-1.8.7L5 23l-.7-1.8-1.8-.7 1.8-.7z' },
+  { title: '子 Agent', description: '把独立的检索拆给子 Agent，主会话保留全貌。', slug: 'subagents', icon: 'M6 3v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9' },
+  { title: '模型与推理', description: '连接自己的服务商，按任务选模型与思考强度。', slug: 'model-selection', icon: 'M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1 3 7 4 4 0 0 1-3 7h-8a4 4 0 0 1-3-7 4 4 0 0 1 3-7V6a4 4 0 0 1 4-4zM9 12h6M12 9v6' },
+  { title: 'Browser Use', description: '需要浏览器的任务，打开网页、点击与截图。', slug: 'browser', icon: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20' },
 ];
 
 // 「方向」：三段路线图，状态以产品概念文档和用户确认为准。首页方向条和开发计划页共用；

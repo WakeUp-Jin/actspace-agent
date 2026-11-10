@@ -4,21 +4,22 @@ import { sitePath } from '../../lib/site-path';
 import character from '../../assets/blog/covers/character-01.png';
 // 精灵只在窗口侧栏「Actor 名册」前出现这一处，作为小图标；不是首屏主角。
 const avatar = await getImage({ src: character, width: 48, format: 'webp', quality: 85 });
+// 每个插件：id、名称、悬停说明、线性图标（24 视口的 path，和窗口里的图标同一套笔画）。
 const tools = [
-  ['read', '读取文件', '按需读取项目文件，内容进入对话'],
-  ['edit', '编辑', '直接修改文件，改动进入 Review'],
-  ['term', '终端', '在你的项目里执行命令，输出回到对话'],
-  ['browser', 'Browser Use', '打开网页、点击与截图，需要浏览器的任务才用'],
+  ['read', '读取文件', '按需读取项目文件，内容进入对话', 'M14 3v5h5M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM9 13h6M9 17h6'],
+  ['edit', '编辑', '直接修改文件，改动进入 Review', 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z'],
+  ['term', '终端', '在你的项目里执行命令，输出回到对话', 'M4 17l6-5-6-5M12 19h8'],
+  ['browser', 'Browser Use', '打开网页、点击与截图，需要浏览器的任务才用', 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20'],
 ];
 const behaviors = [
-  ['skills', 'Skills', '把领域经验按需加载给 Agent'],
-  ['approve', '审批策略', '会改变环境的命令先问你'],
-  ['sub', '子 Agent', '把独立检索派给子 Agent，主会话只收摘要'],
+  ['skills', 'Skills', '把领域经验按需加载给 Agent', 'M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM5 18l.7 1.8L7.5 20.5l-1.8.7L5 23l-.7-1.8-1.8-.7 1.8-.7z'],
+  ['approve', '审批策略', '会改变环境的命令先问你', 'M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1zM9 12l2 2 4-4'],
+  ['sub', '子 Agent', '把独立检索派给子 Agent，主会话只收摘要', 'M6 3v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9'],
 ];
 const contexts = [
-  ['prog', '渐进披露', '用到哪个文件才放进上下文'],
-  ['comp', '压缩', '快到上限时把旧历史压成结构化摘要'],
-  ['panel', '上下文面板', '逐次查看每次请求带了什么'],
+  ['prog', '渐进披露', '用到哪个文件才放进上下文', 'M12 2 2 7l10 5 10-5-10-5zM2 12l10 5 10-5M2 17l10 5 10-5'],
+  ['comp', '压缩', '快到上限时把旧历史压成结构化摘要', 'M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7'],
+  ['panel', '上下文面板', '逐次查看每次请求带了什么', 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM15 3v18'],
 ];
 // 上下文面板的分类，颜色在 home.css 的 [data-c] 上。
 const categories = [['sys', '系统提示词'], ['tools', '工具'], ['rules', '规则'], ['skills', 'Skills'], ['sum', '会话摘要'], ['conv', '会话内容']];
@@ -100,13 +101,13 @@ const categories = [['sys', '系统提示词'], ['tools', '工具'], ['rules', '
         </div>
       </div>
       <div class="grp g-tools"><h6>工具</h6><div class="ms">
-        {tools.map(([id, name, tip]) => <button type="button" class="m" aria-pressed="true" data-m={id} data-side="l" data-tip={`${name}|${tip}`}><span class="t">{name}</span><i class="sw"></i></button>)}
+        {tools.map(([id, name, tip, icon]) => <button type="button" class="m" aria-pressed="true" data-m={id} data-side="l" data-tip={`${name}|${tip}`}><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d={icon}/></svg><span class="t">{name}</span><i class="sw"></i></button>)}
       </div></div>
       <div class="grp g-beh"><h6>行为</h6><div class="ms">
-        {behaviors.map(([id, name, tip]) => <button type="button" class="m" aria-pressed="true" data-m={id} data-side="r" data-tip={`${name}|${tip}`}><span class="t">{name}</span><i class="sw"></i></button>)}
+        {behaviors.map(([id, name, tip, icon]) => <button type="button" class="m" aria-pressed="true" data-m={id} data-side="r" data-tip={`${name}|${tip}`}><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d={icon}/></svg><span class="t">{name}</span><i class="sw"></i></button>)}
       </div></div>
       <div class="grp g-ctx"><h6>上下文</h6><div class="ms">
-        {contexts.map(([id, name, tip]) => <button type="button" class="m" aria-pressed="true" data-m={id} data-side="b" data-tip={`${name}|${tip}`}><span class="t">{name}</span><i class="sw"></i></button>)}
+        {contexts.map(([id, name, tip, icon]) => <button type="button" class="m" aria-pressed="true" data-m={id} data-side="b" data-tip={`${name}|${tip}`}><svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d={icon}/></svg><span class="t">{name}</span><i class="sw"></i></button>)}
       </div></div>
       <p class="count">本任务启用 <b data-hero-count>0</b> / 10 个插件<small>悬停看说明 · 点击开关后重跑</small></p>
       <div class="tip" role="tooltip"></div>

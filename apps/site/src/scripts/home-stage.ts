@@ -16,6 +16,28 @@ export interface PluginStage {
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
+// 折线拐角倒成圆角（半径 8，不够长时按可用长度缩小）。
+const CORNER = 8;
+const roundedPath = (points: [number, number][]) => {
+  let d = `M${points[0][0]} ${points[0][1]}`;
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const [px, py] = points[i - 1];
+    const [cx, cy] = points[i];
+    const [nx, ny] = points[i + 1];
+    const inLen = Math.hypot(cx - px, cy - py);
+    const outLen = Math.hypot(nx - cx, ny - cy);
+    const r = Math.min(CORNER, inLen / 2, outLen / 2);
+    if (r < 0.5) { d += `L${cx} ${cy}`; continue; }
+    const ax = cx - ((cx - px) / inLen) * r;
+    const ay = cy - ((cy - py) / inLen) * r;
+    const bx = cx + ((nx - cx) / outLen) * r;
+    const by = cy + ((ny - cy) / outLen) * r;
+    d += `L${ax} ${ay}Q${cx} ${cy} ${bx} ${by}`;
+  }
+  const [lx, ly] = points[points.length - 1];
+  return `${d}L${lx} ${ly}`;
+};
+
 export function createPluginStage(
   root: HTMLElement,
   target: HTMLElement,
@@ -55,13 +77,15 @@ export function createPluginStage(
         const sy = y(a.top + a.height / 2);
         ex = x(side === 'l' ? b.left : b.right);
         ey = clamp(sy, y(b.top) + 16, y(b.bottom) - 16);
-        d = Math.abs(sy - ey) < 1 ? `M${sx} ${sy}H${ex}` : `M${sx} ${sy}H${(sx + ex) / 2}V${ey}H${ex}`;
+        const mx = (sx + ex) / 2;
+        d = Math.abs(sy - ey) < 1 ? `M${sx} ${sy}H${ex}` : roundedPath([[sx, sy], [mx, sy], [mx, ey], [ex, ey]]);
       } else {
         const sx = x(a.left + a.width / 2);
         const sy = y(side === 'b' ? a.top : a.bottom);
         ex = clamp(sx, x(b.left) + 16, x(b.right) - 16);
         ey = y(side === 'b' ? b.bottom : b.top);
-        d = Math.abs(sx - ex) < 1 ? `M${sx} ${sy}V${ey}` : `M${sx} ${sy}V${(sy + ey) / 2}H${ex}V${ey}`;
+        const my = (sy + ey) / 2;
+        d = Math.abs(sx - ex) < 1 ? `M${sx} ${sy}V${ey}` : roundedPath([[sx, sy], [sx, my], [ex, my], [ex, ey]]);
       }
       const g = document.createElementNS(SVG_NS, 'g');
       g.dataset.m = m.dataset.m;
@@ -173,8 +197,15 @@ const LIMIT = 200;
 const fmt = (k: number) => `${Math.round(k * 10) / 10}K`;
 const icon = (d: string, size = 12) => `<svg class="i chev" viewBox="0 0 24 24" style="width:${size}px;height:${size}px"><path d="${d}"/></svg>`;
 const CHEV = icon('m9 18 6-6-6-6');
+// 上一轮对话：让窗口一开场就像用了一阵子的会话，而不是空白起步。
 const PREVIOUS = `<div class="prev"><div class="bubble">先把路由守卫修好，未登录跳回 /login。</div></div>
-  <div class="prev say">已修复。改动 1 个文件，guard 测试 6 个通过。</div><div class="gap"></div>`;
+  <div class="prev worked">Worked for 34s ${icon('m9 18 6-6-6-6', 13)}</div>
+  <div class="prev say">已修复。<code>requireAuth</code> 现在在 beforeEach 里读 session，未登录统一 redirect 到 /login 并带回 <code>?next=</code>。</div>
+  <div class="prev card chg"><div class="h"><span class="fi"><b>&lt;/&gt;</b></span><div>已编辑 1 个文件<small><u>+12</u> <s>-4</s></small></div></div>
+    <div class="f"><span>src/router/guard.ts</span><span><u>+12</u> <s>-4</s></span></div></div>
+  <div class="prev usage">${icon('M8 4h10a2 2 0 0 1 2 2v10M4 8h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z', 13)}
+    <b>${icon('M3 5c0-1.7 4-3 9-3s9 1.3 9 3-4 3-9 3-9-1.3-9-3M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3', 13)}用量 9.8K tok</b><span>09:38</span></div>
+  <div class="gap"></div>`;
 
 export function initializeHeroStage() {
   const root = document.querySelector<HTMLElement>('[data-hero-stage]');
