@@ -54,7 +54,7 @@
   - 不依赖桌面端运行时、用户数据、密钥或 Electron 构建产物
 
 - `apps/promo-video`
-  - 只读取 `apps/site/src/assets` 里的品牌标志和一张 Space 截图；产品界面是按视频尺寸重画的示意，不 import 桌面端代码
+  - 自成一体：品牌标志和一张 Space 截图存在自己的 `assets/` 里，产品界面是按视频尺寸重画的示意，不读取、不 import 仓库里其他目录的任何文件
   - 不依赖任何 `@actspace/*` 包、Runtime 或用户数据；渲染需要本机的 Chrome 与 ffmpeg；配乐是一首 CC0 曲子，渲染时下载；成片和配乐不入库
 
 - `browser-bridge`

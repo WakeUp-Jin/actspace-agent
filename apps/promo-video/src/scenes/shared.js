@@ -1,4 +1,4 @@
-import markUrl from "@site-assets/brand/actspace-mark.png";
+import markUrl from "../../assets/actspace-mark.png";
 
 export { markUrl };
 

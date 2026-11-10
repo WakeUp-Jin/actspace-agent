@@ -77,9 +77,11 @@ pnpm --filter @actspace/promo-video render --music ~/Downloads/another.mp3 --mus
 - **镜头。** `src/camera.js` 把一张大图放进固定取景框，按时间在几个区域之间推拉平移；区域用相对整张图的 `[左, 上, 宽, 高]` 表示。
 - **字体。** 思源宋体、思源黑体和 JetBrains Mono 随 `@fontsource-variable/*` 打包，不依赖本机字体，换机器渲染字形不变。
 
-## 和其他目录的耦合
+## 和其他目录的关系
 
-- 品牌标志和 Space 截图引用 `apps/site/src/assets/` 里的原文件，不另存一份。颜色、字体和色块舞台沿用 `apps/site/DESIGN.md`。
+这个目录自成一体：代码、素材、说明都在这里，不读取仓库里其他目录的文件，整个目录删掉或搬走都不影响别处。目录之外只有几处登记：`pnpm-lock.yaml` 里的字体依赖、`scripts/check-package-boundaries.mjs` 的应用名单、`apps/README.md` 和 `docs/ARCHITECTURE.md` 里各一段说明，以及 `docs/histories/` 里的任务记录。
+
+- `assets/` 里的品牌标志和 Space 截图是从官网（`apps/site/src/assets/`）复制来的，官网换图后这里不会自动跟着变；要用新图就再复制一次，并核对 `src/scenes/outro.js` 里镜头取的两块区域。颜色、字体和色块舞台照着 `apps/site/DESIGN.md` 写。
 - 重画的界面（任务步骤、上下文用量、审批卡片、轨迹与改动清单）是示意，数字是一条演示任务的数据，不随产品自动更新；产品改了对应的文案或数字，要手动对一遍 `src/scenes/work.js` 和 `src/scenes/features.js`。
 
 画面里的说法以仓库 README 和官网首页为准：只有上下文管理引擎标「已上线」，Harness 自进化、Actor 与 Space 标「进行中」；「怎么用」只写从源码运行。

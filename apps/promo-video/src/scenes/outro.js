@@ -1,4 +1,4 @@
-import spaceUrl from "@site-assets/screenshots/home/space.png";
+import spaceUrl from "../../assets/space.png";
 import { beats } from "../soundtrack.js";
 import { at, chrome, lines, markUrl } from "./shared.js";
 
