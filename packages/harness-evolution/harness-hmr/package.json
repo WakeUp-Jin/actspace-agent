@@ -33,7 +33,6 @@
   },
   "dependencies": {
     "@actspace/harness-control": "workspace:*",
-    "@actspace/boot": "workspace:*",
     "@actspace/cordis-adapter": "workspace:*"
   },
   "devDependencies": {

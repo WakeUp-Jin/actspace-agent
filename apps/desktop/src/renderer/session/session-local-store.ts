@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useRef, useSyncExternalStore } 
 import type { ComposerAttachment, ComposerMode, ModelSelectionId, ResponseAnnotationReference } from "@actspace/shared";
 import type { ComposerDraftRestore, ComposerSendOptions } from "../components/Composer";
 import { revokeAttachmentPreviews } from "../components/composer/attachment-preview";
-import type { CompactionBlock } from "./live-runs/stream-blocks";
+import type { CompactionBlock } from "@actspace/client/live";
 import { EMPTY_MESSAGE_QUEUE, type SessionMessageQueue } from "./message-queue";
 
 // 按会话的本地状态（02 §3.1）：只存在于本窗口、没有 durable 事实源的那部分。

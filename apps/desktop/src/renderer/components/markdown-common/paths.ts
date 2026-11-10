@@ -141,10 +141,6 @@ export function isAbsolutePath(path: string): boolean {
   return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
 }
 
-export function isMarkdownPath(path: string): boolean {
-  return /\.(?:md|markdown)$/i.test(path);
-}
-
 function safeDecode(value: string): string {
   try { return decodeURI(value); } catch { return value; }
 }

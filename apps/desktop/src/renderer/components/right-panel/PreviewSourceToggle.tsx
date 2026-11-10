@@ -1,33 +1,6 @@
-import { Button } from "../ui/Button";
 export type PreviewMode = "preview" | "source";
 
 const GROUP_CLASS = "inline-flex items-center gap-0.5 rounded-act-sm border border-line bg-surface-subtle p-0.5";
-
-/**
- * 工作区操作栏里的预览 / 源码切换（对齐 Cursor 第二层的 View source / View preview）。
- *
- * 与下面的 `PreviewSourceToggle` 是**同一个状态的两种壳**，不是两套控件：
- * 操作栏只在工作区文件 Tab 上出现，那里空间紧、且已经有两个图标按钮，
- * 所以用「按一下去对面」的单个文字按钮 —— 显示的是**目标**而不是当前态。
- * 聊天生成的 markdown/html 没有操作栏，仍用视图内的分段控件。
- */
-export function PreviewSourceButton({
-  mode,
-  onChange,
-  previewLabel = "预览",
-}: {
-  mode: PreviewMode;
-  onChange: (mode: PreviewMode) => void;
-  previewLabel?: string;
-}) {
-  const next: PreviewMode = mode === "preview" ? "source" : "preview";
-  const label = next === "source" ? "查看源码" : `查看${previewLabel}`;
-  return (
-    <Button variant="ghost" size="xs" onClick={() => onChange(next)}>
-      {label}
-    </Button>
-  );
-}
 
 const BUTTON_BASE =
   "rounded-act-sm border-0 px-2 py-0.5 text-act-xxs leading-none [cursor:pointer] [-webkit-app-region:no-drag]";

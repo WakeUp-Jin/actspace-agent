@@ -7,9 +7,6 @@
   },
   "references": [
     {
-      "path": "./../../core/agent-loop/tsconfig.build.json"
-    },
-    {
       "path": "./../../core/agent-service/tsconfig.build.json"
     },
     {

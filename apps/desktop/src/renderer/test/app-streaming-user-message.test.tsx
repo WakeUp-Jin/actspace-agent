@@ -15,11 +15,6 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
 import { projectRecord } from "./helpers/session-records";
 import { replyText } from "./helpers/reply-text";
-import { transcriptShadow } from "./helpers/transcript-shadow";
-
-// 14 T15：每次 durable / live 合并都与旧实现对照，不一致就让用例失败（见 helpers/transcript-shadow.ts）。
-vi.mock("../session/transcript", async (importOriginal) => (await import("./helpers/transcript-shadow")).shadowTranscript(await importOriginal()));
-afterEach(() => { expect(transcriptShadow.mismatches.splice(0)).toEqual([]); });
 
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",

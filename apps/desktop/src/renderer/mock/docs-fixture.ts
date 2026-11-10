@@ -39,12 +39,6 @@ export const MOCK_DOCS_FILES: readonly string[] = [
   "packages/browser-tools/README.md",
 ];
 
-/** 「本会话改过」绿点在 mock 里的数据来源（真实数据来自会话里的 edit_diff / write_diff 消息块）。 */
-export const MOCK_DOCS_EDITED_PATHS: readonly string[] = [
-  "docs/design-docs/自进化的方案设计/README.md",
-  "docs/design-docs/自进化的方案设计/11-Harness统计设计.md",
-];
-
 const README_BODY = [
   "# Harness 自进化方案设计",
   "",

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { FileGenerationCounter } from "../runtime-v2/file-generation-counter";
+import { FileGenerationCounter } from "@actspace/client/live";
 
 describe("file generation character counter", () => {
   it("counts decoded code points at every split boundary without counting metadata", () => {

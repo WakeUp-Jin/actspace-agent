@@ -131,10 +131,3 @@ export function searchMetricsSource(db: DatabaseSync, where: string, args: (stri
   searchCache.set(db, { key, changes: Number((prepare(db, "SELECT total_changes() AS n").get() as { n: number }).n) });
   return "usage_query_rollups";
 }
-
-
-export function runCountsSource(since?: string): string {
-  if (!since) return "usage_run_counts";
-  const boundary = new Date(Math.ceil(Date.parse(since) / 3_600_000) * 3_600_000).toISOString();
-  return `(SELECT session_id,agent_run_id,started_at,kind FROM usage_run_counts WHERE started_at >= '${boundary}' UNION ALL SELECT session_id,agent_run_id,started_at,kind FROM usage_activity WHERE started_at >= '${since}' AND started_at < '${boundary}' AND ${countableRunSql("usage_activity")})`;
-}

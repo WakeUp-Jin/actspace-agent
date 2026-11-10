@@ -11,7 +11,6 @@ export const docsGroups = [
 ] as const;
 
 export type DocsEntry = CollectionEntry<"docs">;
-export type DocsGroupId = (typeof docsGroups)[number]["id"];
 
 export async function getPublicDocs(): Promise<DocsEntry[]> {
   return (await getCollection("docs", ({ data }) => !data.draft)).sort(
@@ -25,10 +24,4 @@ export async function getPublicDocs(): Promise<DocsEntry[]> {
 
 export function docsHref(entry: DocsEntry): string {
   return `/docs/${entry.id.replace(/\.(md|mdx)$/i, "")}/`;
-}
-
-export function docsGroupHref(groupId: DocsGroupId, docs: DocsEntry[]): string {
-  if (groupId === "getting-started") return "/docs/";
-  const firstEntry = docs.find((entry) => entry.data.group === groupId);
-  return firstEntry ? docsHref(firstEntry) : "/docs/";
 }

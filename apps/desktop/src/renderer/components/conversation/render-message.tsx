@@ -19,7 +19,6 @@ import { getToolLogRunningTextAttrs, TOOL_LOG_LINE_TEXT_RUNNING_CLASS } from "..
 import { ToolLogShimmer } from "../messages/ToolLogShimmer";
 import { UserMessage } from "../messages/UserMessage";
 
-export type AgentMessageBlock = Extract<MessageBlock, { kind: "agent" }>;
 export type ReadMessageBlock = Extract<MessageBlock, { kind: "read" }>;
 /** 打开右侧「子 Agent」并选中这个子智能体（对话卡片、通知行、`send_message` / `interrupt_agent` 行共用）；没有 id 时只打开列表。 */
 export type SubagentOpenHandler = (agentId: string | undefined) => void;

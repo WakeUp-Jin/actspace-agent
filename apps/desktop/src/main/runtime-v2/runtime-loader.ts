@@ -21,7 +21,3 @@ async function loadFromPackage(): Promise<RuntimeV2Module> {
   }
   return loader.loadRuntime();
 }
-
-export function resetRuntimeV2ModuleForTest(): void {
-  modulePromise = undefined;
-}

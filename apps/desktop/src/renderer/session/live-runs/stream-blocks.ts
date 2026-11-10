@@ -1,2 +1,0 @@
-// 实现已迁到 @actspace/client/live，Web 端共用。
-export { createCompactionBlock, displayFileName, getStreamingBashStatus, getStreamingDeleteText, getStreamingDirectoryText, getStreamingGlobText, getStreamingGrepText, getStreamingMediaAnalysisText, getStreamingReadText, getStreamingSearchText, getStreamingWebSearchText, streamingStateToBlocks, toolEntryToBlock, type CompactionBlock } from "@actspace/client/live";
