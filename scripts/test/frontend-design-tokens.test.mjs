@@ -9,14 +9,19 @@ import {
   checkCssBlocks,
   checkNativeButtons,
   checkSource,
+  checkSpacingLiterals,
   checkTokenReferences,
   checkUiOnly,
   collectDefinedVariables,
   collectNativeButtonCounts,
+  collectSpacingLiteralCounts,
   countNativeButtons,
+  countSpacingLiterals,
   loadNativeButtonBaseline,
+  loadSpacingLiteralBaseline,
   runAllChecks,
   runCheck,
+  DESKTOP_PROFILE,
   WEB_PROFILE,
 } from "../check-frontend-design-tokens.mjs";
 
@@ -177,6 +182,41 @@ test("native buttons above the baseline fail, below it only suggest tightening",
   assert.deepEqual(checkNativeButtons(new Map([["components/A.tsx", 2]]), { "components/A.tsx": 2 }), { errors: [], notices: [] });
 });
 
+test("spacing literals count margin / padding / gap / inset arbitrary px values, not sizes or tokens", () => {
+  assert.equal(
+    countSpacingLiterals("components/A.tsx", 'const A = "p-[7px] py-[5px] gap-[3px] gap-x-[9px] space-y-[2px] inset-x-[1px] top-[-4px] -ml-[9px] pl-[31px]";'),
+    9,
+  );
+  assert.equal(countSpacingLiterals("components/A.tsx", 'const A = "w-[7px] h-[18px] min-w-[120px] max-w-[320px] size-[22px] leading-[18px] p-2 gap-1.5 px-[0.5em] mt-[var(--x)] top-[50%]";'), 0);
+  assert.equal(countSpacingLiterals("components/A.tsx", "// p-[7px] 以前在这里\n/* gap-[3px] */\nconst a = 1;"), 0);
+  assert.equal(countSpacingLiterals("styles/a.css", ".a { padding: 7px; } /* p-[7px] */"), 0);
+  assert.equal(countSpacingLiterals("components/a.ts", 'const cls = "py-[7px]";'), 1);
+});
+
+test("spacing literals above the baseline fail, below it only suggest tightening", () => {
+  const result = checkSpacingLiterals(new Map([["components/A.tsx", 3], ["components/B.tsx", 1], ["components/New.tsx", 1]]), {
+    "components/A.tsx": 2,
+    "components/B.tsx": 3,
+    "components/Gone.tsx": 1,
+  });
+  assert.equal(result.errors.length, 2);
+  assert.match(result.errors[0], /^components\/A\.tsx 有 3 个间距任意值（p-\[7px\] \/ gap-\[3px\] 这类），基线是 2 — 间距用 Tailwind 刻度/);
+  assert.match(result.errors[1], /^components\/New\.tsx 有 1 个间距任意值.*基线是 0/);
+  assert.equal(result.notices.length, 2);
+  assert.match(result.notices[0], /^components\/B\.tsx 间距任意值.* 从 3 降到 1/);
+  assert.match(result.notices[1], /^components\/Gone\.tsx 已不存在/);
+  assert.deepEqual(checkSpacingLiterals(new Map([["components/A.tsx", 2]]), { "components/A.tsx": 2 }), { errors: [], notices: [] });
+});
+
+test("spacing baseline file has one group per scan profile and matches the tree exactly", () => {
+  const baseline = loadSpacingLiteralBaseline();
+  assert.deepEqual(Object.keys(baseline).sort(), ["desktop", "web"]);
+  for (const profile of [DESKTOP_PROFILE, WEB_PROFILE]) {
+    const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..", profile.root);
+    assert.deepEqual(Object.fromEntries(collectSpacingLiteralCounts(root)), baseline[profile.name], `${profile.name} 基线与代码不一致，跑 --update-spacing-baseline 并核对 diff`);
+  }
+});
+
 test("runCheck reports a portal, a dialog and an extra native button in a renderer tree", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "frontend-tokens-"));
   try {
@@ -185,16 +225,20 @@ test("runCheck reports a portal, a dialog and an extra native button in a render
     fs.writeFileSync(path.join(root, "styles/diff.css"), ".file-diff-content { max-height: 4px; overflow-y: auto; overflow-x: auto; }\n");
     fs.mkdirSync(path.join(root, "components/ui"), { recursive: true });
     fs.writeFileSync(path.join(root, "components/ui/Dialog.tsx"), 'createPortal(<div role="dialog"><button /></div>, document.body);');
-    fs.writeFileSync(path.join(root, "components/Panel.tsx"), '<div role="dialog"><button /><button /></div>;');
+    fs.writeFileSync(path.join(root, "components/Panel.tsx"), '<div role="dialog" className="py-[7px] gap-[3px]"><button /><button /></div>;');
+    fs.writeFileSync(path.join(root, "components/Row.tsx"), '<div className="pl-[31px]" />;');
     fs.mkdirSync(path.join(root, "test"));
-    fs.writeFileSync(path.join(root, "test/Panel.test.tsx"), "createPortal(<button />, document.body);");
+    fs.writeFileSync(path.join(root, "test/Panel.test.tsx"), "createPortal(<button className=\"p-[7px]\" />, document.body);");
     const notices = [];
-    const problems = runCheck(root, { "components/Panel.tsx": 1 }, notices);
-    assert.deepEqual(problems.map((problem) => problem.split(" ")[0]), ["components/Panel.tsx:1", "components/Panel.tsx"]);
+    const problems = runCheck(root, { "components/Panel.tsx": 1 }, notices, DESKTOP_PROFILE, { "components/Panel.tsx": 1, "components/Row.tsx": 2 });
+    assert.deepEqual(problems.map((problem) => problem.split(" ")[0]), ["components/Panel.tsx:1", "components/Panel.tsx", "components/Panel.tsx"]);
     assert.match(problems[0], /role="dialog"/);
     assert.match(problems[1], /有 2 个原生 <button>，基线是 1/);
-    assert.deepEqual(notices, []);
+    assert.match(problems[2], /有 2 个间距任意值.*基线是 1/);
+    assert.deepEqual(notices.map((notice) => notice.split(" ")[0]), ["components/Row.tsx"]);
+    assert.match(notices[0], /从 2 降到 1/);
     assert.deepEqual([...collectNativeButtonCounts(root)], [["components/Panel.tsx", 2]]);
+    assert.deepEqual([...collectSpacingLiteralCounts(root)], [["components/Panel.tsx", 2], ["components/Row.tsx", 1]]);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -261,6 +305,20 @@ test("web root: native <button>, createPortal and role=dialog are only allowed i
   assert.ok(problems.some((problem) => /pages\/A\.tsx:1 createPortal — .*apps\/web|pages\/A\.tsx:1 createPortal — 弹层用 ui\//.test(problem)));
   assert.ok(problems.some((problem) => /role="dialog" — .*ui\//.test(problem)));
   assert.ok(problems.some((problem) => /^\[web\] pages\/A\.tsx 有 1 个原生 <button>，基线是 0 — 用 ui\/ 的 Button/.test(problem)));
+});
+
+test("web root: spacing literals are checked against the web group of the baseline", () => {
+  const files = { "pages/A.tsx": 'export const A = () => <p className="mt-[7px] gap-[3px]" />;' };
+  const repo = makeWebRepo(files);
+  try {
+    const failing = runAllChecks(repo, {}, { desktop: { "pages/A.tsx": 5 }, web: { "pages/A.tsx": 1 } }).flatMap((result) => result.problems);
+    assert.equal(failing.length, 1);
+    assert.match(failing[0], /^\[web\] pages\/A\.tsx 有 2 个间距任意值.*基线是 1/);
+    assert.deepEqual(runAllChecks(repo, {}, { web: { "pages/A.tsx": 2 } }).flatMap((result) => result.problems), []);
+    assert.equal(webProblems(files).length, 1);
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true });
+  }
 });
 
 test("web root is skipped when apps/web/src does not exist", () => {
