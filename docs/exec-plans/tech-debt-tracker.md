@@ -22,7 +22,8 @@
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
-| 2026-10-06 | renderer / 文件行数 | `settings/SettingsPrimitives.tsx` 856 行、`workspace/WorkspaceChromeControls.tsx` 662 行，超过 500 行（RightPanel 已拆到 `right-panel/`，不再超标）。SettingsPrimitives 剩下的组件都被两个以上设置文件使用，再降要拆成多个文件。 | SettingsPrimitives 按行 / 表单控件 / 菜单拆成 `settings/primitives/`；WorkspaceChromeControls 按控件拆。 |
+| 2026-10-06 | renderer / 文件行数 | `settings/SettingsPrimitives.tsx` 856 行、`workspace/WorkspaceChromeControls.tsx` 663 行，超过 500 行（RightPanel 已拆到 `right-panel/`，不再超标）。SettingsPrimitives 剩下的组件都被两个以上设置文件使用，再降要拆成多个文件。 | SettingsPrimitives 按行 / 表单控件 / 菜单拆成 `settings/primitives/`；WorkspaceChromeControls 按控件拆。 |
+| 2026-11-10 | renderer / 文件行数 | 2026-11-10 复查 `main`，超过 500 行且未登记的还有 5 个：`App.tsx` 1670（11 `useState`、18 `useEffect`、65 `useCallback`、12 `useRef`，会话列表、工作区、队列、发送、evict、侧边对话全在一个函数里）、`trajectory/builder.ts` 791、`stats/stats-ui.tsx` 617、`harness-stats/HarnessStatsCards.tsx` 523、`components/Composer.tsx` 507。 | `App.tsx` 走 [App 装配层拆分计划](active/20261110-app-assembly-split.md)；`builder.ts` 按事件种类拆成 `trajectory/builders/`（纯函数，带单测）；`stats-ui.tsx` 把 `DataTable`、环形图、`StatsCard` 各自成文件；`HarnessStatsCards.tsx` 按卡片拆；`Composer.tsx` 刚过线，随 09 的 Composer 收尾一起看。 |
 | 2026-10-06 | renderer / 手写弹层 | `right-panel/RightPanelTabStrip.tsx` 的标签溢出菜单（菜单项里嵌「关闭标签」按钮）没有迁到 `components/ui/`，仍自己监听 Escape 和外部点击（`ModelMultiSelector` 已随模型页重做删除）。 | 先改交互（关闭按钮挪出菜单项或改子菜单）再换 `ui/Menu`。 |
 | 2026-10-06 | renderer / 死入口 | `ProviderKeyModal` 打不开：`SettingsPage` 传下去的 `onConnectProvider` 在 `settings/sections/` 里没有调用方（16 之前的 `ProvidersSection` 也只解构不调用）。 | 确认 Provider Key 是否已全部改由模型连接向导录入；是就删掉 `ProviderKeyModal` 和这条 prop，否则补上入口。 |
 | 2026-10-06 | renderer / 占位按钮 | Composer 的「更多审查操作」`⋯`（`review-overflow-button`）没有 `onClick`，点了没有反应，16 之前就是这样。 | 补上菜单内容，或先隐藏。09（2026-10-07）只把它搬进 `composer/ReviewStrip.tsx`，行为未改。 |
