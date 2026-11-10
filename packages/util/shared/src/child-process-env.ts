@@ -2,22 +2,47 @@
  * 子进程环境变量的两档构造。Desktop main 进程的 `process.env` 继承自用户登录环境，子进程不该原样拿到。
  *
  * - `toolChildEnv`：Agent 工具和用户工具链（bash、rg、源码编译、本地更新脚本）。继承全部变量，
- *   只剥掉名字像凭据的；这样用户装的 node / go / pnpm 还能找到，但 Key 不跟着进去。
+ *   只剥掉名字像凭据的，和值里带着账号密码的地址；这样用户装的 node / go / pnpm 还能找到，但 Key 不跟着进去。
  * - `hostChildEnv`：main 自己拼 argv 的子进程（git、ssh）。只放行运行所需的少量变量。
  */
 export type ChildEnvSource = Readonly<Record<string, string | undefined>>;
 
-/** 名字里出现这些片段就视为凭据。`KEY` 单独不算（`XDG_SESSION_KEY` 之类太多误伤）。 */
-const CREDENTIAL_NAME_PATTERN = /API_?KEY|ACCESS_KEY|PRIVATE_KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL/i;
+/**
+ * 名字里出现这些片段就视为凭据。`KEY` 单独不算（`XDG_SESSION_KEY` 之类太多误伤）。
+ * `PWD` 和 `DSN` 要求前面是下划线并且在结尾：`PWD`、`OLDPWD` 是 shell 的当前目录，不能剥。
+ */
+const CREDENTIAL_NAME_PATTERN = /API_?KEY|ACCESS_KEY|PRIVATE_KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL|DATABASE_URL|_PWD$|_DSN$/i;
+
+/** 地址里 `://` 后面的 `user:password@`。用户名可以为空（`redis://:secret@host`）。 */
+const USERINFO_WITH_PASSWORD = /[^\s/?#@:]*:[^\s/?#@]+@/y;
+
+/** 代理地址即使带账号密码也保留：剥掉以后，要经过这个代理才能上网的机器上，命令里的 curl / git / npm 全部连不出去。 */
+const PROXY_ENV_NAMES = new Set(["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"]);
 
 export function isCredentialEnvName(name: string): boolean {
   return CREDENTIAL_NAME_PATTERN.test(name);
 }
 
+/**
+ * 值里有带账号密码的地址，比如 `REDIS_URL=redis://:secret@host`、`PIP_INDEX_URL=https://me:secret@pypi.example/simple`。
+ * 地址可以在值的任何位置（`jdbc:postgresql://…`、逗号分隔的多个地址）。
+ *
+ * 每次起子进程都要对所有变量跑一遍，所以先用 indexOf 找 `://`，只从那里往后看。
+ * 把协议名也写进正则、从头扫一遍是平方级的：一个 50 KB 的值（base64 的证书）实测要 2 秒多。
+ */
+export function isCredentialEnvValue(name: string, value: string): boolean {
+  if (PROXY_ENV_NAMES.has(name.toUpperCase())) return false;
+  for (let at = value.indexOf("://"); at !== -1; at = value.indexOf("://", at + 3)) {
+    USERINFO_WITH_PASSWORD.lastIndex = at + 3;
+    if (USERINFO_WITH_PASSWORD.test(value)) return true;
+  }
+  return false;
+}
+
 export function toolChildEnv(source: ChildEnvSource): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [name, value] of Object.entries(source)) {
-    if (value === undefined || isCredentialEnvName(name)) continue;
+    if (value === undefined || isCredentialEnvName(name) || isCredentialEnvValue(name, value)) continue;
     env[name] = value;
   }
   return env;
