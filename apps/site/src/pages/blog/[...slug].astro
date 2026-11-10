@@ -46,6 +46,10 @@ const colors = coverColors[cover];
 const coverImage = imageOf(cover);
 const category = presentationFor(entry.id)?.category ?? entry.data.tags[0];
 
+// 迁移来的文章有一半把开场白原样填进了 description；头部再放一遍就和正文第一段重复。
+const comparable = (value: string) => value.replace(/[\s*`_]+/g, "");
+const descriptionOpensBody = comparable(entry.body ?? "").startsWith(comparable(entry.data.description).slice(0, 40));
+
 // 列表按发布时间倒序：上一篇是更早的一篇，下一篇是更新的一篇。
 const posts = await getPublicPosts();
 const index = posts.findIndex((post) => post.id === entry.id);
@@ -60,16 +64,19 @@ const neighbours = [
 <main id="main-content">
 <header class:list={["post-hero", { "is-light": colors.light }]} style={`--cv-bg:${colors.bg};--cv-ink:${colors.ink}`}>
 <div class="post-hero-in">
-<div>
-<a class="post-back" href={sitePath("/blog/")}>← 博客</a>
+<div class="post-hero-text">
+<nav class="post-crumb" aria-label="面包屑">
+<a href={sitePath("/blog/")}>博客</a>
+<span aria-hidden="true">/</span>
+<a href={sitePath(`/blog/?category=${encodeURIComponent(category)}`)}>{category}</a>
+</nav>
+<h1>{spaceCjk(entry.data.title)}</h1>
+{!descriptionOpensBody && <p class="post-desc">{spaceCjk(entry.data.description)}</p>}
 <p class="post-meta">
-<span>{category}</span>
 <time datetime={publishedAt}>{publishedAt}</time>
 <span>{entry.data.authors.join("、")}</span>
 <span>约 {minutes} 分钟</span>
 </p>
-<h1>{spaceCjk(entry.data.title)}</h1>
-<p class="post-desc">{spaceCjk(entry.data.description)}</p>
 </div>
 {coverImage && <Image class="post-hero-character" src={coverImage} alt="" format="webp" quality={90} widths={[480, 840]} sizes="(max-width: 900px) 240px, 420px" loading="eager" />}
 </div>
