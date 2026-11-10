@@ -19,6 +19,7 @@
 - `packages/util/shared`：IPC contracts、session schema、跨进程共享类型。桌面 IPC 契约集中在 `src/ipc/`，只允许 `apps/*`、`packages/client/*`、`packages/host/*` 引用，`pnpm check:packages` 把关；会话领域模型在 `src/session/`，前后端共用。目录划分见 [util 包地图](../packages/util/README.md)。
 - `apps/web`：浏览器 / PWA 客户端（React + Vite），手机和电脑浏览器经 WebSocket `/rpc` 连接一台 Agent Host，查看会话、审批与发送消息；可由 Host 的 `webRoot` 同源托管。设计见 [front-web-pwa客户端规范](design-docs/frontend/front-web-pwa客户端规范.md)。
 - `apps/site`：Astro 静态官网、公开文档、博客与从 release 文档生成的更新页。
+- `apps/promo-video`：产品宣传片。一个可按时刻定位的网页合成（Vite），由无头 Chrome 逐帧截图、ffmpeg 编码成 MP4；用法见 [README](../apps/promo-video/README.md)。
 - `browser-bridge`：Browser Use Go bridge CLI、Chrome Extension 和协议层；对应插件 `browser-tools` 默认不加载，在 扩展 › 插件 中开启。
 - `scripts/`：正式自动化入口；人工诊断脚本在 `scripts/diagnostics/`，可复建验收环境在 `scripts/acceptance/`。
 - `docs/`：仓库知识库；规范、计划、验收证据、历史与参考资料按用途分区。
@@ -52,6 +53,10 @@
   - 构建时读取根目录 `docs/releases/feature-release-notes.md` 与 `docs/roadmap.md`，生成更新页和开发计划页
   - 不依赖桌面端运行时、用户数据、密钥或 Electron 构建产物
 
+- `apps/promo-video`
+  - 只读取 `apps/site/src/assets` 里已公开的品牌图与截图，并在录制时访问本地官网开发服务器的首屏演示
+  - 不依赖任何 `@actspace/*` 包、Runtime 或用户数据；渲染需要本机的 Chrome 与 ffmpeg，成片和中间帧不入库
+
 - `browser-bridge`
   - 独立 Go 模块，不参与 pnpm workspace
   - 通过 Host capability 与 v2 Tool Runtime 通信
@@ -78,7 +83,7 @@ runtime --(Host capability)--> browser-bridge
 - 桌面端首版采用 `Electron + React + TypeScript + Vite`。
 - 交互基础组件优先采用 `Radix UI` primitives，而不是直接依赖重样式组件库。
 - 本地数据优先使用 `jsonl` 文件存储，直接落盘到用户电脑。
-- 工程骨架已落地为 `apps/{desktop,cli,site,web} + packages/core/runtime + 多个领域 workspace packages + packages/util/shared` 的单仓结构。
+- 工程骨架已落地为 `apps/{desktop,cli,site,web,promo-video} + packages/core/runtime + 多个领域 workspace packages + packages/util/shared` 的单仓结构。
 - 桌面端主模型由前端模型选择器驱动，模型注册表定义在 `packages/util/shared/src/model-config.ts`，从 `@actspace/shared` 根入口直接导出。
 - 密钥不进入 renderer 或 Session Journal，Host 只通过 credential resolver 向 Runtime 提供短生命周期凭据。
 - 开发态启动需要先确保 `shared`、领域 packages、`runtime` 有可消费产物，再启动 Electron main/preload 的 watch 与 renderer。

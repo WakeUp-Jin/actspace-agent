@@ -7,6 +7,7 @@
 1. `pnpm --filter @actspace/desktop dev:renderer`，打开 `http://127.0.0.1:5173/?mock=<场景>`。
 2. 用 Chrome DevTools 协议设视口与 DPR，截图后用 sharp 裁切。侧栏用「收起会话侧栏」按钮收起；窄视口下侧栏会自动隐藏，要先点一次「会话侧栏」按钮。
 3. 换图后重新量 `src/lib/home-features.ts` 里每个要点的 `rect`。
+4. 宣传片（`apps/promo-video`）直接引用这里的 `home/{approval,context-panel,trajectory,turn-deliverables,space}.png` 和 `docs/{usage,model-connection,workspace-overview}.png`，镜头位置写在它的 `src/scenes/*.js` 里。换了这些图，要同步改那边的 `size` 和 `rect` 并重新渲染。
 
 | 文件 | 场景与参数 |
 | --- | --- |
