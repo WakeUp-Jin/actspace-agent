@@ -164,6 +164,9 @@ describe("production Session projections", () => {
     const liveTail = await live.readProjection({ sessionId: "s" });
     expect(liveTail.window.events.filter(event => event.seq < liveTail.window.fromSeq).map(event => event.seq)).toEqual(carried.map(event => event.seq));
     await live.closeAll();
+    // 窗口正好从一条请求记录开始：这条请求在窗口内，不算进起点之前的请求数。
+    const fromRequest = await cold.readProjection({ sessionId: "s", afterSeq: seqOf("request/header", "r5") - 1 });
+    expect([fromRequest.window.fromSeq, fromRequest.window.requestOffset, fromRequest.window.turnOffset]).toEqual([seqOf("request/header", "r5"), 5, 6]);
     // 从头开始的一页不需要补。
     const older = await cold.readProjection({ sessionId: "s", beforeSeq: tail.window.beforeSeq! });
     expect(older.window.fromSeq).toBe(0);
@@ -233,6 +236,21 @@ describe("production Session projections", () => {
     expect(full.deferredToolCalls).toEqual([]);
     expect(JSON.stringify(full.window)).toContain(output);
     expect(JSON.stringify(await controller.browseToolDetail("s", "c"))).toContain(output);
+  });
+
+  it("defers a tool call only when one of its events is larger than the threshold", async () => {
+    const f = await fixture(1);
+    const core = { ownerPluginId: "@actspace/core" };
+    f.journal.append({ type: "turn/start", eventVersion: 1, source: core, data: { turnId: "tool-turn" }, surface: null });
+    f.journal.append({ type: "step/start", eventVersion: 1, source: core, data: { turnId: "tool-turn", stepId: "tool-step" }, surface: null });
+    const call = (callId: string, command: string) => {
+      f.journal.append({ type: "tool/call", eventVersion: 1, source: core, data: { callId, name: "bash", pluginId: "core", args: { command } }, surface: null });
+      return JSON.stringify(f.journal.events.at(-1)).length;
+    };
+    const room = 24_000 - call("c0", "");
+    expect([call("c1", "x".repeat(room)), call("c2", "x".repeat(room + 1))]).toEqual([24_000, 24_001]);
+    await appendFile(f.path, f.journal.events.slice(3).map(event => JSON.stringify(event)).join("\n") + "\n");
+    expect((await f.controller().readProjection({ sessionId: "s" })).deferredToolCalls).toEqual(["c2"]);
   });
 
   it("rejects invalid cursors and Session paths", async () => {
