@@ -15,7 +15,7 @@ kind: "package-group"
 | `session-persistence` | 接口 | 全局 | 开 | 在日志与存储之间做业务协调：创建、打开、写入、恢复；提供 `session.store` |
 | `session-persistence-jsonl` | 实现 | 全局 | 开 | 把会话保存为本机 JSONL 文件（含写入租约、修复、查询读取）；提供 `session.storage` |
 | `session-projection` | 接口 | 全局 | 开 | 把日志事件整理成界面和 Agent 能读的状态（投影注册表）；提供 `session.projection` |
-| `session-projection-cache` | 库 | 库 | — | 可丢弃的派生缓存：单会话日志缓存和跨会话摘要索引，丢了可从日志重建 |
+| `session-projection-cache` | 库 | 库 | — | 可丢弃的派生缓存：单会话日志缓存和跨会话摘要索引，丢了可从日志重建；轮次、请求、工具调用在日志里的位置索引（`history-index.ts`）也在这里，冷会话缓存和 `core/runtime` 里打开中的会话共用 |
 | `session-storage` | 接口 | 库 | — | 中立的物理存储端口（`SessionStorage` 等类型），不含实现 |
 | `session-checkpoint-policy` | 实现 | 全局 | 开 | 决定什么时候给会话存检查点（flush）；提供 `session.checkpoint` |
 | `session-transcript` | 实现 | 全局 | 开 | 每轮结束从日志重写 `sessions-v2/<id>/transcript.md`（派生视图，可删除重建），并在主会话提示词里告诉 Agent 怎么读历史会话；提供 `session.transcript` |
