@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { HostError } from "@actspace/shared/host-protocol";
+import { HostError, HostRequestError } from "@actspace/shared/host-protocol";
 
 const PART_CHARACTERS = 32768;
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -22,7 +22,7 @@ export class HostPayloads {
     const value = this.#values.get(id);
     if (!value) throw new HostError("NOT_FOUND", "Response page expired; refresh snapshot", true);
     const parts = Math.ceil(value.json.length / PART_CHARACTERS);
-    if (!Number.isSafeInteger(part) || part < 0 || part >= parts) throw new TypeError("Invalid response part");
+    if (!Number.isSafeInteger(part) || part < 0 || part >= parts) throw new HostRequestError("Invalid response part");
     // Every page is small even if JSON escaping expands all characters sixfold.
     const text = value.json.slice(part * PART_CHARACTERS, (part + 1) * PART_CHARACTERS);
     value.expires = this.now() + 30_000;

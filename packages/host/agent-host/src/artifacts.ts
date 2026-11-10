@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { open, realpath, stat } from "node:fs/promises";
 import { basename, isAbsolute, relative, resolve } from "node:path";
-import { HostError } from "@actspace/shared/host-protocol";
+import { HostError, HostRequestError } from "@actspace/shared/host-protocol";
 import type { NodeArtifactStore } from "./node-ports/artifact-store.js";
 import type { HostUploads } from "./uploads.js";
 /** Session-owned immutable snapshots; paths never become download capabilities. */
@@ -46,7 +46,7 @@ export class HostArtifacts {
   }
   async read(sessionId: string, id: string, offset: number, length: number) {
     const value = await this.#read(sessionId, id);
-    if (offset < 0 || offset > value.bytes.length || length < 1 || length > 262144) throw new TypeError("Invalid artifact range");
+    if (offset < 0 || offset > value.bytes.length || length < 1 || length > 262144) throw new HostRequestError("Invalid artifact range");
     const bytes = Buffer.from(value.bytes.subarray(offset, offset + length));
     return { data: bytes.toString("base64"), sha256: hash(bytes), size: value.bytes.length };
   }

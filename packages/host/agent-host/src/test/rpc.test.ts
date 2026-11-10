@@ -1,4 +1,5 @@
 import { expect, it, vi } from "vitest";
+import { HostRequestError } from "@actspace/shared/host-protocol";
 import { HostRpc } from "../rpc.js";
 import type { HostRpcOptions } from "../rpc.js";
 import type { HostRequestContext } from "../server.js";
@@ -76,8 +77,8 @@ it("passes a rewind and the client's Run id to the application and maps rewind r
   expect(submitTask).toHaveBeenCalledWith("s", "a", "hi", "run-new");
   await rpc.dispatch("tasks.submit", { sessionId: "s", submissionId: "b", content: "edited", rewind: { runId: "run-2", expectedThroughSeq: 40 }, agentRunId: "run-new" }, context);
   expect(rewindAndSubmit).toHaveBeenCalledWith("s", { runId: "run-2", expectedThroughSeq: 40 }, "b", "edited", "run-new");
-  await expect(rpc.dispatch("tasks.submit", { sessionId: "s", submissionId: "c", content: "x", rewind: { runId: "r", expectedThroughSeq: -2 } }, context)).rejects.toBeInstanceOf(TypeError);
-  await expect(rpc.dispatch("tasks.submit", { sessionId: "s", submissionId: "c", content: "x", rewind: { runId: "r", expectedThroughSeq: 1, extra: true } }, context)).rejects.toBeInstanceOf(TypeError);
+  await expect(rpc.dispatch("tasks.submit", { sessionId: "s", submissionId: "c", content: "x", rewind: { runId: "r", expectedThroughSeq: -2 } }, context)).rejects.toBeInstanceOf(HostRequestError);
+  await expect(rpc.dispatch("tasks.submit", { sessionId: "s", submissionId: "c", content: "x", rewind: { runId: "r", expectedThroughSeq: 1, extra: true } }, context)).rejects.toBeInstanceOf(HostRequestError);
   for (const [code, kind] of [["SESSION_BUSY", "CONFLICT"], ["REWIND_CONFLICT", "CONFLICT"], ["REWIND_INHERITED", "FORBIDDEN"]] as const) {
     refusal = code;
     await expect(rpc.dispatch("tasks.submit", { sessionId: "s", submissionId: `d-${code}`, content: "x", rewind: { runId: "r", expectedThroughSeq: 1 } }, context)).rejects.toMatchObject({ kind, message: code });

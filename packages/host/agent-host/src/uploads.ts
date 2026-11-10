@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { HOST_LIMITS, HostError } from "@actspace/shared/host-protocol";
+import { HOST_LIMITS, HostError, HostRequestError } from "@actspace/shared/host-protocol";
 import { SerialGate, writeDurableJson } from "./storage.js";
 
 type Upload = {
@@ -41,7 +41,7 @@ export class HostUploads {
   }
   begin(input: { deviceId: string; sessionId: string; name: string; size: number; sha256: string }): Promise<UploadReference> {
     return this.#gate.run(async () => {
-      if (!Number.isSafeInteger(input.size) || input.size < 0 || input.size > HOST_LIMITS.fileBytes || !/^[a-f0-9]{64}$/.test(input.sha256) || !input.name.trim() || input.name.length > 255 || /[\x00-\x1f/\\]/.test(input.name)) throw new TypeError("Invalid upload metadata");
+      if (!Number.isSafeInteger(input.size) || input.size < 0 || input.size > HOST_LIMITS.fileBytes || !/^[a-f0-9]{64}$/.test(input.sha256) || !input.name.trim() || input.name.length > 255 || /[\x00-\x1f/\\]/.test(input.name)) throw new HostRequestError("Invalid upload metadata");
       await mkdir(this.root, { recursive: true, mode: 0o700 });
       let reserved = 0;
       for (const id of await readdir(this.root)) {
@@ -68,9 +68,9 @@ export class HostUploads {
   }
   write(deviceId: string, sessionId: string, id: string, offset: number, encoded: string, sha256: string): Promise<UploadReference> {
     return this.#gate.run(async () => {
-      if (!Number.isSafeInteger(offset) || offset < 0 || encoded.length > Math.ceil(HOST_LIMITS.chunkBytes / 3) * 4) throw new TypeError("Invalid upload chunk");
+      if (!Number.isSafeInteger(offset) || offset < 0 || encoded.length > Math.ceil(HOST_LIMITS.chunkBytes / 3) * 4) throw new HostRequestError("Invalid upload chunk");
       const bytes = Buffer.from(encoded, "base64");
-      if (!bytes.length || bytes.length > HOST_LIMITS.chunkBytes || bytes.toString("base64") !== encoded || digest(bytes) !== sha256) throw new TypeError("Invalid upload chunk digest or encoding");
+      if (!bytes.length || bytes.length > HOST_LIMITS.chunkBytes || bytes.toString("base64") !== encoded || digest(bytes) !== sha256) throw new HostRequestError("Invalid upload chunk digest or encoding");
       const value = await this.#read(id); this.#check(value, deviceId, sessionId);
       if (offset + bytes.length > value.size || offset > value.offset) throw new HostError("CONFLICT", "Upload offset mismatch");
       const file = await open(join(this.#directory(id), "content"), "r+");
@@ -153,7 +153,7 @@ export class HostUploads {
     return this.#gate.run(async () => {
       const value = await this.#read(id);
       if (value.sessionId !== sessionId || !value.complete || !value.pins.length) throw new HostError("NOT_FOUND", "Session artifact not found");
-      if (!Number.isSafeInteger(offset) || offset < 0 || offset > value.size || !Number.isSafeInteger(length) || length < 1 || length > HOST_LIMITS.chunkBytes) throw new TypeError("Invalid artifact range");
+      if (!Number.isSafeInteger(offset) || offset < 0 || offset > value.size || !Number.isSafeInteger(length) || length < 1 || length > HOST_LIMITS.chunkBytes) throw new HostRequestError("Invalid artifact range");
       const file = await open(join(this.#directory(id), "content"), "r");
       try {
         const bytes = Buffer.alloc(Math.min(length, value.size - offset));

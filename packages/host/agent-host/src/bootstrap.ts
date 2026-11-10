@@ -69,6 +69,7 @@ export async function bootstrapHost(config: HostConfig, options: {
     const gateway = new HostGateway({ auth, address: config.listen.address, port: config.listen.port,
       ...(config.tls ? { tls: { cert: await readFile(config.tls.cert, "utf8"), key: await readFile(config.tls.key, "utf8") } } : {}),
       allowedOrigins: config.allowedOrigins, ...(config.webRoot ? { webRoot: config.webRoot } : {}), state: () => lifecycle?.state() ?? "blocked",
+      onFailure: (method, error) => options.log(`Host ${method} failed: ${String(error)}`),
       dispatch: async (method, params, context) => {
         await admin.assertOwned();
         if (!rpc) throw new Error("Host starting");
