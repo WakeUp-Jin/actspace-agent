@@ -30,7 +30,7 @@ export function UnderlineTabs<T extends string>({
     else if (event.key === "End") next = tabs.length - 1;
     if (next < 0) return;
     event.preventDefault();
-    const target = tabs[next]!;
+    const target = tabs[next];
     onChange(target.value);
     listRef.current?.querySelector<HTMLButtonElement>(`[data-tab="${target.value}"]`)?.focus();
   };

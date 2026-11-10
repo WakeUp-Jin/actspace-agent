@@ -40,7 +40,7 @@ describe("durable content queue", () => {
     const second = await ledger.submit("large-b", content);
     expect(ledger.blocked).toBe(false);
     expect(Buffer.byteLength(JSON.stringify(ledger.snapshot()))).toBeGreaterThan(1024 * 1024);
-    expect(Object.isFrozen(ledger.snapshot().tasks[0]!.content)).toBe(true);
+    expect(Object.isFrozen(ledger.snapshot().tasks[0].content)).toBe(true);
     expect((await ledger.submit("large-b", content)).task.taskId).toBe(second.task.taskId);
     const seq = session.lastSeq;
     expect(() => ledger.submit("oversized", "x".repeat(1024 * 1024))).toThrow("1 MiB");
@@ -52,7 +52,7 @@ describe("durable content queue", () => {
     expect(recovered.snapshot().tasks).toHaveLength(2);
     expect((await recovered.submit("large-b", content)).task.taskId).toBe(second.task.taskId);
     await recovered.setPaused(false, recovered.snapshot().revision);
-    await recovered.start(recovered.snapshot().queue[0]!, "after-reopen", harness, {});
+    await recovered.start(recovered.snapshot().queue[0], "after-reopen", harness, {});
     await recovered.finish("after-reopen", "completed");
     expect((await recovered.submit("next", "ok")).task.state).toBe("pending");
   });
@@ -139,8 +139,8 @@ describe("durable content queue", () => {
     for (const id of ["first", "second", "third", "fourth"]) receipts.push(await ledger.submit(id, id));
     const ids = receipts.map(receipt => receipt.task.taskId);
     // Designation order is deliberately different from the durable queue order.
-    await ledger.designate(ids[3]!, "run", ledger.snapshot().revision);
-    await ledger.designate(ids[1]!, "run", ledger.snapshot().revision);
+    await ledger.designate(ids[3], "run", ledger.snapshot().revision);
+    await ledger.designate(ids[1], "run", ledger.snapshot().revision);
     await ledger.finish("run", outcome);
     expect(ledger.snapshot().queue).toEqual([ids[1], ids[3], ids[0], ids[2]]);
     expect(ledger.snapshot().paused).toBe(outcome !== "completed");

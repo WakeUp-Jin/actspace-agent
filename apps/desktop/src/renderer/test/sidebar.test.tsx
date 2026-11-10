@@ -444,7 +444,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
 
   it("labels the pin item by the session's current pinned state", () => {
     renderSidebar();
-    const pinnedRow = screen.getAllByText("Bash 工具开发与权限调度")[0]!.closest(".session-row");
+    const pinnedRow = screen.getAllByText("Bash 工具开发与权限调度")[0].closest(".session-row");
     fireEvent.contextMenu(pinnedRow as HTMLElement, { clientX: 120, clientY: 80 });
     expect(screen.getByRole("menuitem", { name: "取消置顶" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "置顶" })).not.toBeInTheDocument();
@@ -533,7 +533,7 @@ describe("Sidebar (cursor-aligned layout)", () => {
     const user = userEvent.setup();
     const [statusButton] = screen.getAllByRole("button", { name: "会话状态： 空闲" });
 
-    await user.click(statusButton!);
+    await user.click(statusButton);
     const popover = await screen.findByRole("dialog", { name: "会话状态：空闲" });
     expect(popover).toHaveTextContent("空闲");
     expect(onSelectSession).not.toHaveBeenCalled();
@@ -541,21 +541,21 @@ describe("Sidebar (cursor-aligned layout)", () => {
     expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
     expect(statusButton).toHaveFocus();
 
-    await user.click(statusButton!);
+    await user.click(statusButton);
     expect(await screen.findByRole("dialog", { name: "会话状态：空闲" })).toBeInTheDocument();
     // 再点一次按钮是关闭，不会先被当成点外面关掉、再被 onClick 打开。
-    await user.click(statusButton!);
+    await user.click(statusButton);
     expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
 
-    await user.click(statusButton!);
+    await user.click(statusButton);
     expect(await screen.findByRole("dialog", { name: "会话状态：空闲" })).toBeInTheDocument();
     await user.click(document.body);
     expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
 
     // 触屏上 Radix 在按下时就判定「点外面」；按钮本身不算外面，所以点一下按钮仍是关闭，而不是关了又开。
-    await user.click(statusButton!);
+    await user.click(statusButton);
     expect(await screen.findByRole("dialog", { name: "会话状态：空闲" })).toBeInTheDocument();
-    await user.pointer([{ keys: "[TouchA]", target: statusButton! }]);
+    await user.pointer([{ keys: "[TouchA]", target: statusButton }]);
     expect(screen.queryByRole("dialog", { name: "会话状态：空闲" })).toBeNull();
   });
 

@@ -111,7 +111,7 @@ function costSummarySql(database: DatabaseSync, filter: Where, source?: string):
     COALESCE(SUM(kind='llm_request' AND status!='running' AND (cost_amount IS NULL OR COALESCE(cost_currency,'')!='USD') AND total_tokens_unknown=0),0) AS unknown,
     COALESCE(SUM(kind='llm_request' AND historical_unverified=1 AND cost_amount IS NOT NULL AND cost_currency='USD'),0) AS unverified
     FROM usage_activity a ${filter.sql}`, source)).get(...filter.args) as Record<string, number>;
-  return { costUsd: row.cost!, knownCostRequestCount: row.known!, unknownCostRequestCount: row.unknown!, unverifiedHistoricalRequestCount: row.unverified! };
+  return { costUsd: row.cost, knownCostRequestCount: row.known, unknownCostRequestCount: row.unknown, unverifiedHistoricalRequestCount: row.unverified };
 }
 
 function aggregateSql(database: DatabaseSync, filter: Where, source?: string): { providers: UsageActivityAggregate[]; models: UsageActivityAggregate[] } {

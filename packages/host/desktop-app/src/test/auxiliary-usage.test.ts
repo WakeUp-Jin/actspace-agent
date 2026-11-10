@@ -10,7 +10,7 @@ it("records title usage against its Session without inventing a Run", async () =
     const result = await completeText(new LlmService(routes, { resolve: async () => ({}) }), { sessionId: "s", purpose: "utility", model: "title-model", messages: [], auxiliary: { recorder: { start }, owner: { sessionId: "s", purpose: "session-title" } } });
     expect(result.text).toBe("Title");
     expect(start).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "s", purpose: "session-title", routeId: "utility", model: "title-model", attempt: 1, attemptId: expect.any(String) }));
-    expect(start.mock.calls[0]![0]).not.toHaveProperty("agentRunId");
+    expect(start.mock.calls[0][0]).not.toHaveProperty("agentRunId");
     expect(finish).toHaveBeenCalledExactlyOnceWith({ status: "completed", usage });
   } finally { await route.dispose(); }
 });

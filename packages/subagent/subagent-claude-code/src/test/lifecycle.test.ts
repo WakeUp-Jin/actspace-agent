@@ -24,13 +24,13 @@ async function setup(path: string | undefined, config?: Record<string, unknown>)
     workspaceRoot: "/workspace", hostCapabilities: new Set(), capabilitySet: { ids: [], has: () => false, get: () => { throw Error("unused"); } },
     journal: { recordDispatch: async () => {}, checkpointBeforeBody: async () => {}, commitResult: async () => {} }, createArtifact: async () => { throw Error("unused"); },
   };
-  const run = async (args: unknown) => (await tools.executeBatch([{ name: "agent_claude_code", callId: "c-1", arguments: args, sessionId: "s", agentRunId: "r", turnId: "t", stepId: "step" }], env))[0]!;
+  const run = async (args: unknown) => (await tools.executeBatch([{ name: "agent_claude_code", callId: "c-1", arguments: args, sessionId: "s", agentRunId: "r", turnId: "t", stepId: "step" }], env))[0];
   return { provided, run, calls, cleanup: () => cleanup!() };
 }
 
 describe("Claude Code subagent plugin lifecycle", () => {
   it("declares the Entry and the injects it consumes", () => {
-    const behavior = manifest.behaviors[0]!;
+    const behavior = manifest.behaviors[0];
     expect(behavior.entryId).toBe("subagent.claude-code");
     expect([...(behavior.injects ?? [])]).toEqual(inject);
   });

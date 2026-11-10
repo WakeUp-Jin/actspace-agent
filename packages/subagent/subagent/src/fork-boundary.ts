@@ -25,14 +25,14 @@ export class ForkBoundaryError extends Error {
 export function resolveForkBoundary(events: readonly SessionEventEnvelopeV1[], registry: EventCodecRegistry, callId: string): ForkBoundary {
   const call = events.findIndex(event => event.type === "tool/call" && callIdOf(event) === callId);
   if (call < 0) throw new ForkBoundaryError("FORK_CALL_NOT_FOUND", `Tool call ${callId} is not in the parent Session.`);
-  const turnId = field(events[call]!, "turnId");
+  const turnId = field(events[call], "turnId");
   const turnStart = lastIndexBefore(events, call, event => event.type === "turn/start");
   const stepStart = lastIndexBefore(events, call, event => event.type === "step/start");
   if (turnStart < 0 || stepStart < turnStart) throw new ForkBoundaryError("FORK_CALL_NOT_FOUND", `Tool call ${callId} is outside a Step.`);
-  const turnStartEvent = events[turnStart]!;
+  const turnStartEvent = events[turnStart];
   if (turnId !== undefined && field(turnStartEvent, "turnId") !== turnId) throw new ForkBoundaryError("FORK_CALL_NOT_FOUND", `Tool call ${callId} is outside its Turn.`);
   const stepEnd = lastIndexBefore(events, stepStart, (event, index) => index > turnStart && event.type === "step/end");
-  const boundary = stepEnd >= 0 ? events[stepEnd]! : events[stepStart - 1]!;
+  const boundary = stepEnd >= 0 ? events[stepEnd] : events[stepStart - 1];
   if (!isBalancedPrefix(events.slice(0, boundary.seq + 1), registry)) {
     throw new ForkBoundaryError("FORK_BOUNDARY_UNBALANCED", "The conversation before this step has an unfinished tool call or request.");
   }
@@ -51,7 +51,7 @@ function isBalancedPrefix(events: readonly SessionEventEnvelopeV1[], registry: E
 }
 
 function lastIndexBefore(events: readonly SessionEventEnvelopeV1[], end: number, match: (event: SessionEventEnvelopeV1, index: number) => boolean): number {
-  for (let index = end - 1; index >= 0; index--) if (match(events[index]!, index)) return index;
+  for (let index = end - 1; index >= 0; index--) if (match(events[index], index)) return index;
   return -1;
 }
 

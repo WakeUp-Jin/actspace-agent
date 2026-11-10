@@ -54,5 +54,5 @@ export function fakeSockets(handler: () => Handler, behaviour: { refuse?: () => 
     void Promise.resolve().then(() => (behaviour.refuse?.() ? socket.close(1006) : socket.open()));
     return socket;
   };
-  return { sockets, create, last: () => sockets[sockets.length - 1]! };
+  return { sockets, create, last: () => sockets[sockets.length - 1] };
 }

@@ -90,7 +90,7 @@ describe("first message session title", () => {
   it("aborts outstanding generation on disposal without writing a late title", async () => {
     const f = fixture();
     await f.submit(input);
-    const signal = f.complete.mock.calls[0]![0].signal!;
+    const signal = f.complete.mock.calls[0][0].signal!;
     const disposal = f.app.dispose();
     expect(signal.aborted).toBe(true);
     f.resolve({ text: "过期标题" });

@@ -96,7 +96,7 @@ export async function bootstrapHost(config: HostConfig, options: {
     const { application } = runtime;
     // Session lists observe the host topic only; run state is otherwise published per session.
     const running = new Set<string>();
-    rpc = new HostRpc({ application, config, approvals, observations, uploads, output, artifacts: new HostArtifacts(uploads, artifacts), state: () => lifecycle!.state(), runningSessions: () => [...running] });
+    rpc = new HostRpc({ application, config, approvals, observations, uploads, output, artifacts: new HostArtifacts(uploads, artifacts), state: () => lifecycle.state(), runningSessions: () => [...running] });
     own(runtime.subscribeTasks(containNotification({ logger: { error: (_message, error) => options.log(`Task notification observer failed: ${String(error)}`) } }, snapshot => {
       for (const run of snapshot.runs) if (run.state !== "running") output.clear(snapshot.sessionId, run.runId);
       observations.publish(snapshot.sessionId, { kind: "tasks", snapshot });
@@ -125,16 +125,16 @@ export async function bootstrapHost(config: HostConfig, options: {
     });
     const port = await gateway.listen();
     stopMaintenance = startUploadMaintenance(() => uploads.cleanup(), () => {
-      lifecycle!.block();
+      lifecycle.block();
       options.log("Host upload maintenance failed; inspect storage and restart.");
     });
     own(stopMaintenance);
     const stopTimers = new Set<ReturnType<typeof setTimeout>>();
     own(() => { for (const timer of stopTimers) clearTimeout(timer); });
-    const handle = { auth, port, hostId: auth.hostId, application, state: () => lifecycle!.state(), stop: (force = false) => lifecycle!.stop(force) };
+    const handle = { auth, port, hostId: auth.hostId, application, state: () => lifecycle.state(), stop: (force = false) => lifecycle.stop(force) };
     adminDispatch = async request => {
       switch (request.command) {
-        case "status": return { hostId: auth.hostId, state: lifecycle!.state(), port, approvals: approvals.list().length, ...await lifecycle!.diagnostics() };
+        case "status": return { hostId: auth.hostId, state: lifecycle.state(), port, approvals: approvals.list().length, ...await lifecycle.diagnostics() };
         case "pair": return auth.createPairCode();
         case "devices": return auth.list();
         case "revoke": if (!request.deviceId) throw new Error("deviceId required"); await auth.revoke(request.deviceId); return { revoked: true };

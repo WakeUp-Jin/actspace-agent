@@ -57,7 +57,7 @@ describe("subagent cards from subagent/* events", () => {
     expect(projectSubagentItems(stopped)).toHaveLength(1);
     expect(projectSubagentItems(stopped)[0]).toMatchObject({ status: "interrupted", activationCount: 2 });
     const failed = [...settled.slice(0, -1), envelope(6, "subagent/activation", { op: "settle", agentId: "sa-1", activationId: "act-1", status: "max_steps", summary: "too long", delivery: "notified", endedAt: "2026-11-04T00:01:00.000Z" })];
-    expect(projectSubagentItems(failed)[0]!.status).toBe("failed");
+    expect(projectSubagentItems(failed)[0].status).toBe("failed");
   });
 
   it("ends external subagents after their one run and fills a missing model from the child's requests", () => {
@@ -82,7 +82,7 @@ describe("subagent cards from subagent/* events", () => {
   it("keeps each subagent's latest message to the parent, timed when it was sent", () => {
     const at = (seq: number, time: string, data: SessionEventEnvelopeV1["data"]) => ({ ...envelope(seq, "agent/inbox/spliced", data), time });
     const letter = (messageId: string, body: string) => ({ source: "agent_message", senderId: "sa-1", messageId, content: `<agent_message from="sa-1" relation="child">\n${body}\n</agent_message>` });
-    expect(projectSubagentItems(journal())[0]!.lastMessage).toBeUndefined();
+    expect(projectSubagentItems(journal())[0].lastMessage).toBeUndefined();
     const items = projectSubagentItems(journal([
       at(6, "2026-11-04T00:00:10.000Z", { operation: "enqueue", ...letter("m-1", "first note") }),
       at(7, "2026-11-04T00:00:20.000Z", { operation: "enqueue", ...letter("m-2", "\n**Only** one file\nmore detail") }),
@@ -91,10 +91,10 @@ describe("subagent cards from subagent/* events", () => {
       // 别的来源、别的发送方不算。
       at(9, "2026-11-04T00:00:40.000Z", { operation: "enqueue", source: "subagent_notification", senderId: "sa-1", messageId: "n-1", content: "done" }),
     ]));
-    expect(items[0]!.lastMessage).toEqual({ text: "**Only** one file", at: "2026-11-04T00:00:20.000Z" });
+    expect(items[0].lastMessage).toEqual({ text: "**Only** one file", at: "2026-11-04T00:00:20.000Z" });
     // 只有领取（enqueue 不在日志里）时用领取时间。
     const claimed = projectSubagentItems(journal([at(6, "2026-11-04T00:01:00.000Z", { operation: "claim", ...letter("m-3", "late") })]));
-    expect(claimed[0]!.lastMessage).toEqual({ text: "late", at: "2026-11-04T00:01:00.000Z" });
+    expect(claimed[0].lastMessage).toEqual({ text: "late", at: "2026-11-04T00:01:00.000Z" });
   });
 
   it("maps each subagent to its dispatch card's status, the later card winning", () => {
@@ -122,7 +122,7 @@ describe("subagent cards from subagent/* events", () => {
 
   it("shows the final reply on the card, how it ended when there is none, and the tool output before settling", () => {
     const card = (events: SessionEventEnvelopeV1[]) => projectChatSession(snapshot(["call-agent"]), events, "/w").events
-      .flatMap(event => event.type === "tool_result" && event.payload.uiPreview?.kind === "agent" ? [event.payload.uiPreview] : [])[0]!;
+      .flatMap(event => event.type === "tool_result" && event.payload.uiPreview?.kind === "agent" ? [event.payload.uiPreview] : [])[0];
     expect(card(journal()).summary).toBe("Started sa-1");
     const settled = (data: Record<string, string>) => journal([envelope(6, "subagent/activation", { op: "settle", agentId: "sa-1", activationId: "act-1", delivery: "notified", endedAt: "2026-11-04T00:01:00.000Z", ...data })]);
     expect(card(settled({ status: "completed", summary: "done", result: "Found 3 packages" })).summary).toBe("Found 3 packages");
@@ -147,10 +147,10 @@ describe("subagent cards from subagent/* events", () => {
     const titles = projectChatSession(snapshot(callIds), events, "/w").events
       .flatMap(event => event.type === "tool_result" && event.payload.uiPreview?.kind === "generic" ? [event.payload.uiPreview] : []);
     expect(titles.map(preview => preview.title)).toEqual(["发消息给 Map the repo", "停止 Map the repo", "等待子智能体", "查看子智能体", "查看可选模型"]);
-    expect(titles[0]!.content).toContain("Also check docs");
-    expect(titles[0]!.subagentLink).toEqual({ agentId: "sa-1", verb: "发消息给", target: "Map the repo" });
-    expect(titles[1]!.subagentLink).toEqual({ agentId: "sa-1", verb: "停止", target: "Map the repo" });
-    expect(titles[2]!.subagentLink).toBeUndefined();
+    expect(titles[0].content).toContain("Also check docs");
+    expect(titles[0].subagentLink).toEqual({ agentId: "sa-1", verb: "发消息给", target: "Map the repo" });
+    expect(titles[1].subagentLink).toEqual({ agentId: "sa-1", verb: "停止", target: "Map the repo" });
+    expect(titles[2].subagentLink).toBeUndefined();
     // 等待 / 查看类只显示标题，不带「wait_agent completed」「Input arrived.」这类给模型看的结果。
     expect(titles.slice(2).map(preview => preview.content)).toEqual(["", "", ""]);
   });

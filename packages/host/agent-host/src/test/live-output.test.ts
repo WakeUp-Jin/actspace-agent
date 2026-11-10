@@ -30,6 +30,6 @@ it("drops a settled message, keeps paging stable across a settle, and ignores no
   // The next page continues after the last revision it returned; the settled text is gone, nothing shifts.
   expect(output.page("s", "r", first.next).chunks).toEqual([]);
   expect(replay(output, "r", through)).toBe("thinking");
-  const later = output.accept(delta("b", "!", "reasoning-delta"))!;
+  const later = output.accept(delta("b", "!", "reasoning-delta"));
   expect(later).toBeGreaterThan(through);
 });

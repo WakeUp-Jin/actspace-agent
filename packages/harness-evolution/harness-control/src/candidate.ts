@@ -18,7 +18,7 @@ export function describeMount(request: HarnessMountRequest): SelectionDescriptio
 export async function validateCandidate(request: HarnessMountRequest, host: HarnessCompatibilityHost, sharedServices: readonly string[]): Promise<void> {
   if (request.sharedServices.some(s => !sharedServices.includes(s))) throw new HarnessControlError("RESTART_REQUIRED", "Candidate expands Host shared services");
   const errors = checkHarnessCompatibility(request.composition, [...request.artifacts.values()], host);
-  if (errors.length) throw new HarnessControlError(errors[0]!.code, errors.map(e => `${e.entryId ?? "Host"}: ${e.message}`).join("; "), { diagnostics: errors });
+  if (errors.length) throw new HarnessControlError(errors[0].code, errors.map(e => `${e.entryId ?? "Host"}: ${e.message}`).join("; "), { diagnostics: errors });
   for (const entry of request.composition.entries.filter(e => e.enabled && e.state !== "skipped")) {
     const artifact = request.artifacts.get(entry.pluginId)!;
     const behavior = artifact.manifest.plugin.behaviors.find(b => b.entryId === (entry.manifestEntryId ?? entry.entryId))!;

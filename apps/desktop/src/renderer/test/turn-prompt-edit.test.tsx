@@ -86,7 +86,7 @@ describe("editing a prompt in the message flow", () => {
     expect(turnOf("第 3 轮提问").querySelector(".opacity-0")).not.toBeNull();
     await act(async () => { vi.advanceTimersByTime(300); });
     expect(onResendTurn).toHaveBeenCalledOnce();
-    expect(onResendTurn.mock.calls[0]![0]).toMatchObject({ sessionId: "session-1", runId: "run-2", fromSeq: 20, text: "改过的第二问" });
+    expect(onResendTurn.mock.calls[0][0]).toMatchObject({ sessionId: "session-1", runId: "run-2", fromSeq: 20, text: "改过的第二问" });
     expect(screen.queryByRole("textbox", { name: "编辑提问内容" })).toBeNull();
   });
 

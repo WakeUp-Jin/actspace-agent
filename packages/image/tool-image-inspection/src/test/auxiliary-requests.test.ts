@@ -16,7 +16,7 @@ function fixture(attempts: readonly (readonly LlmStreamEvent[] | Error)[] = [[do
   let index = 0;
   const dispatch = vi.fn(async function* () {
     order.push("dispatch");
-    const events = attempts[index++]!;
+    const events = attempts[index++];
     if (events instanceof Error) throw events;
     yield* events;
   });
@@ -86,7 +86,7 @@ describe("image inspection auxiliary request lifecycle", () => {
     expect(f.start).toHaveBeenCalledTimes(2);
     const [first, second] = f.start.mock.calls.map(call => call[0] as unknown as Record<string, unknown>);
     expect(first).toMatchObject({ attemptId: "request-1", attempt: 1 });
-    expect(second).toMatchObject({ attemptId: "request-2", attempt: 2, logicalRequestId: first!.logicalRequestId });
+    expect(second).toMatchObject({ attemptId: "request-2", attempt: 2, logicalRequestId: first.logicalRequestId });
     expect(f.finish.mock.calls).toEqual([[{ status: "failed", usage }], [{ status: "completed", usage }]]);
   });
 });

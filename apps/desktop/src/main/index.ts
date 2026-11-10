@@ -247,7 +247,7 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
       if (browserFailures === 1) await logMain("Chrome connection refresh failed", { error: error instanceof Error ? error.message : String(error) });
     }
     if (!shuttingDown) {
-      const base = browserFailures ? [1_000, 2_000, 5_000, 10_000][Math.min(browserFailures - 1, 3)]! : 10_000;
+      const base = browserFailures ? [1_000, 2_000, 5_000, 10_000][Math.min(browserFailures - 1, 3)] : 10_000;
       scheduleBrowserSync(Math.round(base * (0.9 + Math.random() * 0.2)));
     }
   };

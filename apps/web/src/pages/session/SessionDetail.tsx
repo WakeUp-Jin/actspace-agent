@@ -38,7 +38,7 @@ export function SessionDetail({ sessionId }: { readonly sessionId: string }) {
     const rest: ApprovalRequest[] = [];
     for (const request of approvals) {
       const index = approvalAnchorIndex(items, request.callId);
-      const key = index < 0 ? null : items[index]!.key;
+      const key = index < 0 ? null : items[index].key;
       if (key === null) rest.push(request); else byKey.set(key, [...(byKey.get(key) ?? []), request]);
     }
     return { after: byKey, trailing: rest };

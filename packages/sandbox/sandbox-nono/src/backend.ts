@@ -37,7 +37,7 @@ export function createNonoBackend(host: SandboxHostPort, fs: CoverFs = nodeCover
       // A real wrap proves the kernel mechanism works here (Landlock may be missing on Linux).
       const wrap = await host.run({ command: nonoPath, args: [...WRAP, "--read", "/usr", "--block-net", "--", "/usr/bin/true"], cwd: "/usr/bin", env, timeoutMs: PROBE_TIMEOUT_MS });
       if (wrap.error !== undefined || wrap.exitCode !== 0) return unavailable(`nono wrap probe failed: ${failure(wrap)}`);
-      return { available: true as const, version: parsed[1]!, capabilities: nonoCapabilities(host.platform) };
+      return { available: true as const, version: parsed[1], capabilities: nonoCapabilities(host.platform) };
     },
     prepare: async (policy: SandboxPolicy) => {
       const nonoPath = host.resources.nonoPath;

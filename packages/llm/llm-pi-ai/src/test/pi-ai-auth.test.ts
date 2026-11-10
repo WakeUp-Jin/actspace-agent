@@ -22,8 +22,8 @@ it.each([
   const adapter = new PiAiAdapter({ wire: { providerId: "custom", route: "anthropic-messages", baseUrl: "https://relay.example" } });
   for await (const _event of await adapter.dispatch(request(credential))) { /* drain */ }
   expect(seen).toHaveLength(1);
-  expect(seen[0]!.get(present)).toBe(value);
-  expect(seen[0]!.has(absent)).toBe(false);
+  expect(seen[0].get(present)).toBe(value);
+  expect(seen[0].has(absent)).toBe(false);
 });
 
 

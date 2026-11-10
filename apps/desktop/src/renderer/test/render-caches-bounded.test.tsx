@@ -86,10 +86,10 @@ it("shares one ResizeObserver across tool lines and releases it with the last on
   expect(instances).toHaveLength(1);
   expect(observedOverflowCount()).toBe(2);
   offFirst();
-  expect(instances[0]!.unobserve).toHaveBeenCalledWith(first);
-  expect(instances[0]!.disconnect).not.toHaveBeenCalled();
+  expect(instances[0].unobserve).toHaveBeenCalledWith(first);
+  expect(instances[0].disconnect).not.toHaveBeenCalled();
   offSecond();
-  expect(instances[0]!.disconnect).toHaveBeenCalledTimes(1);
+  expect(instances[0].disconnect).toHaveBeenCalledTimes(1);
   expect(observedOverflowCount()).toBe(0);
 });
 

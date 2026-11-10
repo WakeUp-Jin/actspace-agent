@@ -100,8 +100,12 @@ export const MarkdownProse = memo(function MarkdownProse({ content, writing, onO
   const definitions = collectDefinitions(blocks);
 
   // 脚注编号表：只有编号变了才换新对象，否则脚注引用以外的东西不会被通知。
+  // 编号就是标识在表里的顺序（collectDefinitions），所以能从 key 原样重建，不必依赖 definitions 的对象身份。
   const numbersKey = Array.from(definitions.footnoteNumbers.keys()).join("\u0000");
-  const footnoteNumbers = useMemo(() => (numbersKey ? definitions.footnoteNumbers : EMPTY_NUMBERS), [numbersKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const footnoteNumbers = useMemo<ReadonlyMap<string, number>>(
+    () => (numbersKey ? new Map(numbersKey.split("\u0000").map((id, index) => [id, index + 1])) : EMPTY_NUMBERS),
+    [numbersKey],
+  );
 
   // 末尾效果落在最后一个会显示的块上；最后一块是脚注定义时落在脚注区上。
   let liveIndex = -1;

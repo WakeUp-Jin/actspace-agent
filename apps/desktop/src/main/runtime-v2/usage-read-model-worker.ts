@@ -291,7 +291,7 @@ function sessionPage(database: DatabaseSync, input: SessionListPageInput): Sessi
       conditions.push("(updated_at < ? OR (updated_at=? AND session_id>?))"); args.push(after.updated_at, after.updated_at, input.after);
     }
     const rows = boundedRows(prepare(database, `SELECT *,${SIDE_CHAT_COUNT} FROM session_catalog WHERE ${conditions.join(" AND ")} ORDER BY updated_at DESC,session_id ASC LIMIT ?`).iterate(...args, limit + 1)) as Record<string, string | number | null>[];
-    return { items: rows.slice(0, limit).map(toSessionListItem), groups: [], indexing: false, failed: 0, ...(rows.length > limit ? { nextCursor: String(rows[limit - 1]!.session_id) } : {}) };
+    return { items: rows.slice(0, limit).map(toSessionListItem), groups: [], indexing: false, failed: 0, ...(rows.length > limit ? { nextCursor: String(rows[limit - 1].session_id) } : {}) };
   }
   const groupRoot = "COALESCE(json_extract(worktree_json,'$.sourceWorkspaceRoot'),workspace_root,'')";
   // 子 Agent 的会话只在父会话的「Agent」面板里看，不进侧栏列表；侧边对话只算进父会话的计数。

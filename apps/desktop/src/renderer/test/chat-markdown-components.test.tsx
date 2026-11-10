@@ -31,7 +31,7 @@ function withHost(host: MarkdownHost, children: ReactNode) {
 describe("CodeBlock", () => {
   it("挂载时已闭合且超过 22 行：折叠，按钮写明总行数，展开后变成「收起」", async () => {
     const { container } = render(<MarkdownProse content={fence(lines(30))} />);
-    const shell = container.querySelector(".md-code")!;
+    const shell = container.querySelector(".md-code");
     expect(shell).toHaveAttribute("data-folded", "true");
     const toggle = screen.getByRole("button", { name: "展开全部 30 行" });
     await userEvent.click(toggle);

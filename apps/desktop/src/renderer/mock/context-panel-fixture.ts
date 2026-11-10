@@ -74,7 +74,7 @@ function conversationEntries(session: MockSession | undefined): { entries: Conte
   // 最新的用户 / 助手条目换成 mock 会话真实的 messageId（从后往前一一对应）。
   const real = { user: [...(session?.messages ?? [])].filter((m) => m.role === "user").reverse(), assistant: [...(session?.messages ?? [])].filter((m) => m.role === "assistant").reverse() };
   for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = entries[index]!;
+    const entry = entries[index];
     const role = entry.kind === "user" ? "user" : entry.kind === "assistant" || entry.kind === "thinking" ? "assistant" : null;
     const message = role ? real[role].shift() : undefined;
     if (message) entries[index] = { ...entry, trajectoryRef: { messageId: message.id } };

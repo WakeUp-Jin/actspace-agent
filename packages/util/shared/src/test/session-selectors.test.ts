@@ -457,7 +457,7 @@ describe("session selectors", () => {
       ["assistant-1", "run-identity", undefined],
       ["stopped-1", "run-identity", 9],
     ]);
-    expect("sourceSeq" in blocks[1]!).toBe(false);
+    expect("sourceSeq" in blocks[1]).toBe(false);
   });
 
   it("restores an aborted turn as a persisted Stopped status", () => {

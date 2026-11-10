@@ -73,7 +73,7 @@ export async function bootDesktopRuntimeV2(options: DesktopRuntimeV2BootOptions)
   const globalSwitched = switched.filter(entry => entry.loaders.includes("host"));
   const composition = options.module.createProfileComposition(options.module.RUNTIME_PROFILE_IDS.desktop, host, {
     appBundle: desktopApp.DESKTOP_APP_BUNDLE,
-    ...(globalSwitched.length === 0 ? {} : { invocationPatch: { id: "desktop.plugin-switches", provenance: "desktop-settings", operations: globalSwitched.map(entry => ({ id: `disable:${entry.id}`, kind: "disable" as const, target: String(entry.manifest.behaviors[0]!.entryId) })) } }),
+    ...(globalSwitched.length === 0 ? {} : { invocationPatch: { id: "desktop.plugin-switches", provenance: "desktop-settings", operations: globalSwitched.map(entry => ({ id: `disable:${entry.id}`, kind: "disable" as const, target: String(entry.manifest.behaviors[0].entryId) })) } }),
   });
   const credentialResolver = new DesktopCredentialResolver(options.models);
   const capabilityMap = new Map<string, unknown>([

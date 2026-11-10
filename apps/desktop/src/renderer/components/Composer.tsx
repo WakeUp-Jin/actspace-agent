@@ -206,27 +206,27 @@ export const Composer = memo(function Composer({
 
   // Composer 只挂一次（16 T14），换会话不重挂：开着的菜单和上下文用量浮层收起，不带到下一个会话。
   useEffect(() => {
-    closeFloatingPanels();
+    overlays.close();
+    slash.dismiss();
     slash.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只在换会话时收起
-  }, [draftKey]);
+  }, [draftKey, overlays.close, slash.dismiss, slash.reset]);
 
   useEffect(() => {
     if (!slash.open) return;
     overlays.close();
     void skills.load();
-  }, [selectedWorkspaceRoot, slash.open]);
+  }, [selectedWorkspaceRoot, slash.open, overlays.close, skills.load]);
 
   useEffect(() => {
     if (overlays.overlay === null) return;
     slash.dismiss();
-  }, [overlays.overlay]);
+  }, [overlays.overlay, slash.dismiss]);
 
   // 打开 `+` 面板就加载 Skills：主页的搜索也要能搜到它们。
   useEffect(() => {
     if (!overlays.paletteOpen || isChatForm) return;
     void skills.load();
-  }, [overlays.paletteOpen, isChatForm, selectedWorkspaceRoot]);
+  }, [overlays.paletteOpen, isChatForm, selectedWorkspaceRoot, skills.load]);
 
   function closeFloatingPanels() {
     overlays.close();

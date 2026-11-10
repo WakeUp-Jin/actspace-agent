@@ -11,7 +11,7 @@ it("atomically consumes one code, persists hashes and revokes one device after r
   const { code } = await auth.createPairCode();
   const results = await Promise.allSettled([auth.pair(code, "Mac", "one"), auth.pair(code, "Phone", "two")]);
   expect(results.filter(r => r.status === "fulfilled")).toHaveLength(1);
-  const first = results.find(r => r.status === "fulfilled")! as PromiseFulfilledResult<Awaited<ReturnType<HostAuth["pair"]>>>;
+  const first = results.find(r => r.status === "fulfilled") as PromiseFulfilledResult<Awaited<ReturnType<HostAuth["pair"]>>>;
   const second = await auth.pair((await auth.createPairCode()).code, "Other", "three");
   const stored = await readFile(join(root, "devices.json"), "utf8");
   expect(stored).not.toContain(first.value.token); expect(stored).not.toContain(code);

@@ -97,7 +97,7 @@ export async function resolvePolicy(request: SandboxRequest, template: SandboxTe
   if (limits && Object.keys(limits).length) derived.push("process.resource-limits");
   const requiredCapabilities = unique([...DEFAULT_TEMPLATE.requiredCapabilities, ...template.requiredCapabilities, ...request.requiredCapabilities ?? [], ...derived]).sort() as SandboxCapability[];
   const filesystem = Object.freeze({ read: readPolicy, readWrite, denyRead, denyWrite });
-  const bounds = { purpose: request.purpose, isolation: request.isolation, filesystem, network: network!, requiredCapabilities, timeoutMs: request.timeoutMs ?? null, limits: limits ?? null };
+  const bounds = { purpose: request.purpose, isolation: request.isolation, filesystem, network: network, requiredCapabilities, timeoutMs: request.timeoutMs ?? null, limits: limits ?? null };
   const policy: SandboxPolicy = {
     purpose: request.purpose, isolation: request.isolation, argv: Object.freeze([...request.argv]), cwd: resolve(request.cwd), env: Object.freeze({ ...request.env }), scratchDir: resolve(request.scratchDir),
     filesystem, network: network!, requiredCapabilities: Object.freeze(requiredCapabilities), ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),

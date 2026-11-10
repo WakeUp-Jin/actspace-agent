@@ -18,7 +18,7 @@ function hasPendingTransaction(window: RuntimeV2EventWindow): boolean {
   if (known !== undefined) return known;
   let pending = false;
   for (let index = window.events.length - 1; index >= 0; index--) {
-    const type = window.events[index]!.type;
+    const type = window.events[index].type;
     if (TRANSACTION_BOUNDARIES.has(type)) { pending = type.endsWith("/start"); break; }
   }
   pendingTransactionByWindow.set(window, pending);
@@ -170,7 +170,7 @@ export class ClientSessionStore {
       for (const message of envelope.snapshot.messages) if (!older || !messages.has(message.messageId)) messages.set(message.messageId, message);
       const tools = new Map(cell.snapshot?.tools.map(tool => [tool.callId, tool]));
       for (const tool of envelope.snapshot.tools) if (!older || !tools.has(tool.callId)) tools.set(tool.callId, tool);
-      const snapshot = { ...(older ? cell.snapshot! : envelope.snapshot), messages: [...messages.values()].filter(message => older || active.has(message.messageId)), tools: [...tools.values()] };
+      const snapshot = { ...(older ? cell.snapshot : envelope.snapshot), messages: [...messages.values()].filter(message => older || active.has(message.messageId)), tools: [...tools.values()] };
       this.applySnapshot(snapshot, { requestGeneration });
       const current = this.#cell(envelope.sessionId);
       this.#cells.set(envelope.sessionId, Object.freeze({ ...current, window, watermarks: envelope.watermarks ?? current.watermarks, deferredToolCalls: [...new Set([...cell.deferredToolCalls, ...envelope.deferredToolCalls])] }));
@@ -181,7 +181,7 @@ export class ClientSessionStore {
           if (value === undefined) continue;
           const currentRevision = current.projectionRevisions[key];
           const newer = currentRevision !== undefined && currentRevision >= envelope.throughJournalSeq;
-          values[key] = newer ? current.projectionValues[key]! : value;
+          values[key] = newer ? current.projectionValues[key] : value;
           revisions[key] = newer ? currentRevision : envelope.throughJournalSeq;
         }
         this.#cells.set(envelope.sessionId, Object.freeze({ ...this.#cell(envelope.sessionId), projectionValues: Object.freeze(values), projectionRevisions: Object.freeze(revisions) }));
@@ -305,7 +305,7 @@ export class ClientSessionStore {
 /** The updated tool moves to the end of the list (its latest activity); other tools keep their order. */
 function withToolUpdated(tools: RuntimeV2SessionSnapshot["tools"], tool: RuntimeV2SessionSnapshot["tools"][number]): RuntimeV2SessionSnapshot["tools"] {
   let at = -1;
-  for (let index = tools.length - 1; index >= 0; index--) if (tools[index]!.callId === tool.callId) { at = index; break; }
+  for (let index = tools.length - 1; index >= 0; index--) if (tools[index].callId === tool.callId) { at = index; break; }
   if (at === -1) return tools.concat([tool]);
   const next = tools.slice(0, at).concat(tools.slice(at + 1));
   next.push(tool);

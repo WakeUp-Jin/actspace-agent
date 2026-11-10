@@ -15,7 +15,7 @@ export async function startRemoteHost(config: HostConfig, options: { mock?: bool
     log: message => { process.stderr.write(`${message}\n`); },
     bootRuntime: async ({ artifacts, approvals, readArtifact, resolveArtifact, onLiveEvent }) => {
       const capabilities = ["filesystem.read", "filesystem.write", "network", "approval", "credential", "process"] as const;
-      const workspaceRoot = config.workspaces[0]!.path;
+      const workspaceRoot = config.workspaces[0].path;
       const host = { hostKind: "host" as const, runtimeContract: "actspace.runtime.v2" as const, invocationId: randomUUID(), workspaceRef: workspaceRoot, capabilityCeiling: capabilities };
       const capabilitySet = { ids: capabilities, has: (id: string) => (capabilities as readonly string[]).includes(id), get: <T>(id: string): T => { throw new Error(`Unavailable capability ${id}`); } };
       const router = new HostModelRouter(config, { mock: options.mock, readArtifact });

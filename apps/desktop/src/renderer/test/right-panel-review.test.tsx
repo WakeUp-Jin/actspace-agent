@@ -427,8 +427,8 @@ function cappedSnapshot(): ReviewSnapshot {
     ...snapshot,
     id: "capped",
     files: [
-      snapshot.files[0]!,
-      { ...snapshot.files[0]!, id: "second", path: "src/second.ts", fingerprint: "second" },
+      snapshot.files[0],
+      { ...snapshot.files[0], id: "second", path: "src/second.ts", fingerprint: "second" },
     ],
     totals: { files: 2, additions: 4, deletions: 2, changedLines: 6, estimatedChangedBytes: 13 * 1024 * 1024 },
     loadPolicy: { mode: "single-file", reason: "changed-bytes" },

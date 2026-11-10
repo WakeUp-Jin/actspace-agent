@@ -380,7 +380,7 @@ describe("rollback when settings.json fails after secrets.json was written", () 
   });
 
   it("stops restoring secrets.json when restoring settings.json also fails (best effort)", async () => {
-    const testCase = ROLLBACK_CASES[0]!;
+    const testCase = ROLLBACK_CASES[0];
     const { root, writer, service, before } = await seeded(testCase);
     writer.failOn(2, "after");
     writer.failOn(3, "after");

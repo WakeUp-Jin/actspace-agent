@@ -19,7 +19,7 @@ export function convert(event: OldEvent): SessionEventEnvelopeV1 {
   const data = { ...event.data };
   switch (event.type) {
     case "user/message": case "assistant/message": case "agent/inbox/spliced": case "tool/recovery-outcome":
-      data.content = node.content!; break;
+      data.content = node.content; break;
     case "tool/result":
       // 旧格式里 node.content 就是 modelOutput，isError 就是 status !== "completed"：转换时不搬，只核对。
       expect(node.content).toEqual(data.modelOutput);
@@ -35,7 +35,7 @@ export function convert(event: OldEvent): SessionEventEnvelopeV1 {
 
 export function readOldFixture(): { header: SessionHeaderV1; oldEvents: OldEvent[] } {
   const [headerLine, ...lines] = readFileSync(join(SURFACE_FIXTURES, "old-format.jsonl"), "utf8").trim().split("\n");
-  return { header: JSON.parse(headerLine!) as SessionHeaderV1, oldEvents: lines.map(line => JSON.parse(line) as OldEvent) };
+  return { header: JSON.parse(headerLine) as SessionHeaderV1, oldEvents: lines.map(line => JSON.parse(line) as OldEvent) };
 }
 
 /** 插件事件（agent-service task/run、context supplement）与 surface 无关，用宽松 codec 登记，只为回放。 */

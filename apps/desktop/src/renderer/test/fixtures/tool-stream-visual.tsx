@@ -44,7 +44,7 @@ function ToolStreamVisual() {
             : { kind: "read", filePath: path, displayText };
 
           const event = { id: String(index), type: "tool_result", schemaVersion: 2, sessionId: "visual", agentRunId: "run", timestamp: "2026-09-06T00:00:00Z", payload: { toolCallId: String(index), toolName: definition.name, ok: !definition.error, uiPreview: preview } } as SessionEvent;
-          const block = createMessageBlocks([event])[0]!;
+          const block = createMessageBlocks([event])[0];
           if (phase !== "finished" && "status" in block) block.status = "running";
           if (block.kind === "write_diff" && preview.kind === "write") block.streamingContent = preview.streamingContent;
           if (block.kind === "write_diff" || block.kind === "edit_diff") return <FileDiffBlock key={index} message={block} />;

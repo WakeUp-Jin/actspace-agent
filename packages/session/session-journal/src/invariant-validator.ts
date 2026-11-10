@@ -68,7 +68,7 @@ export class SessionEventValidator {
     };
     try {
       for (let index = 0; index < events.length; index++) {
-        const event = events[index]!;
+        const event = events[index];
         validateEventEnvelopeShape(event);
         if (event.seq !== this.nextSeq) throw new SessionError("SESSION_CORRUPT", `Expected seq ${this.nextSeq}, received ${event.seq}.`);
         validateReferences(event);
@@ -103,7 +103,7 @@ export class SessionEventValidator {
       publish?.(effective);
       return this.result;
     } catch (error) {
-      for (let index = undo.length - 1; index >= 0; index--) undo[index]!();
+      for (let index = undo.length - 1; index >= 0; index--) undo[index]();
       this.nextSeq = checkpoint.nextSeq; this.accessState = checkpoint.accessState;
       this.diagnostics.length = checkpoint.diagnostics;
       this.pending = checkpoint.pending; this.pending.length = checkpoint.pendingLength;

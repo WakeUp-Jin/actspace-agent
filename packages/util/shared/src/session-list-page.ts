@@ -46,8 +46,8 @@ export function paginateSessionSummaries(result: RuntimeV2BrowseList, input: Ses
   const groups: SessionListPage['groups'] = [];
   const items: SessionListItem[] = [];
   for (const group of grouped.values()) {
-    const workspaceRoot = group[0]!.worktree?.sourceWorkspaceRoot ?? group[0]!.workspaceRoot ?? '';
-    const pinned = group[0]!.pinned === true;
+    const workspaceRoot = group[0].worktree?.sourceWorkspaceRoot ?? group[0].workspaceRoot ?? '';
+    const pinned = group[0].pinned === true;
     if (input.workspaceRoot !== undefined && workspaceRoot !== input.workspaceRoot) continue;
     if (input.pinned !== undefined && pinned !== input.pinned) continue;
     const start = input.after ? Math.max(0, group.findIndex(s => s.id === input.after) + 1) : 0;

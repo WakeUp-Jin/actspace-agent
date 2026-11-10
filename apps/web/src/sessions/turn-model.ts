@@ -49,11 +49,11 @@ export function buildTurns(items: readonly TranscriptItem[]): Turn[] {
     current.items.push(item);
   }
   return raw.map(({ key, user, items: list }) => {
-    if (list.length === 1 && isKind(list[0]!, SEPARATE)) return { key, user, process: [], reply: [], tail: list };
+    if (list.length === 1 && isKind(list[0], SEPARATE)) return { key, user, process: [], reply: [], tail: list };
     const tail = list.filter(item => isKind(item, TAIL_KINDS));
     const rest = list.filter(item => !isKind(item, TAIL_KINDS));
     let split = rest.length;
-    while (split > 0 && isKind(rest[split - 1]!, ASSISTANT)) split -= 1;
+    while (split > 0 && isKind(rest[split - 1], ASSISTANT)) split -= 1;
     return { key, user, process: rest.slice(0, split), reply: rest.slice(split), tail };
   });
 }
@@ -62,8 +62,8 @@ export function buildTurns(items: readonly TranscriptItem[]): Turn[] {
 export function workedMs(turn: Turn): number | undefined {
   const blocks = turn.process.flatMap(itemBlocks);
   if (blocks.length === 0) return undefined;
-  const start = Date.parse(blocks[0]!.createdAt);
-  const endBlock = turn.reply.length ? itemBlocks(turn.reply[0]!)[0] : blocks[blocks.length - 1];
+  const start = Date.parse(blocks[0].createdAt);
+  const endBlock = turn.reply.length ? itemBlocks(turn.reply[0])[0] : blocks[blocks.length - 1];
   const end = endBlock ? Date.parse(endBlock.createdAt) : Number.NaN;
   return Number.isFinite(start) && Number.isFinite(end) ? end - start : undefined;
 }

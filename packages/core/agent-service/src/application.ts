@@ -243,7 +243,7 @@ export class AgentApplication implements AgentApplicationContract {
     } finally { release(); }
     const model = this.#runs.configuration(sessionId).model;
     if (!taskOperation(content)) emitNotification(this.ctx, "application/run-preparing", { session, input: { sessionId, content, model }, snapshot: this.#sessions.snapshot(session) });
-    emitNotification(this.ctx, "application/session-rewound", { sessionId, ...rewound! });
+    emitNotification(this.ctx, "application/session-rewound", { sessionId, ...rewound });
     return receipt;
   }
   async taskCommand(input: import("@actspace/shared/runtime-v2").TaskCommand): Promise<import("@actspace/shared/runtime-v2").TaskCommandResult> {

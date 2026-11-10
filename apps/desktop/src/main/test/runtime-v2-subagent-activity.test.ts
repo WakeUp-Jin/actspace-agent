@@ -23,7 +23,7 @@ describe("subagent activity in the parent stream", () => {
     expect(labels()).toContain("正在读取 · test.ts");
     expect(labels().at(-1)).toBe("正在执行 2 项工具调用 · 正在搜索");
     const result = { status: "completed" as const, summary: "ok", modelOutput: [], artifacts: [], detail: [], failure: null };
-    for (const [callId, name] of [["read", "read_file"], ["grep", "grep"]]) adapter.accept({ ...child, kind: "tool-finished", callId: callId!, name: name!, result: result as never, resultEventId: callId! });
+    for (const [callId, name] of [["read", "read_file"], ["grep", "grep"]]) adapter.accept({ ...child, kind: "tool-finished", callId: callId, name: name, result: result as never, resultEventId: callId });
     for (let i = 0; i < 30; i++) adapter.accept({ ...child, kind: "assistant-delta", message: "hidden reply" });
     expect(labels().filter((label) => label === "正在整理回复")).toHaveLength(1);
     expect(labels().join()).not.toMatch(/hidden|do-not-show|private/);

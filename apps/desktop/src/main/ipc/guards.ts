@@ -131,7 +131,7 @@ const taskCommand: IpcGuard = input => {
     resume: { revision: integer(0) },
     stop: { runId: "string" },
   };
-  return check(command, byOp[command.op as string]!, `Invalid task command (${command.op as string})`);
+  return check(command, byOp[command.op as string], `Invalid task command (${command.op as string})`);
 };
 
 const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> = [

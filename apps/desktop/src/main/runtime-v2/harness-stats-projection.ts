@@ -473,7 +473,7 @@ function entryKind(key: string): string {
 }
 function trim<T>(map: Record<string, T>, limit: number): void {
   const keys = Object.keys(map);
-  for (let index = 0; index < keys.length - limit; index++) delete map[keys[index]!];
+  for (let index = 0; index < keys.length - limit; index++) delete map[keys[index]];
 }
 function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "";

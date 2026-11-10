@@ -190,8 +190,8 @@ export function initializeHeroStage() {
   const ph = h('ph');
   const ring = h('ring');
   const ringArc = h<SVGCircleElement>('ring-arc');
-  const segments = new Map(CATEGORIES.map((c) => [c, h('bar').querySelector<HTMLElement>(`[data-c="${c}"]`)!]));
-  const legend = new Map(CATEGORIES.map((c) => [c, app.querySelector<HTMLElement>(`[data-l="${c}"]`)!]));
+  const segments = new Map(CATEGORIES.map((c) => [c, h('bar').querySelector<HTMLElement>(`[data-c="${c}"]`)]));
+  const legend = new Map(CATEGORIES.map((c) => [c, app.querySelector<HTMLElement>(`[data-l="${c}"]`)]));
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const clock = createClock();
   let playing = false;

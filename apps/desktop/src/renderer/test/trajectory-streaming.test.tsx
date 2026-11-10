@@ -28,7 +28,7 @@ function withToolCall(snapshot: RuntimeV2TrajectorySnapshot): RuntimeV2Trajector
   const last = snapshot.nodes.at(-1)!;
   const data = last.data as Record<string, string>;
   const call = { ...last, key: `${last.sessionId}:${last.eventSeq + 1}`, eventSeq: last.eventSeq + 1, eventType: "tool/call", callId: "streaming-call",
-    data: { turnId: data.turnId!, stepId: data.stepId!, callId: "streaming-call", name: "bash", arguments: { command: "ls" } } };
+    data: { turnId: data.turnId, stepId: data.stepId, callId: "streaming-call", name: "bash", arguments: { command: "ls" } } };
   return { ...snapshot, throughJournalSeq: call.eventSeq, nodes: [...snapshot.nodes, call] as RuntimeV2TrajectorySnapshot["nodes"] };
 }
 
@@ -56,7 +56,7 @@ describe("trajectory streaming", () => {
         observer.observe(row!.parentElement!, { childList: true });
       }
       expect(current).toBe(row);
-      lengths.push(current!.querySelector(".tj-content")!.textContent!.length);
+      lengths.push(current!.querySelector(".tj-content")!.textContent.length);
     }
     observer.disconnect();
     expect(removed.filter(node => node === row)).toHaveLength(0);
@@ -78,10 +78,10 @@ describe("trajectory streaming", () => {
     const lengths: number[] = [];
     for (let frame = 2; frame <= 4; frame += 1) {
       view.rerender(at(frame));
-      lengths.push(screen.getByRole("tabpanel").textContent!.length);
+      lengths.push(screen.getByRole("tabpanel").textContent.length);
     }
-    expect(lengths[0]).toBeLessThan(lengths[1]!);
-    expect(lengths[1]).toBeLessThan(lengths[2]!);
+    expect(lengths[0]).toBeLessThan(lengths[1]);
+    expect(lengths[1]).toBeLessThan(lengths[2]);
     expect(within(screen.getByRole("tabpanel")).getByText(/正在整理轨迹页面：先对齐工具栏和时/)).toBeInTheDocument();
   });
 
