@@ -14,10 +14,6 @@ export function projectArtifactRef(input: ToolArtifactRef & { readonly label?: s
   });
 }
 
-export function markArtifactUnavailable(input: RuntimeV2ArtifactRef): RuntimeV2ArtifactRef {
-  return Object.freeze({ ...input, available: false });
-}
-
 export function projectUnknownArtifact(input: unknown): RuntimeV2ArtifactRef | null {
   if (input === null || typeof input !== "object" || Array.isArray(input)) return null;
   const value = input as Record<string, unknown>;

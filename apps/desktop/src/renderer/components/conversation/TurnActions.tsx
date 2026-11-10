@@ -1,5 +1,5 @@
 import { useContext, useMemo, useState } from "react";
-import { Copy, MoreHorizontal } from "lucide-react";
+import { Copy, Ellipsis } from "lucide-react";
 import { cn } from "../ui/cn";
 import { SessionActionsContext } from "../../session/session-actions-context";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../ui/Menu";
@@ -103,7 +103,7 @@ export function TurnActions({
             aria-label="复制回复"
             onClick={() => void handleCopy(copyText)}
           >
-            <Copy size={15} strokeWidth={2} />
+            <Copy size={15} />
           </button>
         </TooltipTrigger>
         <TooltipContent>复制回复</TooltipContent>
@@ -113,7 +113,7 @@ export function TurnActions({
           <TooltipTrigger asChild>
             <MenuTrigger asChild>
               <button className={TURN_ACTION_TRIGGER_CLASS} type="button" aria-label="更多消息操作">
-                <MoreHorizontal size={18} strokeWidth={2.2} />
+                <Ellipsis size={18} />
               </button>
             </MenuTrigger>
           </TooltipTrigger>

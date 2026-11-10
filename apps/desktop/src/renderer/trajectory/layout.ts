@@ -165,7 +165,7 @@ export function collapseTurns(rows: readonly TrajectoryTableRow[], collapsed: Re
     if (turn === null || !collapsed.has(turn) || row.cell.requestOnly || row.cell.kind === "system") return [row];
     const turnRows = content.get(turn) ?? [row];
     if (turnRows.length <= 1) return [row];
-    if (row.cell.index !== turnRows[0]!.cell.index) return [];
+    if (row.cell.index !== turnRows[0].cell.index) return [];
     return [
       { ...row, turnEnd: false },
       { ...row, key: rowKey(row.cell, "turn"), groupStart: false, turnStart: false, turnEnd: true, collapsed: { kind: "turn" as const, summary: summarizeTurn(turnRows.slice(1), layout) } },
@@ -178,7 +178,7 @@ export function collapseAssistants(rows: readonly TrajectoryTableRow[], collapse
   if (collapsed.size === 0) return [...rows];
   const out: TrajectoryTableRow[] = [];
   for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index]!;
+    const row = rows[index];
     out.push(row);
     if (row.cell.kind !== "message" || !collapsed.has(row.cell.recordId)) continue;
     const calls = assistantCalls(rows, index);
@@ -196,7 +196,7 @@ export function collapseAssistants(rows: readonly TrajectoryTableRow[], collapse
 export function assistantCalls(rows: readonly TrajectoryTableRow[], index: number): TrajectoryTableRow[] {
   const calls: TrajectoryTableRow[] = [];
   for (let next = index + 1; next < rows.length; next += 1) {
-    const candidate = rows[next]!;
+    const candidate = rows[next];
     if (candidate.collapsed || !isToolCell(candidate.cell)) break;
     calls.push(candidate);
   }

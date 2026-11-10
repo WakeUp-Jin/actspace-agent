@@ -9,7 +9,7 @@ export function SendButton({ tone, className, type = "button", ...rest }: Omit<B
   const stop = tone === "stop";
   return (
     <button type={type} aria-label={stop ? "停止" : "发送"} title={stop ? "停止" : "发送"} data-tone={tone} className={cx("send-btn", className)} {...rest}>
-      {stop ? <span aria-hidden className="send-stop" /> : <ArrowUp size={16} strokeWidth={2.4} aria-hidden />}
+      {stop ? <span aria-hidden className="send-stop" /> : <ArrowUp size={16} aria-hidden />}
     </button>
   );
 }

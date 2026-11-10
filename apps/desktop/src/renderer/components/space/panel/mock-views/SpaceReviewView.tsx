@@ -7,14 +7,14 @@ import { PanelEmpty } from "../PanelEmpty";
 /** 子 Agent、可视化回复：演示里只放说明和空态。 */
 export function SpaceSubagentsView() {
   return (
-    <PanelEmpty icon={<Bot size={22} strokeWidth={1.6} />}>
+    <PanelEmpty icon={<Bot size={22} />}>
       {"这次对话还没有子 Agent。\n子 Agent 是一次性的只读助手，和 Space 里的 Actor 是两回事。"}
     </PanelEmpty>
   );
 }
 
 export function SpaceReplyView() {
-  return <PanelEmpty icon={<MessageSquare size={22} strokeWidth={1.6} />}>还没有可视化回复。</PanelEmpty>;
+  return <PanelEmpty icon={<MessageSquare size={22} />}>还没有可视化回复。</PanelEmpty>;
 }
 
 function DiffCount({ add, del }: { add: number; del: number }) {
@@ -29,7 +29,7 @@ function DiffCount({ add, del }: { add: number; del: number }) {
 export function SpaceReviewView({ scope }: { scope: PanelScope }) {
   const { openFile } = useSpaceDemoActions();
   const files = reviewFiles(scope.member);
-  if (!files.length) return <PanelEmpty icon={<GitBranch size={22} strokeWidth={1.6} />}>这次还没有改动。</PanelEmpty>;
+  if (!files.length) return <PanelEmpty icon={<GitBranch size={22} />}>这次还没有改动。</PanelEmpty>;
   const add = files.reduce((s, f) => s + f.add, 0);
   const del = files.reduce((s, f) => s + f.del, 0);
   const BranchIcon = scope.tree ? GitFork : GitBranch;

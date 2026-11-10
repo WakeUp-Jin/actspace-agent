@@ -1,4 +1,4 @@
-import { CircleHelp, X } from "lucide-react";
+import { CircleQuestionMark, X } from "lucide-react";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../../ui/Dialog";
 import { IconButton } from "../../ui/IconButton";
@@ -19,7 +19,7 @@ export function SpaceDemoHelpButton() {
     <Dialog>
       <DialogTrigger asChild>
         <IconButton label="这是什么" size="sm" className="[-webkit-app-region:no-drag]">
-          <CircleHelp size={15} aria-hidden="true" />
+          <CircleQuestionMark size={15} aria-hidden="true" />
         </IconButton>
       </DialogTrigger>
       <DialogContent size="lg" withDescription className="flex max-h-[calc(100vh_-_64px)] flex-col gap-3 p-5">

@@ -34,7 +34,7 @@ kind: "package-map"
 | [`core/`](core/README.md) | Agent 身份与注册表、Agent 循环、任务调度、工具运行时，以及总装配 `runtime` | 6 | 全局、会话、库 |
 | [`session/`](session/README.md) | 会话日志、持久化、物理存储、视图、检查点和会话记录 Markdown | 8 | 全局、库 |
 | [`llm/`](llm/README.md) | 模型服务契约和提供商适配 | 2 | 全局、库 |
-| [`context/`](context/README.md) | 每一轮发给模型的上下文：引擎、提示词、各个来源、披露与压缩 | 12 | 会话 |
+| [`context/`](context/README.md) | 每一轮发给模型的上下文：引擎、提示词、各个来源、披露与压缩 | 13 | 会话 |
 | [`fs/`](fs/README.md) | 读、搜索、写工作区文件的工具 | 3 | 会话 |
 | [`shell/`](shell/README.md) | 命令行（Bash）工具与随包 Python 运行时 | 2 | 会话、库 |
 | [`web/`](web/README.md) | 网页搜索与读取工具 | 1 | 会话 |
@@ -52,8 +52,7 @@ kind: "package-map"
 | [`browser/`](browser/README.md) | 操控浏览器的工具（默认关） | 1 | 会话 |
 | [`english-learning/`](english-learning/README.md) | 英语学习（默认关） | 1 | 全局 |
 | [`skill/`](skill/README.md) | Skill 的发现、注册和官方 Skill | 2 | 库 |
-| [`util/`](util/README.md) | 跨包共享的契约、工具和诊断 | 3 | 库 |
-| [`test-support/`](test-support/README.md) | 测试辅助 | 1 | 库 |
+| [`util/`](util/README.md) | 跨包共享的契约和诊断 | 2 | 库 |
 
 ## 3. 依赖方向
 
@@ -78,13 +77,13 @@ util/shared  composition/cordis-adapter        最底层：不依赖其他 @acts
 - **`core/runtime` 是总装配点。** 它在 `package.json` 里依赖几乎所有插件包（打包默认 Harness 要解析它们），但“加载哪些插件”只在 `plugin-catalog.ts` 里定义。
 - **`host/*` 在能力之上。** 没有能力包依赖 `host/*`；只有 `core/runtime` 依赖三个宿主包。
 - **`apps/*` 不被包依赖。** 可复用包依赖应用会被 `check:packages` 拒绝，应用之间也不能互相依赖。
-- **`test-support` 只进测试。** 生产代码不依赖它。
+- **测试辅助不单独成包。** 测试共用的夹具放在用到它的包的测试目录里（例如 `composition/cordis-adapter/tests/fixtures/`），不再设 `test-support` 这类没有消费者的库包。
 - 包之间不能成环，`check:packages` 会检查。依赖只走公开 exports，不能深导入别的包的 `src`。
 
 ## 4. 新增一个插件
 
 1. **选目录。** 放进已有能力目录；没有合适的就新建目录，写好 `README.md`（`kind: "package-group"`），并在上面的表里加一行。
-2. **建包。** 目录 `packages/<能力>/<包>`，目录名等于包名去掉 `@actspace/`。包里要有 `src/manifest.ts`（含中文 `display`）、`src/plugin.ts`、生命周期测试（`lifecycle.test.ts`），`package.json` 的 `exports` 含 `.`、`./manifest`、`./plugin`；有 Codec 的再加 `./codec`。
+2. **建包。** 目录 `packages/<能力>/<包>`，目录名等于包名去掉 `@actspace/`。包里要有 `src/manifest.ts`（含中文 `display`）、`src/plugin.ts`、生命周期测试（`lifecycle.test.ts`），`package.json` 的 `exports` 含 `.`、`./manifest`、`./plugin`；有 Codec 的再加 `./codec`。`typescript`、`vitest`、`vite`、`@types/node`、`@vitejs/plugin-react` 一律写 `"catalog:"`，版本只在根 `pnpm-workspace.yaml` 的 `catalog:` 里定（`pnpm check:packages` 会拦截直接写版本号的包）。
 3. **登记。** 在 `core/runtime/src/plugin-catalog.ts` 的 `PLUGIN_CATALOG` 加一行（顺序就是加载顺序）；把新包加到 `core/runtime/package.json` 的依赖和 `core/runtime/tsconfig.build.json` 的 `references` 里（打包默认 Harness 要解析它）；把它的 `manifest.ts` 和 `package.json` 路径加进 `scripts/contract-matrix/source-registry.mjs` 的 `MANIFEST_PATHS`、`PACKAGE_PATHS`。会话插件如果要进 Host 的基础组合（Host 要准入它的 manifest），清单行加 `admitOnHost: true`，和同类插件保持一致。带 `plugin.ts` 但不进默认组合的包，改登记到 `PLUGIN_PACKAGES_OUTSIDE_DEFAULT` 并写明原因。
 4. **生成。** 运行 `pnpm --filter @actspace/runtime build && pnpm generate:plugin-loader && pnpm gen:contract-matrix`，由清单生成 `core/runtime/cordis.yml`，并更新[契约矩阵](../docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md)。
 5. **写进 README。** 在所在能力目录 README 的包表里加一行；包表的类别和默认开关必须与清单一致。

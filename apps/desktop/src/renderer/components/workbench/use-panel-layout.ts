@@ -147,7 +147,7 @@ export function usePanelLayout({ isOpen: isRightPanelOpen, openPanel: openRightP
     if (rightWidth > allowedRightWidth) {
       setRightWidth(clamp(allowedRightWidth, RIGHT_MIN_WIDTH, rightMaxWidth));
     }
-  }, [containerWidth, isCompactLayout, isRightPanelOpen, isSidebarHidden, leftMode, leftWidth, rightMaxWidth, rightWidth]);
+  }, [containerWidth, isCompactLayout, isRightPanelOpen, isSidebarHidden, leftMode, leftWidth, rightMaxWidth, rightWidth, closeRightPanel]);
 
   useEffect(() => {
     if (!isCompactLayout) {

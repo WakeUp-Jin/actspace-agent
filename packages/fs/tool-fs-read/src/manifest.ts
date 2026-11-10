@@ -8,6 +8,8 @@ export const manifest = defineBuiltinPluginManifest({
   pluginId: FILESYSTEM_READ_PLUGIN_ID, version: "2.0.0", name: "ActSpace Filesystem Read",
   entry: { entryId: "tools.filesystem-read", behavior: "./plugin.js" },
   host: { required: ["filesystem.read"], optional: [] }, frontend: null,
-  injects: ["tools.runtime", "actspace.host.tools.filesystem-read"],
+  injects: ["tools.runtime"],
+  // Without the grant the tools register but report the capability as unavailable.
+  optionalInjects: ["actspace.host.filesystem"],
   contributions: { services: ["tools.filesystem-read"], tools: FILESYSTEM_READ_TOOLS, prompts: [], events: [] },
 });

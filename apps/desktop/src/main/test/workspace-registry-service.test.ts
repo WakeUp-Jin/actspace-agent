@@ -61,10 +61,10 @@ describe("workspace registry service", () => {
     const options = { dataRoot, defaultWorkspaceRoot, fallbackWorkspaceRoot: defaultWorkspaceRoot, sessions: [] };
     const [entry] = (await readWorkspaceRegistry(options)).items;
 
-    await expect(setWorkspaceHidden(options, entry!.id, true)).resolves.toEqual({ ok: true });
+    await expect(setWorkspaceHidden(options, entry.id, true)).resolves.toEqual({ ok: true });
     const after = await readWorkspaceRegistry(options);
 
-    expect(after.items).toEqual([expect.objectContaining({ id: entry!.id, hidden: true })]);
+    expect(after.items).toEqual([expect.objectContaining({ id: entry.id, hidden: true })]);
   });
 
   it("leaves the registry empty when the default workspace folder cannot be created", async () => {

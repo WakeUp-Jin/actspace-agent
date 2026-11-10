@@ -65,7 +65,7 @@
 
 ### 2.3 运行时层：随应用发布的 Python
 
-照 DSH `scripts/primary-runtime/` 的做法：`astral-sh/python-build-standalone` 3.12 + 锁定 wheel（URL + sha256）清单，构建脚本下载、校验、剪掉 `test/` 目录、生成 `runtime.json`（platform、arch、python 版本、包版本表、digest）。打包位置 `Contents/Resources/app/runtime/python/`，与 `nono`、`browser-components` 同级；`scripts/release-package.sh` 已有 Resources 下松散可执行文件单独签名的先例。
+照 DSH（deepseek-harness）仓库里 primary-runtime 构建脚本的做法：`astral-sh/python-build-standalone` 3.12 + 锁定 wheel（URL + sha256）清单，构建脚本下载、校验、剪掉 `test/` 目录、生成 `runtime.json`（platform、arch、python 版本、包版本表、digest）。打包位置 `Contents/Resources/app/runtime/python/`，与 `nono`、`browser-components` 同级；`scripts/release-package.sh` 已有 Resources 下松散可执行文件单独签名的先例。
 
 | 层 | 内容 | 位置 |
 |---|---|---|

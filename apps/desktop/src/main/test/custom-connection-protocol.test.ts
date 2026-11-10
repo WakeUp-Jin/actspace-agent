@@ -20,7 +20,7 @@ vi.mock("@actspace/llm-pi-ai", async (importOriginal) => ({ ...await importOrigi
 }));
 
 const roots: string[] = [];
-const crypto: SecretCrypto = { isAvailable: () => true, encrypt: (text) => Buffer.from(text), decrypt: (data) => data.toString() };
+const crypto: SecretCrypto = { isAvailable: async () => true, encrypt: async (text) => Buffer.from(text), decrypt: async (data) => data.toString() };
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "actspace-connection-protocol-"));
@@ -40,7 +40,7 @@ it("persists a model's thinking override across reload and connection rename", a
   const service = connectionsService(settings);
   const created = await service.create({ templateId: "custom", apiKey: "secret", baseUrl: "https://relay.example/v1", label: "Relay", models: [{ apiModel: "gpt-6-astra" }] });
   if (!created.ok) throw new Error(created.error.message);
-  const key = created.view.connections[0]!.models[0]!.key;
+  const key = created.view.connections[0].models[0].key;
   const thinking = { levels: ["off", "low", "high"] as const, default: "high" as const };
   expect(await service.updateModel({ key, overrides: { thinking: { levels: [...thinking.levels], default: thinking.default } } })).toMatchObject({ ok: true });
   expect(await service.update({ connectionId: created.connectionId!, label: "Renamed" })).toMatchObject({ ok: true });
@@ -55,7 +55,7 @@ it.each(["low", undefined] as const)("encodes custom Chat with selected effort %
   const service = connectionsService(settings);
   const created = await service.create({ templateId: "custom", protocol: "openai-completions", apiKey: "secret", baseUrl: "https://relay.example/v1", label: "Relay", models: [{ apiModel: "alias" }] });
   if (!created.ok) throw new Error(created.error.message);
-  const key = created.view.connections[0]!.models[0]!.key;
+  const key = created.view.connections[0].models[0].key;
   expect(await service.updateModel({ key, overrides: { thinking: { levels: ["off", "low", "high"], default: "high" } } })).toMatchObject({ ok: true });
   const runtime = new ModelRuntimeService(settings, new ModelStoreService({ settings }));
   const adapter = new DesktopLegacyLlmAdapter(runtime, async () => { throw Error("unused"); });
@@ -75,12 +75,12 @@ it("prices catalog matches at the reference rate times the multiplier and never 
     { apiModel: "claude-manual", overrides: { rates: { input: 4, output: 20, cacheRead: 0.4, cacheWrite: 5 } } },
   ] });
   if (!created.ok) throw new Error(created.error.message);
-  const keys = Object.fromEntries(created.view.connections[0]!.models.map((model) => [model.apiModel, model.key]));
+  const keys = Object.fromEntries(created.view.connections[0].models.map((model) => [model.apiModel, model.key]));
   const runtime = new ModelRuntimeService(settings, new ModelStoreService({ settings }));
-  const catalogModel = runtime.resolveMainModel(keys["claude-sonnet-5"]!);
+  const catalogModel = runtime.resolveMainModel(keys["claude-sonnet-5"]);
   if (!catalogModel.ok) throw new Error(catalogModel.message);
   expect(runtime.resolvePricing(catalogModel.model, "claude-sonnet-5")?.rates.input).toBeCloseTo(0.6);
-  const manualModel = runtime.resolveMainModel(keys["claude-manual"]!);
+  const manualModel = runtime.resolveMainModel(keys["claude-manual"]);
   if (!manualModel.ok) throw new Error(manualModel.message);
   expect(manualModel.model.definition.pricing?.inputCacheMissPerMillion).toBe(4);
   expect(runtime.resolvePricing(manualModel.model, "claude-manual")).toMatchObject({ source: "configured", rates: { input: 4, output: 20 } });

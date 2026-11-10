@@ -51,6 +51,24 @@ async function assertPluginContract(name, manifest, dir) {
   if (manifest.exports?.["./codec"] && !hasCodec) failures.push(`${name}: './codec' export requires src/codec.ts`);
 }
 
+// pnpm-workspace.yaml `catalog:` 里的依赖只能在那一个文件里定版本，各包必须写 `catalog:`。
+async function readCatalogNames() {
+  let source;
+  try { source = await readFile(join(repoRoot, "pnpm-workspace.yaml"), "utf8"); } catch { return []; }
+  const block = source.match(/^catalog:\n((?:[ \t]+.*\n?)+)/m);
+  if (!block) return [];
+  return [...block[1].matchAll(/^[ \t]+"?([^"\s:]+)"?\s*:/gm)].map((match) => match[1]);
+}
+
+function assertCatalogVersions(name, manifest, catalogNames) {
+  for (const field of ["dependencies", "devDependencies", "optionalDependencies"]) {
+    for (const dependency of catalogNames) {
+      const spec = manifest[field]?.[dependency];
+      if (spec !== undefined && spec !== "catalog:") failures.push(`${name}: ${field}.${dependency} must be "catalog:" (version is pinned in pnpm-workspace.yaml), found ${spec}`);
+    }
+  }
+}
+
 async function fileExists(path) {
   try { await access(path); return true; } catch { return false; }
 }
@@ -71,16 +89,55 @@ async function findLifecycleTest(dir) {
   return false;
 }
 
-async function scanSource(dir, name) {
+// 桌面 IPC 契约（packages/util/shared/src/ipc/）只属于客户端表面：apps/*、packages/client/*、packages/host/*。
+// 其余 packages/<capability>/* 是 Runtime / 工具 / 领域包，不应知道 renderer ⇄ main 的通道形状。
+const desktopIpcContractDir = join(repoRoot, "packages", "util", "shared", "src", "ipc");
+const desktopIpcConsumerCapabilities = new Set(["client", "host"]);
+const sharedImportPattern = /(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']@actspace\/shared["']/g;
+const sharedInlineTypePattern = /import\(["']@actspace\/shared["']\)\.([A-Za-z0-9_$]+)/g;
+
+async function collectDesktopIpcContractNames() {
+  const names = new Set();
+  let entries;
+  try { entries = await readdir(desktopIpcContractDir, { withFileTypes: true }); } catch { return names; }
+  for (const entry of entries) {
+    if (!entry.isFile() || !/\.ts$/.test(entry.name) || entry.name === "index.ts") continue;
+    const source = await readFile(join(desktopIpcContractDir, entry.name), "utf8");
+    for (const match of source.matchAll(/^export (?:type|interface|const|function|class|enum) ([A-Za-z0-9_$]+)/mg)) names.add(match[1]);
+    for (const match of source.matchAll(/^export (?:type )?\{([^}]*)\}/mg)) for (const name of importedNames(match[1])) names.add(name);
+  }
+  return names;
+}
+
+function importedNames(specifierList) {
+  return specifierList
+    .split(",")
+    .map((specifier) => specifier.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim())
+    .filter(Boolean);
+}
+
+function findDesktopIpcContractUses(source, contractNames) {
+  const used = new Set();
+  for (const match of source.matchAll(sharedImportPattern)) for (const name of importedNames(match[1])) if (contractNames.has(name)) used.add(name);
+  for (const match of source.matchAll(sharedInlineTypePattern)) if (contractNames.has(match[1])) used.add(match[1]);
+  return [...used].sort();
+}
+
+async function scanSource(dir, name, { desktopIpcContractNames } = {}) {
   let entries;
   try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
   for (const entry of entries) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) await scanSource(path, name);
+    if (entry.isDirectory()) await scanSource(path, name, { desktopIpcContractNames });
     else if (/\.(?:ts|tsx|mts|mjs|cjs)$/.test(entry.name)) {
       const source = await readFile(path, "utf8");
+      const relativePath = path.replace(`${repoRoot}/`, "");
       if (/(?:@deepseek-ai\/[^"']+\/src\/)|(?:from\s+["'][^"']*(?:apps|packages)\/[^"']*\/src\/)/.test(source)) {
-        failures.push(`${name}: forbidden deep source import in ${path.replace(`${repoRoot}/`, "")}`);
+        failures.push(`${name}: forbidden deep source import in ${relativePath}`);
+      }
+      if (desktopIpcContractNames?.size) {
+        const used = findDesktopIpcContractUses(source, desktopIpcContractNames);
+        if (used.length) failures.push(`${name}: desktop IPC contract (${used.join(", ")}) imported in ${relativePath}; only apps/*, packages/client/*, packages/host/* may use packages/util/shared/src/ipc/ types`);
       }
     }
   }
@@ -108,7 +165,10 @@ function findCycles() {
 
 for (const workspaceRoot of workspaceRoots) await walk(workspaceRoot.path, workspaceRoot.kind);
 if (manifests.has("@actspace/harness") || manifests.has("@actspace/plugins")) failures.push("generic harness/plugins package is forbidden");
+const desktopIpcContractNames = await collectDesktopIpcContractNames();
+const catalogNames = await readCatalogNames();
 for (const [name, { manifest, dir, kind }] of manifests) {
+  let guardsDesktopIpc = false;
   if (kind === "app" && manifest.private !== true) failures.push(`${name}: applications must remain private workspace packages`);
   if (kind === "app") {
     for (const dependency of dependencyNames(manifest)) {
@@ -122,10 +182,12 @@ for (const [name, { manifest, dir, kind }] of manifests) {
     for (const dependency of dependencyNames(manifest)) {
       if (manifests.get(dependency)?.kind === "app") failures.push(`${name}: reusable packages cannot depend on application ${dependency}`);
     }
+    guardsDesktopIpc = segments.length === 2 && !desktopIpcConsumerCapabilities.has(segments[0]) && name !== "@actspace/shared";
   }
   assertExports(name, manifest);
+  assertCatalogVersions(name, manifest, catalogNames);
   await assertPluginContract(name, manifest, dir);
-  await scanSource(join(dir, "src"), name);
+  await scanSource(join(dir, "src"), name, { desktopIpcContractNames: guardsDesktopIpc ? desktopIpcContractNames : undefined });
 }
 findCycles();
 

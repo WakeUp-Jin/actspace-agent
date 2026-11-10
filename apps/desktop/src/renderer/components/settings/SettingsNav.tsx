@@ -1,6 +1,6 @@
 import { PerformancePanel } from "../PerformancePanel";
 import type { ComponentType } from "react";
-import { Server, Activity, Archive, ArrowLeft, BarChart3, Cpu, RefreshCw, Search, SlidersHorizontal, Sun, Users, Wrench } from "lucide-react";
+import { Server, Activity, Archive, ArrowLeft, ChartColumn, Cpu, RefreshCw, Search, SlidersHorizontal, Sun, Users, Wrench } from "lucide-react";
 
 export type SettingsSectionId =
   | "hosts"
@@ -15,7 +15,7 @@ export type SettingsSectionId =
   | "harnessStats"
   | "update";
 
-type IconComponent = ComponentType<{ size?: number | string; strokeWidth?: number | string; className?: string }>;
+type IconComponent = ComponentType<{ size?: number | string; className?: string }>;
 
 export const SETTINGS_GROUPS: { label: string; sections: { id: SettingsSectionId; label: string; icon: IconComponent }[] }[] = [
   {
@@ -38,7 +38,7 @@ export const SETTINGS_GROUPS: { label: string; sections: { id: SettingsSectionId
   {
     label: "活动",
     sections: [
-      { id: "usage", label: "使用统计", icon: BarChart3 },
+      { id: "usage", label: "使用统计", icon: ChartColumn },
       { id: "harnessStats", label: "Harness 统计", icon: Activity },
       { id: "archivedChats", label: "归档会话", icon: Archive },
     ],
@@ -48,8 +48,6 @@ export const SETTINGS_GROUPS: { label: string; sections: { id: SettingsSectionId
     sections: [{ id: "update", label: "更新", icon: RefreshCw }],
   },
 ];
-
-export const SETTINGS_SECTIONS = SETTINGS_GROUPS.flatMap((group) => group.sections);
 
 const NAV_GROUP_LABEL_CLASS = "px-2.5 pb-1 pt-3.5 text-act-xxs font-medium text-text-faint first:pt-1 max-[820px]:hidden";
 
@@ -72,7 +70,7 @@ function renderSectionButton(
       aria-current={isActive ? "page" : undefined}
       className={`${NAV_ITEM_CLASS} ${isActive ? NAV_ITEM_ACTIVE_CLASS : NAV_ITEM_IDLE_CLASS}`}
     >
-      <Icon size={15} strokeWidth={1.9} className={isActive ? "text-text-main" : "text-text-faint"} />
+      <Icon size={15} className={isActive ? "text-text-main" : "text-text-faint"} />
       <span>{label}</span>
     </button>
   );
@@ -98,7 +96,7 @@ export function SettingsNav({
         aria-label="返回应用"
         className={`${NAV_ITEM_CLASS} ${NAV_ITEM_IDLE_CLASS} mb-1.5 h-7 gap-1.5 whitespace-nowrap max-[820px]:mb-0`}
       >
-        <ArrowLeft size={14} strokeWidth={2} />
+        <ArrowLeft size={14} />
         <span>返回应用</span>
       </button>
       {SETTINGS_GROUPS.map((group) => (

@@ -4,7 +4,6 @@ import {
   type ConnectionView,
   type EffectiveModel,
   type ModelOverrides,
-  type ModelRates,
   type ModelThinking,
   type ProviderLogoKey,
   type PurposeBinding,
@@ -172,8 +171,6 @@ export function toggleLevel(thinking: ModelThinking | null, level: ThinkingLevel
   const levels = sortLevels(current);
   return thinking?.default && levels.includes(thinking.default) ? { levels, default: thinking.default } : { levels };
 }
-
-export const EMPTY_RATES: ModelRates = { input: 0, output: 0, cacheRead: null, cacheWrite: null };
 
 export type PickerGroup = { connection: ConnectionView; models: ConnectionModelView[] };
 

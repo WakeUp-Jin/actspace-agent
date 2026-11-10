@@ -4,10 +4,8 @@ import { useRunTarget } from "./target/use-run-target";
 import type { RunTargetValue } from "./target/run-target-context";
 import type { SideChatRuntimeValue } from "./components/right-panel/side-chat/side-chat-runtime";
 import { sideChatOpenError } from "./components/right-panel/side-chat/use-open-side-chat";
-import { createEmptyStreamingState } from "./session/session-run-state";
 import { REWIND_ERROR_MESSAGES, taskOperation } from "@actspace/shared/runtime-v2";
-import { upsertStreamingTool } from "./session/live-runs/stream-state";
-import type { CompactionBlock } from "./session/live-runs/stream-blocks";
+import { createEmptyStreamingState, upsertStreamingTool, type CompactionBlock, type SessionRunState } from "@actspace/client/live";
 import { getSessionTitle } from "./session/session-title";
 import { createSessionCellRetention } from "./session/session-store";
 import { useChatSessionRecord } from "./session/session-store";
@@ -474,7 +472,7 @@ export function App() {
     setSelectedWorkspaceRoot(normalizeWorkspaceRoot(
       sessionRecord?.meta.worktree?.sourceWorkspaceRoot ?? sessionRecord?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
     ));
-  }, [fallbackWorkspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot]);
+  }, [fallbackWorkspaceRoot, selectedWorkspaceRoot, sessionRecord?.meta.workspaceRoot, sessionRecord?.meta.worktree?.sourceWorkspaceRoot]);
 
   useEffect(() => {
     const lockedWorktree = sessionRecord?.meta.worktree;
@@ -762,7 +760,7 @@ export function App() {
     }
     void bootstrapSession().catch(handleBootstrapError);
     return () => { disposed = true; if (timer) clearTimeout(timer); };
-  }, [listRetry, readSessionPage]);
+  }, [listRetry, readSessionPage, setActiveSessionId]);
 
   // 流式事件归并进 live run（规则在 live-run-store.ts）；steer 的正文取自任务队列缓存。
   const handleStreamEvent = useCallback((event: StreamEvent) => liveRuns.applyStreamEvent(event, (sessionId, messageId) => {
@@ -831,7 +829,7 @@ export function App() {
         });
       }
     });
-  }, [liveRuns, handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshReviewSummary, localStore, patchLocal, setLocalFlag, setCompactionFailureForSession]);
+  }, [liveRuns, handleStreamEvent, refreshPendingApprovalStatuses, setApprovalPendingForSession, setFailedForSession, readSessionPage, refreshReviewSummary, localStore, patchLocal, setLocalFlag, setCompactionFailureForSession, readSidebarSessions, refreshTaskQueue]);
 
   const createSessionForInput = useCallback(async (input: NewSessionInput = {}): Promise<SessionRecord | null> => {
     const selectionRequest = messageRequestRef.current;
@@ -860,7 +858,7 @@ export function App() {
       if (input.runLocation) throw error;
       return null;
     }
-  }, [fallbackWorkspaceRoot, refreshWorkspaces]);
+  }, [fallbackWorkspaceRoot, refreshWorkspaces, readSidebarSessions, sessionStore, setActiveSessionId]);
 
   /** 首次发送保留结果兼容接口；执行与后续队列均由 Host 调度。 */
   const continueQueue = useCallback(async (sessionId: string, _outcome: SessionRunOutcome) => { await refreshTaskQueue(sessionId); }, [refreshTaskQueue]);
@@ -924,7 +922,7 @@ export function App() {
   const startOptimisticRun = useCallback((sessionId: string, agentRunId: string, text: string, options: ComposerSendOptions) => {
     const state = createEmptyStreamingState();
     state.waitingForModel = true;
-    const run: import("./session/session-run-state").SessionRunState = { sessionId, agentRunId, state, aborting: false,
+    const run: SessionRunState = { sessionId, agentRunId, state, aborting: false,
       userBlock: { kind: "user", id: `turn:${agentRunId}:user:0`, runId: agentRunId, content: text, createdAt: new Date().toISOString(),
         attachments: options.attachments, fileReferences: options.fileReferences, responseAnnotations: options.responseAnnotations } };
     liveRuns.start(run);
@@ -982,8 +980,8 @@ export function App() {
       return new Error(message);
     };
     const expectedThroughSeq = sessionStore.peek(sessionId)?.snapshot?.throughJournalSeq;
-    if (expectedThroughSeq === undefined) throw refuse(REWIND_ERROR_MESSAGES.REWIND_CONFLICT!);
-    if (liveRuns.has(sessionId) || sendsInFlightRef.current.get(sessionId)) throw refuse(REWIND_ERROR_MESSAGES.SESSION_BUSY!);
+    if (expectedThroughSeq === undefined) throw refuse(REWIND_ERROR_MESSAGES.REWIND_CONFLICT);
+    if (liveRuns.has(sessionId) || sendsInFlightRef.current.get(sessionId)) throw refuse(REWIND_ERROR_MESSAGES.SESSION_BUSY);
     patchLocal(sessionId, { lastSendOptions: options, rewinding: { fromSeq } });
     setFailedForSession(sessionId, false);
     setCompactionFailureForSession(sessionId, null);
@@ -1173,7 +1171,7 @@ export function App() {
         restored?.meta.worktree?.sourceWorkspaceRoot ?? restored?.meta.workspaceRoot ?? fallbackWorkspaceRoot,
       ));
     },
-    [fallbackWorkspaceRoot, refreshPendingApprovalStatuses, readSessionPage],
+    [fallbackWorkspaceRoot, refreshPendingApprovalStatuses, readSessionPage, setActiveSessionId],
   );
 
   useEffect(() => {
@@ -1414,6 +1412,9 @@ export function App() {
     refreshWorkspaces,
     setApprovalPendingForSession,
     setFailedForSession,
+    readSidebarSessions,
+    sessionStore,
+    setActiveSessionId,
   ]);
 
   const handleTogglePin = useCallback(
@@ -1426,7 +1427,7 @@ export function App() {
         console.error("Failed to toggle session pin", error);
       }
     },
-    [],
+    [readSidebarSessions],
   );
 
   const handleRenameSession = useCallback(
@@ -1447,7 +1448,7 @@ export function App() {
         console.error("Failed to rename session", error);
       }
     },
-    [],
+    [readSidebarSessions],
   );
 
   const handleArchiveSession = useCallback(
@@ -1550,7 +1551,7 @@ export function App() {
     if (normalizeWorkspaceRoot(selectedWorkspaceRoot) === normalizeWorkspaceRoot(workspaceRoot)) {
       setSelectedWorkspaceRoot(firstVisibleWorkspaceRoot(refreshed, sessions));
     }
-  }, [activeSessionId, handleCreateSession, readSessionPage, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry, evictSession]);
+  }, [activeSessionId, handleCreateSession, readSessionPage, refreshWorkspaces, selectedWorkspaceRoot, sessions, workspaceRegistry, evictSession, setActiveSessionId]);
 
   const handleArchivedSessionsChange = useCallback(async () => {
     try {
@@ -1559,7 +1560,7 @@ export function App() {
     } catch (error) {
       console.error("Failed to refresh sessions after archived chats changed", error);
     }
-  }, []);
+  }, [readSidebarSessions]);
 
   const handleRestoreSession = useCallback(async (sessionId: string) => {
     try {

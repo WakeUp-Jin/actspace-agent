@@ -3,6 +3,8 @@
 // 另有少量 CSS 块规则（CSS_BLOCK_RULES），守住个别选择器里的禁用值和必要行为。
 // 颜色契约（tokens、强调色、黑白与任意值颜色）由 check-frontend-theme-colors.mjs 负责；这里只拦 Tailwind 调色板色名和旧的彩色焦点环。
 // 基础组件约束（16 S8）：原生 <button> 按文件不超过基线；createPortal 和 role="dialog" 只能写在 components/ui/。
+// 间距任意值（p-[7px] / gap-[3px] 等）按文件不超过 scripts/spacing-literal-baseline.json 的基线，desktop 与 web 各一组。
+// 图标约束（token 规范 §12）：JSX 里不写 strokeWidth（lucide 统一默认线宽，手绘 SVG 按文件登记）；lucide 导入不用别名和同义图标（LUCIDE_ICON_RENAMES）。
 // 扫描根是一个列表（SCAN_PROFILES）：desktop = apps/desktop/src/renderer，web = apps/web/src（目录不存在时静默跳过）。
 // 每个根读自己的 token 定义；web 的原生 <button>、createPortal、role="dialog" 只允许在 apps/web/src/ui/，其余基线为 0，没有字面量例外。
 // 规范见 docs/design-docs/frontend/front-视觉token规范.md 和 front-web-pwa客户端规范.md §1。
@@ -13,6 +15,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const rendererRoot = path.join(repoRoot, "apps/desktop/src/renderer");
 export const NATIVE_BUTTON_BASELINE_PATH = path.join(repoRoot, "scripts/native-button-baseline.json");
+export const SPACING_LITERAL_BASELINE_PATH = path.join(repoRoot, "scripts/spacing-literal-baseline.json");
 const UI_PRIMITIVES_DIR = "components/ui/";
 
 // 精确到「文件 + 匹配串」的例外；每条都要能说清为什么不用 token。
@@ -22,6 +25,36 @@ export const LITERAL_ALLOWLIST = new Map([
   ["components/review/ReviewDiffCanvas.tsx", ["rounded-[2px]"]],
   ["components/ContextPopup.tsx", ["rounded-[3px]"]],
   ["components/workspace/workspaceOpenTool.tsx", ["rounded-[3px]"]],
+  // 手绘 SVG 的线宽：轨迹 kind 图标对标 DSH 的 16px viewBox / 1px 线；文件类型和品牌 glyph 有自己的几何；环形图不是图标。
+  ["components/trajectory/kind-icons.tsx", ["strokeWidth={strokeWidth}", "strokeWidth={1}", "strokeWidth={1.4}", 'strokeWidth="1.8"', "strokeWidth={2}"]],
+  ["components/files/FileTypeIcon.tsx", ['strokeWidth="2.38"', 'strokeWidth="1.2"', 'strokeWidth="1.35"']],
+  ["components/settings/ProviderLogo.tsx", ['strokeWidth="1.8"']],
+  ["components/stats/stats-ui.tsx", ['strokeWidth="15"', "strokeWidth={highlighted === index ? 18 : 15}"]],
+]);
+
+// lucide 图标：别名 → 规范名（别名只是 re-export，渲染出的 class 仍是规范名），以及同义图标 → 本仓库首选。见 token 规范 §12。
+export const LUCIDE_ICON_RENAMES = new Map([
+  ["AlertCircle", "CircleExclamationPoint"],
+  ["CircleAlert", "CircleExclamationPoint"],
+  ["AlertTriangle", "TriangleExclamationPoint"],
+  ["TriangleAlert", "TriangleExclamationPoint"],
+  ["ShieldAlert", "ShieldExclamationPoint"],
+  ["CheckCircle2", "CircleCheck"],
+  ["CircleHelp", "CircleQuestionMark"],
+  ["Loader2", "LoaderCircle"],
+  ["MoreHorizontal", "Ellipsis"],
+  ["Trash2", "Trash"],
+  ["Code2", "CodeXml"],
+  ["FileCode2", "FileCodeCorner"],
+  ["BarChart3", "ChartColumn"],
+  ["AlignLeft", "TextAlignStart"],
+  ["WrapText", "TextWrap"],
+  ["ArchiveRestore", "ArchiveArrowUp"],
+  // 同义图标
+  ["Terminal", "SquareTerminal"],
+  ["TerminalSquare", "SquareTerminal"],
+  ["SquareArrowOutUpRight", "ExternalLink"],
+  ["RotateCw", "RefreshCw"],
 ]);
 
 export const RULES = [
@@ -45,6 +78,11 @@ export const RULES = [
     id: "focus-ring-legacy",
     pattern: /focus(?:-visible|-within)?:(?:border|ring|outline)-(?:blue|green|sky|emerald)-/g,
     hint: "焦点环用 ring-focus-ring / outline-focus-ring，不用彩色焦点环",
+  },
+  {
+    id: "icon-stroke-width-literal",
+    pattern: /(?<![\w-])strokeWidth=(?:\{[^}]*\}|"[^"]*"|'[^']*')/g,
+    hint: "lucide 图标不传 strokeWidth，统一用默认线宽；手绘 SVG 的线宽按文件登记在 LITERAL_ALLOWLIST",
   },
 ];
 
@@ -161,6 +199,22 @@ export function checkUiOnly(relative, source, profile = DESKTOP_PROFILE) {
   return violations;
 }
 
+/** `import { … } from "lucide-react"` 里是否用了别名或同义图标；返回 { rule, match, line, hint }[]。 */
+export function checkLucideImports(relative, source, renames = LUCIDE_ICON_RENAMES) {
+  if (!/\.tsx?$/.test(relative)) return [];
+  const code = stripComments(source);
+  const violations = [];
+  for (const statement of code.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["']lucide-react["']/g)) {
+    for (const specifier of statement[1].split(",")) {
+      const imported = specifier.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim();
+      const replacement = renames.get(imported);
+      if (!replacement) continue;
+      violations.push({ rule: "lucide-icon-rename", match: imported, line: lineOf(code, statement.index), hint: `lucide 图标用 ${replacement}（见 token 规范 §12 的图标表）` });
+    }
+  }
+  return violations;
+}
+
 /** 文件里原生 `<button` 的个数（不含注释）；components/ui/ 不计数。 */
 export function countNativeButtons(relative, source, primitivesDir = UI_PRIMITIVES_DIR) {
   if (relative.startsWith(primitivesDir) || !relative.endsWith(".tsx")) return 0;
@@ -168,27 +222,57 @@ export function countNativeButtons(relative, source, primitivesDir = UI_PRIMITIV
 }
 
 /**
- * 原生按钮数量对照基线：超过基线（含基线里没有的新文件）是错误；低于基线只提示收紧。
- * 返回 { errors: string[], notices: string[] }。
+ * 按文件计数对照基线：超过基线（含基线里没有的新文件）是错误；低于基线只提示收紧。
+ * `label` 是被计数的东西（出现在报错里），`hint` 是超标时的建议。返回 { errors: string[], notices: string[] }。
  */
-export function checkNativeButtons(counts, baseline, primitivesDir = UI_PRIMITIVES_DIR) {
+export function checkCountBaseline(counts, baseline, { label, hint }) {
   const errors = [];
   const notices = [];
   for (const [relative, count] of [...counts].sort(([a], [b]) => a.localeCompare(b))) {
     const limit = baseline[relative] ?? 0;
     if (count > limit) {
-      errors.push(`${relative} 有 ${count} 个原生 <button>，基线是 ${limit} — 用 ${primitivesDir} 的 Button / IconButton；确实需要原生按钮时说明原因并更新基线`);
+      errors.push(`${relative} 有 ${count} 个${label}，基线是 ${limit} — ${hint}`);
     } else if (count < limit) {
-      notices.push(`${relative} 原生 <button> 从 ${limit} 降到 ${count}，可以收紧基线`);
+      notices.push(`${relative} ${label} 从 ${limit} 降到 ${count}，可以收紧基线`);
     }
   }
   for (const relative of Object.keys(baseline).sort()) {
-    if (!counts.has(relative) && baseline[relative] > 0) notices.push(`${relative} 已不存在或没有原生 <button>，可以从基线删除`);
+    if (!counts.has(relative) && baseline[relative] > 0) notices.push(`${relative} 已不存在或没有${label}，可以从基线删除`);
   }
   return { errors, notices };
 }
 
+/** 原生按钮数量对照基线。 */
+export function checkNativeButtons(counts, baseline, primitivesDir = UI_PRIMITIVES_DIR) {
+  return checkCountBaseline(counts, baseline, {
+    label: "原生 <button>",
+    hint: `用 ${primitivesDir} 的 Button / IconButton；确实需要原生按钮时说明原因并更新基线`,
+  });
+}
+
 export function loadNativeButtonBaseline(baselinePath = NATIVE_BUTTON_BASELINE_PATH) {
+  return JSON.parse(fs.readFileSync(baselinePath, "utf8"));
+}
+
+// 间距任意值：margin / padding / gap / space / inset 的 `-[Npx]`（含负值与 `-ml-[…]`）。宽高、max-w 等尺寸任意值不算，见 token 规范 §11。
+const SPACING_LITERAL_PATTERN = /(?<![\w-])-?(?:[mp][xytblrse]?|gap(?:-[xy])?|space-[xy]|inset(?:-[xy])?|top|left|right|bottom)-\[-?\d+(?:\.\d+)?px\]/g;
+
+/** 文件里间距任意值的个数（不含注释）。 */
+export function countSpacingLiterals(relative, source) {
+  if (!/\.tsx?$/.test(relative)) return 0;
+  return stripComments(source).match(SPACING_LITERAL_PATTERN)?.length ?? 0;
+}
+
+/** 间距任意值数量对照基线（token 规范 §6：存量只减不增）。 */
+export function checkSpacingLiterals(counts, baseline) {
+  return checkCountBaseline(counts, baseline, {
+    label: "间距任意值（p-[7px] / gap-[3px] 这类）",
+    hint: "间距用 Tailwind 刻度（4px 网格，p-0.5 = 2px 起步）；确实要对齐某个像素时说明原因并更新基线",
+  });
+}
+
+/** 基线文件按扫描根分组：{ desktop: { "components/A.tsx": 2 }, web: { … } }。 */
+export function loadSpacingLiteralBaseline(baselinePath = SPACING_LITERAL_BASELINE_PATH) {
   return JSON.parse(fs.readFileSync(baselinePath, "utf8"));
 }
 
@@ -283,7 +367,24 @@ export function collectNativeButtonCounts(root = rendererRoot, primitivesDir = U
   return counts;
 }
 
-export function runCheck(root, baseline = loadNativeButtonBaseline(), notices = [], profile = DESKTOP_PROFILE) {
+/** 各文件的间距任意值数（只列大于 0 的）。 */
+export function collectSpacingLiteralCounts(root = rendererRoot) {
+  const counts = new Map();
+  for (const file of collectFiles(root)) {
+    const relative = path.relative(root, file).split(path.sep).join("/");
+    const count = countSpacingLiterals(relative, fs.readFileSync(file, "utf8"));
+    if (count > 0) counts.set(relative, count);
+  }
+  return counts;
+}
+
+export function runCheck(
+  root,
+  baseline = loadNativeButtonBaseline(),
+  notices = [],
+  profile = DESKTOP_PROFILE,
+  spacingBaseline = loadSpacingLiteralBaseline()[profile.name] ?? {},
+) {
   root = root ?? path.join(repoRoot, profile.root);
   const styleDir = path.join(root, "styles");
   const styleNames = profile.styleFiles ?? fs.readdirSync(styleDir).filter((name) => name.endsWith(".css")).map((name) => `styles/${name}`);
@@ -307,25 +408,30 @@ export function runCheck(root, baseline = loadNativeButtonBaseline(), notices = 
     for (const v of checkSource(relative, source, profile)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
     for (const m of checkTokenReferences(relative, source, defined)) problems.push(`${relative}:${m.line} ${m.match} — 未定义的 token ${m.variable}`);
     for (const v of checkUiOnly(relative, source, profile)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
+    for (const v of checkLucideImports(relative, source)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
   }
   const buttons = checkNativeButtons(collectNativeButtonCounts(root, profile.primitivesDir), baseline, profile.primitivesDir);
   problems.push(...buttons.errors);
   notices.push(...buttons.notices);
+  const spacing = checkSpacingLiterals(collectSpacingLiteralCounts(root), spacingBaseline);
+  problems.push(...spacing.errors);
+  notices.push(...spacing.notices);
   return problems;
 }
 
 /**
  * 对仓库里存在的每个扫描根运行检查；根目录不存在则跳过。
  * 返回 { name, root, problems, notices }[]，problems / notices 已加上 `[name]` 前缀。web 的原生按钮基线固定为 0。
+ * spacingBaselines 按扫描根名分组（见 loadSpacingLiteralBaseline）。
  */
-export function runAllChecks(repo = repoRoot, desktopBaseline = loadNativeButtonBaseline()) {
+export function runAllChecks(repo = repoRoot, desktopBaseline = loadNativeButtonBaseline(), spacingBaselines = loadSpacingLiteralBaseline()) {
   const results = [];
   for (const profile of SCAN_PROFILES) {
     const root = path.join(repo, profile.root);
     if (!fs.existsSync(root)) continue;
     const notices = [];
     const baseline = profile.name === "desktop" ? desktopBaseline : {};
-    const problems = runCheck(root, baseline, notices, profile);
+    const problems = runCheck(root, baseline, notices, profile, spacingBaselines[profile.name] ?? {});
     results.push({
       name: profile.name,
       root: profile.root,
@@ -341,6 +447,19 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const counts = Object.fromEntries([...collectNativeButtonCounts()].sort(([a], [b]) => a.localeCompare(b)));
   fs.writeFileSync(NATIVE_BUTTON_BASELINE_PATH, `${JSON.stringify(counts, null, 2)}\n`);
   console.log(`已写入 ${path.relative(repoRoot, NATIVE_BUTTON_BASELINE_PATH)}：${Object.keys(counts).length} 个文件，${Object.values(counts).reduce((sum, n) => sum + n, 0)} 个原生 <button>`);
+} else if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv.includes("--update-spacing-baseline")) {
+  // 同上：只在数量下降，或新增像素对齐已说明原因时运行。
+  const baselines = {};
+  let total = 0;
+  for (const profile of SCAN_PROFILES) {
+    const root = path.join(repoRoot, profile.root);
+    if (!fs.existsSync(root)) continue;
+    const counts = Object.fromEntries([...collectSpacingLiteralCounts(root)].sort(([a], [b]) => a.localeCompare(b)));
+    baselines[profile.name] = counts;
+    total += Object.values(counts).reduce((sum, n) => sum + n, 0);
+  }
+  fs.writeFileSync(SPACING_LITERAL_BASELINE_PATH, `${JSON.stringify(baselines, null, 2)}\n`);
+  console.log(`已写入 ${path.relative(repoRoot, SPACING_LITERAL_BASELINE_PATH)}：${total} 个间距任意值`);
 } else if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const results = runAllChecks();
   const problems = results.flatMap((result) => result.problems);

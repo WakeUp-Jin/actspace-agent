@@ -33,7 +33,7 @@ function recordingSandbox(options: { readonly probe?: Awaited<ReturnType<Sandbox
     prepare: async (policy) => {
       if (options.prepareError) throw new Error(options.prepareError);
       policies.push(policy);
-      return { spawn: { command: policy.argv[0]!, args: policy.argv.slice(1), cwd: policy.cwd, env: policy.env }, dispose: async () => undefined };
+      return { spawn: { command: policy.argv[0], args: policy.argv.slice(1), cwd: policy.cwd, env: policy.env }, dispose: async () => undefined };
     },
   });
   return { sandbox, policies };
@@ -244,7 +244,7 @@ describe("shell-tools ports", () => {
     const background = await invoke(ports.bash, { command: "printf 'READY token-abcdefgh\\n'; sleep 30", intent: "verify notifications", blockMs: 0, notifyOnOutput: { pattern: "READY", reason: "service ready", debounceMs: 5_000 } });
     expect(JSON.stringify(background)).toContain("bash_");
     await waitFor(() => lastHost.matches.length > 0);
-    expect(lastHost.matches[0]!.summary).toContain("service ready");
+    expect(lastHost.matches[0].summary).toContain("service ready");
     expect(JSON.stringify(lastHost.matches)).toContain("[REDACTED]");
     expect(JSON.stringify(lastHost.matches)).not.toContain("token-abcdefgh");
     await ports.dispose?.();
@@ -313,7 +313,7 @@ describe("shell-tools ports", () => {
     const [scratch] = await readdir(join(tmpRoot, "bash-v2"));
     await ports.dispose();
     expect(await readFile(logPath, "utf8")).toBe("ready");
-    expect(existsSync(join(tmpRoot, "bash-v2", scratch!))).toBe(false);
+    expect(existsSync(join(tmpRoot, "bash-v2", scratch))).toBe(false);
   });
 
   it("allows five running background tasks per Session", async () => {

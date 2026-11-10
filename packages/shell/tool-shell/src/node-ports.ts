@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { sessionScratchDirectory } from "./scratch.js";
 export { sessionScratchDirectory } from "./scratch.js";
 import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
+import { toolChildEnv } from "@actspace/shared";
 import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { spawnHostProcess } from "@actspace/sandbox/node-ports";
 import type { HostProcessSpec, SandboxExecution, SandboxRequest, SandboxResult, SandboxService } from "@actspace/sandbox/types";
@@ -116,7 +117,7 @@ async function executeBash(
     if (context.signal.aborted) return failed("TOOL_ABORTED", "Bash was cancelled before process creation.", true);
     const argv = [process.platform === "darwin" ? "/bin/zsh" : "/bin/bash", "-lc", command];
     const run = !options.sandbox
-      ? directRun({ command: argv[0]!, args: argv.slice(1), cwd: realCwd, env })
+      ? directRun({ command: argv[0], args: argv.slice(1), cwd: realCwd, env })
       : options.sandbox.run(noSandbox
         ? { purpose: "tool", isolation: "none", argv, cwd: realCwd, env, scratchDir: scratchRoot }
         : await sandboxedRequest(argv, realCwd, workspaceRoot, scratchRoot, env));
@@ -252,9 +253,12 @@ async function sandboxedRequest(argv: readonly string[], cwd: string, workspaceR
   return { purpose: "tool", isolation: "sandboxed", argv, cwd, env: { ...env, TMPDIR: scratch }, scratchDir: scratch, filesystem: { readWrite: [await realpath(workspaceRoot), scratch, await realpath(tmpdir())] } };
 }
 
-/** The Session's scratch directory for scripts, plus the bundled Python when the app ships one. */
+/**
+ * The tool child environment (credentials stripped) plus the Session's scratch directory for scripts, plus the
+ * bundled Python when the app ships one.
+ */
 export function commandEnvironment(sessionScratch: string, python: BashPythonRuntime | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...base, ACTSPACE_SCRATCH: sessionScratch };
+  const env: NodeJS.ProcessEnv = { ...toolChildEnv(base), ACTSPACE_SCRATCH: sessionScratch };
   if (python === undefined) return env;
   // Windows spells the variable `Path`; keep whichever key the parent has so the shell sees one PATH.
   const pathKey = Object.keys(env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
@@ -415,9 +419,9 @@ export async function readLog(path: string, since?: number): Promise<{ readonly 
     return { text: `[Earlier output omitted; read the output file for the full log]\n${redactToolText(bytes.subarray(-OUTPUT_PREVIEW_BYTES).toString("utf8").replace(/^[^\n]*\n/, ""))}`, logSize, nextOffset: logSize };
   }
   let start = Math.min(since, logSize);
-  while (start < logSize && isContinuationByte(bytes[start]!)) start += 1;
+  while (start < logSize && isContinuationByte(bytes[start])) start += 1;
   let end = Math.min(start + OUTPUT_PREVIEW_BYTES, logSize);
-  if (end < logSize) while (end > start && isContinuationByte(bytes[end]!)) end -= 1;
+  if (end < logSize) while (end > start && isContinuationByte(bytes[end])) end -= 1;
   return { text: redactToolText(bytes.subarray(start, end).toString("utf8")), logSize, nextOffset: end };
 }
 

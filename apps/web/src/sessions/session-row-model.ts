@@ -25,7 +25,7 @@ export function formatRowTime(iso: string, now: Date = new Date()): string {
   if (Number.isNaN(date.getTime())) return "";
   const days = Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000);
   if (days <= 0) return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  if (days < 7) return WEEKDAYS[date.getDay()]!;
+  if (days < 7) return WEEKDAYS[date.getDay()];
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 

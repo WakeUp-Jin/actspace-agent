@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Archive, ArchiveRestore, GitFork, MoreHorizontal, Pin, PinOff } from "lucide-react";
+import { Archive, ArchiveArrowUp, GitFork, Ellipsis, Pin, PinOff } from "lucide-react";
 import type { SessionListItem } from "@actspace/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
 import { IconButton } from "../ui/IconButton";
@@ -290,7 +290,7 @@ export function SessionRow({
                   {session.hostName ? <span className="shrink-0 text-act-xxs text-text-faint" title={session.connectionState}>{session.hostName}{session.connectionState !== "connected" ? " · 离线" : ""}</span> : null}
                   {session.sideChatCount ? (
                     <span className="inline-flex shrink-0 items-center gap-0.5 text-act-xxs tabular-nums text-text-faint" aria-label={`${session.sideChatCount} 个侧边对话`} title={`${session.sideChatCount} 个侧边对话`}>
-                      <GitFork size={11} strokeWidth={2} aria-hidden="true" />
+                      <GitFork size={11} aria-hidden="true" />
                       {session.sideChatCount}
                     </span>
                   ) : null}
@@ -311,7 +311,7 @@ export function SessionRow({
                       openContextMenuAt(rowRef.current, event.currentTarget);
                     }}
                   >
-                    <MoreHorizontal size={14} strokeWidth={1.9} aria-hidden="true" />
+                    <Ellipsis size={14} aria-hidden="true" />
                   </IconButton>
                   {archived ? (
                     <IconButton
@@ -321,7 +321,7 @@ export function SessionRow({
                       disabled={!onRestore}
                       onClick={(event) => { event.stopPropagation(); onRestore?.(); }}
                     >
-                      <ArchiveRestore size={13} strokeWidth={1.9} aria-hidden="true" />
+                      <ArchiveArrowUp size={13} aria-hidden="true" />
                     </IconButton>
                   ) : (
                     <IconButton
@@ -331,7 +331,7 @@ export function SessionRow({
                       disabled={archiveDisabled}
                       onClick={(event) => { event.stopPropagation(); if (!archiveDisabled) onArchive?.(); }}
                     >
-                      <Archive size={13} strokeWidth={1.9} aria-hidden="true" />
+                      <Archive size={13} aria-hidden="true" />
                     </IconButton>
                   )}
                   {onTogglePin && !archived ? (
@@ -342,8 +342,8 @@ export function SessionRow({
                       onClick={(event) => { event.stopPropagation(); onTogglePin(); }}
                     >
                       {session.pinned
-                        ? <PinOff size={13} strokeWidth={1.9} aria-hidden="true" />
-                        : <Pin size={13} strokeWidth={1.9} aria-hidden="true" />}
+                        ? <PinOff size={13} aria-hidden="true" />
+                        : <Pin size={13} aria-hidden="true" />}
                     </IconButton>
                   ) : null}
                 </div>

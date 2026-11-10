@@ -3,7 +3,7 @@
  * 下载入口。下载在 main 进程里进行，这里每 1.5 秒拉一次状态直到结束；离线机器按提示手动放 wheel。
  */
 import { useCallback, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import type { PythonRuntimeStatus } from "@actspace/shared";
 import { Button } from "../ui/Button";
 import { pythonRuntimeApi } from "../../api/python-runtime";
@@ -80,7 +80,7 @@ export function PythonRuntimePanel() {
               {extension.state === "ready" ? <span className="whitespace-nowrap rounded-full bg-success-soft px-2 py-px text-act-xxs text-on-success">已安装</span>
                 : extension.state === "installing" ? (
                   <span role="status" className="flex items-center gap-1.5 whitespace-nowrap text-act-xs text-text-muted">
-                    <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                    <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
                     下载中{extension.progress ? ` ${extension.progress.completed}/${extension.progress.total}` : ""}
                   </span>
                 ) : (

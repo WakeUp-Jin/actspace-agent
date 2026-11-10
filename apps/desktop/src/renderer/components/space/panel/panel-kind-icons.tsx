@@ -17,5 +17,5 @@ const ICONS: Record<PanelKind, LucideIcon> = {
 
 export function PanelKindIcon({ kind, size = 15 }: { kind: PanelKind; size?: number }) {
   const Icon = ICONS[kind];
-  return <Icon size={size} strokeWidth={1.8} aria-hidden="true" />;
+  return <Icon size={size} aria-hidden="true" />;
 }

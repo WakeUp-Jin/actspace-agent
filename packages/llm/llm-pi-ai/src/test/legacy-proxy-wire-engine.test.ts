@@ -3,7 +3,7 @@ import type { LlmAdapterDispatchInput } from "@actspace/llm-service";
 import type { LlmStreamEvent } from "@actspace/llm-service";
 import { LegacyProxyWireEngine, type LegacyProxySdkLoader } from "../legacy-proxy-wire-engine.js";
 import { ProviderProxyError, ProviderProxyPool } from "@actspace/llm-service";
-import type { PiAiWireRoute } from "../pi-ai-wire-engine.js";
+import type { PiAiWireRoute } from "../pi-ai-stream.js";
 
 const routes: readonly PiAiWireRoute[] = ["openai-completions", "openai-responses", "anthropic-messages"];
 
@@ -181,8 +181,8 @@ describe("LegacyProxyWireEngine", () => {
     const original = input("anthropic-messages");
     for await (const _event of await engine.stream({ ...original, credential: { ...auth, proxyUrl: "http://proxy.example:8080" } })) { /* drain */ }
     expect(seen).toHaveLength(1);
-    expect(seen[0]!.get(present)).toBe(value);
-    expect(seen[0]!.has(absent)).toBe(false);
+    expect(seen[0].get(present)).toBe(value);
+    expect(seen[0].has(absent)).toBe(false);
     await pool.dispose();
   });
 

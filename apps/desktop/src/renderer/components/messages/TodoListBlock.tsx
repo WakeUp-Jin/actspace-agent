@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Circle, Loader2 } from "lucide-react";
+import { CircleExclamationPoint, CircleCheck, ChevronDown, ChevronRight, Circle, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { MessageBlock, TodoItem } from "@actspace/shared";
 
@@ -51,7 +51,7 @@ export function TodoListBlock({
         )}
         <span className="min-w-0 flex-1 truncate text-act-md leading-5 text-text-muted">{summaryText}</span>
         {message.status === "failed" ? (
-          <AlertCircle className="shrink-0 text-danger" size={15} aria-label="Todo update failed" />
+          <CircleExclamationPoint className="shrink-0 text-danger" size={15} aria-label="Todo update failed" />
         ) : null}
       </button>
       {expanded && message.todos.length > 0 ? (
@@ -66,7 +66,7 @@ export function TodoListBlock({
 function TodoRow({ todo }: { todo: TodoItem }) {
   const completed = todo.status === "completed";
   const inProgress = todo.status === "in_progress";
-  const Icon = completed ? CheckCircle2 : inProgress ? Loader2 : Circle;
+  const Icon = completed ? CircleCheck : inProgress ? LoaderCircle : Circle;
   const iconClass = completed
     ? "text-text-faint"
     : inProgress ? "text-operational" : "text-text-faint";
@@ -83,7 +83,6 @@ function TodoRow({ todo }: { todo: TodoItem }) {
       <Icon
         className={`mt-0.5 shrink-0 ${iconClass}${inProgress ? " animate-spin motion-reduce:animate-none" : ""}`}
         size={15}
-        strokeWidth={1.9}
         aria-hidden="true"
       />
       <div className="min-w-0">

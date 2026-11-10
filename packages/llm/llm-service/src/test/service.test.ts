@@ -142,24 +142,11 @@ describe("LlmService", () => {
     const preparing = service.prepareAsync({ routeId: "async", model: "model", messages: [] });
     old.beginDrain();
     await Promise.resolve();
-    resolvePreparation!({ request: { requestId: "prepared", routeId: "async", model: "model", messages: [], tools: [], options: {}, credentialRef: "credential" }, dispatch: async () => completedStream() });
+    resolvePreparation({ request: { requestId: "prepared", routeId: "async", model: "model", messages: [], tools: [], options: {}, credentialRef: "credential" }, dispatch: async () => completedStream() });
     const prepared = await preparing;
     expect(prepared.registration.registrationId).toBe(old.registration.registrationId);
     prepared.release();
     await old.dispose(100);
-  });
-
-  it("keeps legacy transport behind the same ActSpace adapter seam", async () => {
-    const calls: string[] = [];
-    const { LegacyTransportAdapter } = await import("../legacy-transport-adapter.js");
-    const legacy = new LegacyTransportAdapter({ send: async ({ request }) => { calls.push(`legacy:${request.routeId}`); return completedStream(); } });
-    const routeRegistry = new LlmRouteRegistry();
-    const legacyRoute = routeRegistry.register({ routeId: "proxied", providerId: "provider", modelPattern: "*", adapter: legacy, credentialRef: "credential", defaults: {} });
-    const service = new LlmService(routeRegistry, credentials);
-    const legacyStream = await service.prepare({ routeId: "proxied", model: "model", messages: [] }).dispatch();
-    await legacyStream.abort();
-    expect(calls).toEqual(["legacy:proxied"]);
-    await legacyRoute.dispose(100);
   });
 
   it("disposes an adapter only after captured leases drain", async () => {

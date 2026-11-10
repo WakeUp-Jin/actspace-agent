@@ -31,7 +31,7 @@ export function preparedAttachments(prepared: unknown): ComposerAttachment[] {
       return [{ id: artifactId, artifactId, kind: mimeType?.startsWith("image/") ? "image" : "file", name: typeof block.label === "string" ? block.label : artifactId, ...(mimeType ? { mimeType } : {}) }];
     }
     const match = block.type === "text" && typeof block.text === "string" ? ATTACHED_FILE.exec(block.text) : null;
-    return match ? [{ id: match[2]!, artifactId: match[2]!, kind: "file", name: match[1]! }] : [];
+    return match ? [{ id: match[2], artifactId: match[2], kind: "file", name: match[1] }] : [];
   });
 }
 

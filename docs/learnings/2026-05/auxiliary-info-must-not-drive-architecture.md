@@ -104,6 +104,6 @@ v1.0 时给每个工具加了 JSON Schema 展开按钮，理由是"未来工具�
 
 ## 相关
 
-- 本次推导过程：`docs/histories/2026-05/20260528-2018-kairos-context-sheet-v1-3-chapter-flow.md`
-- 当前实现规范：`docs/archive/v1/design-docs/front-Kairos监控页规范.md`（v1.3）
+- 本次推导过程：`docs/histories/2026-05/20260528-2018-kairos-context-sheet-v1-3-and-v1-4.md`
+- 当时的实现规范：v1 的 Kairos 监控页规范（历史：Kairos 已随 v1 从产品入口和 Runtime 删除，规范文件已移除，需要时查 git 历史）
 - 类似职责分层模式：`docs/learnings/2026-05/color-as-identity-badge-not-container.md`（色彩作为身份徽章而非容器底色——同一套"附加属性 vs 主体"的取舍逻辑，只不过那次是色彩职责的错位）

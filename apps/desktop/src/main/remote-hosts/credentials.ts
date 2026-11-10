@@ -6,8 +6,8 @@ import { randomUUID } from "node:crypto";
 export class HostCredentials {
   #tail: Promise<unknown> = Promise.resolve();
   constructor(private readonly path: string) {}
-  #available() {
-    if (!safeStorage.isEncryptionAvailable() || (process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text")) throw new Error("System credential encryption is unavailable");
+  async #available() {
+    if (!(await safeStorage.isAsyncEncryptionAvailable()) || (process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text")) throw new Error("System credential encryption is unavailable");
   }
   async #read(): Promise<Record<string, string>> {
     try {
@@ -17,14 +17,18 @@ export class HostCredentials {
     } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return {}; throw error; }
   }
   async get(hostId: string): Promise<string | undefined> {
-    this.#available(); await this.#tail; const value = (await this.#read())[hostId];
-    return value === undefined ? undefined : safeStorage.decryptString(Buffer.from(value, "base64"));
+    await this.#available(); await this.#tail; const value = (await this.#read())[hostId];
+    if (value === undefined) return undefined;
+    const decrypted = await safeStorage.decryptStringAsync(Buffer.from(value, "base64"));
+    // The OS key was rotated: persist the token under the new key so later reads do not depend on the old one.
+    if (decrypted.shouldReEncrypt) await this.set(hostId, decrypted.result).catch(() => undefined);
+    return decrypted.result;
   }
   set(hostId: string, token: string | undefined): Promise<void> {
-    this.#available();
     const next = this.#tail.then(async () => {
+      await this.#available();
       const values = await this.#read();
-      if (token === undefined) delete values[hostId]; else Object.defineProperty(values, hostId, { value: safeStorage.encryptString(token).toString("base64"), enumerable: true, configurable: true });
+      if (token === undefined) delete values[hostId]; else Object.defineProperty(values, hostId, { value: (await safeStorage.encryptStringAsync(token)).toString("base64"), enumerable: true, configurable: true });
       await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
       const temporary = `${this.path}.${randomUUID()}.tmp`;
       try {

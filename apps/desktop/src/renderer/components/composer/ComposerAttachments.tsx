@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent } from "react";
 import { BookOpen, FileText, X } from "lucide-react";
 import type { ComposerAttachment } from "@actspace/shared";
 import { dialogsApi } from "../../api/dialogs";
@@ -101,13 +101,13 @@ export function useComposerAttachments({
   const [attachments, setAttachmentState] = useState<ComposerAttachment[]>(() => draftKey && readAttachmentDraft ? readAttachmentDraft(draftKey) : [...(initial ?? [])]);
   const attachmentsRef = useRef(attachments);
   // 附件改动同时写回当前 draftKey 的草稿（16 T14）。ref 同步更新，连续两次改动不会基于旧值。
-  const setAttachments = (update: ComposerAttachment[] | ((current: ComposerAttachment[]) => ComposerAttachment[])) => {
+  const setAttachments = useCallback((update: ComposerAttachment[] | ((current: ComposerAttachment[]) => ComposerAttachment[])) => {
     const next = typeof update === "function" ? update(attachmentsRef.current) : update;
     if (next === attachmentsRef.current) return;
     attachmentsRef.current = next;
     setAttachmentState(next);
     if (draftKey) writeAttachmentDraft?.(draftKey, next);
-  };
+  }, [draftKey, writeAttachmentDraft]);
   const persistsAttachmentsRef = useRef(false);
   persistsAttachmentsRef.current = Boolean(draftKey && writeAttachmentDraft);
   const [error, setError] = useState<string | null>(null);
@@ -301,7 +301,7 @@ export function ComposerAttachments({ attachments, selectedSkills, issueAttachme
                       onRemove(attachment.id);
                     }}
                   >
-                    <X size={11} strokeWidth={2.6} aria-hidden="true" />
+                    <X size={11} aria-hidden="true" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>移除 {attachment.name}</TooltipContent>
@@ -312,7 +312,7 @@ export function ComposerAttachments({ attachments, selectedSkills, issueAttachme
 
         return (
           <div className={FILE_ATTACHMENT_CLASS} aria-label={`已附加的文件 ${attachment.name}`} aria-describedby={issueAttachmentId === attachment.id ? "composer-send-error" : undefined} key={attachment.id}>
-            <FileText size={17} strokeWidth={1.9} aria-hidden="true" />
+            <FileText size={17} aria-hidden="true" />
             <span className={FILE_ATTACHMENT_NAME_CLASS}>{attachment.name}</span>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -326,7 +326,7 @@ export function ComposerAttachments({ attachments, selectedSkills, issueAttachme
                     onRemove(attachment.id);
                   }}
                 >
-                  <X size={13} strokeWidth={2.4} aria-hidden="true" />
+                  <X size={13} aria-hidden="true" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>移除 {attachment.name}</TooltipContent>
@@ -336,7 +336,7 @@ export function ComposerAttachments({ attachments, selectedSkills, issueAttachme
       })}
       {selectedSkills.map((skill) => (
         <div className={SKILL_PILL_CLASS} aria-label={`已选择的 Skill ${skill}`} key={skill}>
-          <BookOpen size={16} strokeWidth={1.9} aria-hidden="true" />
+          <BookOpen size={16} aria-hidden="true" />
           <span className="truncate">{skill}</span>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -351,7 +351,7 @@ export function ComposerAttachments({ attachments, selectedSkills, issueAttachme
                   onRemoveSkill(skill);
                 }}
               >
-                <X size={13} strokeWidth={2.4} aria-hidden="true" />
+                <X size={13} aria-hidden="true" />
               </button>
             </TooltipTrigger>
             <TooltipContent>移除 Skill {skill}</TooltipContent>

@@ -16,7 +16,7 @@ function FileRow({ file, onOpen }: { file: LibraryFile; onOpen: () => void }) {
   const Icon = file.kind === "artifact" ? FileText : BookOpen;
   return (
     <button type="button" className={ROW_CLASS} onClick={onOpen}>
-      <Icon size={14} strokeWidth={1.8} className="text-text-faint" aria-hidden="true" />
+      <Icon size={14} className="text-text-faint" aria-hidden="true" />
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-act-sm text-text-main">
         {file.name}
         {file.src ? <small className="block text-act-xxs font-normal text-text-faint">来自 {file.src}</small> : null}
@@ -53,7 +53,7 @@ export function LibraryList() {
           {added.map((f) => <FileRow key={f.id} file={f} onOpen={preview} />)}
         </>
       ) : null}
-      {library.length ? null : <PanelEmpty icon={<Library size={22} strokeWidth={1.6} />}>库还是空的。</PanelEmpty>}
+      {library.length ? null : <PanelEmpty icon={<Library size={22} />}>库还是空的。</PanelEmpty>}
       <div className="mx-1 mt-3.5 rounded-act-md border border-dashed border-line px-3 py-2.5 text-act-xs leading-[1.6] text-text-faint">
         库就是 <code className="font-mono text-text-muted [overflow-wrap:anywhere]">spaces/&lt;id&gt;/library/</code> 这个真实目录。Actor 的产出写进{" "}
         <code className="font-mono text-text-muted">artifacts/</code>，代码本身不会复制进来。

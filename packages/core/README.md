@@ -24,18 +24,20 @@ core 是 Agent 的主干。`agent`、`scope`、`agent-loop` 定义 Agent 是什�
 
 连接关系来自各插件 manifest（`pnpm gen:contract-matrix` 生成的[矩阵](../../docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md)可对照）。
 
-- **全局，启动时加载：** `actspace-runtime`（inject `actspace.host`）；`session-runtime`（provides `session.runtime`，inject `session.journal`、`session.store`、`session.projection`）；`core-agent`（`agent` 包，provides `agent.registry`）；`agent-runtime`（provides `agent.runtime`、`agent.service`、`harness.control`、`harness.hmr`、`harness.plugin-manager`；inject `agent.registry`、`session.runtime`、`session.checkpoint` 和一批 `actspace.host.*` 端口）。
-- **会话，每个 Harness 一份：** `tools-runtime`（provides `tools.runtime`，inject `tools.approval`）；所有 `tool-*` 工具插件都 inject `tools.runtime`；`agent-factory`（provides `agent.run-factory`）inject `agent.registry`、`session.runtime`、`session.checkpoint`、`llm.service`、`tools.runtime`、`prompt.runtime`、`context.engine`、`context.source.system`、`context.source.conversation`。
-- `agent-factory` 用 `agent-loop` 的 `AgentLoop` 建循环，并按 `context.source.*` 搭起 Context 来源；`agent-runtime` 为每个会话挂载 Harness、租用组合并运行。
+- **全局，启动时加载：** `actspace-runtime`（inject `actspace.host`）；`session-runtime`（provides `session.runtime`，inject `session.journal`、`session.store`、`session.projection`）；`core-agent`（`agent` 包，provides `agent.registry`）；`agent-runtime`（provides `agent.runtime`、`agent.service`、`harness.control`、`harness.hmr`、`harness.plugin-manager`；inject `agent.registry`、`session.runtime`、`session.checkpoint` 和一批 `actspace.host.*` 端口；Harness 树可见的共享服务列表是 `harness/default-harness.ts` 的 `DEFAULT_HARNESS_SHARED_SERVICES`，其中 `OPTIONAL_HOST_SHARED_SERVICES`——浏览器端口和文件 / 进程能力授予——Host 可以不给）。
+- **会话，每个 Harness 一份：** `tools-runtime`（provides `tools.runtime`，inject `tools.approval`）；所有 `tool-*` 工具插件都 inject `tools.runtime`；`agent-factory`（provides `agent.run-factory`）inject `agent.registry`、`session.runtime`、`session.checkpoint`、`llm.service`、`tools.runtime`、`prompt.runtime`、`context.engine`、`context.assembly`。
+- `agent-factory` 用 `agent-loop` 的 `AgentLoop` 建循环，Context 来源和工具结果观察者由 `context.assembly` 按 Agent 角色搭好交给它，它不认识任何来源种类；`agent-runtime` 为每个会话挂载 Harness、租用组合并运行。
+- 主 Agent 形态 `actspace.main` 的成员由 `runtime/src/main-agent-form.ts` 从 `PLUGIN_CATALOG` 推导（Harness 加载且 manifest 声明了 `contributions.tools` 的条目），`agent` 包只提供 `defineMainAgentForm` / `activateAgentFormTools` 契约；Host 在 `startup/boot.ts` 经 `actspace.host.agent.agentForm` 交给 `agent-factory`。工具在哪些模式可见由各自 `ToolDefinition.modes` 声明，`agent` 包的 `allowedAgentModeTools` 只按定义过滤，不列工具名。
 - `agent-service` 不导入默认循环和 runtime，只依赖结构化的 `RunFactory` 和 `RunLease`。
 
 ## 入口与测试
 
 - `runtime/src/plugin-catalog.ts`：唯一插件清单；`runtime/src/manifests.ts`：runtime 自带四个插件的 manifest；`runtime/cordis.yml`：由清单生成，勿手改。
-- `runtime/src/startup/`、`session/`、`harness/`、`profiles/`、`projection/`：分别是启动退出、会话接线、执行组合与默认 Harness、默认声明、Host 读模型。`runtime/scripts/build-default-harness.mjs` 把清单里的会话插件打成固定 ESM。
+- `runtime/src/startup/`、`session/`、`harness/`、`profiles/`、`projection/`：分别是启动退出、会话接线、执行组合与默认 Harness、默认声明、Host 读模型。`runtime/scripts/build-default-harness.mjs` 把清单里的会话插件打成固定 ESM：内核条目一份代码分割闭包（发布为 `actspace.default-harness`），每个贡献工具的插件（`isHarnessToolPlugin`）单独一份 `plugins/<entry>/plugin.js`，按自己的 pluginId 发布，可被 Harness 补丁单独替换。
 - 测试在各包 `src/test/` 或 `src/**/*.test.ts`：`pnpm --filter @actspace/runtime test`，其他包同理。`agent-service` 另见[包 README](agent-service/README.md)。
 
 ## 怎么扩展
 
 - 新增一个插件：见[总地图](../README.md)“新增一个插件”，登记到 `runtime/src/plugin-catalog.ts`。
+- 新增一个工具：在 `ToolDefinition` 里声明 `modes`（漏声明会被 `normalizeToolDefinition` 拒绝），所属插件 manifest 的 `contributions.tools` 列出工具名即可进入主 Agent 形态；不用改 `agent` 包。
 - 改 Agent 循环：主体在 `agent-loop/src/loop.ts`，会话里的调用边界在 `runtime/src/harness/agent-factory-plugin.ts`。

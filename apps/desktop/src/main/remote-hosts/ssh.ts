@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, createConnection } from "node:net";
+import { hostChildEnv } from "@actspace/shared";
 export interface SshTunnel { port: number; close(): Promise<void> }
 /** Only forwards to server loopback; relies on the user's existing OpenSSH trust configuration. */
 export async function openSshTunnel(alias: string, remotePort: number, configFile?: string): Promise<SshTunnel> {
@@ -8,7 +9,7 @@ export async function openSshTunnel(alias: string, remotePort: number, configFil
   await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
   const port = (server.address() as { port: number }).port;
   await new Promise<void>(resolve => server.close(() => resolve()));
-  const child = spawn("/usr/bin/ssh", [...(configFile ? ["-F", configFile] : []), "-N", "-T", "-o", "BatchMode=yes", "-o", "ForwardAgent=no", "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "StrictHostKeyChecking=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ConnectTimeout=10", "-o", "ServerAliveInterval=20", "-o", "ServerAliveCountMax=3", "-L", `127.0.0.1:${port}:127.0.0.1:${remotePort}`, "--", alias], { stdio: ["ignore", "ignore", "pipe"] });
+  const child = spawn("/usr/bin/ssh", [...(configFile ? ["-F", configFile] : []), "-N", "-T", "-o", "BatchMode=yes", "-o", "ForwardAgent=no", "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "StrictHostKeyChecking=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ConnectTimeout=10", "-o", "ServerAliveInterval=20", "-o", "ServerAliveCountMax=3", "-L", `127.0.0.1:${port}:127.0.0.1:${remotePort}`, "--", alias], { stdio: ["ignore", "ignore", "pipe"], env: hostChildEnv(process.env) });
   let error = "", failure: Error | undefined;
   child.stderr.on("data", bytes => { error = (error + String(bytes)).slice(-4096); });
   child.once("error", value => { failure = value; });

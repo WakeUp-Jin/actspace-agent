@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chmod, mkdir, mkdtemp, open, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, open, readFile, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:net";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -250,6 +250,27 @@ describe("BrowserBridgeService", () => {
     expect(second).toEqual(first);
     expect(first.lastError).toContain("doctor failed");
     expect(calls).toEqual(["doctor"]);
+  });
+
+  it("stores the source root as a real path and only builds from the saved root", async () => {
+    const dataRoot = await mkdtemp(join(tmpdir(), "actspace-browser-bridge-data-"));
+    const linkRoot = await mkdtemp(join(tmpdir(), "actspace-browser-bridge-link-"));
+    tempDirs.push(dataRoot, linkRoot);
+    const repoRoot = await realpath(join(__dirname, "..", "..", "..", "..", ".."));
+    const link = join(linkRoot, "repo");
+    await symlink(repoRoot, link);
+    const service = new BrowserBridgeService({ dataRoot });
+
+    expect(await service.buildAndInstall()).toMatchObject({ ok: false, error: expect.stringContaining("请先选择源码扩展目录") });
+    expect(await service.useSourceExtension("relative/path")).toMatchObject({ ok: false });
+    expect(await service.useSourceExtension(join(linkRoot, "missing"))).toMatchObject({ ok: false, error: "该目录缺少有效的 ActSpace Chrome 扩展。" });
+
+    expect(await service.useSourceExtension(link)).toEqual({ ok: true });
+    expect((await service.getStatus()).sourceRoot).toBe(repoRoot);
+    expect(JSON.parse(await readFile(join(service.pluginRoot, "connection.json"), "utf8"))).toMatchObject({ sourceRoot: repoRoot });
+
+    expect(await service.useSourceExtension(null)).toEqual({ ok: true });
+    expect((await service.getStatus()).sourceRoot).toBeUndefined();
   });
 
   it("dispose kills in-flight abb commands, is idempotent and rejects later commands", async () => {

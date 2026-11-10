@@ -1,5 +1,4 @@
 import { emptyRuntimePromptSource } from "./host-context.js";
-import type { CordisContext } from "@actspace/cordis-adapter";
 import type { Context, ContextSource } from "@actspace/context-engine";
 import type { RuntimeV2JsonValue, RuntimeV2AgentMode } from "@actspace/shared/runtime-v2";
 import type { CoreContributorOptions } from "./core-contributors.js";
@@ -11,8 +10,8 @@ export type SourceOptions = Omit<CoreContributorOptions, "instructions" | "skill
   readonly scope: AgentScope;
   readonly prompt: PromptRuntimeService;
 };
+/** Shape of a `context.source.<kind>` service; `@actspace/context-assembly` publishes it and hands the factory to the loop. */
 export type SourceFactory = { readonly create: (options: SourceOptions) => ContextSource };
-export function publish(ctx: CordisContext, kind: string, create: SourceFactory["create"]): void { ctx.provide?.(`context.source.${kind}`, Object.freeze({ create })); }
 export function runtimeInfo(context: Context): { mode: RuntimeV2AgentMode; selectedSkillIds: readonly string[]; hostFacts: RuntimeV2JsonValue } {
   const value = context.status.plugins["actspace.loop"] as { mode?: RuntimeV2AgentMode; selectedSkillIds?: string[]; hostFacts?: RuntimeV2JsonValue } | undefined;
   return { mode: value?.mode ?? "agent", selectedSkillIds: value?.selectedSkillIds ?? [], hostFacts: value?.hostFacts ?? {} };

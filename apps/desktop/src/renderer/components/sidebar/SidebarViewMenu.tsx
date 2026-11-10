@@ -42,7 +42,7 @@ export function SidebarViewMenu({ options, onGroupBy, onSort, onArchived, onRese
           label={modified ? "视图选项（已改动）" : "视图选项"}
           tooltip={modified ? "视图选项（已改动）" : "视图选项"}
         >
-          <SlidersHorizontal size={13} strokeWidth={1.9} className={modified ? VIEW_ICON_TINT_CLASS : undefined} aria-hidden="true" />
+          <SlidersHorizontal size={13} className={modified ? VIEW_ICON_TINT_CLASS : undefined} aria-hidden="true" />
           {modified ? <span aria-hidden="true" className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-accent" /> : null}
         </IconButton>
       </MenuTrigger>

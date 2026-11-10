@@ -1,5 +1,5 @@
-import { useEffect, useId, useLayoutEffect, useState, type RefObject } from "react";
-import { Asterisk, BookOpen, Bot, ChartPie, Check, GitBranch, GitFork, ListTodo, Loader2, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useId, useLayoutEffect, useState, type RefObject } from "react";
+import { Asterisk, BookOpen, Bot, ChartPie, Check, GitBranch, GitFork, ListTodo, LoaderCircle, type LucideIcon } from "lucide-react";
 import type { ComposerMode, SkillCatalogItem } from "@actspace/shared";
 import {
   composerSlashFunctionOptionId,
@@ -175,8 +175,11 @@ export function useSlashMenu({ message, inputLocked, isChatForm, isStreaming, al
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只挂一次；composerRef 是稳定的 ref
-  }, []);
+  }, [composerRef]);
+
+  const dismiss = useCallback(() => setDismissed(true), []);
+  /** 输入框内容变了：允许菜单再次打开。 */
+  const reset = useCallback(() => setDismissed(false), []);
 
   return {
     menuId,
@@ -188,9 +191,8 @@ export function useSlashMenu({ message, inputLocked, isChatForm, isStreaming, al
     results,
     active,
     activeOptionId,
-    dismiss: () => setDismissed(true),
-    /** 输入框内容变了：允许菜单再次打开。 */
-    reset: () => setDismissed(false),
+    dismiss,
+    reset,
     move: (direction: 1 | -1) => setActiveIndex((current) => (current + direction + results.length) % results.length),
     /** 鼠标移到某一项上：高亮跟过去。 */
     highlight: (result: ComposerSlashResult) => {
@@ -274,9 +276,9 @@ export function SlashMenu({ surface, slash, mode, selectedSkills, skillsLoading,
                 onMouseEnter={() => slash.highlight(result)}
                 onClick={() => onSelect(result)}
               >
-                <Icon className={SLASH_FUNCTION_ICON_CLASS} size={14} strokeWidth={1.9} aria-hidden="true" />
+                <Icon className={SLASH_FUNCTION_ICON_CLASS} size={14} aria-hidden="true" />
                 <span className={SLASH_FUNCTION_COMMAND_CLASS}>{commandDisplayName}</span>
-                {isSelectedMode ? <Check className="shrink-0 text-text-muted" size={13} strokeWidth={2.2} aria-hidden="true" /> : null}
+                {isSelectedMode ? <Check className="shrink-0 text-text-muted" size={13} aria-hidden="true" /> : null}
                 <span className={SLASH_FUNCTION_DESCRIPTION_CLASS}>{item.description}</span>
               </button>
             );
@@ -289,7 +291,7 @@ export function SlashMenu({ surface, slash, mode, selectedSkills, skillsLoading,
           <div className={SLASH_GROUP_LABEL_CLASS} id={skillsLabelId}>Skills</div>
           {skillsLoading ? (
             <div className={`${SLASH_STATUS_CLASS} flex items-center gap-2`}>
-              <Loader2 className="animate-spin" size={15} aria-hidden="true" /> 正在加载 Skills…
+              <LoaderCircle className="animate-spin" size={15} aria-hidden="true" /> 正在加载 Skills…
             </div>
           ) : skillsError ? (
             <div className={SLASH_STATUS_CLASS}>
@@ -323,9 +325,9 @@ export function SlashMenu({ surface, slash, mode, selectedSkills, skillsLoading,
                 onMouseEnter={() => slash.highlight(result)}
                 onClick={() => onSelect(result)}
               >
-                <BookOpen className={SLASH_FUNCTION_ICON_CLASS} size={14} strokeWidth={1.9} aria-hidden="true" />
+                <BookOpen className={SLASH_FUNCTION_ICON_CLASS} size={14} aria-hidden="true" />
                 <span className={SLASH_SKILL_NAME_CLASS}>{skill.name}</span>
-                {isSelected ? <Check className="shrink-0 text-text-muted" size={13} strokeWidth={2.2} aria-hidden="true" /> : null}
+                {isSelected ? <Check className="shrink-0 text-text-muted" size={13} aria-hidden="true" /> : null}
                 <span className={SLASH_SKILL_DESCRIPTION_CLASS}>{skill.description || "暂无说明"}</span>
               </button>
             );

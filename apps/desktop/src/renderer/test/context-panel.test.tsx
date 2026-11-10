@@ -151,17 +151,17 @@ describe("ContextPanel", () => {
     expect(rows[2]).toHaveTextContent("活跃文件清单更新 ×6");
     expect(rows[2]).toHaveTextContent(/第 8 轮$/);
     // 0 写「±0」用弱色；未知留空；推导的只在悬停说明里写。
-    expect(within(rows[1]!).getByText("±0")).toHaveClass("text-text-faint");
+    expect(within(rows[1]).getByText("±0")).toHaveClass("text-text-faint");
     expect(rows[7]).toHaveTextContent("模型切换Sonnet 5.5 → Opus 5.5第 3 轮 · 步 1");
     expect(rows[7]).not.toHaveTextContent("推导");
-    expect(rows[7]!.title).toContain("根据请求推导");
+    expect(rows[7].title).toContain("根据请求推导");
   });
 
   it("has no separate load-more button; 再显示 fetches the next page when the local rows run out", async () => {
     const view = mockContextPanelView(SESSION);
     const conversation = view.current.entries.filter(entry => entry.bucket === "conversation");
     const older = Array.from({ length: 30 }, (_, i) => ({ key: `older-${i}`, bucket: "conversation" as const, kind: "tool-call" as const, title: `更早 ${i}`, estimatedTokens: 1 }));
-    const counts = { ...Object.fromEntries(Object.entries(Object.groupBy(view.current.entries, entry => entry.bucket)).map(([key, list]) => [key, list!.length])), conversation: conversation.length + older.length };
+    const counts = { ...Object.fromEntries(Object.entries(Object.groupBy(view.current.entries, entry => entry.bucket)).map(([key, list]) => [key, list.length])), conversation: conversation.length + older.length };
     const listContextEntries = vi.fn(async () => {
       await new Promise(resolve => setTimeout(resolve, 20));
       return { revision: "rev", total: view.current.entries.length + older.length, bucketCounts: counts, entries: older, previous: [] };

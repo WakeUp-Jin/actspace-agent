@@ -116,8 +116,8 @@ function Preview() {
     <div className="flex h-screen flex-col bg-app-bg text-text-main">
       <div className="flex shrink-0 items-center gap-4 border-b border-line p-3 text-act-sm">
         <span>Mermaid 图表验收样例</span>
-        <button onClick={() => setStreaming(true)}>流式中（fence 未闭合）</button>
-        <button onClick={() => setStreaming(false)}>回复完成</button>
+        <button type="button" onClick={() => setStreaming(true)}>流式中（fence 未闭合）</button>
+        <button type="button" onClick={() => setStreaming(false)}>回复完成</button>
         <a href="?theme=light">浅色</a><a href="?theme=dark">深色</a>
       </div>
       <TestConversationView messages={messages} contextSnapshot={null}

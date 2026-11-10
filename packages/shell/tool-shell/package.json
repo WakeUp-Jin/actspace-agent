@@ -41,8 +41,8 @@
   "devDependencies": {
     "@actspace/sandbox-nono": "workspace:*",
     "@actspace/sandbox-seatbelt": "workspace:*",
-    "@types/node": "^24.0.3",
-    "typescript": "^5.8.3",
-    "vitest": "^4.1.12"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

@@ -1,4 +1,4 @@
-import { FileCode2, Search, X } from "lucide-react";
+import { FileCodeCorner, Search, X } from "lucide-react";
 import type { ReviewFileSummary } from "@actspace/shared";
 
 const STATUS_COLOR: Record<ReviewFileSummary["status"], string> = {
@@ -32,7 +32,7 @@ export function ReviewFileTree({ files, selectedFileId, filter, onFilter, onSele
         {filtered.map((file) => (
           <div key={file.id} className={`group flex min-h-8 items-center gap-2 rounded-act-sm px-2 ${selectedFileId === file.id ? "bg-selected" : "hover:bg-surface-subtle"}`} role="treeitem" aria-selected={selectedFileId === file.id}>
             <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => onSelect(file.id)} title={file.path}>
-              <FileCode2 size={14} className={STATUS_COLOR[file.status]} />
+              <FileCodeCorner size={14} className={STATUS_COLOR[file.status]} />
               <span className="min-w-0 flex-1 truncate font-mono text-act-xxs text-text-main">{file.path}</span>
               {file.additions > 0 || file.deletions > 0 ? <span className="shrink-0 text-act-xxs tabular-nums">{file.additions > 0 ? <span className="text-success">+{file.additions}</span> : null}{file.additions > 0 && file.deletions > 0 ? " " : null}{file.deletions > 0 ? <span className="text-danger">-{file.deletions}</span> : null}</span> : null}
             </button>

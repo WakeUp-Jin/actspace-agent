@@ -47,7 +47,7 @@ function ContextPathRow({ path, cycle, workspaceRoot, open, onToggle }: {
         {/* 整行可点的展开按钮，和「上下文明细」分类行同类，Button 原语不适合整行列表项。 */}
         <button type="button" aria-expanded={open} onClick={onToggle} title={path.path}
           className={cn("flex min-w-0 flex-1 items-center gap-[7px] rounded-act-sm border-0 bg-transparent py-1 pl-2 pr-1 text-left [cursor:pointer] hover:bg-hover-overlay", ROW_FOCUS_CLASS)}>
-          <FileText size={13} strokeWidth={2} aria-hidden="true" className="shrink-0 text-text-faint" />
+          <FileText size={13} aria-hidden="true" className="shrink-0 text-text-faint" />
           <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden">
             <span className={cn("shrink truncate text-act-xs", sleeping ? "text-text-muted" : "text-text-main")}>{name}</span>
             {dir ? <span className="min-w-0 flex-1 truncate font-mono text-act-xxs text-text-faint">{dir}</span> : null}
@@ -98,7 +98,7 @@ function CopyPathButton({ path, className }: { path: string; className?: string 
   };
   return (
     <IconButton label={state === "copied" ? "已复制" : state === "failed" ? "复制失败" : "复制完整路径"} size="xs" variant="ghost" className={className} onClick={() => void copy()}>
-      {state === "copied" ? <Check size={12} strokeWidth={2} aria-hidden="true" /> : <Copy size={12} strokeWidth={2} aria-hidden="true" />}
+      {state === "copied" ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
     </IconButton>
   );
 }

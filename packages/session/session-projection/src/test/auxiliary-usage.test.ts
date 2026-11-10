@@ -34,7 +34,7 @@ describe("auxiliary request usage facts", () => {
     }
     expect(registry.snapshot("s").values.providerUsage).toEqual({ inputTokens: 880, outputTokens: 160, cacheReadTokens: 40, cacheWriteTokens: 0, totalTokens: 1080, costUsd: null });
     expect(registry.snapshot("s").values.sessionStats).toMatchObject({ stepCount: 7, turnCount: 1 });
-    const state = registry.checkpoint("s").rows.providerUsage!.state as Record<string, unknown>;
+    const state = registry.checkpoint("s").rows.providerUsage.state as Record<string, unknown>;
     expect(state.selected).toEqual({});
     const replay = new SessionProjectionRegistry(); registerSessionFacts(replay, value => value);
     replay.sync("s", events); replay.sync("s", events);
@@ -55,7 +55,7 @@ describe("auxiliary request usage facts", () => {
   it("rejects pre-auxiliary usage checkpoints so complete journals rebuild", () => {
     const { registry } = fixture();
     const checkpoint = registry.checkpoint("s");
-    const old = { ...checkpoint, rows: { ...checkpoint.rows, providerUsage: { ...checkpoint.rows.providerUsage!, stateVersion: 2 } } };
+    const old = { ...checkpoint, rows: { ...checkpoint.rows, providerUsage: { ...checkpoint.rows.providerUsage, stateVersion: 2 } } };
     expect(() => registry.restore("s", old)).toThrow("version mismatch: providerUsage");
   });
 });

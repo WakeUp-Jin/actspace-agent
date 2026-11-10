@@ -10,6 +10,9 @@
       "path": "./../../background-tasks/background-tasks/tsconfig.build.json"
     },
     {
+      "path": "./../context-assembly/tsconfig.build.json"
+    },
+    {
       "path": "./../context-engine/tsconfig.build.json"
     },
     {

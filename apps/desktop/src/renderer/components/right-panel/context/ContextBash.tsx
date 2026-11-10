@@ -110,7 +110,7 @@ function ProgramRow({ row, open, onToggle }: { row: BashProgramRow; open: boolea
   const cells = (
     <>
       <span className="flex w-2.5 shrink-0 justify-center text-text-faint" aria-hidden="true">
-        {expandable ? <ChevronRight size={11} strokeWidth={2.4} className={cn("transition-transform duration-(--motion-fast) motion-reduce:transition-none", open && "rotate-90")} /> : null}
+        {expandable ? <ChevronRight size={11} className={cn("transition-transform duration-(--motion-fast) motion-reduce:transition-none", open && "rotate-90")} /> : null}
       </span>
       <span className={cn("min-w-16 max-w-[45%] shrink-0 truncate font-mono", row.other ? "text-text-muted" : "text-text-main")} title={row.label}>{row.label}</span>
       <span className="min-w-0 flex-1 truncate text-act-xxs text-text-faint" title={open ? undefined : row.summary || undefined}>{open ? "" : row.summary}</span>

@@ -22,7 +22,7 @@ export function installBridge(bridge: DesktopBridge): void {
 export function domainApi<D extends keyof DesktopBridge>(domain: D): DesktopBridge[D] {
   const api: Record<string, (...args: unknown[]) => unknown> = {};
   for (const member of Object.keys(desktopBridgeContract[domain])) {
-    api[member] = (...args) => (getBridge()[domain] as unknown as Record<string, (...args: unknown[]) => unknown>)[member]!(...args);
+    api[member] = (...args) => (getBridge()[domain] as unknown as Record<string, (...args: unknown[]) => unknown>)[member](...args);
   }
   return Object.freeze(api) as unknown as DesktopBridge[D];
 }

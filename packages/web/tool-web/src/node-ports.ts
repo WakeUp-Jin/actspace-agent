@@ -48,7 +48,7 @@ async function webSearch(args: Readonly<Record<string, RuntimeV2JsonValue>>, con
   if (!query) return failed("INVALID_ARGUMENTS", "query is required", false);
   const maxResults = clampInteger(args.max_results, 5, 1, 10);
   const domestic = credentials.zhipu ? provider("zhipu", credentials.zhipu, fetchImpl) : undefined;
-  const international = (["tavily", "tinyfish", "exa"] as const).flatMap((id) => credentials[id] ? [provider(id, credentials[id]!, fetchImpl)] : []);
+  const international = (["tavily", "tinyfish", "exa"] as const).flatMap((id) => credentials[id] ? [provider(id, credentials[id], fetchImpl)] : []);
   if (domestic === undefined && international.length === 0 && !credentials.deepseek) return failed("WEB_SEARCH_NOT_CONFIGURED", "Web search is unavailable: enable and configure at least one DeepSeek, Zhipu, Tavily, TinyFish, or Exa search source.", false);
   const [domesticResult, internationalResult, deepseekResult] = await Promise.all([
     // Each lane participates independently; DeepSeek never replaces existing lanes.

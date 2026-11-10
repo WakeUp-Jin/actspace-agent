@@ -107,7 +107,7 @@ describe("Composer attachment drafts", () => {
     dropImage("photo.png");
     dropImage("other.png");
     const [photo] = store.get("session-a").attachments!;
-    view.rerender(<SessionComposer store={store} sessionId="session-a" onSend={onSend} draftRestore={{ id: 1, sessionId: "session-a", text: "重试", attachments: [photo!] }} />);
+    view.rerender(<SessionComposer store={store} sessionId="session-a" onSend={onSend} draftRestore={{ id: 1, sessionId: "session-a", text: "重试", attachments: [photo] }} />);
     expect(screen.getByLabelText("已附加的图片 photo.png")).toBeInTheDocument();
     expect(screen.queryByLabelText("已附加的图片 other.png")).toBeNull();
     expect(revokeObjectURL).toHaveBeenCalledTimes(1);

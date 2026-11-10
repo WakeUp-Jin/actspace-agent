@@ -26,7 +26,7 @@ async function setup(authorized = true, failOldDispose = false) {
   const control = new HarnessControl(options); controls.push(control); await control.initialize();
   async function prepare(control: HarnessControl, artifact: PluginArtifact) {
     const current = control.inspect().current!;
-    return control.prepare({ harnessId: "main", expectedRevision: current.revision, baseExecutionDigest: current.executionDigest, artifactIds: [artifact.artifactId], patch: { id: "patch", provenance: "test", operations: [{ id: "replace", kind: "replace", target: "old", artifactId: artifact.artifactId, manifestEntryId: artifact.manifest.plugin.behaviors[0]!.entryId }] } });
+    return control.prepare({ harnessId: "main", expectedRevision: current.revision, baseExecutionDigest: current.executionDigest, artifactIds: [artifact.artifactId], patch: { id: "patch", provenance: "test", operations: [{ id: "replace", kind: "replace", target: "old", artifactId: artifact.artifactId, manifestEntryId: artifact.manifest.plugin.behaviors[0].entryId }] } });
   }
   return { control, options, next, prepare, artifact };
 }
@@ -191,7 +191,7 @@ it("prepares first branches without publishing and rechecks their source during 
 });
 it("allows the Host to upgrade only an untouched builtin while retaining its history", async () => {
   const { control, options, next } = await setup();
-  const original = control.inspect().current!; await control.close();
+  const original = control.inspect().current; await control.close();
   const composition = composeRuntime({ profile: { id: "main", runtimeContract: "actspace.runtime.v2", orderedBundleIds: ["base"] }, bundles: [{ id: "base", version: "2", provenance: "test", manifests: [next.manifest.plugin] }], hostCapabilities: [] });
   const upgradedOptions = { ...options, upgradePristineBuiltin: () => true, builtin: async () => ({ composition, artifacts: new Map([["new", next]]), sharedServices: [] }) };
   const upgraded = new HarnessControl(upgradedOptions); controls.push(upgraded); await upgraded.initialize();
@@ -204,7 +204,7 @@ it("allows the Host to upgrade only an untouched builtin while retaining its his
 });
 it("never replaces a user-selected Harness through the pristine builtin upgrade path", async () => {
   const { control, options, next, prepare } = await setup();
-  const candidate = await prepare(control, next); await control.activate("user-selected", candidate.candidateId); const chosen = control.inspect().current!; await control.close();
+  const candidate = await prepare(control, next); await control.activate("user-selected", candidate.candidateId); const chosen = control.inspect().current; await control.close();
   const upgrade = vi.fn(() => true);
   const restored = new HarnessControl({ ...options, upgradePristineBuiltin: upgrade }); controls.push(restored); await restored.initialize();
   expect(upgrade).not.toHaveBeenCalled(); expect(restored.inspect().current).toEqual(chosen);
@@ -232,7 +232,7 @@ it("does not rewrite an unchanged trusted bootstrap or auto-repair a damaged art
   const { control, options } = await setup(); const original = control.inspect().current!; await control.close();
   const unchanged = new HarnessControl({ ...options, upgradePristineBuiltin: () => true }); controls.push(unchanged); await unchanged.initialize();
   expect(unchanged.inspect().history).toHaveLength(1); await unchanged.close();
-  await rm(join(options.artifactRoot, original.description.artifactIds[0]!), { recursive: true });
+  await rm(join(options.artifactRoot, original.description.artifactIds[0]), { recursive: true });
   const damaged = new HarnessControl({ ...options, upgradePristineBuiltin: () => true }); controls.push(damaged); await damaged.initialize();
   expect(damaged.inspect().current).toEqual(original);
   await expect(damaged.acquire("main")).rejects.toMatchObject({ code: "RECOVERY_BLOCKED" });

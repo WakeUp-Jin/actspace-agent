@@ -16,11 +16,6 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 import { recordProjectionFixture } from "./projection-fixture";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
 import { projectRecord } from "./helpers/session-records";
-import { transcriptShadow } from "./helpers/transcript-shadow";
-
-// 14 T15：每次 durable / live 合并都与旧实现对照，不一致就让用例失败（见 helpers/transcript-shadow.ts）。
-vi.mock("../session/transcript", async (importOriginal) => (await import("./helpers/transcript-shadow")).shadowTranscript(await importOriginal()));
-afterEach(() => { expect(transcriptShadow.mismatches.splice(0)).toEqual([]); });
 
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",
@@ -126,7 +121,7 @@ function setupQueueFixture() {
     })),
     "sessions.get": projectRecord(async ({ sessionId }: { sessionId: string }) => records.get(sessionId) ?? null),
     "sessions.getPage": async ({ sessionId }: { sessionId: string }) => recordProjectionFixture(records.get(sessionId)!),
-    "sessions.create": projectRecord(async () => records.get("queue-a")!),
+    "sessions.create": projectRecord(async () => records.get("queue-a")),
     "tasks.abort": abort,
     "approvals.listPending": async () => [],
     "review.getSnapshot": async () => ({ ok: false, reason: "not_git_repository" }),
@@ -236,7 +231,7 @@ describe("App message queue", () => {
     await userEvent.type(await screen.findByLabelText("消息输入框"), "idle question");
     await userEvent.click(screen.getByLabelText("发送消息"));
     await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledOnce());
-    const agentRunId = fixture.submitTask.mock.calls[0]![0].agentRunId;
+    const agentRunId = fixture.submitTask.mock.calls[0][0].agentRunId;
     expect(agentRunId).toEqual(expect.any(String));
     // 任务还在 pending（Host 尚未开始）：消息已在消息流里，托盘不出现。
     await waitFor(() => expect(screen.getByText("idle question")).toBeInTheDocument());
@@ -278,7 +273,7 @@ describe("App message queue", () => {
     await userEvent.clear(input);
     await userEvent.type(input, "edited prompt{Enter}");
     await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledOnce());
-    const submitted = fixture.submitTask.mock.calls[0]![0];
+    const submitted = fixture.submitTask.mock.calls[0][0];
     expect(submitted).toMatchObject({ userInput: "edited prompt", rewind: { runId: "run-1" } });
     expect(submitted.agentRunId).toEqual(expect.any(String));
     await waitFor(() => expect(fixture.pending.get("queue-a")?.input.agentRunId).toBe(submitted.agentRunId));
@@ -339,7 +334,7 @@ describe("App message queue", () => {
     await userEvent.click(screen.getByLabelText("加入队列"));
     await queueText("third");
     // 运行中发送的才是排队消息：不带 run id，进托盘。
-    expect(fixture.submitTask.mock.calls[1]![0].agentRunId).toBeUndefined();
+    expect(fixture.submitTask.mock.calls[1][0].agentRunId).toBeUndefined();
 
     expect(within(tray()!).getByRole("img", { name: /^2 条排队/ })).toBeInTheDocument();
     expect(within(tray()!).getByText("second")).toBeInTheDocument();
@@ -458,7 +453,7 @@ describe("App message queue", () => {
       await userEvent.type(screen.getByLabelText("消息输入框"), "in flight");
       await userEvent.click(screen.getByLabelText("发送消息"));
       await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledTimes(1));
-      expect(fixture.submitTask.mock.calls[0]![0].submissionId).toBe("sub-4");
+      expect(fixture.submitTask.mock.calls[0][0].submissionId).toBe("sub-4");
       await releaseSnapshots();
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
       expect(screen.getByLabelText("消息输入框")).toHaveValue("");
@@ -507,7 +502,7 @@ describe("App message queue", () => {
       await waitFor(() => expect(screen.getByLabelText("消息输入框")).toHaveValue("send again"));
       await userEvent.click(screen.getByLabelText("发送消息"));
       await waitFor(() => expect(fixture.submitTask).toHaveBeenCalledTimes(1));
-      expect(fixture.submitTask.mock.calls[0]![0].submissionId).toBe("sub-3");
+      expect(fixture.submitTask.mock.calls[0][0].submissionId).toBe("sub-3");
       await waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
     });
   });
@@ -520,7 +515,7 @@ describe("App message queue", () => {
     await queueText("also check tests");
 
     await userEvent.click(within(tray()!).getByRole("button", { name: "↳ 引导" }));
-    const steerInput = fixture.designateSupplement.mock.calls[0]![0];
+    const steerInput = fixture.designateSupplement.mock.calls[0][0];
     expect(steerInput).toMatchObject({ sessionId: "queue-a", op: "designate", runId: fixture.pending.get("queue-a")!.input.agentRunId });
     expect(await within(tray()!).findByText("下一步读取")).toBeInTheDocument();
     expect(within(tray()!).getByRole("img", { name: /1 条已引导/ })).toBeInTheDocument();
@@ -541,7 +536,7 @@ describe("App message queue", () => {
     await startFirstRun(fixture);
     await queueText("steer me");
     await queueText("later");
-    await userEvent.click(within(tray()!).getAllByRole("button", { name: "↳ 引导" })[0]!);
+    await userEvent.click(within(tray()!).getAllByRole("button", { name: "↳ 引导" })[0]);
     await within(tray()!).findByText("下一步读取");
 
     await userEvent.click(screen.getByLabelText("停止 Agent"));
@@ -600,7 +595,7 @@ describe("App message queue", () => {
 
     await act(async () => fixture.finish("queue-a", "completed"));
     await waitFor(() => expect(fixture.sentTexts()).toEqual(["first question", "background follow-up"]));
-    expect(fixture.startExecution.mock.calls[1]![0].sessionId).toBe("queue-a");
+    expect(fixture.startExecution.mock.calls[1][0].sessionId).toBe("queue-a");
   });
 
   it("queues /compact as a command without steering", async () => {

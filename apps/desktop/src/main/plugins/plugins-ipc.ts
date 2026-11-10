@@ -26,7 +26,7 @@ export type CommandResolver = (command: string) => Promise<string | undefined>;
 export async function unavailablePluginReasons(catalog: readonly Pick<PluginListCatalogEntry, "id">[], resolve: CommandResolver): Promise<ReadonlyMap<string, string>> {
   const reasons = new Map<string, string>();
   await Promise.all(catalog.filter((entry) => entry.id in CLI_PLUGINS).map(async (entry) => {
-    const { command } = CLI_PLUGINS[entry.id]!;
+    const { command } = CLI_PLUGINS[entry.id];
     let found: string | undefined;
     try { found = await resolve(command); } catch { found = undefined; }
     if (found === undefined) reasons.set(entry.id, `本机没有找到 ${command} 命令`);
@@ -66,9 +66,9 @@ export function listPluginItems(input: {
       canDisable: display.canDisable,
       loaded: display.canDisable ? input.startupSwitches.get(entry.id) ?? true : true,
       enabled: current.get(entry.id) ?? true,
-      ...(input.unavailable?.has(entry.id) ? { unavailableReason: input.unavailable.get(entry.id)! } : {}),
+      ...(input.unavailable?.has(entry.id) ? { unavailableReason: input.unavailable.get(entry.id) } : {}),
       ...(currentSettings[entry.id] ? {
-        settings: { ...currentSettings[entry.id]! },
+        settings: { ...currentSettings[entry.id] },
         settingsPendingRestart: input.startupPluginSettings?.[entry.id] !== undefined && JSON.stringify(input.startupPluginSettings[entry.id]) !== JSON.stringify(currentSettings[entry.id]),
       } : {}),
     });

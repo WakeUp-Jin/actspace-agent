@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, Copy, Loader2, Square, SquareTerminal, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, LoaderCircle, Square, SquareTerminal, X } from "lucide-react";
 import type { BackgroundBashTaskView } from "@actspace/shared/runtime-v2";
 import { tasksApi } from "../../api/tasks";
 import { EnvironmentIcon } from "../messages/BashRunBlock";
@@ -19,7 +19,10 @@ export function BackgroundTasksPanel({ sessionId, focus }: { sessionId: string |
   // 从消息里的「后台」标签进来：等列表到了再按 taskId 选中，找不到时回到列表并说明。
   const [pendingTask, setPendingTask] = useState(focus?.taskId);
   const [missingTask, setMissingTask] = useState(false);
-  useEffect(() => { if (focus) setPendingTask(focus.taskId); }, [focus?.revision]);
+  // revision 每次点击递增：同一个 taskId 再点一次也要重新定位。
+  const focusRevision = focus?.revision;
+  const focusTaskId = focus?.taskId;
+  useEffect(() => { if (focusTaskId !== undefined) setPendingTask(focusTaskId); }, [focusRevision, focusTaskId]);
   useEffect(() => {
     if (!pendingTask || !loaded) return;
     const found = tasks.some((task) => task.taskId === pendingTask);
@@ -62,7 +65,7 @@ export function BackgroundTasksPanel({ sessionId, focus }: { sessionId: string |
       return <div key={String(running)} className="mb-6"><h2 className="mb-2 px-3 text-act-xs font-normal text-text-faint">{running ? "运行中" : "已结束"} · {items.length}</h2>
         {items.map((task) => <button key={task.taskId} type="button" className={rowClass} onClick={() => { setSelectedId(task.taskId); setMissingTask(false); }}>
           <span className="flex items-start gap-3">
-            <SquareTerminal size={15} strokeWidth={1.8} className="mt-0.5 flex-none text-text-faint" aria-hidden="true" />
+            <SquareTerminal size={15} className="mt-0.5 flex-none text-text-faint" aria-hidden="true" />
             <span className="min-w-0 flex-1">
               <span className="flex min-w-0 items-center gap-1.5">
                 <span className="truncate text-act-sm text-text-main" title={task.description}>{task.description}</span>
@@ -178,7 +181,7 @@ function BackgroundTaskDetail({ sessionId, task, onBack, onTask }: {
 function TaskStatus({ task }: { task: BackgroundBashTaskView }) {
   const base = "flex flex-none items-center gap-1 text-act-xs tabular-nums";
   if (task.status === "running") {
-    return <span className={`${base} text-accent`}><Loader2 size={12} className="animate-spin" aria-hidden="true" />{elapsed(task)}</span>;
+    return <span className={`${base} text-accent`}><LoaderCircle size={12} className="animate-spin" aria-hidden="true" />{elapsed(task)}</span>;
   }
   if (task.status === "stopped") return <span className={`${base} text-text-muted`}><Square size={10} fill="currentColor" aria-hidden="true" />已停止</span>;
   if (task.status === "lost") return <span className={`${base} text-text-muted`}>已中断</span>;

@@ -53,7 +53,7 @@ export function Select({
           <SelectPrimitive.Value>{selected?.label ?? placeholder ?? value}</SelectPrimitive.Value>
         </span>
         <SelectPrimitive.Icon asChild>
-          <ChevronDown size={14} strokeWidth={1.9} aria-hidden="true"
+          <ChevronDown size={14} aria-hidden="true"
             className="shrink-0 text-text-faint transition-transform duration-(--motion-base) group-data-[state=open]:rotate-180 motion-reduce:transition-none" />
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
@@ -69,7 +69,7 @@ export function Select({
                 {entry.options.map((option) => (
                   <SelectPrimitive.Item key={option.value} value={toRadix(option.value)} disabled={option.disabled}
                     className={cn(MENU_ITEM_CLASS, "data-[state=checked]:bg-selected data-[state=checked]:font-medium")}>
-                    <SelectPrimitive.ItemIndicator className="shrink-0"><Check size={14} strokeWidth={2.4} aria-hidden="true" /></SelectPrimitive.ItemIndicator>
+                    <SelectPrimitive.ItemIndicator className="shrink-0"><Check size={14} aria-hidden="true" /></SelectPrimitive.ItemIndicator>
                     {option.value === value ? null : <span className="w-[14px] shrink-0" aria-hidden="true" />}
                     {wrapOptions ? <span className="min-w-0 whitespace-normal break-all py-1">
                       <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>

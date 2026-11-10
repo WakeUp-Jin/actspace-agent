@@ -40,7 +40,7 @@ export const BROWSER_TOOL_DEFINITIONS: readonly ToolDefinition[] = Object.freeze
 ]);
 
 function definition(localName: string, description: string, inputSchema: ToolDefinition["inputSchema"], sensitiveArgumentPaths: readonly string[] = [], concurrency: ToolDefinition["concurrency"] = "exclusive"): ToolDefinition {
-  return Object.freeze({ abiVersion: 2, pluginId: BROWSER_TOOLS_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: [{ capabilityId: "browser", mode: "use" as const, resourceScope: "browser-session" }], concurrency, sensitiveArgumentPaths: ["/headers", "/cookies", "/token", "/password", ...sensitiveArgumentPaths], resultSchemaVersion: 1 });
+  return Object.freeze({ abiVersion: 2, pluginId: BROWSER_TOOLS_PLUGIN_ID, name: localName, definitionVersion: 1, description, inputSchema, effects: [{ capabilityId: "browser", mode: "use" as const, resourceScope: "browser-session" }], modes: ["agent" as const], concurrency, sensitiveArgumentPaths: ["/headers", "/cookies", "/token", "/password", ...sensitiveArgumentPaths], resultSchemaVersion: 1 });
 }
 
 function categorySchema(category: keyof typeof browserActionsByCategory, properties: Readonly<Record<string, unknown>>, required: readonly string[]): ToolDefinition["inputSchema"] {

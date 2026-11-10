@@ -44,17 +44,51 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
-      // 桌面端 a11y 是独立专题，先不进门禁。
-      "a11y": { "preset": "none" },
+      // a11y 分三层（2026-11-10 按 recommended 预设逐条点过命中数）：
+      // - 预设默认（error）：当前零命中的规则，直接进门禁，如 useAltText、useValidAriaProps、noPositiveTabindex、useButtonType。
+      // - warn：命中 1–8 处、每处都要看上下文才知道是改标记还是改交互的规则，`pnpm lint:report` 可看存量；新代码不要再加，清零后升 error。
+      // - off：存量几十处、修法等于重做交互语义（div 换 button、补 tabIndex / 键盘事件）的规则，留给桌面端 a11y 专题整体做。
+      "a11y": {
+        "preset": "recommended",
+        "useKeyWithClickEvents": "warn",
+        "useKeyWithMouseEvents": "warn",
+        "noAriaHiddenOnFocusable": "warn",
+        "useAriaPropsForRole": "warn",
+        "useValidAnchor": "warn",
+        "noLabelWithoutControl": "warn",
+        "noNoninteractiveElementToInteractiveRole": "warn",
+        // 命中的是 assets/ 下的装饰性品牌 svg 和 ProviderLogo 的 aria-hidden 占位图；装饰图不该有 title，等规则认 aria-hidden 再说。
+        "noSvgWithoutTitle": "warn",
+        // 对话框和行内编辑态打开时把焦点放到第一个输入是组件规范要求的行为，autoFocus 是有意的。
+        "noAutofocus": "off",
+        "useSemanticElements": "off",
+        "useAriaPropsSupportedByRole": "off",
+        "noStaticElementInteractions": "off",
+        "noNoninteractiveElementInteractions": "off",
+        "noNoninteractiveTabindex": "off",
+        "useFocusableInteractive": "off"
+      },
       "correctness": {
         "noUnusedImports": "error",
         "noUnusedVariables": "error",
-        // 存量命中较多，先以 warning 暴露、不阻塞 CI；清零后再升 error。
-        "useExhaustiveDependencies": "warn",
+        "useExhaustiveDependencies": {
+          "level": "error",
+          "options": {
+            // `useEffect(fn, [refreshKey])` 这类「把 key / revision / tick 当触发器」的写法在仓库里是有意的成规模用法，
+            // React 官方的 exhaustive-deps 也不把 effect 的多余依赖当错误；这里只追「漏依赖」，不追「多依赖」。
+            "reportUnnecessaryDependencies": false
+          }
+        },
         // `case x: return this.handle();` 在 void 方法里是仓库惯用写法，tsc 已经约束返回类型。
         "noVoidTypeReturn": "off",
         // `useSourceExtension` 这类 use* 命名的普通 API 会被误判为 React hook。
         "useHookAtTopLevel": "off"
+      },
+      "style": {
+        // 2026-11-09 已用 tsc 逐处核对：删掉所有「去掉也不报错」的 `!`，剩下的每一处都在表达 tsc 看不见的不变量
+        // （`if (map.has(k)) map.get(k)!`、`length > 0 ? arr.shift()!`、闭包里已经赋值的局部变量等），改成 `?.` / 抛错是改行为。
+        // 仓库没开 noUncheckedIndexedAccess，`arr[i]!` 不需要也不要写；新增 `!` 只能用于上述不变量。
+        "noNonNullAssertion": "off"
       },
       "suspicious": {
         // 产品代码用 `unknown` 加收窄；测试里的 mock / 响应体允许 `any`，见下方 overrides。

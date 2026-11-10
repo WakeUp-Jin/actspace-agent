@@ -76,14 +76,30 @@ test("passes when main registers every invoke / send member and sends every even
   assert.deepEqual(audit(consistentMain), []);
 });
 
-test("accepts direct constant and string-literal registrations as well as the registrar", () => {
+test("resolves channels through constant aliases and string literals, but only the registrar may touch ipcMain", () => {
   const main = `
 const channels = DEMO_CHANNELS;
 handle(channels.ping, () => "pong");
 ipcMain.on("demo:theme", () => undefined);
 win.webContents.send(DEMO_CHANNELS.changed, value);
 `;
-  assert.deepEqual(audit(main), []);
+  assert.deepEqual(audit(main), [
+    "main 绕过统一注册器直接调用了 ipcMain.on（main.ts），请改用 ipc.on(contract.…)",
+  ]);
+  assert.deepEqual(audit(main, consistentPreload, { registrarPath: "main.ts" }), []);
+});
+
+test("fails on every raw ipcMain registration outside the registrar, even for contract channels", () => {
+  const main = `${consistentMain}
+ipcMain.handle(DEMO_CHANNELS.ping, () => "pong");
+ipcMain.handleOnce(DEMO_CHANNELS.ping, () => "pong");
+ipcMain.once(DEMO_CHANNELS.theme, () => undefined);
+`;
+  assert.deepEqual(audit(main), [
+    "main 绕过统一注册器直接调用了 ipcMain.handle（main.ts），请改用 ipc.handle(contract.…)",
+    "main 绕过统一注册器直接调用了 ipcMain.handleOnce（main.ts），请改用 ipc.handle(contract.…)",
+    "main 绕过统一注册器直接调用了 ipcMain.once（main.ts），请改用 ipc.on(contract.…)",
+  ]);
 });
 
 test("fails when a contract invoke or send member is not registered in main", () => {
@@ -102,7 +118,7 @@ test("fails when a contract event is never sent by main", () => {
 });
 
 test("fails when main registers or sends a channel outside the contract", () => {
-  const main = `${consistentMain}\nipcMain.handle("demo:secret", () => 1);\nwin.webContents.send("demo:leak", 1);`;
+  const main = `${consistentMain}\nhandle("demo:secret", () => 1);\nwin.webContents.send("demo:leak", 1);`;
   assert.deepEqual(audit(main), [
     'main 注册了契约之外的 channel "demo:secret"（main.ts）',
     'main 发送了契约之外的 channel "demo:leak"（main.ts）',
@@ -111,7 +127,7 @@ test("fails when main registers or sends a channel outside the contract", () => 
 
 test("fails when main uses a channel in the wrong direction", () => {
   const main = `${consistentMain}\nipcMain.on(DEMO_CHANNELS.changed, () => undefined);\nwin.webContents.send(DEMO_CHANNELS.ping, 1);`;
-  assert.deepEqual(audit(main), [
+  assert.deepEqual(audit(main, consistentPreload, { registrarPath: "main.ts" }), [
     'main 注册了契约中的事件 events.changed（"demo:changed"），事件只能由 main 发送（main.ts）',
     'main 发送了契约中的 invoke 成员 demo.ping（"demo:ping"），只有事件由 main 发送（main.ts）',
   ]);

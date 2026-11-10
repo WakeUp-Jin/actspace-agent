@@ -30,33 +30,33 @@ export function RightPanelObjectMenu({
       <Menu>
         <MenuTrigger asChild>
           <button className="chrome-button" type="button" aria-label="新建右侧面板对象" title="新建对象">
-            <Plus size={15} strokeWidth={1.8} />
+            <Plus size={15} />
           </button>
         </MenuTrigger>
         <MenuContent align="end" className="w-[188px]">
           {sideChat.available ? (
             // 打开失败时 App 在主会话输入框上方提示原因。
             <MenuItem disabled={sideChat.opening} onSelect={() => void sideChat.open().catch(() => undefined)}>
-              <GitFork size={15} strokeWidth={2} />
+              <GitFork size={15} />
               侧边对话
             </MenuItem>
           ) : null}
           {developmentEnabled ? (
             <>
               <MenuItem onSelect={() => openTab({ id: "docs", kind: "docs", title: "MD 文档" })}>
-                <BookOpen size={15} strokeWidth={2} />
+                <BookOpen size={15} />
                 MD 文档
               </MenuItem>
               {onOpenReview ? (
                 <MenuItem onSelect={onOpenReview}>
-                  <GitBranch size={15} strokeWidth={2} />
+                  <GitBranch size={15} />
                   改动
                 </MenuItem>
               ) : null}
             </>
           ) : null}
           <MenuItem onSelect={() => openTab({ id: "context", kind: "context", title: "上下文" })}>
-            <Eye size={15} strokeWidth={2} />
+            <Eye size={15} />
             上下文
           </MenuItem>
         </MenuContent>

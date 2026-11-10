@@ -37,7 +37,7 @@ describe("live event hub", () => {
     emit(envelope(null));
     expect(all).toHaveBeenCalledTimes(2);
     expect(queue).toHaveBeenCalledTimes(1);
-    expect(queue.mock.calls[0]![0].event.sessionId).toBe("s1");
+    expect(queue.mock.calls[0][0].event.sessionId).toBe("s1");
     expect(title).not.toHaveBeenCalled();
 
     offAll();

@@ -25,7 +25,7 @@ export function ConnectionListSection({ connections }: { connections: readonly C
       headingLevel={3}
       action={(
         <Button variant="primary" onClick={() => go({ name: "catalog" })}>
-          <Plus size={14} strokeWidth={2} aria-hidden="true" />
+          <Plus size={14} aria-hidden="true" />
           添加连接
         </Button>
       )}

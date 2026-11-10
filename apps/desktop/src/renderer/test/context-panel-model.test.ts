@@ -146,7 +146,7 @@ describe("trendLayout", () => {
       { requestId: "r2", turnIndex: 2, stepIndex: 2, sentAt: "", estimatedTokens: 50, buckets: { conversation: 50 }, compactedBefore: { compactionId: "c", reclaimedTokens: 150 } },
     ]);
     expect(columns.map((column) => column.height)).toEqual([1, 0.25]);
-    expect(columns[0]!.segments.map((segment) => [segment.key, segment.share])).toEqual([["tools", 0.25], ["conversation", 0.75]]);
+    expect(columns[0].segments.map((segment) => [segment.key, segment.share])).toEqual([["tools", 0.25], ["conversation", 0.75]]);
     expect(columns.map((column) => column.compactedBefore)).toEqual([false, true]);
   });
 });

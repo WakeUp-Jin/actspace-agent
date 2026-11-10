@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { SkillCatalogItem } from "@actspace/shared";
 import { skillsApi } from "../../api/skills";
 
@@ -19,7 +19,7 @@ export function useComposerSkills({ workspaceRoot, selected, onSelectedChange }:
   const loadedWorkspaceRef = useRef<string | null>(null);
   const requestRef = useRef(0);
 
-  async function load(forceReload = false) {
+  const load = useCallback(async (forceReload = false) => {
     const workspaceKey = workspaceRoot ?? "__default__";
     if (!forceReload && loadedWorkspaceRef.current === workspaceKey) return;
     loadedWorkspaceRef.current = workspaceKey;
@@ -44,7 +44,7 @@ export function useComposerSkills({ workspaceRoot, selected, onSelectedChange }:
     } finally {
       if (requestRef.current === requestId) setLoading(false);
     }
-  }
+  }, [workspaceRoot]);
 
   function toggle(name: string) {
     onSelectedChange?.(

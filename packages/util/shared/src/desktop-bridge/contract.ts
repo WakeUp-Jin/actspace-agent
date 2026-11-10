@@ -191,13 +191,16 @@ export const desktopBridgeContract = {
   browserBridge: {
     getStatus: invoke<void, S.BrowserBridgeStatus>(CH.getBrowserBridgeStatus),
     connect: invoke<void, S.BrowserBridgeInstallResult>(CH.connectBrowserBridge),
-    useSourceExtension: invoke<string | null, S.BrowserBridgeActionResult>(CH.useBrowserSourceExtension),
+    /** main 弹系统目录对话框并校验；renderer 不传路径。 */
+    selectSourceExtension: invoke<void, S.BrowserBridgeActionResult>(CH.selectBrowserSourceExtension),
+    useBundledExtension: invoke<void, S.BrowserBridgeActionResult>(CH.useBundledBrowserExtension),
     prepareUpdate: invoke<void, S.BrowserBridgeInstallResult>(CH.prepareBrowserBridgeUpdate),
     disconnect: invoke<void, S.BrowserBridgeActionResult>(CH.disconnectBrowserBridge),
     selectInstance: invoke<string, S.BrowserBridgeActionResult>(CH.selectBrowserBridgeInstance),
     openExtensions: invoke<void, S.BrowserBridgeActionResult>(CH.openBrowserExtensions),
     revealExtensionDirectory: invoke<void, S.BrowserBridgeActionResult>(CH.revealBrowserExtensionDirectory),
-    installFromRepo: invoke<{ repoRoot: string }, S.BrowserBridgeInstallResult>(CH.installBrowserBridgeFromRepo),
+    /** 只编译 main 已保存并校验过的源码目录。 */
+    installFromRepo: invoke<void, S.BrowserBridgeInstallResult>(CH.installBrowserBridgeFromRepo),
     installNativeHost: invoke<void, S.BrowserBridgeActionResult>(CH.installBrowserBridgeNativeHost),
   },
   plugins: {

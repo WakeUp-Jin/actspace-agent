@@ -11,7 +11,7 @@ import {
   Image,
   Laptop,
   Link,
-  Loader2,
+  LoaderCircle,
   MonitorUp,
   Plus,
   Search,
@@ -234,7 +234,7 @@ export function WorkspaceChromeControls({
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
               <button ref={environmentToggleRef} type="button" className="chrome-button" aria-label="查看工作区环境">
-                <Bookmark size={15} strokeWidth={1.8} aria-hidden="true" />
+                <Bookmark size={15} aria-hidden="true" />
               </button>
             </PopoverTrigger>
           </TooltipTrigger>
@@ -244,12 +244,12 @@ export function WorkspaceChromeControls({
           <section className="p-2">
             <div className="flex items-center justify-between px-0.5 pb-1 text-act-xs font-medium text-text-faint">
               <span>工作区环境</span>
-              {loadingEnvironment ? <Loader2 size={13} className="animate-spin" aria-label="正在加载工作区环境" /> : null}
+              {loadingEnvironment ? <LoaderCircle size={13} className="animate-spin" aria-label="正在加载工作区环境" /> : null}
             </div>
             <button type="button" className={ROW_CLASS} onClick={() => { onOpenReview(); setEnvironmentOpen(false); }}>
               <GitCommitHorizontal size={15} aria-hidden="true" />
               <span className="min-w-0 flex-1">变更</span>
-              {reviewSummary?.status === "loading" ? <Loader2 size={13} className="animate-spin text-text-faint" aria-hidden="true" /> : hasChanges ? (
+              {reviewSummary?.status === "loading" ? <LoaderCircle size={13} className="animate-spin text-text-faint" aria-hidden="true" /> : hasChanges ? (
                 <span className="flex items-center gap-1 font-medium">
                   <span className="text-success">+{reviewSummary?.additions ?? 0}</span>
                   <span className="text-danger">-{reviewSummary?.deletions ?? 0}</span>
@@ -557,7 +557,7 @@ function GitActionDialog({
             <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
               <Button variant="secondary" size="md" disabled={busy} onClick={onClose}>关闭</Button>
               <Button type="submit" variant="primary" size="md" disabled={busy || !branchName.trim()}>
-                {busy ? <Loader2 size={14} className="mr-2 animate-spin" aria-hidden="true" /> : null} 创建并切换
+                {busy ? <LoaderCircle size={14} className="mr-2 animate-spin" aria-hidden="true" /> : null} 创建并切换
               </Button>
             </div>
           </form>

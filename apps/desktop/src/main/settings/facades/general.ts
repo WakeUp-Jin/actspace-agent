@@ -163,7 +163,7 @@ export async function updateModelStorage(store: SettingsStore, input: ModelStora
         const key = normalizeModelKey(rawKey);
         if (!key) continue;
         if (value === null) delete store.settings.customModels[key];
-        else if (isValidModelDefinition(value, key)) store.settings.customModels[key] = sanitizeCustomModels({ [key]: value })[key]!;
+        else if (isValidModelDefinition(value, key)) store.settings.customModels[key] = sanitizeCustomModels({ [key]: value })[key];
       }
       for (const [rawKey, value] of Object.entries(input.overrides ?? {})) {
         const key = normalizeModelKey(rawKey);

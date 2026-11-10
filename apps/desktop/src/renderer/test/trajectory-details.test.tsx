@@ -142,7 +142,7 @@ describe('DetailPanel', () => {
 
   it('describes a request with provider, model and retries', () => {
     const requests = [...layout.requests.values()];
-    setup({ kind: 'request', request: requests[1]! }, 'overview');
+    setup({ kind: 'request', request: requests[1] }, 'overview');
     const panel = screen.getByRole('tabpanel');
     for (const text of ['已完成', '提供方', '模型', '重试', '重试延迟', '上次尝试错误', '超时']) expect(panel).toHaveTextContent(text);
     expect(screen.getByText('请求 #2')).toBeInTheDocument();
@@ -151,7 +151,7 @@ describe('DetailPanel', () => {
   });
 
   it('shows provider and model for the first request', () => {
-    setup({ kind: 'request', request: [...layout.requests.values()][0]! }, 'overview');
+    setup({ kind: 'request', request: [...layout.requests.values()][0] }, 'overview');
     expect(screen.getByText('deepseek')).toBeInTheDocument();
     expect(screen.getByText('v4')).toBeInTheDocument();
   });

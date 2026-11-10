@@ -6,7 +6,7 @@
 
 公开入口：`.`、`./manifest`、`./plugin`。
 
-Host port 为 `actspace.host.tools.shell-tools`；factory 只创建本包资源。
+进程实现在本包 `node-ports.ts`，随 Harness 产物打包；Host 只通过可选的能力授予 `actspace.host.process`（`@actspace/tool-runtime` 的 `ProcessHostGrant`）给根目录、强制结束钩子和随包 Python（`python`，类型 `BundledPythonGrant`：版本、shim 目录、核心/扩展包清单、扩展层 site-packages 查找），没有授予时 `bash` 注册但报告能力不可用。沙箱（`sandbox`）仍是可选服务。
 
 ## 沙箱
 

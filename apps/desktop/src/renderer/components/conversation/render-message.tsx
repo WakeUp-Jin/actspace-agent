@@ -1,5 +1,5 @@
 import type { MessageBlock } from "@actspace/shared";
-import { Check, GitBranch, Loader2 } from "lucide-react";
+import { Check, GitBranch, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getSessionToolDetail } from "../../api/sessions";
 import { AgentRunBlock } from "../messages/AgentRunBlock";
@@ -19,7 +19,6 @@ import { ToolLogShimmer } from "../messages/ToolLogShimmer";
 import { getToolLogRunningTextAttrs, TOOL_LOG_LINE_TEXT_RUNNING_CLASS } from "../messages/toolLogStyles";
 import { UserMessage } from "../messages/UserMessage";
 
-export type AgentMessageBlock = Extract<MessageBlock, { kind: "agent" }>;
 export type ReadMessageBlock = Extract<MessageBlock, { kind: "read" }>;
 /** 打开右侧「子 Agent」并选中这个子智能体（对话卡片、通知行、`send_message` / `interrupt_agent` 行共用）；没有 id 时只打开列表。 */
 export type SubagentOpenHandler = (agentId: string | undefined) => void;
@@ -202,11 +201,7 @@ function WorkspacePreparationBlock({ message }: { message: Extract<MessageBlock,
       open={!completed}
     >
       <summary className="flex cursor-pointer list-none items-center gap-2 text-text-main">
-        {completed ? (
-          <Check size={15} aria-hidden="true" />
-        ) : (
-          <Loader2 className="animate-spin" size={15} aria-hidden="true" />
-        )}
+        {completed ? <Check size={15} aria-hidden="true" /> : <LoaderCircle className="animate-spin" size={15} aria-hidden="true" />}
         <span className="font-medium">{completed ? "已创建工作树" : "正在创建工作树"}</span>
         {completed && message.durationMs !== undefined ? (
           <span className="text-act-xs leading-4 text-text-faint">

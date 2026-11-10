@@ -45,12 +45,24 @@ it("reads live child sessions from memory instead of re-reading their journals",
       }
     }
     expect({ fullReads, refreshes }).toEqual({ fullReads: 0, refreshes: 0 });
+    // 主会话的子 Agent 面板按序号增量读：内存里的会话只给新增的事件，不读文件。
+    const first = children[1]!;
+    const tail = await sessions.inspectEventsAfter(first.header.sessionId, first.lastSeq - 2);
+    expect(tail.lastSeq).toBe(first.lastSeq);
+    expect(tail.events.map(event => event.seq)).toEqual([first.lastSeq - 1, first.lastSeq]);
+    expect((await sessions.inspectEventsAfter(first.header.sessionId, first.lastSeq)).events).toEqual([]);
+    expect((await sessions.inspectEventsAfter(first.header.sessionId, -1)).events).toHaveLength(first.lastSeq + 1);
+    expect({ fullReads, refreshes }).toEqual({ fullReads: 0, refreshes: 0 });
 
     // 子 Agent 结束、取消登记后，内存里的读模型一起释放：之后再读走磁盘，读到的仍是完整内容。
-    releases[0]!();
+    releases[0]();
     const released = await sessions.inspect("child-0");
     expect(released.metadata.title).toBe("t4");
     expect(fullReads).toBeGreaterThan(0);
+    // 冷会话的增量读也只交出序号之后的那段。
+    const cold = await sessions.inspectEventsAfter("child-0", children[0]!.lastSeq - 1);
+    expect(cold.lastSeq).toBe(children[0]!.lastSeq);
+    expect(cold.events.map(event => event.seq)).toEqual([children[0]!.lastSeq]);
   } finally {
     for (const child of children) await child.close();
     await sessions.closeAll(); await rm(root, { recursive: true, force: true });

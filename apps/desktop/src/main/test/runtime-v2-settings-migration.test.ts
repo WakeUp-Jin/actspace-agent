@@ -7,9 +7,9 @@ import { SettingsService, type SecretCrypto } from "../settings-service";
 
 const roots: string[] = [];
 const crypto: SecretCrypto = {
-  isAvailable: () => true,
-  encrypt: (plain) => Buffer.from(plain, "utf8"),
-  decrypt: (cipher) => cipher.toString("utf8"),
+  isAvailable: async () => true,
+  encrypt: async (plain) => Buffer.from(plain, "utf8"),
+  decrypt: async (cipher) => cipher.toString("utf8"),
 };
 
 afterEach(async () => {

@@ -53,7 +53,7 @@ export function startExecution(input: { readonly request: SandboxRequest; readon
       catch (error) { return { outcome: { status: "prepare_failed", reasons: [`${selection.backend.id}: ${message(error)}`] }, facts: { ...facts, cleanup: "ok" } }; }
       spec = launch.spawn;
     } else {
-      spec = { command: policy.argv[0]!, args: policy.argv.slice(1), cwd: policy.cwd, env: policy.env };
+      spec = { command: policy.argv[0], args: policy.argv.slice(1), cwd: policy.cwd, env: policy.env };
     }
     const finish = async (outcome: SandboxOutcome): Promise<SandboxResult> => {
       finished = true;

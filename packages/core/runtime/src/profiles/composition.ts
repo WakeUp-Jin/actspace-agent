@@ -60,7 +60,7 @@ export async function loadBuiltinToolCodec(specifier: string, manifest: PluginMa
 /** Harness rows whose manifest the Host composes: a composition-disabled or skipped entry is not loaded into the Harness. */
 export function toolTransportPatches(composition: ResolvedComposition) {
   return PLUGIN_CATALOG.filter(item => item.loaders.includes("harness") && item.admitOnHost === true).map(item => {
-    const entry = composition.entries.find(entry => entry.pluginId === item.manifest.pluginId && entry.entryId === item.manifest.behaviors[0]!.entryId);
+    const entry = composition.entries.find(entry => entry.pluginId === item.manifest.pluginId && entry.entryId === item.manifest.behaviors[0].entryId);
     return { id: item.id, disabled: !entry?.enabled || entry.state === "skipped" };
   });
 }

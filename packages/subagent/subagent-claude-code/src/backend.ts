@@ -65,8 +65,8 @@ export function createClaudeCodeBackend(options: ClaudeCodeBackendOptions = {}):
       const args = ["-p", "--output-format", "stream-json", "--verbose", "--session-id", sessionId, "--permission-mode", config.permissionMode, ...(input.model ? ["--model", input.model] : [])];
       const child = spawn(path, args, { cwd: input.cwd, env, stdio: ["pipe", "pipe", "pipe"] });
       const stderr = new OutputTail();
-      child.stderr!.on("data", chunk => stderr.push(chunk));
-      child.stdin!.on("error", () => undefined);
+      child.stderr.on("data", chunk => stderr.push(chunk));
+      child.stdin.on("error", () => undefined);
       await new Promise<void>((started, failed) => {
         child.once("spawn", () => started());
         child.once("error", failed);
@@ -74,7 +74,7 @@ export function createClaudeCodeBackend(options: ClaudeCodeBackendOptions = {}):
       let outcome: ExternalRunResult | undefined;
       let lastAssistantText = "";
       let interrupted = false;
-      createInterface({ input: child.stdout! }).on("line", line => {
+      createInterface({ input: child.stdout }).on("line", line => {
         let message: Record<string, unknown>;
         try { message = record(JSON.parse(line)); } catch { return; }
         if (message.type === "assistant") {
@@ -94,7 +94,7 @@ export function createClaudeCodeBackend(options: ClaudeCodeBackendOptions = {}):
           else settle({ status: "failed", text: lastAssistantText, error: firstErrorLine(stderr.lastLine() ?? `claude exited with ${signal ?? `code ${code}`}`) });
         });
       });
-      child.stdin!.end(input.prompt);
+      child.stdin.end(input.prompt);
       return Object.freeze<ExternalRun>({
         transcriptPath: claudeTranscriptPath(input.cwd, sessionId, env),
         result,

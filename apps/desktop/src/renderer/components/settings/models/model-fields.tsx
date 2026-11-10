@@ -47,7 +47,7 @@ export function FamilyMark({ model }: { model: Pick<ConnectionModelView, "apiMod
 export function SavedMark({ offset = "right-2.5" }: { offset?: string }) {
   return (
     <span className={cx("pointer-events-none absolute inset-y-0 flex items-center gap-1 text-act-xs text-operational animate-[settings-saved-fade_1.8s_forwards] motion-reduce:animate-none", offset)}>
-      <Check size={12} strokeWidth={2.4} aria-hidden="true" />
+      <Check size={12} aria-hidden="true" />
       已保存
     </span>
   );
@@ -122,7 +122,7 @@ export function CheckMark({ checked, muted = false }: { checked: boolean; muted?
         muted ? "border-line bg-surface-subtle text-text-faint" : checked ? "border-action bg-action text-on-action" : "border-line-strong bg-surface",
       )}
     >
-      {checked ? <Check size={10} strokeWidth={2.8} /> : null}
+      {checked ? <Check size={10} /> : null}
     </span>
   );
 }
@@ -239,9 +239,11 @@ function DefaultThinking({ effective, onChange }: { effective: EffectiveModel; o
  * 显示的是已经乘过倍率的价格；手填的就是实际价格。
  */
 function RatePair({ rates, onCommit }: { rates: ModelRates | null; onCommit: (rates: ModelRates | null) => void }) {
-  const initial = { input: formatRateInput(rates?.input), output: formatRateInput(rates?.output) };
+  const initialInput = formatRateInput(rates?.input);
+  const initialOutput = formatRateInput(rates?.output);
+  const initial = { input: initialInput, output: initialOutput };
   const [text, setText] = useState(initial);
-  useEffect(() => setText(initial), [initial.input, initial.output]);
+  useEffect(() => setText({ input: initialInput, output: initialOutput }), [initialInput, initialOutput]);
   const commit = () => {
     if (text.input === initial.input && text.output === initial.output) return;
     const input = parseRate(text.input);

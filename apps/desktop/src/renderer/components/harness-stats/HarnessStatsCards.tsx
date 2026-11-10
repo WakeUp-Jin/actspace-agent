@@ -1,4 +1,4 @@
-import { CircleX, Database, Eye, GitCompare, Info, Layers, Scale, Shrink, TriangleAlert, X, Zap, ChevronRight } from "lucide-react";
+import { CircleX, Database, Eye, GitCompare, Info, Layers, Scale, Shrink, TriangleExclamationPoint, X, Zap, ChevronRight } from "lucide-react";
 import type {
   HarnessFlag,
   HarnessRevisionMetrics,
@@ -68,9 +68,9 @@ const USAGE_PREVIEW = 7;
 // ---------------------------------------------------------------- 值得关注
 
 const FLAG_ICON = {
-  error: <CircleX size={15} strokeWidth={1.9} aria-hidden="true" className="mt-0.5 text-danger" />,
-  warn: <TriangleAlert size={15} strokeWidth={1.9} aria-hidden="true" className="mt-0.5 text-warning" />,
-  info: <Info size={15} strokeWidth={1.9} aria-hidden="true" className="mt-0.5 text-info" />,
+  error: <CircleX size={15} aria-hidden="true" className="mt-0.5 text-danger" />,
+  warn: <TriangleExclamationPoint size={15} aria-hidden="true" className="mt-0.5 text-warning" />,
+  info: <Info size={15} aria-hidden="true" className="mt-0.5 text-info" />,
 } as const;
 
 export function FlagsBlock({ flags, onOpen }: { flags: readonly HarnessFlag[]; onOpen: (flag: HarnessFlag) => void }) {
@@ -89,7 +89,7 @@ export function FlagsBlock({ flags, onOpen }: { flags: readonly HarnessFlag[]; o
             <span className="block text-act-sm font-medium text-text-main">{flag.title}</span>
             <span className="mt-px block text-act-xs text-text-faint">{flag.detail}</span>
           </span>
-          <span className="mt-0.5 flex items-center gap-0.5 whitespace-nowrap text-act-xxs text-text-subtle">{flag.category}<ChevronRight size={13} strokeWidth={1.9} aria-hidden="true" /></span>
+          <span className="mt-0.5 flex items-center gap-0.5 whitespace-nowrap text-act-xxs text-text-subtle">{flag.category}<ChevronRight size={13} aria-hidden="true" /></span>
         </PlainButton>
       ))}
     </section>
@@ -292,7 +292,7 @@ export function SourcesCard({ error, onRetry, data, selected, onClear, flash }: 
   return (
     <StatsCard id="sources" title={selected ? `来源 · ${bucketLabel(selected)}` : "最大的上下文来源"} icon={Layers} span={6} flash={flash}
       aside={selected
-        ? <PlainButton onClick={onClear} className="inline-flex items-center gap-0.5 rounded-act-xs text-text-muted hover:text-text-main">看全部<X size={12} strokeWidth={2} aria-hidden="true" /></PlainButton>
+        ? <PlainButton onClick={onClear} className="inline-flex items-center gap-0.5 rounded-act-xs text-text-muted hover:text-text-main">看全部<X size={12} aria-hidden="true" /></PlainButton>
         : "平均大小 · 变化率"}
       footer="变化率 = 和上一次请求相比内容变了的比例；越高越容易让缓存失效。">
       {!data ? <Pending error={error} onRetry={onRetry} /> : (

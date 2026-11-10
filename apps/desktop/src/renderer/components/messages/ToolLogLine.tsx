@@ -191,8 +191,8 @@ function WebToolBlock({
       >
         <span className="web-tool-summary">{displayText}</span>
         {expanded
-          ? <ChevronDown size={14} strokeWidth={2.2} />
-          : <ChevronRight size={14} strokeWidth={2.2} />}
+          ? <ChevronDown size={14} />
+          : <ChevronRight size={14} />}
       </button>
       {expanded ? (
         contentPreview ? (
@@ -241,7 +241,7 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
       {canOpenFile ? summary : null}
       <button className="tool-result-toggle" type="button" aria-label={canOpenFile ? `Show result for ${displayText}` : undefined} aria-expanded={expanded} onClick={() => { if (!expanded) onExpand?.(); setExpanded((value) => !value); }}>
         {canOpenFile ? null : <span className="tool-result-summary">{summaryContent ?? displayText}</span>}
-        {expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />}
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </button>
     </div>
     {expanded ? <ul className="tool-result-list">{detailItems.map((item, index) => <li key={`${item}-${index}`} className="tool-result-item">{item}</li>)}</ul> : null}
@@ -265,7 +265,7 @@ function SubagentToolLine({ message, className, onOpenSubagent }: { message: Ext
           : <span className="tool-summary-target" title={link.target}>{link.target}</span>}
       </span>
       {message.content ? <button className="tool-result-toggle" type="button" aria-label={expanded ? `收起 ${message.title}` : `展开 ${message.title}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
-        {expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />}
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </button> : null}
     </div>
     {expanded ? <pre className={SUBAGENT_TOOL_BODY_CLASS}>{message.content}</pre> : null}

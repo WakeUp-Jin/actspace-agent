@@ -40,7 +40,7 @@ export class RemoteSessionRouter {
     }
     const ids: string[] = []; let transferred = 0;
     for (let index = 0; index < paths.length; index++) {
-      const source = sources[index]!, bytes = source.bytes ?? await readFile(source.path!);
+      const source = sources[index], bytes = source.bytes ?? await readFile(source.path!);
       if (bytes.length !== source.size) throw new Error("附件内容已变化，请重新选择文件。");
       const sha256 = createHash("sha256").update(bytes).digest("hex");
       const begin = await (existingIds[index]

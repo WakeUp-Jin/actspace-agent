@@ -1,7 +1,7 @@
 import type { CordisContext } from "@actspace/cordis-adapter";
 import type { ContextSource } from "@actspace/context-engine";
 import type { RunningSubagent, SubagentHostPort } from "@actspace/subagent";
-import { publish } from "@actspace/prompt/source-support";
+import { publish } from "@actspace/context-assembly";
 
 export const SUBAGENTS_CONTEXT_OWNER = "actspace.context-subagents";
 
@@ -35,5 +35,6 @@ function clock(iso: string): string {
 
 export function apply(ctx: CordisContext): void {
   const subagents = ctx.get?.("actspace.host.subagents") as SubagentHostPort | undefined;
-  publish(ctx, "subagents", () => createSubagentsSource(subagents ?? { running: () => [] }));
+  // 只给主 Agent：子智能体（含 fork）不能再派子智能体。
+  publish(ctx, "subagents", () => createSubagentsSource(subagents ?? { running: () => [] }), ["main"]);
 }

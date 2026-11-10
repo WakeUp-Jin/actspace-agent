@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft, Copy, FolderOpen, Loader2, Square } from "lucide-react";
+import { Check, ChevronLeft, Copy, FolderOpen, LoaderCircle, Square } from "lucide-react";
 import { subagentKindLabel, type MessageBlock, type SubAgentTranscriptRef, type SubagentListItem } from "@actspace/shared";
 import { IconButton } from "../ui/IconButton";
 import { Button } from "../ui/Button";
@@ -44,11 +44,15 @@ export function SubagentsPanel({ sessionId, focus }: { sessionId: string | null;
   const [stopError, setStopError] = useState<string>();
   // 运行中的耗时用 Date.now() 现算；列表没变化时不 setState，所以靠这个每秒一次的计数让耗时继续走。
   const [, setTick] = useState(0);
+  // revision 每次点击递增：同一个 agentId 再点一次也要重新定位。
+  const focusRevision = focus?.revision;
+  const focusAgentId = focus?.agentId;
+  const focusView = focus?.view;
   useEffect(() => {
-    if (!focus) return;
-    setPendingAgent(focus.agentId);
-    setView(focus.view);
-  }, [focus?.revision]);
+    if (focusAgentId === undefined || focusView === undefined) return;
+    setPendingAgent(focusAgentId);
+    setView(focusView);
+  }, [focusRevision, focusAgentId, focusView]);
   useEffect(() => {
     if (!pendingAgent || !loaded) return;
     const found = agents.some((item) => item.agentId === pendingAgent);
@@ -152,7 +156,7 @@ function SubagentRow({ agent, stopping, onOpen, onStop }: { agent: SubagentListI
       ? <span className="relative mr-2 grid size-7 shrink-0 place-items-center">
         {line?.letter && !stopping
           ? <span aria-hidden="true" data-testid="subagent-letter-dot" className={`${ROW_LETTER_DOT_CLASS}${idleClass}`} />
-          : <Loader2 size={15} aria-hidden="true" className={`${ROW_SPINNER_CLASS}${idleClass}`} />}
+          : <LoaderCircle size={15} aria-hidden="true" className={`${ROW_SPINNER_CLASS}${idleClass}`} />}
         <IconButton label={`停止 ${agent.description}`} tooltip="停止" variant="danger" shape="round" disabled={stopping} onClick={onStop}
           className={`absolute inset-0 ${stopping ? "opacity-0" : "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 group-focus-within/row:opacity-100"}`}>
           <Square size={11} fill="currentColor" />

@@ -63,10 +63,12 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
   });
   const onCancelRef = useRef(onCancel);
   onCancelRef.current = onCancel;
+  const attachmentsRef = useRef(attachments);
+  attachmentsRef.current = attachments;
 
-  // 原提问里的图片已经存在会话里：按 artifactId 读出预览。
+  // 原提问里的图片已经存在会话里：按 artifactId 读出预览。只在打开编辑器时读一次，之后附件变化不重读。
   useEffect(() => {
-    const pending = attachments.filter((attachment) => attachment.kind === "image" && !attachment.previewUrl && (attachment.artifactId || attachment.remoteArtifact));
+    const pending = attachmentsRef.current.filter((attachment) => attachment.kind === "image" && !attachment.previewUrl && (attachment.artifactId || attachment.remoteArtifact));
     if (pending.length === 0) return;
     let active = true;
     void Promise.all(pending.map(async (attachment) => {
@@ -79,8 +81,7 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
       setAttachments((current) => current.map((attachment) => previews.has(attachment.id) && !attachment.previewUrl ? { ...attachment, previewUrl: previews.get(attachment.id) } : attachment));
     });
     return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只在打开编辑器时读一次
-  }, [sessionId]);
+  }, [sessionId, setAttachments]);
 
   useLayoutEffect(() => {
     const input = inputRef.current;
@@ -143,10 +144,10 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
         <div className={EDITOR_REFERENCES_CLASS}>
           {fileReferences.map((reference) => (
             <span key={reference.relativePath} className={FILE_REFERENCE_CLASS} title={reference.relativePath}>
-              <FileText size={14} strokeWidth={1.9} aria-hidden="true" className="shrink-0 text-text-faint" />
+              <FileText size={14} aria-hidden="true" className="shrink-0 text-text-faint" />
               <span className="truncate">{reference.displayName}</span>
               <IconButton label={`移除 ${reference.displayName}`} variant="ghost" size="xs" onClick={() => setFileReferences((current) => current.filter((item) => item !== reference))}>
-                <X size={12} strokeWidth={2.4} aria-hidden="true" />
+                <X size={12} aria-hidden="true" />
               </IconButton>
             </span>
           ))}
@@ -175,7 +176,7 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
           shape="round"
           onClick={() => void (acceptsFiles ? attachmentState.selectFiles() : attachmentState.selectImages())}
         >
-          <Plus size={17} strokeWidth={2.1} aria-hidden="true" />
+          <Plus size={17} aria-hidden="true" />
         </IconButton>
         <ModelPicker
           catalog={model.catalog}
@@ -199,7 +200,7 @@ export function TurnPromptEditor({ sessionId, initial, onCancel, onSubmit }: Tur
           aria-disabled={!canSend}
           onClick={submit}
         >
-          <ArrowUp size={15} strokeWidth={2.4} aria-hidden="true" />
+          <ArrowUp size={15} aria-hidden="true" />
         </IconButton>
       </div>
     </div>

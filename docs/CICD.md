@@ -16,7 +16,7 @@
 | 工作流 | 触发 | 内容 |
 |---|---|---|
 | `base-checks.yml` | `pull_request`（**不带路径过滤**）、`push: main`、手动 | `repository-checks`（`scripts/ci.sh` + markdownlint）。唯一每个 PR 都会产生的 check，也是唯一能安全设为 required status check 的 job。 |
-| `ci.yml` | `pull_request`（忽略纯文档路径）、`push: main`、手动 | 四个并行 job：`typecheck-test`（contract matrix、Biome lint、typecheck、`pnpm test`）、`build`（`pnpm build`；`main` 上额外跑一次 Linux `release-package.sh` 冒烟，不上传产物）、`site`（check / test / build）、`browser-bridge`（契约检查 + Go 测试 + Windows / macOS 交叉编译，保证发布矩阵能 `go build`）。 |
+| `ci.yml` | `pull_request`（忽略纯文档路径）、`push: main`、手动 | 八个并行 job：`lint-typecheck`（build graph、contract matrix、Biome lint、`pnpm typecheck`）、`test-process`（根目录脚本测试 + 进程级测试）、`test-packages`（desktop 以外全部包的 vitest）、`test-desktop` ×2（desktop vitest 按 `--shard` 对半）、`build`（`pnpm build`；`main` 上额外跑一次 Linux `release-package.sh` 冒烟，不上传产物）、`site`（check / test / build）、`browser-bridge`（契约检查 + Go 测试 + Windows / macOS 交叉编译，保证发布矩阵能 `go build`）。 |
 | `agent-cli-binaries.yml` | `pull_request` 改到 CLI / packages / 打包脚本时、手动 | 在 CLI 支持的最低 Node 大版本上构建并校验 managed package，artifact 保留 3 天。 |
 | `supply-chain-security.yml` | `pull_request` 改到依赖清单 / lockfile / patches 时（`docs/**` 下的原型 `package.json` 不算）、每周一定时、手动 | 依赖变更审查（仅 PR）、OSV 扫描。 |
 | `codeql.yml` | `push: main`、`pull_request`（均忽略纯文档路径）、每周一定时、手动 | CodeQL `javascript-typescript` 与 `actions` 两种语言，`security-and-quality` 查询集；忽略测试、fixture、dist、生成文件和 `scripts/acceptance/**`（`.github/codeql/codeql-config.yml`）。不要在仓库设置里同时开启 CodeQL default setup。本地复现：用 [CodeQL CLI](https://github.com/github/codeql-action/releases) `database create --language=javascript-typescript --codescanning-config=.github/codeql/codeql-config.yml` 建库后 `database analyze --format=sarif-latest`，结果与 GitHub 一致。 |
@@ -27,13 +27,15 @@
 
 所有 PR 触发的工作流都带 `concurrency` 组并 `cancel-in-progress`，同一个 PR 连续推送只保留最后一次；`main` 上的 push 不取消。需要 pnpm 的 job 统一用 `pnpm/action-setup`（读根 `package.json` 的 `packageManager`）加 `actions/setup-node` 的 `cache: pnpm`，store 命中时 `pnpm install` 约 20 秒。
 
+`ci.yml` 里需要 workspace 产物的四个 job（`lint-typecheck`、`test-process`、`test-packages`、`test-desktop`）共用 `.github/actions/setup-workspace`：装 pnpm / Node、`pnpm install`，再用 `actions/cache` 恢复 `packages/*/*/dist`（含 `tsc -b` 的 `.tsbuildinfo`；不能写 `packages/**/dist`，`**` 会跟进 `node_modules` 里的符号链接匹配上万个第三方 `dist`）。随后各 job 跑 `pnpm build:deps`——即 desktop 的 `build:deps:dev`：`tsc -b tsconfig.desktop-deps.json` 按项目引用图编全部 packages，再补 client / agent-host 的 esbuild 包、english-learning 的 prompts 和 runtime 的默认 harness。缓存 key 带 commit SHA、`restore-keys` 退到同一 lockfile 下最近一次的产物，所以 `tsc -b` 只重编源码变了的包（冷 10 s 级、热 1 s 级）；PR 分支能读到 `main` 和自己之前推送的缓存。手动 `workflow_dispatch` 不恢复缓存，用来强制全量构建。四个 job 互不 `needs`，总时长取最长的那个。
+
 markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-cli2.jsonc`：第三方 skill 原文（`.agents/skills/**`）、已完成的 history 和测试 fixture 不扫；纯排版类规则（空行、列表周围空行、表格对齐、代码块语言等）关闭，只保留会影响渲染或链接正确性的规则（表格列数、标题层级、重复的兄弟标题、图片 alt、文件末尾换行等）。本地复现用 `npx -y markdownlint-cli2@0.20.0 "**/*.md"`。
 
-`main` 的 ruleset 如果要加 required status checks，只能选 `仓库基础检查`（`base-checks.yml` 的 `repository-checks`）：它不带路径过滤，每个 PR 都会报告。`typecheck-test`、`build`、CodeQL 这类带 `paths` / `paths-ignore` 的 job 不能设为必需——纯文档 PR 不触发它们，GitHub 会一直显示 Expected 并永远卡住合并。历史上 `repository-checks` 曾放在 `ci.yml`、并有一份路径互补的 `docs.yml`，两者都带路径过滤、任一设为必需都会卡死另一类 PR，所以拆成了独立的 `base-checks.yml`。
+`main` 的 ruleset 如果要加 required status checks，只能选 `仓库基础检查`（`base-checks.yml` 的 `repository-checks`）：它不带路径过滤，每个 PR 都会报告。`lint-typecheck`、`test-*`、`build`、CodeQL 这类带 `paths` / `paths-ignore` 的 job 不能设为必需——纯文档 PR 不触发它们，GitHub 会一直显示 Expected 并永远卡住合并。历史上 `repository-checks` 曾放在 `ci.yml`、并有一份路径互补的 `docs.yml`，两者都带路径过滤、任一设为必需都会卡死另一类 PR，所以拆成了独立的 `base-checks.yml`。
 
 ### Dependabot
 
-`.github/dependabot.yml` 每周一开一批更新 PR：npm 按「开发依赖的 minor/patch」「运行时依赖的 minor/patch」各合成一个 PR，运行时依赖的 major 单独开 PR 逐个评估，上限 5 个；GitHub Actions 与 Go module 各合成一个 PR。Dependabot 对 SHA pin 的 action 会同时更新 SHA 和版本注释，不会破坏 `check-action-pinning.sh`。两类依赖被排除在自动更新之外：由 `pnpm.overrides` 钉死的 `@deepseek-ai/cordis*`，以及带 `patches/` 补丁的 `@earendil-works/pi-ai`——它们的升级必须连 overrides 或补丁一起手动改。
+`.github/dependabot.yml` 每周一开一批更新 PR：npm 按「开发依赖的 minor/patch」「运行时依赖的 minor/patch」各合成一个 PR，运行时依赖的 major 单独开 PR 逐个评估，上限 5 个；GitHub Actions 与 Go module 各合成一个 PR。Dependabot 对 SHA pin 的 action 会同时更新 SHA 和版本注释，不会破坏 `check-action-pinning.sh`。三类依赖被排除在自动更新之外：由 `pnpm.overrides` 钉死的 `@deepseek-ai/cordis*` 和 `katex`（`rehype-katex` / `mermaid` 各自声明的范围由 overrides 统一到一个版本），以及带 `patches/` 补丁的 `@earendil-works/pi-ai`——它们的升级必须连 overrides 或补丁一起手动改。`typescript`、`vitest`、`vite`、`@types/node`、`@vitejs/plugin-react` 的版本只在 `pnpm-workspace.yaml` 的 `catalog:` 里，各包写 `catalog:`；升级这五个只改那一处再 `pnpm install`，`scripts/check-package-boundaries.mjs` 会拒绝在包里直接写版本号。
 
 ### 在 GitHub 上重新启用
 
@@ -44,8 +46,9 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
 - `pnpm dev`
 - `pnpm build`
 - `pnpm lint`
+- `pnpm build:deps`
 - `pnpm typecheck`
-- `pnpm test`
+- `pnpm test`（= `pnpm test:scripts` + `pnpm -r --if-present test`）
 - `pnpm package:desktop`
 - `pnpm dev:site`
 - `pnpm dev:web`
@@ -73,8 +76,11 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
   - GitHub Actions pinning
   - shell 脚本语法检查
 - `.github/workflows/base-checks.yml` 的 `repository-checks` 不需要 pnpm，只装 ripgrep 后跑 `scripts/ci.sh` 与 markdownlint。
-- `.github/workflows/ci.yml` 中的工程 job（`typecheck-test`、`build`、`site`、`browser-bridge`）都从 `pnpm install --frozen-lockfile` 开始，然后各自执行：
-  - `typecheck-test`：`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。job 开头装 ripgrep（`tool-fs-search` 的测试调真实 `rg`）；`pnpm test` 之前先 `pnpm --filter '@actspace/agent-cli...' build`，因为 `test:agent-host:process` 等进程级测试直接 spawn `apps/cli/dist/cli.js`。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
+- `.github/workflows/ci.yml` 中的工程 job 都从 `pnpm install --frozen-lockfile` 开始，然后各自执行：
+  - `lint-typecheck`：`pnpm check:desktop-build-graph`（必须排在 `build:deps` 之前，因为后者会重新生成 `tsconfig.build.json`）、`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。`pnpm typecheck` = `build:deps`（`tsc -b` 本身就是对全部 packages 的类型检查）+ 只对 apps 跑 `tsc --noEmit`（`packages/` 下每个包都在 `tsconfig.desktop-deps.json` 的引用图里；新增图外的包时要把它加进这条 filter）。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
+  - `test-process`：装 ripgrep、`pnpm build:deps`、`pnpm --filter @actspace/agent-cli build`、`pnpm test:scripts`（根目录全部 `node --test` 与 `check:*`，含 `test:agent-host:process` 等直接 spawn `apps/cli/dist/cli.js` 的进程级测试）。
+  - `test-packages`：装 ripgrep（`tool-fs-search` 的测试调真实 `rg`）、`pnpm build:deps`、`pnpm -r --filter '!@actspace/desktop' --filter '!actspace' test`（只带排除式 `--filter` 时 pnpm 会把 workspace 根也选进来，根的 `test` 会递归回 `pnpm -r test`，所以要一并排除）。
+  - `test-desktop`：两个分片，`pnpm build:deps` 后 `vitest run --shard=N/2`。desktop 的 vitest 配置分成 `main`（node 环境）和 `renderer`（jsdom）两个 project，`vitest run src/main` 这类路径过滤照常可用。
   - `build`：`pnpm build`（`agent-cli...` 带依赖闭包，runner 上没有现成的 `dist/`，要先按拓扑顺序构建 workspace 依赖）；在 `main` 上再装 Go 并执行 `./scripts/release-package.sh` 作为打包冒烟，产物不上传。
   - `site`：`check:site`、`test:site` 和 `build:site`，并使用 Netlify 的 `/` base path 验证生产构建；CI 中的 `https://example.com` 仅用于构建检查，不是官网地址。
   - `browser-bridge`：`pnpm check:browser` 与 `go test`。

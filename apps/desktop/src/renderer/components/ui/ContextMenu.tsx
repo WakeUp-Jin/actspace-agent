@@ -3,7 +3,7 @@ import { Check, ChevronRight, Circle } from "lucide-react";
 import * as React from "react";
 import { cn } from "./cn";
 import {
-  MENU_DANGER_ITEM_CLASS, MENU_INDICATOR_SLOT_CLASS, MENU_ITEM_CLASS, MENU_LABEL_CLASS, MENU_SEPARATOR_CLASS, MENU_SHORTCUT_CLASS, MENU_SURFACE_CLASS,
+  MENU_DANGER_ITEM_CLASS, MENU_INDICATOR_SLOT_CLASS, MENU_ITEM_CLASS, MENU_LABEL_CLASS, MENU_SEPARATOR_CLASS, MENU_SURFACE_CLASS,
 } from "./menu-styles";
 
 // 右键菜单。与 Menu 同构，样式共用 menu-styles。右键、或焦点在触发区域内时按 Shift+F10 / 菜单键打开，
@@ -12,9 +12,7 @@ import {
 
 const ContextMenu = ({ modal = false, ...props }: React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Root>) => <ContextMenuPrimitive.Root modal={modal} {...props} />;
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
-const ContextMenuGroup = ContextMenuPrimitive.Group;
 const ContextMenuSub = ContextMenuPrimitive.Sub;
-const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
 
 function stopEscape(event: React.KeyboardEvent) {
   // 与 DialogContent 相同：Esc 不再沿组件树冒泡到外层的 Esc 处理。
@@ -42,7 +40,7 @@ const ContextMenuCheckboxItem = React.forwardRef<React.ElementRef<typeof Context
   className, children, ...props
 }, ref) => (
   <ContextMenuPrimitive.CheckboxItem ref={ref} className={cn(MENU_ITEM_CLASS, className)} {...props}>
-    <span className={MENU_INDICATOR_SLOT_CLASS}><ContextMenuPrimitive.ItemIndicator><Check size={14} strokeWidth={2.4} aria-hidden="true" /></ContextMenuPrimitive.ItemIndicator></span>
+    <span className={MENU_INDICATOR_SLOT_CLASS}><ContextMenuPrimitive.ItemIndicator><Check size={14} aria-hidden="true" /></ContextMenuPrimitive.ItemIndicator></span>
     {children}
   </ContextMenuPrimitive.CheckboxItem>
 ));
@@ -88,11 +86,7 @@ const ContextMenuSeparator = React.forwardRef<React.ElementRef<typeof ContextMen
 ));
 ContextMenuSeparator.displayName = "ContextMenuSeparator";
 
-function ContextMenuShortcut({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) {
-  return <span className={cn(MENU_SHORTCUT_CLASS, className)} {...props} />;
-}
-
 export {
-  ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuGroup, ContextMenuItem, ContextMenuCheckboxItem, ContextMenuRadioGroup, ContextMenuRadioItem,
-  ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent, ContextMenuSeparator, ContextMenuLabel, ContextMenuShortcut,
+  ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuCheckboxItem, ContextMenuRadioItem,
+  ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent, ContextMenuSeparator, ContextMenuLabel,
 };

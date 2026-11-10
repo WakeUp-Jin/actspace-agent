@@ -110,7 +110,7 @@ export function WindowChromeBar({
           aria-pressed={!isLeftHidden}
           onClick={onToggleLeft}
         >
-          <PanelLeft size={15} strokeWidth={1.8} />
+          <PanelLeft size={15} />
         </button>
         <div className="chrome-navigation" aria-label="会话导航">
           <button
@@ -121,7 +121,7 @@ export function WindowChromeBar({
             disabled={!canGoBack}
             onClick={onGoBack}
           >
-            <ArrowLeft size={15} strokeWidth={1.8} />
+            <ArrowLeft size={15} />
           </button>
           <button
             className="chrome-button"
@@ -131,7 +131,7 @@ export function WindowChromeBar({
             disabled={!canGoForward}
             onClick={onGoForward}
           >
-            <ArrowRight size={15} strokeWidth={1.8} />
+            <ArrowRight size={15} />
           </button>
         </div>
       </div>
@@ -164,7 +164,7 @@ export function WindowChromeBar({
               title={rightOpen ? "关闭右侧面板" : "打开右侧面板"}
               onClick={onToggleRight}
             >
-              <PanelRight size={15} strokeWidth={1.8} />
+              <PanelRight size={15} />
             </button>
           ) : null}
         </div>

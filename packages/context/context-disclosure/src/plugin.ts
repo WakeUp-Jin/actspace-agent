@@ -1,4 +1,5 @@
 import type { CordisContext } from "@actspace/cordis-adapter";
+import { CONTEXT_ASSEMBLY_SERVICE_ID, type ContextAssemblyService } from "@actspace/context-assembly";
 import { CONTEXT_TRACE_DETAIL_LABEL, type RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { SessionEventEnvelopeV1 } from "@actspace/session-journal";
 import type { Context, ContextPathState, ContextSource, CompactionDisclosure, CompactionRegion, CompactionResult, CompactionSession, ContextCompactionCoordinator } from "@actspace/context-engine";
@@ -164,13 +165,20 @@ export function createDisclosureSource(): ContextSource {
     write({ supplements: [{ id: "navigation", owner: DISCLOSURE_OWNER, afterEventSeq: -1, sourceEventSeq: -1, text }] });
   } };
 }
+/**
+ * Enabled, the strategy joins the engine three ways: compaction hooks and Context hydration through the coordinator,
+ * the navigation source and the tool-result observer through `context.assembly`. The loop references none of them.
+ */
 export function apply(ctx: CordisContext): void {
   const host = ctx.get?.("actspace.host.agent") as { contextDisclosure?: DisclosureHost } | undefined;
   if (!host?.contextDisclosure) { ctx.provide?.("context.disclosure", undefined); return; }
   const disclosure = new ProgressiveDisclosure(host.contextDisclosure);
   const engine = ctx.get?.("context.engine") as { compaction: ContextCompactionCoordinator } | undefined;
-  if (!engine) throw new Error("Context disclosure requires context.engine.");
+  const assembly = ctx.get?.(CONTEXT_ASSEMBLY_SERVICE_ID) as ContextAssemblyService | undefined;
+  if (!engine || !assembly) throw new Error(`Context disclosure requires context.engine and ${CONTEXT_ASSEMBLY_SERVICE_ID}.`);
   const remove = engine.compaction.registerDisclosure(disclosure); ctx.effect?.(() => remove);
+  ctx.effect?.(() => assembly.register({ kind: "disclosure", create: () => createDisclosureSource() }), "context.source.disclosure");
+  ctx.effect?.(() => assembly.registerToolResultObserver((session, event) => disclosure.observe(session, event)), "context.disclosure.observer");
   ctx.provide?.("context.disclosure", disclosure);
 }
 function record(value: unknown): Readonly<Record<string, RuntimeV2JsonValue>> { return value && typeof value === "object" && !Array.isArray(value) ? value as Readonly<Record<string, RuntimeV2JsonValue>> : {}; }

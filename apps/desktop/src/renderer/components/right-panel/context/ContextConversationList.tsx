@@ -43,7 +43,7 @@ export function ContextConversationList({ category, total, paging = false, onLoa
   const hasKinds = category.entries.some((entry) => entry.kind !== undefined);
   const rows = conversationRows(category.entries, filters);
   const shown = rows.slice(0, limit);
-  const single = filters.length === 1 ? filters[0]! : null;
+  const single = filters.length === 1 ? filters[0] : null;
 
   const toggle = (filter: ConversationFilter) =>
     setFilters((current) => (current.includes(filter) ? current.filter((value) => value !== filter) : [...current, filter]));
@@ -64,7 +64,7 @@ export function ContextConversationList({ category, total, paging = false, onLoa
             <button type="button" onClick={() => navigation.revealInTrajectory({ latest: single })}
               className={cn("inline-flex h-[21px] shrink-0 items-center gap-0.5 whitespace-nowrap rounded-act-xs border-0 bg-transparent px-1 text-act-xxs text-text-faint [cursor:pointer] hover:text-text-main", ROW_FOCUS_CLASS)}>
               {single ? `在轨迹中打开最新${FILTER_LABEL[single]}` : "在轨迹中打开"}
-              <ArrowUpRight size={11} strokeWidth={2.4} aria-hidden="true" />
+              <ArrowUpRight size={11} aria-hidden="true" />
             </button>
           ) : null}
         </div>
@@ -87,7 +87,7 @@ export function ContextConversationList({ category, total, paging = false, onLoa
           <button key={entry.key} type="button" title={`在轨迹中查看：${entry.title}`} onClick={() => navigation.revealInTrajectory(target)}
             className={cn("group border-0 bg-transparent [cursor:pointer] hover:bg-hover-overlay", ROW_CLASS, ROW_FOCUS_CLASS)}>
             {content}
-            <ArrowUpRight size={11} strokeWidth={2.4} aria-hidden="true"
+            <ArrowUpRight size={11} aria-hidden="true"
               className="shrink-0 text-text-faint opacity-0 transition-opacity duration-(--motion-fast) group-hover:opacity-100 group-focus-visible:opacity-100" />
           </button>
         );

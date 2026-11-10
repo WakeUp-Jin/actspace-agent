@@ -1,4 +1,4 @@
-import { ChevronRight, TriangleAlert } from "lucide-react";
+import { ChevronRight, TriangleExclamationPoint } from "lucide-react";
 import { OpenInAppMenu } from "./OpenInAppMenu";
 import type { RightPanelTab, WorkspaceFileMeta } from "./RightPanelContext";
 import { useReloadFileTab } from "./useFileFreshness";
@@ -67,7 +67,7 @@ export function WorkspaceOperationBar({
                 <span className={WORKSPACE_BAR_ROOT_CLASS} title={boundRoot}>
                   {rootLabel}
                 </span>
-                <ChevronRight size={12} strokeWidth={1.8} className="shrink-0 text-text-faint" aria-hidden="true" />
+                <ChevronRight size={12} className="shrink-0 text-text-faint" aria-hidden="true" />
               </>
             ) : null}
             <span className={WORKSPACE_BAR_PATH_CLASS} title={path}>
@@ -81,7 +81,7 @@ export function WorkspaceOperationBar({
       </div>
       {isStale ? (
         <div className={WORKSPACE_STALE_BAR_CLASS} role="status">
-          <TriangleAlert size={13} strokeWidth={2} className="shrink-0" aria-hidden="true" />
+          <TriangleExclamationPoint size={13} className="shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1">文件已在磁盘上变更，当前显示的是旧内容。</span>
           <button type="button" className={WORKSPACE_STALE_ACTION_CLASS} onClick={reload}>
             重新加载

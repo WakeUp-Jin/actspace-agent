@@ -43,7 +43,7 @@ export function analyzeCommandPrefixGrant(command: string): { readonly argv: rea
     const rest = directory === undefined ? args : args.slice(2);
     const sub = rest[0];
     if (!sub || !command.includes(` ${sub}`) || rest.some(arg => arg.startsWith("-L") || /^--(?:output|ext-diff|textconv|no-index|exec-path|exclude-from)(?:=|$)/.test(arg))) return undefined;
-    const special = sub === "remote" && (rest.length === 2 && rest[1] === "-v" || rest.length === 3 && rest[1] === "get-url" && /^[A-Za-z0-9._-]+$/.test(rest[2]!))
+    const special = sub === "remote" && (rest.length === 2 && rest[1] === "-v" || rest.length === 3 && rest[1] === "get-url" && /^[A-Za-z0-9._-]+$/.test(rest[2]))
       || (sub === "branch" || sub === "tag") && rest[1] === "--list" && rest.length === 2;
     if (!GIT_COMMANDS.has(sub) && !special) return undefined;
     // Keep the canonical argv used by the matcher separate from Git's effective cwd.
@@ -75,7 +75,7 @@ function queryOperands(program: string, args: readonly string[]): string[] | und
   const paths: string[] = [];
   let pattern = program !== "rg" && program !== "grep" || args.includes("--files"), literal = false;
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i]!;
+    const arg = args[i];
     if (!literal && arg === "--") { literal = true; continue; }
     if (!literal && arg.startsWith("-")) {
       if ((program === "head" || program === "tail") && /^-(?:n|c)\d+$/.test(arg)) continue;

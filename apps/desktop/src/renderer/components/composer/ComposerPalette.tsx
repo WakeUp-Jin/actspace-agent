@@ -1,4 +1,4 @@
-import { BookOpen, Check, ChevronLeft, ChevronRight, Image, ListTodo, Loader2, MessageCircle, Paperclip, Search, type LucideIcon } from "lucide-react";
+import { BookOpen, Check, ChevronLeft, ChevronRight, Image, ListTodo, LoaderCircle, MessageCircle, Paperclip, Search, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { ComposerMode, SkillCatalogItem } from "@actspace/shared";
 import { Button } from "../ui/Button";
@@ -166,12 +166,12 @@ function ComposerPaletteContent({
       key: `skill:${skill.scope}:${skill.name}`,
       label: skill.name,
       description: skill.description || "暂无说明",
-      icon: <BookOpen className="shrink-0 text-text-faint" size={14} strokeWidth={1.9} aria-hidden="true" />,
+      icon: <BookOpen className="shrink-0 text-text-faint" size={14} aria-hidden="true" />,
       checked,
       trailing: (
         <>
           <span className="text-act-xxs uppercase tracking-wide">{skill.scope}</span>
-          {checked ? <Check className="text-text-main" size={14} strokeWidth={2.2} aria-hidden="true" /> : null}
+          {checked ? <Check className="text-text-main" size={14} aria-hidden="true" /> : null}
         </>
       ),
       // 多选：勾完留在面板里。
@@ -191,7 +191,7 @@ function ComposerPaletteContent({
           key: `mode:${candidate}`,
           label: meta.label,
           description: meta.description,
-          icon: <Icon className={`shrink-0 ${meta.iconClass}`} size={14} strokeWidth={1.9} aria-hidden="true" />,
+          icon: <Icon className={`shrink-0 ${meta.iconClass}`} size={14} aria-hidden="true" />,
           disabled: modeDisabled,
           activate: () => finish(() => onSelectMode(candidate)),
         };
@@ -202,16 +202,16 @@ function ComposerPaletteContent({
         key: "entry:attachment",
         label: attachment.label,
         description: attachment.description,
-        icon: <AttachmentIcon className="shrink-0 text-text-faint" size={14} strokeWidth={1.9} aria-hidden="true" />,
+        icon: <AttachmentIcon className="shrink-0 text-text-faint" size={14} aria-hidden="true" />,
         activate: () => finish(attachment.onSelect),
       },
       ...(skills ? [{
         key: "entry:skills",
         label: "Skills",
         description: "为本轮加载技能说明",
-        icon: <BookOpen className="shrink-0 text-text-faint" size={14} strokeWidth={1.9} aria-hidden="true" />,
+        icon: <BookOpen className="shrink-0 text-text-faint" size={14} aria-hidden="true" />,
         drill: () => goTo("skills", "entry:skills"),
-        trailing: <ChevronRight size={14} strokeWidth={2} aria-hidden="true" />,
+        trailing: <ChevronRight size={14} aria-hidden="true" />,
         activate: () => goTo("skills", "entry:skills"),
       }] : []),
     ].filter((row) => !normalizedQuery || matches(normalizedQuery, row.label, row.description));
@@ -233,7 +233,7 @@ function ComposerPaletteContent({
     if (skills.loading) {
       emptyState = (
         <div className={STATE_CLASS}>
-          <Loader2 className="animate-spin" size={14} aria-hidden="true" /> 正在加载 Skills…
+          <LoaderCircle className="animate-spin" size={14} aria-hidden="true" /> 正在加载 Skills…
         </div>
       );
     } else if (skills.error) {
@@ -258,11 +258,12 @@ function ComposerPaletteContent({
   // 当前行不在列表里（搜索词变了、刚换页）时落到第一条可选的行。
   const activeRow = enabledRows.find((row) => row.key === activeKey) ?? enabledRows[0];
   const rowId = (row: PaletteRow) => `${listboxId}-${row.key}`;
+  const activeRowId = activeRow ? rowId(activeRow) : null;
 
   useEffect(() => {
-    if (!activeRow) return;
-    document.getElementById(rowId(activeRow))?.scrollIntoView?.({ block: "nearest" });
-  }, [activeRow?.key]);
+    if (!activeRowId) return;
+    document.getElementById(activeRowId)?.scrollIntoView?.({ block: "nearest" });
+  }, [activeRowId]);
 
   function move(delta: 1 | -1) {
     if (enabledRows.length === 0) return;
@@ -332,10 +333,10 @@ function ComposerPaletteContent({
     >
         <div className={SEARCH_ROW_CLASS}>
           {page === "main" ? (
-            <Search size={14} strokeWidth={2} aria-hidden="true" />
+            <Search size={14} aria-hidden="true" />
           ) : (
             <IconButton className="-ml-1" label="返回" tooltip={false} size="xs" tabIndex={-1} onClick={goBack}>
-              <ChevronLeft size={15} strokeWidth={2} aria-hidden="true" />
+              <ChevronLeft size={15} aria-hidden="true" />
             </IconButton>
           )}
           <input

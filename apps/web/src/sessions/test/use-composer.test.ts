@@ -17,10 +17,10 @@ it("submits the trimmed text and keeps the same submissionId across retries of t
   await controller.send("你好");
   const submits = client.calls.filter(call => call.method === "tasks.submit");
   expect(submits).toHaveLength(2);
-  expect(submits[0]!.params).toEqual({ sessionId: "s1", submissionId: "id-1", content: "你好" });
-  expect(submits[1]!.params.submissionId).toBe("id-1");
+  expect(submits[0].params).toEqual({ sessionId: "s1", submissionId: "id-1", content: "你好" });
+  expect(submits[1].params.submissionId).toBe("id-1");
   await controller.send("下一条");
-  expect(client.calls.filter(call => call.method === "tasks.submit")[2]!.params.submissionId).toBe("id-2");
+  expect(client.calls.filter(call => call.method === "tasks.submit")[2].params.submissionId).toBe("id-2");
 });
 
 it("uses a new submissionId once the text changed after a failure", async () => {
@@ -39,8 +39,8 @@ it("retries a mode change once with a fresh revision after CONFLICT", async () =
   });
   await controller.setMode("plan");
   expect(client.calls.map(call => call.method)).toEqual(["sessions.update", "sessions.page", "sessions.update"]);
-  expect(client.calls[0]!.params).toEqual({ sessionId: "s1", patch: { mode: "plan", expectedRevision: 3 } });
-  expect(client.calls[2]!.params).toEqual({ sessionId: "s1", patch: { mode: "plan", expectedRevision: 9 } });
+  expect(client.calls[0].params).toEqual({ sessionId: "s1", patch: { mode: "plan", expectedRevision: 3 } });
+  expect(client.calls[2].params).toEqual({ sessionId: "s1", patch: { mode: "plan", expectedRevision: 9 } });
 });
 
 it("gives up after the second CONFLICT and does not retry other errors", async () => {
@@ -57,8 +57,8 @@ it("stops a run, cancels a queued task with the known revision and applies the r
   const { client, controller, applied } = setup(() => ({ snapshot }));
   await controller.stop("r1");
   await controller.cancel("t9");
-  expect(client.calls[0]!.params).toEqual({ sessionId: "s1", op: "stop", runId: "r1" });
-  expect(client.calls[1]!.params).toEqual({ sessionId: "s1", op: "cancel", taskId: "t9", revision: 7 });
+  expect(client.calls[0].params).toEqual({ sessionId: "s1", op: "stop", runId: "r1" });
+  expect(client.calls[1].params).toEqual({ sessionId: "s1", op: "cancel", taskId: "t9", revision: 7 });
   expect(applied).toEqual([snapshot, snapshot]);
 });
 
@@ -70,9 +70,9 @@ it("retries cancel once with the snapshot revision after CONFLICT, and configure
   });
   await controller.cancel("t1");
   expect(client.calls.map(call => call.params.op)).toEqual(["cancel", "snapshot", "cancel"]);
-  expect(client.calls[2]!.params.revision).toBe(12);
+  expect(client.calls[2].params.revision).toBe(12);
   await controller.configure({ model: "p/m", reasoningEffort: "high" });
-  expect(client.calls[3]!.params).toEqual({ sessionId: "s1", op: "configure", configuration: { model: "p/m", reasoningEffort: "high" } });
+  expect(client.calls[3].params).toEqual({ sessionId: "s1", op: "configure", configuration: { model: "p/m", reasoningEffort: "high" } });
 });
 
 it("resumes explicitly with the current revision and refreshes once on conflict", async () => {
@@ -83,8 +83,8 @@ it("resumes explicitly with the current revision and refreshes once on conflict"
   });
   await controller.resume();
   expect(client.calls.map(call => call.params.op)).toEqual(["resume", "snapshot", "resume"]);
-  expect(client.calls[0]!.params.revision).toBe(7);
-  expect(client.calls[2]!.params.revision).toBe(12);
+  expect(client.calls[0].params.revision).toBe(7);
+  expect(client.calls[2].params.revision).toBe(12);
   expect(applied.at(-1)).toMatchObject({ paused: false });
 });
 

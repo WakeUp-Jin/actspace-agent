@@ -34,12 +34,12 @@ function CoordStatusRow({ dirs, snapshot }: { dirs: string[]; snapshot: ContextU
     <div className={`flex min-h-5 items-center justify-between gap-3 px-3 text-act-sm leading-5 text-text-faint`} aria-label="协调 Agent 的范围">
       <div className="flex min-w-0 items-center gap-1.5">
         <span className="inline-flex min-w-0 items-center gap-1.5" title={dirs.join(", ")}>
-          <Folder className="shrink-0 text-text-subtle" size={14} strokeWidth={2} aria-hidden="true" />
+          <Folder className="shrink-0 text-text-subtle" size={14} aria-hidden="true" />
           <span className="truncate">{dirs.join(", ")}</span>
         </span>
         <span className="shrink-0 opacity-60" aria-hidden="true">·</span>
         <span className="inline-flex shrink-0 items-center gap-1.5">
-          <Eye className="shrink-0 text-text-subtle" size={14} strokeWidth={2} aria-hidden="true" />
+          <Eye className="shrink-0 text-text-subtle" size={14} aria-hidden="true" />
           <span>只读，交事给 Actor</span>
         </span>
       </div>
@@ -102,7 +102,7 @@ export function SpaceComposer() {
       onExpandContext={coord ? undefined : () => actions.openPanelTab("context")}
       permissionControl={coord ? undefined : (
         <span className="inline-flex items-center gap-1.5 text-text-muted" title="权限：自动">
-          <ShieldCheck className="shrink-0 text-text-subtle" size={14} strokeWidth={2} aria-hidden="true" />
+          <ShieldCheck className="shrink-0 text-text-subtle" size={14} aria-hidden="true" />
           <span>自动</span>
         </span>
       )}

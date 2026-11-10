@@ -121,7 +121,7 @@ export function TrajectoryView({ snapshot, onAbort, isAborting, sessionId: watch
   // 本地分页：只显示最后 historyLimit 行，起点退到所在轮次的第一行。
   const historyStart = useMemo(() => {
     if (remoteHistory || allRows.length <= historyLimit) return 0;
-    const section = allRows[allRows.length - historyLimit]!.section;
+    const section = allRows[allRows.length - historyLimit].section;
     return allRows.findIndex(row => row.section === section);
   }, [allRows, historyLimit, remoteHistory]);
   const windowRows = useMemo(() => historyStart === 0 ? allRows : allRows.slice(historyStart), [allRows, historyStart]);

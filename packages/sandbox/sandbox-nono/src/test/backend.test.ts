@@ -94,7 +94,7 @@ describe("nono configuration", () => {
   });
 
   it("writes allowlists as profile network fields, on Linux too", async () => {
-    const evaluation = sandboxTemplate("evaluation", { homeDir: "/Users/agent", platform: "linux" })!;
+    const evaluation = sandboxTemplate("evaluation", { homeDir: "/Users/agent", platform: "linux" });
     const resolved = await resolvePolicy(request({ purpose: "evaluation", network: { mode: "allowlist", domains: ["api.example.com"], localPorts: [8080], upstreamProxy: "127.0.0.1:7897" } }), evaluation);
     if (!resolved.ok) throw new Error(resolved.reasons.join());
     const network = { allow_domain: ["api.example.com"], open_port: [8080], upstream_proxy: "127.0.0.1:7897" };
@@ -153,7 +153,7 @@ describe("nono backend", () => {
     const tree = { ...TREE, "/work": "dir" as const, [scratch]: "dir" as const };
     const policy = { ...await policyFor("darwin"), scratchDir: scratch, env: { HOME: "/Users/agent", NONO_ALLOW: "/" }, filesystem: { ...(await policyFor("darwin")).filesystem, readWrite: ["/work"] } };
     const launch = await createNonoBackend(fakeHost("darwin", "/n"), fakeFs(tree)).prepare(policy);
-    const configPath = launch.spawn.args[4]!;
+    const configPath = launch.spawn.args[4];
     expect(launch.spawn).toMatchObject({ command: "/n", args: ["wrap", "-s", "--no-diagnostics", "-p", configPath, "--", "/bin/zsh", "-lc", "true"], env: { HOME: "/Users/agent" } });
     expect(configPath.startsWith(scratch)).toBe(true);
     const profile = JSON.parse(await readFile(configPath, "utf8"));
@@ -177,11 +177,11 @@ describe("nono backend", () => {
   it.each(["darwin", "linux"] as const)("uses nono run with a profile for allowlists on %s and drops the caller's proxy", async platform => {
     const scratch = await mkdtemp(join(tmpdir(), "nono-run-"));
     const tree = { ...TREE, "/work": "dir" as const, [scratch]: "dir" as const };
-    const evaluation = sandboxTemplate("evaluation", { homeDir: "/Users/agent", platform })!;
+    const evaluation = sandboxTemplate("evaluation", { homeDir: "/Users/agent", platform });
     const resolved = await resolvePolicy(request({ purpose: "evaluation", scratchDir: scratch, filesystem: { readWrite: ["/work"] }, env: { HOME: "/Users/agent", HTTPS_PROXY: "http://corp:8080", NONO_ALLOW: "/" }, network: { mode: "allowlist", domains: ["a.com"] } }), evaluation);
     if (!resolved.ok) throw new Error(resolved.reasons.join());
     const launch = await createNonoBackend(fakeHost(platform, "/n"), fakeFs(tree)).prepare(resolved.policy);
-    const configPath = launch.spawn.args[6]!;
+    const configPath = launch.spawn.args[6];
     expect(launch.spawn).toEqual({ command: "/n", args: ["run", "-s", "--no-diagnostics", "--no-audit", "--no-rollback", "-p", configPath, "--", "/bin/zsh", "-lc", "true"], cwd: "/work", env: { HOME: "/Users/agent" } });
     const profile = JSON.parse(await readFile(configPath, "utf8"));
     expect(profile.network).toEqual({ allow_domain: ["a.com"] });

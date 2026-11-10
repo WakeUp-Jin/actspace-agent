@@ -27,7 +27,7 @@ describe("JsonTree", () => {
   it("expands a child on click and collapses it again", async () => {
     const user = userEvent.setup();
     render(<JsonTree data={data} />);
-    await user.click(screen.getAllByRole("button", { name: "展开" })[0]!);
+    await user.click(screen.getAllByRole("button", { name: "展开" })[0]);
     const group = screen.getByRole("group");
     expect(group).toHaveTextContent("a:");
     await user.click(screen.getByRole("button", { name: "收起" }));
@@ -36,7 +36,7 @@ describe("JsonTree", () => {
 
   it("toggles with the keyboard", () => {
     render(<JsonTree data={data} />);
-    const expander = screen.getAllByRole("button", { name: "展开" })[0]!;
+    const expander = screen.getAllByRole("button", { name: "展开" })[0];
     fireEvent.keyDown(expander, { key: "ArrowRight" });
     expect(screen.getByRole("group")).toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole("button", { name: "收起" }), { key: "ArrowLeft" });

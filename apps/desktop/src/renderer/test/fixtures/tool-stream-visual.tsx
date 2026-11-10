@@ -25,10 +25,10 @@ function ToolStreamVisual() {
     <div style={{ maxWidth: 850, margin: "auto" }}>
       <h1 style={{ fontSize: 22, marginBottom: 16 }}>工具流式渲染 · 显式测试样例</h1>
       <div style={{ display: "flex", gap: 16, marginBottom: 30 }}>
-        <button onClick={() => setPhase("streaming")}>参数生成</button>
-        <button onClick={() => setPhase("running")}>工具执行</button>
-        <button onClick={() => setPhase("finished")}>结果完成</button>
-        <button onClick={() => setDark(!dark)}>{dark ? "浅色" : "深色"}</button>
+        <button type="button" onClick={() => setPhase("streaming")}>参数生成</button>
+        <button type="button" onClick={() => setPhase("running")}>工具执行</button>
+        <button type="button" onClick={() => setPhase("finished")}>结果完成</button>
+        <button type="button" onClick={() => setDark(!dark)}>{dark ? "浅色" : "深色"}</button>
       </div>
       <p style={{ marginBottom: 24 }}>我先读取文件并查看目录。合法正文 JSON：{'{"valid":true}'}</p>
       <div style={{ display: "grid", gap: 22 }}>
@@ -44,7 +44,7 @@ function ToolStreamVisual() {
             : { kind: "read", filePath: path, displayText };
 
           const event = { id: String(index), type: "tool_result", schemaVersion: 2, sessionId: "visual", agentRunId: "run", timestamp: "2026-09-06T00:00:00Z", payload: { toolCallId: String(index), toolName: definition.name, ok: !definition.error, uiPreview: preview } } as SessionEvent;
-          const block = createMessageBlocks([event])[0]!;
+          const block = createMessageBlocks([event])[0];
           if (phase !== "finished" && "status" in block) block.status = "running";
           if (block.kind === "write_diff" && preview.kind === "write") block.streamingContent = preview.streamingContent;
           if (block.kind === "write_diff" || block.kind === "edit_diff") return <FileDiffBlock key={index} message={block} />;

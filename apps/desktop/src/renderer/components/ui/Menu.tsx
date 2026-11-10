@@ -11,7 +11,6 @@ import {
 
 const Menu = ({ modal = false, ...props }: React.ComponentPropsWithoutRef<typeof MenuPrimitive.Root>) => <MenuPrimitive.Root modal={modal} {...props} />;
 const MenuTrigger = MenuPrimitive.Trigger;
-const MenuGroup = MenuPrimitive.Group;
 const MenuSub = MenuPrimitive.Sub;
 const MenuRadioGroup = MenuPrimitive.RadioGroup;
 
@@ -41,7 +40,7 @@ const MenuCheckboxItem = React.forwardRef<React.ElementRef<typeof MenuPrimitive.
   className, children, ...props
 }, ref) => (
   <MenuPrimitive.CheckboxItem ref={ref} className={cn(MENU_ITEM_CLASS, className)} {...props}>
-    <span className={MENU_INDICATOR_SLOT_CLASS}><MenuPrimitive.ItemIndicator><Check size={14} strokeWidth={2.4} aria-hidden="true" /></MenuPrimitive.ItemIndicator></span>
+    <span className={MENU_INDICATOR_SLOT_CLASS}><MenuPrimitive.ItemIndicator><Check size={14} aria-hidden="true" /></MenuPrimitive.ItemIndicator></span>
     {children}
   </MenuPrimitive.CheckboxItem>
 ));
@@ -92,6 +91,6 @@ function MenuShortcut({ className, ...props }: React.HTMLAttributes<HTMLSpanElem
 }
 
 export {
-  Menu, MenuTrigger, MenuContent, MenuGroup, MenuItem, MenuCheckboxItem, MenuRadioGroup, MenuRadioItem,
+  Menu, MenuTrigger, MenuContent, MenuItem, MenuCheckboxItem, MenuRadioGroup, MenuRadioItem,
   MenuSub, MenuSubTrigger, MenuSubContent, MenuSeparator, MenuLabel, MenuShortcut,
 };

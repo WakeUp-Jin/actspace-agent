@@ -13,7 +13,7 @@ import {
   writeWorkspaceMarkdownFile,
 } from "../workspace-fs-service";
 import type { GitRunner } from "../git/run-git";
-import type { AppDataRoots } from "../agent-run";
+import type { AppDataRoots } from "../app-paths";
 
 const created: string[] = [];
 

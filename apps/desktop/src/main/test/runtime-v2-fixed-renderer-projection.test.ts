@@ -110,8 +110,8 @@ describe("fixed renderer v2 projection", () => {
 
     // 批注里的 assistantMessageId 依赖这个 id 形态，main 端按 seq 回查。
     expect(messages[1]).toMatchObject({ id: "v2-2", type: "assistant_message" });
-    expect(messages[0]!.payload).toEqual({ content: "张飞是谁", attachments: [] });
-    expect(messages[2]!.payload).toEqual({
+    expect(messages[0].payload).toEqual({ content: "张飞是谁", attachments: [] });
+    expect(messages[2].payload).toEqual({
       content: "继续[map.png]",
       attachments: [{ id: "img-1", path: "img-1", kind: "image", name: "map.png", mimeType: "image/png" }],
       fileReferences: [{ relativePath: "docs/三国.md", displayName: "三国.md" }],

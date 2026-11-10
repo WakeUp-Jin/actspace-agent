@@ -1,4 +1,4 @@
-import { Folder, RotateCw } from "lucide-react";
+import { Folder, RefreshCw } from "lucide-react";
 import { IconButton } from "../../../ui/IconButton";
 import { terminalLines } from "../../model/panel-fixtures";
 import type { PanelScope } from "../../model/selectors";
@@ -35,7 +35,7 @@ export function SpaceTerminalView({ scope }: { scope: PanelScope }) {
         <span aria-hidden="true">·</span>
         <span>{scope.tree ? `工作树 ${scope.tree}` : "本机"}</span>
         <IconButton label="重启终端" size="xs" className="ml-auto" onClick={() => showNotice("演示里省略：重启终端")}>
-          <RotateCw size={12} aria-hidden="true" />
+          <RefreshCw size={12} aria-hidden="true" />
         </IconButton>
       </div>
     </div>

@@ -73,7 +73,7 @@ export function foldSubagentTree(events: Iterable<FoldableEvent>): SubagentTree 
 
 /** Subagents the model may see and message: everything except old `delegation/*` records. */
 export function listedSubagents(tree: SubagentTree): readonly SubagentView[] {
-  return tree.order.map(id => tree.agents[id]!).filter(agent => !agent.legacy);
+  return tree.order.map(id => tree.agents[id]).filter(agent => !agent.legacy);
 }
 
 export function runningActivation(agent: SubagentView): SubagentActivationView | undefined {
@@ -89,7 +89,7 @@ export function runningSubagentCount(tree: SubagentTree): number {
 /** The model the subagent ran with most recently, if any activation recorded one. */
 export function lastActivationModel(agent: SubagentView): string | undefined {
   for (let index = agent.activations.length - 1; index >= 0; index -= 1) {
-    const model = agent.activations[index]!.model;
+    const model = agent.activations[index].model;
     if (model) return model;
   }
   return undefined;
@@ -127,7 +127,7 @@ function activation(state: SubagentTree, data: Readonly<Record<string, RuntimeV2
   if (data.op === "settle") {
     const index = current.activations.findIndex(item => item.activationId === activationId);
     const endedAt = text(data.endedAt);
-    if (index < 0 || current.activations[index]!.settle || !endedAt || !oneOf(data.status, SUBAGENT_ACTIVATION_STATUSES) || !oneOf(data.delivery, SUBAGENT_DELIVERIES)) return state;
+    if (index < 0 || current.activations[index].settle || !endedAt || !oneOf(data.status, SUBAGENT_ACTIVATION_STATUSES) || !oneOf(data.delivery, SUBAGENT_DELIVERIES)) return state;
     const settle: SubagentActivationSettle = {
       status: data.status, summary: typeof data.summary === "string" ? data.summary : "", delivery: data.delivery, endedAt,
       ...(typeof data.result === "string" ? { result: data.result } : {}),
@@ -155,7 +155,7 @@ function legacyCompleted(state: SubagentTree, data: Readonly<Record<string, Runt
   if (!current?.legacy || current.activations[0]?.settle) return state;
   const status: SubagentActivationStatus = data.status === "completed" ? "completed" : data.status === "aborted" ? "interrupted" : "failed";
   const model = text(data.model);
-  const first = { ...current.activations[0]!, ...(model ? { model } : {}), settle: { status, summary: "", delivery: "returned" as const, endedAt: time } };
+  const first = { ...current.activations[0], ...(model ? { model } : {}), settle: { status, summary: "", delivery: "returned" as const, endedAt: time } };
   return replace(state, { ...current, status: "closed", activations: [first] });
 }
 

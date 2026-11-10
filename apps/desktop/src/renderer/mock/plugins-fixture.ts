@@ -65,8 +65,8 @@ export function mockPluginList(settings: SettingsV4Snapshot["settings"]): Plugin
     const canDisable = id in MOCK_LOADED;
     return {
       id, title, description, scope, directory, canDisable,
-      loaded: canDisable ? MOCK_LOADED[id]! : true,
-      enabled: canDisable ? settings.tools.plugins?.[id] ?? MOCK_LOADED[id]! : true,
+      loaded: canDisable ? MOCK_LOADED[id] : true,
+      enabled: canDisable ? settings.tools.plugins?.[id] ?? MOCK_LOADED[id] : true,
       ...(MOCK_UNAVAILABLE[id] ? { unavailableReason: MOCK_UNAVAILABLE[id] } : {}),
       ...mockPluginSettings(id, settings),
     };

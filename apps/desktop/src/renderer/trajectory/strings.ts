@@ -158,4 +158,3 @@ export const collapsedRowAria = (kind: "turn" | "assistant", summary: string) =>
 export const rowAria = (request: number | null, kind: string, content: string) =>
   `${request === null ? "" : `请求 ${request}，`}${kind}，${content || "无内容"}`;
 export const namedParametersJson = (name: string) => `${name} 参数 JSON`;
-export const goalRoundLabel = (round: number) => `目标 · Round ${round}`;

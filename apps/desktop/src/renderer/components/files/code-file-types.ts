@@ -220,75 +220,6 @@ const EXTENSION_TYPES: Readonly<Record<string, CodeFileType>> = {
   'zsh': 'shell',
 }
 
-const LINK_CODE_EXTENSIONS = new Set([
-  'ts',
-  'tsx',
-  'js',
-  'jsx',
-  'mjs',
-  'cjs',
-  'cts',
-  'mts',
-  'css',
-  'scss',
-  'sass',
-  'less',
-  'html',
-  'htm',
-  'vue',
-  'svelte',
-  'astro',
-  'json',
-  'jsonc',
-  'json5',
-  'yaml',
-  'yml',
-  'toml',
-  'xml',
-  'ini',
-  'env',
-  'sh',
-  'bash',
-  'zsh',
-  'fish',
-  'ps1',
-  'bat',
-  'cmd',
-  'py',
-  'pyi',
-  'rb',
-  'rs',
-  'go',
-  'java',
-  'kt',
-  'kts',
-  'c',
-  'cc',
-  'cpp',
-  'cxx',
-  'h',
-  'hh',
-  'hpp',
-  'cs',
-  'php',
-  'swift',
-  'sql',
-  'proto',
-  'graphql',
-  'gql',
-  'lua',
-  'r',
-  'pl',
-  'scala',
-  'clj',
-  'cljs',
-  'ex',
-  'exs',
-  'erl',
-  'hs',
-  'dart',
-])
-
 function basename(path: string): string {
   return path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
 }
@@ -300,15 +231,6 @@ function basename(path: string): string {
  */
 export function isCodeFileType(type: string): type is CodeFileType {
   return CODE_FILE_TYPE_SET.has(type)
-}
-
-/**
- * Test whether an extension belongs to the established coarse link-icon code category.
- * @param extension - Extension without a leading dot.
- * @returns Whether clickable links keep the code glyph for this extension.
- */
-export function isLinkCodeExtension(extension: string): boolean {
-  return LINK_CODE_EXTENSIONS.has(extension.toLowerCase())
 }
 
 /**

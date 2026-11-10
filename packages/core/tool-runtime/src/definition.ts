@@ -1,6 +1,11 @@
+import type { RuntimeV2AgentMode } from "@actspace/shared/runtime-v2";
 import { createHash } from "node:crypto";
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
+
+/** Agent modes a tool declares itself visible in; a mode it leaves out never sees it (fail closed). */
+export type ToolMode = RuntimeV2AgentMode;
+const TOOL_MODES: ReadonlySet<string> = new Set<ToolMode>(["chat", "plan", "agent"]);
 
 export type ToolEffect = {
   readonly capabilityId: string;
@@ -18,6 +23,7 @@ export type ToolDefinition = {
   readonly description: string;
   readonly inputSchema: JsonSchema;
   readonly effects: readonly ToolEffect[];
+  readonly modes: readonly ToolMode[];
   readonly concurrency: ToolConcurrency;
   readonly sensitiveArgumentPaths: readonly string[];
   readonly resultSchemaVersion: number;
@@ -44,7 +50,10 @@ export function normalizeToolDefinition(definition: ToolDefinition): NormalizedT
     throw new TypeError("resultSchemaVersion must be a positive integer.");
   }
   if (!definition.description) throw new TypeError("Tool description is required.");
-  const normalized = deepFreeze({ ...definition, effects: [...definition.effects], sensitiveArgumentPaths: [...definition.sensitiveArgumentPaths] });
+  if (!Array.isArray(definition.modes) || definition.modes.some(mode => !TOOL_MODES.has(mode)) || new Set(definition.modes).size !== definition.modes.length) {
+    throw new TypeError("Tool modes must list distinct values from chat, plan, agent.");
+  }
+  const normalized = deepFreeze({ ...definition, effects: [...definition.effects], modes: [...definition.modes], sensitiveArgumentPaths: [...definition.sensitiveArgumentPaths] });
   const definitionDigest = createHash("sha256").update(canonicalJson(normalized)).digest("hex");
   return deepFreeze({ ...normalized, definitionDigest });
 }

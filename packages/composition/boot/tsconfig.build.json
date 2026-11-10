@@ -7,9 +7,6 @@
   },
   "references": [
     {
-      "path": "./../bundle/tsconfig.build.json"
-    },
-    {
       "path": "./../composition/tsconfig.build.json"
     },
     {

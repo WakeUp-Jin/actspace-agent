@@ -1,6 +1,6 @@
 import type { MessageBlock } from "@actspace/shared";
 import { detectScriptCommand, elideScriptSource, type ScriptCommand } from "@actspace/shared/runtime-v2";
-import { ChevronDown, ChevronRight, MoreHorizontal, ShieldCheck, ShieldOff, TerminalSquare } from "lucide-react";
+import { ChevronDown, ChevronRight, Ellipsis, ShieldCheck, ShieldOff, SquareTerminal } from "lucide-react";
 import { createContext, useContext, useMemo, useState } from "react";
 import { PlainButton } from "../ui/PlainButton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/Tooltip";
@@ -147,7 +147,7 @@ export function EnvironmentIcon({ sandboxed, className = "" }: { sandboxed: bool
       aria-label={sandboxed ? "沙盒" : "真实环境"}
       title={title}
     >
-      <Icon size={14} strokeWidth={2} aria-hidden="true" />
+      <Icon size={14} aria-hidden="true" />
     </span>
   );
 }
@@ -178,7 +178,7 @@ function BashExecutionBlock({
   onOpenWorkspaceFile?: OpenWorkspaceFile;
 }) {
   const [expanded, setExpanded] = useState(!replyCompleted && message.status === "failed");
-  const chevron = expanded ? <ChevronDown size={14} strokeWidth={2.2} /> : <ChevronRight size={14} strokeWidth={2.2} />;
+  const chevron = expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />;
   const summary = getExecutionSummary(message);
   const script = useScriptCommand(message.command);
   // 内联脚本的命令文本就是整段代码，主行改写成「Python 脚本（N 行）」；脚本文件的命令本身很短，照常显示。
@@ -258,7 +258,7 @@ function BashExecutionBlock({
           <Tooltip>
             <TooltipTrigger asChild>
               <button className={BASH_OUTPUT_MENU_CLASS} type="button" aria-label="Open Bash output actions">
-                <MoreHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
+                <Ellipsis size={16} aria-hidden="true" />
               </button>
             </TooltipTrigger>
             <TooltipContent>更多 Bash 输出操作</TooltipContent>
@@ -339,7 +339,7 @@ function BashApprovalBlock({
   const heads = script ? scriptSummary(script, "运行 ") : getShellCommandHeads(message.command).join(", ");
   return (
     <ApprovalCard
-      icon={<TerminalSquare size={14} strokeWidth={2} />}
+      icon={<SquareTerminal size={14} />}
       target={
         <>
           <span className={BASH_APPROVAL_INTENT_CLASS} title={message.intent}>
