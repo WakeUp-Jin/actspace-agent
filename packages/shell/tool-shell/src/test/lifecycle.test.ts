@@ -6,7 +6,7 @@ import type { SandboxService } from "@actspace/sandbox/types";
 import { materializeToolArguments, PROCESS_HOST_PORT_ID, ToolRuntime, type ProcessHostGrant } from "@actspace/tool-runtime";
 import { describe, expect, it, vi } from "vitest";
 import { manifest } from "../manifest.js";
-import { apply, registerTools, TOOL_DEFINITIONS } from "../plugin.js";
+import { apply, registerTools, TOOL_DEFINITIONS, type ShellToolsService } from "../plugin.js";
 
 /** Only `status` matters for permissions; running is covered in node-ports.test.ts. */
 function sandboxWithStatus(available: boolean): SandboxService {
@@ -207,8 +207,17 @@ describe("shell-tools lifecycle", () => {
         if (grant) ctx.provide(PROCESS_HOST_PORT_ID, grant);
         await ctx.plugin({ apply: inner => apply(inner as never) });
         expect(runtime.registry.listDefinitions().map(item => item.name)).toEqual(["bash"]);
-        const service = ctx.get("tools.shell-tools") as { hasRunningBackgroundTask(sessionId: string): boolean };
+        const service = ctx.get("tools.shell-tools") as ShellToolsService;
         expect(service.hasRunningBackgroundTask("s")).toBe(false);
+        if (grant) {
+          // A forked subagent keeps its parent's system prompt, so its scratch directory has to be the parent's.
+          const own = service.scratchDirectory?.("fork");
+          const stop = service.shareScratchDirectory?.("fork", "parent");
+          expect(service.scratchDirectory?.("fork")).toBe(service.scratchDirectory?.("parent"));
+          stop?.();
+          expect(service.scratchDirectory?.("fork")).toBe(own);
+          expect(own).not.toBe(service.scratchDirectory?.("parent"));
+        } else expect(service.scratchDirectory).toBeUndefined();
         if (grant) expect(onProcesses).toHaveBeenCalledWith(expect.objectContaining({ forceTerminate: expect.any(Function) }));
         else {
           expect(onProcesses).not.toHaveBeenCalled();

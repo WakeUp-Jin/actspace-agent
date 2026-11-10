@@ -279,6 +279,16 @@ describe("shell-tools ports", () => {
     expect(existsSync(ports.scratchRoot)).toBe(false);
   });
 
+  it("runs a Session that shares another's scratch directory with the owner's ACTSPACE_SCRATCH", async () => {
+    const root = await workspace(); const tmpRoot = await workspace();
+    const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, scratchOwner: sessionId => sessionId === "fork" ? "parent" : sessionId });
+    try {
+      const result = await invoke(ports.bash, { command: "printf '%s' \"$ACTSPACE_SCRATCH\"", intent: "scratch env", blockMs: 5_000 }, "fork");
+      expect(JSON.stringify(result.modelOutput)).toContain(join(ports.scratchRoot, "scripts", "parent"));
+      expect(existsSync(join(ports.scratchRoot, "scripts", "fork"))).toBe(false);
+    } finally { await ports.dispose(); }
+  });
+
   it("puts the bundled Python shim in front of PATH and exports ACTSPACE_PYTHON / ACTSPACE_PYTHON_EXT only when the layer is installed", async () => {
     const root = await workspace(); const tmpRoot = await workspace();
     const shimDirectory = join(await workspace(), "shim");

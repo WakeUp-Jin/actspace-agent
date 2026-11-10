@@ -18,7 +18,7 @@
 
 ## 脚本临时目录
 
-`node-ports.ts` 创建端口时就建好并 realpath 它的 scratch 根 `<tmpRoot>/bash-v2/<process>/`，`plugin.ts` 在 `apply` 时把它登记到 `tools.runtime` 插件提供的 `actspace.host-writable-roots`：这个目录下的路径 `read_file` / `write_file` / `edit_file` 免审批，`delete_file` 仍问。每条命令执行前确保 `scripts/<sessionId>/` 存在，并以环境变量 `ACTSPACE_SCRATCH` 传给子进程；`python3 "$ACTSPACE_SCRATCH"/run.py` 这类脚本路径在前缀授权里算作工作区内（`query-paths.ts` 的 `extraRoots`）。Harness 卸载时整个 scratch 根随 `dispose` 删除，上次崩溃残留的由下次创建端口时的 sweep 清。
+`node-ports.ts` 创建端口时就建好并 realpath 它的 scratch 根 `<tmpRoot>/bash-v2/<process>/`，`plugin.ts` 在 `apply` 时把它登记到 `tools.runtime` 插件提供的 `actspace.host-writable-roots`：这个目录下的路径 `read_file` / `write_file` / `edit_file` 免审批，`delete_file` 仍问。每条命令执行前确保 `scripts/<sessionId>/` 存在，并以环境变量 `ACTSPACE_SCRATCH` 传给子进程；`python3 "$ACTSPACE_SCRATCH"/run.py` 这类脚本路径在前缀授权里算作工作区内（`query-paths.ts` 的 `extraRoots`）。fork 子智能体保留父会话的系统提示词，所以它用父会话的目录：Agent 工厂调 `tools.shell-tools` 的 `shareScratchDirectory(forkId, parentId)`，之后 `scratchDirectory(forkId)` 和 fork 命令的 `ACTSPACE_SCRATCH` 都是父会话那个（`scratch.ts` 的 `ScratchOwners`）。Harness 卸载时整个 scratch 根随 `dispose` 删除，上次崩溃残留的由下次创建端口时的 sweep 清。
 
 ## 随包 Python
 

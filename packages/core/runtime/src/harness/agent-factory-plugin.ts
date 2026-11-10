@@ -176,7 +176,13 @@ function createAgentFactory(ctx: CordisContext, hostReadableFiles: HostReadableF
         },
       };
     };
-    if (role === "fork") registerMainTools(scope);
+    if (role === "fork") {
+      registerMainTools(scope);
+      // The parent's system prompt and conversation name the parent's scratch directory; the fork keeps both, so it works there.
+      const parentId = session.header.lineage?.parentSessionId;
+      const shared = parentId === undefined ? undefined : (ctx.get?.("tools.shell-tools") as ShellToolsService | undefined)?.shareScratchDirectory?.(session.header.sessionId, parentId);
+      if (shared !== undefined) scope.disposer.add(shared);
+    }
     const binding = tools.bindAgentScope(session.header.sessionId, subject.agentId, () => new Set(allowedToolNames ?? []));
     scope.disposer.add(binding.dispose);
     const loop = new AgentLoop({ contextSources: createSources(scope, descriptor, workspaceRoot, role), contextExtensions: role === "fork" ? forkExtensions(session, scope.identity.scopeId) : extensions(session.header.sessionId, scope.identity.scopeId, "subagent"), observeContextToolResult, createContextEngine: options => engine.create(options), descriptor, scope, agentSubject: subject, session, inbox: new MainAgentInbox(session), llm, tools, toolEnvironment: scopedToolEnvironment, toolScopeToken: binding.token, compositionDigest: host.compositionDigest, hostCapabilityDigest: host.hostCapabilityDigest, host: host.host, ...(allowedToolNames === undefined ? {} : { allowedToolNames: new Set(allowedToolNames) }), compaction: engine.compaction, onLiveEvent: host.onLiveEvent, context: scopeContext(ctx, scope.scopeKey, scope.disposer) });

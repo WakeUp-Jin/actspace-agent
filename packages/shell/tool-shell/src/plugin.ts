@@ -12,10 +12,10 @@ import type { BackgroundTaskHost } from "@actspace/background-tasks";
 import { SANDBOX_SERVICE_ID, type SandboxService } from "@actspace/sandbox/types";
 import { SHELL_TOOLS_PLUGIN_ID, type SHELL_TOOLS_TOOLS } from "./manifest.js";
 import { createNodeBashToolPorts } from "./node-ports.js";
-import { sessionScratchDirectory } from "./scratch.js";
+import { ScratchOwners, sessionScratchDirectory } from "./scratch.js";
 
-function createGrantedPorts(grant: ProcessHostGrant, background: BackgroundTaskHost | undefined, sandbox: SandboxService | undefined, dataRoot: string): ToolPorts {
-  const ports = createNodeBashToolPorts({ workspaceRoot: grant.workspaceRoot, tmpRoot: grant.tmpRoot, dataRoot, sandbox, background, ...(grant.python === undefined ? {} : { python: grant.python }) });
+function createGrantedPorts(grant: ProcessHostGrant, background: BackgroundTaskHost | undefined, sandbox: SandboxService | undefined, dataRoot: string, scratchOwner: (sessionId: string) => string): ToolPorts {
+  const ports = createNodeBashToolPorts({ workspaceRoot: grant.workspaceRoot, tmpRoot: grant.tmpRoot, dataRoot, sandbox, background, scratchOwner, ...(grant.python === undefined ? {} : { python: grant.python }) });
   grant.onProcesses?.(ports);
   return ports;
 }
@@ -41,6 +41,8 @@ export type ShellToolsService = {
   readonly scratchRoot?: string;
   /** A Session's scratch directory (`ACTSPACE_SCRATCH` of its commands); absent without a scratch root. */
   readonly scratchDirectory?: (sessionId: string) => string;
+  /** Makes `sessionId` work in `ownerSessionId`'s scratch directory until the returned function is called. */
+  readonly shareScratchDirectory?: (sessionId: string, ownerSessionId: string) => () => void;
   readonly python?: BashPythonRuntime;
 };
 
@@ -56,7 +58,8 @@ export async function apply(ctx: CordisContext): Promise<void> {
   if (!runtime || !dataRoot) throw new Error("shell-tools requires tools.runtime and actspace.host.session.");
   const sandbox = ctx.get?.(SANDBOX_SERVICE_ID) as SandboxService | undefined;
   const grant = ctx.get?.(PROCESS_HOST_PORT_ID) as ProcessHostGrant | undefined;
-  const ports: ToolPorts = grant ? createGrantedPorts(grant, ctx.get?.("actspace.host.background-tasks") as BackgroundTaskHost | undefined, sandbox, dataRoot) : {};
+  const scratchOwners = new ScratchOwners();
+  const ports: ToolPorts = grant ? createGrantedPorts(grant, ctx.get?.("actspace.host.background-tasks") as BackgroundTaskHost | undefined, sandbox, dataRoot, scratchOwners.ownerOf) : {};
   let registrations: readonly ToolRegistration[];
   try { registrations = registerTools(runtime, ports, sandbox); }
   catch (error) { await ports.dispose?.(); throw error; }
@@ -66,7 +69,10 @@ export async function apply(ctx: CordisContext): Promise<void> {
   if (scratchRoot !== undefined) writableRoots?.add(scratchRoot);
   const service: ShellToolsService = Object.freeze({
     registrations, definitions: TOOL_DEFINITIONS, hasRunningBackgroundTask: ports.hasRunningBackgroundTask ?? (() => false), scratchRoot, python: ports.python,
-    ...(scratchRoot === undefined ? {} : { scratchDirectory: (sessionId: string) => sessionScratchDirectory(scratchRoot, sessionId) }),
+    ...(scratchRoot === undefined ? {} : {
+      scratchDirectory: (sessionId: string) => sessionScratchDirectory(scratchRoot, scratchOwners.ownerOf(sessionId)),
+      shareScratchDirectory: (sessionId: string, ownerSessionId: string) => scratchOwners.share(sessionId, ownerSessionId),
+    }),
   });
   ctx.provide?.("tools.shell-tools", service);
   ctx.effect?.(() => async () => {

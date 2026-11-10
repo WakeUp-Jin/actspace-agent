@@ -58,6 +58,8 @@ type BashOptions = {
   readonly subagentTimeoutMs?: number;
   /** The Python the app ships, when it does; absent in development without `pnpm python-runtime:prepare`. */
   readonly python?: BashPythonRuntime;
+  /** Whose `scripts/<sessionId>/` a Session's commands use; a forked subagent uses its parent's. Defaults to its own. */
+  readonly scratchOwner?: (sessionId: string) => string;
 };
 
 /**
@@ -106,7 +108,7 @@ async function executeBash(
 
   // The scratch directory is recreated per command: another process's sweep may have taken an idle one.
   const scratchRoot = registry.scratchRoot;
-  const sessionScratch = sessionScratchDirectory(scratchRoot, context.sessionId);
+  const sessionScratch = sessionScratchDirectory(scratchRoot, options.scratchOwner?.(context.sessionId) ?? context.sessionId);
   await mkdir(sessionScratch, { recursive: true, mode: 0o700 });
   const env = commandEnvironment(sessionScratch, options.python);
   const log = await registry.logs.create(context.sessionId);

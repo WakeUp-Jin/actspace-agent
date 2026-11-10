@@ -100,6 +100,8 @@ Codex 没有打包 Python，靠系统 `python3` + 沙箱放行；DSH 打包但�
 
 模型通过两个渠道知道路径：`bash` 子进程环境 `ACTSPACE_SCRATCH=<scratch>/scripts/<sessionId>`；系统提示词 model-fact 给出绝对路径，并说明"临时脚本放这里，会话结束自动清理"。
 
+**fork 子智能体用父会话的目录。** fork 保留父会话的系统提示词和消息前缀（这样首个请求能命中父会话的提示词缓存），而 model-fact 里的绝对路径带 sessionId；如果 fork 用自己的目录，系统提示词就和父会话不一致。`tools.shell-tools` 的 `shareScratchDirectory(forkSessionId, parentSessionId)` 让 fork 的 model-fact 和 `ACTSPACE_SCRATCH` 都指向父会话的 `scripts/<parentSessionId>/`，Agent 工厂在创建 fork 的 loop 时登记、scope 释放时撤销。普通（delegation）子智能体有自己的系统提示词，仍用自己的目录。`scripts/test/host-subagent-fork-cache-process.test.mjs` 守这条不变量。
+
 ### 2.5 指导层：提示词小节与官方 Skill
 
 `packages/context/prompt/src/core-contributors.ts` 新增 `coreScripting()`，控制在十行内：
