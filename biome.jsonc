@@ -81,8 +81,8 @@
         },
         // `case x: return this.handle();` 在 void 方法里是仓库惯用写法，tsc 已经约束返回类型。
         "noVoidTypeReturn": "off",
-        // `useSourceExtension` 这类 use* 命名的普通 API 会被误判为 React hook。
-        "useHookAtTopLevel": "off"
+        // 规则按名字认 hook：以 use 开头的普通函数或方法在回调、条件里调用会被当成违规。普通 API 不要用 use 开头命名。
+        "useHookAtTopLevel": "error"
       },
       "style": {
         // 2026-11-09 已用 tsc 逐处核对：删掉所有「去掉也不报错」的 `!`，剩下的每一处都在表达 tsc 看不见的不变量

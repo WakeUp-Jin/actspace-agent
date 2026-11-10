@@ -193,7 +193,7 @@ export const desktopBridgeContract = {
     connect: invoke<void, S.BrowserBridgeInstallResult>(CH.connectBrowserBridge),
     /** main 弹系统目录对话框并校验；renderer 不传路径。 */
     selectSourceExtension: invoke<void, S.BrowserBridgeActionResult>(CH.selectBrowserSourceExtension),
-    useBundledExtension: invoke<void, S.BrowserBridgeActionResult>(CH.useBundledBrowserExtension),
+    switchToBundledExtension: invoke<void, S.BrowserBridgeActionResult>(CH.useBundledBrowserExtension),
     prepareUpdate: invoke<void, S.BrowserBridgeInstallResult>(CH.prepareBrowserBridgeUpdate),
     disconnect: invoke<void, S.BrowserBridgeActionResult>(CH.disconnectBrowserBridge),
     selectInstance: invoke<string, S.BrowserBridgeActionResult>(CH.selectBrowserBridgeInstance),

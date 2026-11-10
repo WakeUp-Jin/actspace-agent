@@ -146,7 +146,7 @@ const NO_INPUT_SPECS: InvokeSpec<unknown, unknown>[] = [
   contract.quickOpen.consume, contract.quickOpen.getShortcutStatus, contract.modelConnections.list, contract.englishLearning.getState, contract.englishLearning.stopSpeech,
   contract.englishLearning.previewSpeech, contract.browserBridge.getStatus, contract.browserBridge.connect, contract.browserBridge.prepareUpdate, contract.browserBridge.disconnect,
   contract.browserBridge.openExtensions, contract.browserBridge.revealExtensionDirectory, contract.browserBridge.installNativeHost,
-  contract.browserBridge.selectSourceExtension, contract.browserBridge.useBundledExtension, contract.browserBridge.installFromRepo, contract.plugins.list,
+  contract.browserBridge.selectSourceExtension, contract.browserBridge.switchToBundledExtension, contract.browserBridge.installFromRepo, contract.plugins.list,
   contract.pythonRuntime.getStatus, contract.pythonRuntime.installExtension, contract.skills.install,
   contract.updates.getState, contract.updates.selectSource, contract.updates.start, contract.hosts.list,
 ];
