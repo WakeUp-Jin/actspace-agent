@@ -1,7 +1,7 @@
 // 首页 V4 文案数据。首屏插件与任务演示在 components/home/Hero.astro 里，这里只放可复用的列表。
 // icon 是 24 viewBox 的线性图标 path，首页基础功能卡片用。
 export interface Capability { title: string; description: string; slug: string; icon: string; }
-export interface Direction { id: string; status: 'live' | 'wip'; name: string; summary: string; done: string; next: string; }
+export interface Direction { id: string; status: 'live' | 'wip'; name: string; summary: string; done: string; next: string; icon: string; }
 
 export const statusLabel = { live: '已上线', wip: '进行中' } as const;
 
@@ -20,9 +20,9 @@ export const todayCapabilities: Capability[] = [
 // 「方向」：三段路线图，状态以产品概念文档和用户确认为准。首页方向条和开发计划页共用；
 // done / next 只在开发计划页展示，须与 docs/roadmap.md 的条目对得上。
 export const directions: Direction[] = [
-  { id: 'context', status: 'live', name: '上下文管理引擎', summary: '长任务压缩与可检查的上下文。', done: '插件化上下文、结构化压缩、渐进披露与上下文面板', next: 'Agent 记忆模块' },
-  { id: 'harness', status: 'wip', name: 'Harness 自进化', summary: '工具、上下文与行为都是插件，可以按问题派生新版本。', done: 'V1：在会话里让 Agent 新增或修改工具', next: 'V2：失败触发派生新版本，沙箱评估后由你决定' },
-  { id: 'space', status: 'wip', name: 'Actor 与 Space', summary: '在场景里长成的 Actor，在 Space 里一起解决专业问题。', done: '前端演示：Space、Actor 名册与协调 Agent', next: '多 Actor 协作运行时' },
+  { id: 'context', status: 'live', name: '上下文管理引擎', summary: '长任务压缩与可检查的上下文。', done: '插件化上下文、结构化压缩、渐进披露与上下文面板', next: 'Agent 记忆模块', icon: 'M12 3 3 8l9 5 9-5zM3 12l9 5 9-5M3 16l9 5 9-5' },
+  { id: 'harness', status: 'wip', name: 'Harness 自进化', summary: '工具、上下文与行为都是插件，可以按问题派生新版本。', done: 'V1：在会话里让 Agent 新增或修改工具', next: 'V2：失败触发派生新版本，沙箱评估后由你决定', icon: 'M6 3v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 12a6 6 0 0 1-6 6H9M18 3v.5' },
+  { id: 'space', status: 'wip', name: 'Actor 与 Space', summary: '在场景里长成的 Actor，在 Space 里一起解决专业问题。', done: '前端演示：Space、Actor 名册与协调 Agent', next: '多 Actor 协作运行时', icon: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20a6 6 0 0 1 12 0M16 11a3 3 0 1 0 0-6M21 20a6 6 0 0 0-5-5.9' },
 ];
 
 // 真实界面功能块（components/home/FeatureShot.astro）：左边说明，右边截图。

@@ -416,7 +416,7 @@ export function initializeHeroStage() {
         step(1500, () => {
           card = put(`<div class="card appr"><div class="hd">${icon('M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 8 2-2-2-2m4 6h4', 14)}运行项目测试 pnpm</div>
             <div class="cmd"><i>$</i> <em>pnpm</em> test</div>
-            <div class="ft">${icon('M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1zM4 4l16 16', 13)}<span></span><b>拒绝</b><b class="go">运行</b></div></div>`);
+            <div class="ft">${icon('M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1zM4 4l16 16', 13)}<span></span><b>拒绝</b><b class="al">本会话允许 <code>pnpm</code></b><b class="go">运行</b></div></div>`);
           stage.light(['approve']);
           h('ses-spin').hidden = true;
           const pending = h('ses-time'); pending.hidden = false; pending.textContent = '待审批'; pending.classList.add('pending');

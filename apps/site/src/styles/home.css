@@ -263,6 +263,9 @@
 .app .lights { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 6px; }
 .app .lights span { flex: 1; }
 .app .top-lights { display: none; padding: 0 10px 0 0; height: auto; }
+/* 侧栏收起时标题栏补上桌面端的「展开侧栏」和前进后退，不让标题孤零零贴着红绿灯。 */
+.app .top .nav-ic { display: none; align-items: center; gap: 6px; margin-right: 6px; }
+.app .top .nav-ic svg + svg { color: var(--app-faint); }
 .app .lights svg { width: 14px; height: 14px; color: var(--app-faint); }
 .app-nav { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 7px; white-space: nowrap; }
 .app-nav svg { color: var(--app-muted); }
@@ -346,7 +349,8 @@
 .app .appr .ft > .chev { color: var(--app-muted); }
 .app .appr .ft span { margin-right: auto; }
 .app .appr .ft b { display: grid; place-items: center; height: 25px; padding: 0 11px; border-radius: 999px; font-size: 11.5px; font-weight: 400; color: var(--app-muted); white-space: nowrap; }
-.app .appr .ft .al { background: #ecebe8; font: 11px var(--mono); color: var(--ink); }
+.app .appr .ft .al { display: inline-flex; align-items: center; background: #ecebe8; color: var(--ink); }
+.app .appr .ft .al code { margin-left: 4px; font: 11px var(--mono); }
 .app .appr .ft .go { background: var(--ink); color: #fff; transition: transform 0.15s, box-shadow 0.3s; }
 .app .appr .ft .go.press { transform: scale(0.94); box-shadow: 0 0 0 4px rgba(29, 28, 26, 0.12); }
 
@@ -554,7 +558,7 @@
 .direction-strip a {
   display: grid;
   grid-template-columns: auto auto 1fr auto;
-  grid-template-areas: "idx pill . arrow" "name name name name" "sum sum sum sum";
+  grid-template-areas: "idx pill . arrow" "icon icon icon icon" "name name name name" "sum sum sum sum";
   align-items: center;
   gap: 10px 12px;
   height: 100%;
@@ -568,6 +572,9 @@
 .direction-strip strong { grid-area: name; font-family: var(--site-font-display); font-size: 20px; font-weight: 500; }
 .direction-summary { grid-area: sum; font-size: 14px; line-height: 1.7; color: var(--body); }
 .direction-strip .arrow { grid-area: arrow; color: var(--muted); }
+.direction-icon { grid-area: icon; display: grid; place-items: center; width: 38px; height: 38px; margin-top: 4px; border-radius: 11px; background: var(--site-paper); box-shadow: inset 0 0 0 1px var(--line); color: var(--body); transition: background 0.2s, color 0.2s; }
+.direction-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.direction-strip a:hover .direction-icon { background: var(--site-accent-soft); color: var(--site-accent); }
 .direction-strip a:hover .arrow { color: var(--site-accent); transform: translateX(3px); }
 
 /* ---------- 功能块：左文右舞台，交替 ---------- */
@@ -758,6 +765,7 @@
 @media (max-width: 1400px) {
   .app .side { display: none; }
   .app .top-lights { display: flex; }
+  .app .top .nav-ic { display: inline-flex; }
 }
 /* 1180px 以下首屏改为纵向：窗口在上，插件收成可换行的标签行，不画连线和悬停说明。 */
 @media (max-width: 1180px) {
