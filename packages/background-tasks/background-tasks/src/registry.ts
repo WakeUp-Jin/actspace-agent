@@ -140,6 +140,15 @@ export class BackgroundTaskRegistry {
     this.options.wake(source.sessionId);
   }
 
+  /** Bash output subscriptions: the subscription ended while the task keeps running. Wakes the model, which may be waiting for a match. */
+  async notifySubscriptionStopped(taskId: string, summary: string): Promise<void> {
+    const entry = this.#entries.get(taskId);
+    if (entry?.status !== "running" || this.#disposed) return;
+    const { source } = entry;
+    await this.#enqueue(source.sessionId, renderTaskNotification(source, { status: "subscription_stopped", summary, body: "" }), { taskId: source.taskId, kind: source.kind, title: source.description, status: "subscription_stopped" });
+    this.options.wake(source.sessionId);
+  }
+
   /** After a restart, tasks started by an earlier process are lost; tell the model without waking it. */
   async reconcile(session: SessionHandle): Promise<void> {
     const open = session.journal.project(OPEN_TASKS, () => new Map<string, { readonly kind: BackgroundTaskKind; readonly description: string }>(), (state, event) => {
@@ -255,7 +264,7 @@ function record(entry: Entry): BackgroundTaskRecord {
 function core(data: RuntimeV2JsonValue) { return { type: "background/task", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data, surface: null } as never; }
 
 /** The surface Harness plugins use through `actspace.host.background-tasks`. */
-export type BackgroundTaskHost = Pick<BackgroundTaskRegistry, "register" | "list" | "get" | "output" | "stop" | "wait" | "notifyOutputMatch" | "markPruned" | "hasRunning" | "runningCount">;
+export type BackgroundTaskHost = Pick<BackgroundTaskRegistry, "register" | "list" | "get" | "output" | "stop" | "wait" | "notifyOutputMatch" | "notifySubscriptionStopped" | "markPruned" | "hasRunning" | "runningCount">;
 export const BACKGROUND_TASK_HOST_SERVICE = "actspace.host.background-tasks" as const;
 
 /** Late-bound Host service: the registry exists only after the Agent runtime starts. */
@@ -268,6 +277,7 @@ export function createBackgroundTaskHost(resolve: () => BackgroundTaskRegistry):
     stop: (sessionId, taskId, reason) => resolve().stop(sessionId, taskId, reason),
     wait: (sessionId, options) => resolve().wait(sessionId, options),
     notifyOutputMatch: (taskId, summary, line) => resolve().notifyOutputMatch(taskId, summary, line),
+    notifySubscriptionStopped: (taskId, summary) => resolve().notifySubscriptionStopped(taskId, summary),
     markPruned: (sessionId, taskId) => resolve().markPruned(sessionId, taskId),
     hasRunning: (sessionId, kind) => resolve().hasRunning(sessionId, kind),
     runningCount: (sessionId, kind) => resolve().runningCount(sessionId, kind),

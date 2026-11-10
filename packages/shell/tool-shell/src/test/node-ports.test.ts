@@ -49,13 +49,14 @@ import { createNodeBashToolPorts, readLog, sandboxDenial } from "../node-ports.j
 
 /** Records what Bash hands to the Host registry. */
 function fakeHost() {
-  const sources = new Map<string, BackgroundTaskSource>(); const terminals = new Map<string, BackgroundTaskTerminal>(); const matches: { taskId: string; summary: string; line: string }[] = []; const pruned: { sessionId: string; taskId: string }[] = [];
+  const sources = new Map<string, BackgroundTaskSource>(); const terminals = new Map<string, BackgroundTaskTerminal>(); const matches: { taskId: string; summary: string; line: string }[] = []; const stops: { taskId: string; summary: string }[] = []; const pruned: { sessionId: string; taskId: string }[] = [];
   const host = {
     register: async (source: BackgroundTaskSource) => { sources.set(source.taskId, source); void source.done.then(terminal => terminals.set(source.taskId, terminal)); return undefined as never; },
     notifyOutputMatch: async (taskId: string, summary: string, line: string) => { matches.push({ taskId, summary, line }); },
+    notifySubscriptionStopped: async (taskId: string, summary: string) => { stops.push({ taskId, summary }); },
     markPruned: async (sessionId: string, taskId: string) => { pruned.push({ sessionId, taskId }); },
   } as unknown as BackgroundTaskHost;
-  return { host, sources, terminals, matches, pruned };
+  return { host, sources, terminals, matches, stops, pruned };
 }
 let lastHost: ReturnType<typeof fakeHost>;
 /** Logs go under `dataRoot`; tests that do not look at them share the temp root. */
@@ -243,11 +244,39 @@ describe("shell-tools ports", () => {
 
     const background = await invoke(ports.bash, { command: "printf 'READY token-abcdefgh\\n'; sleep 30", intent: "verify notifications", blockMs: 0, notifyOnOutput: { pattern: "READY", reason: "service ready", debounceMs: 5_000 } });
     expect(JSON.stringify(background)).toContain("bash_");
-    await waitFor(() => lastHost.matches.length > 0);
+    await waitFor(() => lastHost.matches.length > 0, 5_000);
     expect(lastHost.matches[0].summary).toContain("service ready");
     expect(JSON.stringify(lastHost.matches)).toContain("[REDACTED]");
     expect(JSON.stringify(lastHost.matches)).not.toContain("token-abcdefgh");
     await ports.dispose?.();
+  });
+  it("reports a match found before the command went to the background, and only lines that match", async () => {
+    const root = await workspace(); const tmpRoot = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot });
+    try {
+      const background = await invoke(ports.bash, { command: "printf 'starting\\nlistening on 8080\\nidle\\n'; sleep 30", intent: "match while waiting", blockMs: 500, notifyOnOutput: { pattern: "^listening on \\d+$", reason: "port open" } });
+      expect(background.summary).toContain("block_timeout");
+      await waitFor(() => lastHost.matches.length > 0, 5_000);
+      expect(lastHost.matches).toEqual([{ taskId: JSON.stringify(background).match(/bash_[0-9a-f-]+/)![0], summary: "Background command output matched the subscription (port open).", line: "listening on 8080" }]);
+      expect(lastHost.stops).toEqual([]);
+    } finally { await ports.dispose(); }
+  });
+  it("drops an output subscription whose pattern takes too long, without stalling this thread, and tells the Host once", async () => {
+    const root = await workspace(); const tmpRoot = await workspace(); const ports = createNodeToolPorts({ workspaceRoot: root, tmpRoot, subscriptionMatchTimeoutMs: 300 });
+    // The longest stretch during which this thread could not run a timer.
+    let longestStall = 0; let last = performance.now();
+    const beat = setInterval(() => { const now = performance.now(); longestStall = Math.max(longestStall, now - last); last = now; }, 10);
+    try {
+      // (a+)+$ against 30 a's and a "!" backtracks for more than ten seconds. The later "aaa" line would match at once.
+      const background = await invoke(ports.bash, { command: `printf '${"a".repeat(30)}!\\n'; sleep 1; printf 'aaa\\n'; sleep 30`, intent: "slow pattern", blockMs: 0, notifyOnOutput: { pattern: "(a+)+$", reason: "never ready" } });
+      const taskId = JSON.stringify(background).match(/bash_[0-9a-f-]+/)![0];
+      await waitFor(() => lastHost.stops.length > 0, 5_000);
+      expect(longestStall).toBeLessThan(1_000);
+      await vi.waitFor(async () => expect(await readFile(lastHost.sources.get(taskId)!.bash!.outputPath, "utf8")).toContain("\naaa\n"), { timeout: 5_000 });
+      await new Promise(resolve => setTimeout(resolve, 200));
+      expect(lastHost.stops).toEqual([{ taskId, summary: expect.stringMatching(/never ready.*could not be matched in time.*still running/) }]);
+      expect(lastHost.matches).toEqual([]);
+      expect(ports.hasRunningBackgroundTask("session")).toBe(true);
+    } finally { clearInterval(beat); await ports.dispose(); }
   });
   it("deletes a foreground log once the result exists and keeps long output as an artifact", async () => {
     const root = await workspace(); const tmpRoot = await workspace(); const dataRoot = await workspace();

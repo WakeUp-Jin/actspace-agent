@@ -2,7 +2,7 @@
 
 `@actspace/tool-shell` 拥有 bash 的工具定义、注册和 lifecycle。
 
-转后台的命令（`blockMs` 到时或 `blockMs=0`）登记到 Host 服务 `actspace.host.background-tasks`：进程仍归本包持有（卸载 Harness 会结束进程），完成通知、`notifyOnOutput` 匹配通知、`task_output` / `task_stop` 查询都由 Host 登记表负责，见 [后台任务](../../../docs/design-docs/collaboration/agent-background-tasks.md)。
+转后台的命令（`blockMs` 到时或 `blockMs=0`）登记到 Host 服务 `actspace.host.background-tasks`：进程仍归本包持有（卸载 Harness 会结束进程），完成通知、`notifyOnOutput` 匹配通知、`task_output` / `task_stop` 查询都由 Host 登记表负责，见 [后台任务](../../../docs/design-docs/collaboration/agent-background-tasks.md)。`notifyOnOutput` 的正则在单独的线程里匹配（`node-ports.ts` 的 `LineMatcher`），一批输出行 5 秒内没匹配完就停掉这条订阅并通知模型。
 
 公开入口：`.`、`./manifest`、`./plugin`。
 
