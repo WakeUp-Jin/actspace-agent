@@ -12,7 +12,7 @@ import { DEFAULT_LLM_RETRY_POLICY, retryDelay, retryPolicySnapshot } from "@acts
 import type { RequestAssembler } from "@actspace/prompt";
 import type { PreparedRequestMetadata } from "@actspace/prompt";
 import type { AgentScope } from "@actspace/scope";
-import type { SessionHandle } from "@actspace/session-persistence";
+import { settleOpenTurnWork, type SessionHandle } from "@actspace/session-persistence";
 import type { ToolCallInput, ToolPreparedEnvironment } from "@actspace/tool-runtime";
 import type { ToolRuntime } from "@actspace/tool-runtime";
 import type { ToolExecutionResult } from "@actspace/tool-runtime";
@@ -106,6 +106,7 @@ export class AgentLoop {
     if (this.#active !== null) throw new AgentRuntimeError("TURN_ALREADY_ACTIVE", "This Session already has an active turn.");
     const controller = new AbortController(); this.#active = controller; this.#idle = new Promise<void>((resolve) => { this.#resolveIdle = resolve; });
     const agentRunId = input.agentRunId ?? randomUUID(); const turnId = randomUUID(); let stepCount = 0; let finalText = "";
+    let turnStartSeq: number | null = null;
     try {
       // A notification read by an earlier Run leaves nothing to deliver; settle without a turn.
       if (input.wake && !this.options.inbox.hasPendingNotifications()) return Object.freeze({ agentRunId, turnId, reason: "completed", steps: 0, finalText });
@@ -119,7 +120,7 @@ export class AgentLoop {
       const modeRuntime = await this.options.modeRuntime?.(mode);
       const assembler = modeRuntime?.assembler ?? this.options.assembler;
       const compaction = modeRuntime?.compaction ?? this.options.compaction;
-      await this.options.session.append(core("turn/start", { turnId, agentRunId, mode, modeRevision }));
+      turnStartSeq = (await this.options.session.append(core("turn/start", { turnId, agentRunId, mode, modeRevision }))).seq;
       const turnEnvironment = this.options.toolEnvironment(this.options.session);
       const configuredPermissionMode = typeof turnEnvironment.permissionMode === "function" ? turnEnvironment.permissionMode() : turnEnvironment.permissionMode ?? "default";
       if (turnEnvironment.permissionModeExplicit && currentPermissionMode(this.options.session.journal.latestEvents(["permission/mode-set"])) !== configuredPermissionMode) {
@@ -316,6 +317,10 @@ export class AgentLoop {
       if (this.options.session.durabilityState !== "blocked") {
         try {
           if (!input.keepPendingOnAbort) await this.options.inbox.discardAll(controller.signal.aborted ? "turn-aborted" : "turn-failed");
+          // 一条记录没写进去（过大、带敏感字段名、钩子抛错）时，这个回合里已开始的请求和工具调用没有结果，
+          // Step 和 Turn 结束不了，会话会卡住直到重启。先把它们了结，下面才能正常收尾。
+          const open = this.options.session.journal.validation.relations;
+          if (turnStartSeq !== null && open.openTurnId === turnId && (open.openRequestIds.length > 0 || open.openToolCallIds.length > 0)) await settleOpenTurnWork(this.options.session, turnStartSeq);
           const relations = this.options.session.journal.validation.relations;
           if (relations.openStepId !== null && relations.openRequestIds.length === 0 && relations.openToolCallIds.length === 0) await this.options.session.append(core("step/end", { turnId, stepId: relations.openStepId, reason: "interrupted" }));
           if (this.options.session.journal.validation.relations.openTurnId === turnId && this.options.session.journal.validation.relations.openStepId === null) await this.options.session.append(core("turn/end", { turnId, reason: controller.signal.aborted ? "aborted" : "failed", ...(controller.signal.aborted ? {} : { failure }) }));

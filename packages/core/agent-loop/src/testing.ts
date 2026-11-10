@@ -47,7 +47,8 @@ export async function runToolStreamFixture(options: {
   compaction?: import("@actspace/context-compaction").CompactionPlugin;
   usage?: import("@actspace/llm-service").LlmUsage;
   contextWindow?: number;
-  onLoop?: (loop: AgentLoop, inbox: MainAgentInbox) => void;
+  /** 在 fixture 自己的回合开始前调用；返回 Promise 时会等它结束，可以用来先跑一个回合。 */
+  onLoop?: (loop: AgentLoop, inbox: MainAgentInbox) => void | Promise<void>;
   wake?: boolean;
 } = {}) {
   const registry = createCoreCodecRegistry();
@@ -101,8 +102,8 @@ export async function runToolStreamFixture(options: {
     context: options.context,
     compaction: options.compaction,
   });
-  options.onLoop?.(loop, inbox);
   try {
+    await options.onLoop?.(loop, inbox);
     const result = await loop.runTurn({ content: options.content ?? "Read fixture", mode: options.mode, thinkingEnabled: options.thinkingEnabled, reasoningEffort: options.reasoningEffort, agentRunId: options.agentRunId ?? "run-test", ...(options.wake ? { wake: true } : {}) });
     if (options.followup) await loop.runTurn({ content: "Continue without tools", mode: options.mode });
     return { result, events, journal: [...session.journal.events], header: session.header, registry };
