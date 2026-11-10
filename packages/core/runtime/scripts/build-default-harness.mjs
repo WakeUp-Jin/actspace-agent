@@ -27,8 +27,10 @@ const relativeOutputs = (result, prefix) => Object.keys(result.metafile.outputs)
 await rm(outdir, { recursive: true, force: true });
 const kernelBuild = await build({ ...common, entryPoints: kernel.map(entry => ({ out: entry.id, in: entry.module })), outdir, splitting: true });
 const inventory = { kernel: relativeOutputs(kernelBuild, "dist/default-harness/"), plugins: {} };
+// Same segment join as `publishPluginArtifact`'s sourceRoot in default-harness.ts; this is the
+// artifact layout under dist, not the retired workspace plugins directory the cutover check hunts.
 for (const entry of plugins) {
-  const pluginDir = join("dist/default-harness/plugins", entry.id);
+  const pluginDir = join("dist/default-harness", "plugins", entry.id);
   const result = await build({ ...common, entryPoints: [{ out: "plugin", in: entry.module }], outdir: join(root, pluginDir), splitting: false });
   inventory.plugins[entry.id] = relativeOutputs(result, `${pluginDir}/`);
 }
