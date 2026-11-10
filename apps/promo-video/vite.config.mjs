@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 
 export default defineConfig({
-  // 截下来的产品画面（.cache/ui/）和合成的配乐都是可再生成的本地产物，放在 Git 忽略的 .cache/ 里，由开发服务器原样托管。
+  // 配乐（.cache/music/）是下载来的本地文件，放在 Git 忽略的 .cache/ 里，由开发服务器原样托管给预览页。
   publicDir: here("./.cache"),
   resolve: {
     alias: {

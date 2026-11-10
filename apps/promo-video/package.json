@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "capture:ui": "node scripts/capture-ui.mjs",
+    "music": "node scripts/lib/soundtrack.mjs",
     "render": "node scripts/render.mjs",
     "test": "node --test scripts/test/*.test.mjs"
   },

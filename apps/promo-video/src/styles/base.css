@@ -1,10 +1,9 @@
-/* 颜色与字体沿用官网的视觉语言（apps/site/DESIGN.md）：暖纸底、单一紫色强调、带颗粒的色块舞台、衬线标题。
-   视频里另加一套深色（--night-*），给开场和「一切皆插件」做明暗对比。 */
+/* 颜色与字体沿用官网的视觉语言（apps/site/DESIGN.md）：暖纸底、单一紫色强调、带颗粒的色块舞台、衬线标题。 */
 :root {
   --canvas: #f2f1ed;
   --paper: #fbfaf7;
   --ink: #1d1c1a;
-  --body: #46433e;
+  --body: #4f4c46;
   --muted: #7c7972;
   --faint: #b3afa6;
   --line: #dcd9d1;
@@ -17,13 +16,6 @@
   --wip-soft: #efe5cf;
   --danger: #c2372c;
 
-  --night: #181715;
-  --night-card: #24221f;
-  --night-line: rgba(242, 241, 237, 0.12);
-  --on-night: #f2f1ed;
-  --on-night-muted: rgba(242, 241, 237, 0.6);
-  --accent-night: #b7a2f2;
-
   --peach: #efc3a6;
   --peach-soft: #f4d9c6;
   --peach-base: #e6cdbb;
@@ -33,9 +25,7 @@
   --mint-deep: #9cc5ae;
   --mint-base: #cfe3d2;
   --lemon: #efe3a0;
-  --violet: #cdbdf0;
   --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .2  0 0 0 0 .18  0 0 0 0 .15  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  --grain-light: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 
   --serif: "Noto Serif SC Variable", serif;
   --sans: "Noto Sans SC Variable", sans-serif;
@@ -44,7 +34,6 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 * { box-sizing: border-box; }
@@ -64,34 +53,45 @@ i, em { font-style: normal; }
 .enter-fade { animation: scene-fade var(--enter) ease both; }
 .enter-iris { animation: scene-iris var(--enter) var(--ease-in-out) both; }
 .enter-lift { animation: scene-lift var(--enter) var(--ease-in-out) both; }
-.enter-slide { animation: scene-slide var(--enter) var(--ease-in-out) both; }
 @keyframes scene-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scene-iris { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(75% at 50% 50%); } }
 @keyframes scene-lift { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
-@keyframes scene-slide { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
 
-/* 入场动画：延时用 --at，可选的离场时刻用 --out。 */
-.rise { animation: rise 0.7s var(--ease-out) var(--at, 0s) both, leave 0.4s var(--ease-in) var(--out, 9999s) forwards; }
-.fade { animation: fade 0.5s ease var(--at, 0s) both, fade-out 0.35s ease var(--out, 9999s) forwards; }
-.pop { animation: pop 0.6s var(--ease-spring) var(--at, 0s) both, leave 0.4s var(--ease-in) var(--out, 9999s) forwards; }
+/* 入场动画：延时用 --at，可选的离场时刻用 --out（都以所在分镜的开始为零点）。 */
+.rise { animation: rise 0.9s var(--ease-out) var(--at, 0s) both, leave 0.5s var(--ease-in) var(--out, 9999s) forwards; }
+.fade { animation: fade 0.7s ease var(--at, 0s) both, fade-out 0.45s ease var(--out, 9999s) forwards; }
+.pop { animation: pop 0.8s var(--ease-out) var(--at, 0s) both, leave 0.5s var(--ease-in) var(--out, 9999s) forwards; }
 .mask { display: block; overflow: hidden; padding: 0.1em 0 0.16em; margin: -0.1em 0 -0.16em; }
-.up { display: block; animation: up 0.8s var(--ease-out) var(--at, 0s) both, up-out 0.45s var(--ease-in) var(--out, 9999s) forwards; }
+.up { display: block; animation: up 1s var(--ease-out) var(--at, 0s) both, up-out 0.6s var(--ease-in) var(--out, 9999s) forwards; }
 .press { animation: press 0.34s ease var(--at, 0s) both; }
-@keyframes rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
-@keyframes leave { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-30px); } }
+@keyframes rise { from { opacity: 0; transform: translateY(34px); } to { opacity: 1; transform: none; } }
+@keyframes leave { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-26px); } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
-@keyframes pop { from { opacity: 0; transform: scale(0.86) translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.86); } to { opacity: 1; transform: none; } }
 @keyframes up { from { transform: translateY(135%); } to { transform: none; } }
 @keyframes up-out { from { transform: none; } to { transform: translateY(-135%); } }
 @keyframes press { 0%, 100% { transform: none; } 45% { transform: scale(0.9); } }
 
+/* 字阶 */
+.display, .display-m, .display-s { font-family: var(--serif); font-weight: 560; letter-spacing: 0.005em; color: var(--ink); }
+.display { font-size: 104px; line-height: 1.24; }
+.display-m { font-size: 92px; line-height: 1.2; }
+.display-s { font-size: 60px; line-height: 1.26; }
+.display em, .display-m em, .display-s em { color: var(--accent); }
+.lead { font-size: 30px; line-height: 1.62; color: var(--body); text-wrap: balance; }
+.eyebrow { display: flex; align-items: center; gap: 16px; font: 500 20px/1 var(--mono); letter-spacing: 0.14em; color: var(--muted); }
+.eyebrow i { width: 52px; height: 1px; background: var(--faint); }
+.eyebrow b { font-weight: 600; color: var(--accent); letter-spacing: 0.06em; }
+.mono { font-family: var(--mono); }
+.icon { width: 1em; height: 1em; flex: none; }
+
 /* 色块舞台：渐变色场加一层颗粒。 */
-.stage { position: absolute; inset: 0; overflow: hidden; isolation: isolate; }
+.stage { position: relative; overflow: hidden; border-radius: 28px; isolation: isolate; }
 .stage::before, .stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
 .stage::before { z-index: -2; }
 .stage::after { z-index: -1; background: var(--grain); opacity: 0.2; mix-blend-mode: multiply; }
-.stage-paper::before { background: radial-gradient(60% 70% at 85% 0%, #fbf3ea 0, transparent 65%), radial-gradient(50% 60% at 0% 100%, #ebe8f4 0, transparent 70%), var(--canvas); }
+.stage-full { position: absolute; inset: 0; border-radius: 0; }
 .stage-peach::before {
   background:
     radial-gradient(60% 80% at 12% 10%, var(--peach-soft) 0, transparent 60%),
@@ -124,52 +124,21 @@ i, em { font-style: normal; }
     radial-gradient(40% 50% at 100% 96%, var(--peach-soft) 0, transparent 70%),
     #ece6c6;
 }
-.stage-violet::before {
-  background:
-    radial-gradient(55% 75% at 10% 6%, #e6defa 0, transparent 62%),
-    radial-gradient(50% 70% at 92% 22%, var(--slate-soft) 0, transparent 66%),
-    radial-gradient(45% 60% at 70% 105%, var(--violet) 0, transparent 70%),
-    radial-gradient(40% 50% at 0% 100%, var(--peach-soft) 0, transparent 70%),
-    #d9d0ee;
-}
-.stage-night::before {
-  background:
-    radial-gradient(55% 70% at 88% 0%, #2b2640 0, transparent 65%),
-    radial-gradient(50% 65% at 0% 100%, #2a2520 0, transparent 70%),
-    var(--night);
-}
-.stage-night::after { background: var(--grain-light); opacity: 0.07; mix-blend-mode: screen; }
+.grain { position: absolute; inset: 0; background: var(--grain); opacity: 0.1; mix-blend-mode: multiply; pointer-events: none; }
 
-/* 白色卡片：放界面元素的底。 */
-.card { position: relative; border-radius: 32px; background: var(--paper); box-shadow: 0 50px 90px -40px rgba(29, 28, 26, 0.5), 0 0 0 1px rgba(29, 28, 26, 0.07); }
-.mono { font-family: var(--mono); }
-.icon { width: 1em; height: 1em; flex: none; }
+/* 分镜角标 */
+.chrome { position: absolute; top: 54px; left: 120px; right: 110px; display: flex; align-items: center; justify-content: space-between; }
+.chrome-brand { display: flex; align-items: center; gap: 12px; font: 560 26px/1 var(--serif); color: var(--ink); }
+.chrome-brand img { height: 30px; width: auto; }
+.chrome-chapter { display: flex; align-items: center; gap: 14px; font: 500 19px/1 var(--mono); letter-spacing: 0.14em; color: var(--muted); }
+.chrome-chapter b { font-weight: 600; color: var(--accent); letter-spacing: 0.06em; }
 
-/* 小标签 */
-.tag { display: inline-flex; align-items: center; gap: 14px; align-self: flex-start; padding: 12px 22px; border-radius: 999px; background: rgba(251, 250, 247, 0.7); box-shadow: 0 0 0 1px rgba(29, 28, 26, 0.08); font: 500 24px/1 var(--mono); letter-spacing: 0.1em; color: var(--body); }
-.tag b { font-weight: 600; color: var(--accent); }
-.tag-night { background: rgba(242, 241, 237, 0.08); box-shadow: 0 0 0 1px var(--night-line); color: var(--on-night-muted); }
-.tag-night b { color: var(--accent-night); }
-
-/* 左文右图的分镜版式：左边一个大标题加一句话，右边一组放大重画的界面元素。 */
-.shot-copy { position: absolute; left: 120px; top: 0; bottom: 0; width: 660px; display: flex; flex-direction: column; justify-content: center; padding-bottom: 20px; }
-.shot-title { margin-top: 40px; font: 700 124px/1.2 var(--serif); letter-spacing: 0.01em; color: var(--ink); }
-.shot-title em { color: var(--accent); }
-.shot-sub { margin-top: 36px; max-width: 620px; font-size: 38px; line-height: 1.55; color: var(--body); text-wrap: balance; }
-.shot-visual { position: absolute; left: 820px; right: 100px; top: 0; bottom: 0; display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 26px; }
-
-/* 鼠标指针：定位在包住目标按钮的 .aim 里，坐标相对按钮中心。 */
-.aim { position: relative; display: inline-flex; }
-.pointer { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; z-index: 5; pointer-events: none; filter: drop-shadow(0 6px 8px rgba(29, 28, 26, 0.35)); animation: pointer-move var(--move) var(--ease-in-out) var(--at) both, pointer-click 0.34s ease var(--click) both; }
-.pointer svg { width: 100%; height: 100%; }
-@keyframes pointer-move { 0% { opacity: 0; translate: var(--fx) var(--fy); } 20% { opacity: 1; } 100% { opacity: 1; translate: var(--tx) var(--ty); } }
-@keyframes pointer-click { 0%, 100% { scale: 1; } 45% { scale: 0.8; } }
-
-/* 按钮 */
-.btn { display: inline-flex; align-items: center; justify-content: center; padding: 0 30px; height: 68px; border-radius: 999px; font: 500 30px/1 var(--sans); white-space: nowrap; color: var(--body); }
-.btn-soft { background: #ecebe6; color: var(--ink); }
-.btn-solid { background: var(--ink); color: var(--paper); font-weight: 600; }
+/* 截图镜头：一张大图放进固定取景框，位置和缩放由 camera.js 按时刻算。 */
+.cam { position: absolute; overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 34px 70px -28px rgba(29, 28, 26, 0.42), 0 0 0 1px rgba(29, 28, 26, 0.08); }
+.cam-layer { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.cam-layer img { width: 100%; height: 100%; }
 
 /* 状态标签 */
-.badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; font: 500 24px/1.2 var(--sans); white-space: nowrap; }
-.badge-live { background: var(--live-soft); color: var(--live); }
+.status { font: 500 16px/1 var(--mono); padding: 7px 12px; border-radius: 999px; white-space: nowrap; }
+.status-live { background: var(--live-soft); color: var(--live); }
+.status-wip { background: var(--wip-soft); color: var(--wip); }

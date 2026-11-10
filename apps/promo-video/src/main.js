@@ -1,26 +1,15 @@
 import "./styles/fonts.css";
 import "./styles/base.css";
 import "./styles/scenes.css";
-import "./styles/motion.css";
-import "./styles/short.css";
+import "./styles/cards.css";
 import "./styles/player.css";
-import { DEFAULT_FILM, FPS, films, HEIGHT, WIDTH } from "./films/index.js";
+import { FPS, HEIGHT, scenes, WIDTH } from "./film.js";
+import { soundtrack } from "./soundtrack.js";
 import { createTimeline } from "./timeline.js";
 
 const params = new URLSearchParams(location.search);
 const rendering = params.has("render");
 const film = document.querySelector("#film");
-const filmId = params.get("film") ?? DEFAULT_FILM;
-
-/** capture:ui 截下来的产品画面和各个按钮的位置；只有用到真实界面的版本才需要。 */
-async function loadUi() {
-  const response = await fetch("/ui/meta.json");
-  // 文件不存在时开发服务器会回退到首页 HTML，所以还要看内容类型。
-  if (!response.ok || !response.headers.get("content-type")?.includes("json")) {
-    throw new Error("还没有截取产品画面。先运行：pnpm --filter @actspace/promo-video capture:ui");
-  }
-  return response.json();
-}
 
 /** 中文字体按 unicode-range 切成了上百片，等它们全部就绪再出第一帧，否则前几帧会用回退字体。 */
 async function loadFonts() {
@@ -31,8 +20,7 @@ async function loadFonts() {
 
 async function decodeImages() {
   // 分镜默认是 display:none，里面的图不会自己加载；逐个解码一遍，seek 到那一帧时才不会空着。
-  // 按时刻切换的整幅画面（data-at）由时间线在换上来时解码，不在这里一次占满内存。
-  const images = [...film.querySelectorAll("img:not([data-at])")].filter((image) => image.getAttribute("src"));
+  const images = [...film.querySelectorAll("img")].filter((image) => image.getAttribute("src"));
   await Promise.all(images.map((image) => image.decode().catch(() => {})));
 }
 
@@ -43,7 +31,8 @@ function startPreview(timeline) {
   const scrub = document.querySelector("#scrub");
   const clock = document.querySelector("#clock");
   const sceneName = document.querySelector("#scene-name");
-  const audio = new Audio(`/music-${filmId}.wav`);
+  // 配乐由 `pnpm music` 下载到 .cache/music/；没有下载时预览照常播放，只是没有声音。
+  const audio = new Audio(`/${soundtrack.file}`);
   audio.preload = "auto";
 
   document.body.classList.add("is-preview");
@@ -61,8 +50,8 @@ function startPreview(timeline) {
   let playing = false;
   let last = 0;
 
-  const show = async () => {
-    await timeline.seek(time);
+  const show = () => {
+    timeline.seek(time);
     scrub.value = String(time);
     const minutes = Math.floor(time / 60);
     clock.value = `${minutes}:${(time - minutes * 60).toFixed(1).padStart(4, "0")}`;
@@ -77,7 +66,7 @@ function startPreview(timeline) {
       return;
     }
     if (time >= timeline.duration - 0.05) time = 0;
-    audio.currentTime = time;
+    audio.currentTime = soundtrack.start + time;
     audio.play().catch(() => {});
     last = performance.now();
     requestAnimationFrame(tick);
@@ -87,7 +76,7 @@ function startPreview(timeline) {
     if (!playing) return;
     time = Math.min(timeline.duration, time + (now - last) / 1000);
     last = now;
-    void show();
+    show();
     if (time >= timeline.duration) setPlaying(false);
     else requestAnimationFrame(tick);
   };
@@ -95,8 +84,8 @@ function startPreview(timeline) {
   play.addEventListener("click", () => setPlaying(!playing));
   scrub.addEventListener("input", () => {
     time = Number(scrub.value);
-    if (playing) audio.currentTime = time;
-    void show();
+    if (playing) audio.currentTime = soundtrack.start + time;
+    show();
   });
   document.addEventListener("keydown", (event) => {
     if (event.code !== "Space" || event.target === scrub) return;
@@ -104,17 +93,15 @@ function startPreview(timeline) {
     setPlaying(!playing);
   });
 
-  return show();
+  show();
 }
 
 const ready = (async () => {
-  const definition = films[filmId];
-  if (!definition) throw new Error(`没有「${filmId}」这个版本。可选：${Object.keys(films).join("、")}`);
-  const [ui] = await Promise.all([definition.needs === "ui" ? loadUi() : null, loadFonts()]);
-  const timeline = createTimeline(film, definition.scenes({ ui }));
+  await loadFonts();
+  const timeline = createTimeline(film, scenes);
   await decodeImages();
-  if (rendering) await timeline.seek(0);
-  else await startPreview(timeline);
+  if (rendering) timeline.seek(0);
+  else startPreview(timeline);
   return timeline;
 })();
 

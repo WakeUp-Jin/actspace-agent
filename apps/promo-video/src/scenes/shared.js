@@ -5,14 +5,26 @@ export { markUrl };
 /** 入场时刻（秒）写成 CSS 变量，动画延时全靠它；可选的离场时刻用 out。时刻都以所在分镜的开始为零点。 */
 export const at = (seconds, out) => `--at:${seconds}s;${out === undefined ? "" : `--out:${out}s;`}`;
 
+/** 「激活」区间：左侧要点在 on 到 off 之间亮起，前后压暗。 */
+export const span = (on, off) => `--on:${on}s;--off:${off}s;`;
+
 /** 大标题逐行从遮罩里升起。 */
-export function lines(rows, start, { step = 0.1, out } = {}) {
+export function lines(rows, start, { step = 0.14, out } = {}) {
   return rows
     .map(
       (row, index) =>
-        `<span class="mask"><span class="up" style="${at(start + index * step, out === undefined ? undefined : out + index * 0.05)}">${row}</span></span>`,
+        `<span class="mask"><span class="up" style="${at(start + index * step, out === undefined ? undefined : out + index * 0.06)}">${row}</span></span>`,
     )
     .join("");
+}
+
+/** 分镜角标：左上品牌，右上章节。 */
+export function chrome(number, chapter) {
+  return `
+    <header class="chrome fade" style="${at(0.1)}">
+      <span class="chrome-brand"><img src="${markUrl}" alt="">ActSpace</span>
+      <span class="chrome-chapter"><b>${number}</b>${chapter}</span>
+    </header>`;
 }
 
 const stroke = (paths) =>
@@ -32,11 +44,11 @@ export const icons = {
   arrowUp: stroke('<path d="M12 19V5M6 11l6-6 6 6"/>'),
   plus: stroke('<path d="M12 5v14M5 12h14"/>'),
   shield: stroke('<path d="M12 3l7 3v5.5c0 4.3-2.9 7.8-7 9.5-4.1-1.7-7-5.2-7-9.5V6z"/><path d="M9 12l2.2 2.2L15 10.5"/>'),
-  open: stroke('<path d="M14 5h5v5M19 5l-8 8"/><path d="M18 14v3a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3"/>'),
   key: stroke('<circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2.5 2.5"/>'),
+  gauge: stroke('<path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-6"/>'),
 };
 
-/** 鼠标指针：从 from 滑到 to（画布坐标），到位后按一下。 */
+/** 鼠标指针：放在包住目标按钮的 .aim 里，从 from 滑到 to（相对按钮中心的像素），到位后按一下。 */
 export const pointer = ({ from, to, start, click }) => `
   <i class="pointer" style="--fx:${from[0]}px;--fy:${from[1]}px;--tx:${to[0]}px;--ty:${to[1]}px;${at(start)}--move:${(click - start - 0.1).toFixed(2)}s;--click:${click}s;">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8.5-6.2 1.3L10.5 19z" fill="#1d1c1a" stroke="#fbfaf7" stroke-width="1.6" stroke-linejoin="round"/></svg>
