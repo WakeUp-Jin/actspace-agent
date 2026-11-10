@@ -558,16 +558,46 @@ describe("Tool Runtime execution contract", () => {
     expect(reference).toEqual({ type: "artifact", artifact: { artifactId: "full-1", mediaType: "text/plain", size: Buffer.byteLength(full.replace("token-abcdefgh", "[REDACTED]")), sha256: "digest" }, label: "Full tool output" });
   });
 
-  it("cuts a result to the per-call budget the Agent Loop passes for a nearly full context window", async () => {
+  it("cuts a batch to the budget the Agent Loop passes for a nearly full context window", async () => {
     const runtime = new ToolRuntime();
     runtime.register({ definition: definition(), executor: { async execute(args) { return success(String(args.value).repeat(5_000)); } } });
-    const results = await runtime.executeBatch([call("a", { value: "aaaa" }), call("b", { value: "b" })], { ...environment([]), modelOutputChars: 6_000 });
+    const results = await runtime.executeBatch([call("a", { value: "aaaa" }), call("b", { value: "b" })], { ...environment([]), modelOutputBatchChars: 12_000 });
     const texts = results.map((result) => (result.modelOutput[0] as { text: string }).text);
+    // 两个调用、12,000 字符：先出结果的那个要给另一个留一半。
     expect(texts[0]).toMatch(/^a{4000,5600}\n\n\[Output truncated: this tool returned 20000 characters and the context window has room for about 6000\. The first \d+ characters are shown\. The full output was saved as a file\.\]$/);
     expect(texts[0]!.length + 400).toBeLessThanOrEqual(6_000);
     // 没超额度的那次调用原样返回。
     expect(texts[1]).toBe("b".repeat(5_000));
     expect(results.map((result) => result.modelOutput.length)).toEqual([2, 1]);
+  });
+
+  it("lets one large result use what the small results of the same batch do not need", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition(), executor: { async execute(args) { return success("x".repeat(Number(args.value))); } } });
+    // 平分的话每个调用 10,000 字符，20,000 的那个会被截短；合计 22,000 其实放得下。
+    const calls = [call("small-1", { value: "1000" }), call("large", { value: "20000" }), call("small-2", { value: "1000" })];
+    const results = await runtime.executeBatch(calls, { ...environment([]), modelOutputBatchChars: 30_000 });
+    expect(results.map((result) => (result.modelOutput[0] as { text: string }).text.length)).toEqual([1_000, 20_000, 1_000]);
+    expect(results.every((result) => result.artifacts.length === 0)).toBe(true);
+  });
+
+  it("keeps a batch of large results within the budget in total", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition({ concurrency: "exclusive" }), executor: { async execute() { return success("y".repeat(40_000)); } } });
+    const results = await runtime.executeBatch(["a", "b", "c", "d"].map((id) => call(id)), { ...environment([]), modelOutputBatchChars: 60_000 });
+    const sizes = results.map((result) => (result.modelOutput[0] as { text: string }).text.length + (result.modelOutput.length - 1) * 400);
+    expect(sizes.reduce((sum, size) => sum + size, 0)).toBeLessThanOrEqual(60_000);
+    // 第一个调用给后面三个各留 8,000，自己用 36,000；后面三个各拿到留给它的那一份。
+    expect(sizes[0]).toBeGreaterThan(34_000);
+    for (const size of sizes.slice(1)) { expect(size).toBeGreaterThan(6_000); expect(size).toBeLessThanOrEqual(8_000); }
+  });
+
+  it("does not hold budget back for a call that never reached its tool body", async () => {
+    const runtime = new ToolRuntime();
+    runtime.register({ definition: definition({ concurrency: "exclusive" }), executor: { async execute() { return success("z".repeat(20_000)); } }, permission: { extractResources: () => [], evaluate: (args) => args.value === "deny" ? { kind: "deny", code: "POLICY_DENIED", reason: "Not allowed." } : { kind: "allow" } } });
+    const results = await runtime.executeBatch([call("denied", { value: "deny" }), call("allowed", { value: "ok" })], { ...environment([]), modelOutputBatchChars: 21_000 });
+    expect(results.map((result) => result.status)).toEqual(["denied", "completed"]);
+    expect((results[1]!.modelOutput[0] as { text: string }).text).toBe("z".repeat(20_000));
   });
 
   it("caps the message of a result that never reached the tool body", async () => {

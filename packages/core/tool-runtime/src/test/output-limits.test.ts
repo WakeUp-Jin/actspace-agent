@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import type { ToolArtifactRef, ToolModelOutputBlock } from "../executor.js";
-import { boundToolResult, sliceWholeChars, TOOL_RESULT_DETAIL_BYTES, TOOL_RESULT_MODEL_OUTPUT_BYTES, TOOL_RESULT_TEXT_FIELD_BYTES } from "../output-limits.js";
+import { boundToolResult, sliceWholeChars, TOOL_BATCH_PENDING_CALL_CHARS, TOOL_RESULT_DETAIL_BYTES, TOOL_RESULT_MODEL_OUTPUT_BYTES, TOOL_RESULT_TEXT_FIELD_BYTES, ToolOutputBudget } from "../output-limits.js";
 import type { ToolExecutionResult } from "../result.js";
 
 const MIB = 1024 * 1024;
@@ -201,5 +201,50 @@ describe("boundToolResult", () => {
       expect(await boundToolResult(input, { modelOutputChars: Number.NaN, saveFullOutput: save })).toBe(input);
       expect(await boundToolResult(input, { modelOutputChars: Number.POSITIVE_INFINITY, saveFullOutput: save })).toBe(input);
     });
+  });
+});
+
+describe("ToolOutputBudget", () => {
+  it("gives a single call the whole batch budget", () => {
+    expect(new ToolOutputBudget(50_000, 1).take(80_000)).toBe(50_000);
+  });
+
+  it("holds back a fixed share for each call that has not produced its result yet", () => {
+    const budget = new ToolOutputBudget(100_000, 5);
+    // 先出结果的调用给后面 4 个各留 8,000。
+    expect(budget.take(64_000)).toBe(100_000 - 4 * TOOL_BATCH_PENDING_CALL_CHARS);
+    // 用了 64,000，剩 36,000：给后面 3 个各留 8,000。
+    expect(budget.take(1_000)).toBe(36_000 - 3 * TOOL_BATCH_PENDING_CALL_CHARS);
+    // 小结果没用完的部分留给后面的调用。
+    expect(budget.take(500)).toBe(35_000 - 2 * TOOL_BATCH_PENDING_CALL_CHARS);
+    expect(budget.take(500)).toBe(34_500 - TOOL_BATCH_PENDING_CALL_CHARS);
+    expect(budget.take(500)).toBe(34_000);
+  });
+
+  it("splits evenly when the budget cannot hold back the fixed share for everyone", () => {
+    const budget = new ToolOutputBudget(20_000, 4);
+    expect([budget.take(50_000), budget.take(50_000), budget.take(50_000), budget.take(50_000)]).toEqual([5_000, 5_000, 5_000, 5_000]);
+  });
+
+  it("hands out exactly the batch budget when every result is large", () => {
+    for (const [total, calls] of [[346_000, 10], [60_000, 4], [100_000, 3], [9_000, 2]] as const) {
+      const budget = new ToolOutputBudget(total, calls);
+      let used = 0;
+      for (let index = 0; index < calls; index++) used += Math.min(64_000, budget.take(64_000));
+      expect(used).toBe(total);
+    }
+  });
+
+  it("counts a result cut to the minimum size as that size and stays at zero once used up", () => {
+    const budget = new ToolOutputBudget(1_000, 3);
+    // 每个调用的额度都不到最小值，截短后的结果按最小值 2,048 计。
+    expect(budget.take(64_000)).toBe(334);
+    expect(budget.take(64_000)).toBe(0);
+    expect(budget.take(64_000)).toBe(0);
+  });
+
+  it("treats a non-positive budget as empty", () => {
+    expect(new ToolOutputBudget(-5, 2).take(100)).toBe(0);
+    expect(new ToolOutputBudget(0, 0).take(100)).toBe(0);
   });
 });

@@ -1,6 +1,7 @@
 import type { PreparedDispatch, ToolCallInput, ToolPreparedEnvironment } from "./prepared-execution.js";
 import { PreparedToolExecution } from "./prepared-execution.js";
 import { OrderedToolCommitQueue } from "./ordered-commit.js";
+import { ToolOutputBudget } from "./output-limits.js";
 import type { ToolRegistry } from "./registry.js";
 import type { ToolExecutionResult } from "./result.js";
 
@@ -18,11 +19,13 @@ export class ToolExecutionScheduler {
 
   prepareBatch(calls: readonly ToolCallInput[], environment: ToolPreparedEnvironment): readonly PreparedToolExecution[] {
     const commits = new OrderedToolCommitQueue();
+    const batchChars = environment.modelOutputBatchChars;
+    const outputBudget = typeof batchChars === "number" && Number.isFinite(batchChars) ? new ToolOutputBudget(batchChars, calls.length) : undefined;
     const prepared: PreparedToolExecution[] = [];
     try {
       for (const call of calls) {
         const registration = this.registry.capture(call.name);
-        prepared.push(new PreparedToolExecution(registration, call, environment, commits.reserve()));
+        prepared.push(new PreparedToolExecution(registration, call, environment, commits.reserve(), outputBudget));
       }
       return Object.freeze(prepared);
     } catch (error) {

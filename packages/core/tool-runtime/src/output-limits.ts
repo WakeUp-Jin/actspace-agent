@@ -30,6 +30,8 @@ export const TOOL_RESULT_RENDERER_BYTES = 64 * 1024;
 export const TOOL_RESULT_TEXT_FIELD_BYTES = 16 * 1024;
 /** 按窗口给的字符额度再小也按这个数算：放得下截断说明、完整输出的文件引用和一小段开头。 */
 export const TOOL_RESULT_MODEL_OUTPUT_MIN_CHARS = 2_048;
+/** 一批调用共用额度时，给每个还没出结果的调用留的字符数：搜索结果、短文件、目录列表这类常见的小结果放得下。 */
+export const TOOL_BATCH_PENDING_CALL_CHARS = 8_000;
 /** 一个文件引用块渲染给模型后大约这么多字符（标签、类型、路径和读取提示）。 */
 const REFERENCE_CHARS = 400;
 /** 截断说明和新增的文件引用占的位置，字节和字符都按这个数预留。 */
@@ -40,7 +42,7 @@ const DETAIL_LABEL_CHARS = 200;
 export type ToolResultBounds = {
   /**
    * 这次调用给模型的输出最多多少个字符（UTF-16 单元，和上下文估算用的单位一致）。
-   * Agent Loop 按上下文窗口还放得下多少来给；不给就只受字节上限约束。
+   * 来自这一批调用按上下文窗口共用的额度（ToolOutputBudget）；不给就只受字节上限约束。
    */
   readonly modelOutputChars?: number;
   /** 把完整输出存成会话拥有的文件。抛错时照样截断，说明里写明没能保存。 */
@@ -66,7 +68,7 @@ export async function boundToolResult(result: ToolExecutionResult, bounds: ToolR
     next = rest;
   }
   if (!fitsJsonBytes(result.detail, TOOL_RESULT_DETAIL_BYTES)) next = { ...next, detail: Object.freeze(boundDetail(result.detail)) };
-  if (!fitsJsonBytes(result.modelOutput, TOOL_RESULT_MODEL_OUTPUT_BYTES) || (maxChars !== undefined && modelOutputChars(result.modelOutput) > maxChars)) {
+  if (!fitsJsonBytes(result.modelOutput, TOOL_RESULT_MODEL_OUTPUT_BYTES) || (maxChars !== undefined && toolModelOutputChars(result.modelOutput) > maxChars)) {
     const bounded = await boundModelOutput(result.modelOutput, maxChars, bounds.saveFullOutput);
     next = { ...next, modelOutput: Object.freeze(bounded.modelOutput), artifacts: Object.freeze(bounded.saved === undefined ? [...result.artifacts] : [...result.artifacts, bounded.saved]) };
   }
@@ -82,10 +84,39 @@ export function capToolResultText(text: string): string {
 type ArtifactBlock = Extract<ToolModelOutputBlock, { type: "artifact" }>;
 
 /** 给模型的输出按上下文估算的口径有多少字符：文本和 json 的文字，加上每个文件引用渲染后的大致长度。 */
-function modelOutputChars(blocks: readonly ToolModelOutputBlock[]): number {
+export function toolModelOutputChars(blocks: readonly ToolModelOutputBlock[]): number {
   let chars = 0;
   for (const block of blocks) chars += block.type === "text" ? block.text.length : block.type === "json" ? (JSON.stringify(block.value) ?? "null").length : REFERENCE_CHARS;
   return chars;
+}
+
+/**
+ * 一批工具调用共用的输出额度（字符）。Agent Loop 按上下文窗口给出这一批合计能用多少，
+ * 调用按出结果的先后来取：先出结果的可以用剩下的全部额度，只给每个还没出结果的调用留一份
+ * （TOOL_BATCH_PENDING_CALL_CHARS；剩下的不够这样留时就平分）。
+ *
+ * 不按调用数平分，是因为一批里常常只有一两个大结果：平分会把它们截短，而其他调用根本用不完自己那份。
+ * 全是大结果时，后出结果的调用拿到的也不会少于留给它的那一份。
+ */
+export class ToolOutputBudget {
+  #remaining: number;
+  #pending: number;
+
+  constructor(batchChars: number, calls: number) {
+    this.#remaining = Math.max(0, Math.floor(batchChars));
+    this.#pending = Math.max(0, Math.floor(calls));
+  }
+
+  /** 一个调用出了结果，原本要给模型 wanted 个字符：返回它最多能给多少，并记下它用掉的部分。每个调用取一次。 */
+  take(wanted: number): number {
+    const others = Math.max(0, this.#pending - 1);
+    const share = Math.floor(this.#remaining / Math.max(1, this.#pending));
+    const allowance = this.#remaining - others * Math.min(TOOL_BATCH_PENDING_CALL_CHARS, share);
+    // 额度再小，截短后的结果也有 TOOL_RESULT_MODEL_OUTPUT_MIN_CHARS 那么长（boundToolResult）。
+    this.#remaining = Math.max(0, this.#remaining - Math.min(Math.max(0, wanted), Math.max(allowance, TOOL_RESULT_MODEL_OUTPUT_MIN_CHARS)));
+    this.#pending = others;
+    return allowance;
+  }
 }
 
 async function boundModelOutput(blocks: readonly ToolModelOutputBlock[], maxChars: number | undefined, save: (text: string) => Promise<ToolArtifactRef>): Promise<{ readonly modelOutput: ToolModelOutputBlock[]; readonly saved?: ToolArtifactRef }> {
@@ -123,7 +154,7 @@ async function boundModelOutput(blocks: readonly ToolModelOutputBlock[], maxChar
   };
   let modelOutput = compose(head);
   // 预留的位置万一不够：序列化后每个 UTF-16 单元至少占 1 字节，按超出的量去掉开头的末尾，一定在变小。
-  const excess = (): number => Math.max(jsonBytes(modelOutput) - maxBytes, maxChars === undefined ? 0 : modelOutputChars(modelOutput) - maxChars);
+  const excess = (): number => Math.max(jsonBytes(modelOutput) - maxBytes, maxChars === undefined ? 0 : toolModelOutputChars(modelOutput) - maxChars);
   for (let over = excess(); over > 0 && head.length > 0; over = excess()) {
     head = sliceWholeChars(head, Math.max(0, head.length - over));
     modelOutput = compose(head);
