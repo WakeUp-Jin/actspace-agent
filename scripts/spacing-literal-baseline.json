@@ -1,7 +1,6 @@
 {
   "desktop": {
     "components/composer/ComposerAttachments.tsx": 2,
-    "components/composer/ComposerInput.tsx": 2,
     "components/composer/ModelPicker.tsx": 7,
     "components/ContextPopup.tsx": 1,
     "components/extensions/PluginsSection.tsx": 3,

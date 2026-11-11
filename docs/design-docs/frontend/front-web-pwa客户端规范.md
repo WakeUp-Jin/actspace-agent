@@ -152,7 +152,7 @@ PWA 必须运行在安全上下文（HTTPS 或 `localhost`），否则 Service W
 ## 9. 视觉
 
 - 玻璃材质：`--web-glass` / `--web-glass-strong`，浅色 `rgba(255,255,255,.72)` / `.9`，深色 `rgba(36,37,34,.72)` / `.92`，配合 `backdrop-filter: blur(18px) saturate(1.6)`；不画实线边框，用 0.5px `--web-glass-edge` 描边 + `--web-glass-shadow` 柔和投影；弹层 blur 24；不支持 `backdrop-filter` 回退 `--act-color-surface`。
-- 列表和设置用 iOS 式 inset 分组（`surface` 底、圆角 12、0.5px 缩进分隔线）；顶栏是 36px 玻璃圆钮 + 标题胶囊，下方渐隐。手机正文 15px、标题 16px（`--text-act-base: 15px`，只在 web token 文件定义），比桌面大一档。图标 `lucide-react`。
+- 列表和设置用 iOS 式 inset 分组（`surface` 底、圆角 12、0.5px 缩进分隔线）；顶栏是 36px 玻璃圆钮 + 标题胶囊，下方渐隐。手机正文 15px、标题 16px（`--text-act-base`），与桌面聊天正文同一档。图标 `lucide-react`。
 - 状态色：运行中 operational 翡翠绿；等待审批 warning 琥珀；未读 success 绿点；错误 danger 红。可点区域不小于 44×44px；列表行按下显示 `hover` 背景。
 
 ## 10. 安全

@@ -86,7 +86,7 @@ DocsReader（React，面板外壳）
 | 引用 | 竖条 4px，左内边距 12px |
 | 正文区 | 左右各 16px，顶部 12px，底部留 64px 便于最后一行滚到中间编辑；预览最大宽度 760px 居中，源码模式通栏 |
 
-H3 的 18px 没有全局 token：只在 `markdown-editor.css` 定义局部变量 `--md-h3-size`，不新增全局 token，其余字号都用 `var(--text-act-*)`。
+字号都用 `var(--text-act-*)`，H3 的 18px 是 `--text-act-head`。
 
 ### 6.2 颜色映射
 

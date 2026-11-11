@@ -107,6 +107,7 @@
   /* web 正文（front-web-pwa客户端规范 §9）：手机阅读距离更近，比桌面正文大一档。 */
   --text-act-base: 15px;
   --text-act-lg: 16px;
+  --text-act-head: 18px;
   --text-act-xl: 20px;
   --text-act-title: 24px;
 

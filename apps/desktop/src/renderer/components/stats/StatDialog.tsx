@@ -16,7 +16,7 @@ export type StatDialog = {
 
 /** 交给 PopoverContent 的 className：宽度随最长一行，夹在 300–440px 之间。 */
 export const STAT_DIALOG_CONTENT_CLASS =
-  "w-max min-w-[min(300px,calc(100vw-24px))] max-w-[min(440px,calc(100vw-24px))] p-4 text-act-xs leading-[18px]";
+  "w-max min-w-[min(300px,calc(100vw-24px))] max-w-[min(440px,calc(100vw-24px))] p-4 text-act-xs leading-4.5";
 
 /** 明细值后面跟的次要标记，例如「预估」。 */
 export const STAT_NOTE_CLASS = "whitespace-nowrap text-text-faint";

@@ -362,7 +362,7 @@ export function ConversationView({
   };
 
   if (!messageScrollMounted) {
-    return <main className={CONVERSATION_SHELL_CLASS}><p role={sessionError ? 'alert' : 'status'} className="px-5 py-4 text-act-md leading-5 text-text-muted">
+    return <main className={CONVERSATION_SHELL_CLASS}><p role={sessionError ? 'alert' : 'status'} className="px-5 py-4 text-act-sm leading-5 text-text-muted">
       {sessionError ?? (browse?.messageLoading ? '正在加载消息…' : '正在加载会话…')}
       {sessionError && !locatorError && <button type="button" onClick={retrySession}>重试</button>}
     </p></main>;
@@ -394,8 +394,8 @@ export function ConversationView({
             className={isInitialComposer ? MESSAGE_SCROLL_INITIAL_CLASS : MESSAGE_SCROLL_CLASS}
             aria-label="会话消息"
           >
-              {browse?.messageLoading && <p role="status" className="px-5 py-3 text-act-md leading-5 text-text-muted">正在加载消息…</p>}
-              {sessionError && <p role="alert" className="px-5 py-3 text-act-md leading-5 text-text-muted">{sessionError}{locatorError ? null : <> <button type="button" onClick={retrySession}>重试</button></>}</p>}
+              {browse?.messageLoading && <p role="status" className="px-5 py-3 text-act-sm leading-5 text-text-muted">正在加载消息…</p>}
+              {sessionError && <p role="alert" className="px-5 py-3 text-act-sm leading-5 text-text-muted">{sessionError}{locatorError ? null : <> <button type="button" onClick={retrySession}>重试</button></>}</p>}
               {browse?.earlierLoading && <p role="status" className="flex items-center justify-center gap-1.5 py-2 text-act-xs leading-4 text-text-faint"><LoaderCircle className="animate-spin" size={12} aria-hidden="true" />正在加载更早消息…</p>}
               {browse?.earlierError && <p role="alert" className="px-5 text-act-xs leading-4 text-text-muted">{browse.earlierError} <button type="button" onClick={requestEarlier}>重试</button></p>}
               {isInitialComposer ? null : (

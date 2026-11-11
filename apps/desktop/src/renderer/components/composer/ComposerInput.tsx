@@ -19,12 +19,12 @@ const COMPOSER_BODY_AGENT_STACKED_CLASS =
   `${COMPOSER_BODY_BASE_CLASS} gap-y-1.5 pt-2.5 grid-cols-[auto_auto_minmax(0,1fr)_auto] [grid-template-areas:'input_input_input_input'_'plus_model_._send']`;
 // 输入区最高 200px，超出后在内部滚动；新建页最少 2 行。
 const COMPOSER_INPUT_CLASS =
-  "composer-input block w-full min-h-[34px] max-h-[200px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-[7px] text-act-lg leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
+  "composer-input block w-full min-h-[34px] max-h-[200px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-1.5 text-act-base leading-5.5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
 const COMPOSER_INITIAL_INPUT_CLASS =
-  "composer-input block w-full min-h-[54px] max-h-[200px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-[7px] text-act-lg leading-5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
+  "composer-input block w-full min-h-[54px] max-h-[200px] [grid-area:input] resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-1.5 text-act-base leading-5.5 text-text-muted outline-none placeholder:text-text-subtle not-placeholder-shown:text-text-main disabled:cursor-default";
 /** 窄窗始终多行（沿用原来的 600px 断点）。 */
 const COMPOSER_NARROW_QUERY = "(max-width: 600px)";
-// 单行高度 = 20px line-height + 7px*2 padding = 34px；超过它说明内容折行（显式换行或自动 wrap）。
+// 单行高度 = 22px line-height + 6px*2 padding = 34px；超过它说明内容折行（显式换行或自动 wrap）。
 const COMPOSER_SINGLE_LINE_MAX_PX = 40;
 
 export type ComposerLayoutOptions = {

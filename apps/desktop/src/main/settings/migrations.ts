@@ -204,6 +204,7 @@ export function parseSettingsV4(raw: Record<string, unknown>, dataRoot: string):
     general: {
       performanceMonitoring: general.performanceMonitoring === true,
       showTurnCodeChanges: general.showTurnCodeChanges !== false,
+      simplifyThinking: general.simplifyThinking !== false,
       defaultPermissionMode: general.defaultPermissionMode === "auto-review" || general.defaultPermissionMode === "full-access" ? general.defaultPermissionMode : "default",
       englishLearning: { lastSessionId: isRecord(general.englishLearning) && typeof general.englishLearning.lastSessionId === "string" ? general.englishLearning.lastSessionId.slice(0, 200) : null },
       personalization: {
