@@ -1,5 +1,4 @@
 import { localExecutionRoot } from "../target/run-target";
-import { PerformancePanel } from "./PerformancePanel";
 import { DEFAULT_MODEL_ID } from "@actspace/shared";
 import type { AppSettings, SessionListItem, UsageActivitySnapshot, WorkspaceEntry } from "@actspace/shared";
 import { USAGE_REQUEST_PAGE_SIZE, type UsageQuery } from "./usage/usage-query";
@@ -435,7 +434,6 @@ export const WorkbenchLayout = memo(function WorkbenchLayout({
         rightWidth={effectiveRightWidth}
         rightExpanded={rightExpanded}
       />
-      {(isCompactLayout ? !compactSidebarOpen : isSidebarHidden) ? <PerformancePanel compact /> : null}
       {isCompactLayout && compactSidebarOpen ? (
         <div className="fixed inset-0 z-(--act-z-drawer)" data-testid="compact-sidebar-overlay">
           <button

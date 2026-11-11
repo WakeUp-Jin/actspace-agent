@@ -135,10 +135,6 @@
 - 归档全部：renderer 先冻结快照并处理 active session 落点，再走 main-owned 批量归档，返回至少含 `archivedSessionIds` 与 `failedSessionIds`。在 IDE 中打开与从侧栏移除各走 main-owned Workspace IPC，输入只含 `workspaceId`。
 - Workspace registry 的读取、reconciliation 和 visibility 更新是同一读改写事务，按 `dataRoot` 串行并用唯一临时文件原子替换。
 
-## 性能面板
-
-设置 → 通用里的「显示性能面板」默认关闭，开启后在侧栏底部显示 CPU 与内存（`components/PerformancePanel.tsx`，侧栏隐藏或窗口窄时紧凑贴窗口左下角）。监控组件独立更新，每两秒向可信主进程请求 CPU / 工作集内存采样；关闭与窗口隐藏时停止采集。面板仅以 `text-act-xxs`（11px）显示 CPU 与内存，无边框、无内边距、无展开明细。
-
 ## 设计原则
 
 - 轻量：信息密度高、不做重卡片；侧边栏只暴露打开、归档、隐藏三个工作区动作加拖拽排序，不引入重命名工作区、迁移等重管理。

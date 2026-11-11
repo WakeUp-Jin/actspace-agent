@@ -23,7 +23,7 @@ renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的
 ## 2. 契约约定
 
 - 成员按业务域分组：`app`、`sessions`、`workspaces`、`hosts`、`settings`……事件统一放在 `events` 域。
-- channel 字符串只来自 shared 的常量表（`RUNTIME_V2_FIXED_RENDERER_CHANNELS`、`PERFORMANCE_CHANNELS`、`ENGLISH_LEARNING_CHANNELS`、`HOST_IPC`），契约里不写字面量。
+- channel 字符串只来自 shared 的常量表（`RUNTIME_V2_FIXED_RENDERER_CHANNELS`、`RESOURCE_MONITOR_CHANNELS`、`ENGLISH_LEARNING_CHANNELS`、`HOST_IPC`），契约里不写字面量。
 - 五种 spec：
 
 | 构造函数 | 方向 | 生成的方法 | 说明 |

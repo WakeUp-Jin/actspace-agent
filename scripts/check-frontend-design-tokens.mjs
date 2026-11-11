@@ -30,6 +30,8 @@ export const LITERAL_ALLOWLIST = new Map([
   ["components/files/FileTypeIcon.tsx", ['strokeWidth="2.38"', 'strokeWidth="1.2"', 'strokeWidth="1.35"']],
   ["components/settings/ProviderLogo.tsx", ['strokeWidth="1.8"']],
   ["components/stats/stats-ui.tsx", ['strokeWidth="15"', "strokeWidth={highlighted === index ? 18 : 15}"]],
+  // 资源占用迷你折线：基线 1px、曲线 1.5px，与悬浮窗 public/monitor/monitor.css 一致。
+  ["components/settings/resources/ResourceUsageSection.tsx", ['strokeWidth="1"', 'strokeWidth="1.5"']],
 ]);
 
 // lucide 图标：别名 → 规范名（别名只是 re-export，渲染出的 class 仍是规范名），以及同义图标 → 本仓库首选。见 token 规范 §12。

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>ActSpace 资源监控</title>
+<!-- 资源监控悬浮窗：手写的极简页面，不加载主应用的 React 和样式。规范见 docs/design-docs/frontend/front-资源监控规范.md。 -->
+<link rel="stylesheet" href="./monitor.css" />
+</head>
+<body>
+<div id="float" class="float">
+  <div id="alert" class="alert" hidden></div>
+  <div class="head">
+    <svg class="grip" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/></svg>
+    <div id="summary" class="summary">
+      <span><span class="k">CPU</span><span id="cpu" class="num">—</span></span><span class="sep"></span>
+      <span><span class="k">内存</span><span id="mem" class="num">—</span></span><span class="sep"></span>
+      <span><span class="k">主线程</span><span id="delay" class="num">—</span></span>
+    </div>
+    <button id="toggle" class="ibtn" type="button" aria-label="展开" title="展开">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path id="toggle-path" d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <button id="close" class="ibtn" type="button" aria-label="关闭悬浮窗" title="关闭悬浮窗">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div id="body" class="body" hidden>
+    <div class="chart">
+      <div class="chart-h"><b>CPU</b><span id="cpu-range"></span></div>
+      <svg id="cpu-chart" viewBox="0 0 300 44" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </div>
+    <div class="chart">
+      <div class="chart-h"><b>内存</b><span id="mem-range"></span></div>
+      <svg id="mem-chart" viewBox="0 0 300 44" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </div>
+    <table id="table" class="tbl">
+      <thead><tr><th>进程</th><th>CPU</th><th>内存</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="foot"><span>内存含共享页</span><span>CPU 100% = 1 核</span></div>
+  </div>
+</div>
+<script src="./monitor.js"></script>
+</body>
+</html>
