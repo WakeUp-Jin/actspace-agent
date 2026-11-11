@@ -13,6 +13,7 @@ import { sideChatScenario } from "./side-chat";
 import { sidebarScenario } from "./sidebar";
 import { streamingScenario } from "./streaming";
 import { subagentTrajectoryScenario } from "./subagent-trajectory";
+import { thinkingScenario } from "./thinking";
 import { turnDeliverablesScenario } from "./turn-deliverables";
 
 export type MockScenario =
@@ -33,7 +34,8 @@ export type MockScenario =
   | "harness-stats"
   | "usage-stats"
   | "markdown"
-  | "script-execution";
+  | "script-execution"
+  | "thinking";
 
 /** 场景只负责写入种子数据，必要时覆盖少量 handler（如流式回放的触发时机）。 */
 export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) => MockHandlers | void>> = {
@@ -53,6 +55,7 @@ export const MOCK_SCENARIOS: Readonly<Record<MockScenario, (clock: MockClock) =>
   "side-chat": sideChatScenario,
   markdown: markdownScenario,
   "script-execution": scriptExecutionScenario,
+  thinking: thinkingScenario,
   // 「Harness 统计」页的数据在 harness-stats-fixture.ts，会话侧沿用空场景；起始位置见 components/harness-stats/dev-start.ts。
   "harness-stats": emptyScenario,
   "usage-stats": emptyScenario,

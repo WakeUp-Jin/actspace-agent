@@ -6,6 +6,12 @@ import { TestConversationView } from "./helpers/workbench";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
 
+// 这里验证的是「简化思考过程」关闭时的思考行（标题 `Thinking...`、运行中展开）；开启时见 thinking-compact.test.tsx。
+vi.mock("../components/conversation/display-settings", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../components/conversation/display-settings")>()),
+  useSimplifyThinking: () => false,
+}));
+
 const messages: MessageBlock[] = [
   {
     kind: "user",
