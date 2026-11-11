@@ -6,7 +6,7 @@ import { IconButton } from "../../ui/IconButton";
 import { formatPathReadAgo, splitContextPath } from "./context-paths-model";
 import { ROW_FOCUS_CLASS } from "./ContextPanelParts";
 
-const TAG_CLASS = "shrink-0 whitespace-nowrap rounded-act-xs px-1.5 text-act-xxs leading-[17px]";
+const TAG_CLASS = "shrink-0 whitespace-nowrap rounded-act-xs px-1.5 text-act-xxs leading-4.5";
 
 /**
  * 「路径」卡片展开后的列表：只平铺，行内带目录。点一行展开完整路径和元数据；

@@ -7,7 +7,7 @@ import { ResponseAnnotationMarkers, type DraftAnnotationMark } from "./ResponseA
 
 const ASSISTANT_REPLY_CLASS = "message-row assistant-reply block animate-[fade-in_260ms_ease_both]";
 const ASSISTANT_CONTENT_CLASS =
-  "assistant-content relative max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)] font-normal leading-[1.65] text-text-main";
+  "assistant-content relative max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)] font-normal leading-relaxed text-text-main";
 const NO_MARKS: readonly DraftAnnotationMark[] = [];
 
 /** 流式期间只有正在写的那条回复换了 message 对象，其余回复靠 memo 跳过。 */

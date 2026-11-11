@@ -74,7 +74,7 @@ export function LocalUpdateProgressDialog({
               )}
             </span>
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <h3 className="text-act-lg font-bold text-text-main">本地更新</h3>
+              <h3 className="text-act-lg font-semibold text-text-main">本地更新</h3>
               <p className="min-w-0 text-act-xs leading-relaxed text-text-faint">{progress.message}</p>
             </div>
           </div>

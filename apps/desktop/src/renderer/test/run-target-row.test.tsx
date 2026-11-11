@@ -64,7 +64,7 @@ describe("RunTargetRow", () => {
     const row = screen.getByLabelText("初始工作区与运行位置选择");
     expect(within(row).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["选择工作区", "选择分支", "选择运行位置"]);
     for (const button of within(row).getAllByRole("button")) {
-      expect(button).toHaveClass("h-7", "text-act-md", "text-text-muted", "hover:text-text-main", "hover:bg-hover-overlay", "rounded-act-sm");
+      expect(button).toHaveClass("h-7", "text-act-sm", "text-text-muted", "hover:text-text-main", "hover:bg-hover-overlay", "rounded-act-sm");
       expect(button).toHaveAttribute("aria-haspopup", "menu");
     }
     expect(screen.getByRole("button", { name: "选择运行位置" })).toHaveTextContent("本机");

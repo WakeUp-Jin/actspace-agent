@@ -14,7 +14,7 @@ import {
 } from "./model-options";
 
 const MODEL_BUTTON_CLASS =
-  "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-act-md leading-5 font-medium text-text-muted transition-colors duration-(--motion-fast) ease-in-out hover:text-text-main max-[600px]:max-w-[210px]";
+  "model-button inline-flex h-8 max-w-[220px] items-center gap-[6px] rounded-full border-0 bg-transparent px-1.5 text-act-sm leading-5 font-medium text-text-muted transition-colors duration-(--motion-fast) ease-in-out hover:text-text-main max-[600px]:max-w-[210px]";
 const MODEL_BUTTON_TEXT_CLASS = "model-button-text truncate";
 // 模型菜单维持 Cursor 式紧凑单列：主菜单只负责选择，Options 作为贴行的轻量二级浮层。
 // 外框（边框、背景、阴影、层级）来自 ui/Popover；滚动放在里面一层，Options 浮层才能伸到外框之外。
@@ -38,7 +38,7 @@ const MODEL_MENU_ROW_CLASS =
   "model-menu-row relative flex min-h-[34px] items-center rounded-act-md transition-colors duration-(--motion-fast) ease-in-out hover:bg-hover-overlay focus-within:bg-selected";
 const MODEL_MENU_ROW_SELECTED_CLASS = "is-selected-row";
 const MODEL_SELECT_BUTTON_CLASS =
-  "model-select-button flex min-h-[34px] min-w-0 flex-1 items-center justify-start rounded-act-md border-0 bg-transparent px-2 py-1.5 pr-[46px] text-left text-act-md font-normal leading-5 text-text-main";
+  "model-select-button flex min-h-[34px] min-w-0 flex-1 items-center justify-start rounded-act-md border-0 bg-transparent px-2 py-1.5 pr-[46px] text-left text-act-sm font-normal leading-5 text-text-main";
 const MODEL_SELECT_BUTTON_SELECTED_CLASS = "pr-[58px]";
 const MODEL_ROW_ACTIONS_CLASS =
   "model-row-actions absolute right-2 flex h-full min-w-[34px] items-center justify-end gap-1";
@@ -54,7 +54,7 @@ const MODEL_OPTIONS_ESTIMATED_HEIGHT_PX = 292;
 export const DROPDOWN_LABEL_CLASS = "dropdown-label px-2 pb-1 pt-1.5 text-act-xxs font-medium text-text-faint";
 const OPTION_SEPARATOR_CLASS = "mx-1 my-1 h-px bg-line";
 const OPTION_TOGGLE_ROW_CLASS =
-  "option-toggle-row flex min-h-[34px] cursor-pointer items-center gap-2 rounded-act-md px-2 py-1.5 text-act-md text-text-main hover:bg-hover-overlay";
+  "option-toggle-row flex min-h-[34px] cursor-pointer items-center gap-2 rounded-act-md px-2 py-1.5 text-act-sm text-text-main hover:bg-hover-overlay";
 const OPTION_TOGGLE_LABEL_CLASS = "flex-1";
 const OPTION_TOGGLE_INPUT_CLASS = "absolute opacity-0 pointer-events-none";
 // 注意：track 的底色不写进基类，由 on/off 分支二选一给出，避免同属性 utility 互相覆盖。
@@ -65,7 +65,7 @@ const TOGGLE_TRACK_OFF_CLASS = "bg-line";
 const TOGGLE_THUMB_CLASS =
   "toggle-thumb absolute left-[3px] top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-act-knob transition-transform duration-(--motion-fast) ease-in-out";
 const TOGGLE_THUMB_ON_CLASS = "translate-x-3";
-const OPTION_EMPTY_CLASS = "px-2.5 py-2 text-act-md leading-5 text-text-faint";
+const OPTION_EMPTY_CLASS = "px-2.5 py-2 text-act-sm leading-5 text-text-faint";
 export const OPTION_CHOICE_CLASS =
   "flex min-h-[32px] w-full items-center rounded-act-md border-0 bg-transparent px-2 text-left text-act-sm text-text-main transition-colors duration-(--motion-fast) ease-in-out hover:bg-hover-overlay focus-visible:bg-selected focus-visible:outline-none disabled:cursor-default disabled:text-text-faint disabled:hover:bg-transparent";
 export const OPTION_CHOICE_LABEL_CLASS = "flex-1 capitalize";

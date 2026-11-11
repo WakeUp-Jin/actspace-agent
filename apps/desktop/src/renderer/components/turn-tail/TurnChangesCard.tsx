@@ -24,7 +24,7 @@ export const TURN_CARD_TILE_CLASS =
 const ROW_CLASS =
   "flex min-h-6 w-full min-w-0 items-center justify-between gap-2.5 border-0 bg-transparent py-[7px] pr-[18px] pl-3.5 text-left text-text-faint hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:shadow-[inset_0_0_0_2px_var(--act-color-focus-ring)] focus-visible:outline-none pointer-coarse:min-h-11";
 const TOGGLE_CLASS =
-  "flex w-full items-center gap-1 border-0 bg-transparent py-2.5 pr-[18px] pl-3.5 text-left text-act-xs leading-[18px] text-text-faint hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:outline-none pointer-coarse:min-h-11";
+  "flex w-full items-center gap-1 border-0 bg-transparent py-2.5 pr-[18px] pl-3.5 text-left text-act-xs leading-4.5 text-text-faint hover:bg-hover-overlay focus-visible:bg-hover-overlay focus-visible:outline-none pointer-coarse:min-h-11";
 
 function Counts({ added, deleted }: { added: number; deleted: number }) {
   return (
@@ -107,7 +107,7 @@ export function TurnChangesCard({ changes, onOpenReview, onFileContextMenu }: {
                   onContextMenu={contextMenu(file)}
                 >
                   <span className="min-w-0 truncate text-act-xs">{file.path}</span>
-                  <span className="inline-flex flex-none gap-1.5 font-mono text-act-xxs leading-[18px] whitespace-nowrap">
+                  <span className="inline-flex flex-none gap-1.5 font-mono text-act-xxs leading-4.5 whitespace-nowrap">
                     <Counts added={file.additions} deleted={file.deletions} />
                   </span>
                 </button>

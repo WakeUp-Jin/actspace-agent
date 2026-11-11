@@ -19,7 +19,7 @@ export function PageHeader({ title, sub, left, right }: { readonly title: ReactN
         <div className="justify-self-start">{left}</div>
         <GlassPill className="flex h-9 min-w-0 max-w-[250px] flex-col items-center justify-center justify-self-center rounded-act-pill px-3.5">
           <b className="max-w-full truncate text-act-base font-semibold leading-5">{title}</b>
-          {sub ? <span className="flex max-w-full items-center gap-1 text-act-xxs leading-[14px] text-text-faint">{sub}</span> : null}
+          {sub ? <span className="flex max-w-full items-center gap-1 text-act-xxs leading-4 text-text-faint">{sub}</span> : null}
         </GlassPill>
         <div className="justify-self-end">{right}</div>
       </header>

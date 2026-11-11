@@ -20,7 +20,7 @@ type FileDiffMessage =
 const DIFF_APPROVAL_STATS_CLASS =
   "file-diff-approval-stats inline-flex h-5 flex-none items-center gap-1 rounded-act-xs border-0 bg-transparent px-1 font-mono text-act-xs leading-4 hover:bg-hover-overlay focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring aria-expanded:bg-hover-overlay";
 const DIFF_ERROR_DETAIL_CLASS =
-  "file-diff-error-detail mx-[var(--conversation-text-inset)] mt-1 rounded-act-sm bg-surface-subtle px-[9px] py-[7px] font-mono text-act-xs leading-[1.55] text-text-muted [overflow-wrap:anywhere]";
+  "file-diff-error-detail mx-[var(--conversation-text-inset)] mt-1 rounded-act-sm bg-surface-subtle px-[9px] py-[7px] font-mono text-act-xs leading-relaxed text-text-muted [overflow-wrap:anywhere]";
 
 function StatusLine({
   text,

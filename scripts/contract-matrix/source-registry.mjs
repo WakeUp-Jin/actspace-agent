@@ -165,6 +165,7 @@ export const PACKAGE_PATHS = Object.freeze([
   "apps/cli/package.json",
   "apps/desktop/package.json",
   "apps/site/package.json",
+  "apps/promo-video/package.json",
   "apps/web/package.json",
 ]);
 

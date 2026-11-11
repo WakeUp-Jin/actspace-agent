@@ -1,0 +1,30 @@
+name: Install ripgrep
+description: >
+  从 ripgrep 的 GitHub Release 下载固定版本的 Linux 静态二进制，校验 sha256 后装到 /usr/local/bin。
+  不走 apt：runner 上 archive.ubuntu.com 偶发 DNS 解析失败（2026-11-11 连续多次），且 apt 需要先 update 才稳定。
+  升级版本时同时改 RG_VERSION 和 RG_SHA256（取 Release 里同名 .sha256 文件的值）。
+
+runs:
+  using: composite
+  steps:
+    - name: Install ripgrep
+      shell: bash
+      env:
+        RG_VERSION: 14.1.1
+        RG_SHA256: 4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e
+      run: |
+        set -euo pipefail
+        if command -v rg >/dev/null 2>&1; then
+          rg --version | head -1
+          exit 0
+        fi
+        name="ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl"
+        tmp="$(mktemp -d)"
+        curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors \
+          -o "${tmp}/rg.tar.gz" \
+          "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/${name}.tar.gz"
+        echo "${RG_SHA256}  ${tmp}/rg.tar.gz" | sha256sum -c -
+        tar -xzf "${tmp}/rg.tar.gz" -C "${tmp}"
+        sudo install -m 0755 "${tmp}/${name}/rg" /usr/local/bin/rg
+        rm -rf "${tmp}"
+        rg --version | head -1

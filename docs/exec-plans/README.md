@@ -30,6 +30,7 @@
 
 全部已完成计划的日期、标题和一句话见 [completed/README.md](completed/README.md)。最近几项：
 
+- [字号规范落地：三层字号](completed/20261111-typography-scale.md)：界面 13 / 正文 15 / 标题 18，聊天正文去掉衬线，工具行和 Thinking 降到 13px，`check:frontend-tokens` 拦任意行高、非档位字重和样式文件里的字号字面量；Electron 实机检查未做。
 - [后端插件包解耦：让 Harness 自进化不必改 core](completed/20261109-harness-plugin-decoupling.md)：P1–P4 随 #68 完成——工具自声明模式、形态由 manifest 推导、默认 Harness 按插件产出产物、上下文来源注册式（`context-assembly`）、文件 / Shell 实现迁入 Harness 树。
 - [性能第三轮：高频路径不再整份读日志](completed/20261108-perf-round3.md)：自动审查、每次请求查压缩摘要、子 Agent 面板轮询都改成增量；读旧事件不再深拷贝；每项配 1k / 10k 规模测试，新增 `pnpm check:scale-tests`；实机采样对比未做。见[执行摘要](../exec-runs/20261108-perf-round3/execution-summary.md)。
 - [CI 重新上线与桌面发布流水线](completed/20261108-ci-pipelines.md)：P1–P5 随 #48、#57、#58 合入；签名与自动更新留待单独立项。

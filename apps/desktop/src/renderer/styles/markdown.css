@@ -2,22 +2,21 @@
  * Content rendering boundary for model-generated Markdown.
  * Keep these selectors scoped to markdown containers.
  *
- * 聊天区（MarkdownProse）的「A 书页」排版，规范见 front-聊天区Markdown渲染规范.md。
+ * 聊天区（MarkdownProse）的排版，规范见 front-聊天区Markdown渲染规范.md §4；字号档位见 front-视觉token规范 §5。
  * 右侧「文档」面板是 CodeMirror 编辑器，样式在 markdown-editor.css。
  */
 
-/* ====================== 聊天区：A 书页 ====================== */
+/* ====================== 聊天区正文 ====================== */
 
 .markdown-prose {
-  --md-chat-size: 16.5px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  gap: 12px;
   overflow-wrap: anywhere;
   color: var(--act-color-text);
-  font-family: var(--act-font-reading);
-  font-size: var(--md-chat-size);
-  line-height: 1.78;
+  font-family: var(--act-font-ui);
+  font-size: var(--text-act-base);
+  line-height: 1.7;
 
   & > :first-child { margin-top: 0; }
   & > :last-child { margin-bottom: 0; }
@@ -25,21 +24,20 @@
   & p, & blockquote, & ul, & ol, & pre, & table, & hr { margin: 0; }
 
   & h1, & h2, & h3, & h4 {
-    margin: 14px 0 0;
+    margin: 8px 0 0;
     color: var(--act-color-text);
-    font-family: inherit;
     font-weight: 600;
-    letter-spacing: -0.005em;
     line-height: 1.35;
   }
-  & h1 { font-size: 1.55em; }
-  & h2 { font-size: 1.3em; }
-  & h3 { font-size: 1.12em; }
-  & h4 { font-size: 1em; }
-  & strong { font-weight: 650; }
+  & h1, & h2 { margin-top: 14px; }
+  & h1 { font-size: var(--text-act-xl); }
+  & h2 { font-size: var(--text-act-head); }
+  & h3 { font-size: var(--text-act-lg); }
+  & h4 { font-size: var(--text-act-base); }
+  & strong { font-weight: 600; }
 
   /* 列表：Tailwind Preflight 清掉了 list-style，这里补回 */
-  & ul, & ol { display: grid; gap: 7px; padding-left: 1.6em; }
+  & ul, & ol { display: grid; gap: 6px; padding-left: 1.6em; }
   & ul { list-style: disc; }
   & ol { list-style: decimal; }
   & ul ul { list-style: circle; }
@@ -76,7 +74,7 @@
     background: var(--act-color-surface-subtle);
     color: var(--act-color-inline-code-text);
     font-family: var(--font-mono);
-    font-size: 0.82em;
+    font-size: 0.87em;
   }
   & code.md-path {
     padding: 0.14em 0.4em;
@@ -86,7 +84,7 @@
     color: var(--act-color-link);
     cursor: pointer;
     font-family: var(--font-mono);
-    font-size: 0.82em;
+    font-size: 0.87em;
     overflow-wrap: anywhere;
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
@@ -115,8 +113,7 @@
     display: block;
     margin-bottom: 2px;
     color: var(--callout);
-    font-family: var(--act-font-ui);
-    font-size: 12.5px;
+    font-size: var(--text-act-xs);
     font-weight: 600;
     letter-spacing: 0.04em;
     line-height: 1.6;
@@ -143,13 +140,12 @@
     border: 0;
     border-collapse: collapse;
     background: transparent;
-    font-family: var(--act-font-ui);
-    font-size: 14px;
+    font-size: var(--text-act-md);
     font-variant-numeric: tabular-nums;
     line-height: 1.6;
   }
   & th, & td {
-    padding: 10px 16px 10px 0;
+    padding: 8px 16px 8px 0;
     border: 0;
     border-bottom: 1px solid var(--act-color-border);
     background: none;
@@ -158,8 +154,9 @@
   }
   & th {
     border-bottom-color: var(--act-color-border-strong);
-    color: var(--act-color-text);
-    font-weight: 600;
+    color: var(--act-color-text-faint);
+    font-size: var(--text-act-xs);
+    font-weight: 500;
     white-space: nowrap;
   }
   & tr:last-child td { border-bottom: 0; }
@@ -186,8 +183,7 @@
     padding: 0 8px 0 18px;
     border-bottom: 0;
     color: var(--act-color-text-faint);
-    font-family: var(--act-font-ui);
-    font-size: 12px;
+    font-size: var(--text-act-xs);
     line-height: 1.4;
   }
   & .md-code-lang { flex: none; }
@@ -259,8 +255,7 @@
     background: transparent;
     color: var(--act-color-text-muted);
     cursor: pointer;
-    font-family: var(--act-font-ui);
-    font-size: 12px;
+    font-size: var(--text-act-xs);
   }
   & .md-code-fold:hover { color: var(--act-color-text); }
 
@@ -281,7 +276,7 @@
     background: none;
     color: var(--act-color-text-faint);
     font: inherit;
-    font-size: 0.9em;
+    font-size: var(--text-act-sm);
   }
   & button.md-img-note { cursor: pointer; }
   & button.md-img-note:hover { color: var(--act-color-link); }
@@ -291,8 +286,7 @@
     padding: 6px 12px;
     border: 1px solid var(--act-color-border);
     border-radius: var(--radius-lg);
-    font-family: var(--act-font-ui);
-    font-size: 15px;
+    font-size: var(--text-act-md);
   }
   & summary { color: var(--act-color-text-muted); cursor: pointer; }
   & details[open] > summary { margin-bottom: 6px; }
@@ -356,7 +350,7 @@
     linear-gradient(180deg, var(--act-color-code-bg-top), var(--act-color-code-bg-bottom));
   color: var(--act-color-code-text);
   font-family: var(--font-mono);
-  font-size: var(--act-font-mono-size, 0.86rem);
+  font-size: var(--act-font-mono-size, 13px);
   line-height: 1.6;
   max-width: 100%;
   overflow: auto;
@@ -390,7 +384,7 @@
   border-bottom: 1px solid var(--act-color-code-border);
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--text-act-xxs);
 }
 
 .markdown-code-shell > .markdown-code-block {
@@ -513,7 +507,7 @@
 }
 
 .act-code-hl .hljs-strong {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* Mermaid diagrams: the canvas colour comes from the fixed diagram preset (inline style). */

@@ -11,7 +11,7 @@ const PINNED_CARD_CLASS = "overflow-hidden rounded-act-lg border border-line bg-
 // 整行是一个按钮，左侧文字截断、右侧进度，ui/Button 的固定内边距和居中排版放不下这种布局。
 const PINNED_ROW_CLASS =
   "flex w-full min-w-0 cursor-text items-center gap-2.5 py-2 pl-[var(--conversation-card-padding)] pr-3 text-left transition-[border-color] duration-(--motion-fast) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring/30";
-const PINNED_TEXT_CLASS = "min-w-0 flex-1 truncate leading-[1.55] text-text-main";
+const PINNED_TEXT_CLASS = "min-w-0 flex-1 truncate text-act-base leading-5.5 text-text-main";
 const PINNED_PROGRESS_CLASS =
   "inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full bg-surface-subtle px-2 text-act-xs tabular-nums text-text-muted";
 // 提问卡片底边离开视野这么多像素后才叠精简条；这一轮剩下不到这么高时不再叠，避免盖住下一轮的提问。
