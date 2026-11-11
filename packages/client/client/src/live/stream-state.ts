@@ -64,20 +64,31 @@ export function updateStringSet(current: Set<string>, value: string, included: b
   return next;
 }
 
-/** 追加正文 / 思考。同类型且属于同一条消息（任一方不知道消息时视为同一条）就接在上一段后面。 */
+/**
+ * 追加正文 / 思考。同类型且属于同一条消息（任一方不知道消息时视为同一条）就接在上一段后面。
+ * 思考段额外记下第一个字和最后一个字到达的时间（`nowMs`），用于显示思考用时。
+ */
 export function appendOrMergeSegment(
   segments: StreamingSegment[],
   segType: "thinking" | "text",
   delta: string,
   source: { readonly llmCallId?: string; readonly messageId?: string } = {},
+  nowMs: number = Date.now(),
 ): void {
   const last = segments[segments.length - 1];
   if (last && last.type === segType && (last.messageId === undefined || source.messageId === undefined || last.messageId === source.messageId)) {
     last.text += delta;
     if (last.llmCallId === undefined && source.llmCallId !== undefined) last.llmCallId = source.llmCallId;
     if (last.messageId === undefined && source.messageId !== undefined) last.messageId = source.messageId;
+    if (last.type === "thinking") {
+      last.startedAtMs ??= nowMs;
+      last.lastDeltaAtMs = nowMs;
+    }
   } else {
-    segments.push({ type: segType, text: delta, ...(source.llmCallId === undefined ? {} : { llmCallId: source.llmCallId }), ...(source.messageId === undefined ? {} : { messageId: source.messageId }) });
+    const identity = { ...(source.llmCallId === undefined ? {} : { llmCallId: source.llmCallId }), ...(source.messageId === undefined ? {} : { messageId: source.messageId }) };
+    segments.push(segType === "thinking"
+      ? { type: "thinking", text: delta, ...identity, startedAtMs: nowMs, lastDeltaAtMs: nowMs }
+      : { type: "text", text: delta, ...identity });
   }
 }
 

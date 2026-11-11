@@ -55,6 +55,10 @@ export type MessageBlock = {
       collapsedByDefault: boolean;
       /** 仅用于当前 renderer 流式投影；持久化 Thinking 默认是 completed。 */
       status?: "running" | "completed";
+      /** 这段思考收到第一个字的本机时间（毫秒）。仅流式投影有，不写入会话。 */
+      startedAtMs?: number;
+      /** 第一个字到最后一个字的间隔，最少 1000；仅流式投影里已结束的思考有，不写入会话。 */
+      durationMs?: number;
     }
   | {
       kind: "read";

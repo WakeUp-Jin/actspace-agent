@@ -2,12 +2,13 @@
 
 这里的计划实现已经完成，原文保持不动；本页只做检索。人工验收边界保留在各计划正文和对应的[执行摘要](../../exec-runs/README.md)里，不代表全部验证通过。生命周期规则见 [执行计划](../README.md)。
 
-共 210 项，按日期从新到旧；无日期前缀的早期计划排在最后。
+共 211 项，按日期从新到旧；无日期前缀的早期计划排在最后。
 
 另有 [design-archive/](design-archive/)：docs 整理时从前端设计文档里拆出的决策表、测试清单、交接记录和早期重构稿，只做追溯。
 
 | 日期 | 计划 | 一句话 |
 |---|---|---|
+| 2026-11-11 | [简化思考过程](20261111-thinking-compact.md) | 设置 `general.simplifyThinking`（缺省开启）：思考进行时固定一行 `Thinking 6s · 开头一句` 加扫光，结束后 `Thought for 9s`，点标题仍可展开；用时只在流式状态里、不写入会话；只改桌面端；Electron 走查未做 |
 | 2026-11-09 | [Desktop 安全遗留清零](20261109-desktop-security-debt.md) | safeStorage 迁异步、子进程不再继承凭据 env、Browser Bridge 源码目录由 main 对话框选择、主文档 CSP 经 `onHeadersReceived` 下发、IPC 审计禁止裸 `ipcMain.handle`；`style-src` 仍留 `'unsafe-inline'`；Electron 真机走查未做 |
 | 2026-11-09 | [后端插件包解耦：让 Harness 自进化不必改 core](20261109-harness-plugin-decoupling.md) | 工具自声明 `modes`、形态由 manifest 推导、默认 Harness 按插件产出产物、上下文来源登记式（新条目 `context-assembly`）、文件 / Shell 实现迁入 Harness 树（Host 只给 `actspace.host.filesystem` / `actspace.host.process` 授予）；PR #68；Desktop / CLI 实机走查未做 |
 | 2026-11-08 | [性能第三轮：高频路径不再整份读日志](20261108-perf-round3.md) | P1–P4：自动审查上下文、压缩摘要查找、子 Agent 面板轮询改成增量，读旧事件不再深拷贝；每项配 1k / 10k 规模测试，新增 `pnpm check:scale-tests` 覆盖检查；实机采样对比未做 |

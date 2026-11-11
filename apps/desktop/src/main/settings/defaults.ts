@@ -94,6 +94,7 @@ export function defaultSettingsV4Metadata(): SettingsV4Metadata {
     general: {
       performanceMonitoring: false,
       showTurnCodeChanges: true,
+      simplifyThinking: true,
       defaultPermissionMode: "default",
       englishLearning: { lastSessionId: null },
       personalization: { displayName: "", responseStyle: "" },

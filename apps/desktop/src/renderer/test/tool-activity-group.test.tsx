@@ -1,10 +1,17 @@
 import { render, screen } from "@testing-library/react";
+import { vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import type { MessageBlock } from "@actspace/shared";
 import { TestConversationView } from "./helpers/workbench";
 import { RightPanelProvider } from "../components/right-panel/RightPanelContext";
 import { TooltipProvider } from "../components/ui/Tooltip";
 import { replyText } from "./helpers/reply-text";
+
+// 这里验证的是「简化思考过程」关闭时的思考行（标题 `Thinking...`、运行中展开）；开启时见 thinking-compact.test.tsx。
+vi.mock("../components/conversation/display-settings", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../components/conversation/display-settings")>()),
+  useSimplifyThinking: () => false,
+}));
 
 // 一个含「旁白 content + 多个工具 + 最终回复」的 turn，用来覆盖工具活动组的折叠/展开与最终回复留外行为。
 const toolTurn: MessageBlock[] = [

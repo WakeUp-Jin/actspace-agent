@@ -411,6 +411,7 @@ export function streamingStateToBlocks(state: StreamingState, agentRunId?: strin
     if (seg.type === "thinking") {
       if (!hasVisibleText(seg.text)) continue;
       const index = thinkingIdx++;
+      const running = segmentIndex === state.segments.length - 1;
       blocks.push({
         kind: "thinking",
         id: agentRunId ? `turn:${agentRunId}:thinking:${index}` : `streaming-thinking-${index}`,
@@ -418,7 +419,11 @@ export function streamingStateToBlocks(state: StreamingState, agentRunId?: strin
         content: seg.text,
         createdAt: now,
         collapsedByDefault: false,
-        status: segmentIndex === state.segments.length - 1 ? "running" : "completed",
+        status: running ? "running" : "completed",
+        ...(seg.startedAtMs === undefined ? {} : { startedAtMs: seg.startedAtMs }),
+        ...(!running && seg.startedAtMs !== undefined && seg.lastDeltaAtMs !== undefined
+          ? { durationMs: Math.max(1000, seg.lastDeltaAtMs - seg.startedAtMs) }
+          : {}),
       });
     } else if (seg.type === "text") {
       const index = textIdx++;
