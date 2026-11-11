@@ -58,7 +58,17 @@ export const LUCIDE_ICON_RENAMES = new Map([
 ]);
 
 export const RULES = [
-  { id: "font-size-literal", pattern: /(?<![\w-])text-\[\d+(?:\.\d+)?px\]/g, hint: "字号用 text-act-{xxs,xs,sm,md,lg,xl,title}" },
+  { id: "font-size-literal", pattern: /(?<![\w-])text-\[\d+(?:\.\d+)?px\]/g, hint: "字号用 text-act-{xxs,xs,sm,md,base,lg,head,xl,title}" },
+  {
+    id: "line-height-literal",
+    pattern: /(?<![\w-])leading-\[[^\]]+\]/g,
+    hint: "行高用 leading-{none,4,4.5,5,5.5,snug,normal,relaxed}（token 规范 §5.4）",
+  },
+  {
+    id: "font-weight-off-scale",
+    pattern: /(?<![\w-])font-(?:thin|extralight|light|bold|extrabold|black)(?![\w-])/g,
+    hint: "字重只用 font-normal / font-medium / font-semibold（token 规范 §5.5）",
+  },
   {
     id: "tailwind-default-font-size",
     pattern: /(?<![\w\-[])(?:[\w-]*(?:\[[^\]]*\])?:)*text-(?:xs|sm|base|lg|xl|[2-9]xl)(?![\w-])/g,
@@ -118,6 +128,24 @@ export const CSS_BLOCK_RULES = [
   },
 ];
 
+// 样式文件里的 font-size 只能引用 token 或相对值（token 规范 §5.3）：
+// var(--…)、inherit、0、em；px / rem 字面量报错。轨迹页是数据密集页，有自己的小字号白名单，整个文件豁免。
+export const CSS_FONT_SIZE_EXEMPT_FILES = new Set(["styles/trajectory.css"]);
+const CSS_FONT_SIZE_LITERAL = /font-size\s*:\s*([^;}]*\d(?:\.\d+)?(?:px|rem)[^;}]*)/g;
+
+/** 样式文件里写死的 font-size；返回 { rule, match, line, hint }[]。 */
+export function checkCssFontSizes(relative, source, exempt = CSS_FONT_SIZE_EXEMPT_FILES) {
+  if (exempt.has(relative)) return [];
+  const code = stripComments(source);
+  const violations = [];
+  for (const match of code.matchAll(CSS_FONT_SIZE_LITERAL)) {
+    // var(--x, 13px) 这种回退值不算字面量
+    if (/^\s*var\(/.test(match[1])) continue;
+    violations.push({ rule: "css-font-size-literal", match: match[0].trim(), line: lineOf(code, match.index), hint: "样式文件里的字号用 var(--text-act-*)；行内元素用 em（token 规范 §5.3）" });
+  }
+  return violations;
+}
+
 // 只允许写在 components/ui/ 里的写法：业务组件用 ui/Dialog、ui/Popover 等原语，不自己 portal、不自己声明对话框。
 export const UI_ONLY_RULES = [
   { id: "create-portal-outside-ui", pattern: /(?<![\w$])createPortal(?![\w$])/g, hint: "弹层用 components/ui/ 的原语（Dialog / Popover / Menu），不在业务组件里 createPortal" },
@@ -142,6 +170,7 @@ export const DESKTOP_PROFILE = {
   literalAllowlist: LITERAL_ALLOWLIST,
   uiOnlyAllowlist: UI_ONLY_ALLOWLIST,
   cssBlockRules: CSS_BLOCK_RULES,
+  checkCssFontSizes: true,
 };
 export const WEB_PROFILE = {
   name: "web",
@@ -151,6 +180,8 @@ export const WEB_PROFILE = {
   literalAllowlist: new Map(),
   uiOnlyAllowlist: new Map(),
   cssBlockRules: [],
+  // web 的样式文件不在本轮字号收敛范围（docs/exec-plans/active/20261111-typography-scale.md）
+  checkCssFontSizes: false,
 };
 export const SCAN_PROFILES = [DESKTOP_PROFILE, WEB_PROFILE];
 
@@ -401,6 +432,9 @@ export function runCheck(
   }
   for (const [relative, source] of styleSources) {
     for (const v of checkCssBlocks(relative, source, profile.cssBlockRules)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
+    if (profile.checkCssFontSizes) {
+      for (const v of checkCssFontSizes(relative, source)) problems.push(`${relative}:${v.line} ${v.match} — ${v.hint}`);
+    }
   }
   for (const file of collectFiles(root)) {
     const relative = path.relative(root, file).split(path.sep).join("/");
