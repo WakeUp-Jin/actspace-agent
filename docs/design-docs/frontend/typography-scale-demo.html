@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>字号规范 demo</title>
+<style>
+:root {
+  --bg: #f7f7f5; --sidebar: #efefed; --surface: #fff; --subtle: #f1f1ef; --selected: #e4e4e1;
+  --line: #deded9; --line-strong: #8c8c85;
+  --text: #20201e; --muted: #676762; --faint: #72726b; --subtle-text: #85857e;
+  --ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI", "Microsoft YaHei", sans-serif;
+  --mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+}
+/* ── 四套取值：只改这些变量，结构完全一样 ── */
+[data-v="now"] {
+  --chat-font: ui-serif, "New York", "Iowan Old Style", Charter, Georgia, "PingFang SC", serif;
+  --head-font: var(--chat-font);
+  --body: 16.5px; --body-lh: 1.78;
+  --h2: 21.45px; --h2-mt: 14px;
+  --table: 14px; --th: 14px; --th-w: 600; --th-c: var(--text);
+  --user: 16px; --user-lh: 1.55; --input: 16px;
+  --worked: 14px; --model: 14px; --status: 13px; --pill: 12px;
+  --block-gap: 14px;
+}
+[data-v="a"] {
+  --chat-font: var(--ui); --head-font: var(--ui);
+  --body: 14px; --body-lh: 1.65;
+  --h2: 17px; --h2-mt: 22px;
+  --table: 13px; --th: 12px; --th-w: 500; --th-c: var(--faint);
+  --user: 14px; --user-lh: 1.6; --input: 14px;
+  --worked: 13px; --model: 13px; --status: 12px; --pill: 12px;
+  --block-gap: 10px;
+}
+[data-v="b"] {
+  --chat-font: var(--ui); --head-font: var(--ui);
+  --body: 15px; --body-lh: 1.7;
+  --h2: 18px; --h2-mt: 26px;
+  --table: 14px; --th: 12px; --th-w: 500; --th-c: var(--faint);
+  --user: 15px; --user-lh: 1.6; --input: 15px;
+  --worked: 13px; --model: 13px; --status: 12px; --pill: 12px;
+  --block-gap: 12px;
+}
+[data-v="c"] {
+  --chat-font: ui-serif, "New York", "Iowan Old Style", Charter, Georgia, "Songti SC", "Noto Serif CJK SC", serif;
+  --head-font: var(--ui);
+  --body: 16px; --body-lh: 1.75;
+  --h2: 19px; --h2-mt: 26px;
+  --table: 14px; --th: 12px; --th-w: 500; --th-c: var(--faint);
+  --user: 15px; --user-lh: 1.6; --input: 15px;
+  --worked: 13px; --model: 13px; --status: 12px; --pill: 12px;
+  --block-gap: 12px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9e9e5; color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+.page { max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px; }
+
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
+.top h1 { font-size: 15px; font-weight: 600; margin: 0 8px 0 0; }
+.seg { display: inline-flex; background: #dcdcd7; border-radius: 8px; padding: 2px; }
+.seg button { border: 0; background: transparent; font: inherit; font-weight: 500; color: var(--muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: #fff; color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.seg kbd { font-family: var(--mono); font-size: 11px; color: var(--subtle-text); margin-right: 5px; }
+.hint { color: var(--faint); font-size: 12px; }
+.verdict { margin: 0 0 14px; font-size: 13px; color: var(--muted); min-height: 38px; max-width: 900px; }
+.verdict b { color: var(--text); font-weight: 600; }
+
+/* ── 应用窗口 ── */
+.win { display: grid; grid-template-columns: 208px 1fr; height: 660px; border-radius: 12px; overflow: hidden; background: var(--surface); box-shadow: 0 10px 40px rgba(40,40,30,.18), 0 0 0 1px rgba(0,0,0,.08); }
+.side { background: var(--sidebar); display: flex; flex-direction: column; padding: 10px 8px 8px; min-width: 0; }
+.lights { display: flex; gap: 8px; padding: 4px 6px 16px; }
+.lights i { width: 11px; height: 11px; border-radius: 50%; background: #d0d0cb; }
+.nav { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 0 10px; font-size: 13px; font-weight: 500; color: var(--muted); border-radius: 8px; }
+.nav small { margin-left: auto; font-size: 12px; color: var(--faint); }
+.ico { width: 14px; height: 14px; flex: none; border: 1.5px solid currentColor; border-radius: 3px; opacity: .7; }
+.sec { padding: 18px 10px 6px; font-size: 12px; color: var(--faint); }
+.ws { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; font-size: 13px; color: var(--muted); }
+.row { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px 0 32px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.row.on { background: var(--selected); color: var(--text); }
+.row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.row small { margin-left: auto; flex: none; font-size: 11px; font-weight: 400; color: var(--faint); }
+.empty { padding: 3px 0 3px 32px; font-size: 12px; color: var(--faint); }
+.side-foot { margin-top: auto; }
+.cpu { padding: 8px 8px 0; font-size: 11px; color: var(--faint); }
+
+.main { display: flex; flex-direction: column; min-width: 0; background: var(--surface); }
+.chrome { height: 34px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.scroll { flex: 1; overflow: auto; padding: 8px 0 12px; }
+.col { max-width: 660px; margin: 0 auto; padding: 0 18px; }
+.user { border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; font-size: var(--user); line-height: var(--user-lh); }
+.thumbs { display: flex; gap: 6px; margin-top: 8px; }
+.thumbs i { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 6px; background: var(--subtle); }
+.worked { padding: 12px 17px 0; font-size: var(--worked); color: var(--faint); }
+
+.prose { padding: 0 17px; font-family: var(--chat-font); font-size: var(--body); line-height: var(--body-lh); }
+.prose > * { margin: var(--block-gap) 0 0; }
+.prose h2 { font-family: var(--head-font); font-size: var(--h2); font-weight: 600; line-height: 1.35; margin-top: var(--h2-mt); }
+.prose table { width: 100%; border-collapse: collapse; font-family: var(--ui); font-size: var(--table); line-height: 1.6; font-variant-numeric: tabular-nums; }
+.prose th, .prose td { text-align: left; padding: 8px 16px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.prose th { font-size: var(--th); font-weight: var(--th-w); color: var(--th-c); border-bottom-color: var(--line-strong); }
+[data-v="now"] .prose th, [data-v="now"] .prose td { padding: 10px 16px 10px 0; }
+.prose tr:last-child td { border-bottom: 0; }
+.prose code { font-family: var(--mono); font-size: .85em; background: var(--subtle); border: 1px solid var(--line); border-radius: 5px; padding: .1em .35em; }
+
+.dock { flex: none; }
+.composer { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 18px; padding: 9px 8px 9px 14px; box-shadow: 0 2px 10px rgba(40,40,30,.06); }
+.composer .ph { flex: 1; font-size: var(--input); color: var(--subtle-text); }
+.composer .model { font-size: var(--model); font-weight: 500; color: var(--muted); }
+.send { width: 26px; height: 26px; border-radius: 50%; background: #8c8c85; flex: none; }
+.status { display: flex; justify-content: space-between; gap: 12px; padding: 9px 12px 10px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.status .l { font-size: var(--status); }
+.status .r { font-size: var(--pill); display: flex; gap: 14px; }
+
+/* ── 下方说明 ── */
+.below { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+.card { background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 0 0 1px rgba(0,0,0,.06); }
+.card h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
+.sizes { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.sizes td { padding: 5px 0; border-bottom: 1px solid #eeeeea; color: var(--muted); }
+.sizes td:nth-child(2) { color: var(--text); font-weight: 500; text-align: right; white-space: nowrap; }
+.sizes td.bad { color: #c74747; }
+.sum { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.sum b { color: var(--text); }
+.card ol { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; line-height: 1.65; }
+.card ol b { color: var(--text); font-weight: 600; }
+@media (max-width: 860px) { .below { grid-template-columns: 1fr; } .win { grid-template-columns: 1fr; } .side { display: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top">
+    <h1>字号规范 demo</h1>
+    <div class="seg" id="seg">
+      <button data-set="now"><kbd>1</kbd>现状</button>
+      <button data-set="a"><kbd>2</kbd>A 紧凑 14</button>
+      <button data-set="b"><kbd>3</kbd>B 均衡 15（推荐）</button>
+      <button data-set="c"><kbd>4</kbd>C 衬线阅读 16</button>
+    </div>
+    <span class="hint">按 1–4 快速切换，盯着同一处看差别</span>
+  </div>
+  <p class="verdict" id="verdict"></p>
+
+  <div class="win" id="win" data-v="now">
+    <aside class="side">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="nav"><i class="ico"></i>新建会话<small>⌘N</small></div>
+      <div class="nav"><i class="ico"></i>扩展</div>
+      <div class="sec">工作区</div>
+      <div class="ws"><i class="ico"></i>learn-subagent</div>
+      <div class="row on"><span>计算5.2与5.1官方价格美元花费</span><small>21小时</small></div>
+      <div class="row"><span>Agent 子智能体模块设计实现</span><small>3天</small></div>
+      <div class="ws"><i class="ico"></i>wakeup-Jin-wiki</div>
+      <div class="empty">暂无会话</div>
+      <div class="ws"><i class="ico"></i>pi-project</div>
+      <div class="ws"><i class="ico"></i>sandbox</div>
+      <div class="side-foot">
+        <div class="nav"><i class="ico"></i>设置</div>
+        <div class="cpu">CPU 0.2% · 内存 219 MB</div>
+      </div>
+    </aside>
+
+    <section class="main">
+      <div class="chrome">计算5.2与5.1官方价格美元花费</div>
+      <div class="scroll">
+        <div class="col">
+          <div class="user">OK，你现在就算一下，5.2 和 5.1 大概这种价，这种情况下，如果是官方的价格要花多少美元？
+            <div class="thumbs"><i></i><i></i></div>
+          </div>
+          <div class="worked">Worked for 36s ›</div>
+          <div class="prose">
+            <h2>官方价格标准（2026 年 11 月现价）</h2>
+            <table>
+              <tr><th>模型</th><th>输入/M</th><th>Cache Write</th><th>Cache Read/M</th><th>输出/M</th></tr>
+              <tr><td>claude-fable-5-2</td><td>$8</td><td>$10</td><td>$0.20</td><td>$40</td></tr>
+              <tr><td>claude-fable-5-1</td><td>$10</td><td>$12.50</td><td>$0.25</td><td>$50</td></tr>
+            </table>
+            <p>（5.1 的 cache read 在 9 月 1 日从 $1/M 降到了 $0.25/M，降幅 75%。）下面按两张截图里的 token 结构分别估算，<code>cache read</code> 占了绝大部分用量，所以它的单价最影响总花费。</p>
+            <h2>按这两张截图里的 token 结构计算</h2>
+            <table>
+              <tr><th>项目</th><th>Cache Read</th><th>Cache Write</th><th>Output</th><th>小计</th></tr>
+              <tr><td>5.2-high</td><td>54.82M → $10.96</td><td>2.27M → $22.70</td><td>686k → $27.46</td><td><b>$61.67</b></td></tr>
+              <tr><td>5.1-high</td><td>48.10M → $12.03</td><td>1.94M → $24.25</td><td>702k → $35.10</td><td><b>$71.38</b></td></tr>
+            </table>
+            <p>结论：同样的用量，5.2 比 5.1 便宜约 14%，差距主要来自输出单价。</p>
+          </div>
+        </div>
+      </div>
+      <div class="dock">
+        <div class="col">
+          <div class="composer"><span style="color:var(--faint)">＋</span><span class="ph">继续追问…</span><span class="model">deepseek-flash ⌄</span><i class="send"></i></div>
+          <div class="status"><span class="l">本机</span><span class="r"><span>1 轮 5 步 · 230 tok/s</span><span>累计 96K tok · 缓存命中 86%</span><span>2%</span></span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="below">
+    <div class="card">
+      <h3>这一屏实际用到的字号</h3>
+      <table class="sizes" id="sizes"></table>
+      <p class="sum" id="sum"></p>
+    </div>
+    <div class="card">
+      <h3>现状为什么看着怪（代码里查到的）</h3>
+      <ol>
+        <li><b>外壳和正文差两档半。</b>侧栏、标题栏 13px，AI 正文 16.5px，标题 21.5px。同屏最大是最小的近 2 倍，中间没有过渡。</li>
+        <li><b>一行里混了两种字体。</b>阅读字体是「西文衬线 + 中文苹方」，所以「2026 年 11 月」「$1/M 降到了」里数字是衬线、汉字是黑体，标题里尤其明显。</li>
+        <li><b>正文里夹着另一套字。</b>表格是 14px 黑体，上下段落是 16.5px 衬线；表头和内容同字号只靠加粗区分。</li>
+        <li><b>用户消息没有设字号。</b>它吃的是浏览器默认 16px，和回复的 16.5px 只差半像素、字体又不同，像是没对齐。</li>
+        <li><b>规范只管了界面，没管正文。</b>现有规范有 7 档界面字号，但正文、标题、表格各自写死在 markdown.css，还有 12.5 / 15 / 16.5 这类不在档位里的值；行高有 20 多种写法。</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<script>
+const V = {
+  now: {
+    verdict: "<b>现状。</b>同屏 7 种字号（11 / 12 / 13 / 14 / 16 / 16.5 / 21.5）加两种字体。注意标题里的数字和汉字不是一种字体，表格和段落也不是。",
+    rows: [["侧栏、标题栏","13"],["分区标题、快捷键","12"],["时间、CPU","11"],["用户消息","16（未设，浏览器默认）",1],["AI 正文","16.5 衬线+黑体混排",1],["二级标题","21.5",1],["表格 / 表头","14 / 14 加粗"],["Worked for、模型名","14"],["输入框","16"],["底部状态","13 和 12 混用",1]],
+    sum: "<b>7 种字号，2 种字体，正文是界面的 1.27 倍。</b>"
+  },
+  a: {
+    verdict: "<b>A 紧凑 14。</b>Cursor、VS Code 这类开发工具的做法：正文只比界面大 1px，全部用界面字体。信息密度最高，一屏能看到的最多；长篇中文读久了略累。",
+    rows: [["侧栏、标题栏","13"],["分区标题、快捷键","12"],["时间、CPU","11"],["用户消息","14"],["AI 正文","14 / 行高 1.65"],["二级标题","17"],["表格 / 表头","13 / 12 浅色"],["Worked for、模型名","13"],["输入框","14"],["底部状态","12"]],
+    sum: "<b>5 种字号（11 / 12 / 13 / 14 / 17），1 种字体，正文是界面的 1.08 倍。</b>"
+  },
+  b: {
+    verdict: "<b>B 均衡 15（推荐）。</b>界面 13、正文 15、标题 18，每档差 2–3px，全部用界面字体。汉字笔画多，15px 比 14px 读长文轻松，又不会像现在这样和侧栏脱节。用户消息、输入框和正文同字号。",
+    rows: [["侧栏、标题栏","13"],["分区标题、快捷键","12"],["时间、CPU","11"],["用户消息","15"],["AI 正文","15 / 行高 1.7"],["二级标题","18"],["表格 / 表头","14 / 12 浅色"],["Worked for、模型名","13"],["输入框","15"],["底部状态","12"]],
+    sum: "<b>6 种字号（11 / 12 / 13 / 14 / 15 / 18），1 种字体，正文是界面的 1.15 倍。</b>"
+  },
+  c: {
+    verdict: "<b>C 衬线阅读 16。</b>保留「回复像文章」的感觉，但把混排修掉：中文也用衬线（宋体），标题和表格用界面字体，字号取整。代价是宋体在屏幕上偏细，Windows 上没有好的衬线中文字体，两个平台观感会不一样。",
+    rows: [["侧栏、标题栏","13"],["分区标题、快捷键","12"],["时间、CPU","11"],["用户消息","15"],["AI 正文","16 衬线 / 行高 1.75"],["二级标题","19 界面字体"],["表格 / 表头","14 / 12 浅色"],["Worked for、模型名","13"],["输入框","15"],["底部状态","12"]],
+    sum: "<b>7 种字号，2 种字体（各管一块，不在同一行混用），正文是界面的 1.23 倍。</b>"
+  }
+};
+const win = document.getElementById("win"), seg = document.getElementById("seg");
+function set(v) {
+  win.dataset.v = v;
+  seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.set === v));
+  document.getElementById("verdict").innerHTML = V[v].verdict;
+  document.getElementById("sizes").innerHTML = V[v].rows.map(r => `<tr><td>${r[0]}</td><td class="${r[2] ? "bad" : ""}">${r[1]}</td></tr>`).join("");
+  document.getElementById("sum").innerHTML = V[v].sum;
+}
+seg.addEventListener("click", e => { const b = e.target.closest("button"); if (b) set(b.dataset.set); });
+addEventListener("keydown", e => { const v = ["now","a","b","c"][+e.key - 1]; if (v) set(v); });
+set("now");
+</script>
+</body>
+</html>

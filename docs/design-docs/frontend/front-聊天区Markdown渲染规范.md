@@ -9,7 +9,7 @@
 | 包含 | 用 `MarkdownProse` 渲染的两处：助手回复（`AssistantReply`）、右侧子 Agent 面板（`SubagentsPanel`，本地 / Fork 子智能体的对话记录与外部 Agent 最终结果）；两处共用同一套实现，没有开关 |
 | 不包含 | 「文档」面板（CodeMirror 6，见 [front-Markdown编辑与渲染规范.md](front-Markdown编辑与渲染规范.md)）；轨迹详情里的 Markdown；用户消息；生成图片的轮尾列表 |
 
-与「文档」面板的关系：共用路径识别规则（`components/markdown-common/paths.ts`）、提示框写法与语义色（`callouts.ts`）、链接 / 路径颜色规则（`--act-color-link`）、代码高亮配色 `.act-code-hl`、KaTeX 懒加载 chunk。各自不同：聊天区是阅读场景用「A 书页」排版、原始 HTML 按白名单渲染、技术栈 unified（remark / rehype，处理器常驻，见 `markdown/processor.ts`）；文档面板是编辑场景用 Codex 排版、原始 HTML 按原文显示、用 CM6。生成图片是工具产物，不并入 Markdown，只管回复文字里写的图片。
+与「文档」面板的关系：共用路径识别规则（`components/markdown-common/paths.ts`）、提示框写法与语义色（`callouts.ts`）、链接 / 路径颜色规则（`--act-color-link`）、代码高亮配色 `.act-code-hl`、KaTeX 懒加载 chunk。各自不同：聊天区是阅读场景、排版见 §4、原始 HTML 按白名单渲染、技术栈 unified（remark / rehype，处理器常驻，见 `markdown/processor.ts`）；文档面板是编辑场景用 Codex 排版、原始 HTML 按原文显示、用 CM6。生成图片是工具产物，不并入 Markdown，只管回复文字里写的图片。
 
 ## 2. 架构
 
@@ -59,7 +59,7 @@ MarkdownProse（content, onOpenWorkspaceFile）
 ### 3.3 提示框
 
 - GitHub 写法 `> [!NOTE|TIP|IMPORTANT|WARNING|CAUTION]`，标签依次为 说明 / 提示 / 重要 / 注意 / 警告；语义色依次 info / success / 正文色 / warning / danger，与文档面板一致。
-- 左侧 2px 语义色竖条，左内边距 18px；首行显示标签（UI 字体 12.5px、600、字距 0.04em、语义色）。标签用 CSS `::before` 生成，不进入 DOM 文本，批注和复制得到的文字不含标签。
+- 左侧 2px 语义色竖条，左内边距 18px；首行显示标签（12px、600、字距 0.04em、语义色）。标签用 CSS `::before` 生成，不进入 DOM 文本，批注和复制得到的文字不含标签。
 
 ### 3.4 公式
 
@@ -97,36 +97,36 @@ MarkdownProse（content, onOpenWorkspaceFile）
 - 安全：源码按不可信输入处理。固定 Mermaid `strict` 配置，源码不能覆盖 `securityLevel` 等；剥离 `%%{init}%%`、frontmatter `config`、`click` / `link` / `callback`；禁用 HTML labels 与外链；DOMPurify 二次净化（只保留 `#` 内部 href）。上限：源码 20,000 字符、500 条边、10 秒渲染、SVG 2 MB；超限落入错误状态并允许查看源码。
 - 性能：Mermaid 核心按需加载，同一源码 + 主题有 LRU（32）缓存与并发去重，每个实例重写 id 避免 marker / filter 冲突；SVG 只在当前 DOM，不写 Session、磁盘或 artifact，恢复会话时由正文重新渲染。不记录完整回复、源码或 SVG 到日志。
 
-## 4. 排版：A 书页
+## 4. 排版
 
-颜色全部用主题变量，浅色深色自动翻转；以下尺寸以正文字号为基准，em 值随正文缩放。
+颜色全部用主题变量，浅色深色自动翻转。字号、行高、字重的总规则见 [视觉 token 规范 §5](front-视觉token规范.md#5-字体与字号)，这里只写聊天正文的取值。
 
 ### 4.1 字体与正文
 
 | 项目 | 值 |
 | --- | --- |
-| 正文字体 | `--act-font-reading`（`tokens.css`）：`ui-serif, "New York", "Iowan Old Style", Charter, Georgia, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", serif`，西文衬线、中文落到苹方 / 雅黑；只用于聊天区 AI 输出，其余界面仍是 UI 字体 |
-| 字号 / 行高 | 16.5px / 1.78；只在 `markdown.css` 里定义局部变量 `--md-chat-size`，不新增全局字号 token |
-| 块间距 / 粗体 | 14px / 650；文字色 `--act-color-text` |
+| 正文字体 | `--act-font-ui`，和界面同一套字体；不用衬线，没有单独的阅读字体 |
+| 字号 / 行高 | 15px（`--text-act-base`）/ 1.7 |
+| 块间距 / 粗体 | 12px / 600；文字色 `--act-color-text` |
 
 ### 4.2 标题、列表、引用、分隔线
 
-- 标题：与正文同字体，字重 600，行高 1.35，字距 -0.005em，上外边距 14px；H1 1.55em、H2 1.3em、H3 1.12em、H4 1em。
-- 列表：项间距 7px，左缩进 1.6em，圆点和序号用 `--act-color-text-faint`。任务列表去掉圆点（左缩进 0.2rem），复选框 14px、圆角 4px、边框 1.5px `--act-color-border-strong`，勾选时底色 `--act-color-link` 加白色对勾，完成项 faint 色加删除线。
-- 引用：左侧 2px `--act-color-border` 竖条，左内边距 18px，文字 `--act-color-text-muted`。
-- 分隔线 1px `--act-color-border`，上下各 6px；`<details>` UI 字体 15px；链接沿用链接色加淡色下划线，悬停下划线变链接色。
+- 标题：字重 600，行高 1.35，不加字距；H1 20px、H2 18px、H3 16px、H4 15px。H1 / H2 上外边距 14px（加块间距共 26px），H3 / H4 上外边距 8px；标题是第一个块时上外边距为 0。
+- 列表：项间距 6px，左缩进 1.6em，圆点和序号用 `--act-color-text-faint`。任务列表去掉圆点（左缩进 0.2rem），复选框 14px、圆角 4px、边框 1.5px `--act-color-border-strong`，勾选时底色 `--act-color-link` 加白色对勾，完成项 faint 色加删除线。
+- 引用：左侧 2px `--act-color-border` 竖条，左内边距 18px，文字 `--act-color-text-muted`。提示框标签 12px、600、字距 0.04em、语义色。
+- 分隔线 1px `--act-color-border`，上下各 6px；`<details>` 14px；图片下的说明 13px faint；链接沿用链接色加淡色下划线，悬停下划线变链接色。
 
 ### 4.3 行内代码
 
-等宽 0.82em，内边距 0.14em 0.4em，1px `--act-color-inline-code-border` 边框、圆角 5px、底色 `--act-color-surface-subtle`；路径字号和内边距相同，颜色见 3.1。
+等宽 0.87em（正文里约 13px），内边距 0.14em 0.4em，1px `--act-color-inline-code-border` 边框、圆角 5px、底色 `--act-color-surface-subtle`；路径字号和内边距相同，颜色见 3.1。`kbd` 0.8em。
 
 ### 4.4 表格
 
-UI 字体 14px，数字等宽（`tabular-nums`）；无外框和底色，外层容器负责横向滚动；表头正文色 600、下边框 1px `--act-color-border-strong`；每行下边框 1px `--act-color-border`（最后一行不加）；单元格内边距上下 10px、右 16px、左 0，表头和右对齐的列不换行；流式中固定列宽，结束后恢复自动列宽。
+14px / 行高 1.6，数字等宽（`tabular-nums`）；无外框和底色，外层容器负责横向滚动；表头 12px、500、`--act-color-text-faint`、下边框 1px `--act-color-border-strong`，表头和内容靠字号与颜色区分，不靠加粗；每行下边框 1px `--act-color-border`（最后一行不加）；单元格内边距上下 8px、右 16px、左 0，表头和右对齐的列不换行；流式中固定列宽，结束后恢复自动列宽。
 
 ### 4.5 代码块外观
 
-不要边框，圆角 12px（`--radius-lg`），底色 `--act-color-surface-subtle`；头部高 36px、左内边距 18px、UI 字体 12px faint，与代码之间不画分隔线；代码等宽 `--act-font-mono-size`、行高 1.65、内边距左右 18px / 上 0 / 下 16px；折叠时底部 64px 渐隐遮罩，按钮 UI 字体 12px muted。
+不要边框，圆角 12px（`--radius-lg`），底色 `--act-color-surface-subtle`；头部高 36px、左内边距 18px、12px faint，与代码之间不画分隔线；代码等宽 `--act-font-mono-size`、行高 1.65、内边距左右 18px / 上 0 / 下 16px；折叠时底部 64px 渐隐遮罩，按钮 12px muted。
 
 ## 5. 流式输出
 
@@ -172,7 +172,7 @@ UI 字体 14px，数字等宽（`tabular-nums`）；无外框和底色，外层�
 
 ## 9. 工程约束
 
-- 样式写在 `styles/markdown.css` 的 `.markdown-prose` 下：颜色只用主题变量，字号用 em 或局部变量 `--md-chat-size`，圆角用 `--radius-*`（token 规则见 [front-视觉token规范.md](front-视觉token规范.md)）。
+- 样式写在 `styles/markdown.css` 的 `.markdown-prose` 下：颜色只用主题变量，字号用 `var(--text-act-*)`，行内元素用 em，圆角用 `--radius-*`（token 规则见 [front-视觉token规范.md](front-视觉token规范.md)）。
 - 单文件不超过 500 行；插件与组件在 `components/messages/markdown/`（`remark-callouts`、`remark-code-meta`、`remark-math-guard`、`rehype-inline-paths`、`rehype-stream-tail`、`rehype-math-exclude`、`lazy-plugins`、`definitions`、`merge-html-blocks`、`CodeBlock`、`MarkdownLink`、`InlineCode`、`MarkdownImage`、`MarkdownTable`）。
 
 ## 10. 不做

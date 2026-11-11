@@ -85,26 +85,94 @@
 
 ## 5. 字体与字号
 
-字体：界面用 `--act-font-ui`（系统 UI 字体 + 苹方）；代码、diff、Bash、行内 code 用 `--act-font-mono`；聊天区 AI 正文（助手回复、子 Agent 报告）用 `--act-font-reading`（西文衬线 + 中文苹方）。正文里的表格、代码块头、提示框标签仍用 UI 字体。
+> 2026-11-11 定稿（方向 B「均衡 15」，对比稿 `typography-scale-demo.html`）。代码按 [执行计划](../../exec-plans/active/20261111-typography-scale.md) 落地，落地前 `tailwind.css`、`markdown.css` 里的值仍是旧的；计划完成后删除本段。
 
-字号只用 `text-act-*`（只设字号，不带行高，行高另写 `leading-*`）：
+### 5.1 三层字号
+
+整个窗口只有三层文字，层与层之间差 2px，层内不再细分：
+
+| 层 | 字号 | 管什么 |
+|---|---:|---|
+| 辅助 | 11 / 12px | 时间、徽标、分区标题、说明、表头、底部状态 |
+| 界面 | 13px | 侧栏、标题栏、按钮、菜单、设置行、工具行与 Thinking、代码 |
+| 阅读 | 15px | AI 回复正文、用户消息、输入框 |
+
+14px 夹在界面和阅读之间，只给「对话里的次级内容」：正文里的表格、对话内卡片（待办、审批、子 Agent 来信）、分组标题。标题从阅读层往上走：16 / 18 / 20 / 24px。
+
+判断规则：
+
+1. 同一屏的阅读层字号不超过界面层的 1.2 倍（15 / 13 ≈ 1.15）。正文比外壳大出两档以上，窗口就会像两个产品拼在一起。
+2. 用户消息、AI 正文、输入框是同一层，必须同字号；工具行、Thinking、`Worked for` 是过程，属于界面层，比正文小一档。
+3. 区分层级先用颜色（`text-main` → `muted` → `faint`），再用字重，最后才换字号。同一个容器里出现三种以上字号，先检查是不是该用颜色。
+4. 新界面不许发明字号。档位表里找不到合适的，说明角色没想清楚，回到上面三层里选。
+
+### 5.2 字体
+
+- 界面和聊天正文都用 `--act-font-ui`（系统 UI 字体 + 苹方 / 雅黑）；代码、diff、Bash、行内 code 用 `--act-font-mono`。
+- 不用衬线字体，不设单独的「阅读字体」。原因：macOS 和 Windows 都没有适合屏幕正文的中文衬线，西文衬线 + 中文黑体会让「2026 年 11 月」这样的一行里数字和汉字是两种字体。
+- 一行文字里只能有 UI 字体和等宽字体两种；等宽只用于代码、路径、命令、快捷键和 token 数这类需要逐字符辨认的内容。
+
+### 5.3 字号档位
+
+字号只用 `text-act-*`（只设字号，不带行高）；CSS 文件里写 `var(--text-act-*)`。
 
 | 类 | 大小 | 用在 |
 |---|---:|---|
-| `text-act-xxs` | 11px | 时间戳、徽标、kicker、表格脚注 |
-| `text-act-xs` | 12px | 分区标题、说明、Tooltip、按钮 xs |
-| `text-act-sm` | 13px | 侧栏条目、设置行标题、按钮、文件名、代码 / diff / Bash |
-| `text-act-md` | 14px | Thinking、工具行 |
-| `text-act-lg` | 16px | Composer 输入 |
-| `text-act-xl` | 20px | 页面与面板标题 |
+| `text-act-xxs` | 11px | 时间戳、徽标、kicker、表格脚注、代码块工具条 |
+| `text-act-xs` | 12px | 分区标题、说明、Tooltip、按钮 xs、表头、底部状态行、代码块头 |
+| `text-act-sm` | 13px | 侧栏条目、标题栏、设置行标题、按钮、菜单项、工具行、Thinking、`Worked for`、文件名、代码 / diff / Bash |
+| `text-act-md` | 14px | 正文里的表格与 `<details>`、对话内卡片正文、分组标题 |
+| `text-act-base` | 15px | AI 回复正文、用户消息、Composer 输入、聊天 H4 |
+| `text-act-lg` | 16px | 对话框标题、卡片里的关键数值、聊天 H3 |
+| `text-act-head` | 18px | 聊天 H2、文档面板 H3 |
+| `text-act-xl` | 20px | 页面与面板标题、聊天 H1 |
 | `text-act-title` | 24px | 最大标题 |
 
-- AI 回复正文固定 16.5px / 行高 1.78（`markdown.css` 的 `--md-chat-size`），不用 14px 或 16px；细则见 [聊天区 Markdown 渲染规范](front-聊天区Markdown渲染规范.md)。
 - 不用 Tailwind 默认的 `text-xs`、`text-sm`（`text-sm` 是 14px，与本表同名不同值），不写 `text-[13px]`；同一元素上不叠两个字号类（生效的是生成顺序，不是书写顺序）。
+- `styles/*.css` 里的 `font-size` 只写 `var(--text-act-*)`、`var(--act-font-mono-size)`、`inherit` 或 `em`；不写 `12.5px`、`0.72rem` 这类字面量。`em` 只用于必须跟随所在文字缩放的行内元素（行内 code、`kbd`、公式）。
 - 8 / 9 / 10px（`text-act-5xs` / `4xs` / `3xs`）只允许在轨迹视图和 Harness 统计两类数据密集页使用，其他位置最小 11px。反例：普通设置页、面板正文里出现 10px。
 - 数据页的 42–72px 大数字不是营销标题，要在 `scripts/check-frontend-design-tokens.mjs` 的 allowlist 逐条登记。
-- 字重只用 `font-normal` 400 / `font-medium` 500 / `font-semibold` 600 / `font-bold` 700，层级优先靠字号、颜色和间距，不用不稳定档位，不给普通 UI 加负字间距。
+- 外观设置的「界面字号」是整窗缩放，本表所有档位等比变化；「代码字号」只改 `--act-font-mono-size`（默认 13px）。
+
+### 5.4 行高
+
+单行控件用固定行高，多行文字用比例行高。组件里只用下面这些类，不写 `leading-[1.55]`、`leading-[17px]`：
+
+| 类 | 值 | 用在 |
+|---|---:|---|
+| `leading-none` | 1 | 图标旁的数字、徽标 |
+| `leading-4` | 16px | 11 / 12px 的单行文字 |
+| `leading-4.5` | 18px | 12px 的紧凑行（文件变更行、轮尾卡片） |
+| `leading-5` | 20px | 13 / 14px 的单行文字 |
+| `leading-5.5` | 22px | 15px 的单行文字、输入框 |
+| `leading-snug` | 1.375 | 标题 |
+| `leading-normal` | 1.5 | 多行说明、Tooltip、设置项描述 |
+| `leading-relaxed` | 1.625 | 多行阅读：用户消息、展开的思考内容、对话内卡片正文 |
+
+AI 回复正文的行高 1.7 只写在 `markdown.css`，代码块 1.6。中文正文行高不低于 1.6，标题不低于 1.35。
+
+### 5.5 字重与字距
+
+- 字重只用 `font-normal` 400 / `font-medium` 500 / `font-semibold` 600。`font-bold` 700 不用（苹方的 700 和 600 差别很小，Windows 上却明显更黑）；CSS 里不写 650 这类中间值。
+- 400 正文和说明；500 可点击的条目名、按钮、表头；600 标题、正文粗体、关键数值。
+- 普通 UI 不加负字间距；全大写的小标签可以加 `tracking-wide`。
 - 数字列和需要对齐的数值加 `tabular-nums`。
+
+### 5.6 聊天区一览
+
+细则见 [聊天区 Markdown 渲染规范](front-聊天区Markdown渲染规范.md) §4 和 [中间消息区规范](front-中间消息区规范.md)。
+
+| 对象 | 字号 / 行高 | 字重与颜色 |
+|---|---|---|
+| AI 回复正文 | 15px / 1.7 | 400，`text-main` |
+| 聊天 H1 / H2 / H3 / H4 | 20 / 18 / 16 / 15px，行高 1.35 | 600 |
+| 正文表格 | 14px / 1.6；表头 12px | 表头 500 `text-faint` |
+| 用户消息 | 15px / 1.625 | 400，`text-main` |
+| Composer 输入 | 15px / 22px | 占位符 `text-subtle` |
+| 工具行、Thinking 标题、`Worked for` | 13px / 20px | 400，`muted` / `faint` |
+| 展开的思考内容 | 13px / 1.625 | `text-muted` |
+| 模型名、Composer 里的菜单 | 13px | 500 |
+| 底部状态行、统计胶囊 | 12px / 16px | `text-faint` |
 
 ## 6. 间距与密度
 
@@ -216,6 +284,6 @@ Tailwind v4 + Preflight，入口 `styles/index.css`，层序 `theme, base, chrom
 
 ## 13. 检查命令
 
-- `pnpm check:frontend-tokens`：禁止 `text-[Npx]`、Tailwind 默认字号、`rounded-[…]`、`z-[N≥3]`、`duration-[…]` / `duration-N`、Tailwind 调色板色名、彩色焦点环、旧冷色阴影、JSX 里的 `strokeWidth=`、§12 表格左列的 lucide 导入名；确认引用的 `text-act-*`、`rounded-act-*`、`shadow-act-*`、`--act-*`、`--motion-*` 都有定义；原生 `<button>` 数量不得超过基线；间距任意值（§6）数量不得超过 `scripts/spacing-literal-baseline.json`；`createPortal`、`role="dialog"` 只能在 `components/ui/`。例外按「文件 + 精确匹配串」登记在脚本的 `LITERAL_ALLOWLIST`。
+- `pnpm check:frontend-tokens`：禁止 `text-[Npx]`、Tailwind 默认字号、`leading-[…]`、`font-bold`、样式文件里的字号字面量（§5.3，轨迹页样式除外）、`rounded-[…]`、`z-[N≥3]`、`duration-[…]` / `duration-N`、Tailwind 调色板色名、彩色焦点环、旧冷色阴影、JSX 里的 `strokeWidth=`、§12 表格左列的 lucide 导入名；确认引用的 `text-act-*`、`rounded-act-*`、`shadow-act-*`、`--act-*`、`--motion-*` 都有定义；原生 `<button>` 数量不得超过基线；间距任意值（§6）数量不得超过 `scripts/spacing-literal-baseline.json`；`createPortal`、`role="dialog"` 只能在 `components/ui/`。例外按「文件 + 精确匹配串」登记在脚本的 `LITERAL_ALLOWLIST`。
 - `pnpm check:frontend-theme`：token 的浅 / 深 / system 三个分支完整，强调色调色板与 CSS 块一一对应并满足对比度，组件无黑白与任意值颜色字面量。
 - 两个命令都同时扫描 `apps/web/src`，web 没有字面量例外。

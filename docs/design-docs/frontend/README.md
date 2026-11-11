@@ -30,7 +30,7 @@
 ## 必读 4 份
 
 - [新功能开发清单](front-新功能开发清单.md)：工程规则（文件放哪、状态放哪、IPC、安全、测试）加 11 条 UI 自检。
-- [视觉 token 规范](front-视觉token规范.md)：颜色职责与唯一色板、字号（含 8–10px 白名单）、间距、圆角、阴影、层级、动效、强调色、主题硬约束、样式归属。
+- [视觉 token 规范](front-视觉token规范.md)：颜色职责与唯一色板、字体与字号（三层字号、档位、行高、字重，含 8–10px 白名单）、间距、圆角、阴影、层级、动效、强调色、主题硬约束、样式归属。
 - [文案与状态表达规范](front-文案与状态表达规范.md)：中文取舍、说明文字默认不写、同一信息只出现一次、状态表达、空 / 零 / 未知 / 错误 / 加载的固定写法。
 - [组件与交互模式规范](front-组件与交互模式规范.md)：Button / IconButton 变体、Tooltip、弹层怎么选、确认与撤销、设置行与对齐、表格与长值、对标与 demo。
 
@@ -60,4 +60,4 @@
 
 ## 资产与 demo
 
-- 规范和 token 为准；demo 只用于选方向，选定后结论写进区域规范、demo 删除。目前保留的 demo 只有三份，都是等 Electron 复验视觉后就删：`context-panel-polish-demo.html`（上下文面板）、`stats-redesign-demo.html`（统计页）、`subagent-compact-demo.html`（子智能体卡片）。
+- 规范和 token 为准；demo 只用于选方向，选定后结论写进区域规范、demo 删除。目前保留的 demo 只有四份，都是等 Electron 复验视觉后就删：`typography-scale-demo.html`（字号规范，现状与 A / B / C 对比，选定 B）、`context-panel-polish-demo.html`（上下文面板）、`stats-redesign-demo.html`（统计页）、`subagent-compact-demo.html`（子智能体卡片）。
