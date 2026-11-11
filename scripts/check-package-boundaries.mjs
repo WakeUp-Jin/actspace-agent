@@ -31,7 +31,7 @@ function dependencyNames(manifest) {
 }
 
 function assertExports(name, manifest) {
-  const exempt = new Set(["@actspace/desktop", "@actspace/agent-cli", "@actspace/shared", "@actspace/site", "@actspace/web"]);
+  const exempt = new Set(["@actspace/desktop", "@actspace/agent-cli", "@actspace/shared", "@actspace/site", "@actspace/web", "@actspace/promo-video"]);
   if (exempt.has(name)) return;
   if (!manifest.exports || typeof manifest.exports !== "object" || !manifest.exports["."]) failures.push(`${name}: missing package exports['.']`);
   const isLeaf = name.startsWith("@actspace/");
