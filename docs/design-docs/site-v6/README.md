@@ -30,7 +30,7 @@
 
 ### 方向 0 · V4 精修（`demos/0-v4-refined.html`）
 
-![](shots/0-v4-refined-hero.png)
+![方向 0 V4 精修首屏](shots/0-v4-refined-hero.png)
 
 - 保留全部 V4 token、舞台色场、颗粒、圆角、按钮，气质不变。
 - 首屏窗口换成**真实 macOS 窗口框 + 真实 `space.png` 截图**，轻微 3° 透视，像产品发布图；不再手绘会话气泡。
@@ -42,7 +42,7 @@
 
 ### 方向 1 · 星图（`demos/1-starchart.html`）
 
-![](shots/1-starchart-hero.png)
+![方向 1 星图首屏](shots/1-starchart-hero.png)
 
 - 把产品概念里的「宇宙 + 计算」意象当真：深色夜空、同心轨道、东西南北四个方位各对应一种 Actor 状态（N 等你决定 / E 工作中 / W 有结果 / S 空闲）。
 - 协调 Agent 在中心，Actor 以 140–200 秒一圈的速度缓慢运行，单色读数（`AWAITING YOU · 迁移审批`）。
@@ -53,7 +53,7 @@
 
 ### 方向 2 · 博物志（`demos/2-atlas.html`）
 
-![](shots/2-atlas-hero.png)
+![方向 2 博物志首屏](shots/2-atlas-hero.png)
 
 - 一本旧天文学图谱：米色纸、墨线铜版画、双线框、「图一 · 空间测绘」编号图版、罗马数字图例、页边批注、朱印「唯变所适」。
 - 空间 = 一张被仔细测绘过的天体图；Actor = 图版中的天体（角色精灵去色后当作铜版画里的星体）；记忆 = 页边批注。
@@ -63,7 +63,7 @@
 
 ### 方向 3 · 控制台（`demos/3-console.html`）
 
-![](shots/3-console-hero.png)
+![方向 3 控制台首屏](shots/3-console-hero.png)
 
 - 空间站平面图：冷灰网格底、带角标的面板、单色大写标签、尺寸标注线。
 - 首屏是一张舱室平面图：Bay 01–05 各是一个 Actor 工位，中间 Hub 是协调 Agent，走廊是消息总线，虚线流动表示消息；Memory 舱放空间记忆；空位 Bay 05 表示「按场景召集下一个 Actor」。
@@ -73,7 +73,7 @@
 
 ### 方向 4 · 栖息地（`demos/4-habitat.html`）
 
-![](shots/4-habitat-hero.png)
+![方向 4 栖息地首屏](shots/4-habitat-hero.png)
 
 - Actor 是「专业又亲近的精灵」，那就让它们住进来：八张角色封面的底色直接做平涂色块（桃、蓝、松绿、黄、石板、紫），32px 大圆角，粗壮无衬线。
 - 首屏是一个 bento 式栖息地：每个 Actor 占一块有自己颜色的地盘，状态是色块上的小标签；协调 Agent 是黑色地块；真实截图放在最大的石板色块里。
@@ -83,7 +83,7 @@
 
 ### 方向 5 · 留白（`demos/5-whitespace.html`）
 
-![](shots/5-whitespace-hero.png)
+![方向 5 留白首屏](shots/5-whitespace-hero.png)
 
 - 「空间」最直接的表达就是空。纯白、一个占半屏的标题、一行竖排「唯变所适」、一张从右页边切出去的真实截图、三段话、一行用精灵当字的 Actor 名册句子。
 - 几乎没有动效、没有卡片、没有色场；紫色只出现在「空间」两个斜体字上。
