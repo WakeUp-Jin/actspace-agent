@@ -1,0 +1,4 @@
+/* 字体随包走：渲染机器上有没有中文字体都不影响成片。 */
+@import "@fontsource-variable/noto-serif-sc/index.css";
+@import "@fontsource-variable/noto-sans-sc/index.css";
+@import "@fontsource-variable/jetbrains-mono/index.css";
