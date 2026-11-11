@@ -1,7 +1,7 @@
 import { RemoteDesktopAdapter } from "./remote-hosts/desktop-adapter";
 import { RemoteHostRegistry } from "./remote-hosts/registry";
 import { registerRemoteHostIpc } from "./remote-hosts/ipc";
-import { registerPerformanceIpc } from "./performance-ipc";
+import { ResourceMonitorController } from "./resource-monitor/monitor-controller";
 import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
 import { BROWSER_PLUGIN_ID, disabledPluginIds, ENGLISH_LEARNING_PLUGIN_ID, resolvePluginSettings, resolvePluginSwitches } from "./plugins/plugin-switches";
@@ -42,7 +42,7 @@ const APP_DISPLAY_NAME = process.env.ACTSPACE_DEV_APP_NAME?.trim() || "ActSpace"
 let startupLogPath: string | undefined;
 let mainWindow: BrowserWindow | undefined;
 let runtimeV2Registry: DesktopRuntimeV2Registry | undefined;
-let disposePerformanceIpc: (() => void) | undefined;
+let resourceMonitor: ResourceMonitorController | undefined;
 let disposeEnglishLearningIpc: (() => void) | undefined;
 let disposePluginsIpc: (() => void) | undefined;
 let disposePythonRuntimeIpc: (() => void) | undefined;
@@ -163,8 +163,13 @@ async function createMainWindow(): Promise<BrowserWindow> {
   mainWindow = win;
   attachNavigationGuards(win, createAppUrlMatcher({ devServerUrl: DEV_SERVER_URL, indexHtmlPath }));
   attachWindowLifecycle(win, {
-    onClosed: () => { if (mainWindow === win) mainWindow = undefined; },
+    onClosed: () => {
+      if (mainWindow === win) mainWindow = undefined;
+      // 资源监控悬浮窗不该让应用在 Windows / Linux 上关不掉。
+      if (process.platform !== "darwin") resourceMonitor?.closeFloatWindow();
+    },
   });
+  resourceMonitor?.attachMainWindow(win);
   if (DEV_SERVER_URL) await win.loadURL(DEV_SERVER_URL);
   else await win.loadFile(indexHtmlPath);
   return win;
@@ -260,7 +265,15 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     }
   };
   if (browserBridgeService) scheduleBrowserSync(1_000);
-  disposePerformanceIpc = registerPerformanceIpc(getMainWindowOrNull);
+  resourceMonitor = new ResourceMonitorController({
+    settings: settingsService,
+    getMainWindow,
+    dataRoot: roots.dataRoot,
+    preloadPath: join(__dirname, "..", "preload", "index.bundle.js"),
+    devServerUrl: DEV_SERVER_URL,
+    distRoot: join(__dirname, "..", "..", "dist"),
+    log: (message, details) => void logMain(message, details),
+  });
   disposeEnglishLearningIpc = englishLearningEnabled
     ? registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow: getMainWindowOrNull })
     : registerDisabledEnglishLearningIpc({ getMainWindow: getMainWindowOrNull });
@@ -299,7 +312,8 @@ app.whenReady().then(async () => {
   }
   await createMainWindow();
   app.on("activate", async () => {
-    if (BrowserWindow.getAllWindows().length === 0) await createMainWindow();
+    // 资源监控悬浮窗也是窗口，不能按窗口总数判断主窗口在不在。
+    if (!getMainWindow()) await createMainWindow();
   });
 }).catch((error: unknown) => {
   void logMain("desktop bootstrap failed", { error: error instanceof Error ? error.message : String(error) });
@@ -332,7 +346,7 @@ app.on("before-quit", (event) => {
       // 两者都是同步、不抛错的清理；放在 finally 里，前面的异步清理失败时也照样执行。
       browserBridgeService?.dispose();
       localUpdateService?.dispose();
-      disposePerformanceIpc?.();
+      resourceMonitor?.dispose();
       disposeEnglishLearningIpc?.();
       disposePluginsIpc?.();
       disposePythonRuntimeIpc?.();

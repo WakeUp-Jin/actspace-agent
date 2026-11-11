@@ -21,6 +21,7 @@
 | Context 面板 | Context 面板 | 会话状态与数据流 |
 | 子 Agent、后台任务、侧边对话 | 子 Agent 与后台任务 | 右侧面板与文件渲染 |
 | 设置页、模型连接 | 设置页 | 组件与交互模式 §6 |
+| 资源占用、悬浮监控窗口 | 资源监控 | 设置页 |
 | 使用统计、Harness 统计 | 统计页 | 设置页 |
 | 会话数据、store、live 事件 | 会话状态与数据流 | Preload bridge 与 Mock |
 | 新增 IPC、写 mock、写测试 | Preload bridge 与 Mock | 前端验证约定 |
@@ -52,6 +53,7 @@
 - [子 Agent 与后台任务](front-子Agent与后台任务规范.md)：子 Agent 列表与详情顶栏、后台任务、侧边对话。
 - [轨迹视图](front-轨迹视图规范.md)：轨迹页的结构、小字号白名单与交互。
 - [设置页](front-设置页规范.md)：设置信息架构、模型连接、外观。
+- [资源监控](front-资源监控规范.md)：资源占用页与悬浮窗、CPU / 内存口径、采集开销。
 - [统计页](front-统计页规范.md)：使用统计与 Harness 统计的共同骨架、指标口径、卡片、明细表与存储改动。
 - [会话状态与数据流](front-会话状态与数据流规范.md)：cell / live run / 本地状态、合并规则、evict。
 - [Preload bridge 与 Mock](front-preload-bridge与mock规范.md)：`window.actspace` 契约、`api/<域>`、新增 IPC 步骤、mock 与测试打桩。

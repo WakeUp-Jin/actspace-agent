@@ -16,7 +16,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 
 export const CHANNEL_SOURCES = [
   { file: "packages/util/shared/src/runtime-v2/fixed-renderer.ts", constant: "RUNTIME_V2_FIXED_RENDERER_CHANNELS" },
-  { file: "packages/util/shared/src/performance.ts", constant: "PERFORMANCE_CHANNELS" },
+  { file: "packages/util/shared/src/resource-monitor.ts", constant: "RESOURCE_MONITOR_CHANNELS" },
   { file: "packages/util/shared/src/english-learning.ts", constant: "ENGLISH_LEARNING_CHANNELS" },
   { file: "packages/util/shared/src/host-protocol/connections.ts", constant: "HOST_IPC" },
 ];

@@ -5,7 +5,7 @@ import {
 } from "../desktop-bridge";
 import { ENGLISH_LEARNING_CHANNELS } from "../english-learning";
 import { HOST_IPC } from "../host-protocol";
-import { PERFORMANCE_CHANNELS } from "../performance";
+import { RESOURCE_MONITOR_CHANNELS } from "../resource-monitor";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS } from "../runtime-v2";
 
 function entries(): Array<{ path: string; spec: BridgeSpec }> {
@@ -30,7 +30,7 @@ describe("desktop bridge contract", () => {
   it("uses exactly the existing renderer channel constants", () => {
     const known = [
       ...Object.values(RUNTIME_V2_FIXED_RENDERER_CHANNELS),
-      ...Object.values(PERFORMANCE_CHANNELS),
+      ...Object.values(RESOURCE_MONITOR_CHANNELS),
       ...Object.values(ENGLISH_LEARNING_CHANNELS),
       ...Object.values(HOST_IPC),
     ];

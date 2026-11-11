@@ -64,4 +64,4 @@ export * from "./request-record";
 export * from "./context-estimate";
 export * from "./token-estimate";
 
-export * from "./performance";
+export * from "./resource-monitor";
