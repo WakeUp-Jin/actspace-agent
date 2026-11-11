@@ -43,7 +43,7 @@ const DELTA_TONE_CLASS: Record<DeltaTone, string> = {
 
 export function DeltaBadge({ tone, children }: { tone: DeltaTone; children: ReactNode }) {
   return (
-    <span className={cn("shrink-0 whitespace-nowrap rounded-act-xs px-1.5 text-act-xxs font-semibold leading-[17px] tabular-nums", DELTA_TONE_CLASS[tone])}>
+    <span className={cn("shrink-0 whitespace-nowrap rounded-act-xs px-1.5 text-act-xxs font-semibold leading-4.5 tabular-nums", DELTA_TONE_CLASS[tone])}>
       {children}
     </span>
   );
