@@ -85,8 +85,6 @@
 
 ## 5. 字体与字号
 
-> 2026-11-11 定稿（方向 B「均衡 15」，对比稿 `typography-scale-demo.html`）。代码按 [执行计划](../../exec-plans/active/20261111-typography-scale.md) 落地，落地前 `tailwind.css`、`markdown.css` 里的值仍是旧的；计划完成后删除本段。
-
 ### 5.1 三层字号
 
 整个窗口只有三层文字，层与层之间差 2px，层内不再细分：
