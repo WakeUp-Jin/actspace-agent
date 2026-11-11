@@ -14,9 +14,9 @@ type ThinkingMessage = Extract<MessageBlock, { kind: "thinking" }>;
 const THINKING_BLOCK_CLASS =
   "message-row thinking-block max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)] animate-[fade-in_260ms_ease_both]";
 const THINKING_TOGGLE_CLASS =
-  "thinking-toggle group flex max-w-full items-center gap-2 border-0 bg-transparent p-0 text-act-md font-normal leading-[22px] text-text-faint";
+  "thinking-toggle group flex max-w-full items-center gap-2 border-0 bg-transparent p-0 text-act-sm font-normal leading-5 text-text-faint";
 const THINKING_CONTENT_CLASS =
-  "thinking-content mt-[7px] mb-0 whitespace-pre-wrap font-[inherit] text-act-md leading-[1.65] text-text-muted";
+  "thinking-content mt-[7px] mb-0 whitespace-pre-wrap font-[inherit] text-act-sm leading-relaxed text-text-muted";
 /** 简化样式收起时箭头占位但隐藏，标题每秒变化时箭头不跳；hover / 聚焦 / 展开时可见。 */
 const QUIET_CHEVRON_CLASS = "shrink-0 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100";
 

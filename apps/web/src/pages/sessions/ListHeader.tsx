@@ -25,7 +25,7 @@ export function ListHeader({ onTop }: { readonly onTop: () => void }) {
     <PageHeader
       title="会话"
       sub={<StatusLine />}
-      left={<HeaderButton label="回到顶部" onClick={onTop}><span className="text-act-md font-extrabold tracking-tight">A</span></HeaderButton>}
+      left={<HeaderButton label="回到顶部" onClick={onTop}><span className="text-act-md font-semibold tracking-tight">A</span></HeaderButton>}
       right={<HeaderButton label="设置" onClick={() => navigate({ name: "settings" })}><Settings size={20} aria-hidden /></HeaderButton>}
     />
   );

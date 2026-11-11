@@ -54,7 +54,7 @@ export function LibraryList() {
         </>
       ) : null}
       {library.length ? null : <PanelEmpty icon={<Library size={22} />}>库还是空的。</PanelEmpty>}
-      <div className="mx-1 mt-3.5 rounded-act-md border border-dashed border-line px-3 py-2.5 text-act-xs leading-[1.6] text-text-faint">
+      <div className="mx-1 mt-3.5 rounded-act-md border border-dashed border-line px-3 py-2.5 text-act-xs leading-relaxed text-text-faint">
         库就是 <code className="font-mono text-text-muted [overflow-wrap:anywhere]">spaces/&lt;id&gt;/library/</code> 这个真实目录。Actor 的产出写进{" "}
         <code className="font-mono text-text-muted">artifacts/</code>，代码本身不会复制进来。
       </div>

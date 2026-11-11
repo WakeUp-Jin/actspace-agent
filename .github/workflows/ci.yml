@@ -59,9 +59,8 @@ jobs:
 
       - uses: ./.github/actions/setup-workspace
 
-      - name: Install ripgrep
-        # 进程级测试会真的拉起 Agent Host，工具 grep / glob 直接调 rg；ubuntu-latest 不预装。
-        run: sudo apt-get install -y --no-install-recommends ripgrep
+      # 进程级测试会真的拉起 Agent Host，工具 grep / glob 直接调 rg；ubuntu-latest 不预装。
+      - uses: ./.github/actions/install-ripgrep
 
       - name: Build workspace dependencies
         run: pnpm build:deps
@@ -83,9 +82,8 @@ jobs:
 
       - uses: ./.github/actions/setup-workspace
 
-      - name: Install ripgrep
-        # tool-fs-search 的 grep / glob 直接调 rg，它的测试需要真实二进制；ubuntu-latest 不预装。
-        run: sudo apt-get install -y --no-install-recommends ripgrep
+      # tool-fs-search 的 grep / glob 直接调 rg，它的测试需要真实二进制；ubuntu-latest 不预装。
+      - uses: ./.github/actions/install-ripgrep
 
       - name: Build workspace dependencies
         run: pnpm build:deps
@@ -109,9 +107,8 @@ jobs:
 
       - uses: ./.github/actions/setup-workspace
 
-      - name: Install ripgrep
-        # main 进程的 runtime-v2 输出引用测试会经真实 Runtime 调 rg 搜索落盘的大输出；ubuntu-latest 不预装。
-        run: sudo apt-get install -y --no-install-recommends ripgrep
+      # main 进程的 runtime-v2 输出引用测试会经真实 Runtime 调 rg 搜索落盘的大输出；ubuntu-latest 不预装。
+      - uses: ./.github/actions/install-ripgrep
 
       - name: Build workspace dependencies
         run: pnpm build:deps

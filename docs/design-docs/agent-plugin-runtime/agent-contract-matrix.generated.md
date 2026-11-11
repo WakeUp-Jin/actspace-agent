@@ -1,14 +1,14 @@
 # Agent Contract Matrix
 
 > Generated artifact; edit source declarations instead. Do not hand-edit this file.
-> Generator 1.0.0; source digest `6cfa37a3a8f043eb49da4678b6e5a4b9f0150194879c8742a0b184aeb5852cb8`.
+> Generator 1.0.0; source digest `fbbb6a6fed4343be16f1edb7f345ab9b1567cd96cfb9e727eaf316c6b55780b3`.
 
 This document is an audit view of the current ActSpace v2 declarations. It never activates Runtime services, plugins, Session persistence, tools or Cordis entries.
 
 - Services: 60
 - Events: 87 (Session core 14, Loop interventions 8, notifications 7)
 - Plugins: 54
-- Packages: 73
+- Packages: 74
 
 ## Services
 
@@ -295,6 +295,7 @@ This document is an audit view of the current ActSpace v2 declarations. It never
 | @actspace/llm-service | domain | active | .<br>./manifest<br>./plugin | @actspace/cordis-adapter<br>@actspace/shared<br>undici | packages/llm/llm-service/package.json#package.json | composition/admission-contract |
 | @actspace/official-skills | domain | active | . | - | packages/skill/official-skills/package.json#package.json | composition/admission-contract |
 | @actspace/plugin-manager | domain | active | .<br>./manifest<br>./plugin | @actspace/bundle<br>@actspace/cordis-adapter<br>@actspace/harness-control<br>@actspace/harness-hmr<br>@actspace/official-skills<br>@actspace/tool-runtime<br>typescript | packages/harness-evolution/plugin-manager/package.json#package.json | composition/admission-contract |
+| @actspace/promo-video | host | active | - | - | apps/promo-video/package.json#package.json | composition/admission-contract |
 | @actspace/prompt | domain | active | .<br>./manifest<br>./plugin<br>./source-support | @actspace/agent<br>@actspace/context-engine<br>@actspace/cordis-adapter<br>@actspace/llm-service<br>@actspace/scope<br>@actspace/session-journal<br>@actspace/shared<br>@actspace/skill | packages/context/prompt/package.json#package.json | composition/admission-contract |
 | @actspace/python-runtime | domain | active | . | - | packages/shell/python-runtime/package.json#package.json | composition/admission-contract |
 | @actspace/runtime | domain | active | .<br>./agent-factory<br>./agent-runtime<br>./cordis<br>./loader<br>./session | @actspace/agent<br>@actspace/agent-host<br>@actspace/agent-loop<br>@actspace/agent-service<br>@actspace/approval<br>@actspace/auto-review<br>@actspace/background-tasks<br>@actspace/boot<br>@actspace/bundle<br>@actspace/composition<br>@actspace/context-assembly<br>@actspace/context-background-tasks<br>@actspace/context-compaction<br>@actspace/context-conversation<br>@actspace/context-disclosure<br>@actspace/context-engine<br>@actspace/context-rules<br>@actspace/context-runtime<br>@actspace/context-skills<br>@actspace/context-subagents<br>@actspace/context-system<br>@actspace/context-tools<br>@actspace/cordis-adapter<br>@actspace/desktop-app<br>@actspace/diagnostics<br>@actspace/english-learning<br>@actspace/harness-control<br>@actspace/harness-hmr<br>@actspace/harness-stats<br>@actspace/headless<br>@actspace/llm-pi-ai<br>@actspace/llm-service<br>@actspace/official-skills<br>@actspace/plugin-manager<br>@actspace/prompt<br>@actspace/sandbox<br>@actspace/sandbox-nono<br>@actspace/sandbox-seatbelt<br>@actspace/scope<br>@actspace/session-checkpoint-policy<br>@actspace/session-journal<br>@actspace/session-persistence<br>@actspace/session-persistence-jsonl<br>@actspace/session-projection<br>@actspace/session-projection-cache<br>@actspace/session-transcript<br>@actspace/shared<br>@actspace/side-chat<br>@actspace/subagent<br>@actspace/subagent-claude-code<br>@actspace/subagent-codex<br>@actspace/tool-background-tasks<br>@actspace/tool-browser<br>@actspace/tool-fs-read<br>@actspace/tool-fs-search<br>@actspace/tool-fs-write<br>@actspace/tool-image-generation<br>@actspace/tool-image-inspection<br>@actspace/tool-runtime<br>@actspace/tool-shell<br>@actspace/tool-subagent<br>@actspace/tool-todo<br>@actspace/tool-web | packages/core/runtime/package.json#package.json | composition/admission-contract |

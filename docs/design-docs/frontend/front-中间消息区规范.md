@@ -18,9 +18,10 @@
 
 | 对象 | 字号 / 行高 | 字重与颜色 |
 | --- | --- | --- |
-| 工具行、Thinking 标题 | 14px / 22px | 400；动作 muted，目标与元数据 faint；Thinking 标题 faint |
-| 助手回复正文 | 16.5px / 1.78（`--md-chat-size`） | 主文字色，语义强调保留 |
-| 展开的思考内容 | 14px / 1.65 | UI 字体，muted，保留原始换行与空行 |
+| 工具行、Thinking 标题、`Worked for` | 13px / 20px | 400；动作 muted，目标与元数据 faint；Thinking 标题 faint |
+| 助手回复正文 | 15px / 1.7（`--text-act-base`） | 主文字色，语义强调保留 |
+| 用户消息 | 15px / 1.625 | 400，主文字色；与助手正文同字号 |
+| 展开的思考内容 | 13px / 1.625 | UI 字体，muted，保留原始换行与空行 |
 | Bash 输出、工具结果详情 | mono 字号设置，默认 13px / 1.6 | muted；保留语法与 diff 的专用样式 |
 
 - 同一种工具不得因「有无 resultPreview」「是否可点击文件」而改变字号、字重或行高。

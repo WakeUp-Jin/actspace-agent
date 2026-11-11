@@ -9,9 +9,9 @@ const FOLD_TO = 8;
 
 const SHELL_CLASS = "script-source act-code-hl min-w-0 overflow-hidden rounded-act-md border border-line";
 const HEAD_CLASS =
-  "script-source-head flex min-h-7 items-center gap-2.5 px-3 text-act-xs leading-[1.4] text-text-faint";
+  "script-source-head flex min-h-7 items-center gap-2.5 px-3 text-act-xs leading-snug text-text-faint";
 const BODY_CLASS =
-  "script-source-body m-0 overflow-x-auto px-3 pb-2.5 font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.6] text-text-main";
+  "script-source-body m-0 overflow-x-auto px-3 pb-2.5 font-mono text-[length:var(--act-font-mono-size,13px)] leading-relaxed text-text-main";
 const FOLD_CLASS = "script-source-fold block w-full px-3 py-1.5 text-act-xs text-text-muted hover:text-text-main";
 
 /**

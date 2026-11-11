@@ -4,14 +4,12 @@
  * 归属：这是 Tailwind 样式架构允许的例外。CodeMirror 的 DOM 和类名（.cm-*）以及编辑器装饰、
  * widget 生成的类名（.md-*）不在 React 组件里，只能用全局 CSS 写；所有规则都限定在 `.md-editor` 下。
  *
- * 约束：颜色只用主题变量（浅色 / 深色自动翻转），字号只用 `--text-act-*`，
- * 唯一的例外是 H3 的局部变量 `--md-h3-size`（全局档位里没有 18px）。
+ * 约束：颜色只用主题变量（浅色 / 深色自动翻转），字号只用 `--text-act-*`。
  * 排版取 Codex 原样：14px / 行高 1.4 / 每行上下各 2px / 标题 24·20·18·14 字重 500 / 粗体 700。
  */
 .md-editor {
   --md-accent: var(--act-color-link);
   --md-pad-x: 16px;
-  --md-h3-size: 18px;
   --md-callout: var(--act-color-info);
   background: var(--act-color-surface);
   color: var(--act-color-text);
@@ -81,7 +79,7 @@
 .md-editor.cm-md-preview .md-h .tok-heading { font-weight: 500; color: var(--act-color-text); }
 .md-editor.cm-md-preview .cm-line.md-h1 { font-size: var(--text-act-title); }
 .md-editor.cm-md-preview .cm-line.md-h2 { font-size: var(--text-act-xl); }
-.md-editor.cm-md-preview .cm-line.md-h3 { font-size: var(--md-h3-size); }
+.md-editor.cm-md-preview .cm-line.md-h3 { font-size: var(--text-act-head); }
 .md-editor.cm-md-preview .cm-line.md-h4 { font-size: var(--text-act-md); }
 .md-editor.cm-md-preview .cm-line.md-setext-mark { font-size: 0; line-height: 0; padding-top: 0; padding-bottom: 0; }
 
