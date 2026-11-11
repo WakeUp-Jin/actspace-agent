@@ -21,7 +21,7 @@ type BashMessage = Extract<MessageBlock, { kind: "bash" }>;
 const BASH_RUN_CLASS =
   "message-row bash-run max-w-[var(--conversation-block-max-width)] px-[var(--conversation-text-inset)]";
 const BASH_RUN_TOGGLE_CLASS =
-  "bash-run-toggle flex w-full max-w-full items-center gap-[7px] overflow-hidden border-0 bg-transparent p-0 text-left text-act-md font-normal leading-[22px] text-text-muted";
+  "bash-run-toggle flex w-full max-w-full items-center gap-[7px] overflow-hidden border-0 bg-transparent p-0 text-left text-act-sm font-normal leading-5 text-text-muted";
 const BASH_RUN_SUMMARY_CLASS = "bash-run-summary flex-none whitespace-nowrap";
 const BASH_COMMAND_PREVIEW_CLASS =
   "bash-command-preview min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-normal text-text-faint";

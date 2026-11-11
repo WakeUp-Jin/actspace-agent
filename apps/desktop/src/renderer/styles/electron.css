@@ -167,7 +167,7 @@
   display: block;
   margin: 0;
   max-width: 100%;
-  font-size: 13px;
+  font-size: var(--text-act-sm);
   font-weight: 500;
   color: var(--text-soft);
   overflow: hidden;

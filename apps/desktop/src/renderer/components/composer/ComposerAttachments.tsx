@@ -10,7 +10,7 @@ const IMAGE_ATTACHMENT_WRAPPER_CLASS = "group/image-attachment relative h-12 w-1
 const IMAGE_ATTACHMENT_CLASS =
   "image-attachment block h-12 w-12 overflow-hidden rounded-lg border border-line bg-surface-subtle bg-cover bg-center shadow-act-thumb transition-[border-color,opacity] duration-(--motion-fast) hover:border-line-strong hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring";
 const FILE_ATTACHMENT_CLASS =
-  "file-attachment group/file-attachment inline-flex h-9 max-w-[220px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-act-md leading-5 font-medium text-text-main shadow-act-thumb";
+  "file-attachment group/file-attachment inline-flex h-9 max-w-[220px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-act-sm leading-5 font-medium text-text-main shadow-act-thumb";
 const FILE_ATTACHMENT_NAME_CLASS = "truncate";
 const ATTACHMENT_REMOVE_BASE_CLASS =
   "attachment-remove grid place-items-center rounded-lg opacity-0 pointer-events-none transition-[background,color,opacity] duration-(--motion-base) ease-in-out";
@@ -19,7 +19,7 @@ const IMAGE_ATTACHMENT_REMOVE_CLASS =
 const FILE_ATTACHMENT_REMOVE_CLASS =
   `${ATTACHMENT_REMOVE_BASE_CLASS} file-attachment-remove h-[22px] w-[22px] text-text-faint group-hover/file-attachment:pointer-events-auto group-hover/file-attachment:opacity-100 group-focus-within/file-attachment:pointer-events-auto group-focus-within/file-attachment:opacity-100 hover:bg-hover-overlay hover:text-text-main`;
 const SKILL_PILL_CLASS =
-  "group/skill-pill inline-flex h-9 max-w-[240px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-act-md leading-5 font-medium text-text-main shadow-act-thumb";
+  "group/skill-pill inline-flex h-9 max-w-[240px] items-center gap-2 rounded-lg border border-line bg-surface px-2.5 pr-1.5 text-act-sm leading-5 font-medium text-text-main shadow-act-thumb";
 
 function createAttachmentId(): string {
   return `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

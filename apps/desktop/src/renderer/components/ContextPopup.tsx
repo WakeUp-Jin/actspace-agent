@@ -14,12 +14,12 @@ const CONTEXT_POPOVER_CLASS = "context-popover w-(--radix-popper-anchor-width) p
 const CONTEXT_ROW_CLASS = "flex items-center justify-between gap-3.5";
 const CONTEXT_CLOSE_CLASS =
   "grid h-6 w-6 place-items-center rounded-full border-0 bg-surface-subtle text-text-muted transition-colors hover:bg-[var(--act-color-hover-overlay)]";
-const CONTEXT_SUMMARY_CLASS = `${CONTEXT_ROW_CLASS} py-3 pb-2 text-act-md leading-5 text-text-muted`;
+const CONTEXT_SUMMARY_CLASS = `${CONTEXT_ROW_CLASS} py-3 pb-2 text-act-sm leading-5 text-text-muted`;
 const CONTEXT_METER_CLASS =
   "context-meter flex h-1.5 overflow-hidden rounded-full bg-[var(--act-color-meter-track)]";
 const CONTEXT_BUCKETS_CLASS = "context-buckets grid gap-1 py-3 pb-1";
 const CONTEXT_BUCKET_CLASS =
-  "context-bucket grid grid-cols-[14px_minmax(0,1fr)_auto_36px] items-center gap-2.5 rounded-md px-1.5 py-1 text-left text-act-md leading-5 text-text-main transition-colors";
+  "context-bucket grid grid-cols-[14px_minmax(0,1fr)_auto_36px] items-center gap-2.5 rounded-md px-1.5 py-1 text-left text-act-sm leading-5 text-text-main transition-colors";
 const BUCKET_SWATCH_CLASS = "bucket-swatch h-[13px] w-[13px] rounded-[3px]";
 const CONTEXT_BUCKET_VALUE_CLASS = "font-semibold text-text-main";
 

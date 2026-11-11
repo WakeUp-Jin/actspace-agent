@@ -197,7 +197,7 @@ function WorkspacePreparationBlock({ message }: { message: Extract<MessageBlock,
   const completed = message.status === "completed";
   return (
     <details
-      className="group/worktree rounded-act-md border border-line bg-surface-subtle/70 px-3 py-2 text-act-md leading-5 text-text-muted"
+      className="group/worktree rounded-act-md border border-line bg-surface-subtle/70 px-3 py-2 text-act-sm leading-5 text-text-muted"
       open={!completed}
     >
       <summary className="flex cursor-pointer list-none items-center gap-2 text-text-main">
