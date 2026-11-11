@@ -11,6 +11,22 @@ export function attachWindowLifecycle(win: LifecycleWindow, deps: WindowLifecycl
   });
 }
 
+export type ShutdownStep = readonly [label: string, run: () => unknown];
+
+/**
+ * Run quit-time cleanup in order. A failing step is logged and skipped so later steps
+ * still run and the caller always reaches `app.exit`; one throw used to stall quit until the 35 s fallback.
+ */
+export async function runShutdownSteps(steps: readonly ShutdownStep[], log: Log): Promise<void> {
+  for (const [label, run] of steps) {
+    try {
+      await run();
+    } catch (error) {
+      log("shutdown step failed", { step: label, ...describeError(error) });
+    }
+  }
+}
+
 type ProcessLike = Pick<NodeJS.EventEmitter, "on" | "off">;
 
 /**

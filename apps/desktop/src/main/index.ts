@@ -32,7 +32,7 @@ import { ProviderNetworkService } from "./runtime-v2/provider-network-service";
 import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
 import { registerFixedRendererIpc, type FixedRendererIpcRegistration } from "./runtime-v2/fixed-renderer-ipc";
 import { LocalUpdateService } from "./local-update-service";
-import { attachWindowLifecycle, installProcessErrorLogging } from "./main-lifecycle";
+import { attachWindowLifecycle, installProcessErrorLogging, runShutdownSteps } from "./main-lifecycle";
 import { attachNavigationGuards, blockWebviewAttachment, buildContentSecurityPolicy, createAppUrlMatcher, createMainWindowOptions, installContentSecurityPolicy } from "./window-security";
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
@@ -331,30 +331,27 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   const timeout = setTimeout(() => app.exit(1), 35_000);
   void (async () => {
-    try {
-      const window = getMainWindow();
-      if (window) window.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.appShuttingDown, { reason: "normal" });
-      remoteDesktop?.dispose();
-      await remoteHosts?.dispose();
-      disposeRemoteHostIpc?.();
-      await runtimeV2Registry?.dispose();
-      await providerNetworkService?.dispose();
-      quickOpenShortcutController?.dispose();
-    } catch (error) {
-      await logMain("v2 shutdown incomplete", { error: error instanceof Error ? error.message : String(error) });
-    } finally {
-      // 两者都是同步、不抛错的清理；放在 finally 里，前面的异步清理失败时也照样执行。
-      browserBridgeService?.dispose();
-      localUpdateService?.dispose();
-      resourceMonitor?.dispose();
-      disposeEnglishLearningIpc?.();
-      disposePluginsIpc?.();
-      disposePythonRuntimeIpc?.();
-      await speechPlayback?.dispose();
-      clearTimeout(timeout);
-      disposeRuntimeV2DesktopShell?.();
-      fixedRendererIpc?.dispose();
-      app.exit(0);
-    }
+    // 每一步单独兜错：任何一步抛错（比如窗口已销毁时解绑监听）都只记日志，后面的步骤照常执行，
+    // 最后一定走到 app.exit(0)，不会卡在「正在安全关闭」直到 35 秒兜底。
+    await runShutdownSteps([
+      ["notify renderer", () => getMainWindow()?.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.appShuttingDown, { reason: "normal" })],
+      ["remote desktop", () => remoteDesktop?.dispose()],
+      ["remote hosts", () => remoteHosts?.dispose()],
+      ["remote host ipc", () => disposeRemoteHostIpc?.()],
+      ["runtime", () => runtimeV2Registry?.dispose()],
+      ["provider network", () => providerNetworkService?.dispose()],
+      ["quick open", () => quickOpenShortcutController?.dispose()],
+      ["browser bridge", () => browserBridgeService?.dispose()],
+      ["local update", () => localUpdateService?.dispose()],
+      ["resource monitor", () => resourceMonitor?.dispose()],
+      ["english learning ipc", () => disposeEnglishLearningIpc?.()],
+      ["plugins ipc", () => disposePluginsIpc?.()],
+      ["python runtime ipc", () => disposePythonRuntimeIpc?.()],
+      ["speech playback", () => speechPlayback?.dispose()],
+      ["desktop shell", () => disposeRuntimeV2DesktopShell?.()],
+      ["fixed renderer ipc", () => fixedRendererIpc?.dispose()],
+    ], (message, details) => void logMain(message, details));
+    clearTimeout(timeout);
+    app.exit(0);
   })();
 });
