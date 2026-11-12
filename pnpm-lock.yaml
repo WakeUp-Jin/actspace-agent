@@ -973,34 +973,6 @@ importers:
         specifier: 'catalog:'
         version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
-  packages/context/context-subagents:
-    dependencies:
-      '@actspace/context-assembly':
-        specifier: workspace:*
-        version: link:../context-assembly
-      '@actspace/context-engine':
-        specifier: workspace:*
-        version: link:../context-engine
-      '@actspace/cordis-adapter':
-        specifier: workspace:*
-        version: link:../../composition/cordis-adapter
-      '@actspace/prompt':
-        specifier: workspace:*
-        version: link:../prompt
-      '@actspace/subagent':
-        specifier: workspace:*
-        version: link:../../subagent/subagent
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.19.2
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.12(@opentelemetry/api@1.9.0)(@types/node@24.19.2)(jsdom@26.1.0)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-
   packages/context/context-system:
     dependencies:
       '@actspace/context-assembly':
@@ -1264,9 +1236,6 @@ importers:
       '@actspace/context-skills':
         specifier: workspace:*
         version: link:../../context/context-skills
-      '@actspace/context-subagents':
-        specifier: workspace:*
-        version: link:../../context/context-subagents
       '@actspace/context-system':
         specifier: workspace:*
         version: link:../../context/context-system
@@ -2224,6 +2193,9 @@ importers:
       '@actspace/agent-loop':
         specifier: workspace:*
         version: link:../../core/agent-loop
+      '@actspace/background-tasks':
+        specifier: workspace:*
+        version: link:../../background-tasks/background-tasks
       '@actspace/cordis-adapter':
         specifier: workspace:*
         version: link:../../composition/cordis-adapter

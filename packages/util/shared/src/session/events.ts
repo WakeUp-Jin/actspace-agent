@@ -54,7 +54,8 @@ export type UserMessagePayload = {
 /**
  * 后台任务完成通知的元数据，来自收件箱 `notice`。
  *
- * `taskKind`：`bash` 来自 `task_notification`；`subagent` 来自 `subagent_notification`（子智能体一次激活结束）；
+ * `taskKind`：`bash` 来自 `task_notification`；`subagent` 是子智能体结束的通知——新会话来自 `task_notification`（登记表 `kind: "agent"`），
+ * 老会话来自 `subagent_notification`；
  * `agent_message` 来自另一个智能体的 `send_message`（`taskId` 为发送方 agent id）；`agent` 只出现在老会话。
  */
 export type BackgroundNotice = {

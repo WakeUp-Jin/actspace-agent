@@ -21,6 +21,10 @@ function source(taskId: string, sessionId = "parent"): Controlled {
     finish: terminal => finish({ status: "completed", summary: `${taskId} completed`, body: "tail", exitCode: 0, ...terminal }) };
 }
 
+function agentSource(taskId: string): Controlled {
+  return { ...source(taskId), kind: "agent", description: "review auth", agent: { transcriptPath: `/t/${taskId}.md`, label: "general" } };
+}
+
 function setup(...ids: string[]) {
   const sessions = new Map(ids.map(id => [id, session(id)]));
   const wakes: string[] = [];
@@ -48,29 +52,6 @@ describe("BackgroundTaskRegistry", () => {
     expect(String(pending[0].content)).toContain("<output_tail>");
     expect(wakes).toEqual(["parent"]);
     expect(registry.hasRunning("parent")).toBe(false);
-  });
-
-  it("reports through task_wait instead of a notification", async () => {
-    const { registry, facts, inbox, wakes } = setup("parent");
-    const task = source("bash_9");
-    await registry.register(task);
-    const waiting = registry.wait("parent", { timeoutMs: 1_000 });
-    task.finish();
-    await expect(waiting).resolves.toMatchObject({ status: "completed", task: { taskId: "bash_9", status: "completed" }, output: { text: "output of bash_9" } });
-    expect(inbox().pending()).toEqual([]);
-    expect(facts().at(-1)).toMatchObject({ op: "settle", delivery: "wait" });
-    expect(wakes).toEqual([]);
-  });
-
-  it("discards an unread notification when task_wait reports an already settled task", async () => {
-    const { registry, inbox } = setup("parent");
-    const task = source("bash_1");
-    await registry.register(task);
-    task.finish();
-    await flush(); await flush();
-    expect(inbox().pending()).toHaveLength(1);
-    await expect(registry.wait("parent", { taskId: "bash_1", timeoutMs: 10 })).resolves.toMatchObject({ status: "completed" });
-    expect(inbox().pending()).toEqual([]);
   });
 
   it("stops without a notification", async () => {
@@ -121,19 +102,7 @@ describe("BackgroundTaskRegistry", () => {
     await expect(registry.stop("parent", "bash_1", "x")).rejects.toMatchObject({ code: "TASK_NOT_FOUND" });
   });
 
-  it("times out without stopping and waits only for tasks running at call time", async () => {
-    const { registry } = setup("parent");
-    await expect(registry.wait("parent", { timeoutMs: 10 })).resolves.toEqual({ status: "no_running_tasks" });
-    await registry.register(source("bash_1"));
-    await expect(registry.wait("parent", { timeoutMs: 10 })).resolves.toMatchObject({ status: "timed_out", running: [expect.objectContaining({ taskId: "bash_1" })] });
-    const controller = new AbortController();
-    const waiting = registry.wait("parent", { timeoutMs: 1_000, signal: controller.signal });
-    controller.abort();
-    await expect(waiting).resolves.toMatchObject({ status: "interrupted" });
-    expect(registry.hasRunning("parent")).toBe(true);
-  });
-
-  it("ignores agent tasks recorded by older versions", async () => {
+  it("ignores agent tasks recorded before subagents joined the registry", async () => {
     const first = setup("parent");
     const session = first.sessions.get("parent")!;
     await session.append({ type: "background/task", eventVersion: 1, source: { ownerPluginId: "@actspace/core" }, data: { op: "start", taskId: "agent_old", kind: "agent", sessionId: "parent", callId: "call-old", description: "old agent", startedAt: "2026-10-22T00:00:00.000Z" }, surface: null } as never);
@@ -182,6 +151,48 @@ describe("BackgroundTaskRegistry", () => {
     await restarted.markPruned("other", "bash_1");
     expect(facts().filter(fact => fact.op === "prune")).toEqual([{ op: "prune", taskId: "bash_1", prunedAt: "2026-10-22T06:00:00.000Z", reason: "session-cap" }]);
     expect(earlier.facts().filter(fact => fact.op === "prune")).toEqual([{ op: "prune", taskId: "bash_old", prunedAt: "2026-10-22T07:00:00.000Z", reason: "session-cap" }]);
+  });
+
+  it("registers a background subagent, records its transcript and notifies with its closing message", async () => {
+    const { registry, wakes, facts, inbox } = setup("parent");
+    const task = agentSource("a-1");
+    await registry.register(task);
+    expect(registry.list("parent")).toEqual([expect.objectContaining({ taskId: "a-1", kind: "agent", agent: { transcriptPath: "/t/a-1.md", label: "general" } })]);
+    task.finish({ summary: "Subagent a-1 finished.", body: "Found <3> issues & fixed them." });
+    await flush(); await flush();
+    expect(facts()).toEqual([expect.objectContaining({ op: "start", kind: "agent", transcriptPath: "/t/a-1.md" }), expect.objectContaining({ op: "settle", status: "completed", delivery: "notified" })]);
+    const [item] = inbox().pending();
+    expect(item).toMatchObject({ source: "task_notification", notice: { taskId: "a-1", kind: "subagent", title: "review auth", status: "completed" } });
+    expect(String(item.content)).toBe([
+      "<task_notification>", "<task_id>a-1</task_id>", "<kind>agent</kind>", "<description>review auth</description>", "<status>completed</status>",
+      "<summary>Subagent a-1 finished.</summary>", "<transcript>/t/a-1.md</transcript>", "<closing_message>", "Found <3> issues & fixed them.", "</closing_message>", "</task_notification>",
+    ].join("\n"));
+    expect(wakes).toEqual(["parent"]);
+  });
+
+  it("replaces a subagent's closing message with its note, and stops it without a notification", async () => {
+    const { registry, inbox } = setup("parent");
+    const noted = agentSource("a-2");
+    await registry.register(noted);
+    noted.finish({ summary: "done", body: "", note: "It sent you a message just before finishing, so its closing message is omitted." });
+    await flush(); await flush();
+    expect(String(inbox().pending()[0].content)).toContain("<note>It sent you a message just before finishing, so its closing message is omitted.</note>");
+    const stopped = agentSource("a-3");
+    await registry.register(stopped);
+    await expect(registry.stop("parent", "a-3", "Stopped by the agent.")).resolves.toMatchObject({ status: "stopped" });
+    expect(stopped.stopped).toEqual(["Stopped by the agent."]);
+    expect(inbox().pending()).toHaveLength(1);
+  });
+
+  it("marks a subagent from an earlier process as lost and says to start a new one", async () => {
+    const first = setup("parent");
+    await first.registry.register(agentSource("a-4"));
+    const session = first.sessions.get("parent")!;
+    await new BackgroundTaskRegistry({ openSession: async () => session, wake: () => undefined }).reconcile(session);
+    const [item] = first.inbox().pending();
+    expect(item.notice).toMatchObject({ taskId: "a-4", kind: "subagent", status: "lost" });
+    expect(String(item.content)).toContain("<transcript>/t/a-4.md</transcript>");
+    expect(String(item.content)).toContain("start a new subagent if the work still needs doing");
   });
 
   it("stops running tasks on dispose and leaves them for restart reconciliation", async () => {

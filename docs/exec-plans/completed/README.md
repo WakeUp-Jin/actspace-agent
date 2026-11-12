@@ -2,12 +2,13 @@
 
 这里的计划实现已经完成，原文保持不动；本页只做检索。人工验收边界保留在各计划正文和对应的[执行摘要](../../exec-runs/README.md)里，不代表全部验证通过。生命周期规则见 [执行计划](../README.md)。
 
-共 213 项，按日期从新到旧；无日期前缀的早期计划排在最后。
+共 214 项，按日期从新到旧；无日期前缀的早期计划排在最后。
 
 另有 [design-archive/](design-archive/)：docs 整理时从前端设计文档里拆出的决策表、测试清单、交接记录和早期重构稿，只做追溯。
 
 | 日期 | 计划 | 一句话 |
 |---|---|---|
+| 2026-11-12 | [子智能体简化：临时上下文窗口 + 并入后台任务](20261112-subagent-simplify.md) | 子智能体默认同步（30 分钟转后台）、只跑一次不续派；后台的登记进后台任务登记表（`kind: "agent"`），统一 `<task_notification>`、`task_list` / `task_output` / `task_stop`；删 `wait_agent` / `task_wait` / `list_agents` / `interrupt_agent` 和 `context-subagents`；`send_message` 只有主→运行中的子、子→父；Electron 实机检查未做 |
 | 2026-11-11 | [资源监控：悬浮窗与「资源占用」页](20261111-resource-monitor.md) | 侧栏性能文字换成常驻悬浮窗 + 设置页「资源占用」：单核口径 CPU、RSS、主线程延迟、分组进程表（含 Agent 子进程）、复制快照；关着时零开销；用户实机验收通过 |
 | 2026-11-11 | [简化思考过程](20261111-thinking-compact.md) | 设置 `general.simplifyThinking`（缺省开启）：思考进行时固定一行 `Thinking 6s · 开头一句` 加扫光，结束后 `Thought for 9s`，点标题仍可展开；用时只在流式状态里、不写入会话；只改桌面端；Electron 走查未做 |
 | 2026-11-11 | [字号规范落地：三层字号（界面 13 / 阅读 15）](20261111-typography-scale.md) | 新增 `text-act-base` 15 / `text-act-head` 18；聊天正文 16.5px 衬线 → 15px 界面字体，用户消息、输入框同字号，工具行与 Thinking 13px，表头 12px 浅色；46 处任意行高收到刻度；检查脚本新增三条规则；Electron 实机检查未做 |

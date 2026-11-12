@@ -110,7 +110,7 @@ export const desktopBridgeContract = {
      * 远程会话返回 null：远程适配器在 `agent_run_started(recoveredReset)` 之后自己推 `live_output_baseline`。
      */
     liveOutput: invoke<{ sessionId: string }, RV2.LiveOutputBaseline | null>(CH.getSessionLiveOutput),
-    /** 子 Agent 面板的「停止」：效果同主会话调用 `interrupt_agent`；message 是给模型看的同一句话。 */
+    /** 子 Agent 面板的「停止」：后台的走后台任务的用户停止（模型下一步读到「用户停止了它」），同步的直接中断、等着的工具调用返回停止结果。 */
     interruptSubagent: invoke<{ sessionId: string; agentId: string }, { ok: boolean; message: string }>(CH.interruptSubagent),
     /** 外部子智能体详情的「在 Finder 中显示」：路径由主进程从父 Journal 的 `subagent/spawned` 取，renderer 不传路径。 */
     revealSubagentRecord: invoke<{ sessionId: string; agentId: string }, { ok: boolean }>(CH.revealSubagentRecord),
