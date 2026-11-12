@@ -129,6 +129,8 @@ describe("formatThinkingElapsed", () => {
 
 describe("simplified thinking in the conversation", () => {
   it("keeps a running thought to one line while the turn streams, and leaves tools untouched", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(START + 3000);
     await withSetting(true);
     const turn: MessageBlock[] = [
       { kind: "user", id: "u-1", content: "把思考过程做得安静一点", createdAt: "2026-11-11T12:00:00.000Z" },
@@ -140,7 +142,7 @@ describe("simplified thinking in the conversation", () => {
     });
     await act(async () => {});
     expect(screen.queryByText(`${FIRST}。很长很长的推理正文`)).toBeNull();
-    expect(screen.getByRole("button", { name: new RegExp(`^Thinking (\\d+m )?\\d+s · ${FIRST}$`) })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `Thinking 3s · ${FIRST}` })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Read ThinkingBlock.tsx" })).toBeInTheDocument();
   });
 });
