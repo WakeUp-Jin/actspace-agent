@@ -251,7 +251,7 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
 // 与后台通知行展开后的原文块同一样式：消息原文要整段看，不按行截断。
 const SUBAGENT_TOOL_BODY_CLASS = "mt-1 mb-2 max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-act-md bg-surface-subtle px-3.5 py-3 font-mono text-act-xs leading-5 text-text-muted";
 
-/** `send_message` / `interrupt_agent`：「发消息给 ‹描述›」，点描述打开该子智能体，展开看消息原文与结果（设计 05 §1）。 */
+/** `send_message` / 停止子智能体的 `task_stop`（老会话 `interrupt_agent`）：「发消息给 ‹描述›」，点描述打开该子智能体，展开看消息原文与结果（设计 05 §1）。 */
 function SubagentToolLine({ message, className, onOpenSubagent }: { message: Extract<MessageBlock, { kind: "tool" }>; className?: string; onOpenSubagent?: (agentId: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const link = message.subagentLink!;

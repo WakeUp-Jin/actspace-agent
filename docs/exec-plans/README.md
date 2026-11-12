@@ -30,6 +30,7 @@
 
 全部已完成计划的日期、标题和一句话见 [completed/README.md](completed/README.md)。最近几项：
 
+- [子智能体简化：临时上下文窗口 + 并入后台任务](completed/20261112-subagent-simplify.md)：默认同步、不续派，后台子智能体并入后台任务登记表，删四个管理工具和 `context-subagents`；Electron 实机检查未做。见[执行摘要](../exec-runs/20261112-subagent-simplify/execution-summary.md)。
 - [简化思考过程](completed/20261111-thinking-compact.md)：设置「通用 › 对话显示 › 简化思考过程」（缺省开启），思考进行时固定一行 `Thinking 6s · 开头一句`，不展开正文；Electron 走查未做。见[执行摘要](../exec-runs/20261111-thinking-compact/execution-summary.md)。
 - [字号规范落地：三层字号](completed/20261111-typography-scale.md)：界面 13 / 正文 15 / 标题 18，聊天正文去掉衬线，工具行和 Thinking 降到 13px，`check:frontend-tokens` 拦任意行高、非档位字重和样式文件里的字号字面量；Electron 实机检查未做。
 - [后端插件包解耦：让 Harness 自进化不必改 core](completed/20261109-harness-plugin-decoupling.md)：P1–P4 随 #68 完成——工具自声明模式、形态由 manifest 推导、默认 Harness 按插件产出产物、上下文来源注册式（`context-assembly`）、文件 / Shell 实现迁入 Harness 树。

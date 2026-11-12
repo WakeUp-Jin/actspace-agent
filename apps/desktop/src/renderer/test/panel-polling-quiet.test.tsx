@@ -95,7 +95,7 @@ it("polls the subagent list every second while one runs and every five seconds w
   const start = list.mock.calls.length;
   await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
   expect(list.mock.calls.length - start).toBeGreaterThanOrEqual(3);
-  status = "idle";
+  status = "ended";
   await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
   const idle = list.mock.calls.length;
   await act(async () => { await vi.advanceTimersByTimeAsync(4500); });

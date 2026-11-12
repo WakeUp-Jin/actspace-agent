@@ -1,6 +1,6 @@
 # @actspace/subagent
 
-子智能体管理器与工具定义。`SubagentManager` 实现 Host 端口 `SubagentHostPort`：创建（同步或后台，同步超时转后台）、`agent_fork`、`send_message` 续派与插话、`wait_agent`、`list_agents`、`interrupt_agent`、`list_subagent_models`，以及完成通知、唤醒空闲的主会话、重启后补 `lost`。
+子智能体管理器与工具定义。`SubagentManager` 实现 Host 端口 `SubagentHostPort`：创建（默认同步，等满 30 分钟转后台）、`agent_fork`、外部子智能体、`send_message`（主会话发给运行中的子智能体，子智能体发给父会话）、`list_subagent_models`。后台子智能体登记进后台任务登记表（`kind: "agent"`），完成通知、`task_stop`、重启后的 `lost` 通知都由登记表负责；管理器另提供界面停止（`stopByUser`）、编辑重发停止（`stopAll`）和重启后补写 `lost`。
 
 - 每个子智能体一个 child Session（lineage 指向主会话），预设 `general` / `explore`，工具集在创建时固定；子智能体不弹审批，继承父会话的权限模式和会话授权。
 - `agent_fork` 复制主会话到「当前轮最后一个完整步骤」（`fork-boundary.ts`），按主 Agent 组装：系统提示词、工具列表和模型与父会话相同，首个请求能命中父会话的缓存；子智能体不能用的工具在执行时拦下。

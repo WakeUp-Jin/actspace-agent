@@ -63,7 +63,7 @@
 | 模式切换 | `agent/mode-set` |
 | 辅助模型调用 | `llm/auxiliary-start / end`（`purpose, status`，时间差为耗时） |
 | 子 Agent | `delegation/requested / completed`（父会话）、`delegation/child-terminal`（子会话：`durationMs, toolUseCount, usage, text, status`） |
-| 后台任务 | `background/task`（`start` / `settle`），没人读输出 = 没有任何 `task_output / task_wait` 调用的 `args.taskId` 指向它，且 `settle.delivery` 不是 `wait` |
+| 后台任务 | `background/task`（`start` / `settle`），没人读输出 = 没有任何 `task_output` 调用（老日志还有 `task_wait`）的 `args.taskId` 指向它，且 `settle.delivery` 不是 `wait`（老日志） |
 | 侧边对话 | 会话头 `lineage.origin="side-chat"`（目录已有 `side_chat_parent_id`） |
 | Harness 版本 | `plugin/actspace.agent-service/run` 的 `start.harness.revision`，按 `runId`（= `agentRunId`）关联到 turn；没有 run 事件的会话（子 Agent、侧边对话）取父会话发起调用时的版本，仍取不到记为“未知版本” |
 | 自进化操作 | `tool/call.name="plugin_manager"` 的 `args.action` 与对应 `tool/result.status` |

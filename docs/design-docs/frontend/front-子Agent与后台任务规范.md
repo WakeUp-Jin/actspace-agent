@@ -18,7 +18,7 @@
 
 ## 2. 子 Agent 列表
 
-按「运行中」「其他」分两组（「其他」含空闲、已中断、失败、已结束）；空组不显示。组标题一行：左边组名，右边数量（`text-act-xs text-text-faint`）。组内没有外框和分隔线（2026-11-07 改，原来的分组卡分隔线顶到边框、悬停底色盖住圆角）：行自带 `rounded-act-md`，悬停才有 `bg-hover-overlay` 底色，与侧边栏会话行一致。
+按「运行中」「其他」分两组（「其他」含已中断、失败、已结束；没有「空闲」，老会话里空闲的子智能体显示为已结束）；空组不显示。组标题一行：左边组名，右边数量（`text-act-xs text-text-faint`）。组内没有外框和分隔线（2026-11-07 改，原来的分组卡分隔线顶到边框、悬停底色盖住圆角）：行自带 `rounded-act-md`，悬停才有 `bg-hover-overlay` 底色，与侧边栏会话行一致。
 
 每个子 Agent 一行，三列：
 
@@ -29,7 +29,7 @@
   - 这一行换内容时旧的上滑淡出、新的从下滑入（与原对话卡片第二行同一动画 `agent-activity.css`）；减少动态效果时直接替换。
 - 右：两行，右对齐。上面是子会话累计 token（`18.4K tokens`），没有数据（外部子智能体、旧会话、子会话还没发出请求）时不写；下面是「状态文字 · 耗时」。
 
-运行中的行最右固定一格（28px）：平时是绿色转圈；鼠标移到这一行或键盘聚焦时，转圈换成停止按钮（`IconButton` `variant="danger"` `shape="round"`，可读名称「停止 ‹描述›」，Tooltip「停止」），效果同 `interrupt_agent`。这一格宽度不变，切换时不挤动文字；按钮平时透明但仍在 Tab 顺序里。停止请求发出后只显示转圈；停止失败时列表顶部一行「停止失败：…」。
+运行中的行最右固定一格（28px）：平时是绿色转圈；鼠标移到这一行或键盘聚焦时，转圈换成停止按钮（`IconButton` `variant="danger"` `shape="round"`，可读名称「停止 ‹描述›」，Tooltip「停止」），已转后台的走后台任务登记表的用户停止（模型下一步被告知是用户停的，不唤醒），同步等待中的直接中断。这一格宽度不变，切换时不挤动文字；按钮平时透明但仍在 Tab 顺序里。停止请求发出后只显示转圈；停止失败时列表顶部一行「停止失败：…」。
 
 不显示类型（通用 / 探索 / Fork / Codex / Claude Code）、模型和「后台」标签，它们只在详情标题的悬停里。空列表写「此会话还没有子智能体。」，加载失败写「无法加载子智能体，请稍后重试。」。
 
@@ -40,13 +40,13 @@
 **派发卡片**（`AgentRunBlock`，2026-11-08 改为单行）：
 
 - 一行，高 34px，整张是按钮，点开右侧「子 Agent」并选中它；外观沿用原卡片（`rounded-act-md border border-line bg-surface-subtle`，悬停 `border-line-strong bg-surface`）。
-- 从左到右：20px 头像（`AgentAvatar`）、任务标题（`description`，`flex-1` 单行截断，悬停看全文）、种类（通用 / 探索 / Fork / Codex / Claude Code，`text-act-xs text-text-faint`）、「后台」标签（只有后台运行时）、状态（`AgentStatus`：转圈「运行中」/ ✓「已完成」/ 「失败」/ 「已停止」，固定宽度）。
+- 从左到右：20px 头像（`AgentAvatar`）、任务标题（`description`，`flex-1` 单行截断，悬停看全文）、种类（通用 / 探索 / Fork / Codex / Claude Code，`text-act-xs text-text-faint`）、「后台」标签（只有后台运行时）、状态（`AgentStatus`：转圈「运行中」/ ✓「已完成」/ 「失败」/ 「已停止」，固定宽度；子智能体跑完就是终态，没有「空闲」）。
 - 不再显示模型名和最新动态：模型在右侧详情顶栏，动态在右侧列表第二行。失败时卡片的 `title` 悬停给出错误，状态文字为「失败」（`text-danger`）。
 
 **结束不另出行**：子智能体一次激活结束时，结果只体现在卡片的状态上（转圈停下，变为已完成 / 失败 / 已停止）。这个子智能体在对话里的所有卡片（派发卡片和来信卡片）一起变。
 
-- 收件箱的完成通知（`subagent_notification`，`taskKind: "subagent"`）在会话视图里不显示。主会话运行中读到的直接跳过；唤醒空闲主会话的仍然开新的一轮（领取事件 `opensTurn` 不变），只是这一轮没有开头那一行，由 `groupMessagesIntoTurns` / Web `buildTurns` 处理。
-- `wait_agent`、`list_agents`、`list_subagent_models` 只显示标题「等待子智能体」「查看子智能体」「查看可选模型」，不带工具结果（`wait_agent completed`、`Input arrived.` 等是给模型看的）；失败时带错误。
+- 收件箱里后台子智能体的完成通知（`task_notification`，通知类型 `taskKind: "subagent"`；老会话的 `subagent_notification` 同样处理）在会话视图里不显示。主会话运行中读到的直接跳过；唤醒空闲主会话的仍然开新的一轮（领取事件 `opensTurn` 不变），只是这一轮没有开头那一行，由 `groupMessagesIntoTurns` / Web `buildTurns` 处理。
+- `list_subagent_models` 只显示标题「查看可选模型」，不带工具结果；失败时带错误。`task_stop` 停的是子智能体时显示「停止 ‹描述›」一行（按任务 ID 认出子智能体）；停 Bash 仍是通用的任务行。
 
 **来信卡片**（`agent_message`，`SubagentMessageCard`，2026-11-08 起替代 `BackgroundNoticeRow` 分隔行）：
 
@@ -57,7 +57,7 @@
 - 出现时轻轻上浮淡入（`rise-in`），减少动态效果时直接出现。
 - 状态：发送方运行中显示转圈「运行中」，跑完一起变为已完成等。发送方查不到时（老数据、外部子智能体）不显示状态。
 
-后台 Bash 通知仍是 `BackgroundNoticeRow` 分隔行，不变。
+后台 Bash 通知仍是 `BackgroundNoticeRow` 分隔行；用户停止的任务，通知行状态写「已停止」。
 
 ### 2.2 右侧列表里的实时动态与来信
 
@@ -90,14 +90,14 @@
 ### 3.3 数据与格式
 
 - 列表项是 `SubagentListItem`（`projectSubagentItems`），由 `sessions.getSubagents` 每秒轮询；数据没变时保持引用不重渲染，只在有运行中的子 Agent 时推进耗时。
-- 状态文字：`SubagentStatus` 只写文字（运行中、空闲、已中断、失败、已结束），不叠图标，不写「第 N 轮」；运行中整段绿色（`text-operational`），失败 `text-on-danger`。耗时用 `tabular-nums`，宽度不跳。
+- 状态文字：`SubagentStatus` 只写文字（运行中、已中断、失败、已结束），不叠图标，不写「第 N 轮」；运行中整段绿色（`text-operational`），失败 `text-on-danger`。耗时用 `tabular-nums`，宽度不跳。
 - 耗时按最近一次激活算：运行中是「现在 − `activeSince`」，结束后是「`endedAt` − `activeSince`」。格式：不到一分钟 `38s`，一分钟以上 `1m 12s`，一小时以上 `1h 05m`（`formatAgentDuration`）。
 - token：`SubagentListItem.totalTokens`，取子会话快照的 `usage.totalTokens`（input + output + cache read + cache write 累加，与输入框用量胶囊同一口径），只有通用 / 探索 / Fork 有；格式 `formatTokenCount`（`999` / `18.4K` / `1.2M`）后接「tokens」。读子会话失败时不填，界面不显示。
 - 模型名取该子 Agent 实际使用的模型（父会话委派完成时记下的，运行中取子会话最近一次请求的实际模型），不按用途猜。
 
 ## 4. 后台任务
 
-只列后台 Bash 命令；后台子 Agent 在「子 Agent」面板里。登记表只在当前进程里，应用重启前的任务不会出现。
+只列后台 Bash 命令；后台子 Agent 虽然也登记在后台任务登记表里（`kind: "agent"`），但只在「子 Agent」面板里显示。登记表只在当前进程里，应用重启前的任务不会出现。
 
 ### 4.1 列表
 

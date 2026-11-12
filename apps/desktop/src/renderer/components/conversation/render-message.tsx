@@ -20,7 +20,7 @@ import { getToolLogRunningTextAttrs, TOOL_LOG_LINE_TEXT_RUNNING_CLASS } from "..
 import { UserMessage } from "../messages/UserMessage";
 
 export type ReadMessageBlock = Extract<MessageBlock, { kind: "read" }>;
-/** 打开右侧「子 Agent」并选中这个子智能体（对话卡片、通知行、`send_message` / `interrupt_agent` 行共用）；没有 id 时只打开列表。 */
+/** 打开右侧「子 Agent」并选中这个子智能体（对话卡片、通知行、`send_message` / 停止子智能体的 `task_stop` 行共用）；没有 id 时只打开列表。 */
 export type SubagentOpenHandler = (agentId: string | undefined) => void;
 
 const TURN_STATUS_LINE_CLASS = "turn-status-line w-fit py-0.5 text-act-sm leading-snug";
