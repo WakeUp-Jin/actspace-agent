@@ -130,6 +130,7 @@ export class PreparedToolExecution {
   readonly definitionDigest: string;
   readonly concurrency: "exclusive" | "parallel";
   readonly #controller = new AbortController();
+  readonly #onCallerAbort = (): void => { this.#controller.abort(this.input.signal?.reason); };
   readonly #lease: ToolActivationLease;
   #args: Readonly<Record<string, RuntimeV2JsonValue>> | undefined;
   #finalizers: Array<() => Promise<void>> = [];
@@ -164,7 +165,7 @@ export class PreparedToolExecution {
     this.concurrency = registration.definition.concurrency === "exclusive" ? "exclusive" : "parallel";
     if (input.signal !== undefined) {
       if (input.signal.aborted) this.#controller.abort(input.signal.reason);
-      else input.signal.addEventListener("abort", () => this.#controller.abort(input.signal?.reason), { once: true });
+      else input.signal.addEventListener("abort", this.#onCallerAbort, { once: true });
     }
   }
 
@@ -668,6 +669,8 @@ export class PreparedToolExecution {
   async #releaseAfterUse(): Promise<void> {
     if (this.#released) return;
     this.#released = true;
+    // 调用方的 signal 通常属于整个回合，比这次调用活得久：用完就摘掉监听器，否则它抓着这次调用的参数和结果一直到回合结束。
+    this.input.signal?.removeEventListener("abort", this.#onCallerAbort);
     this.#lease.release();
   }
 }
