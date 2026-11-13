@@ -54,8 +54,8 @@
   - 不依赖桌面端运行时、用户数据、密钥或 Electron 构建产物
 
 - `apps/promo-video`
-  - 自成一体：品牌标志和一张 Space 截图存在自己的 `assets/` 里，产品界面是按视频尺寸重画的示意，不读取、不 import 仓库里其他目录的任何文件
-  - 不依赖任何 `@actspace/*` 包、Runtime 或用户数据；渲染需要本机的 Chrome 与 ffmpeg；配乐是一首 CC0 曲子，渲染时下载；成片和配乐不入库
+  - 自成一体：品牌标志和一张 Space 截图存在自己的 `assets/` 里，产品界面是按视频尺寸重画的示意；合成和渲染不读取、不 import 仓库里其他目录的任何文件。唯一往外看的是手动运行的 `scripts/origin-stats.mjs`：它读 git 历史和 `docs/histories/`，给《诞生记》数出画面上的数字
+  - 不依赖任何 `@actspace/*` 包、Runtime 或用户数据；渲染需要本机的 Chrome 与 ffmpeg；配乐用授权清楚的现成曲子（宣传片的是 CC0，《诞生记》的是 CC BY 4.0、需要署名），渲染时下载；成片和配乐不入库
 
 - `browser-bridge`
   - 独立 Go 模块，不参与 pnpm workspace
