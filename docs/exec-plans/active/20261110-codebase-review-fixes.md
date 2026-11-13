@@ -59,6 +59,7 @@
 - **需要用户做的**：这批 PR 合完之后，在 **Settings › Rules › Rulesets › main** 把 `CI 汇总` 加进 required status checks。先合工作流、确认这个 check 在 PR 上出现过，再设必需。
 - **顺带**：#78 合入后 `docs/design-docs/site-v6/README.md` 有 6 张图没有 alt，`main` 的 `仓库基础检查` 是红的，之后每个 PR 都会带着这个失败。第一个提交补上 alt。
 - **验证**：本地模拟四类改动（纯文档含中文文件名、代码、代码改名成文档、工作流文件）时 `changes` 的输出正确；PR 上 `变更范围` 与 `CI 汇总` 两个 check 出现并通过；`./scripts/check-action-pinning.sh`、`./scripts/ci.sh`、markdownlint 通过。
+- **2026-11-13 追加**：#90 带进 `main` 的三种让「包测试」随机变红的失败也修在这个 PR。两种只改用例，一种改后台任务登记表的 `dispose()`。放在这里的原因见「决策记录」，细节见 `docs/histories/2026-11/20261113-1311-flaky-package-tests-and-registry-dispose.md`。上面「顺带」那一条的 alt，`main` 后来自己补了，同步时取 `main` 的。
 
 ### PR 2：工具结果体积上限（H4）
 
@@ -87,6 +88,7 @@
   - `packages/util/shared/src/child-process-env.ts` 剥离「名字像凭据」的环境变量时漏了 `DATABASE_URL`、`*_DSN`、`*_PWD` 这几类，值里形如 `scheme://user:pass@host` 的也没有处理。
   - `packages/shell/tool-shell/src/node-ports.ts` 的后台命令输出订阅让模型给一个正则，每行输出同步匹配一次；7 个字符的 `(a+)+$` 对 28 个字符的输入要 2.9 秒，匹配期间整个进程不响应。把匹配移出主线程并加超时。
   - `packages/fs/tool-fs-search/src/node-ports.ts` 按块 `chunk.toString("utf8")` 解码 ripgrep 输出，多字节字符被切在两块之间时变成乱码。改用 `StringDecoder`。
+- **2026-11-13 追加**：推送后 CI 报了两处，都修在这个 PR。PR 2 和这个 PR 各加了一条 2026-11-10 的发布记录，官网构建失败，合成一条；L9 环境变量值的检查用的粘性正则被 CodeQL 报成多项式复杂度，换成逐字符扫描，行为不变。
 
 ### PR 4：Agent Loop 请求路径
 
@@ -139,7 +141,8 @@
 ## 验证方式
 
 - 每个 PR 提交前在本地跑：`./scripts/ci.sh`、`npx -y markdownlint-cli2@0.24.0 "**/*.md"`、`pnpm lint`、`pnpm typecheck`、改到的包的 `pnpm --filter <包> test`、`pnpm check:hot-path-reads`、`pnpm check:scale-tests`、`pnpm check:packages`；改到契约矩阵覆盖的源码时 `pnpm run gen:contract-matrix`。
-- 每个 PR 推送后看 GitHub 上的 `仓库基础检查` 与 `CI 汇总`，红了就在同一个分支上修。
+- 2026-11-13 起每个 PR 推送前还跑：`pnpm check:desktop-build-graph`、`pnpm run gen:contract-matrix --check`、`pnpm check:docs`、官网的 `pnpm check:site`、`pnpm test:site`、`pnpm build:site`，以及 `pnpm build`。原因见执行记录「遇到的问题」。
+- 每个 PR 推送后看 GitHub 上的 `仓库基础检查` 与 `CI 汇总`，红了就在同一个分支上修。2026-11-13 起，上一个 PR 的 CI 跑完并且通过之后，才给下一个分支建 PR。
 - 栈顶分支上跑一遍完整的 `pnpm -r --if-present --filter '!actspace' test` 与 `pnpm test:scripts`。
 - 手工检查与未覆盖范围写在 `docs/exec-runs/20261110-codebase-review-fixes/execution-summary.md`。
 
@@ -148,7 +151,8 @@
 - [x] 读协作文档、确认环境、定 PR 结构。
 - [x] PR 1：CI 门禁。[#83](https://github.com/WakeUp-Jin/actspace-agent/pull/83)，全部检查通过。
 - [x] PR 2：H4。四层都已落地，过程见执行记录步骤 2。[#84](https://github.com/WakeUp-Jin/actspace-agent/pull/84)，全部检查通过。
-- [x] PR 3：修复合集。M6、M9、M7、M3、L2、L9 都已落地，过程见执行记录步骤 3。
+- [x] PR 3：修复合集。M6、M9、M7、M3、L2、L9 都已落地，过程见执行记录步骤 3。[#85](https://github.com/WakeUp-Jin/actspace-agent/pull/85)。
+- [x] 2026-11-13：三个 PR 同步 `main`（`bf566305`）；修 #85 推送后才发现的两处 CI 失败；修 `main` 上三种让「包测试」随机变红的失败（放在 PR 1）。过程见执行记录步骤 4。同步后 #83 全部检查通过。
 - [ ] PR 4：Agent Loop 请求路径。
 - [ ] PR 5：路径安全模块。
 - [ ] PR 6：类型安全。
@@ -180,6 +184,10 @@
 - 2026-11-10：L9 剥环境变量时不按值剥代理变量。原因：需要带账号的代理才能上网的机器上，剥掉它命令就连不了网。代价是命令能读到代理密码，写进了 `docs/SECURITY.md`。
 - 2026-11-10：L9 输出订阅停掉时发单独的 `subscription_stopped` 通知，不复用「输出匹配」。原因：模型可能正等着匹配，要让它知道不会再有匹配上报；复用的话界面上会显示成一次匹配。匹配变成异步之后，命令结束时还没匹配完的行直接丢掉，结束通知本身带着输出尾部。
 - 2026-11-10：和 L9 的 ripgrep 解码同样的写法（按块 `toString`）还有两处没改：桌面端 Browser Bridge 的编译日志、子 Agent 外部 CLI 的 stderr 尾部。原因：两处都只在失败时给出诊断信息（编译日志、外部 CLI 退出时的错误行），最坏结果是其中一个字符显示成乱码；记到技术债。
+- 2026-11-13：同步 `main` 用合并提交，从栈底往上逐层合，不 rebase。原因：三个 PR 已经推送，rebase 之后要强制推送，已有的提交全部换掉，PR 上看过的内容和跑过的 CI 都对不上；合并提交只留下冲突处的解决结果，每个 PR 相对它的 base 的改动不变。代价是分支历史里多出几个合并提交。
+- 2026-11-13：`main` 上随机失败的用例修在 PR 1，不放到别的 PR，也不单开一个。原因：PR 1 做的事是让 `CI 汇总` 能设成合并必需检查，设上之后随机失败的用例会把无关的 PR 卡住；放在栈底，上面每个 PR 的 CI 也不再受它影响。
+- 2026-11-13：三种随机失败里，第三种改后台任务登记表的 `dispose()`，不改用例。原因：前两种只是用例的写法依赖时间。第三种在产品里也会发生：Host 关闭前一刻结束的任务，通知已经进了收件箱、收尾记录还没写完时会话被关掉，下次启动这个任务会被再标一次 `lost`，模型先收到「完成」又收到「丢失」。
+- 2026-11-13：这一批里同一天的发布记录只写一条，后来的 PR 把内容并进已有的那一条。原因：`docs/releases/README.md` 规定每个日期只写一次发布，官网的解析器照这条规则报错；PR 2 和 PR 3 在同一天各加了一条，官网的构建因此失败过一次。
 
 ## 执行模式
 

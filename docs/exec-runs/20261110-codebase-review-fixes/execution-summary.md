@@ -20,6 +20,7 @@
 | `main` 的 markdownlint 红灯 | `docs/design-docs/site-v6/README.md` | 6 张图补 alt。不修的话这批 PR 的必需检查全是红的。 |
 | `ci.yml` 改成 job 级路径判断加汇总 job | `.github/workflows/ci.yml` | 每个 PR 都会报告 `CI 汇总`，可以设为合并必需检查；纯文档 PR 仍然跳过全部工程 job。 |
 | 文档同步 | `.github/workflows/base-checks.yml`、`docs/CICD.md` | 说明哪些 check 可以设为必需、新增 job 时要改哪三处。 |
+| 三种让「包测试」随机变红的失败（PR 1，2026-11-13 加） | `packages/background-tasks/background-tasks/src/registry.ts`、`packages/shell/tool-shell/src/test/node-ports.test.ts`、`packages/subagent/subagent/src/test/{external,manager}.test.ts` | #90 带进 `main` 的。两处只改用例；后台任务登记表关闭时改成等刚结束的任务把通知和收尾记录写完。不属于审查条目，放在 PR 1 是因为 `CI 汇总` 设成必需之后它们会卡住无关的 PR。 |
 | 文件工具的输出上限（PR 2） | `packages/fs/tool-fs-read`、`packages/fs/tool-fs-write` | `read_file` 流式读取，输出 64,000 字符、单行 2,000 字符，拒绝二进制；`list_directory`、`write_file`、`edit_file` 的输出同样限制在 64,000 字符。 |
 | tool-runtime 兜底（PR 2） | `packages/core/tool-runtime/src/output-limits.ts`、`prepared-execution.ts` | 任何工具的一条结果提交前按字节数检查，超出的截短，完整输出存成文件。 |
 | 按窗口的批次额度（PR 2） | `packages/core/agent-loop/src/tool-output-budget.ts`、`loop.ts`、`tool-runtime` 的 `ToolOutputBudget` | 一批工具结果合计不超过上下文窗口放得下的量。 |
@@ -84,12 +85,14 @@
 - PR 1 上 `仓库基础检查`、`变更范围`、八个工程 job、`CI 汇总` 全部通过。
 - PR 2：四层各自的单测与集成用例（清单见 `docs/histories/2026-11/20261110-1710-tool-result-size-limits.md` 的 Verification）。额度的集成用例做了反向验证：去掉额度后同一个用例报 `Context exceeds model capacity`。`pnpm check:hot-path-reads`、`pnpm check:scale-tests` 通过。PR 2 上 15 项检查全部通过。
 - PR 3：M9 的规模测试、M7 的读取量测试、L9 的 ripgrep 解码用例和慢正则用例都在旧代码上确认过会失败；M3 的旧行为（IPv6 字面量地址全部读不了）单独确认过。数字见执行过程步骤 3。M9 的新旧读路径用 7,806 组读取参数对拍，返回内容逐字节一致。全量包测试、桌面端测试、仓库脚本与进程级测试在本地通过。
+- 2026-11-13 同步 `main` 之后：三个分支各跑了一遍全量验证（范围见执行过程步骤 4）；每次合并前后比较了各 PR 相对它的 base 的改动量，没有变化。三种随机失败都先在本地复现（把 CPU 占满之后报错和 CI 上一致），改完同样条件下反复跑，不再失败；次数见 `docs/histories/2026-11/20261113-1311-flaky-package-tests-and-registry-dispose.md`。环境变量值的检查换写法之后，新旧两种写法在 200 万个随机串上结果一致。
 
 ## 已知风险和遗留事项
 
 - 工程 job 现在要等 `changes` 跑完才开始，每次 CI 多十几秒。
 - `CI 汇总` 设为必需之后，`ci.yml` 里新增 job 时要同时加 `needs: changes`、`if: needs.changes.outputs.code == 'true'`，并把它列进 `ci-gate` 的 `needs`；漏了第三步，那个 job 失败不会拦合并。`docs/CICD.md` 的「下一步推荐」第 1 条写了这一点。
 - 没有做的条目和原因见计划的「范围 › 不包含」。
+- 2026-11-13 写这一条时，`main` 自己最近一次 CI（#91 合入后）是红的，红在核心变更清单里「三种随机失败」的第一种上。PR 1 合入后消失；在那之前，别的 PR 的「包测试」也可能随机红一次，重跑一次通常就过。
 - PR 2 的额度按 4 个字符 1 token 估算，对中文偏低。以中文为主的大输出（例如一次读几个很长的中文文档）仍可能比估算的多占窗口；Provider 报了用量时，已有内容的占用是准的，偏差只在新的这一批结果上。要根治得改共用的估算器，它同时影响上下文面板、自动压缩和容量检查，这批没有动。
 - PR 2 之后，一条记录写不进会话时这一轮仍然会失败，只是会话不再卡死。其中一种情况值得单独决定：工具调用的参数对象或工具返回的 json 块里有名为 `authorization`、`apikey`、`api_key`、`secret`、`password`、`cookie` 的字段时，`session-journal` 会拒绝这条记录。这是原有的安全规则，这批没有改；要不要改成「把值脱敏后写入」而不是拒绝，需要你来定。
 - PR 2 的额度在并行调用整体超额时，各调用被截到多长取决于谁先出结果，同样的请求两次运行截断位置可能不同。完整输出都存成了文件，模型可以再读。

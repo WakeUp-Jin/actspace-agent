@@ -60,6 +60,23 @@
 - L9：环境变量 56 个用例，含一条「200 KB 的值不是平方耗时」。ripgrep 解码用例用一个把「中」字拆成两次写出的假 `rg`，旧代码输出乱码。输出订阅的慢正则用例在旧代码上主线程卡住 11.6 秒后失败，新代码主线程最长停顿小于 1 秒。
 - `pnpm check:hot-path-reads`、`pnpm check:scale-tests` 通过；基线里 `session-controller.ts` 的整份读从 4 处降到 3 处，`subagent/src/manager.ts` 的整份遍历从 2 处降到 0 处。
 
+### 🔁 2026-11-13 补充：同步 `main`，修两处推送后才发现的 CI 失败
+
+11-10 推送后没有等 CI 跑完就接着做下一个 PR。11-13 回来看，#85 有两项检查是红的，都是这个 PR 自己的问题；`main` 这时已经合了 #82、#86–#90，这一批的三个 PR 也要先同步。
+
+- **同步 `main`**：从栈底往上逐层用合并提交同步（`main` → PR 1 → PR 2 → 这个分支），不改写已经推送的提交。这个分支和 #90（子智能体并入后台任务）都改了后台任务登记表，要手工解决的冲突四处：
+  - `registry.ts`：`main` 删掉了 `task_wait`，这个分支加了 `notifySubscriptionStopped`，两边都保留。
+  - `registry.test.ts`：两边在同一个位置加的用例全部保留。
+  - `agent-background-tasks.md` 的「通知与唤醒」：用 `main` 改写后的条目，保留这个分支加的正则匹配那一条。
+  - 发布记录：按日期倒序排。
+
+  其余两边都改过的文件（`subagent/src/manager.ts`、`ipc/guards.ts` 和它的测试、`BackgroundNoticeRow.tsx`、`desktop-bridge/contract.ts`）由 git 自动合并，合并后跑了全量验证。
+- **「官网」构建失败**：PR 2 和这个 PR 各加了一条 2026-11-10 的发布记录。官网的更新日志解析器要求一个日期只有一条发布，`pnpm build:site` 报错。两条合成一条，内容不变。
+- **CodeQL 报了一条 high**：`child-process-env.ts` 里判断值里有没有 `://用户名:密码@` 的那条粘性正则，被报成多项式复杂度。这条正则单独拿出来确实是平方级的（不带 sticky 标志时，4 万个 `:` 要 1.07 秒）；代码里是先用 `indexOf` 找到 `://`、再带着 sticky 标志只匹配这一个位置，实际是线性的，但要把正则和调用它的循环放在一起才看得出来。换成逐字符扫描的 `startsWithPasswordUserinfo`，不回溯。新旧两种写法在 200 万个随机串上结果全部一致（对比脚本没有入库）；测试补了 6 条边界，上面 Verification 里写的 56 个用例现在是 62 个。
+- **「包测试」随机失败**：同步之后 #83 和 #85 的「包测试」各红了一次，`main` 自己也红了一次，是 #90 带进来的三种依赖时间的失败，和这一批的改动无关。修在第 1 个 PR 上，见 `docs/histories/2026-11/20261113-1311-flaky-package-tests-and-registry-dispose.md`。
+
+前两处当时没发现的原因：本地验证没有跑官网的三条命令（`pnpm check:site`、`pnpm test:site`、`pnpm build:site`），推送后也没等 CI 跑完。之后每个 PR 的本地验证都带上这三条；上一个 PR 的 CI 跑完并且通过，才给下一个分支建 PR。
+
 ### 📁 Files Modified
 
 - `packages/core/tool-runtime/src/test/runtime.test.ts`
