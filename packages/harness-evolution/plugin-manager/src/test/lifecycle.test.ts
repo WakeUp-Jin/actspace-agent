@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from "vitest";
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -98,6 +98,13 @@ it("rejects foreign workspaces, invalid source, denied initialization and stale 
   await expect(s.run({ action: "prepare", workspaceId: c.workspaceId })).rejects.toThrow("denied");
   await expect(s.run({ action: "create", purpose: "Change system", entryId: "base" })).rejects.toThrow("editable source");
 }, 30000);
+it("refuses to create a workspace through a link that leads out of the project", async () => {
+  const s = await setup();
+  const outside = await mkdtemp(join(tmpdir(), "evolution-outside-")); cleanup.push(() => rm(outside, { recursive: true, force: true }));
+  await mkdir(join(s.dir, ".actspace"), { recursive: true }); await symlink(outside, join(s.dir, ".actspace", "evolution"));
+  await expect(s.run({ action: "create", purpose: "Escape the project", toolName: "tool_out" })).rejects.toThrow("escapes project root");
+  expect(await readdir(outside)).toEqual([]);
+});
 it("keeps the old selection when activation is denied and makes discarded candidates unusable", async () => {
   const s = await setup();
   const before = await s.hmr.inspect("a");
