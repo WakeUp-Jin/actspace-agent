@@ -58,6 +58,11 @@ function findSettingsBackButton() {
   return screen.findByRole("button", { name: "返回应用" }, { timeout: 10_000 });
 }
 
+// TrajectoryView 也是 React.lazy，第一次切到轨迹视图同样要等冷转译。
+function findTrajectoryView() {
+  return screen.findByTestId("trajectory-view", {}, { timeout: 10_000 });
+}
+
 function StatefulWorkbench({ sessions }: { sessions: WorkbenchProps["sessions"] }) {
   const [activeSessionId, setActiveSessionId] = useState(sessions[0]?.id ?? null);
   const activeTitle = sessions.find((session) => session.id === activeSessionId)?.title ?? "New chat";
@@ -392,7 +397,7 @@ describe("WorkbenchLayout narrow window behavior", () => {
     await user.type(input, "keep this while inspecting the run");
     await user.click(screen.getByRole("button", { name: "查看执行轨迹" }));
 
-    expect(await screen.findByTestId("trajectory-view")).toBeInTheDocument();
+    expect(await findTrajectoryView()).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "会话消息" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("消息输入框")).toHaveValue("keep this while inspecting the run");
 
@@ -427,14 +432,14 @@ describe("WorkbenchLayout narrow window behavior", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "查看执行轨迹" }));
-    expect(await screen.findByTestId("trajectory-view")).toBeInTheDocument();
+    expect(await findTrajectoryView()).toBeInTheDocument();
 
     rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-view-b" title="Session View B" messages={[{ kind: "assistant", id: "assistant-view-b", content: "B", createdAt: "2026-08-05T09:00:01.000Z" }]} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "查看执行轨迹" })).toBeInTheDocument());
 
     rerender(<WorkbenchFixture sessions={sessions} activeSessionId="session-view-a" title="Session View A" messages={[{ kind: "assistant", id: "assistant-view-a", content: "A", createdAt: "2026-08-05T10:00:01.000Z" }]} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "返回对话" })).toBeInTheDocument());
-    expect(await screen.findByTestId("trajectory-view")).toBeInTheDocument();
+    expect(await findTrajectoryView()).toBeInTheDocument();
   });
 
   it("lets the right panel use the wide-screen space left after protecting the conversation", async () => {
