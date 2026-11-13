@@ -21,7 +21,7 @@ const EDITOR_BORDER_CLASS = "border-composer-focus";
 const EDITOR_DROP_CLASS = "border-line-strong bg-selected";
 const EDITOR_REFERENCES_CLASS = "flex flex-wrap items-center gap-1.5 px-3.5 pt-3";
 const EDITOR_INPUT_CLASS =
-  "block max-h-[240px] min-h-6 w-full resize-none border-0 bg-transparent px-[calc(var(--conversation-card-padding)-2px)] pt-3 leading-[1.55] text-text-main outline-none placeholder:text-text-faint";
+  "block max-h-[240px] min-h-6 w-full resize-none border-0 bg-transparent px-[calc(var(--conversation-card-padding)-2px)] pt-3 text-act-base leading-relaxed text-text-main outline-none placeholder:text-text-faint";
 const EDITOR_BAR_CLASS = "flex min-h-[30px] items-center gap-1.5 px-2.5 pb-2 pt-2";
 const FILE_REFERENCE_CLASS =
   "inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-act-md border border-line bg-surface-subtle pl-2 pr-0.5 text-act-sm leading-5 text-text-main";

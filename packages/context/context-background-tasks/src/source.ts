@@ -6,9 +6,9 @@ import { publish } from "@actspace/context-assembly";
 export const BACKGROUND_TASKS_CONTEXT_OWNER = "actspace.context-background-tasks";
 
 /**
- * Running background tasks, refreshed once per turn. The engine dedupes an
- * unchanged text and re-mounts it after compaction; a Session that never had
- * background work gets nothing.
+ * Running background tasks — Bash commands and background subagents — refreshed once per turn, so the model
+ * still knows what is working after compaction or a restart. The engine dedupes an unchanged text and
+ * re-mounts it after compaction; a Session that never had background work gets nothing.
  */
 export function createBackgroundTasksSource(tasks: Pick<BackgroundTaskHost, "list">): ContextSource {
   let turn: string | undefined; let text: string | undefined;
@@ -27,9 +27,16 @@ function render(all: readonly BackgroundTaskRecord[]): string | undefined {
   if (running.length === 0) return "No background tasks are running.";
   return [
     "Background tasks still running (this list supersedes earlier lists; completion notifications supersede it):",
-    ...running.map(task => `- ${task.taskId} · ${task.kind} · ${task.description} · started ${localIso(task.startedAt)}`),
-    "Do not start duplicates. Use task_output / task_wait only if you need them.",
+    ...running.map(line),
+    "Do not start duplicates. You are notified when each one finishes; task_stop stops one.",
   ].join("\n");
+}
+
+/** A subagent names its kind label and transcript, so the model can check on it without a tool call. */
+function line(task: BackgroundTaskRecord): string {
+  const head = `- ${task.taskId} · ${task.kind} · ${task.description}`;
+  const started = `started ${localIso(task.startedAt)}`;
+  return task.agent ? `${head} · ${task.agent.label} · ${started} · transcript: ${task.agent.transcriptPath}` : `${head} · ${started}`;
 }
 
 function localIso(ms: number): string {

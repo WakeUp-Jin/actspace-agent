@@ -328,11 +328,7 @@ function createSubagentHost(manager: () => import("@actspace/subagent").Subagent
     spawnFork: input => manager().spawnFork(input),
     spawnExternal: (backend, input) => manager().spawnExternal(backend, input),
     sendMessage: input => manager().sendMessage(input),
-    waitForInput: input => manager().waitForInput(input),
-    listAgents: input => manager().listAgents(input),
-    interrupt: input => manager().interrupt(input),
     listModels: input => manager().listModels(input),
-    running: sessionId => manager().running(sessionId),
   };
   return Object.freeze(port);
 }

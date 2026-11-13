@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import type { FixtureRunInput, FixtureRunResult, FixtureCompactionInput, FixtureCompactionResult } from "./task-host-fixture";
 import { taskHostFixture } from "./task-host-fixture";
 import { FixedRendererStreamAdapter } from "../../main/runtime-v2/fixed-renderer-stream-adapter";
@@ -15,6 +16,12 @@ import { TooltipProvider } from "../components/ui/Tooltip";
 import { overrideBridge, setupBridge } from "./helpers/bridge";
 import { projectRecord } from "./helpers/session-records";
 import { replyText } from "./helpers/reply-text";
+
+// 这里验证的是「简化思考过程」关闭时的思考行（标题 `Thinking...`、运行中展开）；开启时见 thinking-compact.test.tsx。
+vi.mock("../components/conversation/display-settings", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../components/conversation/display-settings")>()),
+  useSimplifyThinking: () => false,
+}));
 
 const bootstrapState: BootstrapState = {
   appVersion: "0.1.0",

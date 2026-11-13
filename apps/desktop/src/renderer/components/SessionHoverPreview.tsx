@@ -19,9 +19,9 @@ const SESSION_HOVER_CARD_CLASS =
   "session-hover-card w-[min(420px,calc(100vw-32px))] rounded-act-md border border-line bg-surface-raised px-3 py-2.5 text-left text-text-main shadow-act-popover";
 const SESSION_HOVER_TITLE_CLASS = "line-clamp-2 text-act-sm font-semibold leading-snug text-text-main";
 const SESSION_HOVER_ROWS_CLASS = "mt-2 grid gap-1.5";
-const SESSION_HOVER_ROW_CLASS = "grid grid-cols-[16px_minmax(0,1fr)] gap-2 text-act-xs leading-[1.4] text-text-muted";
+const SESSION_HOVER_ROW_CLASS = "grid grid-cols-[16px_minmax(0,1fr)] gap-2 text-act-xs leading-snug text-text-muted";
 const SESSION_HOVER_ICON_CLASS = "mt-[1px] h-3.5 w-3.5 text-text-faint";
-const SESSION_HOVER_PATH_CLASS = "break-all font-mono text-act-xxs leading-[1.45] text-text-muted [overflow-wrap:anywhere]";
+const SESSION_HOVER_PATH_CLASS = "break-all font-mono text-act-xxs leading-normal text-text-muted [overflow-wrap:anywhere]";
 const SESSION_HOVER_LOADING_CLASS = "mt-2 text-act-xxs text-text-faint";
 
 function formatTokenCount(tokens: number): string {

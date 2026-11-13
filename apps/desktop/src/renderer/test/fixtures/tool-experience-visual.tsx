@@ -12,7 +12,7 @@ const now = "2026-09-06T12:00:00Z";
 const subagent = (agentId: string, description: string, status: SubagentListItem["status"], extra: Partial<SubagentListItem> = {}): SubagentListItem => ({ agentId, kind: "local", preset: "explore", description, status, activationCount: 1, background: true, createdAt: now, activeSince: now, transcriptPath: `/data/${agentId}.md`, ...extra });
 const subagents: SubagentListItem[] = [
   subagent("a", "Inspect renderer and streaming events", "running"),
-  subagent("b", "Check tool parameter contracts", "idle", { summary: "已核对工具参数契约", activationCount: 2 }),
+  subagent("b", "Check tool parameter contracts", "ended", { summary: "已核对工具参数契约" }),
   subagent("c", "验证失败状态与错误摘要", "failed"),
   subagent("d", "验证停止状态以及很长的任务名称在有限空间内的截断表现", "interrupted", { kind: "fork", preset: undefined }),
 ];

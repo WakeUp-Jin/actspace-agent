@@ -51,7 +51,7 @@ it("rewinds a five-Turn Session to its second prompt: the Journal, Context cache
   const removeGate = sessions.addReleaseGate({ canRelease: id => runs.canRelease(id), release: id => runs.release(id) });
   const background = new BackgroundTaskRegistry({ openSession: async id => sessions.getOpen(id) ?? sessions.resume(id), wake: id => runs.service.wake(id) });
   const subagentStops: string[] = [];
-  const subagents = { activeCount: 0, running: () => [], interrupt: async () => ({ ok: true, text: "" }), stopAll: async (rootId: string) => { subagentStops.push(rootId); } };
+  const subagents = { activeCount: 0, runningCount: () => 0, stopByUser: async () => ({ ok: true, message: "" }), stopAll: async (rootId: string) => { subagentStops.push(rootId); } };
   const evicted: [string, string | undefined][] = [];
   const engine = { instances: { evict: (sessionId: string, scope?: string) => { evicted.push([sessionId, scope]); return true; } } };
   const inspectCapability = async <T, R>(name: string, inspect: (service: T | undefined) => R) => inspect((name === "context.engine" ? engine : undefined) as T | undefined);

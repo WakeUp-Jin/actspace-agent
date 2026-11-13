@@ -163,7 +163,7 @@ function BackgroundTaskDetail({ sessionId, task, onBack, onTask }: {
           {copied ? <Check size={14} /> : <Copy size={14} />}
         </IconButton>
       </div>
-      <pre ref={outputRef} aria-label="后台命令输出" className="m-0 min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-3 py-2.5 font-mono text-[length:var(--act-font-mono-size,13px)] leading-[1.6] text-text-muted [word-break:break-word]">
+      <pre ref={outputRef} aria-label="后台命令输出" className="m-0 min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-3 py-2.5 font-mono text-[length:var(--act-font-mono-size,13px)] leading-relaxed text-text-muted [word-break:break-word]">
         {outputError ? <span role="alert">无法读取输出：{outputError}</span> : text === undefined ? "正在读取输出…" : text || (running ? "还没有输出。" : "没有输出。")}
       </pre>
     </div>

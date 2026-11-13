@@ -81,7 +81,7 @@ export function subagentListChildrenWithoutModel(state: SubagentListState): { re
     if (view.legacy || view.kind === "codex" || view.kind === "claude-code") continue;
     requested.add(view.agentId);
     if (lastActivationModel(view)) known.add(view.agentId);
-    // An inactive local subagent can be continued and send more requests; only a closed one cannot.
+    // A settled subagent is closed and sends no more requests.
     if (view.status === "closed") finished.add(view.agentId);
   }
   return [...requested].filter((id) => !known.has(id)).map((childSessionId) => ({ childSessionId, finished: finished.has(childSessionId) }));
@@ -137,14 +137,14 @@ function item(view: SubagentView, requestModel: string | undefined, callArgs: Re
   };
 }
 
-/** 运行中、空闲（可续派）、已中断、失败、已结束（外部或老会话，不能续派）. */
+/** 运行中、已中断、失败、已结束；子智能体结束即关闭，不能续派。 */
 function listStatus(view: SubagentView): SubagentListStatus {
   // Old Sessions' delegations ran inside a runtime that no longer exists: unsettled means it never finished.
   if (view.status === "running" && !view.legacy) return "running";
   const status = view.activations.at(-1)?.settle?.status;
   if (status === "failed" || status === "max_steps") return "failed";
   if (status === "interrupted" || status === "lost" || status === undefined) return "interrupted";
-  return view.legacy || view.status === "closed" ? "ended" : "idle";
+  return "ended";
 }
 
 export type SubagentCardStatus = Extract<MessageBlock, { kind: "agent" }>["status"];

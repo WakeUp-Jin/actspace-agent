@@ -41,11 +41,11 @@ describe("subagent cards from subagent/* events", () => {
     });
   });
 
-  it("follows the latest activation: idle after completing, a continuation counts, an interrupt shows as interrupted", () => {
+  it("follows the latest activation: ended after completing, an old Session's continuation counts, an interrupt shows as interrupted", () => {
     const settled = journal([
       envelope(6, "subagent/activation", { op: "settle", agentId: "sa-1", activationId: "act-1", status: "completed", summary: "done", result: "Found 3 packages", delivery: "notified", endedAt: "2026-11-04T00:01:00.000Z" }),
     ]);
-    expect(projectSubagentItems(settled)[0]).toMatchObject({ status: "idle", activationCount: 1, result: "Found 3 packages", endedAt: "2026-11-04T00:01:00.000Z" });
+    expect(projectSubagentItems(settled)[0]).toMatchObject({ status: "ended", activationCount: 1, result: "Found 3 packages", endedAt: "2026-11-04T00:01:00.000Z" });
     const continued = [...settled,
       envelope(7, "tool/call", { agentRunId: "run-1", callId: "call-send", name: "send_message", args: { agent_id: "sa-1", message: "Also check docs" } }),
       envelope(8, "subagent/activation", { op: "start", agentId: "sa-1", activationId: "act-2", trigger: "message", senderId: "s", callId: "call-send", background: true, startedAt: "2026-11-04T00:02:00.000Z" }),
@@ -142,17 +142,24 @@ describe("subagent cards from subagent/* events", () => {
         envelope(10 + index * 2, "tool/call", { agentRunId: "run-1", callId: `call-${name}`, name, args: {} }),
         envelope(11 + index * 2, "tool/result", { agentRunId: "run-1", callId: `call-${name}`, name, status: "completed", summary: `${name} completed` }),
       ]),
+      // task_stop 停一个子智能体（task id 就是 agent id）读作「停止 ‹描述›」；停 Bash 时是普通行。
+      envelope(16, "tool/call", { agentRunId: "run-1", callId: "call-task-stop", name: "task_stop", args: { taskId: "sa-1" } }),
+      envelope(17, "tool/result", { agentRunId: "run-1", callId: "call-task-stop", name: "task_stop", status: "completed", summary: "Background task stopped" }),
+      envelope(18, "tool/call", { agentRunId: "run-1", callId: "call-bash-stop", name: "task_stop", args: { taskId: "bash_1" } }),
+      envelope(19, "tool/result", { agentRunId: "run-1", callId: "call-bash-stop", name: "task_stop", status: "completed", summary: "Background task stopped" }),
     ]);
     const callIds = events.flatMap(event => event.type === "tool/call" ? [String((event.data as { callId: string }).callId)] : []);
     const titles = projectChatSession(snapshot(callIds), events, "/w").events
       .flatMap(event => event.type === "tool_result" && event.payload.uiPreview?.kind === "generic" ? [event.payload.uiPreview] : []);
-    expect(titles.map(preview => preview.title)).toEqual(["发消息给 Map the repo", "停止 Map the repo", "等待子智能体", "查看子智能体", "查看可选模型"]);
+    expect(titles.map(preview => preview.title)).toEqual(["发消息给 Map the repo", "停止 Map the repo", "等待子智能体", "查看子智能体", "查看可选模型", "停止 Map the repo", "task_stop"]);
     expect(titles[0].content).toContain("Also check docs");
     expect(titles[0].subagentLink).toEqual({ agentId: "sa-1", verb: "发消息给", target: "Map the repo" });
     expect(titles[1].subagentLink).toEqual({ agentId: "sa-1", verb: "停止", target: "Map the repo" });
     expect(titles[2].subagentLink).toBeUndefined();
+    expect(titles[5].subagentLink).toEqual({ agentId: "sa-1", verb: "停止", target: "Map the repo" });
+    expect(titles[6].subagentLink).toBeUndefined();
     // 等待 / 查看类只显示标题，不带「wait_agent completed」「Input arrived.」这类给模型看的结果。
-    expect(titles.slice(2).map(preview => preview.content)).toEqual(["", "", ""]);
+    expect(titles.slice(2, 5).map(preview => preview.content)).toEqual(["", "", ""]);
   });
 });
 
@@ -166,10 +173,13 @@ describe("inbox notices from subagents", () => {
     adapter.accept({ ...base, messageId: "m2", source: "agent_message", notice: { taskId: "sa-1", kind: "agent_message", title: "Map the repo", status: "message" } });
     adapter.accept({ ...base, messageId: "m3", source: "steer", notice: { taskId: "x", kind: "subagent", title: "x", status: "completed" } });
     adapter.accept({ ...base, messageId: "m4", source: "subagent_notification", opensTurn: true, notice: { taskId: "sa-2", kind: "subagent", title: "Fork", status: "failed" } });
+    // 新会话：后台子智能体的结束通知走后台任务登记表的 task_notification。
+    adapter.accept({ ...base, messageId: "m5", source: "task_notification", notice: { taskId: "sa-3", kind: "subagent", title: "Scan", status: "stopped" } });
     expect(seen).toEqual([
       { taskId: "sa-1", taskKind: "subagent", title: "Map the repo", status: "completed", opensTurn: false },
       { taskId: "sa-1", taskKind: "agent_message", title: "Map the repo", status: "message", opensTurn: false },
       { taskId: "sa-2", taskKind: "subagent", title: "Fork", status: "failed", opensTurn: true },
+      { taskId: "sa-3", taskKind: "subagent", title: "Scan", status: "stopped", opensTurn: false },
     ]);
   });
 

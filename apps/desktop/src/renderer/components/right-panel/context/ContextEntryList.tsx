@@ -109,7 +109,7 @@ function EntryRow({ entry, category, grandTotal, open, onToggle }: {
           </div>
           {entry.fullTextAvailable ? <ContextEntryText key={entry.key} entryKey={entry.key} /> : null}
           {entry.preview ? (
-            <pre className="m-0 max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-act-sm border border-line bg-surface px-2.5 py-2 font-mono text-act-xxs leading-[1.55] text-text-main">
+            <pre className="m-0 max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-act-sm border border-line bg-surface px-2.5 py-2 font-mono text-act-xxs leading-relaxed text-text-main">
               {entry.preview}
             </pre>
           ) : (

@@ -36,8 +36,8 @@ Composer 上下文弹层的「查看完整上下文」、对象启动页的「�
    |---|---|---|---|
    | 文件 | 补充 `actspace.context-disclosure/navigation` | 活跃文件清单更新 | 「新增 a.ts 等 N 个，移除 M 个，共 K 个」 |
    | 运行 | 补充 `actspace.context-runtime/runtime-state` | 运行状态更新 | 「模式 agent → plan」或「模式 agent · 日期 2026-11-08」 |
-   | 子 Agent | 补充 `actspace.context-subagents/subagents` | 子 Agent 清单更新 | 「N 个运行中：描述、描述」 |
-   | 后台 | 补充 `actspace.context-background-tasks/background-tasks` | 后台任务清单更新 | 「N 个运行中：描述」或「全部结束」 |
+   | 后台 | 补充 `actspace.context-background-tasks/background-tasks`（后台 Bash 与后台子智能体） | 后台任务清单更新 | 「N 个运行中：描述」或「全部结束」 |
+   | 子 Agent | 老会话的补充 `actspace.context-subagents/subagents`（已并进后台任务清单，只读） | 子 Agent 清单更新 | 「N 个运行中：描述、描述」 |
    | 补充 | 其他补充 | 上下文补充 · id | 来源 owner |
    | 压缩 | `compaction/end` | 上下文已压缩 | 「旧对话换成摘要」 |
    | 工具 | 第二条起的 `request/tools` | 工具清单变化 | 「新增 N 个：a、b；移除 M 个：c」 |

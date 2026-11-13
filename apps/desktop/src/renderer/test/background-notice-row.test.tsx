@@ -13,6 +13,20 @@ const done = [
   "<closing_message>", "顺序没问题，`a &lt; b` 成立。", "</closing_message>", "</subagent_notification>",
 ].join("\n");
 
+// 登记表发的新格式：结论保持原文（不转义）。
+const taskDone = [
+  "<task_notification>", "<task_id>child-1</task_id>", "<kind>agent</kind>", "<description>复核提交顺序</description>", "<status>completed</status>",
+  "<summary>Subagent child-1 (复核提交顺序) completed.</summary>", "<transcript>/data/child-1/transcript.md</transcript>",
+  "<closing_message>", "顺序没问题，`a &lt; b` 是字面量。", "</closing_message>", "</task_notification>",
+].join("\n");
+
+it("reads the registry's task_notification for a subagent, closing message kept as written", () => {
+  expect(backgroundNoticeBody(notice({ content: taskDone }))).toBe("顺序没问题，`a &lt; b` 是字面量。");
+  const stopped = taskDone.replace(/<closing_message>[\s\S]*<\/closing_message>/, "").replace("completed.</summary>", "was stopped.</summary>");
+  expect(backgroundNoticeBody(notice({ content: stopped, status: "stopped" }))).toBe("Subagent child-1 (复核提交顺序) was stopped.");
+  expect(backgroundNoticeLabel(notice({ status: "stopped" }))).toBe("子智能体 复核提交顺序 已停止");
+});
+
 it("labels subagent, agent message and Bash notices", () => {
   expect(backgroundNoticeLabel(notice({}))).toBe("子智能体 复核提交顺序 已完成");
   expect(backgroundNoticeLabel(notice({ status: "lost" }))).toBe("子智能体 复核提交顺序 中断（应用退出）");

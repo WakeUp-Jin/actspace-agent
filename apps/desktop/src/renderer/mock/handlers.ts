@@ -63,7 +63,7 @@ export function defaultHandlers(clock: MockClock): MockHandlers {
 
   return {
     app: { getBootstrapState: async () => db.bootstrap },
-    performance: { setActive: async () => undefined },
+    resourceMonitor: { watch: async () => ({ history: [], latest: null }), copySnapshot: async () => "" },
     tasks: {
       command: async (command) => {
         if (command.op === "stop") playbacks.get(command.sessionId)?.abort();

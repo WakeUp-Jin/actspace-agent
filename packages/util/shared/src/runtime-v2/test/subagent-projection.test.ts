@@ -6,7 +6,7 @@ const start = (agentId: string, activationId: string, extra: Record<string, unkn
 const settle = (agentId: string, activationId: string, status = "completed") => ({ type: "subagent/activation", data: { op: "settle", agentId, activationId, status, summary: "done", delivery: "notified", endedAt: "2026-11-03T10:05:00.000Z" } });
 
 describe("subagent tree projection", () => {
-  it("folds spawn, activations and settles into running, inactive and closed", () => {
+  it("folds spawn, activations and settles into running and closed; an old continuation reads as running again", () => {
     const tree = foldSubagentTree([
       spawned("a", "local", { toolNames: ["read_file", "send_message"] }), start("a", "a1", { model: "m1" }), settle("a", "a1"),
       start("a", "a2", { trigger: "message", senderId: "main" }),
@@ -17,7 +17,7 @@ describe("subagent tree projection", () => {
     expect(tree.order).toEqual(["a", "b", "c", "d"]);
     expect(tree.agents.a).toMatchObject({ status: "running", toolNames: ["read_file", "send_message"], activations: [{ activationId: "a1", model: "m1", settle: { status: "completed" } }, { activationId: "a2", trigger: "message", senderId: "main" }] });
     expect(tree.agents.c.status).toBe("closed");
-    expect(tree.agents.d.status).toBe("inactive");
+    expect(tree.agents.d.status).toBe("closed");
     expect(runningSubagentCount(tree)).toBe(2);
     expect(lastActivationModel(tree.agents.a)).toBe("m1");
   });
@@ -25,7 +25,7 @@ describe("subagent tree projection", () => {
   it("ignores duplicate and orphan events", () => {
     const tree = foldSubagentTree([start("x", "x1"), spawned("a"), spawned("a", "local", { description: "again" }), start("a", "a1"), start("a", "a1"), settle("a", "a1"), settle("a", "a1", "failed")]);
     expect(tree.order).toEqual(["a"]);
-    expect(tree.agents.a).toMatchObject({ description: "task a", status: "inactive", activations: [{ settle: { status: "completed" } }] });
+    expect(tree.agents.a).toMatchObject({ description: "task a", status: "closed", activations: [{ settle: { status: "completed" } }] });
   });
 
   it("keeps old delegation records readable but out of the model's list", () => {

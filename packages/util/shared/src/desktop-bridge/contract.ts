@@ -5,7 +5,7 @@ import type { SessionEventEnvelopeV1 } from "../runtime-v2/session-events";
 import type { AddHostInput, HostArtifactPreview, HostConnection, HostEvent, HostMethod, HostUploadProgress } from "../host-protocol/index";
 import { ENGLISH_LEARNING_CHANNELS } from "../english-learning";
 import { HOST_IPC } from "../host-protocol/connections";
-import { PERFORMANCE_CHANNELS } from "../performance";
+import { RESOURCE_MONITOR_CHANNELS } from "../resource-monitor";
 import { RUNTIME_V2_FIXED_RENDERER_CHANNELS as CH } from "../runtime-v2/fixed-renderer";
 import { event, invoke, invokeWithDefault, local, send, type BridgeOf } from "./types";
 
@@ -33,9 +33,14 @@ export const desktopBridgeContract = {
   app: {
     getBootstrapState: invoke<void, S.BootstrapState>(CH.bootstrapState),
   },
-  performance: {
-    sample: invoke<void, S.DesktopPerformanceSnapshot>(PERFORMANCE_CHANNELS.sample),
-    setActive: invoke<boolean, void>(PERFORMANCE_CHANNELS.active),
+  resourceMonitor: {
+    /** 设置「资源占用」页可见时 `true`、离开或页面隐藏时 `false`；返回采集器当前的曲线与最新读数。 */
+    watch: invoke<boolean, S.ResourceWatchState>(RESOURCE_MONITOR_CHANNELS.watch),
+    /** 生成纯文本快照（macOS 附 footprint，点击时才取）。 */
+    copySnapshot: invoke<void, string>(RESOURCE_MONITOR_CHANNELS.copySnapshot),
+    /** 以下两项只由悬浮窗发出，主窗口发来的会被忽略。 */
+    setFloatLayout: send<S.ResourceFloatLayout>(RESOURCE_MONITOR_CHANNELS.setFloatLayout),
+    closeFloat: send<void>(RESOURCE_MONITOR_CHANNELS.closeFloat),
   },
   tasks: {
     command: invoke<RV2.TaskCommand, RV2.TaskCommandResult>(CH.taskCommand),
@@ -105,7 +110,7 @@ export const desktopBridgeContract = {
      * 远程会话返回 null：远程适配器在 `agent_run_started(recoveredReset)` 之后自己推 `live_output_baseline`。
      */
     liveOutput: invoke<{ sessionId: string }, RV2.LiveOutputBaseline | null>(CH.getSessionLiveOutput),
-    /** 子 Agent 面板的「停止」：效果同主会话调用 `interrupt_agent`；message 是给模型看的同一句话。 */
+    /** 子 Agent 面板的「停止」：后台的走后台任务的用户停止（模型下一步读到「用户停止了它」），同步的直接中断、等着的工具调用返回停止结果。 */
     interruptSubagent: invoke<{ sessionId: string; agentId: string }, { ok: boolean; message: string }>(CH.interruptSubagent),
     /** 外部子智能体详情的「在 Finder 中显示」：路径由主进程从父 Journal 的 `subagent/spawned` 取，renderer 不传路径。 */
     revealSubagentRecord: invoke<{ sessionId: string; agentId: string }, { ok: boolean }>(CH.revealSubagentRecord),
@@ -249,6 +254,9 @@ export const desktopBridgeContract = {
     hostsChanged: event<HostConnection[]>(HOST_IPC.changed),
     hostEvent: event<HostEventEnvelope>(HOST_IPC.event),
     hostUploadProgress: event<HostUploadProgress>(HOST_IPC.uploadProgress),
+    resourceSample: event<S.ResourceSampleNotice>(RESOURCE_MONITOR_CHANNELS.sample),
+    /** 只发给悬浮窗：加载完成时的完整状态。 */
+    resourceFloatState: event<S.ResourceFloatState>(RESOURCE_MONITOR_CHANNELS.floatState),
   },
 } as const;
 

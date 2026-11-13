@@ -90,8 +90,8 @@ export class AgentRuntimeService {
         return environment.permissionModeExplicit ? (typeof configured === "function" ? configured() : configured ?? "default") : projectPermissionMode(session.journal.latestEvents(["permission/mode-set"]));
       },
       isSessionRunning: id => this.runs.isActive(id),
-      hasQueuedInput: id => this.runs.hasQueuedTask(id),
       wake: id => this.runs.service.wake(id),
+      backgroundTasks: this.backgroundTasks,
       onError: error => host.onHarnessDiagnostic?.(error),
     });
   }
@@ -147,8 +147,9 @@ export class AgentRuntimeService {
   async dispose(): Promise<void> {
     for (const unregister of this.#unregisterRelease.splice(0)) unregister();
     this.runs.quiesce();
-    await this.subagents.dispose();
+    // The registry first: it stops background subagents without a notification; the manager then stops the synchronous ones.
     await this.backgroundTasks.dispose();
+    await this.subagents.dispose();
     await this.runs.dispose();
     await this.evolution?.close();
     await this.hmr?.close();

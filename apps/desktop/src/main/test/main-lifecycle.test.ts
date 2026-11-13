@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { attachWindowLifecycle, installProcessErrorLogging } from "../main-lifecycle";
+import { attachWindowLifecycle, installProcessErrorLogging, runShutdownSteps } from "../main-lifecycle";
 
 function fakeWindow() {
   return new EventEmitter();
@@ -13,6 +13,22 @@ describe("main window lifecycle", () => {
     attachWindowLifecycle(win, { onClosed });
     win.emit("closed");
     expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("shutdown steps", () => {
+  it("keeps running later steps when one throws, and logs the failure", async () => {
+    const log = vi.fn();
+    const order: string[] = [];
+    await runShutdownSteps([
+      ["first", () => { order.push("first"); }],
+      ["destroyed window", () => { throw new TypeError("Object has been destroyed"); }],
+      ["async reject", async () => { throw new Error("rejected"); }],
+      ["last", async () => { order.push("last"); }],
+    ], log);
+    expect(order).toEqual(["first", "last"]);
+    expect(log).toHaveBeenCalledWith("shutdown step failed", expect.objectContaining({ step: "destroyed window", error: "Object has been destroyed" }));
+    expect(log).toHaveBeenCalledWith("shutdown step failed", expect.objectContaining({ step: "async reject", error: "rejected" }));
   });
 });
 

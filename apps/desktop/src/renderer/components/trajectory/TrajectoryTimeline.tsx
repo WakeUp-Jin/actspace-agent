@@ -276,7 +276,7 @@ export const TrajectoryTimeline = memo(function TrajectoryTimeline({
       </div>
     </div>
     {tip !== null && tipSpan !== undefined && draft === null &&
-      <div role="tooltip" className="pointer-events-none absolute top-full z-(--act-z-popover) mt-1 max-w-[260px] whitespace-pre-line rounded-act-sm border border-line bg-surface-raised px-2 py-1.5 font-medium leading-[1.35] text-text-main shadow-act-popover"
+      <div role="tooltip" className="pointer-events-none absolute top-full z-(--act-z-popover) mt-1 max-w-[260px] whitespace-pre-line rounded-act-sm border border-line bg-surface-raised px-2 py-1.5 font-medium leading-snug text-text-main shadow-act-popover"
         style={{ left: Math.max(0, tip.x - (rootRef.current?.getBoundingClientRect().left ?? 0)) }}>{timelineTooltipLabel(tipSpan)}</div>}
   </section>;
 });

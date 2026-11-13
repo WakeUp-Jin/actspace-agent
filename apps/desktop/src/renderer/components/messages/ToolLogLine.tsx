@@ -55,7 +55,7 @@ function GenericToolApprovalLine({ message, className }: { message: Extract<Mess
 const TOOL_LOG_LINE_TOOLTIP_CONTAINER_CLASS = "has-overflow-text max-w-full rounded-act-xs outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
 const TOOL_LOG_LINE_TOOLTIP_OPEN_CLASS = "is-tooltip-open";
 const TOOL_LOG_TOOLTIP_CLASS =
-  "tool-log-tooltip pointer-events-none absolute left-[var(--conversation-text-inset)] top-[calc(100%_+_6px)] z-40 max-w-[min(720px,calc(100vw_-_96px))] rounded-act-sm border border-line bg-action px-[9px] py-[7px] text-act-xs font-normal leading-[1.55] text-on-action shadow-act-popover [overflow-wrap:anywhere] whitespace-normal";
+  "tool-log-tooltip pointer-events-none absolute left-[var(--conversation-text-inset)] top-[calc(100%_+_6px)] z-40 max-w-[min(720px,calc(100vw_-_96px))] rounded-act-sm border border-line bg-action px-[9px] py-[7px] text-act-xs font-normal leading-relaxed text-on-action shadow-act-popover [overflow-wrap:anywhere] whitespace-normal";
 
 function OverflowToolLine({
   className,
@@ -251,7 +251,7 @@ function ResultPreviewBlock({ displayText, status, resultPreview, className, onO
 // 与后台通知行展开后的原文块同一样式：消息原文要整段看，不按行截断。
 const SUBAGENT_TOOL_BODY_CLASS = "mt-1 mb-2 max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-act-md bg-surface-subtle px-3.5 py-3 font-mono text-act-xs leading-5 text-text-muted";
 
-/** `send_message` / `interrupt_agent`：「发消息给 ‹描述›」，点描述打开该子智能体，展开看消息原文与结果（设计 05 §1）。 */
+/** `send_message` / 停止子智能体的 `task_stop`（老会话 `interrupt_agent`）：「发消息给 ‹描述›」，点描述打开该子智能体，展开看消息原文与结果（设计 05 §1）。 */
 function SubagentToolLine({ message, className, onOpenSubagent }: { message: Extract<MessageBlock, { kind: "tool" }>; className?: string; onOpenSubagent?: (agentId: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const link = message.subagentLink!;

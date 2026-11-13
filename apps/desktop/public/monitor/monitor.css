@@ -1,0 +1,93 @@
+/*
+ * 资源监控悬浮窗。不加载主应用 CSS；颜色照 renderer/styles/tokens.css 的 --act-color-* 抄一份，
+ * 改主题色时两边一起改。无动画、无半透明。
+ */
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --text: #20201e;
+  --muted: #676762;
+  --faint: #72726b;
+  --subtle: #85857e;
+  --line: #deded9;
+  --line-soft: #ebebe7;
+  --hover: #eaeae7;
+  --info: #3978b8;
+  --warning: #91600e;
+  --danger-soft: #f8e9e9;
+  --on-danger: #a93a3a;
+  --series-cpu: #3978b8;
+  --series-mem: #7a68ad;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #30312d;
+    --text: #f1f1ed;
+    --muted: #b5b5ae;
+    --faint: #96968f;
+    --subtle: #787870;
+    --line: #42433d;
+    --line-soft: #3a3b35;
+    --hover: #3a3b35;
+    --info: #6ca6da;
+    --warning: #d2a14d;
+    --danger-soft: #452525;
+    --on-danger: #f08a8a;
+    --series-cpu: #6ca6da;
+    --series-mem: #aa96d7;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; overflow: hidden; background: var(--bg); }
+body {
+  color: var(--text);
+  font: 12px/1.4 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-app-region: no-drag; }
+button:focus-visible { outline: 2px solid var(--info); outline-offset: 1px; border-radius: 4px; }
+svg { display: block; flex-shrink: 0; }
+.num { font-variant-numeric: tabular-nums; }
+.ico { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+.float { display: flex; flex-direction: column; }
+.alert { display: flex; align-items: center; height: 22px; padding: 0 10px; background: var(--danger-soft); color: var(--on-danger); font-size: 11px; font-weight: 500; -webkit-app-region: drag; }
+.head { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 6px 0 4px; -webkit-app-region: drag; }
+.grip { width: 14px; height: 14px; fill: var(--subtle); }
+.summary { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; margin-right: 4px; }
+.summary .k { color: var(--faint); margin-right: 3px; }
+.summary .sep { width: 1px; height: 11px; background: var(--line); }
+.ibtn { width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center; color: var(--faint); }
+.ibtn:hover { background: var(--hover); color: var(--text); }
+.warn { color: var(--warning); }
+.bad { color: var(--on-danger); }
+.stale .num { color: var(--subtle); }
+.stale .num.bad { color: var(--on-danger); }
+
+.body { border-top: 1px solid var(--line-soft); padding: 8px 10px; }
+.chart { margin-bottom: 8px; }
+.chart-h { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; color: var(--faint); margin-bottom: 2px; }
+.chart-h b { font-weight: 500; color: var(--muted); }
+.chart svg { width: 100%; height: 44px; }
+.chart .base { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.chart .line { fill: none; stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.chart .area { stroke: none; opacity: 0.12; }
+#cpu-chart .line { stroke: var(--series-cpu); }
+#cpu-chart .area { fill: var(--series-cpu); }
+#mem-chart .line { stroke: var(--series-mem); }
+#mem-chart .area { fill: var(--series-mem); }
+
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th { font-weight: 400; color: var(--faint); font-size: 11px; text-align: right; padding: 2px 0 4px; }
+.tbl th:first-child { text-align: left; }
+.tbl td { padding: 3px 0; text-align: right; white-space: nowrap; }
+.tbl td:first-child { text-align: left; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.tbl td.cpu { width: 58px; }
+.tbl td.mem { width: 72px; }
+.tbl .sub { color: var(--faint); font-size: 11px; margin-left: 4px; }
+.tbl tr.self td { color: var(--faint); border-top: 1px solid var(--line-soft); padding-top: 5px; }
+.tbl tr.total td { border-top: 1px solid var(--line); padding-top: 5px; font-weight: 500; }
+.foot { display: flex; justify-content: space-between; color: var(--faint); font-size: 11px; margin-top: 6px; }

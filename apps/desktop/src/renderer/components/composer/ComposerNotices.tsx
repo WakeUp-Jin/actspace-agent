@@ -51,7 +51,7 @@ export function ComposerNotices({ annotations, statusNotice, sending, uploadProg
 /** 发送失败的提示，在输入框上方。附件卡片用 aria-describedby 指向它的 id。 */
 export function ComposerSendErrorAlert({ message }: { message: string }) {
   return (
-    <div id="composer-send-error" className="rounded-act-md border border-danger/30 bg-danger-subtle px-3 py-2 text-act-md leading-5 text-danger" role="alert">
+    <div id="composer-send-error" className="rounded-act-md border border-danger/30 bg-danger-subtle px-3 py-2 text-act-sm leading-5 text-danger" role="alert">
       {message}
     </div>
   );
