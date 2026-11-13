@@ -183,6 +183,8 @@ export class AgentLoop {
               this.#events.emit("llm/chunk", this.recordPayload(event.live));
             });
           } catch (error) {
+            // llm/stream 钩子可能在派发之前就抛错。
+            prepared.release();
             output = failedStreamOutput(normalizeLlmFailure(error, attempt));
           }
           if (output.failure === null) break;
@@ -340,21 +342,22 @@ export class AgentLoop {
     }
     // 首次请求的 prepared call：重试从它的 registration 和适配器调用派生。
     const origin = previous?.origin ?? prepared;
-    const estimate = this.checkContextCapacity({ ...converted.input, messages: prepared.request.messages, tools: prepared.request.tools, options: prepared.request.options }, prepared.request.contextWindow ?? null, () => prepared.release());
-    const contextWindow = prepared.request.contextWindow ?? null;
-    converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${prepared.request.routeId}/${prepared.request.model}`, label: prepared.request.model, contextWindow, autoCompactAtTokens: step.compaction?.threshold?.(contextWindow) ?? null }) };
-    const metadata: PreparedRequestMetadata = { route: prepared.request.routeId, model: prepared.request.model, registrationId: origin.registration.registrationId, adapterVersion: origin.registration.adapter.adapterVersion, defaults: origin.request.options as RuntimeV2JsonValue, retryPolicy: retryPolicySnapshot(origin.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY) as unknown as RuntimeV2JsonValue, contextWindow };
-    const records = requestRecords(converted.context, { ...prepared.request, sessionId }, metadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest);
+    // 准备好之后、派发之前出任何错都释放：没派发的调用不会自己归还 lease，路由注销会等到超时后报错。
     try {
+      const estimate = this.checkContextCapacity({ ...converted.input, messages: prepared.request.messages, tools: prepared.request.tools, options: prepared.request.options }, prepared.request.contextWindow ?? null, () => prepared.release());
+      const contextWindow = prepared.request.contextWindow ?? null;
+      converted = { ...converted, context: await converted.engine.recordPrepared(converted.context, { modelKey: `${prepared.request.routeId}/${prepared.request.model}`, label: prepared.request.model, contextWindow, autoCompactAtTokens: step.compaction?.threshold?.(contextWindow) ?? null }) };
+      const metadata: PreparedRequestMetadata = { route: prepared.request.routeId, model: prepared.request.model, registrationId: origin.registration.registrationId, adapterVersion: origin.registration.adapter.adapterVersion, defaults: origin.request.options as RuntimeV2JsonValue, retryPolicy: retryPolicySnapshot(origin.registration.retryPolicy ?? DEFAULT_LLM_RETRY_POLICY) as unknown as RuntimeV2JsonValue, contextWindow };
+      const records = requestRecords(converted.context, { ...prepared.request, sessionId }, metadata as unknown as RuntimeV2JsonValue, this.options.compositionDigest, this.options.hostCapabilityDigest);
       await converted.engine.bindRequest(converted.context);
       await this.options.session.append(core("request/header", { requestId, turnId, stepId, routeId: prepared.request.routeId, model: prepared.request.model, contextWindow, attempt, agentMode: mode, agentModeRevision: step.modeRevision }));
       await this.appendRequestRecords(records, { requestId, turnId, stepId });
       await this.checkpoint("before-llm-dispatch");
+      return { requestId, converted, prepared, origin, routeId, model, estimate, visibleToolNames };
     } catch (error) {
-      if (previous === undefined) prepared.release();
+      prepared.release();
       throw error;
     }
-    return { requestId, converted, prepared, origin, routeId, model, estimate, visibleToolNames };
   }
 
   private candidate(input: import("@actspace/prompt").AssemblyInput, tools: readonly RuntimeV2JsonValue[], requestOptions: RuntimeV2JsonValue): import("@actspace/prompt").LogicalRequestCandidate {
