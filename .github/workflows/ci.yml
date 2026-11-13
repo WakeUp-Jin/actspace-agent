@@ -250,13 +250,17 @@ jobs:
             browser-bridge/apps/cli/go.mod
             browser-bridge/packages/protocol/go.mod
 
+      # 这个 job 里有两处自己起 go 的地方：check-browser-command-registry.mjs 的 go run，和 apps/cli 测试里
+      # ensureDevHostWrapper 的 go build。环境里没有 GOCACHE 时它们都把编译产物放进临时目录，等于绕开上面恢复的缓存
+      # 把 CLI 从头再编一遍。这里把 go 的默认缓存位置写进环境，让它们和 go test、交叉编译共用同一份。
+      - name: Point nested Go builds at the restored cache
+        run: echo "GOCACHE=$(go env GOCACHE)" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # check-browser-command-registry.mjs 在没有 GOCACHE 时把 go run 的编译产物放进临时目录，
-      # 等于绕开上面恢复的缓存再编一遍 CLI；这里指回默认位置，和后面的 go test 共用。
       - name: Browser Bridge contract checks
-        run: GOCACHE="$(go env GOCACHE)" pnpm check:browser
+        run: pnpm check:browser
 
       - name: Browser Bridge Go tests
         working-directory: browser-bridge
