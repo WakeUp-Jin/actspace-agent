@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
 import { stat, realpath } from "node:fs/promises";
-import { basename, isAbsolute, relative, resolve } from "node:path";
-import { toolChildEnv } from "@actspace/shared";
+import * as nodePath from "node:path";
+import { basename, isAbsolute, resolve } from "node:path";
+import { isLexicallyInside, relativePathInside, toolChildEnv } from "@actspace/shared";
 import type { RuntimeV2JsonValue } from "@actspace/shared/runtime-v2";
 import { canonicalizeFileResource, type ToolBodyResult, type ToolExecutionContext, type SessionArtifactResolver } from "@actspace/tool-runtime";
 import type { ToolPorts } from "./plugin.js";
@@ -107,8 +108,7 @@ function resolveWorkspacePath(input: string, workspaceRoot: string): string {
 }
 
 function isWithin(root: string, candidate: string): boolean {
-  const nested = relative(resolve(root), resolve(candidate));
-  return nested === "" || (!nested.startsWith("..") && !isAbsolute(nested));
+  return isLexicallyInside(nodePath, root, candidate, { includeRoot: true });
 }
 
 async function runRipgrep(command: string | undefined, args: readonly string[], cwd: string, signal: AbortSignal): Promise<{ readonly exitCode: number | null; readonly stdout: string; readonly error: string; readonly truncated: boolean }> {
@@ -161,6 +161,6 @@ function ioFailure(action: string, path: string, error: unknown): ToolBodyResult
 }
 
 function stringArg(args: Readonly<Record<string, RuntimeV2JsonValue>>, key: string): string { return typeof args[key] === "string" ? args[key] : ""; }
-function displayPath(path: string, workspaceRoot: string): string { const nested = relative(workspaceRoot, path); return nested && !nested.startsWith("..") && !isAbsolute(nested) ? nested : path; }
+function displayPath(path: string, workspaceRoot: string): string { return relativePathInside(nodePath, workspaceRoot, path) || path; }
 function normalizeSearchLine(line: string, workspaceRoot: string): string { return line.startsWith(`${workspaceRoot}/`) ? line.slice(workspaceRoot.length + 1) : line; }
 function formatBytes(size: number): string { if (size < 1024) return `${size} B`; const units = ["KB", "MB", "GB", "TB"]; let value = size / 1024; let index = 0; while (value >= 1024 && index < units.length - 1) { value /= 1024; index += 1; } return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[index]}`; }
