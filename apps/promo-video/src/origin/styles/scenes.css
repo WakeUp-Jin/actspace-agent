@@ -130,6 +130,8 @@
 .o-tally-next { position: absolute; left: 120px; right: 120px; top: 650px; display: flex; align-items: center; gap: 64px; padding-top: 44px; border-top: 1px solid var(--line); }
 .o-directions { display: flex; gap: 36px; }
 .o-directions li { display: flex; align-items: center; gap: 14px; font: 600 30px/1 var(--sans); color: var(--ink); }
+/* 通用的状态角标是 16px，放在这里太小：这一行要让人看清哪个已上线、哪个还在做。 */
+.o-directions .status { font-size: 20px; padding: 8px 14px; }
 
 /* ── 收尾 ────────────────────────────────────────────── */
 .o-closing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 76px; text-align: center; }
