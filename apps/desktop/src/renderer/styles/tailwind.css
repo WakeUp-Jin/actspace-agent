@@ -93,7 +93,7 @@
   --color-analysis-thinking-soft: var(--act-analysis-thinking-soft);
 
   /*
-   * 字号档位（front-视觉token规范 §5）：text-act-xxs … text-act-title。
+   * 字号档位（front-视觉token规范 §5.3）：text-act-xxs … text-act-title。
    * 用独立命名而不覆盖 Tailwind 默认 text-sm 等，避免「text-sm = 14px 还是 13px」的同名歧义；
    * 默认字号类由 pnpm check:frontend-tokens 禁止。只设字号，不带行高（行高继承或由 leading-* 指定）。
    */
@@ -105,7 +105,9 @@
   --text-act-xs: 12px;
   --text-act-sm: 13px;
   --text-act-md: 14px;
+  --text-act-base: 15px;
   --text-act-lg: 16px;
+  --text-act-head: 18px;
   --text-act-xl: 20px;
   --text-act-title: 24px;
 

@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   checkCssBlocks,
+  checkCssFontSizes,
   checkLucideImports,
   checkNativeButtons,
   checkSource,
@@ -35,6 +36,29 @@ test("flags hard-coded font sizes and Tailwind default font sizes", () => {
     "tailwind-default-font-size:max-[600px]:text-xs",
   ]);
   assert.deepEqual(rules("components/A.tsx", 'const A = "text-act-sm text-text-main text-left";'), []);
+});
+
+test("flags arbitrary line heights and off-scale font weights", () => {
+  assert.deepEqual(rules("components/A.tsx", 'const A = "leading-[1.55] leading-[22px] font-bold font-light";'), [
+    "line-height-literal:leading-[1.55]",
+    "line-height-literal:leading-[22px]",
+    "font-weight-off-scale:font-bold",
+    "font-weight-off-scale:font-light",
+  ]);
+  assert.deepEqual(
+    rules("components/A.tsx", 'const A = "leading-5.5 leading-4.5 leading-relaxed leading-none font-semibold font-medium font-normal font-mono font-boldish";'),
+    [],
+  );
+});
+
+test("flags px / rem font sizes in style files, except token references, em and the trajectory sheet", () => {
+  const sizes = (relative, source) => checkCssFontSizes(relative, source).map((violation) => violation.match);
+  assert.deepEqual(sizes("styles/a.css", ".a { font-size: 12.5px; }\n.b { font-size: 0.72rem; }"), ["font-size: 12.5px", "font-size: 0.72rem"]);
+  assert.deepEqual(
+    sizes("styles/a.css", ".a { font-size: var(--text-act-sm); }\n.b { font-size: 0.87em; }\n.c { font-size: var(--act-font-mono-size, 13px); }\n.d { font-size: 0; font-size: inherit; }\n/* font-size: 14px; */"),
+    [],
+  );
+  assert.deepEqual(sizes("styles/trajectory.css", ".a { font-size: 10px; }"), []);
 });
 
 test("flags radius, z-index, duration literals and the retired cold shadow", () => {
@@ -289,7 +313,7 @@ function makeWebRepo(files) {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), "frontend-web-"));
   const src = path.join(repo, "apps/web/src");
   fs.mkdirSync(path.join(src, "styles"), { recursive: true });
-  fs.writeFileSync(path.join(src, "styles/tailwind.css"), "@theme inline { --text-act-base: 15px; --text-act-sm: 13px; --radius-act-md: 8px; }\n");
+  fs.writeFileSync(path.join(src, "styles/tailwind.css"), "@theme inline { --text-act-base: 15px; --text-act-head: 18px; --text-act-sm: 13px; --radius-act-md: 8px; }\n");
   fs.writeFileSync(
     path.join(src, "styles/tokens.css"),
     `:root { ${lightTokens} --web-glass: rgba(255,255,255,.72); }\n@media (prefers-color-scheme: dark) { :root { ${lightTokens} --web-glass: rgba(36,37,34,.72); } }\n`,
@@ -310,10 +334,10 @@ const webProblems = (files) => {
   }
 };
 
-test("web root: text-act-base is valid in web but undefined in desktop tokens", () => {
-  assert.deepEqual(webProblems({ "pages/A.tsx": 'export const A = () => <p className="text-act-base text-act-sm" />;' }), []);
+test("web root and desktop tokens both define text-act-base / text-act-head; unknown tiers still fail", () => {
+  assert.deepEqual(webProblems({ "pages/A.tsx": 'export const A = () => <p className="text-act-base text-act-head text-act-sm" />;' }), []);
   const desktopDefined = collectDefinedVariables([fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../../apps/desktop/src/renderer/styles/tailwind.css"), "utf8")]);
-  assert.deepEqual(checkTokenReferences("a.tsx", 'x="text-act-base"', desktopDefined).map((item) => item.variable), ["--text-act-base"]);
+  assert.deepEqual(checkTokenReferences("a.tsx", 'x="text-act-base text-act-head text-act-huge"', desktopDefined).map((item) => item.variable), ["--text-act-huge"]);
 });
 
 test("web root: hard-coded font sizes and undefined tokens fail", () => {

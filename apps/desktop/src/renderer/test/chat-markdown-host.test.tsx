@@ -144,7 +144,7 @@ describe("三处使用方", () => {
   it("右栏子 Agent 面板：执行记录里的回复从宿主拿到 openPath", async () => {
     install();
     const openPath = vi.fn();
-    const agent: SubagentListItem = { agentId: "first", kind: "local", preset: "explore", description: "first", status: "idle", activationCount: 1, background: false, createdAt: "now", activeSince: "now", transcriptPath: "/data/first.md" };
+    const agent: SubagentListItem = { agentId: "first", kind: "local", preset: "explore", description: "first", status: "ended", activationCount: 1, background: false, createdAt: "now", activeSince: "now", transcriptPath: "/data/first.md" };
     overrideBridge({
       "sessions.getSubagents": vi.fn().mockResolvedValue([agent]),
       "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue([{ kind: "assistant", id: "a1", content: "结论在 `docs/report.md:9`。", createdAt: "now" }]),

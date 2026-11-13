@@ -7,7 +7,7 @@ import { showTurnFileMenu } from "./open-turn-file";
 import { TurnChangesCard } from "./TurnChangesCard";
 import { TurnDeliverables } from "./TurnDeliverables";
 import { collectPresentedFiles, collectTurnChanges, type TurnChangedFile } from "./turn-tail-data";
-import { useShowTurnCodeChanges } from "./useShowTurnCodeChanges";
+import { useShowTurnCodeChanges } from "../conversation/display-settings";
 
 /**
  * 轮尾：本轮代码改动卡 →「present」交付卡 → 生成的图片，排在最终回复之后、回复操作之前。

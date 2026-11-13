@@ -1,6 +1,5 @@
-import { PerformancePanel } from "../PerformancePanel";
 import type { ComponentType } from "react";
-import { Server, Activity, Archive, ArrowLeft, ChartColumn, Cpu, RefreshCw, Search, SlidersHorizontal, Sun, Users, Wrench } from "lucide-react";
+import { Server, Activity, Archive, ArrowLeft, ChartColumn, Cpu, Gauge, RefreshCw, Search, SlidersHorizontal, Sun, Users, Wrench } from "lucide-react";
 
 export type SettingsSectionId =
   | "hosts"
@@ -13,6 +12,7 @@ export type SettingsSectionId =
   | "archivedChats"
   | "usage"
   | "harnessStats"
+  | "resources"
   | "update";
 
 type IconComponent = ComponentType<{ size?: number | string; className?: string }>;
@@ -45,7 +45,10 @@ export const SETTINGS_GROUPS: { label: string; sections: { id: SettingsSectionId
   },
   {
     label: "系统",
-    sections: [{ id: "update", label: "更新", icon: RefreshCw }],
+    sections: [
+      { id: "resources", label: "资源占用", icon: Gauge },
+      { id: "update", label: "更新", icon: RefreshCw },
+    ],
   },
 ];
 
@@ -105,7 +108,6 @@ export function SettingsNav({
           {group.sections.map((section) => renderSectionButton(section, active, onSelect))}
         </div>
       ))}
-      <PerformancePanel />
     </nav>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCompactionBlock, createEmptyStreamingState, streamingStateToBlocks } from "@actspace/client/live";
+import { appendOrMergeSegment, createCompactionBlock, createEmptyStreamingState, streamingStateToBlocks } from "@actspace/client/live";
 
 // 14 T13：每个 live 块都带所属 run 的 runId。
 describe("live block identity", () => {
@@ -28,6 +28,27 @@ describe("live block identity", () => {
     const state = createEmptyStreamingState();
     state.segments.push({ type: "thinking", text: "\u200B" }, { type: "text", text: "reply" });
     expect(streamingStateToBlocks(state, "run-1").map((block) => block.kind)).toEqual(["assistant"]);
+  });
+
+  it("times a finished thinking segment from its first to its last delta", () => {
+    const state = createEmptyStreamingState();
+    appendOrMergeSegment(state.segments, "thinking", "先看", {}, 1000);
+    appendOrMergeSegment(state.segments, "thinking", "代码。", {}, 4000);
+    state.segments.push({ type: "tool", toolCallId: "call-1" });
+    state.activeTools.set("call-1", { toolName: "read", preview: { kind: "read", filePath: "a.ts", displayText: "Read a.ts" } as never });
+    const [thinking] = streamingStateToBlocks(state, "run-1");
+    expect(thinking).toMatchObject({ kind: "thinking", status: "completed", startedAtMs: 1000, durationMs: 3000 });
+  });
+
+  it("counts a single-delta finished thinking as one second, and leaves a running one untimed", () => {
+    const state = createEmptyStreamingState();
+    appendOrMergeSegment(state.segments, "thinking", "短。", {}, 5000);
+    appendOrMergeSegment(state.segments, "text", "reply", {}, 5000);
+    appendOrMergeSegment(state.segments, "thinking", "又想了一下", { messageId: "m-2" }, 7000);
+    const blocks = streamingStateToBlocks(state, "run-1");
+    expect(blocks[0]).toMatchObject({ kind: "thinking", status: "completed", durationMs: 1000 });
+    expect(blocks[2]).toMatchObject({ kind: "thinking", status: "running", startedAtMs: 7000 });
+    expect(blocks[2]).not.toHaveProperty("durationMs");
   });
 
   it("keeps a compaction block's own runId, and leaves blocks unstamped without a run", () => {

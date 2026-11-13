@@ -203,6 +203,8 @@ export interface SettingsV4General {
   performanceMonitoring?: boolean;
   /** 轮尾是否显示「本轮代码改动」卡；缺省视为开启。 */
   showTurnCodeChanges?: boolean;
+  /** 思考进行时只显示一行标题（用时 + 开头一句），不展开正文；缺省视为开启。 */
+  simplifyThinking?: boolean;
   /** 新建会话时写入的权限模式；缺省视为 "default"（界面上叫「自动」）。之后在输入框状态行改的只影响当前会话。 */
   defaultPermissionMode?: import("./runtime-v2").PermissionMode;
   /** Absent in older v4 snapshots. Runtime enablement is never persisted. */

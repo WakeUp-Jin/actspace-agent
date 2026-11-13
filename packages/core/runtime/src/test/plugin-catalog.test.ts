@@ -25,7 +25,7 @@ describe("plugin catalog", () => {
   it("derives the default Harness rows from the manifests", () => {
     expect(DEFAULT_HARNESS_ENTRIES.map(row => row[0])).toEqual([
       "llm-service", "auto-review", "tools-approval", "sandbox", "sandbox-nono", "sandbox-seatbelt", "tools-runtime", "context-engine", "prompt-runtime",
-      "context-assembly", "context-system", "context-rules", "context-skills", "context-runtime", "context-conversation", "context-tools", "context-background-tasks", "context-subagents",
+      "context-assembly", "context-system", "context-rules", "context-skills", "context-runtime", "context-conversation", "context-tools", "context-background-tasks",
       "context-disclosure", "compaction-runtime", "filesystem-read", "filesystem-search", "filesystem-write", "web-tools", "image-generation", "shell-tools",
       "image-inspection", "todo-tools", "browser-tools", "background-tasks", "subagent-tools", "subagent-codex", "subagent-claude-code", "plugin-manager", "agent-factory",
     ]);

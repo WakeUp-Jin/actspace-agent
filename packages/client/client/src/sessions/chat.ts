@@ -47,7 +47,7 @@ type EventIndex = {
   readonly callData: Map<string, EventRecord>;
   /** Child of an `agent`/`explore` call: `subagent/*` facts for new Sessions, `delegation/*` for old ones. */
   readonly childByCall: Map<string, ChildFacts>;
-  /** Description of each subagent of this Session, for `send_message` / `interrupt_agent` rows. */
+  /** Description of each subagent of this Session, for `send_message` and subagent `task_stop` rows (old Sessions: `interrupt_agent`). */
   readonly describeAgent: (agentId: string) => string | undefined;
   /** Background task status by the tool call that started it, from `background/task` facts. */
   readonly backgroundByCall: Map<string, { readonly status: string }>;

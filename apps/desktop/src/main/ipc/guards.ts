@@ -137,7 +137,7 @@ const taskCommand: IpcGuard = input => {
 const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> = [
   // 无入参
   [contract.app.getBootstrapState, NO_INPUT],
-  [contract.performance.sample, NO_INPUT],
+  [contract.resourceMonitor.copySnapshot, NO_INPUT],
   [contract.dialogs.selectImages, NO_INPUT],
   [contract.workspaces.list, NO_INPUT],
   [contract.workspaces.listOpenTools, NO_INPUT],
@@ -167,8 +167,8 @@ const GUARDS: ReadonlyArray<readonly [InvokeSpec<unknown, unknown>, IpcGuard]> =
   [contract.updates.selectSource, NO_INPUT],
   [contract.updates.start, NO_INPUT],
   [contract.hosts.list, NO_INPUT],
-  // 性能面板
-  [contract.performance.setActive, input => typeof input === "boolean" ? null : "Invalid monitoring state"],
+  // 资源监控
+  [contract.resourceMonitor.watch, input => typeof input === "boolean" ? null : "Invalid monitoring state"],
   // 任务与审批
   [contract.tasks.command, taskCommand],
   [contract.tasks.submit, shape({ sessionId: "string", submissionId: "string", userInput: "string", attachments: "array?", fileReferences: "array?", responseAnnotations: "array?", rewind: optional(nested({ runId: "string", expectedThroughSeq: integer(0) })), agentRunId: "string?" }, "Invalid task submission")],

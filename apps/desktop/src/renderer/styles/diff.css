@@ -18,9 +18,9 @@
   background: none;
   color: var(--color-text-muted);
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-act-sm);
   font-weight: 400;
-  line-height: 1.42;
+  line-height: 20px;
   cursor: pointer;
   text-align: left;
 }
@@ -93,9 +93,9 @@
   margin-bottom: 4px;
   color: var(--color-text-muted);
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--text-act-sm);
   font-weight: 400;
-  line-height: 1.42;
+  line-height: 20px;
 }
 
 .file-diff-content.is-streaming-content {
@@ -144,7 +144,7 @@
   align-items: center;
   margin: 0;
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--text-act-sm);
   color: var(--color-text-muted);
 }
 
@@ -200,7 +200,7 @@
   margin: 0;
   padding: 4px 16px 8px;
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: var(--text-act-sm);
   color: var(--color-text-faint);
 }
 

@@ -47,9 +47,9 @@ export type RunTargetRowProps = {
 };
 
 const RECENT_WORKSPACE_LIMIT = 5;
-const ROW_CLASS = "initial-context-row relative z-20 flex min-h-7 flex-wrap items-center gap-x-2 gap-y-1 px-1 text-act-md text-text-muted";
+const ROW_CLASS = "initial-context-row relative z-20 flex min-h-7 flex-wrap items-center gap-x-2 gap-y-1 px-1 text-act-sm text-text-muted";
 const TEXT_BUTTON_CLASS =
-  "inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-act-sm px-1.5 text-act-md text-text-muted outline-none transition-colors duration-(--motion-fast) hover:bg-hover-overlay hover:text-text-main focus-visible:bg-hover-overlay focus-visible:text-text-main data-[state=open]:bg-hover-overlay data-[state=open]:text-text-main";
+  "inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-act-sm px-1.5 text-act-sm text-text-muted outline-none transition-colors duration-(--motion-fast) hover:bg-hover-overlay hover:text-text-main focus-visible:bg-hover-overlay focus-visible:text-text-main data-[state=open]:bg-hover-overlay data-[state=open]:text-text-main";
 const ICON_CLASS = "shrink-0";
 const CHEVRON_CLASS = "shrink-0 opacity-70";
 const ITEM_ICON_CLASS = "shrink-0 text-text-muted";

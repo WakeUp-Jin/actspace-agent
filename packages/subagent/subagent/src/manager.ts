@@ -1,26 +1,28 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
+import { open } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
 import { MainAgentInbox } from "@actspace/agent";
+import type { BackgroundTaskOutput, BackgroundTaskRegistry, BackgroundTaskTerminal } from "@actspace/background-tasks";
 import type { AgentLoop } from "@actspace/agent-loop";
 import type { AgentScope } from "@actspace/scope";
 import type { ModelsHostPort } from "@actspace/shared";
 import {
-  BACKGROUND_WAKE_KIND, EMPTY_SUBAGENT_TREE, CONTEXT_TRACE_DETAIL_LABEL, lastActivationModel, listedSubagents, reduceSubagentTree, runningActivation,
-  type RuntimeV2AgentMode, type RuntimeV2JsonValue, type SubagentActivationStatus, type SubagentKind, type SubagentPreset, type SubagentTree, type SubagentView,
+  EMPTY_SUBAGENT_TREE, CONTEXT_TRACE_DETAIL_LABEL, listedSubagents, reduceSubagentTree, runningActivation,
+  type RuntimeV2AgentMode, type RuntimeV2JsonValue, type SubagentActivationStatus, type SubagentDelivery, type SubagentKind, type SubagentPreset, type SubagentTree,
 } from "@actspace/shared/runtime-v2";
 import { FORKED_SUBAGENT_PRESET_ID, resolveSessionWorkspaceRoot, type SessionEventEnvelopeV1 } from "@actspace/session-journal";
-import { applySessionRecovery, type SessionHandle, type SessionStore } from "@actspace/session-persistence";
+import type { SessionHandle, SessionStore } from "@actspace/session-persistence";
 import { createChildSession } from "./child-session.js";
 import { firstErrorLine, type ExternalRun, type ExternalRunResult, type ExternalSubagentBackend, type SpawnExternalInput } from "./external.js";
 import { resolveForkBoundary } from "./fork-boundary.js";
 import {
-  agentMessage, backgroundStarted, blockedTool, CANNOT_MESSAGE_SELF, EXTERNAL_LOG_WAIT_MS, externalCannotReceive, externalStartFailed, INPUT_ARRIVED, interruptRequested, messageDelivered,
-  movedToBackground, notRunning, settleSummary, SUBAGENT_CONCURRENCY_LIMIT, SUBAGENT_LIMIT_REACHED, SUBAGENT_MAX_STEPS, SUBAGENT_SYNC_WAIT_MS,
-  subagentNotification, syncResult, taskGuidance, truncateUtf8, unknownAgent, unknownEffort, unknownModel, waitTimedOut, type AgentRelation,
+  agentFinished, agentMessage, backgroundStarted, blockedTool, CANNOT_MESSAGE_SELF, closingBody, CLOSING_OMITTED_NOTE, EXTERNAL_LOG_WAIT_MS, externalCannotReceive, externalStartFailed,
+  messageDelivered, movedToBackground, settleSummary, SIBLING_MESSAGE_BLOCKED, SUBAGENT_CONCURRENCY_LIMIT, SUBAGENT_LIMIT_REACHED, SUBAGENT_MAX_STEPS, SUBAGENT_SYNC_WAIT_MS,
+  syncResult, taskGuidance, truncateUtf8, unknownAgent, unknownEffort, unknownModel,
 } from "./messages.js";
-import { EXPLORE_TOOL_NAMES, SUBAGENT_COORDINATION_TOOL_NAMES, subagentToolNames } from "./preset.js";
-import type { RunningSubagent, SpawnForkInput, SpawnSubagentInput, SubagentCaller, SubagentHostPort, SubagentToolOutcome } from "./types.js";
+import { subagentToolNames } from "./preset.js";
+import type { SpawnForkInput, SpawnSubagentInput, SubagentCaller, SubagentHostPort, SubagentToolOutcome } from "./types.js";
 
 export type ChildLoop = Pick<AgentLoop, "runTurn" | "abort" | "waitForIdle" | "quiesce">;
 /**
@@ -66,25 +68,34 @@ export type SubagentManagerOptions = {
   readonly parentConfiguration: (sessionId: string) => ParentConfiguration;
   readonly permissionMode: (session: SessionHandle) => string;
   readonly isSessionRunning: (sessionId: string) => boolean;
-  /** A user message is queued for this Session. */
-  readonly hasQueuedInput: (sessionId: string) => boolean;
   readonly wake: (sessionId: string) => void;
+  /**
+   * The Host's background task registry. A background subagent, or a synchronous one past its wait limit, becomes
+   * a `kind: "agent"` task there: the registry notifies the parent, lists it and stops it (`task_*` tools).
+   */
+  readonly backgroundTasks: Pick<BackgroundTaskRegistry, "register" | "stop" | "stopByUser">;
   readonly onError?: (error: unknown) => void;
   readonly now?: () => Date;
   /** Tests only. */
   readonly syncWaitMs?: number;
   readonly limit?: number;
   readonly maxSteps?: number;
-  readonly pollMs?: number;
   readonly externalLogWaitMs?: number;
 };
 
-type Settled = { readonly status: SubagentActivationStatus; readonly error?: string; readonly text: string; readonly truncated: boolean };
+type Settled = { readonly status: SubagentActivationStatus; readonly error?: string; readonly text: string; readonly truncated: boolean; readonly byUser: boolean };
+
+/**
+ * Who receives the result. `caller`: the synchronous tool call; `registry`: a background task, notified by the registry;
+ * `stopped`: `task_stop` / the user stopped it, and that stop was the delivery; `dropped`: the main Session rewound past it.
+ */
+type Delivery = "caller" | "registry" | "stopped" | "dropped";
 
 type Activation = {
   readonly rootId: string;
   readonly agentId: string;
   readonly activationId: string;
+  readonly callId: string;
   readonly description: string;
   readonly kind: SubagentKind;
   /** `local` only. */
@@ -96,9 +107,11 @@ type Activation = {
   /** A fork's first Turn runs with the parent's selected skills. */
   readonly selectedSkillIds?: readonly string[];
   readonly controller: AbortController;
-  /** `caller`: a synchronous `agent` call is waiting; `parent`: notify the main Session; `dropped`: the main Session rewound past it, tell no one. */
-  delivery: "caller" | "parent" | "dropped";
-  /** Set inside the child lock when settlement starts; later messages become a new activation. */
+  delivery: Delivery;
+  /** Pending while the registry records the task; `registered` once it has. */
+  registration?: Promise<void>;
+  registered: boolean;
+  /** Set inside the child lock when settlement starts; a later message is refused (the subagent has finished). */
   settling: boolean;
   settled: boolean;
   child?: SessionHandle;
@@ -107,19 +120,21 @@ type Activation = {
   admitted: boolean;
   startSeq: number;
   readonly ready: Deferred<void>;
+  /** What the registry reports for a background subagent. */
+  readonly terminal: Deferred<BackgroundTaskTerminal>;
+  /** Resolved once the child holds nothing: no open Session, scope or Harness lease. */
   readonly result: Deferred<Settled>;
 };
 
-/** A wake activation opens with the claimed inbox message; its ledger task carries no user input. */
-type FirstTurn = { readonly content: string } | { readonly wake: true };
-
 const TREE = Symbol("actspace.subagent.tree");
-const POLL_MS = 200;
+/** `task_output` on a subagent: the end of its transcript. */
+const OUTPUT_TAIL_BYTES = 32 * 1024;
 
 /**
- * Host-owned scheduler of `local` subagents (design 02): creation, continuation, steering,
- * interruption, completion notices and restart recovery. All state is folded from the main
- * Session's `subagent/*` events; only running activations live in memory.
+ * Host-owned scheduler of subagents (design 02). A subagent is a temporary context window: it runs one task,
+ * answers, and is closed. A synchronous call returns its answer; a background one is a task of the background
+ * task registry, which notifies the parent and stops it. All state is folded from the main Session's
+ * `subagent/*` events; only running subagents live in memory.
  */
 export class SubagentManager implements SubagentHostPort {
   readonly #active = new Map<string, Activation>();
@@ -140,7 +155,7 @@ export class SubagentManager implements SubagentHostPort {
     const agentId = randomUUID();
     const transcriptPath = this.options.transcriptPath(agentId);
     const toolNames = subagentToolNames(input.preset, input.parentToolNames, input.registeredToolNames);
-    const activation = this.#reserve({ rootId: caller.rootId, agentId, description: input.description, kind: "local", preset: input.preset, transcriptPath, toolNames, model: model.config, delivery: input.background ? "parent" : "caller" });
+    const activation = this.#reserve({ rootId: caller.rootId, agentId, description: input.description, kind: "local", preset: input.preset, transcriptPath, toolNames, model: model.config, callId: input.callId });
     const root = caller.root;
     try {
       const workspaceRoot = resolveSessionWorkspaceRoot(root.header, root.journal);
@@ -148,12 +163,13 @@ export class SubagentManager implements SubagentHostPort {
       await root.append(coreEvent("subagent/spawned", { agentId, callId: input.callId, kind: "local", preset: input.preset, description: input.description, transcriptPath, createdAt: this.#now(), toolNames: [...toolNames] }));
       await root.append(coreEvent("subagent/activation", startData(activation, { trigger: "spawn", callId: input.callId, background: input.background, startedAt: this.#now() })));
       await root.flush();
+      if (input.background) await this.#register(activation);
     } catch (error) {
       this.#active.delete(agentId);
       await activation.child?.close().catch(report(this.options.onError));
       return fail("SUBAGENT_FAILED", errorText(error));
     }
-    this.#begin(activation, caller.scope, { content: `${input.prompt}\n\n${taskGuidance(transcriptPath, input.preset)}` });
+    this.#begin(activation, caller.scope, `${input.prompt}\n\n${taskGuidance(transcriptPath, input.preset)}`);
     // The transcript must exist with the task message before the path is handed out (design 02 §6.3).
     await Promise.race([activation.ready.promise, activation.result.promise]);
     await this.#refresh(agentId);
@@ -185,7 +201,7 @@ export class SubagentManager implements SubagentHostPort {
     const transcriptPath = this.options.transcriptPath(agentId);
     const toolNames = Object.freeze([...new Set(input.parentToolNames)].sort());
     const { selectedSkillIds } = this.options.parentConfiguration(caller.rootId);
-    const activation = this.#reserve({ rootId: caller.rootId, agentId, description: input.description, kind: "fork", transcriptPath, toolNames, model: model.config, ...(selectedSkillIds?.length ? { selectedSkillIds: [...selectedSkillIds] } : {}), delivery: input.background ? "parent" : "caller" });
+    const activation = this.#reserve({ rootId: caller.rootId, agentId, description: input.description, kind: "fork", transcriptPath, toolNames, model: model.config, ...(selectedSkillIds?.length ? { selectedSkillIds: [...selectedSkillIds] } : {}), callId: input.callId });
     try {
       const createdWith = { ...root.header.createdWith, presetId: FORKED_SUBAGENT_PRESET_ID, manifestDigest: this.options.manifestDigest, plugins: this.options.plugins, codecSetDigest: this.options.store.options.registry.digest };
       const child = await this.options.store.fork({ parentSessionId: caller.rootId, boundarySeq: boundary.boundarySeq, newSessionId: agentId, createdAt: this.#now(), createdWith, origin: "delegation", parentCallId: input.callId }, { onEvent: event => this.#observe(activation, event) });
@@ -198,12 +214,13 @@ export class SubagentManager implements SubagentHostPort {
       await root.append(coreEvent("subagent/spawned", { agentId, callId: input.callId, kind: "fork", description: input.description, transcriptPath, createdAt: this.#now(), inheritedThroughSeq: boundary.boundarySeq, toolNames: [...toolNames] }));
       await root.append(coreEvent("subagent/activation", startData(activation, { trigger: "spawn", callId: input.callId, background: input.background, startedAt: this.#now() })));
       await root.flush();
+      if (input.background) await this.#register(activation);
     } catch (error) {
       this.#active.delete(agentId);
       await activation.child?.close().catch(report(this.options.onError));
       return fail("SUBAGENT_FAILED", errorText(error));
     }
-    this.#begin(activation, caller.scope, { content: `${input.prompt}\n\n${taskGuidance(transcriptPath, "fork")}` });
+    this.#begin(activation, caller.scope, `${input.prompt}\n\n${taskGuidance(transcriptPath, "fork")}`);
     await Promise.race([activation.ready.promise, activation.result.promise]);
     await this.#refresh(agentId);
     const detail = details({ agentId, description: input.description, kind: "fork", transcriptPath, background: input.background, inheritedThroughSeq: boundary.boundarySeq });
@@ -213,7 +230,7 @@ export class SubagentManager implements SubagentHostPort {
 
   /**
    * `agent_codex` / `agent_claude_code` (design 04): run the CLI once in the workspace. It shares the limit,
-   * events, notices and `list_agents` with local subagents; its record is the CLI's own session log.
+   * events and background handling with local subagents; its record is the CLI's own session log.
    */
   async spawnExternal(backend: ExternalSubagentBackend, input: SpawnExternalInput): Promise<SubagentToolOutcome> {
     const caller = await this.#caller(input);
@@ -225,7 +242,7 @@ export class SubagentManager implements SubagentHostPort {
     if (!cwd) return fail("WORKSPACE_UNAVAILABLE", `Session ${caller.rootId} has no workspace.`);
     const agentId = randomUUID();
     const { kind, label } = backend;
-    const activation = this.#reserve({ rootId: caller.rootId, agentId, description: input.description, kind, transcriptPath: "", toolNames: [], model: input.model ? { model: input.model } : {}, delivery: input.background ? "parent" : "caller" });
+    const activation = this.#reserve({ rootId: caller.rootId, agentId, description: input.description, kind, transcriptPath: "", toolNames: [], model: input.model ? { model: input.model } : {}, callId: input.callId });
     let run: ExternalRun;
     try {
       run = await backend.start({ prompt: input.prompt, cwd, ...(input.model ? { model: input.model } : {}), signal: activation.controller.signal });
@@ -238,6 +255,7 @@ export class SubagentManager implements SubagentHostPort {
       await root.append(coreEvent("subagent/spawned", { agentId, callId: input.callId, kind, description: input.description, transcriptPath, createdAt: this.#now() }));
       await root.append(coreEvent("subagent/activation", startData(activation, { trigger: "spawn", callId: input.callId, background: input.background, startedAt: this.#now() })));
       await root.flush();
+      if (input.background) await this.#register(activation);
     } catch (error) {
       this.#active.delete(agentId);
       await run.interrupt().catch(report(this.options.onError));
@@ -252,6 +270,10 @@ export class SubagentManager implements SubagentHostPort {
     return this.#awaitSync(activation, input.signal, detail, text);
   }
 
+  /**
+   * The main agent writes to a running subagent it started; a subagent writes to its parent, which wakes if idle.
+   * Siblings do not talk, and a finished subagent takes no more messages (design 02 §3).
+   */
   async sendMessage(input: SubagentCaller & { readonly agentId: string; readonly message: string }): Promise<SubagentToolOutcome> {
     const caller = await this.#caller(input);
     if (!caller.ok) return caller.outcome;
@@ -259,65 +281,26 @@ export class SubagentManager implements SubagentHostPort {
     if (target === input.sessionId) return fail("INVALID_TARGET", CANNOT_MESSAGE_SELF);
     const root = caller.root, rootId = caller.rootId;
     const tree = subagentTree(root);
-    if (target === rootId) {
+    if (!caller.isRoot) {
+      if (target !== rootId) return tree.agents[target] ? fail("INVALID_TARGET", SIBLING_MESSAGE_BLOCKED) : fail("UNKNOWN_AGENT", unknownAgent(target));
       const sender = tree.agents[input.sessionId];
       const running = this.options.isSessionRunning(rootId);
       await new MainAgentInbox(root).enqueue(agentMessage(input.sessionId, "child", input.message), { taskId: input.sessionId, kind: "agent_message", title: sender?.description ?? input.sessionId, status: "message" }, { source: "agent_message", senderId: input.sessionId });
       await root.flush();
       this.options.wake(rootId);
-      return ok(messageDelivered(rootId, !running));
+      return ok(messageDelivered(rootId, running));
     }
     const view = tree.agents[target];
     if (!view || view.legacy) return fail("UNKNOWN_AGENT", unknownAgent(target));
     if (view.kind === "codex" || view.kind === "claude-code") return fail("SUBAGENT_CLOSED", externalCannotReceive(target));
-    const relation: AgentRelation = caller.isRoot ? "parent" : "sibling";
-    const content = agentMessage(input.sessionId, relation, input.message);
+    const content = agentMessage(input.sessionId, "parent", input.message);
+    // Under the child lock: a message either lands before the subagent decides it is done (and is read), or is refused.
     return this.#lock.run(target, async () => {
       const active = this.#active.get(target);
-      if (active && !active.settling && active.child) {
-        await new MainAgentInbox(active.child).enqueue(content, undefined, { source: "agent_message", senderId: input.sessionId });
-        return ok(messageDelivered(target, false));
-      }
-      return this.#continue(view, { caller, callId: input.callId, senderId: input.sessionId, content });
+      if (!active || active.rootId !== rootId || active.settling || !active.child) return fail("SUBAGENT_CLOSED", agentFinished(target));
+      await new MainAgentInbox(active.child).enqueue(content, undefined, { source: "agent_message", senderId: input.sessionId });
+      return ok(messageDelivered(target, true));
     });
-  }
-
-  async waitForInput(input: SubagentCaller & { readonly timeoutMs: number; readonly signal: AbortSignal }): Promise<SubagentToolOutcome> {
-    const session = this.options.getOpenSession(input.sessionId);
-    if (!session) return fail("SESSION_UNAVAILABLE", `Session ${input.sessionId} is unavailable.`);
-    const arrived = () => new MainAgentInbox(session).hasPendingNotifications() || this.options.hasQueuedInput(input.sessionId);
-    if (arrived()) return ok(INPUT_ARRIVED);
-    return new Promise<SubagentToolOutcome>(resolve => {
-      const finish = (outcome: SubagentToolOutcome) => { clearInterval(poll); clearTimeout(timer); input.signal.removeEventListener("abort", abort); resolve(outcome); };
-      const poll = setInterval(() => { try { if (arrived()) finish(ok(INPUT_ARRIVED)); } catch (error) { finish(fail("WAIT_FAILED", errorText(error))); } }, this.options.pollMs ?? POLL_MS);
-      const timer = setTimeout(() => finish(ok(waitTimedOut(input.timeoutMs))), input.timeoutMs);
-      const abort = () => finish(fail("TOOL_ABORTED", "The wait was cancelled."));
-      input.signal.addEventListener("abort", abort, { once: true });
-      if (input.signal.aborted) abort();
-    });
-  }
-
-  async listAgents(input: SubagentCaller): Promise<SubagentToolOutcome> {
-    const caller = await this.#caller(input);
-    if (!caller.ok) return caller.outcome;
-    const marker = (id: string) => id === input.sessionId ? " (you)" : !caller.isRoot && id === caller.rootId ? " (parent)" : "";
-    const lines = [`${caller.rootId} [${this.options.isSessionRunning(caller.rootId) ? "running" : "inactive"}]${marker(caller.rootId)}`];
-    for (const agent of listedSubagents(subagentTree(caller.root))) {
-      lines.push(`${agent.agentId} [${agent.status}]${marker(agent.agentId)} ${agentSummary(agent)} — ${agent.description}`);
-      lines.push(`  transcript: ${agent.transcriptPath}`);
-    }
-    return ok(lines.join("\n"));
-  }
-
-  async interrupt(input: SubagentCaller & { readonly agentId: string }): Promise<SubagentToolOutcome> {
-    const caller = await this.#caller(input);
-    if (!caller.ok) return caller.outcome;
-    const view = subagentTree(caller.root).agents[input.agentId];
-    if (!view || view.legacy) return fail("UNKNOWN_AGENT", unknownAgent(input.agentId));
-    const active = this.#active.get(input.agentId);
-    if (!active || active.rootId !== caller.rootId || active.settling) return ok(notRunning(input.agentId));
-    active.controller.abort("interrupt");
-    return ok(interruptRequested(input.agentId));
   }
 
   async listModels(input: SubagentCaller): Promise<SubagentToolOutcome> {
@@ -337,53 +320,61 @@ export class SubagentManager implements SubagentHostPort {
     return ok(lines.join("\n"));
   }
 
-  running(sessionId: string): readonly RunningSubagent[] {
-    const root = this.options.getOpenSession(sessionId);
-    if (!root || root.header.lineage?.origin === "delegation") return [];
-    return listedSubagents(subagentTree(root)).flatMap(agent => {
-      const current = agent.status === "running" ? runningActivation(agent) : undefined;
-      return current ? [{ agentId: agent.agentId, description: agent.description, label: agentLabel(agent), startedAt: current.startedAt, transcriptPath: agent.transcriptPath }] : [];
-    }).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-  }
-
   /** The subagent tree of a main Session, for the UI. */
   tree(root: SessionHandle): SubagentTree { return subagentTree(root); }
 
-  /** Running activations of one main Session, as the limit counts them. */
+  /** Running subagents of one main Session, as the limit counts them. */
   runningCount(rootId: string): number { return this.#running(rootId); }
 
   /**
-   * When a main Session opens: an activation that started but never settled and is not
-   * running in this process was cut off by an exit. Record it as lost and tell the main agent.
+   * The 子 Agent panel's 停止 (design 05 §2). A background subagent is stopped through the registry, which tells
+   * the model the user stopped it; a synchronous one is interrupted and its waiting tool call returns that.
+   */
+  async stopByUser(sessionId: string, agentId: string): Promise<{ readonly ok: boolean; readonly message: string }> {
+    const active = this.#active.get(agentId);
+    if (!active || active.rootId !== sessionId || active.settling) return { ok: false, message: `Subagent ${agentId} is not running.` };
+    await active.registration;
+    if (active.registered) await this.options.backgroundTasks.stopByUser(sessionId, agentId);
+    else { active.controller.abort("user"); await active.result.promise; }
+    return { ok: true, message: `Stopped subagent ${agentId}.` };
+  }
+
+  /**
+   * When a main Session opens: an activation that started but never settled and is not running in this process
+   * was cut off by an exit. Record it as lost in the tree; a background one is reported by the registry.
    */
   async recoverLost(root: SessionHandle): Promise<void> {
     if (root.header.lineage?.origin === "delegation") return;
     for (const agent of listedSubagents(subagentTree(root))) {
       const open = runningActivation(agent);
       if (!open || this.#active.get(agent.agentId)?.activationId === open.activationId) continue;
-      const summary = settleSummary({ agentId: agent.agentId, description: agent.description, status: "lost", external: isExternal(agent.kind) });
+      const summary = settleSummary({ agentId: agent.agentId, description: agent.description, status: "lost" });
       await root.append(coreEvent("subagent/activation", { op: "settle", agentId: agent.agentId, activationId: open.activationId, status: "lost", summary, delivery: "lost", endedAt: this.#now() }));
-      await new MainAgentInbox(root).enqueue(subagentNotification({ agentId: agent.agentId, description: agent.description, status: "lost", summary, transcriptPath: agent.transcriptPath }), { taskId: agent.agentId, kind: "subagent", title: agent.description, status: "lost" }, { source: "subagent_notification" });
     }
   }
 
   /**
-   * The main Session is rewinding (agent-edit-resend-rewind.md §3.2): stop its running activations and wait until
-   * each has settled. They settle with `delivery: "lost"`, without a notice or a wake. One already settling keeps its delivery.
+   * The main Session is rewinding (agent-edit-resend-rewind.md §3.2): stop its running subagents and wait until
+   * each has settled. They settle with `delivery: "lost"`, without a notice or a wake; a background one is stopped
+   * through the registry, so it sends no notification either. One already settling keeps its delivery.
    */
   async stopAll(rootId: string): Promise<void> {
     const stopping = [...this.#active.values()].filter(activation => activation.rootId === rootId);
-    for (const activation of stopping) {
-      if (!activation.settling) activation.delivery = "dropped";
-      activation.controller.abort("rewind");
-    }
-    await Promise.all(stopping.map(activation => activation.result.promise));
+    await Promise.all(stopping.map(async activation => {
+      await activation.registration;
+      if (activation.registered) await this.options.backgroundTasks.stop(rootId, activation.agentId, "rewind").catch(report(this.options.onError));
+      else this.#stop(activation, "rewind");
+      await activation.result.promise;
+    }));
   }
 
-  /** Host shutdown: stop every activation without settling it, so the next start reports it as lost. */
+  /**
+   * Host shutdown: stop every subagent without settling it, so the next start reports it as lost. The registry is
+   * disposed first and stops the background ones the same way (`host-shutdown`).
+   */
   async dispose(): Promise<void> {
     this.#disposing = true;
-    for (const activation of this.#active.values()) activation.controller.abort("host-shutdown");
+    for (const activation of this.#active.values()) this.#stop(activation, "host-shutdown");
     await Promise.allSettled([...this.#runs]);
   }
 
@@ -391,44 +382,48 @@ export class SubagentManager implements SubagentHostPort {
 
   // ---- activation lifecycle ----
 
-  /** Continue an idle subagent with a message: reopen its Session and start a new activation. Runs inside its child lock. */
-  async #continue(view: SubagentView, input: { readonly caller: ResolvedCaller; readonly callId: string; readonly senderId: string; readonly content: string }): Promise<SubagentToolOutcome> {
-    const { caller } = input;
-    const scope = caller.scope;
-    if (!scope) return fail("PARENT_AGENT_UNAVAILABLE", `Agent ${input.senderId} is unavailable.`);
-    if (this.#running(caller.rootId) >= this.#limit) return fail("SUBAGENT_LIMIT", SUBAGENT_LIMIT_REACHED);
-    const last = [...view.activations].reverse().find(item => item.model);
-    const kind = view.kind === "fork" ? "fork" : "local";
-    const model: SubagentModelConfiguration = last?.model
-      ? { model: last.model, ...(last.reasoningEffort ? { reasoningEffort: last.reasoningEffort, thinkingEnabled: true } : {}) }
-      : this.#defaultModel(caller.rootId, kind === "local");
-    const toolNames = view.toolNames ?? Object.freeze([...EXPLORE_TOOL_NAMES, ...SUBAGENT_COORDINATION_TOOL_NAMES]);
-    const activation = this.#reserve({ rootId: caller.rootId, agentId: view.agentId, description: view.description, kind, ...(kind === "local" ? { preset: view.preset ?? "general" } : {}), transcriptPath: view.transcriptPath, toolNames, model, delivery: "parent" });
-    try {
-      activation.child = await this.options.store.open(view.agentId, { onEvent: event => this.#observe(activation, event) });
-      // An activation cut off by an exit left its Turn open; close it the way a main Session is repaired.
-      await applySessionRecovery(activation.child);
-      await new MainAgentInbox(activation.child).enqueue(input.content, undefined, { source: "agent_message", senderId: input.senderId });
-      await caller.root.append(coreEvent("subagent/activation", startData(activation, { trigger: "message", senderId: input.senderId, callId: input.callId, background: true, startedAt: this.#now() })));
-      await caller.root.flush();
-    } catch (error) {
-      this.#active.delete(view.agentId);
-      await activation.child?.close().catch(report(this.options.onError));
-      return fail("SUBAGENT_FAILED", errorText(error));
-    }
-    this.#begin(activation, scope, { wake: true });
-    void Promise.race([activation.ready.promise, activation.result.promise]).then(() => this.#refresh(view.agentId));
-    return ok(messageDelivered(view.agentId, true));
-  }
-
-  #reserve(input: Pick<Activation, "rootId" | "agentId" | "description" | "kind" | "preset" | "transcriptPath" | "toolNames" | "model" | "selectedSkillIds" | "delivery">): Activation {
-    const activation: Activation = { ...input, activationId: randomUUID(), controller: new AbortController(), settling: false, settled: false, admitted: false, startSeq: -1, ready: deferred(), result: deferred() };
+  #reserve(input: Pick<Activation, "rootId" | "agentId" | "callId" | "description" | "kind" | "preset" | "transcriptPath" | "toolNames" | "model" | "selectedSkillIds">): Activation {
+    const activation: Activation = { ...input, activationId: randomUUID(), controller: new AbortController(), delivery: "caller", registered: false, settling: false, settled: false, admitted: false, startSeq: -1, ready: deferred(), terminal: deferred(), result: deferred() };
     this.#active.set(input.agentId, activation);
     return activation;
   }
 
-  #begin(activation: Activation, scope: AgentScope, first: FirstTurn): void {
-    this.#track(this.#run(activation, scope, first));
+  #begin(activation: Activation, scope: AgentScope, task: string): void {
+    this.#track(this.#run(activation, scope, task));
+  }
+
+  /**
+   * Hand a running subagent to the background task registry (design 02 §6.1): `taskId` is the agent id, its
+   * transcript is the output, and the registry's stop ends it. Once registered, the registry delivers its result.
+   */
+  #register(activation: Activation): Promise<void> {
+    activation.delivery = "registry";
+    const registering = this.options.backgroundTasks.register({
+      taskId: activation.agentId, kind: "agent", sessionId: activation.rootId, callId: activation.callId, description: activation.description,
+      agent: { transcriptPath: activation.transcriptPath, label: kindLabel(activation) },
+      done: activation.terminal.promise,
+      output: () => this.#transcriptTail(activation),
+      stop: async reason => { this.#stop(activation, reason); await activation.result.promise; },
+    }).then(() => { activation.registered = true; });
+    activation.registration = registering.catch(() => undefined);
+    return registering;
+  }
+
+  /**
+   * Abort an activation. `host-shutdown` leaves the Journal alone; `rewind` tells no one; any other reason is a
+   * `task_stop` or the user, whose stop was the delivery. One already settling keeps its delivery.
+   */
+  #stop(activation: Activation, reason: string): void {
+    if (!activation.settling && reason !== "host-shutdown") {
+      if (reason === "rewind") activation.delivery = "dropped";
+      else if (activation.delivery === "registry") activation.delivery = "stopped";
+    }
+    activation.controller.abort(reason);
+  }
+
+  async #transcriptTail(activation: Activation): Promise<BackgroundTaskOutput> {
+    if (!isExternal(activation.kind)) await this.#refresh(activation.agentId);
+    return { text: await readTail(activation.transcriptPath, OUTPUT_TAIL_BYTES) };
   }
 
   /** Shutdown waits for every tracked run. */
@@ -453,8 +448,11 @@ export class SubagentManager implements SubagentHostPort {
     await this.#lock.run(activation.agentId, () => this.#settle(activation, undefined, outcome, result.text));
   }
 
-  /** Set up the Run, drive Turns until no message is left, then settle under the child lock. */
-  async #run(activation: Activation, parentScope: AgentScope, first: FirstTurn): Promise<void> {
+  /**
+   * Set up the Run and drive its Turn; a message that arrived after the last step runs one more Turn before it
+   * settles (it was sent while the subagent was still running). Settles under the child lock.
+   */
+  async #run(activation: Activation, parentScope: AgentScope, task: string): Promise<void> {
     const { agentId, controller } = activation;
     const child = activation.child!;
     let finalText = "";
@@ -466,7 +464,7 @@ export class SubagentManager implements SubagentHostPort {
       controller.signal.throwIfAborted();
       const lease = await this.options.acquireRun({ scope: parentScope, signal: controller.signal });
       activation.lease = lease;
-      const accepted = await lease.start(child, "content" in first ? first.content : { kind: BACKGROUND_WAKE_KIND }, activation.activationId);
+      const accepted = await lease.start(child, task, activation.activationId);
       activation.admitted = true;
       activation.scope = lease.scope.child(agentId);
       const common = { session: child, scope: activation.scope, agentId, description: activation.description, allowedToolNames: activation.toolNames, maxSteps: this.options.maxSteps ?? SUBAGENT_MAX_STEPS, signal: controller.signal };
@@ -474,11 +472,11 @@ export class SubagentManager implements SubagentHostPort {
       // A fork stays in the Agent mode of the Turn it was cut from: the copied `turn/start` is its latest until it runs its own.
       const mode = activation.kind === "fork" ? latestTurnMode(child) : undefined;
       const configuration = { agentRunId: activation.activationId, ...modelInput(activation.model), ...(mode ? { mode } : {}) };
-      let turn = await loop.runTurn("content" in first ? { ...configuration, ...(activation.selectedSkillIds ? { selectedSkillIds: activation.selectedSkillIds } : {}), content: first.content, messageId: accepted.messageId } : { ...configuration, content: "", wake: true });
+      let turn = await loop.runTurn({ ...configuration, ...(activation.selectedSkillIds ? { selectedSkillIds: activation.selectedSkillIds } : {}), content: task, messageId: accepted.messageId });
       finalText = turn.finalText;
       for (;;) {
         // Deciding and settling happen in one lock section: a message that arrives after the last step
-        // starts another Turn, and one that arrives later sees the subagent already inactive (a continuation).
+        // starts another Turn, and one that arrives later is refused (the subagent has finished).
         const current = turn;
         const again = await this.#lock.run(agentId, async () => {
           if (current.reason === "completed" && !controller.signal.aborted && new MainAgentInbox(child).hasPendingNotifications()) return true;
@@ -496,7 +494,10 @@ export class SubagentManager implements SubagentHostPort {
     }
   }
 
-  /** Record the end of an activation, deliver its result and free its resources. Runs inside the child lock and never throws. */
+  /**
+   * Record the end of an activation, hand its result to the caller or the registry and free its resources.
+   * Runs inside the child lock and never throws.
+   */
   async #settle(activation: Activation, loop: ChildLoop | undefined, outcome: { readonly status: SubagentActivationStatus; readonly error?: string }, finalText: string): Promise<void> {
     const { agentId, rootId, child } = activation;
     const onError = report(this.options.onError);
@@ -507,30 +508,27 @@ export class SubagentManager implements SubagentHostPort {
     try { omitted = child ? closingOmitted(child, activation.startSeq, rootId) : false; } catch (error) { onError(error); }
     const bounded = truncateUtf8(finalText);
     if (activation.admitted) await activation.lease!.finish(outcome.status === "completed" ? "completed" : outcome.status === "interrupted" ? "cancelled" : "failed", { status: outcome.status, text: bounded.text }).catch(onError);
-    let notified = false;
-    if (!this.#disposing) {
+    const summary = settleSummary({ agentId, description: activation.description, status: outcome.status, ...(outcome.error === undefined ? {} : { error: outcome.error }) });
+    // An exit leaves the activation open in the Journal; the next start records it as lost.
+    if (!this.#disposing && activation.controller.signal.reason !== "host-shutdown") {
       try {
         const root = await this.options.openSession(rootId);
-        const summary = settleSummary({ agentId, description: activation.description, status: outcome.status, ...(outcome.error === undefined ? {} : { error: outcome.error }), external: isExternal(activation.kind) });
-        const delivery = activation.delivery === "caller" ? "returned" : activation.delivery === "dropped" ? "lost" : "notified";
-        await root.append(coreEvent("subagent/activation", { op: "settle", agentId, activationId: activation.activationId, status: outcome.status, summary, ...(bounded.text ? { result: bounded.text } : {}), ...(bounded.truncated ? { resultTruncated: true } : {}), delivery, endedAt: this.#now() }));
-        if (delivery === "notified") {
-          const notice = subagentNotification({ agentId, description: activation.description, status: outcome.status, summary, transcriptPath: activation.transcriptPath, closing: omitted ? "omitted" : bounded });
-          await new MainAgentInbox(root).enqueue(notice, { taskId: agentId, kind: "subagent", title: activation.description, status: outcome.status }, { source: "subagent_notification" });
-          notified = true;
-        }
+        await root.append(coreEvent("subagent/activation", { op: "settle", agentId, activationId: activation.activationId, status: outcome.status, summary, ...(bounded.text ? { result: bounded.text } : {}), ...(bounded.truncated ? { resultTruncated: true } : {}), delivery: SETTLE_DELIVERY[activation.delivery], endedAt: this.#now() }));
         await root.flush();
       } catch (error) { onError(error); }
     }
     // The transcript header shows the settled status before the parent reads the notice or the result.
     if (!isExternal(activation.kind)) await this.#refresh(agentId);
-    if (notified) this.options.wake(rootId);
+    activation.terminal.resolve({
+      status: TERMINAL_STATUS[outcome.status], summary,
+      ...(omitted ? { body: "", note: CLOSING_OMITTED_NOTE } : { body: closingBody(bounded.text, bounded.truncated) }),
+    });
     await child?.close().catch(onError);
     await activation.scope?.dispose().catch(onError);
     await activation.lease?.release().catch(onError);
     if (this.#active.get(agentId) === activation) this.#active.delete(agentId);
     // A synchronous caller gets the result once the child holds nothing: no open Session, scope or Harness lease.
-    activation.result.resolve({ status: outcome.status, ...(outcome.error === undefined ? {} : { error: outcome.error }), text: bounded.text, truncated: bounded.truncated });
+    activation.result.resolve({ status: outcome.status, ...(outcome.error === undefined ? {} : { error: outcome.error }), text: bounded.text, truncated: bounded.truncated, byUser: activation.controller.signal.reason === "user" });
   }
 
   async #awaitSync(activation: Activation, signal: AbortSignal, detail: SubagentDetail, external: { readonly external?: string; readonly logMissing?: boolean } = {}): Promise<SubagentToolOutcome> {
@@ -538,15 +536,23 @@ export class SubagentManager implements SubagentHostPort {
     const winner = await new Promise<Settled | "moved">(resolve => {
       const done = (value: Settled | "moved") => { clearTimeout(timer); signal.removeEventListener("abort", abort); resolve(value); };
       void activation.result.promise.then(done);
-      // Settlement already chose the caller; its result follows.
-      const timer = setTimeout(() => { if (!activation.settling && activation.delivery === "caller") { activation.delivery = "parent"; done("moved"); } }, this.options.syncWaitMs ?? SUBAGENT_SYNC_WAIT_MS);
+      // Settlement already chose the caller; its result follows. Otherwise the registry takes over delivery now.
+      const timer = setTimeout(() => {
+        if (activation.settling || activation.delivery !== "caller") return;
+        // Without a registry entry nobody would hear of it: stop it rather than leave it running unseen.
+        this.#register(activation).catch(error => { report(this.options.onError)(error); this.#stop(activation, "rewind"); });
+        done("moved");
+      }, this.options.syncWaitMs ?? SUBAGENT_SYNC_WAIT_MS);
       timer.unref?.();
       const abort = () => activation.controller.abort("parent-abort");
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted) abort();
     });
-    if (winner === "moved") return ok(movedToBackground({ agentId, description, transcriptPath, ...external }), withStatus(detail, "running"));
-    return ok(syncResult({ agentId, description, transcriptPath, ...(external.logMissing ? { logMissing: true } : {}), status: winner.status, ...(winner.error === undefined ? {} : { error: winner.error }), result: winner.text, truncated: winner.truncated }), withStatus(detail, winner.status));
+    if (winner === "moved") {
+      await activation.registration;
+      return ok(movedToBackground({ agentId, description, transcriptPath, ...external }), withStatus(detail, "running"));
+    }
+    return ok(syncResult({ agentId, description, transcriptPath, ...(external.logMissing ? { logMissing: true } : {}), status: winner.status, ...(winner.error === undefined ? {} : { error: winner.error }), result: winner.text, truncated: winner.truncated, ...(winner.byUser ? { byUser: true } : {}) }), withStatus(detail, winner.status));
   }
 
   #observe(activation: Activation, event: SessionEventEnvelopeV1): void {
@@ -588,11 +594,6 @@ export class SubagentManager implements SubagentHostPort {
     const current = parent.model ? usable.find(item => item.key === parent.model) : undefined;
     if (current && !(current.reasoningEfforts as readonly string[]).includes(effort)) return { ok: false, outcome: fail("UNKNOWN_EFFORT", unknownEffort(effort, current.key)) };
     return { ok: true, config: { ...parent, thinkingEnabled: true, reasoningEffort: effort } };
-  }
-
-  #defaultModel(rootId: string, useSetting: boolean): SubagentModelConfiguration {
-    const chosen = this.#chooseModel(rootId, undefined, undefined, useSetting);
-    return chosen.ok ? chosen.config : {};
   }
 
   #running(rootId: string): number { return [...this.#active.values()].filter(item => item.rootId === rootId).length; }
@@ -644,24 +645,25 @@ function canonicalFile(path: string): string {
   try { return realpathSync(path); } catch { return resolvePath(path); }
 }
 
-/** `general · gpt-5.5 · started 14:02`, `fork · 2 turns`, `codex` (design 02 §2.5). */
-function agentSummary(agent: SubagentView): string {
-  const label = agentLabel(agent);
-  if (agent.status === "running") {
-    const current = runningActivation(agent)!;
-    const model = current.model ?? lastActivationModel(agent);
-    return [label, ...(model ? [model] : []), `started ${clock(current.startedAt)}`].join(" · ");
-  }
-  if (agent.status === "inactive") return `${label} · ${agent.activations.length} ${agent.activations.length === 1 ? "turn" : "turns"}`;
-  return label;
-}
+/** The task's kind label in `task_list` and the 子 Agent panel: the preset, `fork`, or the CLI. */
+function kindLabel(activation: Pick<Activation, "kind" | "preset">): string { return activation.kind === "local" ? activation.preset ?? "general" : activation.kind; }
 
-function agentLabel(agent: SubagentView): string { return agent.kind === "local" ? agent.preset ?? "general" : agent.kind; }
+const SETTLE_DELIVERY: Readonly<Record<Delivery, SubagentDelivery>> = { caller: "returned", registry: "notified", stopped: "stopped", dropped: "lost" };
+/** The registry has no `interrupted` or `max_steps`: a stopped subagent is `stopped`, one cut off by the step limit `failed`. */
+const TERMINAL_STATUS: Readonly<Record<SubagentActivationStatus, BackgroundTaskTerminal["status"]>> = { completed: "completed", interrupted: "stopped", failed: "failed", max_steps: "failed", lost: "failed" };
 
-/** Local wall-clock `HH:MM`. */
-export function clock(iso: string): string {
-  const time = new Date(iso);
-  return Number.isNaN(time.getTime()) ? iso : `${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}`;
+/** The last `bytes` of a file, starting at a line boundary; empty when the file does not exist yet. */
+async function readTail(path: string, bytes: number): Promise<string> {
+  let file;
+  try { file = await open(path, "r"); } catch { return ""; }
+  try {
+    const { size } = await file.stat();
+    const start = Math.max(0, size - bytes);
+    const buffer = Buffer.alloc(size - start);
+    await file.read(buffer, 0, buffer.length, start);
+    const text = buffer.toString("utf8");
+    return start === 0 ? text : text.slice(text.indexOf("\n") + 1);
+  } finally { await file.close(); }
 }
 
 /** True while the child's last tool call of this activation was a message to its parent and no input was claimed since. */
@@ -711,9 +713,9 @@ function withStatus(detail: SubagentDetail, status: string): SubagentDetail {
   return detail.map(item => item.label === "delegation" ? { ...item, value: { ...record(item.value), status } } : item);
 }
 
-function startData(activation: Activation, input: { readonly trigger: "spawn" | "message"; readonly senderId?: string; readonly callId: string; readonly background: boolean; readonly startedAt: string }): Record<string, RuntimeV2JsonValue> {
+function startData(activation: Activation, input: { readonly trigger: "spawn"; readonly callId: string; readonly background: boolean; readonly startedAt: string }): Record<string, RuntimeV2JsonValue> {
   return {
-    op: "start", agentId: activation.agentId, activationId: activation.activationId, trigger: input.trigger, ...(input.senderId ? { senderId: input.senderId } : {}),
+    op: "start", agentId: activation.agentId, activationId: activation.activationId, trigger: input.trigger,
     callId: input.callId, background: input.background, ...(activation.model.model ? { model: activation.model.model } : {}),
     ...(activation.model.reasoningEffort ? { reasoningEffort: activation.model.reasoningEffort } : {}), startedAt: input.startedAt,
   };

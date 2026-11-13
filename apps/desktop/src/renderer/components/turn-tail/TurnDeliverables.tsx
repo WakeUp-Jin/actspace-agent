@@ -58,7 +58,7 @@ export function TurnDeliverables({ files, sessionId, workspaceRoot }: {
       {collapsible ? (
         <button
           type="button"
-          className="inline-flex min-w-0 items-center gap-1 self-center rounded-act-sm border-0 bg-transparent px-[11px] py-px text-act-xs leading-[18px] text-text-faint hover:bg-hover-overlay focus-visible:outline-2 focus-visible:outline-focus-ring"
+          className="inline-flex min-w-0 items-center gap-1 self-center rounded-act-sm border-0 bg-transparent px-[11px] py-px text-act-xs leading-4.5 text-text-faint hover:bg-hover-overlay focus-visible:outline-2 focus-visible:outline-focus-ring"
           aria-expanded={expanded}
           aria-label={expanded ? "收起交付文件列表" : `展开全部 ${files.length} 个交付文件`}
           onClick={() => setExpanded((value) => !value)}

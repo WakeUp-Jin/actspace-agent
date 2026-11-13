@@ -1,5 +1,4 @@
 import { memo } from "react";
-import { PerformancePanel } from "./PerformancePanel";
 import { useSessionBrowse } from "../session/SessionBrowseContext";
 import { Blocks, Settings, SquarePen } from "lucide-react";
 import type { SessionListItem, WorkspaceEntry } from "@actspace/shared";
@@ -134,7 +133,6 @@ export const Sidebar = memo(function Sidebar({
         <Settings size={14} />
         设置
       </button>
-      <PerformancePanel />
     </aside>
   );
 });

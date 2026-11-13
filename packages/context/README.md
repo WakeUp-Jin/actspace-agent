@@ -22,18 +22,17 @@ kind: "package-group"
 | `context-runtime` | 实现 | 会话 | 开 | 来源：时间、系统、工作区等运行环境；提供 `context.source.runtime` |
 | `context-conversation` | 实现 | 会话 | 开 | 来源：之前的对话；提供 `context.source.conversation` |
 | `context-tools` | 实现 | 会话 | 开 | 来源：每个工具怎么用；提供 `context.source.tools` |
-| `context-background-tasks` | 实现 | 会话 | 开 | 来源：正在运行的后台任务（只给主 Agent）；提供 `context.source.background-tasks` |
-| `context-subagents` | 实现 | 会话 | 开 | 来源：正在运行的子智能体及其 transcript 路径（只给主 Agent）；提供 `context.source.subagents` |
+| `context-background-tasks` | 实现 | 会话 | 开 | 来源：正在运行的后台任务（后台 Bash 和后台子智能体，子智能体带 transcript 路径；只给主 Agent）；提供 `context.source.background-tasks` |
 | `context-disclosure` | 实现 | 会话 | 开 | 渐进式披露：按需把工作区路径和文件摘要告诉 Agent，并恢复披露状态；提供 `context.disclosure` |
 | `context-compaction` | 实现 | 会话 | 开 | 压缩策略、摘要器和策略注册；通过 append-only 的 Surface 替换记录摘要，不删原始日志；提供 `compaction.runtime`、`compaction.surface` |
 
 ## 包之间怎么连
 
-- **来源。** 每个 `context-*` 来源插件 inject `context.assembly`，用 `@actspace/context-assembly` 的 `publish(ctx, 种类, 工厂, 角色?)` 向登记表登记，同时仍提供 `context.source.<种类>` 作为可见契约。会话插件 `agent-factory`（在 [`core/runtime`](../core/README.md)）不再认识任何种类名：它只 inject `context.assembly`，按 Agent 角色（`main` / `subagent` / `fork`）调 `sourcesFor` 拿到搭好的 `ContextSourceRegistry`。哪些种类必须有由 `context-assembly` manifest 的 `config.required` 决定（默认 `system`、`conversation`），缺了在第一次建 Agent 时报错；`background-tasks`、`subagents` 自己声明只给 `main`。
+- **来源。** 每个 `context-*` 来源插件 inject `context.assembly`，用 `@actspace/context-assembly` 的 `publish(ctx, 种类, 工厂, 角色?)` 向登记表登记，同时仍提供 `context.source.<种类>` 作为可见契约。会话插件 `agent-factory`（在 [`core/runtime`](../core/README.md)）不再认识任何种类名：它只 inject `context.assembly`，按 Agent 角色（`main` / `subagent` / `fork`）调 `sourcesFor` 拿到搭好的 `ContextSourceRegistry`。哪些种类必须有由 `context-assembly` manifest 的 `config.required` 决定（默认 `system`、`conversation`），缺了在第一次建 Agent 时报错；`background-tasks` 自己声明只给 `main`。
 - **披露。** `context-disclosure` inject `context.engine`、`context.assembly` 和 `actspace.host.agent`；启用时自己向协调器登记压缩钩子与 Context 水合（`CompactionDisclosure.hydrate`），向 `context.assembly` 登记 `disclosure` 来源和工具结果观察者。`agent-factory` 不引用披露包。
 - **压缩。** `context-compaction` inject `llm.service`、`context.engine`、`llm.auxiliary-requests`；策略的选择和提交协调仍在引擎的 `compaction.ts`，压缩包只提供策略和摘要器。
 - **提示词。** `prompt` inject `actspace.host.prompt`，来源（`context-rules` 等）借 `@actspace/prompt/source-support` 向引擎贡献内容。Prompt 只贡献内容，引擎负责组织和转换，`llm-service` 负责真实请求。
-- 引擎 inject `session.journal`。`context-background-tasks` inject `actspace.host.background-tasks`；`context-subagents` inject `actspace.host.subagents`。
+- 引擎 inject `session.journal`。`context-background-tasks` inject `actspace.host.background-tasks`。
 
 ## 入口与测试
 

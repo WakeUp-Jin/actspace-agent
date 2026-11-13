@@ -26,6 +26,7 @@ export function describeSupplementEvent(owner: string, id: string, text: string,
     const runtime = describeRuntime(text, previous);
     if (runtime) return runtime;
   }
+  // 旧会话：子智能体清单曾经由单独的 context-subagents 写；现在并进后台任务清单。
   if (owner === "actspace.context-subagents" && id === "subagents") {
     const items = listItems(text, "Running subagents");
     if (items) return described("subagents", "子 Agent 清单更新", running(items.map(item => field(item, 1))), `${items.length} 个运行中`, {});

@@ -226,7 +226,7 @@ function RightPanelLauncher({
       {
         id: "subagents",
         label: "子 Agent",
-        description: "这次对话派出的子智能体，空闲后还能继续派活",
+        description: "这次对话派出的子智能体，每个做完一件事就结束",
         icon: <MessageSquare size={15} />,
         disabled: !sessionId,
         onClick: () => sessionId && openTab({ id: "subagents", kind: "subagents", title: "子 Agent", sessionId }),

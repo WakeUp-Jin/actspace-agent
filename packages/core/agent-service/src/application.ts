@@ -87,8 +87,8 @@ type BackgroundTaskRegistryLike = {
 /** The parts of the subagent manager (`subagent.manager`) the application reads. */
 type SubagentManagerLike = {
   readonly activeCount: number;
-  running(sessionId: string): readonly unknown[];
-  interrupt(input: { readonly sessionId: string; readonly callId: string; readonly agentId: string }): Promise<{ readonly ok: boolean; readonly text: string }>;
+  runningCount(sessionId: string): number;
+  stopByUser(sessionId: string, agentId: string): Promise<{ readonly ok: boolean; readonly message: string }>;
   stopAll?(rootId: string): Promise<void>;
 };
 type AgentRuntimeService = { readonly runs: ApplicationRunService; readonly subagents?: SubagentManagerLike; readonly backgroundTasks?: BackgroundTaskRegistryLike };
@@ -102,7 +102,7 @@ export type AgentApplicationContract = {
   readonly listBackgroundTasks: (sessionId: string) => readonly BackgroundBashTaskView[];
   readonly readBackgroundTaskOutput: (sessionId: string, taskId: string) => Promise<import("@actspace/shared/runtime-v2").BackgroundTaskOutputView>;
   readonly stopBackgroundTask: (sessionId: string, taskId: string) => Promise<BackgroundBashTaskView>;
-  /** The 子 Agent panel's 停止: same effect as `interrupt_agent` from the main agent (design 05 §2). */
+  /** The 子 Agent panel's 停止 (design 05 §2): a background subagent stops like `task_stop` and the model is told the user stopped it; a synchronous one returns that to its waiting call. */
   readonly interruptSubagent: (sessionId: string, agentId: string) => Promise<{ readonly ok: boolean; readonly message: string }>;
   readonly isIdleForReconfigure: () => Promise<boolean>;
   readonly readSessionProjection: ApplicationSessionService["readProjection"];
@@ -277,8 +277,7 @@ export class AgentApplication implements AgentApplicationContract {
   }
   async interruptSubagent(sessionId: string, agentId: string): Promise<{ readonly ok: boolean; readonly message: string }> {
     if (!this.#subagents) throw new Error("Subagents are unavailable in this runtime.");
-    const outcome = await this.#subagents.interrupt({ sessionId, callId: `user-interrupt:${agentId}`, agentId });
-    return { ok: outcome.ok, message: outcome.text };
+    return this.#subagents.stopByUser(sessionId, agentId);
   }
   #requireBackgroundTasks(): BackgroundTaskRegistryLike {
     if (!this.#backgroundTasks) throw new Error("Background tasks are unavailable in this runtime.");
@@ -393,7 +392,7 @@ export class AgentApplication implements AgentApplicationContract {
     this.#modeWriter.assertAvailable(sessionId);
     return this.#runs.service.exclusive(sessionId, async () => {
       // A running subagent took this Session's mode when it started; switching under it is refused as before.
-      if (this.#backgroundTasks?.hasRunning(sessionId) || this.#subagents?.running(sessionId).length) throw new Error("SESSION_BUSY");
+      if (this.#backgroundTasks?.hasRunning(sessionId) || this.#subagents?.runningCount(sessionId)) throw new Error("SESSION_BUSY");
       const session = await this.#sessions.resume(sessionId);
       const snapshot = this.#sessions.snapshot(session);
       if (expectedRevision !== undefined && expectedRevision !== (snapshot.agentModeRevision ?? 0)) throw new Error("AGENT_MODE_CONFLICT");

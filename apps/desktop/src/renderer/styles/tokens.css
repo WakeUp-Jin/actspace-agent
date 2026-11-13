@@ -13,17 +13,6 @@
     Arial,
     sans-serif;
   --act-font-display: var(--act-font-ui);
-  /* 聊天区 AI 正文的阅读字体：西文衬线，中文落到苹方 / 雅黑（front-聊天区Markdown渲染规范.md §6.1）。 */
-  --act-font-reading:
-    ui-serif,
-    "New York",
-    "Iowan Old Style",
-    Charter,
-    Georgia,
-    "PingFang SC",
-    "Hiragino Sans GB",
-    "Microsoft YaHei",
-    serif;
   --act-font-mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
   /* 代码/等宽字号，由外观设置驱动（代码块 / diff / bash 输出消费）。 */
   --act-font-mono-size: 13px;

@@ -20,7 +20,7 @@ export type RightPanelLauncherItem = {
 };
 
 const LAUNCHER_CLASS = "flex min-h-0 flex-1 flex-col gap-px overflow-auto bg-surface p-2.5";
-const LAUNCHER_CAPTION_CLASS = "m-0 mt-0.5 mb-1.5 px-2 text-act-xs leading-[1.6] text-text-faint";
+const LAUNCHER_CAPTION_CLASS = "m-0 mt-0.5 mb-1.5 px-2 text-act-xs leading-relaxed text-text-faint";
 const LAUNCHER_ITEM_CLASS =
   "group grid h-9 w-full min-w-0 grid-cols-[16px_auto_minmax(0,1fr)] items-center gap-2.5 rounded-act-sm border-0 bg-transparent px-2.5 text-left text-act-sm font-medium text-text-main transition-colors duration-(--motion-fast) hover:bg-hover-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:opacity-45 disabled:hover:bg-transparent [cursor:pointer] disabled:[cursor:not-allowed]";
 const LAUNCHER_ICON_CLASS =

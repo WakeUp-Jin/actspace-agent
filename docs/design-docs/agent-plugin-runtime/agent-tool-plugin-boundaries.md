@@ -14,7 +14,7 @@ Tool Runtime 只拥有注册、参数验证、权限准入、prepared execution�
 | `@actspace/tool-fs-search` | grep、glob | 授予 `actspace.host.filesystem`（可选） |
 | `@actspace/tool-fs-write` | edit_file、write_file、delete_file | 授予 `actspace.host.filesystem`（可选） |
 | `@actspace/tool-shell` | bash | 授予 `actspace.host.process`（可选）、`actspace.host.background-tasks`、`actspace.host.session` |
-| `@actspace/tool-background-tasks` | task_list、task_output、task_stop、task_wait | `actspace.host.background-tasks` |
+| `@actspace/tool-background-tasks` | task_list、task_output、task_stop | `actspace.host.background-tasks` |
 | `@actspace/tool-web` | web、web_search、web_fetch | `actspace.host.tools.web-tools` |
 | `@actspace/tool-image-generation` | generate_image | `actspace.host.tools.image-generation` |
 | `@actspace/tool-image-inspection` | inspect_image | `actspace.host.tools.image-inspection` |

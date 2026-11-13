@@ -52,7 +52,7 @@ export function AgentStatusIcon({ status, size = 13 }: { status: AgentMessage["s
 
 /** 对话卡片标题行右端的状态：固定宽度，状态切换时描述不跳。 */
 export function AgentStatus({ status }: { status: AgentMessage["status"] }) {
-  return <span className={`inline-flex w-[68px] shrink-0 items-center gap-1.5 whitespace-nowrap text-act-xs leading-[1.4] ${status === "failed" ? "text-danger" : "text-text-muted"}`}>
+  return <span className={`inline-flex w-[68px] shrink-0 items-center gap-1.5 whitespace-nowrap text-act-xs leading-snug ${status === "failed" ? "text-danger" : "text-text-muted"}`}>
     <AgentStatusIcon status={status} />
     {labels[status]}
   </span>;

@@ -51,9 +51,9 @@ it("boots the checked-in tree with shell and Todo disabled, leaves file tools av
     expect(mounted).toContain("web-tools");
     expect(onProcesses).not.toHaveBeenCalled();
     const assembly = lease.getService<import("@actspace/context-assembly").ContextAssemblyService>("context.assembly")!;
-    expect(assembly.kinds("main")).toEqual(expect.arrayContaining(["system", "rules", "skills", "runtime", "conversation", "tools", "background-tasks", "subagents"]));
+    expect(assembly.kinds("main")).toEqual(expect.arrayContaining(["system", "rules", "skills", "runtime", "conversation", "tools", "background-tasks"]));
+    expect(assembly.kinds("main")).not.toContain("subagents");
     expect(assembly.kinds("subagent")).not.toContain("background-tasks");
-    expect(assembly.kinds("subagent")).not.toContain("subagents");
     expect(profile.context.get!("session.journal")).toMatchObject({ registry: expect.objectContaining({ digest: expect.any(String) }) });
     const journal = profile.context.get!("session.journal") as { registry: { list(): readonly { type: string }[] } };
     expect(journal.registry.list().some(codec => codec.type === "plugin/actspace.todo/todo-write")).toBe(false);

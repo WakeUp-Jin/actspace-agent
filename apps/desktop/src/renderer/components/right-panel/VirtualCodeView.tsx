@@ -65,7 +65,7 @@ export function VirtualCodeView({ lines, language, renderLine, children }: {
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto focus-visible:outline-2 focus-visible:outline-focus-ring"
       tabIndex={0} aria-label="文件内容" {...handlers}>
-      <div className="act-code-hl relative w-full font-mono text-act-xs leading-[1.55]"
+      <div className="act-code-hl relative w-full font-mono text-act-xs leading-relaxed"
         data-code-total-lines={lines.length} data-code-visible-lines={items.length}
         style={{ height: virtualizer.getTotalSize() }}>
         {items.map(item => (

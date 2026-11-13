@@ -55,8 +55,8 @@ const CASES: Record<string, Case> = {
   "hosts.preview": { spec: contract.hosts.preview, valid: [{ hostId: "h", sessionId: "s", artifactId: "a" }], invalid: [{ hostId: "h", sessionId: "s" }] },
   "hosts.download": { spec: contract.hosts.download, valid: [{ hostId: "h", sessionId: "s", artifactId: "a" }], invalid: [{ hostId: "h", sessionId: 1, artifactId: "a" }] },
   "hosts.call": { spec: contract.hosts.call, valid: [{ hostId: "h", method: "host.describe", params: {} }], invalid: [{ hostId: "h", method: "auth.pair", params: {} }, { hostId: "h", method: "nope", params: {} }, { hostId: "h", method: "host.describe", params: null }] },
-  // 性能、任务与审批
-  "performance.setActive": { spec: contract.performance.setActive, valid: [true, false], invalid: [undefined, "true", 1] },
+  // 资源监控、任务与审批
+  "resourceMonitor.watch": { spec: contract.resourceMonitor.watch, valid: [true, false], invalid: [undefined, "true", 1] },
   "tasks.command": {
     spec: contract.tasks.command,
     valid: [
@@ -141,7 +141,7 @@ const CASES: Record<string, Case> = {
 
 /** 无入参通道只接受 undefined。 */
 const NO_INPUT_SPECS: InvokeSpec<unknown, unknown>[] = [
-  contract.app.getBootstrapState, contract.performance.sample, contract.dialogs.selectImages, contract.workspaces.list, contract.workspaces.listOpenTools,
+  contract.app.getBootstrapState, contract.resourceMonitor.copySnapshot, contract.dialogs.selectImages, contract.workspaces.list, contract.workspaces.listOpenTools,
   contract.harnessStats.getStatus, contract.settings.get, contract.settings.getV4, contract.settings.readSystemPrompt, contract.settings.getSearchUsage,
   contract.quickOpen.consume, contract.quickOpen.getShortcutStatus, contract.modelConnections.list, contract.englishLearning.getState, contract.englishLearning.stopSpeech,
   contract.englishLearning.previewSpeech, contract.browserBridge.getStatus, contract.browserBridge.connect, contract.browserBridge.prepareUpdate, contract.browserBridge.disconnect,

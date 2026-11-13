@@ -1,6 +1,6 @@
 # ActSpace v2 Agent 与 Subagent 设计规范
 
-> v2 产品与行为契约基线；应用操作通过 Profile App Service，启动生命周期见 [Runtime 与 Composition](agent-target-runtime-architecture.md)。精确事件名以 [DSH 事件模型](agent-spec-dsh-event-model.md)为准；下文 enqueue/claim 等描述表达行为，不新增同名 wire event。当前的工具、事件（`subagent/spawned`、`subagent/activation`）、后台与续派、模型、transcript 和通知的现状见[子智能体运行规范](../collaboration/agent-subagent-runtime.md)；下文 §6–§13 里的 delegation 流程是对应的行为契约。
+> v2 产品与行为契约基线；应用操作通过 Profile App Service，启动生命周期见 [Runtime 与 Composition](agent-target-runtime-architecture.md)。精确事件名以 [DSH 事件模型](agent-spec-dsh-event-model.md)为准；下文 enqueue/claim 等描述表达行为，不新增同名 wire event。当前的工具、事件（`subagent/spawned`、`subagent/activation`）、同步与后台、模型、transcript 和通知的现状见[子智能体运行规范](../collaboration/agent-subagent-runtime.md)；下文 §6–§13 里的 delegation 流程是对应的行为契约。
 >
 > 本文固定 v2 的 Agent 产品形态、Preset、子 Agent 生命周期、Session lineage、工具限制、取消和结果提交语义。字段名、TypeScript API、事件名称与预算数值以代码与上面的运行规范为准，但不得改变本文固定的产品范围。
 
@@ -15,14 +15,14 @@ ActSpace v2 采用一个主 Agent 和统一的 Subagent seam：
 - 子 Agent 只向父 Agent 返回一个可持久化的终态结果，不把自己的可变 conversation 合并进父 Session；
 - Todo 状态使用 durable event 表达，由 Session 投影给模型和固定前端。
 
-子 Agent 默认后台运行；一次激活到一个 terminal result 后进入空闲，之后可由 `send_message` 续派下一次激活（冷恢复，沿用创建时固定的工具集）。续派不是转移控制权：父 Agent 始终保留决定权，子 Agent 不能再委派（深度固定 1）。本机 Codex / Claude Code 子 Agent 只跑一轮、不能续派。
+子 Agent 是父 Agent 的临时上下文窗口：默认同步运行，只有一次激活，到一个 terminal result 后关闭，不续派；后台运行的子 Agent 登记进后台任务登记表，由登记表通知结果。父 Agent 始终保留决定权，子 Agent 不能再委派（深度固定 1）。本机 Codex / Claude Code 子 Agent 同样只跑一轮。
 
 ## 2. 五个核心概念
 
 | 概念 | 语义 |
 |---|---|
 | main Agent | 用户 Session 的顶层执行者；一个 Session 同时最多一个 active turn |
-| Subagent invocation | 父 Agent 发起的一次有界委派，也是父 Session 中可审计的调用事实；每次激活（创建或续派）各有一个 terminal result |
+| Subagent invocation | 父 Agent 发起的一次有界委派，也是父 Session 中可审计的调用事实；只有一次激活，对应一个 terminal result（老会话里续派产生的多次激活只读展示） |
 | child Session | 子任务自己的 append-only Journal、Surface、lineage 和恢复证据 |
 | Agent scope | 子 Agent 的身份、贡献可见性和资源所有权，不是安全沙箱 |
 | static Preset | Boot 时解析并验证、Runtime ready 后不可变的 Agent 配方 |
@@ -208,11 +208,11 @@ Todo 可以继续通过工具形态供模型操作，但工具 result 不是状�
 | child 执行失败 | child 写 terminal failure，父 Agent 收到一个 linked failed result |
 | parent 取消 | 级联取消 child，等待有界 flush / dispose，返回 aborted 事实 |
 | child 已完成但 parent result 未提交即崩溃 | 恢复时幂等补齐 link，不重新执行 child |
-| child 尚未完成时进程崩溃 | repair child 的 open Turn / Step / Tool，父调用提交 aborted 或 outcome-unknown（重启后补 `lost`）；旧 activation 不被恢复，需要时用 `send_message` 开新的一次激活 |
+| child 尚未完成时进程崩溃 | repair child 的 open Turn / Step / Tool，父调用提交 aborted 或 outcome-unknown（重启后补 `lost`）；旧 activation 不被恢复，需要时父 Agent 再开一个新的子 Agent |
 | 外部副作用结果无法确认 | 标记 outcome-unknown，禁止把它伪装成未开始后自动重试 |
 | Runtime shutdown | 停止新委派，取消并 drain active child，flush 后再 dispose root Context |
 
-child Session 可以被检查、导出和用于审计。续派走子 Agent 管理器自己的冷恢复：重新打开 child Session、补齐未正常结束的 Turn，再取运行租约；不通过主会话的 public continuation / resume 入口，也不接受主会话的任务调度。
+child Session 可以被检查、导出和用于审计。子 Agent 结束后不再运行，也不通过主会话的 public continuation / resume 入口恢复，不接受主会话的任务调度。
 
 ## 14. Startup Validation 与诊断
 
@@ -232,7 +232,7 @@ Runtime diagnostics 至少展示 preset identity / version、child / parent line
 
 同一条 pending Task 可以调整顺序、指定交付、撤回或删除；不再维护 next-step/next-turn 两套用户队列。停止当前 Run 会暂停队列，显式继续后再调度；重启恢复不重复领取已结算内容。详细字段、幂等性和模式限制见[Task/Run 规范](agent-task-run-lifecycle.md)。
 
-Agent Inbox 仍用于后台 `task_notification`、`subagent_notification`、`agent_message` 等领域输入，因此对应 codec/replay 不能删除。它不再拥有主用户任务队列。续派的每次激活启动时取得当前 Harness 租约。
+Agent Inbox 仍用于后台 `task_notification`（后台 Bash 与后台子 Agent）、`agent_message` 等领域输入，老会话的 `subagent_notification` 也照常回放，因此对应 codec/replay 不能删除。它不再拥有主用户任务队列。子 Agent 的激活启动时取得当前 Harness 租约。
 
 ## 16. 明确不做
 
@@ -246,4 +246,4 @@ v2 明确不包含：
 - 旧 Agent / Explore executor、ContextManager、ToolManager 和 bridge 的兼容壳；
 - Kairos 作为 Agent 形态或候选插件。
 
-main Agent 自身仍是正常的多轮 Session，并通过 TaskLedger 接受用户输入；子 Agent 的续派只发生在激活之间，不改变这一点。
+main Agent 自身仍是正常的多轮 Session，并通过 TaskLedger 接受用户输入；子 Agent 只有一次激活，不改变这一点。

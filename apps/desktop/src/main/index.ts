@@ -1,7 +1,7 @@
 import { RemoteDesktopAdapter } from "./remote-hosts/desktop-adapter";
 import { RemoteHostRegistry } from "./remote-hosts/registry";
 import { registerRemoteHostIpc } from "./remote-hosts/ipc";
-import { registerPerformanceIpc } from "./performance-ipc";
+import { ResourceMonitorController } from "./resource-monitor/monitor-controller";
 import { DesktopSpeechPlayback } from "./speech-playback";
 import { registerEnglishLearningIpc } from "./runtime-v2/english-learning-ipc";
 import { BROWSER_PLUGIN_ID, disabledPluginIds, ENGLISH_LEARNING_PLUGIN_ID, resolvePluginSettings, resolvePluginSwitches } from "./plugins/plugin-switches";
@@ -32,7 +32,7 @@ import { ProviderNetworkService } from "./runtime-v2/provider-network-service";
 import { QuickOpenShortcutController } from "./quick-open-shortcut-controller";
 import { registerFixedRendererIpc, type FixedRendererIpcRegistration } from "./runtime-v2/fixed-renderer-ipc";
 import { LocalUpdateService } from "./local-update-service";
-import { attachWindowLifecycle, installProcessErrorLogging } from "./main-lifecycle";
+import { attachWindowLifecycle, installProcessErrorLogging, runShutdownSteps } from "./main-lifecycle";
 import { attachNavigationGuards, blockWebviewAttachment, buildContentSecurityPolicy, createAppUrlMatcher, createMainWindowOptions, installContentSecurityPolicy } from "./window-security";
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
@@ -42,7 +42,7 @@ const APP_DISPLAY_NAME = process.env.ACTSPACE_DEV_APP_NAME?.trim() || "ActSpace"
 let startupLogPath: string | undefined;
 let mainWindow: BrowserWindow | undefined;
 let runtimeV2Registry: DesktopRuntimeV2Registry | undefined;
-let disposePerformanceIpc: (() => void) | undefined;
+let resourceMonitor: ResourceMonitorController | undefined;
 let disposeEnglishLearningIpc: (() => void) | undefined;
 let disposePluginsIpc: (() => void) | undefined;
 let disposePythonRuntimeIpc: (() => void) | undefined;
@@ -163,8 +163,13 @@ async function createMainWindow(): Promise<BrowserWindow> {
   mainWindow = win;
   attachNavigationGuards(win, createAppUrlMatcher({ devServerUrl: DEV_SERVER_URL, indexHtmlPath }));
   attachWindowLifecycle(win, {
-    onClosed: () => { if (mainWindow === win) mainWindow = undefined; },
+    onClosed: () => {
+      if (mainWindow === win) mainWindow = undefined;
+      // 资源监控悬浮窗不该让应用在 Windows / Linux 上关不掉。
+      if (process.platform !== "darwin") resourceMonitor?.closeFloatWindow();
+    },
   });
+  resourceMonitor?.attachMainWindow(win);
   if (DEV_SERVER_URL) await win.loadURL(DEV_SERVER_URL);
   else await win.loadFile(indexHtmlPath);
   return win;
@@ -260,7 +265,15 @@ async function bootRuntime(roots: AppDataRoots): Promise<void> {
     }
   };
   if (browserBridgeService) scheduleBrowserSync(1_000);
-  disposePerformanceIpc = registerPerformanceIpc(getMainWindowOrNull);
+  resourceMonitor = new ResourceMonitorController({
+    settings: settingsService,
+    getMainWindow,
+    dataRoot: roots.dataRoot,
+    preloadPath: join(__dirname, "..", "preload", "index.bundle.js"),
+    devServerUrl: DEV_SERVER_URL,
+    distRoot: join(__dirname, "..", "..", "dist"),
+    log: (message, details) => void logMain(message, details),
+  });
   disposeEnglishLearningIpc = englishLearningEnabled
     ? registerEnglishLearningIpc({ registry: runtimeV2Registry, settings: settingsService, getMainWindow: getMainWindowOrNull })
     : registerDisabledEnglishLearningIpc({ getMainWindow: getMainWindowOrNull });
@@ -299,7 +312,8 @@ app.whenReady().then(async () => {
   }
   await createMainWindow();
   app.on("activate", async () => {
-    if (BrowserWindow.getAllWindows().length === 0) await createMainWindow();
+    // 资源监控悬浮窗也是窗口，不能按窗口总数判断主窗口在不在。
+    if (!getMainWindow()) await createMainWindow();
   });
 }).catch((error: unknown) => {
   void logMain("desktop bootstrap failed", { error: error instanceof Error ? error.message : String(error) });
@@ -317,30 +331,27 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   const timeout = setTimeout(() => app.exit(1), 35_000);
   void (async () => {
-    try {
-      const window = getMainWindow();
-      if (window) window.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.appShuttingDown, { reason: "normal" });
-      remoteDesktop?.dispose();
-      await remoteHosts?.dispose();
-      disposeRemoteHostIpc?.();
-      await runtimeV2Registry?.dispose();
-      await providerNetworkService?.dispose();
-      quickOpenShortcutController?.dispose();
-    } catch (error) {
-      await logMain("v2 shutdown incomplete", { error: error instanceof Error ? error.message : String(error) });
-    } finally {
-      // 两者都是同步、不抛错的清理；放在 finally 里，前面的异步清理失败时也照样执行。
-      browserBridgeService?.dispose();
-      localUpdateService?.dispose();
-      disposePerformanceIpc?.();
-      disposeEnglishLearningIpc?.();
-      disposePluginsIpc?.();
-      disposePythonRuntimeIpc?.();
-      await speechPlayback?.dispose();
-      clearTimeout(timeout);
-      disposeRuntimeV2DesktopShell?.();
-      fixedRendererIpc?.dispose();
-      app.exit(0);
-    }
+    // 每一步单独兜错：任何一步抛错（比如窗口已销毁时解绑监听）都只记日志，后面的步骤照常执行，
+    // 最后一定走到 app.exit(0)，不会卡在「正在安全关闭」直到 35 秒兜底。
+    await runShutdownSteps([
+      ["notify renderer", () => getMainWindow()?.webContents.send(RUNTIME_V2_FIXED_RENDERER_CHANNELS.appShuttingDown, { reason: "normal" })],
+      ["remote desktop", () => remoteDesktop?.dispose()],
+      ["remote hosts", () => remoteHosts?.dispose()],
+      ["remote host ipc", () => disposeRemoteHostIpc?.()],
+      ["runtime", () => runtimeV2Registry?.dispose()],
+      ["provider network", () => providerNetworkService?.dispose()],
+      ["quick open", () => quickOpenShortcutController?.dispose()],
+      ["browser bridge", () => browserBridgeService?.dispose()],
+      ["local update", () => localUpdateService?.dispose()],
+      ["resource monitor", () => resourceMonitor?.dispose()],
+      ["english learning ipc", () => disposeEnglishLearningIpc?.()],
+      ["plugins ipc", () => disposePluginsIpc?.()],
+      ["python runtime ipc", () => disposePythonRuntimeIpc?.()],
+      ["speech playback", () => speechPlayback?.dispose()],
+      ["desktop shell", () => disposeRuntimeV2DesktopShell?.()],
+      ["fixed renderer ipc", () => fixedRendererIpc?.dispose()],
+    ], (message, details) => void logMain(message, details));
+    clearTimeout(timeout);
+    app.exit(0);
   })();
 });

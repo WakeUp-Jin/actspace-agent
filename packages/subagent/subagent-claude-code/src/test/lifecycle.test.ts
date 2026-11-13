@@ -40,7 +40,7 @@ describe("Claude Code subagent plugin lifecycle", () => {
     expect(provided.get("tools.subagent-claude-code")).toEqual({ availability: { ok: true, command: "/opt/bin/claude" } });
     expect((await run({})).status).toBe("failed");
     expect(await run({ description: "list packages", prompt: "List them.", model: " sonnet " })).toMatchObject({ status: "completed", modelOutput: [{ type: "text", text: "started" }] });
-    expect(calls[0]).toMatchObject({ backend: { kind: "claude-code", toolName: "agent_claude_code" }, input: { sessionId: "s", callId: "c-1", description: "list packages", prompt: "List them.", background: true, model: "sonnet" } });
+    expect(calls[0]).toMatchObject({ backend: { kind: "claude-code", toolName: "agent_claude_code" }, input: { sessionId: "s", callId: "c-1", description: "list packages", prompt: "List them.", background: false, model: "sonnet" } });
     await cleanup();
     expect(lookup.cleared).toContain("claude");
     await expect(run({ description: "x", prompt: "x" })).rejects.toMatchObject({ failure: { code: "TOOL_NOT_FOUND" } });

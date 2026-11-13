@@ -111,7 +111,6 @@
     "@actspace/sandbox": "workspace:*",
     "@actspace/sandbox-nono": "workspace:*",
     "@actspace/sandbox-seatbelt": "workspace:*",
-    "@actspace/context-subagents": "workspace:*",
     "@actspace/subagent-codex": "workspace:*",
     "@actspace/subagent-claude-code": "workspace:*"
   },
