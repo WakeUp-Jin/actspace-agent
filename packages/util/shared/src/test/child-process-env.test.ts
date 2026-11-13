@@ -54,6 +54,8 @@ describe("isCredentialEnvValue", () => {
     "https://me:s3cret@pypi.example/simple",
     "amqp://guest:guest@localhost",
     "https://mirror.example/simple, https://me:s3cret@pypi.example/simple",
+    "https://me:s3:cret@pypi.example/simple",
+    "http://localhost/, redis://:s3cret@cache.internal",
   ])("flags %s", (value) => expect(isCredentialEnvValue("SOME_URL", value)).toBe(true));
 
   it.each([
@@ -65,6 +67,10 @@ describe("isCredentialEnvValue", () => {
     "git@github.com:org/repo.git",
     "postgres://localhost:5432/app?email=me@example.com",
     "https://host/path:with@colon",
+    "https://me:@pypi.example/simple",
+    "https://:@pypi.example/simple",
+    "https://me@pypi.example:8080/@scope",
+    "https://me :s3cret@pypi.example/simple",
     "/usr/bin:/bin",
     "",
   ])("keeps %s", (value) => expect(isCredentialEnvValue("SOME_URL", value)).toBe(false));
@@ -75,7 +81,7 @@ describe("isCredentialEnvValue", () => {
 
   it("stays linear on a large value", () => {
     // 把协议名写进正则从头扫，前两种输入是平方级的：实测 200 KB 各要 35 秒左右。
-    for (const value of ["a".repeat(200_000), `x://u:${"p".repeat(200_000)}`, "://".repeat(70_000)]) {
+    for (const value of ["a".repeat(200_000), `x://u:${"p".repeat(200_000)}`, "://".repeat(70_000), `x://${":".repeat(200_000)}`, `x://${"!".repeat(200_000)}`, "x://a:".repeat(70_000)]) {
       const startedAt = performance.now();
       expect(isCredentialEnvValue("BIG", value)).toBe(false);
       expect(performance.now() - startedAt).toBeLessThan(200);

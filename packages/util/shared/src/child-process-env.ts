@@ -13,8 +13,8 @@ export type ChildEnvSource = Readonly<Record<string, string | undefined>>;
  */
 const CREDENTIAL_NAME_PATTERN = /API_?KEY|ACCESS_KEY|PRIVATE_KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL|DATABASE_URL|_PWD$|_DSN$/i;
 
-/** 地址里 `://` 后面的 `user:password@`。用户名可以为空（`redis://:secret@host`）。 */
-const USERINFO_WITH_PASSWORD = /[^\s/?#@:]*:[^\s/?#@]+@/y;
+/** `user:password@` 里不会出现的字符：在 `@` 之前遇到，说明 `://` 后面这一段不带账号密码。 */
+const USERINFO_END = /[\s/?#]/;
 
 /** 代理地址即使带账号密码也保留：剥掉以后，要经过这个代理才能上网的机器上，命令里的 curl / git / npm 全部连不出去。 */
 const PROXY_ENV_NAMES = new Set(["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"]);
@@ -33,8 +33,24 @@ export function isCredentialEnvName(name: string): boolean {
 export function isCredentialEnvValue(name: string, value: string): boolean {
   if (PROXY_ENV_NAMES.has(name.toUpperCase())) return false;
   for (let at = value.indexOf("://"); at !== -1; at = value.indexOf("://", at + 3)) {
-    USERINFO_WITH_PASSWORD.lastIndex = at + 3;
-    if (USERINFO_WITH_PASSWORD.test(value)) return true;
+    if (startsWithPasswordUserinfo(value, at + 3)) return true;
+  }
+  return false;
+}
+
+/**
+ * 从 `start` 起是不是 `user:password@`。用户名可以为空（`redis://:secret@host`），密码不能为空，密码里可以有冒号。
+ *
+ * 逐个字符看一遍，不用正则：`[^…]*:[^…]+@` 不锚定时是平方级的，
+ * 靠 sticky 加 lastIndex 才是线性，这一点从正则本身看不出来（CodeQL 也按平方级报）。
+ */
+function startsWithPasswordUserinfo(value: string, start: number): boolean {
+  let colon = -1;
+  for (let at = start; at < value.length; at += 1) {
+    const char = value[at];
+    if (char === "@") return colon !== -1 && at > colon + 1;
+    if (char === ":") { if (colon === -1) colon = at; }
+    else if (USERINFO_END.test(char)) return false;
   }
   return false;
 }
