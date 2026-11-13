@@ -1,0 +1,86 @@
+/* 《诞生记》的公共部件：夜色配色、角标、底部时间轴、代码行数曲线、日期标签、窗口外框。底色、字体和字阶沿用 ../../styles/base.css。 */
+
+/* 夜色分镜：把基础色板整体换成深色，.display / .lead / .eyebrow 这些通用字阶不用再各写一遍。 */
+.scene { --on-accent: #fff; }
+.scene-night, .scene-rewrite, .scene-crisis {
+  --canvas: #171614;
+  --paper: #23211e;
+  --ink: #f2efe8;
+  --body: #c4bfb4;
+  --muted: #918c82;
+  --faint: #5c5851;
+  --line: #36332f;
+  --accent: #a892ea;
+  --accent-soft: #2b2540;
+  --accent-line: #4b4074;
+  --on-accent: #171614;
+  --live: #7fc79f;
+  --wip: #e2b866;
+  --danger: #ea7b6e;
+}
+
+@keyframes o-dim { to { opacity: 0.5; } }
+@keyframes o-grow { from { transform: scaleX(0); } to { transform: none; } }
+
+/* 分镜角标 */
+.o-chrome { position: absolute; top: 54px; left: 120px; right: 120px; display: flex; align-items: center; justify-content: space-between; }
+.o-chrome-brand { display: flex; align-items: center; gap: 12px; font: 560 26px/1 var(--serif); color: var(--ink); }
+.o-chrome-brand img { height: 30px; width: auto; }
+.o-chrome-chapter { display: flex; align-items: center; gap: 14px; font: 500 20px/1 var(--mono); letter-spacing: 0.14em; color: var(--muted); }
+.o-chrome-chapter b { font-weight: 600; color: var(--accent); letter-spacing: 0.06em; }
+
+/* 底部时间轴：176 天从左到右。圆点、进度和「第 N 天」的位置由 shared.js 的 journey() 生成的关键帧驱动。 */
+.o-axis { position: absolute; left: 120px; top: 968px; width: 1680px; height: 50px; }
+.o-axis-rail, .o-axis-fill { position: absolute; left: 0; top: 0; width: 100%; height: 2px; }
+.o-axis-rail { background: var(--line); }
+.o-axis-fill { background: var(--ink); transform-origin: 0 50%; }
+.o-axis-tick { position: absolute; top: 0; padding-top: 20px; font: 500 18px/1 var(--mono); letter-spacing: 0.04em; color: var(--muted); white-space: nowrap; }
+.o-axis-tick::before { content: ""; position: absolute; left: 0; top: 0; width: 2px; height: 10px; background: var(--faint); }
+.o-axis-head { position: absolute; left: 0; top: 1px; }
+.o-axis-head::before { content: ""; position: absolute; left: -8px; top: -8px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 24%, transparent); }
+.o-axis-head::after { content: ""; position: absolute; left: -1px; bottom: 8px; width: 2px; height: var(--guide); background: var(--accent); opacity: 0.35; }
+.o-axis-head span { position: absolute; left: 0; bottom: calc(var(--guide) + 22px); transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font: 600 20px/1 var(--sans); white-space: nowrap; }
+.o-axis-head span i { display: inline-block; min-width: 1.3em; text-align: center; font-family: var(--mono); }
+
+/* 代码行数曲线：坐在时间轴上，和它共用横坐标。 */
+.o-chart { position: absolute; left: 120px; bottom: 112px; width: 1680px; }
+.o-chart-grid { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--line); }
+.o-chart-grid span { position: absolute; right: 0; top: 9px; font: 500 17px/1 var(--mono); color: var(--muted); }
+.o-chart-plot { position: absolute; inset: 0; }
+.o-chart-plot svg { overflow: visible; }
+.o-chart-area { fill: var(--accent); opacity: 0.13; }
+.o-chart-line { fill: none; stroke: var(--ink); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.o-chart-band { position: absolute; top: 0; bottom: 0; border-left: 2px dashed var(--wip); border-right: 2px dashed var(--wip); background: repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--wip) 26%, transparent) 10px 12px); }
+.o-chart-band span { position: absolute; left: 0; right: 0; top: 18px; text-align: center; font: 500 20px/1 var(--sans); color: var(--wip); white-space: nowrap; }
+.o-chart-fall { position: absolute; width: 6px; margin-left: -3px; border-radius: 3px; background: var(--danger); box-shadow: 0 0 18px 2px color-mix(in srgb, var(--danger) 55%, transparent); }
+.o-chart-mark { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed var(--accent); }
+.o-chart-mark span { position: absolute; left: 0; bottom: 10px; font: 500 20px/1 var(--mono); color: var(--accent); white-space: nowrap; }
+
+/* 钉在曲线某一点上的标注：圆点在曲线上，说明框在它左上方，中间一根短线连着。 */
+.o-chart-pin { position: absolute; width: 0; height: 0; transform-origin: 0 0; }
+.o-chart-pin::before { content: ""; position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--canvas); }
+.o-chart-pin::after { content: ""; position: absolute; left: -1px; bottom: 9px; width: 2px; height: 58px; background: var(--accent); }
+.o-chart-note { position: absolute; right: -28px; bottom: 66px; padding: 18px 26px 20px; border-radius: 16px; background: var(--paper); box-shadow: 0 0 0 2px var(--accent), 0 24px 48px -30px rgba(29, 28, 26, 0.4); white-space: nowrap; }
+.o-chart-note-field { display: flex; align-items: baseline; gap: 16px; font: 500 22px/1.2 var(--mono); color: var(--muted); }
+.o-chart-note-field b { font-size: 34px; font-weight: 600; color: var(--accent); }
+.o-chart-note-text { display: flex; align-items: baseline; gap: 16px; margin-top: 12px; font: 500 26px/1.4 var(--sans); color: var(--ink); }
+.o-chart-note-text time { font: 500 20px/1 var(--mono); color: var(--accent); }
+
+/* 右上角的大数字 */
+.o-counter { position: absolute; right: 120px; top: 146px; text-align: right; }
+.o-counter b { display: block; font: 600 88px/1.1 var(--mono); letter-spacing: -0.03em; color: var(--ink); }
+.o-counter span { display: block; margin-top: 10px; font: 500 22px/1 var(--sans); letter-spacing: 0.06em; color: var(--muted); }
+
+/* 带日期的小标签 */
+.o-chips { position: absolute; left: 120px; right: 120px; top: 330px; display: flex; flex-wrap: wrap; gap: 14px; }
+.o-chip { display: inline-flex; align-items: center; gap: 12px; padding: 13px 22px 13px 16px; border-radius: 999px; background: var(--paper); box-shadow: 0 0 0 1px var(--line); font: 500 25px/1.2 var(--sans); color: var(--ink); white-space: nowrap; animation: pop 0.6s var(--ease-out) var(--at) both; }
+.o-chip time { font: 500 19px/1 var(--mono); color: var(--accent); }
+
+/* 桌面窗口的外框：在夜色分镜里也是亮的，所以颜色写死，不跟色板走。 */
+.o-window { overflow: hidden; border-radius: 18px; background: #fbfaf7; box-shadow: 0 34px 70px -28px rgba(29, 28, 26, 0.42), 0 0 0 1px rgba(29, 28, 26, 0.08); }
+.o-window-bar { display: flex; align-items: center; gap: 9px; height: 54px; padding: 0 22px; border-bottom: 1px solid #dcd9d1; }
+.o-window-bar i { width: 13px; height: 13px; border-radius: 50%; background: #c9c5bc; }
+.o-window-bar span { margin-left: 12px; font: 500 20px/1 var(--sans); color: #7c7972; }
+
+/* 画面最下方的口径说明 */
+.o-foot { position: absolute; left: 120px; bottom: 58px; font: 500 20px/1 var(--mono); letter-spacing: 0.04em; color: var(--muted); }

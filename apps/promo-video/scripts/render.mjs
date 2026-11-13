@@ -2,11 +2,11 @@
  * 把片子逐帧渲染成 MP4。
  *
  *   node scripts/render.mjs                    渲染产品宣传片到 out/actspace-promo.mp4
- *   node scripts/render.mjs --film <id>        渲染另一部片子（片子清单见 src/films.js）
+ *   node scripts/render.mjs --film origin      渲染《诞生记》到 out/actspace-origin.mp4（片子清单见 src/films.js）
  *   node scripts/render.mjs --no-audio         不混入配乐
  *   node scripts/render.mjs --music a.mp3 --music-start 12   换一首曲子试听：从它的第 12 秒开始用
  *   node scripts/render.mjs --from 20 --to 30  只渲染一段，调某个分镜时用
- *   node scripts/render.mjs --stills 3,12.5    只导出这些时刻的 PNG（宣传片在 out/stills/，其它片子的目录见 src/films.js）
+ *   node scripts/render.mjs --stills 3,12.5    只导出这些时刻的 PNG 到 out/stills/（《诞生记》是 out/stills-origin/）
  *
  * 做法：无头 Chrome 打开合成页，每一帧先 seek 到对应时刻再截图，图片顺序喂给 ffmpeg。
  * 画面完全由时刻决定，所以渲染多慢都不会掉帧。

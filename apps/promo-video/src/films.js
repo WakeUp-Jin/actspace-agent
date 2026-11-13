@@ -1,7 +1,8 @@
 /**
- * 这个目录里的片子。默认是产品宣传片；预览页加 `?film=<id>`、渲染加 `--film <id>` 换成另一部。
+ * 这个目录里的片子。默认是产品宣传片；预览页加 `?film=origin`、渲染加 `--film origin` 换成《诞生记》。
  * 这个文件网页和 Node 脚本都会引用，所以分镜（要经 Vite 处理图片和样式）只在 scenes() 里按需加载。
  */
+import { soundtrack as originSoundtrack } from "./origin/soundtrack.js";
 import { soundtrack as promoSoundtrack } from "./soundtrack.js";
 
 export const FPS = 30;
@@ -17,6 +18,13 @@ export const films = {
     stills: "out/stills",
     soundtrack: promoSoundtrack,
     scenes: async () => (await import("./film.js")).scenes,
+  },
+  origin: {
+    title: "ActSpace 诞生记",
+    output: "out/actspace-origin.mp4",
+    stills: "out/stills-origin",
+    soundtrack: originSoundtrack,
+    scenes: async () => (await import("./origin/film.js")).scenes,
   },
 };
 

@@ -1,0 +1,143 @@
+/* ── 冷开场：两个数，一句话 ──────────────────────────── */
+.o-cold { position: absolute; left: 120px; top: 150px; width: 1000px; }
+.o-cold-row { display: flex; align-items: baseline; gap: 22px; font: 500 52px/1.2 var(--sans); color: var(--body); }
+.o-cold-row + .o-cold-row { margin-top: 18px; }
+.o-cold-row b { min-width: 7.2ch; text-align: right; font: 600 112px/1 var(--mono); letter-spacing: -0.03em; color: var(--ink); }
+/* 加减号用色块画，不用字形：等宽字体里的减号比加号短一截，摆在一起不齐。 */
+.o-cold-sign { position: relative; flex: none; align-self: center; width: 60px; height: 60px; }
+.o-cold-sign::before, .o-cold-sign.is-plus::after { content: ""; position: absolute; left: 0; top: 24px; width: 60px; height: 12px; border-radius: 3px; background: currentColor; }
+.o-cold-sign.is-plus::after { transform: rotate(90deg); }
+.o-cold-sign.is-plus { color: var(--live); }
+.o-cold-sign.is-minus { color: var(--danger); }
+.o-cold-punch { margin-top: 64px; font: 560 88px/1.3 var(--serif); color: var(--ink); }
+.o-cold-punch em { color: var(--danger); }
+.o-cold-what { margin-top: 44px; font: 560 46px/1.3 var(--serif); color: var(--ink); }
+.o-cells { position: absolute; right: 120px; top: 190px; display: grid; grid-template-columns: repeat(10, 56px); gap: 10px; }
+.o-cell { width: 56px; height: 56px; border-radius: 12px; background: var(--ink); animation: pop 0.5s var(--ease-out) var(--at) both; }
+.o-cell.is-gone { animation: pop 0.5s var(--ease-out) var(--at) both, o-cell-gone 0.5s ease var(--gone) forwards; }
+@keyframes o-cell-gone { to { background: transparent; box-shadow: inset 0 0 0 2px var(--danger); opacity: 0.55; } }
+.o-cells-legend { position: absolute; right: 120px; top: 806px; width: 650px; display: flex; gap: 34px; font: 500 22px/1 var(--sans); color: var(--muted); }
+.o-cells-legend span { display: flex; align-items: center; gap: 12px; }
+.o-cells-legend i { width: 22px; height: 22px; border-radius: 6px; background: var(--ink); }
+.o-cells-legend i.is-gone { background: none; box-shadow: inset 0 0 0 2px var(--danger); opacity: 0.55; }
+
+/* ── 片名 ────────────────────────────────────────────── */
+.o-title { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 10px; text-align: center; }
+.o-title-mark { height: 104px; width: auto; }
+.o-title-dates { display: flex; align-items: center; gap: 18px; margin-top: 36px; font: 500 24px/1 var(--mono); letter-spacing: 0.14em; color: var(--body); }
+.o-title-dates i { width: 56px; height: 1px; background: var(--muted); }
+.o-title-word { margin-top: 16px; font: 600 152px/1.24 var(--serif); color: var(--ink); }
+.o-title-sub { margin-top: 24px; font: 560 54px/1.3 var(--serif); color: var(--ink); }
+.o-title-foot { position: absolute; left: 0; right: 0; bottom: 64px; font: 400 21px/1 var(--sans); letter-spacing: 0.06em; color: var(--body); }
+
+/* ── 第一夜 ──────────────────────────────────────────── */
+.o-night { position: absolute; left: 120px; top: 150px; width: 1060px; }
+.o-log { margin-top: 34px; border-top: 1px solid var(--line); }
+.o-log-row { display: grid; grid-template-columns: 136px 1fr; align-items: baseline; padding: 19px 0; border-bottom: 1px solid var(--line); animation: rise 0.9s var(--ease-out) var(--at) both, o-dim 0.6s ease var(--dim, 9999s) forwards; }
+.o-log-row time { font: 500 28px/1 var(--mono); color: var(--wip); }
+.o-log-row span { font: 500 36px/1.3 var(--sans); color: var(--ink); }
+.o-night-side { position: absolute; right: 120px; top: 150px; width: 520px; }
+.o-clock { position: relative; height: 150px; font: 500 150px/1 var(--mono); letter-spacing: -0.04em; color: var(--ink); }
+.o-clock span { position: absolute; right: 0; top: 0; animation: fade 0.3s ease var(--at) both, fade-out 0.2s ease var(--out, 9999s) forwards; }
+.o-records { display: flex; align-items: baseline; justify-content: flex-end; gap: 14px; margin-top: 24px; font: 500 26px/1 var(--sans); color: var(--muted); }
+.o-records b { min-width: 2ch; text-align: right; font: 600 56px/1 var(--mono); color: var(--wip); }
+.o-frame { position: relative; height: 330px; margin-top: 56px; }
+.o-frame-ghost { position: absolute; inset: 0; display: grid; place-items: center; border: 2px dashed var(--faint); border-radius: 18px; font: 500 24px/1 var(--mono); letter-spacing: 0.08em; color: var(--muted); }
+.o-frame-ghost.is-failed { border-color: var(--danger); color: var(--danger); }
+.o-frame-window { position: absolute; inset: 0; }
+
+/* ── 第一句话 ────────────────────────────────────────── */
+.o-first-copy { position: absolute; left: 120px; top: 236px; width: 840px; }
+.o-first-copy .display { margin-top: 34px; }
+.o-first-copy .lead { margin-top: 36px; }
+.o-first-stage { position: absolute; left: 1010px; top: 150px; right: 120px; height: 724px; }
+.o-first-window { position: absolute; left: 56px; right: 56px; top: 64px; bottom: 64px; }
+.o-stream { display: flex; flex-direction: column; gap: 24px; padding: 44px 48px; }
+.o-stream-ask { align-self: flex-end; width: 44%; height: 54px; margin-bottom: 30px; border-radius: 27px; background: #1d1c1a; }
+.o-stream-bar { height: 28px; border-radius: 14px; background: #d6d2c8; transform-origin: 0 50%; animation: o-grow 0.75s linear var(--at) both; }
+.o-stream-status { position: absolute; left: 48px; bottom: 36px; display: flex; align-items: center; gap: 12px; font: 500 22px/1 var(--mono); color: var(--live); }
+.o-stream-status i { width: 12px; height: 12px; border-radius: 50%; background: var(--live); }
+
+/* ── 越长越多 / 再长一遍 ─────────────────────────────── */
+.o-growth-title { position: absolute; left: 120px; top: 150px; font-size: 84px; white-space: nowrap; }
+.o-growth-lead { position: absolute; left: 120px; top: 268px; display: flex; align-items: center; gap: 20px; font: 500 30px/1.2 var(--sans); color: var(--body); white-space: nowrap; }
+.o-growth-lead b { padding: 8px 14px; border-radius: 10px; background: var(--accent-soft); font: 500 22px/1 var(--mono); color: var(--accent); }
+
+/* ── 推倒重来 ────────────────────────────────────────── */
+.o-rewrite-card { position: absolute; left: 120px; top: 168px; width: 1200px; }
+.o-rewrite-card .display-m, .o-rewrite-card .display-s { margin-top: 30px; }
+.o-rewrite-card .lead { margin-top: 24px; font-size: 34px; }
+.o-rewrite-diff { display: flex; align-items: baseline; gap: 30px; margin-top: 30px; font: 500 34px/1 var(--sans); color: var(--body); }
+.o-rewrite-diff b { font: 600 64px/1 var(--mono); letter-spacing: -0.03em; }
+.o-rewrite-diff .is-plus { color: var(--live); }
+.o-rewrite-diff .is-minus { color: var(--danger); }
+.o-rewrite-lost { display: flex; align-items: center; gap: 18px; margin-top: 34px; font: 500 30px/1.3 var(--sans); color: var(--body); }
+.o-rewrite-lost s { padding: 9px 18px; border-radius: 999px; box-shadow: 0 0 0 1px var(--line); font-size: 26px; color: var(--muted); text-decoration-color: var(--danger); text-decoration-thickness: 2px; }
+
+/* ── 做减法 ──────────────────────────────────────────── */
+.o-less-copy { position: absolute; left: 120px; top: 150px; width: 800px; }
+.o-less-copy .display-m { margin-top: 30px; }
+.o-less-side { position: absolute; left: 960px; right: 120px; top: 196px; }
+.o-less-day { font: 560 50px/1.3 var(--serif); color: var(--ink); }
+.o-less-quote { margin: 36px 0 0; padding-left: 32px; border-left: 4px solid var(--accent); font: 560 38px/1.5 var(--serif); color: var(--ink); }
+.o-less-quote cite { display: block; margin-top: 16px; font: 400 22px/1.4 var(--sans); font-style: normal; color: var(--muted); }
+.o-lives { position: absolute; left: 120px; top: 560px; width: 1680px; height: 330px; }
+.o-life { position: absolute; top: calc(var(--row) * 66px); height: 54px; }
+.o-life-bar { position: absolute; inset: 0; border-radius: 12px; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); transform-origin: 0 50%; animation: o-grow 0.9s var(--ease-out) var(--at) both, o-life-cut 0.5s ease var(--cut) forwards; }
+@keyframes o-life-cut { to { background: transparent; box-shadow: inset 0 0 0 1px var(--line); } }
+.o-life-name { position: absolute; left: 20px; top: 0; height: 54px; display: flex; align-items: center; gap: 18px; white-space: nowrap; animation: fade 0.6s ease calc(var(--at) + 0.3s) both; }
+.o-life-name b { position: relative; font: 600 26px/1 var(--sans); color: var(--ink); }
+.o-life-name b::after { content: ""; position: absolute; left: -5px; right: -5px; top: 50%; height: 3px; border-radius: 2px; background: var(--danger); transform-origin: 0 50%; animation: o-grow 0.45s var(--ease-out) var(--cut) both; }
+.o-life-name span { font: 500 20px/1 var(--mono); color: var(--muted); }
+.o-life::after { content: "×"; position: absolute; right: -15px; top: 12px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--danger); color: #fff; font: 600 22px/1 var(--sans); animation: pop 0.4s var(--ease-out) var(--cut) both; }
+
+/* ── 较真 ────────────────────────────────────────────── */
+.o-crisis { position: absolute; left: 120px; top: 150px; right: 120px; }
+.o-saids { margin-top: 44px; }
+.o-said { display: grid; grid-template-columns: 210px 1fr; align-items: baseline; padding: 32px 0; border-top: 1px solid var(--line); animation: rise 0.9s var(--ease-out) var(--at) both, o-dim 0.6s ease var(--dim) forwards; }
+.o-said time { font: 500 26px/1 var(--mono); color: var(--wip); }
+.o-said q { font: 560 48px/1.4 var(--serif); color: var(--ink); quotes: "「" "」"; }
+.o-crisis-answer { display: flex; flex-wrap: wrap; align-items: center; gap: 22px 16px; padding-top: 40px; border-top: 1px solid var(--line); }
+.o-crisis-answer p { flex-basis: 100%; font: 560 44px/1.3 var(--serif); color: var(--ink); }
+.o-crisis-answer code { padding: 12px 20px; border-radius: 12px; background: var(--paper); box-shadow: 0 0 0 1px var(--line); font: 500 24px/1 var(--mono); color: var(--live); }
+
+/* ── 谁在写 ──────────────────────────────────────────── */
+.o-who-agents { position: absolute; left: 120px; top: 150px; width: 780px; }
+.o-who-human { position: absolute; left: 1010px; top: 150px; width: 790px; }
+.o-who-note { margin-top: 18px; font: 500 22px/1 var(--sans); letter-spacing: 0.04em; color: var(--muted); }
+.o-writers { margin-top: 30px; }
+.o-writer { display: grid; grid-template-columns: 270px 1fr 84px; align-items: center; height: 58px; }
+.o-writer span { font: 500 27px/1 var(--sans); color: var(--ink); }
+.o-writer i { width: calc(var(--share) * 100%); min-width: 4px; height: 26px; border-radius: 6px; background: var(--accent); transform-origin: 0 50%; animation: o-grow 1.1s var(--ease-out) var(--at) both; }
+.o-writer:last-child i { background: var(--faint); }
+.o-writer b { text-align: right; font: 600 30px/1 var(--mono); color: var(--ink); }
+.o-hours { display: flex; align-items: flex-end; gap: 6px; height: 240px; margin-top: 30px; border-bottom: 2px solid var(--line); }
+.o-hour { position: relative; flex: 1; height: var(--tall); min-height: 3px; border-radius: 5px 5px 0 0; background: var(--faint); transform-origin: 50% 100%; animation: o-rise 0.7s var(--ease-out) var(--at) both; }
+.o-hour.is-night { background: var(--accent); }
+.o-hour span { position: absolute; left: 0; top: calc(100% + 14px); font: 500 20px/1 var(--mono); color: var(--muted); white-space: nowrap; }
+@keyframes o-rise { from { transform: scaleY(0); } to { transform: none; } }
+.o-who-night { margin-top: 58px; font: 500 30px/1.4 var(--sans); color: var(--body); }
+.o-who-night b { font: 600 38px/1 var(--mono); color: var(--accent); }
+.o-who-last { position: absolute; left: 120px; right: 120px; top: 752px; display: flex; align-items: baseline; gap: 26px; padding-top: 36px; border-top: 1px solid var(--line); font: 560 50px/1.3 var(--serif); color: var(--ink); }
+.o-who-last time { font: 500 24px/1 var(--mono); color: var(--accent); }
+
+/* ── 回头看 ──────────────────────────────────────────── */
+.o-tally-date { position: absolute; left: 120px; top: 150px; }
+.o-stats { position: absolute; left: 120px; right: 120px; top: 222px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 48px 0; }
+.o-stats li { display: flex; flex-direction: column; gap: 14px; padding-left: 28px; border-left: 2px solid var(--line); }
+.o-stats b { font: 600 84px/1 var(--mono); letter-spacing: -0.04em; color: var(--ink); }
+.o-stats span { font: 500 26px/1 var(--sans); color: var(--body); }
+.o-tally-next { position: absolute; left: 120px; right: 120px; top: 650px; display: flex; align-items: center; gap: 64px; padding-top: 44px; border-top: 1px solid var(--line); }
+.o-directions { display: flex; gap: 36px; }
+.o-directions li { display: flex; align-items: center; gap: 14px; font: 600 30px/1 var(--sans); color: var(--ink); }
+
+/* ── 收尾 ────────────────────────────────────────────── */
+.o-closing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 76px; text-align: center; }
+.o-closing-mark { height: 96px; width: auto; }
+.o-closing-line { margin-top: 30px; font-size: 108px; line-height: 1.26; }
+.o-closing-links { display: flex; gap: 22px; margin-top: 54px; }
+.o-closing-links p { display: flex; align-items: center; gap: 16px; padding: 18px 30px 18px 22px; border-radius: 999px; background: rgba(251, 250, 247, 0.8); box-shadow: 0 0 0 1px rgba(29, 28, 26, 0.1); }
+.o-closing-links span { padding: 6px 12px; border-radius: 999px; background: var(--ink); color: var(--paper); font: 500 17px/1.2 var(--sans); letter-spacing: 0.08em; }
+.o-closing-links b { font: 500 29px/1.2 var(--mono); color: var(--ink); }
+.o-closing-motto { position: absolute; left: 0; right: 0; bottom: 108px; font: 560 28px/1 var(--serif); letter-spacing: 0.1em; color: var(--ink); }
+.o-closing-credit { position: absolute; left: 0; right: 0; bottom: 58px; font: 400 20px/1 var(--mono); color: var(--body); }
