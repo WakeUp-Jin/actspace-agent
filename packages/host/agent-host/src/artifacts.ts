@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { open, realpath, stat } from "node:fs/promises";
-import { basename, isAbsolute, relative, resolve } from "node:path";
+import * as nodePath from "node:path";
+import { basename, resolve } from "node:path";
+import { isLexicallyInside } from "@actspace/shared";
 import { HOST_LIMITS, HostError, HostRequestError } from "@actspace/shared/host-protocol";
 import type { NodeArtifactStore } from "./node-ports/artifact-store.js";
 import type { HostUploads } from "./uploads.js";
@@ -19,14 +21,13 @@ export class HostArtifacts {
   }
   async #snapshotSource(workspace: string, path: string) {
     const root = await realpath(workspace), target = await realpath(resolve(root, path));
-    const nested = relative(root, target);
-    if (nested === ".." || nested.startsWith("../") || isAbsolute(nested)) throw new HostError("FORBIDDEN", "File is outside the Session workspace");
+    // 工作区根目录本身放过去，下面会因为不是普通文件被拒。
+    if (!isLexicallyInside(nodePath, root, target, { includeRoot: true })) throw new HostError("FORBIDDEN", "File is outside the Session workspace");
     const file = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     try {
       const before = await file.stat();
       const verifiedTarget = await realpath(target), current = await stat(verifiedTarget);
-      const verifiedNested = relative(root, verifiedTarget);
-      if (verifiedNested === ".." || verifiedNested.startsWith("../") || isAbsolute(verifiedNested) || current.ino !== before.ino || current.dev !== before.dev) throw new HostError("FORBIDDEN", "Result path changed during access");
+      if (!isLexicallyInside(nodePath, root, verifiedTarget, { includeRoot: true }) || current.ino !== before.ino || current.dev !== before.dev) throw new HostError("FORBIDDEN", "Result path changed during access");
       if (!before.isFile() || before.size > 20 * 1024 * 1024) throw new HostError("LIMIT_EXCEEDED", "Result must be a regular file up to 20 MiB");
       const bytes = await file.readFile(), after = await file.stat();
       if (bytes.length !== before.size || after.mtimeMs !== before.mtimeMs || after.size !== before.size) throw new HostError("CONFLICT", "Result changed during snapshot; retry", true);

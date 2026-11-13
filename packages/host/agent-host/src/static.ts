@@ -1,7 +1,9 @@
 import { createReadStream } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
-import { extname, join, sep } from "node:path";
+import * as nodePath from "node:path";
+import { extname, join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { isLexicallyInside } from "@actspace/shared";
 const MIME: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".webmanifest": "application/manifest+json", ".png": "image/png", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8" };
 const SECURITY = { "Content-Security-Policy": "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" };
 const HOST_NAME = /^[a-z0-9.-]+(:\d{1,5})?$|^\[[0-9a-f:.]+\](:\d{1,5})?$/i;
@@ -16,7 +18,7 @@ export function createStaticHandler(webRoot: string): (request: IncomingMessage,
   const resolveFile = async (path: string): Promise<{ file?: string; dir?: boolean }> => {
     try {
       const real = await realpath(join(webRoot, path));
-      if (real !== webRoot && !real.startsWith(webRoot + sep)) return {};
+      if (!isLexicallyInside(nodePath, webRoot, real, { includeRoot: true })) return {};
       return (await stat(real)).isFile() ? { file: real } : { dir: true };
     } catch { return {}; }
   };
