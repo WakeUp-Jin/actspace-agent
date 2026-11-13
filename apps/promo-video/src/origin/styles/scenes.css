@@ -137,7 +137,7 @@
 .o-closing-line { margin-top: 30px; font-size: 108px; line-height: 1.26; }
 .o-closing-links { display: flex; gap: 22px; margin-top: 54px; }
 .o-closing-links p { display: flex; align-items: center; gap: 16px; padding: 18px 30px 18px 22px; border-radius: 999px; background: rgba(251, 250, 247, 0.8); box-shadow: 0 0 0 1px rgba(29, 28, 26, 0.1); }
-.o-closing-links span { padding: 6px 12px; border-radius: 999px; background: var(--ink); color: var(--paper); font: 500 17px/1.2 var(--sans); letter-spacing: 0.08em; }
+.o-closing-links span { padding: 6px 12px; border-radius: 999px; background: var(--ink); color: var(--paper); font: 500 20px/1.2 var(--sans); letter-spacing: 0.08em; }
 .o-closing-links b { font: 500 29px/1.2 var(--mono); color: var(--ink); }
 .o-closing-motto { position: absolute; left: 0; right: 0; bottom: 108px; font: 560 28px/1 var(--serif); letter-spacing: 0.1em; color: var(--ink); }
 .o-closing-credit { position: absolute; left: 0; right: 0; bottom: 58px; font: 400 20px/1 var(--mono); color: var(--body); }
