@@ -69,11 +69,17 @@ test("scans product and script sources, not tests, build output or other directo
   const files = {
     "packages/a/src/policy.ts": bad,
     "packages/a/src/view.tsx": bad,
+    "packages/a/src/worker.mts": bad,
+    "packages/a/src/loader.cts": bad,
     "apps/b/src/main.cjs": bad,
+    "apps/b/src/preload.js": bad,
+    "apps/b/src/widget.jsx": bad,
     "scripts/pack.mjs": bad,
     "packages/a/src/clean.ts": "export const ok = true;\n",
     "packages/a/src/policy.test.ts": bad,
     "packages/a/src/policy.spec.tsx": bad,
+    "packages/a/src/policy.bench.ts": bad,
+    "packages/a/src/policy.perf.mjs": bad,
     "packages/a/src/types.d.ts": bad,
     "packages/a/src/test/helpers.ts": bad,
     "packages/a/src/tests/helpers.ts": bad,
@@ -95,11 +101,15 @@ test("scans product and script sources, not tests, build output or other directo
     fs.writeFileSync(path.join(root, file), text);
   }
   assert.deepEqual(runCheck(root, []), {
-    files: 5,
+    files: 9,
     errors: [
       "apps/b/src/main.cjs:1 对「..」开头做了前缀判断",
+      "apps/b/src/preload.js:1 对「..」开头做了前缀判断",
+      "apps/b/src/widget.jsx:1 对「..」开头做了前缀判断",
+      "packages/a/src/loader.cts:1 对「..」开头做了前缀判断",
       "packages/a/src/policy.ts:1 对「..」开头做了前缀判断",
       "packages/a/src/view.tsx:1 对「..」开头做了前缀判断",
+      "packages/a/src/worker.mts:1 对「..」开头做了前缀判断",
       "scripts/pack.mjs:1 对「..」开头做了前缀判断",
     ],
   });
