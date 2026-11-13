@@ -46,6 +46,11 @@ describe("split cover", () => {
     expect(linked.files).not.toContain("/broken");
   });
 
+  it("splits the parent of an excluded path whose name starts with two dots instead of granting it whole", async () => {
+    const tree: Record<string, Node> = { "/": "dir", "/srv": "dir", "/srv/..data": "dir", "/srv/..data/token": "file", "/srv/public": "dir", "/srv/notes.txt": "file" };
+    expect(await coverReadable(["/"], ["/srv/..data"], fakeFs(tree))).toEqual({ directories: ["/srv/public"], files: ["/srv/notes.txt"] });
+  });
+
   it("only covers the requested roots", async () => {
     expect(await coverReadable(["/Users/agent"], ["/Users/agent/.ssh"], fakeFs(TREE))).toMatchObject({ directories: expect.arrayContaining(["/Users/agent/proj"]), files: ["/Users/agent/.zshenv"] });
     expect(await coverReadable(["/bin"], ["/Users/agent/.ssh"], fakeFs(TREE))).toEqual({ directories: ["/bin"], files: [] });
