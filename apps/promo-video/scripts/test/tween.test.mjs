@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatNumber, parseKeys, valueAt } from "../../src/tween.js";
+import { formatNumber, linear, parseKeys, valueAt } from "../../src/tween.js";
 
 test("关键帧之外保持首尾的值，中间先快后慢", () => {
   const keys = parseKeys("0@1 100@3 100@4 40@5");
@@ -11,6 +11,12 @@ test("关键帧之外保持首尾的值，中间先快后慢", () => {
   // 先快后慢：走到一半时间时已经过了一半路程。
   assert.ok(valueAt(keys, 2) > 50);
   assert.ok(valueAt(keys, 4.5) < 70);
+});
+
+test("指定匀速时，走到一半时间正好走了一半路程", () => {
+  const keys = parseKeys("0@1 100@3");
+  assert.equal(valueAt(keys, 2, linear), 50);
+  assert.equal(valueAt(keys, 2.5, linear), 75);
 });
 
 test("关键帧写错时直接报错", () => {

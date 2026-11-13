@@ -19,6 +19,15 @@ test("混音参数：从指定位置取够时长，调到 -16 LUFS，结尾淡�
   assert.match(filter, /afade=t=out:st=67\.000:d=3\.000$/);
 });
 
+test("淡入默认 0.3 秒，从曲子中段切入的片子可以指定得长一点", () => {
+  const filterOf = (options) => {
+    const { output } = audioArgs({ file: "a.mp3", offset: 0, seconds: 60, loudness: -16, ...options });
+    return output[output.indexOf("-af") + 1];
+  };
+  assert.match(filterOf({}), /afade=t=in:d=0\.3,/);
+  assert.match(filterOf({ fadeIn: 0.5625 }), /afade=t=in:d=0\.5625,/);
+});
+
 test("只渲染很短的一段时，淡出不会比这一段还长", () => {
   const { output } = audioArgs({ file: "a.mp3", offset: 0, seconds: 2, loudness: -16 });
   assert.match(output[output.indexOf("-af") + 1], /afade=t=out:st=1\.000:d=1\.000$/);
