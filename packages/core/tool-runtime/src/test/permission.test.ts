@@ -3,7 +3,7 @@ import type { SessionGrant } from "@actspace/shared/runtime-v2";
 import { mkdtemp, mkdir, rm, symlink, writeFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifyFileResource, combinePermissionDecisions, evaluateGlobalBoundary, HostReadableFiles, HostWritableRoots, sessionGrantsCoverResources } from "../permission/index.js";
+import { classifyFileResource, combinePermissionDecisions, evaluateGlobalBoundary, HostReadableFiles, HostWritableRoots, isPathWithin, sessionGrantsCoverResources } from "../permission/index.js";
 
 const file = (canonicalPath: string, access: "read" | "write" | "delete" = "read") => ({
   kind: "file" as const,
@@ -144,3 +144,20 @@ describe("host-readable exact files", () => {
   });
 });
 
+describe("isPathWithin", () => {
+  it("resolves a symlinked root before comparing, counts the root itself, and compares the candidate as written", async () => {
+    const base = await realpath(await mkdtemp(join(tmpdir(), "actspace-path-within-")));
+    try {
+      const real = join(base, "real"); const link = join(base, "link");
+      await mkdir(real); await symlink(real, link);
+      expect(isPathWithin(link, real)).toBe(true);
+      expect(isPathWithin(link, join(real, "..data", "a.txt"))).toBe(true);
+      expect(isPathWithin(link, join(base, "real-sibling", "a.txt"))).toBe(false);
+      expect(isPathWithin(link, base)).toBe(false);
+      // 只有 root 会换成真实路径；candidate 要由调用方先解析好。
+      expect(isPathWithin(link, join(link, "a.txt"))).toBe(false);
+      // root 不存在时两边都按字面比较。
+      expect(isPathWithin(join(base, "missing"), join(base, "missing", "a.txt"))).toBe(true);
+    } finally { await rm(base, { recursive: true, force: true }); }
+  });
+});
