@@ -170,12 +170,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check site
-        run: pnpm check:site
-
-      - name: Test site
-        run: pnpm test:site
-
+      # 这里只做别的 job 不做的那一步。官网的 astro check 已经在「Lint 与类型检查」的 pnpm typecheck 里
+      # （apps/site 的 typecheck 和 check 是同一条命令），单元测试在「包测试」的 pnpm -r test 里。
       - name: Build site
         env:
           SITE_URL: https://example.com
