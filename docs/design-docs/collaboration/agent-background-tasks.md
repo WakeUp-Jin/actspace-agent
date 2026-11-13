@@ -61,7 +61,7 @@ Harness 侧                                   Host 侧
 - `<task_notification>` 是所有后台任务的完成通知，`<kind>` 为 `bash` 或 `agent`。Bash：`<summary>` 后带 `<output_path>`，结束时也把日志路径交给模型；超时转后台、完成通知内联输出尾部、`notifyOnOutput` 匹配通知保持不变。子智能体：带 `<description>`、`<transcript>` 和原文的 `<closing_message>`（格式见[设计 02 §6.2](../子智能体和后台任务设计规范/02-子智能体设计规范.md)）。收件箱来源 `task_notification`，通知类型：Bash 为 `bash`，子智能体为 `subagent`。
 - 去重：`task_stop` 停掉的任务不再发通知，已入收件箱但未读的通知会被丢弃；`task_output` 只读，不改通知状态。用户在界面停止（`stopByUser`）同样不发完成通知，改为在模型下一步告知「用户停了它」（状态 `stopped`，不唤醒）。编辑重发回退用 `stop(…, "rewind")`，不通知。
 - 唤醒：回合内收件箱有待读通知时不结束回合（仍受 `maxSteps` 约束）；回合被中断或失败时通知留到下次 Run；会话空闲时 Host 提交一个 `{ kind: "background-wake" }` 任务开新一轮（不写 `user/message`，第一步什么都没领到就直接结束、不调模型）。暂停中的会话不唤醒。
-- 用户停止主会话不停止后台任务；Host 关闭时先关登记表，停止全部后台任务且不写结果（`host-shutdown`），重启后标 `lost`；之后才关子智能体管理器。
+- 用户停止主会话不停止后台任务；Host 关闭时先关登记表，停止全部后台任务且不写结果（`host-shutdown`），重启后标 `lost`；之后才关子智能体管理器。关闭前一刻已经结束、通知和收尾记录还在写的任务，登记表等它写完才返回：Host 随后就关会话，只写了通知、没写收尾记录的任务重启后会再被标一次 `lost`。
 
 ## 上下文清单
 
