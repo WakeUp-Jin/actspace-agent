@@ -135,9 +135,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # PR 上验证发布路径能把 desktop、CLI、Web 都构建出来。
       - name: Build
+        if: github.event_name == 'pull_request'
         run: pnpm build
 
+      # main 上（和手动触发时）换成下面三步：打包脚本的第一步就是 pnpm build 里的 desktop 构建，
+      # 之后再补 CLI 和 Web。构建的内容和 PR 上一样，只是 desktop 不用构建两遍。
       # 打包脚本会 go build 浏览器桥 CLI（scripts/package-browser-components.mjs）。
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: github.event_name != 'pull_request'
@@ -147,10 +151,14 @@ jobs:
             browser-bridge/apps/cli/go.mod
             browser-bridge/packages/protocol/go.mod
 
-      # 只在 main 上验证打包脚本还能跑通，不上传产物；正式产物由 release.yml 负责。
+      # 验证打包脚本还能跑通，不上传产物；正式产物由 release.yml 负责。
       - name: Package desktop (smoke)
         if: github.event_name != 'pull_request'
         run: ./scripts/release-package.sh
+
+      - name: Build CLI and Web
+        if: github.event_name != 'pull_request'
+        run: pnpm build:cli-web
 
   site:
     name: 官网
