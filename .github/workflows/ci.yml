@@ -114,18 +114,21 @@ jobs:
       # desktop 单独一个分片 job；其余包分两台跑。第 1 片是下面列出的目录，第 2 片是剩下的全部：
       # 两片的 filter 由同一份清单生成，一正一反，所以新增的包目录不用登记，自动落在第 2 片。
       # 测试只读 build:deps 的产物，包之间没有先后依赖，--no-sort 让 pnpm 不必按依赖拓扑一批一批地等。
-      # 同时只跑 2 个包（pnpm 默认 4 个）：每个包的 vitest 自己还要开最多 3 个 worker，4 个包一起跑时十几个进程抢
-      # 4 个核，时间敏感的用例更容易偶发失败。降到 2 个每片只多几秒，这个 job 也不是最慢的。
+      # 第 2 片同时只跑 2 个包（pnpm 默认 4 个）：它是四十多个小包，已知的时间敏感用例都在里面；每个包的 vitest 自己还要开
+      # 最多 3 个 worker，4 个包一起跑时十几个进程抢 4 个核。降到 2 个之后各包快一倍，整片的时间不变。
+      # 第 1 片用默认并发：它的时间集中在 apps/cli、apps/web、packages/core/runtime 三个各要 20 s 上下的包上，
+      # 只开 2 个时它们排成两条队，这一步从 50 s 涨到 74 s。
       # 只带排除式 --filter 时 pnpm 会把 workspace 根（actspace）也选进来，根的 test 会递归回 pnpm -r test，所以要一并排除。
       - name: Test
         env:
           SHARD: ${{ matrix.shard }}
         run: |
-          filters=()
+          args=()
           for dir in './packages/core/**' './packages/context/**' './apps/*'; do
-            if [ "$SHARD" = 1 ]; then filters+=(--filter "$dir"); else filters+=(--filter "!$dir"); fi
+            if [ "$SHARD" = 1 ]; then args+=(--filter "$dir"); else args+=(--filter "!$dir"); fi
           done
-          pnpm -r --no-sort --workspace-concurrency=2 --if-present "${filters[@]}" --filter '!@actspace/desktop' --filter '!actspace' test
+          if [ "$SHARD" = 2 ]; then args+=(--workspace-concurrency=2); fi
+          pnpm -r --no-sort --if-present "${args[@]}" --filter '!@actspace/desktop' --filter '!actspace' test
 
   test-desktop:
     name: 桌面端测试 (${{ matrix.shard }}/${{ strategy.job-total }})
