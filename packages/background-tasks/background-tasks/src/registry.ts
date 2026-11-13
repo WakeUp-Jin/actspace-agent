@@ -151,12 +151,16 @@ export class BackgroundTaskRegistry {
     }
   }
 
-  /** Host shutdown: stop processes but leave the Journal open so the next start reports them as lost. */
+  /**
+   * Host shutdown: stop processes but leave the Journal open so the next start reports them as lost.
+   * A task that ended just before is still writing its notice and settle record; the Host closes Sessions
+   * after this returns, so those writes finish first.
+   */
   async dispose(): Promise<void> {
     this.#disposed = true;
-    const running = [...this.#entries.values()].filter(entry => entry.status === "running");
-    await Promise.allSettled(running.map(entry => entry.source.stop("host-shutdown")));
-    await Promise.allSettled(running.map(entry => entry.settled));
+    const entries = [...this.#entries.values()];
+    await Promise.allSettled(entries.filter(entry => entry.status === "running").map(entry => entry.source.stop("host-shutdown")));
+    await Promise.allSettled(entries.map(entry => entry.settled));
     this.#entries.clear();
   }
 
