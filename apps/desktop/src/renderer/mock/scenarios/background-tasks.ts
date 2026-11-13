@@ -31,14 +31,15 @@ function notification(taskId: string, summary: string, body: string): string {
   return ["<task_notification>", `<task_id>${taskId}</task_id>`, "<kind>bash</kind>", "<status>completed</status>", `<summary>${summary}</summary>`, `<output_tail>${body}</output_tail>`, "</task_notification>"].join("\n");
 }
 
+/** 后台子智能体与 Bash 一样登记在后台任务登记表里，结束时发同一种 `<task_notification>`（结论保持原文）。 */
 function subagentNotification(agentId: string, description: string, transcriptPath: string, result: string): string {
-  return ["<subagent_notification>", `<agent_id>${agentId}</agent_id>`, `<description>${description}</description>`, "<status>completed</status>", `<summary>Subagent ${agentId} finished and will do no further work unless you send it more.</summary>`, `<transcript>${transcriptPath}</transcript>`, "<closing_message>", result, "</closing_message>", "</subagent_notification>"].join("\n");
+  return ["<task_notification>", `<task_id>${agentId}</task_id>`, "<kind>agent</kind>", `<description>${description}</description>`, "<status>completed</status>", `<summary>Subagent ${agentId} finished.</summary>`, `<transcript>${transcriptPath}</transcript>`, "<closing_message>", result, "</closing_message>", "</task_notification>"].join("\n");
 }
 
-function claim(messageId: string, notice: { taskId: string; kind: "bash" | "subagent"; title: string; status: string }, content: string, source: "task_notification" | "subagent_notification" = "task_notification"): MockRawEvent {
+function claim(messageId: string, notice: { taskId: string; kind: "bash" | "subagent"; title: string; status: string }, content: string): MockRawEvent {
   return {
     type: "agent/inbox/spliced",
-    data: { operation: "claim", messageId, target: "next-step", source, notice, opensTurn: true, content: content },
+    data: { operation: "claim", messageId, target: "next-step", source: "task_notification", notice, opensTurn: true, content: content },
     surface: { kind: "append" },
   };
 }
@@ -54,10 +55,11 @@ export function backgroundTasksScenario({ db }: MockClock): MockHandlers {
   const transcriptPath = "/Users/demo/Library/Application Support/ActSpace/sessions/mock-child-session/transcript.md";
   appendTool(db, session, first, "agent", { description: "调研 Kimi Code 的后台任务工具", prompt: "调研 Kimi Code 的后台任务工具", agent_preset: "general", background: true }, {
     status: "completed", summary: "agent",
-    modelOutput: [{ type: "text", text: `Started subagent mock-child-session (调研 Kimi Code 的后台任务工具) in the background.\ntranscript: ${transcriptPath}` }],
+    modelOutput: [{ type: "text", text: `Started subagent mock-child-session (调研 Kimi Code 的后台任务工具) in the background.\ntranscript: ${transcriptPath}\nYou will be notified when it finishes. Use send_message only to give it information it is missing; task_stop stops it.` }],
   }, (callId): MockRawEvent[] => [
     { type: "subagent/spawned", data: { agentId: "mock-child-session", callId, kind: "local", preset: "general", description: "调研 Kimi Code 的后台任务工具", transcriptPath, createdAt: new Date().toISOString() } },
     { type: "subagent/activation", data: { op: "start", agentId: "mock-child-session", activationId: "act-1", callId, trigger: "spawn", background: true, startedAt: new Date().toISOString() } },
+    { type: "background/task", data: { op: "start", taskId: "mock-child-session", kind: "agent", callId, description: "调研 Kimi Code 的后台任务工具", transcriptPath, startedAt: new Date().toISOString() } },
   ]);
   appendMockMessage(db, session, "assistant", "测试和调研都放到后台了，完成后我会自动收到通知。", first);
 
@@ -70,8 +72,9 @@ export function backgroundTasksScenario({ db }: MockClock): MockHandlers {
 
   const third = db.nextId("seed-run");
   appendEvents(db, session, third, [
-    { type: "subagent/activation", data: { op: "settle", agentId: "mock-child-session", activationId: "act-1", status: "completed", delivery: "notified", summary: "Subagent mock-child-session finished and will do no further work unless you send it more.", result: KIMI_RESULT, endedAt: new Date().toISOString() } },
-    claim("notice-agent", { taskId: "mock-child-session", kind: "subagent", title: "调研 Kimi Code 的后台任务工具", status: "completed" }, subagentNotification("mock-child-session", "调研 Kimi Code 的后台任务工具", transcriptPath, KIMI_RESULT), "subagent_notification"),
+    { type: "subagent/activation", data: { op: "settle", agentId: "mock-child-session", activationId: "act-1", status: "completed", delivery: "notified", summary: "Subagent mock-child-session finished.", result: KIMI_RESULT, endedAt: new Date().toISOString() } },
+    { type: "background/task", data: { op: "settle", taskId: "mock-child-session", status: "completed", endedAt: new Date().toISOString(), delivery: "notified" } },
+    claim("notice-agent", { taskId: "mock-child-session", kind: "subagent", title: "调研 Kimi Code 的后台任务工具", status: "completed" }, subagentNotification("mock-child-session", "调研 Kimi Code 的后台任务工具", transcriptPath, KIMI_RESULT)),
   ]);
   appendTool(db, session, third, "bash", { command: "pnpm dev", intent: "启动开发服务器", blockMs: 0 }, {
     status: "completed", summary: "Bash command",

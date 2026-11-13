@@ -206,7 +206,7 @@ function validateSubagentActivation(type: PersistedExtensionEventType, data: Rea
   if (data.op === "settle") {
     if (!oneOf(data.status, SUBAGENT_ACTIVATION_STATUSES)) throw invalid(type, "status must be completed, interrupted, failed, max_steps or lost");
     if (typeof data.summary !== "string") throw invalid(type, "summary must be a string");
-    if (!oneOf(data.delivery, SUBAGENT_DELIVERIES)) throw invalid(type, "delivery must be returned, notified or lost");
+    if (!oneOf(data.delivery, SUBAGENT_DELIVERIES)) throw invalid(type, "delivery must be returned, notified, stopped or lost");
     if (data.result !== undefined) {
       if (typeof data.result !== "string") throw invalid(type, "result must be a string when present");
       if (new TextEncoder().encode(data.result).length > SUBAGENT_RESULT_LIMIT_BYTES) throw invalid(type, `result must be at most ${SUBAGENT_RESULT_LIMIT_BYTES} UTF-8 bytes`);

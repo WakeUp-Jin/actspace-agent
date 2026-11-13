@@ -40,7 +40,7 @@ describe("Codex subagent plugin lifecycle", () => {
     expect(provided.get("tools.subagent-codex")).toEqual({ availability: { ok: true, command: "/opt/bin/codex" } });
     expect((await run({})).status).toBe("failed");
     expect(await run({ description: "list packages", prompt: "List them.", model: " gpt-5.5 " })).toMatchObject({ status: "completed", modelOutput: [{ type: "text", text: "started" }] });
-    expect(calls[0]).toMatchObject({ backend: { kind: "codex", toolName: "agent_codex" }, input: { sessionId: "s", callId: "c-1", description: "list packages", prompt: "List them.", background: true, model: "gpt-5.5" } });
+    expect(calls[0]).toMatchObject({ backend: { kind: "codex", toolName: "agent_codex" }, input: { sessionId: "s", callId: "c-1", description: "list packages", prompt: "List them.", background: false, model: "gpt-5.5" } });
     await cleanup();
     expect(lookup.cleared).toContain("codex");
     await expect(run({ description: "x", prompt: "x" })).rejects.toMatchObject({ failure: { code: "TOOL_NOT_FOUND" } });

@@ -264,7 +264,7 @@ export type ToolUiPreview =
   | TodoUiPreview
   | { kind: "generic"; title: string; content: string; artifacts?: ToolArtifact[]; subagentLink?: SubagentToolLink };
 
-/** `send_message` / `interrupt_agent` 行：动词加目标子智能体，点目标名打开它（设计 05 §1）。 */
+/** `send_message` 与停止子智能体的 `task_stop`（老会话 `interrupt_agent`）行：动词加目标子智能体，点目标名打开它（设计 05 §1）。 */
 export type SubagentToolLink = { agentId: string; verb: string; target: string };
 
 export type BashStatus =

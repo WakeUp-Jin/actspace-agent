@@ -26,9 +26,9 @@ const MARKER_WAVE_WIDTH_CLASSES = ["w-6", "w-5", "w-4", "w-3", "w-2"] as const;
 const PREVIEW_CARD_CLASS =
   "w-[min(340px,calc(100vw-64px))] rounded-act-md border border-line bg-surface-raised px-3 py-2.5 text-left shadow-act-popover";
 const PREVIEW_INPUT_CLASS =
-  "line-clamp-2 whitespace-pre-wrap break-words text-act-sm font-semibold leading-[1.45] text-text-main";
+  "line-clamp-2 whitespace-pre-wrap break-words text-act-sm font-semibold leading-normal text-text-main";
 const PREVIEW_REPLY_CLASS =
-  "mt-2 border-t border-line pt-2 line-clamp-3 whitespace-pre-wrap break-words text-act-xs leading-[1.5] text-text-muted";
+  "mt-2 border-t border-line pt-2 line-clamp-3 whitespace-pre-wrap break-words text-act-xs leading-normal text-text-muted";
 
 function previewLabel(item: ConversationTurnNavigationItem, index: number): string {
   const compactInput = item.input.replace(/\s+/g, " ").trim();

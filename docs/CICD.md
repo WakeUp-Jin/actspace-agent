@@ -87,6 +87,7 @@ markdownlint 的规则在 `.markdownlint.json`，扫描范围在 `.markdownlint-
   - GitHub Actions pinning
   - shell 脚本语法检查
 - `.github/workflows/base-checks.yml` 的 `repository-checks` 不需要 pnpm，只装 ripgrep 后跑 `scripts/ci.sh` 与 markdownlint。
+- 需要 `rg` 的 job（`repository-checks`、`test-process`、`test-packages`、`test-desktop`）统一用仓库内 composite action `.github/actions/install-ripgrep`：从 ripgrep GitHub Release 下载固定版本的 Linux musl 静态包、校验 sha256 后装到 `/usr/local/bin`。不走 apt，因为 runner 上 `archive.ubuntu.com` 会偶发 DNS 解析失败；升级版本时同时改 action 里的 `RG_VERSION` 与 `RG_SHA256`。
 - `.github/workflows/ci.yml` 中的工程 job 都从 `pnpm install --frozen-lockfile` 开始，然后各自执行：
   - `lint-typecheck`：`pnpm check:desktop-build-graph`（必须排在 `build:deps` 之前，因为后者会重新生成 `tsconfig.build.json`）、`pnpm run gen:contract-matrix --check`、`pnpm lint`、`pnpm typecheck`。改到 `agent-contract-matrix.generated.md` 头部 digest 覆盖的源码路径（Runtime 事件、服务、plugin manifest、composition 等声明）时要先跑 `pnpm run gen:contract-matrix` 并提交结果，否则这一步会报 stale。`pnpm typecheck` = `build:deps`（`tsc -b` 本身就是对全部 packages 的类型检查）+ 只对 apps 跑 `tsc --noEmit`（`packages/` 下每个包都在 `tsconfig.desktop-deps.json` 的引用图里；新增图外的包时要把它加进这条 filter）。`pnpm lint` 只在 error 级诊断上失败，规则与分层见 `docs/coding-standards/lint-conventions.md`。
   - `test-process`：装 ripgrep、`pnpm build:deps`、`pnpm --filter @actspace/agent-cli build`、`pnpm test:scripts`（根目录全部 `node --test` 与 `check:*`，含 `test:agent-host:process` 等直接 spawn `apps/cli/dist/cli.js` 的进程级测试）。

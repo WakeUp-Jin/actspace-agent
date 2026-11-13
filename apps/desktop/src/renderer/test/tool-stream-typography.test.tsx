@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ThinkingBlock } from "../components/messages/ThinkingBlock";
@@ -12,8 +12,11 @@ const base = { id: "fixture", createdAt: "2026-09-16T00:00:00.000Z" };
 
 describe("tool stream presentation preserves behavior", () => {
   it("collapses completed thinking once but permits a manual reopening", async () => {
+    // 「简化思考过程」关闭时的原有行为；开启时见 thinking-compact.test.tsx。
+    setupBridge({ "settings.getV4": vi.fn(async () => ({ version: 4, revision: "r", settings: { general: { simplifyThinking: false } } })) });
     const message = { ...base, kind: "thinking" as const, title: "Thinking", content: "Reasoning detail", collapsedByDefault: false };
-    const view = render(<ThinkingBlock message={message} />);
+    let view!: ReturnType<typeof render>;
+    await act(async () => { view = render(<ThinkingBlock message={message} />); });
     expect(screen.getByText("Reasoning detail")).toBeInTheDocument();
     view.rerender(<ThinkingBlock message={message} replyCompleted />);
     expect(screen.queryByText("Reasoning detail")).not.toBeInTheDocument();

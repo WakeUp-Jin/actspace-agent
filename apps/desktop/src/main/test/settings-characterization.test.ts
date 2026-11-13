@@ -146,6 +146,18 @@ function recordingWriter() {
 
 
 describe("settings load snapshots (v1–v4)", () => {
+  it("treats a missing simplifyThinking as on and keeps an explicit off", async () => {
+    const root = await makeRoot({ "settings.json": "v4.json" });
+    const service = new SettingsService({ dataRoot: root, crypto: fixtureCrypto });
+    await service.load();
+    expect(service.getV4().settings.general.simplifyThinking).toBe(true);
+
+    await service.updateNamespaceV4({ namespace: "general", expectedRevision: service.getV4().revision, patch: { simplifyThinking: false } });
+    const reloaded = new SettingsService({ dataRoot: root, crypto: fixtureCrypto });
+    await reloaded.load();
+    expect(reloaded.getV4().settings.general.simplifyThinking).toBe(false);
+  });
+
   it.each(["v1", "v2", "v3", "v4"])("loads a %s settings file", async (version) => {
     const root = await makeRoot({ "settings.json": `${version}.json` });
     const fixtureRaw = await readFile(join(FIXTURES, `${version}.json`), "utf8");

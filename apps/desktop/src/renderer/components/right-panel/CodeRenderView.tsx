@@ -21,7 +21,7 @@ const ROOT_CLASS = "flex min-h-0 flex-1 flex-col";
 const SCROLL_CLASS = "min-h-0 flex-1 overflow-auto";
 // 折行时宽度必须是 `w-full`：`w-max` 会让 grid 取内容宽度，代码列那个 `1fr` 跟着变成
 // 「最长行的宽度」，`whitespace-pre-wrap` 就永远没有需要折行的机会。
-const GRID_CLASS = "grid w-full grid-cols-[auto_1fr] font-mono text-act-xs leading-[1.55]";
+const GRID_CLASS = "grid w-full grid-cols-[auto_1fr] font-mono text-act-xs leading-relaxed";
 // sticky left-0：折行后仍可能有单个超长不可断 token 顶出横向滚动，行号跟着滚走就看不出在第几行。
 // 需要不透明背景（bg-surface-subtle）压住从下面滚过去的代码。
 const GUTTER_CLASS =

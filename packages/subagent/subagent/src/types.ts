@@ -39,9 +39,6 @@ export type SpawnForkInput = SubagentCaller & {
   readonly signal: AbortSignal;
 };
 
-/** One running subagent as the main agent's context lists it (design 02 §6.4). */
-export type RunningSubagent = { readonly agentId: string; readonly description: string; readonly label: string; readonly startedAt: string; readonly transcriptPath: string };
-
 /** Host side of the subagent tools; the texts it returns are design 02 §2 verbatim. */
 export interface SubagentHostPort {
   spawn(input: SpawnSubagentInput): Promise<SubagentToolOutcome>;
@@ -49,10 +46,5 @@ export interface SubagentHostPort {
   /** `agent_codex` / `agent_claude_code` (design 04): one CLI run, scheduled like any subagent. */
   spawnExternal(backend: ExternalSubagentBackend, input: SpawnExternalInput): Promise<SubagentToolOutcome>;
   sendMessage(input: SubagentCaller & { readonly agentId: string; readonly message: string }): Promise<SubagentToolOutcome>;
-  waitForInput(input: SubagentCaller & { readonly timeoutMs: number; readonly signal: AbortSignal }): Promise<SubagentToolOutcome>;
-  listAgents(input: SubagentCaller): Promise<SubagentToolOutcome>;
-  interrupt(input: SubagentCaller & { readonly agentId: string }): Promise<SubagentToolOutcome>;
   listModels(input: SubagentCaller): Promise<SubagentToolOutcome>;
-  /** Running subagents of a live main Session, oldest first; empty for any other Session. */
-  running(sessionId: string): readonly RunningSubagent[];
 }

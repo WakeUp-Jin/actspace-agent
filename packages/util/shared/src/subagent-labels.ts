@@ -18,6 +18,8 @@ export function subagentKindLabel(input: { readonly subagentKind?: SubagentKind;
 
 /** How one activation ended, as the completion notice says it. */
 export function subagentActivationStatusLabel(status: string): string {
+  // `stopped` arrives from background-task notices (task_stop / user stop); the rest are activation statuses.
+  if (status === "stopped") return "已停止";
   switch (status as SubagentActivationStatus) {
     case "completed": return "已完成";
     case "interrupted": return "已中断";
@@ -33,14 +35,13 @@ export function agentMessageBody(content: string): string {
   return /^\s*<agent_message\b[^>]*>\n?([\s\S]*?)\n?<\/agent_message>\s*$/.exec(content)?.[1] ?? content;
 }
 
-/** Panel status of one subagent: working, idle and continuable, or done for good. */
-export const SUBAGENT_LIST_STATUSES = ["running", "idle", "interrupted", "failed", "ended"] as const;
+/** Panel status of one subagent: working, or how it ended (a finished subagent is closed for good). */
+export const SUBAGENT_LIST_STATUSES = ["running", "interrupted", "failed", "ended"] as const;
 export type SubagentListStatus = (typeof SUBAGENT_LIST_STATUSES)[number];
 
 export function subagentListStatusLabel(status: SubagentListStatus): string {
   switch (status) {
     case "running": return "运行中";
-    case "idle": return "空闲";
     case "interrupted": return "已中断";
     case "failed": return "失败";
     case "ended": return "已结束";

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ActSpace 产品宣传片</title>
+  </head>
+  <body>
+    <div id="viewport">
+      <div id="film"></div>
+    </div>
+    <footer id="player" hidden>
+      <button id="play" type="button" aria-label="播放或暂停">播放</button>
+      <input id="scrub" type="range" min="0" step="0.01" value="0" aria-label="时间">
+      <output id="clock">0:00.0</output>
+      <output id="scene-name"></output>
+    </footer>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

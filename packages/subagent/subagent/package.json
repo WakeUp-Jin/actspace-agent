@@ -35,6 +35,7 @@
     "@actspace/cordis-adapter": "workspace:*",
     "@actspace/agent": "workspace:*",
     "@actspace/agent-loop": "workspace:*",
+    "@actspace/background-tasks": "workspace:*",
     "@actspace/scope": "workspace:*",
     "@actspace/session-journal": "workspace:*",
     "@actspace/session-persistence-jsonl": "workspace:*",

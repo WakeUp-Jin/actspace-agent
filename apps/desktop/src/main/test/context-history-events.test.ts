@@ -31,11 +31,11 @@ describe("describeSupplementEvent", () => {
     expect(describeSupplementEvent(RUNTIME, "runtime-state", runtime("plan"), first.memory).detail).toBe("模式 agent → plan");
   });
 
-  it("counts running subagents and background tasks", () => {
+  it("counts running background tasks, and running subagents of old Sessions", () => {
     const agents = "Running subagents (this list supersedes earlier ones):\n- a1 · review-ui · general · started 10:02 · transcript: /t/a1\n- a2 · test-runner · general · started 10:03 · transcript: /t/a2";
     expect(describeSupplementEvent("actspace.context-subagents", "subagents", agents, undefined)).toMatchObject({ kind: "subagents", detail: "2 个运行中：review-ui、test-runner" });
-    const tasks = "Background tasks still running (this list supersedes earlier lists; completion notifications supersede it):\n- b1 · bash · pnpm dev · started 2026-11-08T10:00:00+08:00\nDo not start duplicates. Use task_output / task_wait only if you need them.";
-    expect(describeSupplementEvent("actspace.context-background-tasks", "background-tasks", tasks, undefined)).toMatchObject({ kind: "background", detail: "1 个运行中：pnpm dev" });
+    const tasks = "Background tasks still running (this list supersedes earlier lists; completion notifications supersede it):\n- b1 · bash · pnpm dev · started 2026-11-08T10:00:00+08:00\n- a3 · agent · review auth · explore · started 2026-11-08T10:01:00+08:00 · transcript: /t/a3\nDo not start duplicates. You are notified when each one finishes; task_stop stops one.";
+    expect(describeSupplementEvent("actspace.context-background-tasks", "background-tasks", tasks, undefined)).toMatchObject({ kind: "background", detail: "2 个运行中：pnpm dev、review auth" });
     expect(describeSupplementEvent("actspace.context-background-tasks", "background-tasks", "No background tasks are running.", undefined).detail).toBe("全部结束");
   });
 

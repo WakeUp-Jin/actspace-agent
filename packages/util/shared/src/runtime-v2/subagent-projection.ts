@@ -7,7 +7,7 @@ import {
 /**
  * The subagent tree of one main Session, folded from its own Journal (design 02 §4.1):
  * `subagent/spawned` and `subagent/activation`, plus the read-only `delegation/*` of old Sessions.
- * The Host manager, `list_agents`, the running-subagents context source and the UI all read this one fold.
+ * The Host manager, the background task context source and the UI all read this one fold.
  */
 
 export type SubagentActivationSettle = {
@@ -42,7 +42,7 @@ export type SubagentView = {
   readonly inheritedThroughSeq?: number;
   /** Tools fixed at creation and reused by every activation, so the child's prompt prefix stays stable. */
   readonly toolNames?: readonly string[];
-  /** Recorded by `delegation/*` before subagents could be continued: shown, never listed to the model or messaged. */
+  /** Recorded by `delegation/*` in old Sessions: shown, never messaged. */
   readonly legacy: boolean;
   readonly status: SubagentStatus;
   readonly activations: readonly SubagentActivationView[];
@@ -102,7 +102,7 @@ function spawned(state: SubagentTree, data: Readonly<Record<string, RuntimeV2Jso
   if (state.agents[agentId]) return state;
   const toolNames = Array.isArray(data.toolNames) ? data.toolNames.filter((name): name is string => typeof name === "string") : undefined;
   const view: SubagentView = {
-    agentId, kind: data.kind, description, transcriptPath, callId, createdAt, legacy: false, status: "inactive", activations: [],
+    agentId, kind: data.kind, description, transcriptPath, callId, createdAt, legacy: false, status: "closed", activations: [],
     ...(oneOf(data.preset, SUBAGENT_PRESETS) ? { preset: data.preset } : {}),
     ...(typeof data.inheritedThroughSeq === "number" ? { inheritedThroughSeq: data.inheritedThroughSeq } : {}),
     ...(toolNames ? { toolNames } : {}),
@@ -134,7 +134,7 @@ function activation(state: SubagentTree, data: Readonly<Record<string, RuntimeV2
       ...(typeof data.resultTruncated === "boolean" ? { resultTruncated: data.resultTruncated } : {}),
     };
     const activations = current.activations.map((item, position) => position === index ? { ...item, settle } : item);
-    return replace(state, { ...current, activations, status: statusOf(current.kind, activations) });
+    return replace(state, { ...current, activations, status: statusOf(activations) });
   }
   return state;
 }
@@ -159,10 +159,9 @@ function legacyCompleted(state: SubagentTree, data: Readonly<Record<string, Runt
   return replace(state, { ...current, status: "closed", activations: [first] });
 }
 
-/** External subagents end for good; local and forked ones idle until the next message. */
-function statusOf(kind: SubagentKind, activations: readonly SubagentActivationView[]): SubagentStatus {
-  if (activations.some(item => !item.settle)) return "running";
-  return kind === "codex" || kind === "claude-code" ? "closed" : "inactive";
+/** Running while an activation is open; closed once it settled. */
+function statusOf(activations: readonly SubagentActivationView[]): SubagentStatus {
+  return activations.some(item => !item.settle) ? "running" : "closed";
 }
 
 function replace(state: SubagentTree, view: SubagentView): SubagentTree { return { order: state.order, agents: { ...state.agents, [view.agentId]: view } }; }

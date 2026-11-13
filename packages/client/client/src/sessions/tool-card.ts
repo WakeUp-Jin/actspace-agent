@@ -71,15 +71,15 @@ export function toolPreview(toolName: string, tool: RuntimeV2ToolView | undefine
   if (["agent", "explore", "actspace.subagent/agent", "actspace.subagent/explore"].includes(toolName)) { const detail = record(detailValue(data, "delegation")); const childSessionId = string(detail.childSessionId) ?? child?.childSessionId ?? ""; const presetId = string(detail.presetId) ?? child?.presetId ?? (toolName.endsWith("explore") ? "actspace.explore" : "actspace.agent"); const isBackground = detail.background === true; const status = isBackground && terminal && !failed ? agentBackgroundStatus(child?.status) : string(detail.status) === "aborted" || child?.status === "aborted" || state === "aborted" ? "aborted" : child?.status === "failed" || failed ? "failed" : !terminal ? "running" : "completed"; return { kind: "agent", description: string(args.description) ?? string(args.task) ?? (toolName.endsWith("explore") ? "Explore" : "Agent"), status, subagentType: "explore", ...(isBackground ? { background: true } : {}), agentKind: presetId === "actspace.explore" || toolName.endsWith("explore") ? "explore" : "agent", ...(child?.model ? { model: child.model } : {}), displayText: summary, summary: output, ...(childSessionId ? { transcriptRef: { kind: "subagent_transcript", sessionId, agentRunId, runId: childSessionId } } : {}), stats: { durationMs: tool?.durationMs ?? 0, toolCallCount: 0 }, display: "panel", ...(errorMessage ? { error: errorMessage } : {}) }; }
   const artifacts = tool?.artifacts.filter((artifact) => artifact.kind === "image").map((artifact) => ({ type: "image" as const, name: localName.startsWith("browser_") ? "Chrome 截图" : artifact.label, path: artifact.artifactId, mimeType: artifact.mimeType })) ?? [];
   const subagentTitle = subagentToolTitle(toolName, args, describeAgent);
-  const linkedAgent = toolName === "send_message" || toolName === "interrupt_agent" ? string(args.agent_id) : null;
+  const linkedAgent = toolName === "send_message" || toolName === "interrupt_agent" ? string(args.agent_id) : stoppedAgent(toolName, args, describeAgent);
   const subagentLink = linkedAgent ? { agentId: linkedAgent, verb: toolName === "send_message" ? "发消息给" : "停止", target: describeAgent?.(linkedAgent) ?? linkedAgent } : undefined;
-  // 等待 / 查看类子智能体工具只显示标题：工具结果（「wait_agent completed」「Input arrived.」、清单原文）是给模型看的，失败时才带错误。
+  // 查看类子智能体工具只显示标题：工具结果（模型清单原文；老会话的「wait_agent completed」「Input arrived.」）是给模型看的，失败时才带错误。
   const titleOnly = SUBAGENT_TITLE_ONLY_TOOLS.has(toolName);
   const content = titleOnly ? errorMessage ?? "" : [toolName === "send_message" ? string(args.message) : undefined, summary, output, errorMessage].filter(Boolean).join("\n\n");
   return { kind: "generic", title: subagentTitle ?? toolName, content, ...(artifacts.length ? { artifacts } : {}), ...(subagentLink ? { subagentLink } : {}) };
 }
 
-/** Subagent tools whose result is only for the model: the row shows just the title. */
+/** Subagent tools whose result is only for the model: the row shows just the title. `wait_agent` / `list_agents` appear only in old Sessions. */
 const SUBAGENT_TITLE_ONLY_TOOLS: ReadonlySet<string> = new Set(["wait_agent", "list_agents", "list_subagent_models"]);
 
 /** Tools that create a subagent, and the kind they create. */
@@ -87,9 +87,20 @@ const SUBAGENT_SPAWN_TOOLS: Readonly<Record<string, SubagentKind>> = Object.free
 
 function firstLine(value: string | null): string | null { return value?.split(/\r?\n/).find((line) => line.trim())?.trim() || null; }
 
-/** One-line rows for the subagent management tools (design 05 §1); `describe` turns an agent id into its description. */
+/** `task_stop` on a subagent (its task id is the agent id) reads like the old stop row; on a Bash task it stays generic. */
+function stoppedAgent(toolName: string, args: EventRecord, describe: ((agentId: string) => string | undefined) | undefined): string | null {
+  const taskId = toolName === "task_stop" ? string(args.taskId) : null;
+  return taskId && describe?.(taskId) !== undefined ? taskId : null;
+}
+
+/**
+ * One-line rows for the subagent management tools (design 05 §1); `describe` turns an agent id into its description.
+ * `interrupt_agent`, `wait_agent` and `list_agents` were removed; their rows stay for old Sessions.
+ */
 export function subagentToolTitle(toolName: string, args: EventRecord, describe: (agentId: string) => string | undefined = () => undefined): string | undefined {
   const target = () => { const agentId = string(args.agent_id) ?? ""; return describe(agentId) ?? agentId; };
+  const stopped = stoppedAgent(toolName, args, describe);
+  if (stopped) return `停止 ${describe(stopped)}`;
   switch (toolName) {
     case "send_message": return `发消息给 ${target()}`;
     case "interrupt_agent": return `停止 ${target()}`;

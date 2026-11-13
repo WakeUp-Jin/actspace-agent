@@ -32,7 +32,7 @@ it("groups running and other agents as cards, shows status text, tokens and dura
   overrideBridge({
     "sessions.getSubagents": vi.fn().mockResolvedValue([
       item("scan", "running", { model: "deepseek/deepseek-v4", activationCount: 3, totalTokens: 12_630 }),
-      item("review", "idle", { kind: "fork", preset: undefined, activationCount: 2, result: "提交顺序没问题\n细节见下", endedAt: "2026-11-04T09:05:09.000Z" }),
+      item("review", "ended", { kind: "fork", preset: undefined, activationCount: 2, result: "提交顺序没问题\n细节见下", endedAt: "2026-11-04T09:05:09.000Z" }),
       item("port", "ended", { kind: "codex", preset: undefined, result: "Looks fine" }),
       item("broken", "failed"),
       item("old", "interrupted", { legacy: true, preset: "explore" }),
@@ -48,7 +48,7 @@ it("groups running and other agents as cards, shows status text, tokens and dura
     expect(row("scan")).toHaveTextContent(/正在思考.*12\.6K tokens.*运行中 · 1m 12s/);
     expect(row("scan")).not.toHaveTextContent(/通用|deepseek|第 \d+ 轮/);
     // 结束的：最终回复第一行，右下只有状态文字和最近一次激活的耗时（没有图标、没有第 N 轮）；没有 token 时不显示。
-    expect(row("review")).toHaveTextContent(/提交顺序没问题.*空闲 · 9s/);
+    expect(row("review")).toHaveTextContent(/提交顺序没问题.*已结束 · 9s/);
     expect(row("review")).not.toHaveTextContent(/tokens|Fork|第 \d+ 轮/);
     expect(row("review").querySelectorAll("svg")).toHaveLength(0);
     expect(row("port")).toHaveTextContent(/Looks fine.*已结束/);
@@ -69,12 +69,12 @@ it("groups running and other agents as cards, shows status text, tokens and dura
 
 it("puts model and status text in a one-line detail header, the kind in its hover text, and the view toggle last", async () => {
   overrideBridge({
-    "sessions.getSubagents": vi.fn().mockResolvedValue([item("scan", "idle", { preset: "explore", model: "claude-sonnet-5-5", activationCount: 2, endedAt: "2026-11-04T09:06:12.000Z" })]),
+    "sessions.getSubagents": vi.fn().mockResolvedValue([item("scan", "ended", { preset: "explore", model: "claude-sonnet-5-5", activationCount: 2, endedAt: "2026-11-04T09:06:12.000Z" })]),
     "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue([]),
   });
   panel({ agentId: "scan", view: "chat", revision: 1 });
   const header = (await screen.findByRole("heading", { name: "scan" })).closest("header")!;
-  expect(header).toHaveTextContent(/sonnet.*空闲 · 1m 12s/i);
+  expect(header).toHaveTextContent(/sonnet.*已结束 · 1m 12s/i);
   expect(header).not.toHaveTextContent(/第 \d+ 轮/);
   expect(header.querySelectorAll("svg")).toHaveLength(2);
   expect(header).not.toHaveTextContent("探索");
@@ -96,7 +96,7 @@ it("reports a failed stop on the list", async () => {
 it("navigates within the panel while rejecting stale transcript responses", async () => {
   let finishOld!: (value: never[]) => void;
   const transcript = vi.fn().mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; })).mockResolvedValue([]);
-  overrideBridge({ "sessions.getSubagents": vi.fn().mockResolvedValue([item("first", "idle"), item("second", "ended")]), "sessions.getSubAgentTranscript": transcript });
+  overrideBridge({ "sessions.getSubagents": vi.fn().mockResolvedValue([item("first", "ended"), item("second", "ended")]), "sessions.getSubAgentTranscript": transcript });
   const { unmount } = panel();
   await screen.findByRole("group", { name: "其他 · 2" });
   fireEvent.click(row("first"));
@@ -191,7 +191,7 @@ it("opens a focused agent on its trajectory and toggles between trajectory and c
 
 it("shows where a fork split off and hands the boundary to its trajectory", async () => {
   overrideBridge({
-    "sessions.getSubagents": vi.fn().mockResolvedValue([item("branch", "idle", { kind: "fork", preset: undefined, inheritedThroughSeq: 42 })]),
+    "sessions.getSubagents": vi.fn().mockResolvedValue([item("branch", "ended", { kind: "fork", preset: undefined, inheritedThroughSeq: 42 })]),
     "sessions.getSubAgentTranscript": vi.fn().mockResolvedValue([]),
   });
   panel({ agentId: "branch", view: "trajectory", revision: 1 });

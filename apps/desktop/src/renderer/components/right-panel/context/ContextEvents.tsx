@@ -15,7 +15,7 @@ const KIND_LABEL: Record<ContextPanelEventKind, string> = {
   "mode-switch": "模式",
 };
 
-const NEUTRAL_CLASS = "border border-line bg-surface-subtle text-text-muted leading-[15px]";
+const NEUTRAL_CLASS = "border border-line bg-surface-subtle text-text-muted leading-4";
 const KIND_CLASS: Record<ContextPanelEventKind, string> = {
   files: "bg-success-soft text-success",
   runtime: "bg-info-soft text-info",
@@ -63,7 +63,7 @@ export function ContextEvents({ events }: { events: readonly ContextPanelEvent[]
           const position = positionOf(event);
           return (
             <li key={event.id} data-context-event={kind} title={hint} className="flex items-start gap-2 border-b border-dashed border-line py-1.5 text-act-xs last:border-b-0">
-              <span className={cn("mt-px shrink-0 whitespace-nowrap rounded-act-xs px-1.5 text-act-xxs font-medium leading-[17px]", KIND_CLASS[kind])}>{KIND_LABEL[kind]}</span>
+              <span className={cn("mt-px shrink-0 whitespace-nowrap rounded-act-xs px-1.5 text-act-xxs font-medium leading-4.5", KIND_CLASS[kind])}>{KIND_LABEL[kind]}</span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-text-main">{label}</div>
                 {event.detail ? <div className="mt-px truncate text-act-xxs text-text-faint">{event.detail}</div> : null}

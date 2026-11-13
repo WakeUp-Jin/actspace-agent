@@ -29,7 +29,8 @@ export function backgroundNoticeLabel(message: Pick<BackgroundNoticeMessage, "ta
 /** 展开后显示的内容：子智能体完成看结论（没有就看 summary），来信看正文，Bash 看通知原文。 */
 export function backgroundNoticeBody(message: Pick<BackgroundNoticeMessage, "taskKind" | "content">): string {
   if (message.taskKind === "subagent") {
-    const closing = xmlText(message.content, "closing_message");
+    // 新通知（登记表的 `<task_notification>`）里结论保持原文；老会话的 `<subagent_notification>` 里结论是转义过的。
+    const closing = xmlText(message.content, "closing_message", !message.content.startsWith("<task_notification>"));
     const summary = xmlText(message.content, "summary");
     const note = xmlText(message.content, "note");
     return [closing && closing !== "(no closing message)" ? closing : summary, note].filter(Boolean).join("\n\n") || message.content;
@@ -38,10 +39,11 @@ export function backgroundNoticeBody(message: Pick<BackgroundNoticeMessage, "tas
   return message.content;
 }
 
-/** 通知里一个标签的文字（通知生成时转义了 `& < >`，这里还原）。 */
-function xmlText(content: string, tag: string): string | undefined {
+/** 通知里一个标签的文字（通知生成时转义了 `& < >`，这里还原；原文标签不还原）。 */
+function xmlText(content: string, tag: string, escaped = true): string | undefined {
   const value = new RegExp(`<${tag}>\\n?([\\s\\S]*?)\\n?</${tag}>`).exec(content)?.[1]?.trim();
-  return value ? value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&") : undefined;
+  if (!value) return undefined;
+  return escaped ? value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&") : value;
 }
 
 export function BackgroundNoticeRow({ message, onOpenSubagent }: { message: BackgroundNoticeMessage; onOpenSubagent?: (agentId: string) => void }) {

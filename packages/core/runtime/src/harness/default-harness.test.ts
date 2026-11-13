@@ -92,7 +92,7 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
     const definitions = parentLease.getService<import("@actspace/tool-runtime").ToolRuntime>("tools.runtime")!.registry.listDefinitions();
     const visible = (mode: import("@actspace/shared/runtime-v2").RuntimeV2AgentMode) => [...allowedAgentModeTools(mode, definitions)].sort();
     expect(visible("chat")).toEqual(["generate_image", "web"]);
-    expect(visible("plan")).toEqual(["agent", "agent_fork", "glob", "grep", "inspect_image", "interrupt_agent", "list_agents", "list_directory", "list_subagent_models", "read_file", "send_message", "task_list", "task_output", "task_stop", "task_wait", "todo_read", "todo_write", "wait_agent", "web_fetch", "web_search"]);
+    expect(visible("plan")).toEqual(["agent", "agent_fork", "glob", "grep", "inspect_image", "list_directory", "list_subagent_models", "read_file", "send_message", "task_list", "task_output", "task_stop", "todo_read", "todo_write", "web_fetch", "web_search"]);
     expect(visible("agent")).toEqual(expect.arrayContaining(["bash", "edit_file", "present", "generate_image", "plugin_manager", "harness_inspect"]));
     expect(visible("agent")).not.toContain("web");
     const reviewer = parentLease.getService<import("@actspace/auto-review").AutoReviewer>("approval.auto-review");
@@ -143,19 +143,18 @@ it("executes the default Loop from its fixed closure with Harness-owned policies
       observeChild = undefined;
       expect(childResult).toMatchObject({ ok: true, text: expect.stringContaining("fixed loop result") });
       const childSessionId = /Subagent (\S+) \(short result\) finished\./.exec(childResult.text)![1];
-      // A client reading the finished child's task queue gets it without taking the child over,
-      // so the parent can still continue it (acceptance BUG-02).
+      // A client reading the finished child's task queue gets it without taking the child over (acceptance BUG-02).
       expect((await runtime.runs.service.snapshot(childSessionId)).runs).toEqual([expect.objectContaining({ state: "completed" })]);
       expect(sessions.getOpen(childSessionId)).toBeUndefined();
-      expect(await runtime.subagents.sendMessage({ sessionId: "conversation", callId: "follow-up", scope: parentScope, agentId: childSessionId, message: "One more" })).toMatchObject({ ok: true });
-      await vi.waitFor(() => expect(runtime.subagents.activeCount).toBe(0));
+      // A finished subagent is closed: a message is refused and starts nothing.
+      expect(await runtime.subagents.sendMessage({ sessionId: "conversation", callId: "follow-up", scope: parentScope, agentId: childSessionId, message: "One more" })).toMatchObject({ ok: false, code: "SUBAGENT_CLOSED" });
+      expect(runtime.subagents.activeCount).toBe(0);
       const child = await sessions.resume(childSessionId);
       const childLedger = await TaskLedger.open(child);
       expect(childLedger.snapshot().runs).toEqual([
         expect.objectContaining({ state: "completed", harness: expect.objectContaining({ revision: 1 }), result: { status: "completed", text: "fixed loop result" } }),
-        expect.objectContaining({ state: "completed", result: { status: "completed", text: "fixed loop result" } }),
       ]);
-      expect(childLedger.snapshot().tasks).toEqual([expect.objectContaining({ state: "completed" }), expect.objectContaining({ state: "completed" })]);
+      expect(childLedger.snapshot().tasks).toEqual([expect.objectContaining({ state: "completed" })]);
       expect(parentLease.revision).toBe(1);
       expect(harnesses.inspect().instances.find(item => item.generationId === parentLease.generationId)?.users).toBe(1);
       expect(harnesses.inspect().instances.find(item => item.state === "current")?.users).toBe(0);

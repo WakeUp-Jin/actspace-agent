@@ -5,7 +5,6 @@ import { manifest as backgroundTasksToolManifest } from "@actspace/tool-backgrou
 import { manifest as browserToolsManifest } from "@actspace/tool-browser/manifest";
 import { manifest as compactionManifest } from "@actspace/context-compaction/manifest";
 import { manifest as contextBackgroundTasksManifest } from "@actspace/context-background-tasks/manifest";
-import { manifest as contextSubagentsManifest } from "@actspace/context-subagents/manifest";
 import { manifest as contextAssemblyManifest } from "@actspace/context-assembly/manifest";
 import { manifest as contextConversationManifest } from "@actspace/context-conversation/manifest";
 import { manifest as contextDisclosureManifest } from "@actspace/context-disclosure/manifest";
@@ -109,7 +108,6 @@ export const PLUGIN_CATALOG: readonly PluginCatalogEntry[] = Object.freeze([
   { id: "context-conversation", manifest: contextConversationManifest, module: "@actspace/context-conversation/plugin", loaders: harness, directory: "context" },
   { id: "context-tools", manifest: contextToolsManifest, module: "@actspace/context-tools/plugin", loaders: harness, directory: "context" },
   { id: "context-background-tasks", manifest: contextBackgroundTasksManifest, module: "@actspace/context-background-tasks/plugin", loaders: harness, directory: "context" },
-  { id: "context-subagents", manifest: contextSubagentsManifest, module: "@actspace/context-subagents/plugin", loaders: harness, directory: "context" },
   { id: "context-disclosure", manifest: contextDisclosureManifest, module: "@actspace/context-disclosure/plugin", loaders: harness, directory: "context" },
   { id: "compaction-runtime", manifest: compactionManifest, module: "@actspace/context-compaction/plugin", loaders: harness, directory: "context" },
   { id: "filesystem-read", manifest: fsReadManifest, module: "@actspace/tool-fs-read/plugin", loaders: harness, directory: "fs", admitOnHost: true },

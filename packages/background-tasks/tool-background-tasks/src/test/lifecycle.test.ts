@@ -52,6 +52,11 @@ describe("background task tools", () => {
     expect((await run("task_stop", { taskId: "bash_1" })).text).toContain("status: stopped");
     expect(new MainAgentInbox(sessions.get("parent")!).pending()).toEqual([]);
     expect((await run("task_list", { activeOnly: false })).text).toContain("background_tasks: 1");
+    await registry.register({ ...source("agent-1"), kind: "agent", description: "review auth", agent: { transcriptPath: "/t/agent-1.md", label: "explore" } });
+    const agents = await run("task_list", {});
+    expect(agents.text).toContain("kind: agent");
+    expect(agents.text).toContain("transcript: /t/agent-1.md");
+    expect((await run("task_stop", { taskId: "agent-1" })).text).toContain("status: stopped");
     await cleanup();
     await expect(run("task_list", {})).rejects.toMatchObject({ failure: { code: "TOOL_NOT_FOUND" } });
   });
@@ -70,34 +75,15 @@ describe("background task tools", () => {
     expect(pruned.text).not.toContain("fresh lines");
   });
 
-  it("waits for a running task and reports it instead of a notification", async () => {
-    const { registry, sessions, run } = setup();
-    const task = source("bash_2");
-    await registry.register(task);
-    const waiting = run("task_wait", { timeoutSeconds: 5 });
-    setTimeout(() => task.finish(), 5);
-    const result = await waiting;
-    expect(result.text).toContain("wait_status: completed");
-    expect(result.text).toContain("tail of bash_2");
-    expect(new MainAgentInbox(sessions.get("parent")!).pending()).toEqual([]);
-    expect((await run("task_wait", { timeoutSeconds: 1 })).text).toContain("no_running_tasks");
-  });
-
-  it("rejects an out-of-range timeout", async () => {
-    const { run } = setup();
-    const result = await run("task_wait", { timeoutSeconds: 500 });
-    expect(result.status).toBe("failed");
-  });
-
   it("keeps Host error codes across a copied error class", async () => {
     // A Harness artifact inlines its own BackgroundTaskError, so the Host's class is a different constructor.
     class CopiedBackgroundTaskError extends Error {
       constructor(readonly code: string, message: string) { super(message); this.name = "BackgroundTaskError"; }
     }
     const throwing = (error: unknown) => async () => { throw error; };
-    const host = (error: unknown) => ({ list: throwing(error), output: throwing(error), stop: throwing(error), wait: throwing(error), register: throwing(error), notifyOutputMatch: throwing(error), hasRunning: () => false });
+    const host = (error: unknown) => ({ list: throwing(error), output: throwing(error), stop: throwing(error), register: throwing(error), notifyOutputMatch: throwing(error), hasRunning: () => false });
     const notFound = setup(host(new CopiedBackgroundTaskError("TASK_NOT_FOUND", "Background task bash_x was not found.")));
-    for (const [name, args] of [["task_output", { taskId: "bash_x" }], ["task_stop", { taskId: "bash_x" }], ["task_wait", { taskId: "bash_x", timeoutSeconds: 1 }]] as const) {
+    for (const [name, args] of [["task_output", { taskId: "bash_x" }], ["task_stop", { taskId: "bash_x" }]] as const) {
       const result = await notFound.run(name, args);
       expect(result.status).toBe("failed");
       expect(result.text).toContain('"code":"TASK_NOT_FOUND"');

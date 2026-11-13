@@ -22,7 +22,7 @@ import { ArchivedChatsSection } from "./sections/ArchivedChatsSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { LocalUpdateSection } from "./sections/LocalUpdateSection";
 import { MediaDefaultsSection } from "./sections/MediaDefaultsSection";
-import { PerformanceSection } from "./sections/PerformanceSection";
+import { ResourceUsageSection } from "./resources/ResourceUsageSection";
 import { ConversationDisplaySection } from "./sections/ConversationDisplaySection";
 import { SessionDefaultsSection } from "./sections/SessionDefaultsSection";
 import { SubagentSection } from "./sections/SubagentSection";
@@ -175,7 +175,6 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
     case "general":
       return (
         <PageShell title="通用">
-          <PerformanceSection {...rest} />
           <SessionDefaultsSection {...rest} />
           <ConversationDisplaySection {...rest} />
           <GeneralSection {...rest} />
@@ -232,6 +231,8 @@ function SettingsContent({ section, ...rest }: SectionProps & { section: Setting
       );
     case "harnessStats":
       return <HarnessStatsPage />;
+    case "resources":
+      return <PageShell title="资源占用"><ResourceUsageSection {...rest} /></PageShell>;
     case "update":
       return <PageShell title="更新"><LocalUpdateSection /></PageShell>;
     default:

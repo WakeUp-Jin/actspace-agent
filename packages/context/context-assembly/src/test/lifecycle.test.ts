@@ -29,13 +29,13 @@ describe("context assembly", () => {
     const assembly = new ContextAssembly(["system", "conversation"]);
     assembly.register({ kind: "system", create: () => source("context-system") });
     assembly.register({ kind: "conversation", create: () => source("context-conversation") });
-    assembly.register({ kind: "subagents", roles: ["main"], create: () => source("context-subagents") });
-    expect(assembly.kinds()).toEqual(["system", "conversation", "subagents"]);
+    assembly.register({ kind: "background-tasks", roles: ["main"], create: () => source("context-background-tasks") });
+    expect(assembly.kinds()).toEqual(["system", "conversation", "background-tasks"]);
     expect(assembly.kinds("subagent")).toEqual(["system", "conversation"]);
     const main = new AgentScope("main:test"), child = new AgentScope("child:test");
     const mainSources = assembly.sourcesFor("main", options(main));
     const childSources = assembly.sourcesFor("subagent", options(child));
-    expect([...mainSources.owners()]).toEqual(["test.context-system", "test.context-conversation", "test.context-subagents"]);
+    expect([...mainSources.owners()]).toEqual(["test.context-system", "test.context-conversation", "test.context-background-tasks"]);
     expect([...childSources.owners()]).toEqual(["test.context-system", "test.context-conversation"]);
     await main.dispose();
     expect([...mainSources.owners()]).toEqual([]);

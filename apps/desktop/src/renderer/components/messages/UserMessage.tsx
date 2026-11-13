@@ -8,9 +8,9 @@ const USER_MESSAGE_CLASS = "message-row user-message flex flex-col items-stretch
 // 已发送的回复批注胶囊：贴在它所属的用户消息上方，右对齐。execution 变体由 TurnPrompt 放在卡片外面。
 export const USER_ANNOTATIONS_ROW_CLASS = "flex justify-end pb-2";
 const USER_CARD_CLASS =
-  "user-card w-full rounded-act-lg border border-line bg-surface px-[var(--conversation-card-padding)] py-3 leading-[1.55] text-text-main";
+  "user-card w-full rounded-act-lg border border-line bg-surface px-[var(--conversation-card-padding)] py-3 text-act-base leading-relaxed text-text-main";
 const USER_EXECUTION_CARD_CLASS =
-  "user-card w-full px-[var(--conversation-card-padding)] py-3 leading-[1.55] text-text-main";
+  "user-card w-full px-[var(--conversation-card-padding)] py-3 text-act-base leading-relaxed text-text-main";
 // 超长用户消息两态折叠（参考 Cursor）：
 // - 默认折叠只露前几行 + 底部渐隐，不出滚动条，sticky 常驻顶部时遮挡最小；
 // - 点击展开到更大高度、内部滚动，再点收起；拖选文字复制不触发切换。
@@ -24,7 +24,7 @@ const USER_ATTACHMENTS_CLASS = "mt-3 flex flex-wrap items-center gap-2";
 const USER_IMAGE_ATTACHMENT_CLASS =
   "relative block h-14 w-14 cursor-pointer overflow-hidden rounded-act-md border border-line bg-surface-subtle p-0 shadow-act-thumb transition-[border-color,opacity] duration-(--motion-fast) hover:border-line-strong hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default disabled:opacity-100";
 const USER_FILE_ATTACHMENT_CLASS =
-  "inline-flex h-9 max-w-[240px] items-center gap-2 rounded-act-md border border-line bg-surface-subtle px-2.5 text-act-md leading-5 font-medium text-text-main";
+  "inline-flex h-9 max-w-[240px] items-center gap-2 rounded-act-md border border-line bg-surface-subtle px-2.5 text-act-sm leading-5 font-medium text-text-main";
 const USER_FILE_NAME_CLASS = "truncate";
 const EMPTY_ATTACHMENTS: readonly ComposerAttachment[] = [];
 function getAttachmentPreviewStyle(attachment: ComposerAttachment): CSSProperties | undefined {

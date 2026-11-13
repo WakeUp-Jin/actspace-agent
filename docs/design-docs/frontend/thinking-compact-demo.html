@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>简化思考过程 Demo</title>
+<style>
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-read: "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-subtle: #f1f1ef; --selected: #e4e4e1; --hover: #ececea;
+  --line: #deded9; --line-soft: #e9e9e5; --line-strong: #8c8c85;
+  --text: #20201e; --muted: #676762; --faint: #8a8a83;
+  --operational: #087a4b;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+}
+:root[data-theme="dark"] {
+  --bg: #181916; --surface: #242522; --surface-subtle: #292a26; --selected: #30312d; --hover: #2c2d29;
+  --line: #353630; --line-soft: #2e2f2a; --line-strong: #787870;
+  --text: #f1f1ed; --muted: #b5b5ae; --faint: #85857e;
+  --operational: #36c783;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.2);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 13px/1.55 var(--font-ui); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+[hidden] { display: none !important; }
+
+.bar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar h1 { margin: 0 4px 0 0; font-size: 13px; font-weight: 600; }
+.grp { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--surface-subtle); border: 1px solid var(--line); }
+.seg button { padding: 2px 9px; border-radius: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: var(--selected); }
+.pbtn { padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); font-size: 12px; color: var(--muted); }
+.pbtn:hover { color: var(--text); border-color: var(--line-strong); }
+.scrub { flex: 1 1 220px; display: flex; align-items: center; gap: 8px; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.scrub input { flex: 1; accent-color: var(--muted); }
+
+.page { max-width: 1500px; margin: 0 auto; padding: 20px 20px 48px; display: flex; flex-direction: column; gap: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; }
+
+.panel { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.panel header { padding: 10px 16px; border-bottom: 1px solid var(--line-soft); }
+.panel header b { font-size: 13.5px; font-weight: 600; }
+.panel header .tag { margin-left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 11px; color: var(--muted); background: var(--surface-subtle); }
+.panel header p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.body { height: 430px; overflow-y: auto; padding: 14px 20px 20px; background: var(--bg); }
+
+.u { margin: 0 0 12px auto; width: fit-content; max-width: 86%; padding: 8px 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-size: 14px; }
+.row { font-size: 14px; line-height: 22px; margin-top: 5px; }
+.tl { color: var(--muted); display: flex; gap: 6px; min-width: 0; }
+.tl .v { color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt { display: flex; align-items: center; gap: 6px; color: var(--faint); max-width: 100%; font-variant-numeric: tabular-nums; }
+.tt .ttx { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt svg { flex: none; transition: transform .15s, opacity .15s; }
+.tt.open svg { transform: rotate(90deg); }
+.quiet .tt svg { opacity: 0; }
+.quiet .tt:hover svg, .quiet .tt.open svg { opacity: 1; }
+.tt:hover { color: var(--muted); }
+.full { margin: 7px 0 0; white-space: pre-wrap; font: inherit; font-size: 14px; line-height: 1.65; color: var(--muted); }
+
+@keyframes sh { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.shim { background: linear-gradient(90deg, var(--faint) 0%, var(--faint) 38%, var(--text) 50%, var(--faint) 62%, var(--faint) 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: sh 1.1s ease-in-out infinite; }
+
+/* B：一行最新句子 */
+@keyframes flipIn { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: none; } }
+@keyframes flipOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-100%); } }
+.sub { position: relative; margin-top: 1px; font-size: 13px; line-height: 20px; height: 20px; color: var(--faint); overflow: hidden; }
+.sub span { position: absolute; inset: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub span.in { animation: flipIn .36s cubic-bezier(.2,.7,.2,1) both; }
+.sub span.out { animation: flipOut .36s cubic-bezier(.2,.7,.2,1) both; }
+
+/* C：固定三行窗口 */
+.peek { position: relative; margin-top: 5px; height: 66px; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 60%); mask-image: linear-gradient(180deg, transparent 0, #000 60%); }
+.peek > div { position: absolute; left: 0; right: 0; bottom: 0; white-space: pre-wrap; font-size: 13px; line-height: 22px; color: var(--faint); }
+
+.rp { margin: 10px 0 0; font-family: var(--font-read); font-size: 15.5px; line-height: 1.85; }
+
+.cards { display: flex; flex-wrap: wrap; gap: 16px; }
+.card { flex: 1 1 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+.card h2 { margin: 0 0 8px; font-size: 13.5px; }
+.card ul { margin: 0; padding-left: 16px; color: var(--muted); font-size: 12.5px; line-height: 1.8; }
+.setrow { display: flex; align-items: center; gap: 16px; padding: 10px 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--bg); }
+.setrow .t { flex: 1; }
+.setrow .t b { display: block; font-size: 13.5px; font-weight: 500; }
+.setrow .t span { font-size: 12px; color: var(--muted); }
+.tog { width: 34px; height: 20px; border-radius: 10px; background: var(--line-strong); position: relative; transition: background .15s; flex: none; }
+.tog::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.tog[aria-checked="true"] { background: var(--operational); }
+.tog[aria-checked="true"]::after { transform: translateX(14px); }
+.crumb { margin: 0 0 8px; font-size: 12px; color: var(--faint); }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .shim { color: var(--faint); background: none; } }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>简化思考过程</h1>
+  <button class="pbtn" id="replay">重播</button>
+  <button class="pbtn" id="pause">暂停</button>
+  <div class="grp">速度 <div class="seg" id="speed"><button data-v="1" aria-pressed="true">1×</button><button data-v="2" aria-pressed="false">2×</button></div></div>
+  <div class="scrub"><input type="range" id="scrub" min="0" max="23" step="0.05" value="0" aria-label="进度" /><span id="clock">0.0s</span></div>
+  <div class="grp">主题 <div class="seg" id="theme"><button data-v="light" aria-pressed="true">浅色</button><button data-v="dark" aria-pressed="false">深色</button></div></div>
+</div>
+
+<div class="page">
+  <div class="grid" id="grid"></div>
+
+  <div class="cards">
+    <div class="card">
+      <h2>设置项（放在 通用 › 对话显示）</h2>
+      <p class="crumb">设置 › 通用 › 对话显示</p>
+      <div class="setrow">
+        <div class="t"><b>简化思考过程</b><span>思考进行时只显示状态和用时，不展开正文。点击标题仍可查看全文。</span></div>
+        <button class="tog" role="switch" aria-checked="true" aria-label="简化思考过程" onclick="this.setAttribute('aria-checked', this.getAttribute('aria-checked') !== 'true')"></button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>四版共同点</h2>
+      <ul>
+        <li>只改思考行；Read / Grep / Edit 等工具行不变。</li>
+        <li>运行中标题带用时并保留扫光，结束后变成「Thought for 9s」。</li>
+        <li>任何时候点标题都能展开全文，手动展开的状态不会被自动收回。</li>
+        <li>开关关闭时就是第一格「现状」。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const VARIANTS = [
+  { id: "cur", name: "现状", tag: "开关关闭", desc: "正文边输出边展开，高度一直增长，回复结束才收起。" },
+  { id: "A", name: "A · 只有一行", tag: "最安静", desc: "只显示「Thinking 6s」加扫光，不出现任何正文。" },
+  { id: "B", name: "B · 一行 + 最新一句", tag: "", desc: "标题下固定一行。一句话想完才整句出现，下一句想完再向上翻过去；没有逐字打字。" },
+  { id: "C", name: "C · 固定三行窗口", tag: "", desc: "正文在三行高的窗口里向上滚动，顶部渐隐；思考结束窗口消失。" },
+  { id: "D", name: "D · 一行 + 开头一句", tag: "已选", desc: "仍是一行。短语取这段思考的第一个分句，出现后固定不变，直到思考结束。" },
+];
+const TH1 = [
+  ["理解需求", "用户希望思考过程不要打扰阅读。现在的问题是正文一边流式输出，一边把下面的内容往下推，视线会被不断增长的文字带走。"],
+  ["梳理现有折叠逻辑", "先看 ThinkingBlock 的展开状态。运行中默认展开，整轮回复完成后才收起，所以思考越长，占的高度越大。collapsedByDefault 只在历史回读时生效。"],
+  ["确定改法", "改法应该很小：加一个设置项，开启后运行中也保持收起，只在标题里显示用时。用户手动点开的状态要保留，不能被重渲染覆盖。"],
+];
+const TH2 = [
+  ["确认影响范围", "render-message 里只有一处用到 ThinkingBlock。Web 端的 ThinkingRow 是独立实现，这次先不动。"],
+  ["补测试", "还要补一条测试：开启简化后，running 状态下不渲染正文节点。"],
+];
+const REPLY = "已加上「简化思考过程」开关。开启后，思考进行时只显示一行状态和用时，正文默认收起，点击标题仍可查看全文；关闭时保持现在的样式。";
+const SEGS = [
+  { kind: "th", start: 0.4, end: 10, paras: TH1 },
+  { kind: "tool", start: 10, end: 11.2, act: "Read", target: "components/messages/ThinkingBlock.tsx" },
+  { kind: "tool", start: 11.2, end: 12.4, act: "Grep", target: "collapsedByDefault" },
+  { kind: "th", start: 12.4, end: 17.4, paras: TH2 },
+  { kind: "tool", start: 17.4, end: 18.8, act: "Edit", target: "ThinkingBlock.tsx  +18 −4" },
+  { kind: "reply", start: 18.8, end: 22.5, text: REPLY },
+];
+const END = 23;
+for (const s of SEGS) if (s.kind === "th") s.text = s.paras.map(p => p[1]).join("\n\n");
+
+const CHEV = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
+const set = (node, text) => { if (node.textContent !== text) { node.textContent = text; return true; } return false; };
+
+const panels = VARIANTS.map(v => {
+  const panel = el("section", "panel");
+  panel.append(el("header", "", `<b>${v.name}</b>${v.tag ? `<span class="tag">${v.tag}</span>` : ""}<p>${v.desc}</p>`));
+  const body = el("div", "body" + (v.id === "cur" ? "" : " quiet"));
+  body.append(el("div", "u", "把思考过程做得安静一点"));
+  const rows = SEGS.map(seg => {
+    if (seg.kind === "tool") {
+      const row = el("div", "row tl", `<span class="a">${seg.act}</span><span class="v">${seg.target}</span>`);
+      body.append(row);
+      return { seg, row, a: row.firstChild };
+    }
+    if (seg.kind === "reply") { const row = el("p", "rp"); body.append(row); return { seg, row }; }
+    const row = el("div", "row");
+    const tt = el("button", "tt", `<span class="ttx"></span>${CHEV}`);
+    const sub = el("div", "sub"), peek = el("div", "peek", "<div></div>"), full = el("pre", "full");
+    row.append(tt, sub, peek, full);
+    body.append(row);
+    const r = { seg, row, tt, ttx: tt.firstChild, sub, peek, full, explicit: null };
+    tt.onclick = () => { r.explicit = !r.open; render(); };
+    return r;
+  });
+  panel.append(body);
+  document.getElementById("grid").append(panel);
+  return { v, body, rows };
+});
+
+// D 的短语：这段思考的第一个分句（到第一个标点为止），最多 18 个字；出现后固定不变，直到思考结束。
+function topicAt(seg, n) {
+  const clause = seg.text.split(/[，。：；,.:;\n]/)[0];
+  if (n < clause.length + 1) return "";
+  return clause.length > 18 ? clause.slice(0, 18) + "…" : clause;
+}
+function flip(sub, text) {
+  if (sub.dataset.cur === text) return;
+  sub.dataset.cur = text;
+  for (const old of sub.children) { old.className = "out"; setTimeout(() => old.remove(), 360); }
+  if (!text) return;
+  const ln = document.createElement("span");
+  ln.textContent = text;
+  if (sub.children.length) ln.className = "in";
+  sub.append(ln);
+}
+function lastSentence(text) {
+  const done = text.match(/[^。！？\n]+[。！？]/g);
+  return done ? done[done.length - 1].trim() : "";
+}
+
+let t = 0, playing = true, speed = 1, last = performance.now();
+
+function render() {
+  const replyDone = t >= SEGS[SEGS.length - 1].end;
+  for (const { v, body, rows } of panels) {
+    for (const r of rows) {
+      const { seg } = r;
+      const shown = t >= seg.start, running = shown && t < seg.end;
+      r.row.hidden = !shown;
+      if (!shown) continue;
+      const p = Math.min(1, (t - seg.start) / (seg.end - seg.start));
+      if (seg.kind === "tool") { r.a.classList.toggle("shim", running); continue; }
+      if (seg.kind === "reply") { set(r.row, seg.text.slice(0, Math.floor(seg.text.length * p))); continue; }
+      const n = Math.floor(seg.text.length * p), text = seg.text.slice(0, n);
+      const secs = Math.max(1, Math.floor(Math.min(t, seg.end) - seg.start));
+      let title;
+      if (v.id === "cur") title = running ? "Thinking..." : "Thinking";
+      else if (!running) title = `Thought for ${secs}s`;
+      else { const topic = v.id === "D" ? topicAt(seg, n) : ""; title = `Thinking ${secs}s` + (topic ? ` · ${topic}` : ""); }
+      set(r.ttx, title);
+      r.ttx.classList.toggle("shim", running);
+      r.open = r.explicit ?? (v.id === "cur" ? !replyDone : false);
+      r.tt.classList.toggle("open", r.open);
+      r.full.hidden = !r.open;
+      if (r.open) set(r.full, text);
+      r.sub.hidden = !(v.id === "B" && running && !r.open);
+      if (!r.sub.hidden) flip(r.sub, lastSentence(text));
+      r.peek.hidden = !(v.id === "C" && running && !r.open);
+      if (!r.peek.hidden) set(r.peek.firstChild, text);
+    }
+    if (playing) body.scrollTop = body.scrollHeight;
+  }
+  document.getElementById("scrub").value = t;
+  document.getElementById("clock").textContent = t.toFixed(1) + "s";
+}
+function reset() { for (const p of panels) for (const r of p.rows) if ("explicit" in r) r.explicit = null; }
+function tick(now) {
+  const dt = (now - last) / 1000; last = now;
+  if (playing) {
+    t += Math.min(dt, 0.1) * speed;
+    if (t >= END + 2.5) { t = 0; reset(); }
+    render();
+  }
+  requestAnimationFrame(tick);
+}
+const pauseBtn = document.getElementById("pause");
+const setPlaying = on => { playing = on; pauseBtn.textContent = on ? "暂停" : "继续"; };
+pauseBtn.onclick = () => setPlaying(!playing);
+document.getElementById("replay").onclick = () => { t = 0; reset(); setPlaying(true); render(); };
+document.getElementById("scrub").oninput = e => { t = +e.target.value; setPlaying(false); render(); };
+function seg(id, apply) {
+  const box = document.getElementById(id);
+  box.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    for (const x of box.children) x.setAttribute("aria-pressed", x === b);
+    apply(b.dataset.v);
+  };
+}
+seg("speed", v => { speed = +v; });
+seg("theme", v => { document.documentElement.dataset.theme = v; });
+// ?t=7 停在第 7 秒，方便截图对比
+const startAt = new URLSearchParams(location.search).get("t");
+if (startAt != null) { t = +startAt || 0; setPlaying(false); }
+render();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

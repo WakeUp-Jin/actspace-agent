@@ -26,9 +26,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install ripgrep
-        # scripts/check-secrets.sh 依赖 rg；ubuntu-latest 镜像不预装。
-        run: sudo apt-get install -y --no-install-recommends ripgrep
+      # scripts/check-secrets.sh 依赖 rg；ubuntu-latest 镜像不预装。
+      - uses: ./.github/actions/install-ripgrep
 
       - name: Run base CI checks
         run: ./scripts/ci.sh
