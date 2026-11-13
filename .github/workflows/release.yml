@@ -85,15 +85,19 @@ jobs:
 
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
+      # pnpm store 和 Go 编译缓存只在 Linux 上开。一次运行只读得到本分支和 main 存的缓存：Linux 的那份
+      # ci.yml 在 main 上存过（key 相同），这里直接命中；macOS / Windows 没有任何 job 在 main 上存，
+      # 发版时必然读不到，却每个平台各存近 200 MB 到别的运行读不到的 tag 作用域里，白占仓库 10 GB 的缓存额度。
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-          cache: pnpm
+          cache: ${{ matrix.platform == 'linux' && 'pnpm' || '' }}
 
       # release-package.sh 会 go build 浏览器桥 CLI；runner 预装的 Go 可能低于 go.mod 要求。
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: browser-bridge/apps/cli/go.mod
+          cache: ${{ matrix.platform == 'linux' }}
           cache-dependency-path: |
             browser-bridge/apps/cli/go.mod
             browser-bridge/packages/protocol/go.mod
