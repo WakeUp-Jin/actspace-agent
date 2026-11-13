@@ -74,6 +74,7 @@ const stats = [
   .join("");
 
 // 状态与官网首页「方向」一致：只有上下文管理引擎标「已上线」，其余如实标「进行中」。
+// 三个方向比「它还在长。」晚一个和弦，一拍进来一个（一个和弦六拍）。
 const directions = [
   ["live", "已上线", "上下文管理引擎"],
   ["wip", "进行中", "Harness 自进化"],
@@ -81,7 +82,7 @@ const directions = [
 ]
   .map(
     ([status, label, name], index) =>
-      `<li class="rise" style="${at(tally.beat(2, 0.5 + index * 0.25))}"><em class="status status-${status}">${label}</em>${name}</li>`,
+      `<li class="rise" style="${at(tally.beat(3 + index / 6))}"><em class="status status-${status}">${label}</em>${name}</li>`,
   )
   .join("");
 

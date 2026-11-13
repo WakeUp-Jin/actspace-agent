@@ -29,7 +29,11 @@ const logRows = log
 const clock = log
   .map(({ time, start }, index) => `<span style="${at(start, next(index) === undefined ? undefined : (next(index) - 0.2).toFixed(3))}">${time}</span>`)
   .join("");
-const recordKeys = [`0@${log[0].start - 0.3}`, ...log.map(({ records, start }) => `${records}@${start}`)].join(" ");
+// 条数只在每一行落下的那一下滚到位，其余时间不动：钟面上是几点，旁边就是那一刻的条数。
+const ROLL = 0.6;
+const recordKeys = log
+  .flatMap(({ records, start }, index) => [`${log[index - 1]?.records ?? 0}@${start}`, `${records}@${(start + ROLL).toFixed(3)}`])
+  .join(" ");
 
 const SKELETON = log[3].start;
 const FAILED = log[5].start;
