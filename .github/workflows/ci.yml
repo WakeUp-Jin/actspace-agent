@@ -2,16 +2,35 @@ name: CI
 
 # 代码变更的工程门禁。不带路径过滤、每个 PR 都跑的仓库卫生检查在 base-checks.yml。
 # 仓库是 public，标准 GitHub 托管 runner 不计费；这里的拆分只为缩短反馈时间。
+#
+# 只改文档的 PR 和 main 上只改文档的 push 都不触发，所以这里的 job 不能设为必需检查（见 docs/CICD.md）。
+# 规则按顺序求值，后面的覆盖前面的：先全选，再排掉没有任何 job 会读的文档，最后把 docs/ 里被构建或检查
+# 读取的文件加回来。别处的 Markdown（官网内容、内置 skill、prompt、测试夹具）是构建和测试的输入，不排除。
+# 让某个 job 读 docs/ 下的新文件时，要把它加到最后一段，否则只改它的提交不会跑 CI。
 on:
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/PULL_REQUEST_TEMPLATE.md'
+    paths: &code-paths
+      - '**'
+      - '!docs/**'
+      - '!**/README.md'
+      - '!*.md'
+      - '!.agents/**/*.md'
+      - '!apps/site/*.md'
+      - '!browser-bridge/docs/**'
+      - '!browser-bridge/skill/SKILL.md'
+      - '!.github/ISSUE_TEMPLATE/**'
+      - '!.github/PULL_REQUEST_TEMPLATE.md'
+      # 官网的开发计划页和更新日志页
+      - 'docs/roadmap.md'
+      - 'docs/releases/feature-release-notes.md'
+      # pnpm check:browser
+      - 'docs/design-docs/browser/agent-browser-use-command-surface.md'
+      # pnpm run gen:contract-matrix --check
+      - 'docs/design-docs/agent-plugin-runtime/agent-contract-matrix.generated.md'
   push:
     branches:
       - main
+    paths: *code-paths
   workflow_dispatch:
 
 permissions:
