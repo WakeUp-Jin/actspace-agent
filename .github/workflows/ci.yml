@@ -197,18 +197,24 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # 缓存 key 只在第一次没命中时保存一次，之后不再更新。这里比「构建」和 release.yml 多算一个 go.work，
+      # 让这个 job 有自己的 key：它要缓存的是 go test 和两个交叉编译目标的产物，那两处只编本机的 CLI，
+      # 共用一个 key 时谁先存谁占住，另一边每次都从头编。
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: browser-bridge/apps/cli/go.mod
           cache-dependency-path: |
+            browser-bridge/go.work
             browser-bridge/apps/cli/go.mod
             browser-bridge/packages/protocol/go.mod
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # check-browser-command-registry.mjs 在没有 GOCACHE 时把 go run 的编译产物放进临时目录，
+      # 等于绕开上面恢复的缓存再编一遍 CLI；这里指回默认位置，和后面的 go test 共用。
       - name: Browser Bridge contract checks
-        run: pnpm check:browser
+        run: GOCACHE="$(go env GOCACHE)" pnpm check:browser
 
       - name: Browser Bridge Go tests
         working-directory: browser-bridge
