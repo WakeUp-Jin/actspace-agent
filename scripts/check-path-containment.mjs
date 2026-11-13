@@ -1,5 +1,5 @@
-// 路径包含检查：判断「一个路径在不在某个目录里面」只用 `@actspace/shared` 的
-// `isLexicallyInside` / `relativePathInside`（packages/util/shared/src/path-containment.ts）。
+// 路径包含检查：判断「一个路径在不在某个目录里面」只用 packages/util/shared/src/path-containment.ts 里的
+// `isLexicallyInside` / `relativePathInside`（从 `@actspace/shared` 引入）。
 // 各处自己写 `relative(root, target).startsWith("..")` 时，会把 `..notes.md` 这类名字当成往上走；
 // 写对了前缀的，也各有各的漏（Windows 另一个盘符、目录本身算不算在里面）。
 // 扫描 packages/、apps/、scripts/ 的 JS / TS 源码（不含测试和构建产物），找对「..」开头做前缀判断的写法：
@@ -113,7 +113,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (errors.length > 0) {
     console.error(`路径包含检查失败（${errors.length} 处）：`);
     for (const error of errors) console.error(`  - ${error}`);
-    console.error("判断路径在不在某个目录里，用 @actspace/shared 的 isLexicallyInside / relativePathInside（packages/util/shared/src/path-containment.ts）。");
+    console.error("判断路径在不在某个目录里，用 packages/util/shared/src/path-containment.ts 里的 isLexicallyInside / relativePathInside（从 @actspace/shared 引入）。");
     console.error("不是在判断路径包含的，把文件记进 scripts/check-path-containment.mjs 的 ALLOWED，写明理由。");
     process.exit(1);
   }

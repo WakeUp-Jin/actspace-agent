@@ -33,8 +33,8 @@ async function managedRoot(reference: string): Promise<string> { const { package
 function parseManagedReference(reference: string): { packageName: string; version: string } { const separator = reference.lastIndexOf("@"); const packageName = reference.slice(0, separator); const version = reference.slice(separator + 1); if (separator <= 0 || !packageName || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) throw new Error(`Managed plugin reference must pin an exact version: ${reference}.`); return { packageName, version }; }
 async function resolveModule(root: string, specifier: string): Promise<string> { if (!specifier.startsWith("./") || specifier.includes("\0")) throw new Error(`Plugin module must be a relative public file: ${specifier}.`); const candidate = await realpath(resolve(root, specifier)); if (isOutside(root, candidate)) throw new Error(`Plugin module escapes its admitted root: ${specifier}.`); return pathToFileURL(candidate).href; }
 /**
- * 本包和 `@actspace/shared` 同在最底层，互不依赖，所以这里留一份和 `shared/src/path-containment.ts` 写法相同的判断，
- * 改动时对照那边的用例。只比较字面，两边都要先 realpath。
+ * 这里留一份和 `packages/util/shared/src/path-containment.ts` 写法相同的判断：本包和 `@actspace/shared` 同在最底层，
+ * 互不依赖，引用不了那边的实现。改动时对照那边的用例。只比较字面，两边都要先 realpath。
  */
 function isOutside(root: string, candidate: string): boolean { const nested = relative(root, candidate); return nested === ".." || nested.startsWith(`..${sep}`) || isAbsolute(nested); }
 export async function computeLocalPluginIntegrity(root: string, manifest: PluginManifest): Promise<string> { const admittedRoot = await realpath(root); const normalized = { ...manifest, source: { ...manifest.source, integrity: undefined } }; const hash = createHash("sha256").update(canonicalJson(normalized)); const modules = [...new Set([...manifest.codecs.map((descriptor) => descriptor.module), ...manifest.behaviors.map((descriptor) => descriptor.module)])].sort(); for (const specifier of modules) { const moduleUrl = await resolveModule(admittedRoot, specifier); hash.update("\0").update(specifier).update("\0").update(await readFile(new URL(moduleUrl))); } return `sha256-${hash.digest("hex")}`; }
