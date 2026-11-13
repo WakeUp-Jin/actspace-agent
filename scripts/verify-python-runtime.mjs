@@ -3,6 +3,9 @@
 //   node scripts/verify-python-runtime.mjs <runtime-dir> [--extension <extension-layer-dir>]
 // Runs the shim with --version and imports every core package; with --extension also numpy / pandas / markitdown
 // through ACTSPACE_PYTHON_EXT. Exits 1 on the first failure. Called by release-package.sh after it copies the runtime.
+// Every check runs with -B: the runtime may already be signed, and a .pyc written by an import here would break
+// the bundle's code signature ("a sealed resource is missing or invalid"). The shim passes -E, so
+// PYTHONDONTWRITEBYTECODE would be ignored; only the flag works.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -20,8 +23,8 @@ const env = { ...process.env, ...(extension ? { ACTSPACE_PYTHON_EXT: join(extens
 
 /** A .cmd only runs through cmd.exe; its argument quoting cannot carry Python source, so Windows checks call python.exe with the shim's flags. */
 function python(argv) {
-  if (!windows) return execFileSync(shim, argv, { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-  return execFileSync(join(root, ...manifest.executable.split("/")), ["-E", "-s", "-X", "utf8", ...argv], { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  if (!windows) return execFileSync(shim, ["-B", ...argv], { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  return execFileSync(join(root, ...manifest.executable.split("/")), ["-E", "-s", "-X", "utf8", "-B", ...argv], { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
 function run(label, argv) {
