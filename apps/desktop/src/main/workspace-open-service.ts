@@ -1,13 +1,15 @@
 import { execFile } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
-import type {
-  WorkspaceOpenInput,
-  WorkspaceOpenResult,
-  WorkspaceOpenTool,
-  WorkspaceOpenToolId,
-  WorkspaceOpenToolsResult,
+import * as nodePath from "node:path";
+import { dirname, resolve } from "node:path";
+import {
+  isLexicallyInside,
+  type WorkspaceOpenInput,
+  type WorkspaceOpenResult,
+  type WorkspaceOpenTool,
+  type WorkspaceOpenToolId,
+  type WorkspaceOpenToolsResult,
 } from "@actspace/shared";
 import type { AppDataRoots } from "./app-paths";
 
@@ -136,8 +138,7 @@ export async function openWorkspaceInTool(
   const requested = (input.relativePath ?? "").replace(/\\/g, "/").replace(/^\/+/, "");
   if (requested) {
     const abs = resolve(workspaceRoot, requested);
-    const rel = relative(workspaceRoot, abs);
-    if (rel.startsWith("..") || isAbsolute(rel)) {
+    if (!isLexicallyInside(nodePath, workspaceRoot, abs, { includeRoot: true })) {
       return { ok: false, workspaceRoot, toolId: input.toolId, relativePath: requested, error: "escapes_root", message: "Target escapes the workspace root." };
     }
     try {

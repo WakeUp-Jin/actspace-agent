@@ -120,6 +120,21 @@ describe("workspace open service", () => {
       expect(runner).not.toHaveBeenCalled();
     });
 
+    it("does not mistake a name that starts with two dots for a way out of the workspace", async () => {
+      const roots = await makeRoots();
+      await writeFile(join(roots.workspaceRoot, "..notes.md"), "notes\n");
+      const runner = vi.fn(async () => ({ ok: true }));
+
+      const result = await openWorkspaceInTool({ toolId: "cursor", relativePath: "..notes.md" }, roots, runner);
+
+      if (process.platform !== "darwin") {
+        expect(result).toMatchObject({ ok: false, error: "unsupported_platform", relativePath: "..notes.md" });
+        return;
+      }
+      expect(result.ok).toBe(true);
+      expect(runner).toHaveBeenLastCalledWith(["-a", "Cursor", join(roots.workspaceRoot, "..notes.md")]);
+    });
+
     it("refuses a target that does not exist without calling open", async () => {
       const roots = await makeRoots();
       const runner = vi.fn(async () => ({ ok: true }));
