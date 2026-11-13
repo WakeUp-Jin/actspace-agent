@@ -58,7 +58,7 @@ request/context         每次写
 - 「不同」按内容 digest 比较，比较对象是**日志里**最近一条同类事件，不是内存。所以进程重启、恢复会话后，只要内容没变就不会重写。子 Agent 有自己的日志，第一次请求时照常写。
 - 重试（`loop.ts` 的 `llm/retry` 之后）也走同样的规则，通常不会多写。
 - 关系校验（`invariant-validator.ts`）：两种新事件只能出现在「已打开、还没写 `request/context`」的请求里，`requestId` 必须相同。`request/context` 仍是每个请求一条。
-- 无 `contextSources` 的旧拼装路径已删除（2026-11-10）：`AgentLoop` 的 `contextSources` 是必填项，测试夹具默认带对话和工具两个透传来源。
+- 无 `contextSources` 的旧拼装路径已删除（2026-11-13）：`AgentLoop` 的 `contextSources` 是必填项，测试夹具默认带对话和工具两个透传来源。
 
 ## 4. 两个新事件
 

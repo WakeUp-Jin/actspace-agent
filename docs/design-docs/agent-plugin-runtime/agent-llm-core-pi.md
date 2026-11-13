@@ -385,6 +385,13 @@ owner lease 在成功、不可重试失败、重试耗尽、backoff abort、snap
 
 关键回归序列：429 → 释放 attempt lease 但保留 scope lease → backoff → replacement → 原 scope 在旧 generation 重试 → 结束后旧资源恰好 dispose 一次。并行的新 scope 必须使用新 generation。
 
+**实现现状（2026-11-13 核对）**：`LlmRetryScope` 还没有实现。本节开头两段写的 scope、后面写的 owner lease 的释放时机和关键回归序列是目标，不是现状。现在的做法是：Agent Loop 重试时把首次请求的 registration 交给 `prepareCapturedAsync`，后者重新取一次 lease，registration 在 draining 时也放行。每个 attempt 的 lease 在它的流结束时归还，所以 backoff 期间没有 lease：
+
+- registration 只是 draining（replacement 已经开始，旧的还没 dispose 完）时，重试照常在旧 generation 上派发。这一段有测试：`packages/core/agent-loop/src/test/request-hook-retry.test.ts`。
+- registration 在 backoff 期间已经 dispose 完时，重试报 `LLM registration … is disposed.`，这一步失败。这一段没有测试。
+
+生产里第二种情况走不到：路由随 Harness generation 一起注册和注销，进行中的 Run 持有那个 generation 的 lease，generation 要等 Run 结束才 dispose。脱离 Harness 直接使用 `LlmService` 并自己注销路由的调用方没有这层保护。记在 `docs/exec-plans/tech-debt-tracker.md`。
+
 ## 14. Backend 采用矩阵
 
 下表是迁移起点和门禁，不代表 pi-ai 路线已验收。backend 在 Provider I/O 前选择并绑定到本次准备；不得在发送失败或已有 delta 后自动换 backend 重发。失败后的再次发送只允许经 ActSpace durable retry 记录。
