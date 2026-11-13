@@ -102,6 +102,14 @@
 - **现象**：「路径是否在某个目录内」有 13 个具名实现（`within`、`contains`、`isPathWithin`、`isWithin`、`isInside`），另有约 30 处内联判断，语义已经不一致：有的用 `startsWith("..")`，把 `..foo` 这种合法名字误判为越界；有的缺 `isAbsolute` 检查；有的只匹配 `"../"`；有一份把「等于根目录本身」判为不在目录内。
 - **位置**：`packages/core/tool-runtime/src/permission/file-resource.ts`、`packages/fs/tool-fs-{read,write,search}/src/node-ports.ts`、`packages/shell/tool-shell/src/{node-ports,command-rules}.ts`、`packages/sandbox/sandbox/src/policy.ts`、`packages/host/agent-host`、`packages/core/agent-service`、`apps/desktop/src/main`。
 - **修法**：在 `@actspace/shared` 放一个带测试的实现（不新增包），函数名写明「输入必须是已规范化的绝对路径」这条约定，「是否包含根目录本身」做成显式参数；逐处替换。每替换一处先确认原实现的语义，语义有意不同的保留差异并写明原因。
+- **2026-11-13 补充**：做完之后和上面三条对一下。
+  - **数量**：用新加的检查在动手之前的代码上数，手写判断是 22 个文件 28 处，18 处是 `startsWith("..")` 的宽松写法，2 处只认 `../`，8 处是对的；另有两处检查数不到（`cordis-adapter` 一处在清单里，`agent-host` 的 `static.ts` 用的是根目录做字符串前缀）。上面写的「13 个具名实现、约 30 处内联」是审查时的估计。
+  - **位置**：上面没列到的还有 `packages/sandbox/sandbox-nono`、`packages/skill/skill`、`packages/harness-evolution/plugin-manager`、`packages/composition/cordis-adapter`、`packages/client/client`、`apps/cli`。
+  - **约定**：函数名写明的是「只比较字面」（`isLexicallyInside`），不是「输入必须已规范化」。没折叠的 `..` 和多余的分隔符由 `relative` 自己折叠，输入不用先规范化；函数不做的是解析符号链接，要防这个得先 realpath。
+  - **三处没有换成共享函数**：`cordis-adapter` 引用不了 `shared`，在原地改对，留一份本地副本；`plugin-manager` 改成更严的「真实路径等于自身」；`skill` 的那条判断永远不成立，删掉。
+  - **多做了一个检查**：`pnpm check:path-containment`，接进 `pnpm test:scripts`。没有它，下一个人照旧写法再写一份的时候没有东西拦。
+  - **两个构建脚本里的宽松写法没有改**，原因见决策记录。
+  - 每一处改完之后行为变没变，见 `docs/histories/2026-11/20261113-1545-path-containment.md` 的表。
 
 ### PR 6：类型安全（M10）
 
@@ -154,8 +162,8 @@
 - [x] PR 2：H4。四层都已落地，过程见执行记录步骤 2。[#84](https://github.com/WakeUp-Jin/actspace-agent/pull/84)，全部检查通过。
 - [x] PR 3：修复合集。M6、M9、M7、M3、L2、L9 都已落地，过程见执行记录步骤 3。[#85](https://github.com/WakeUp-Jin/actspace-agent/pull/85)。
 - [x] 2026-11-13：三个 PR 同步 `main`（`bf566305`）；修 #85 推送后才发现的两处 CI 失败；修 `main` 上三种让「包测试」随机变红的失败（放在 PR 1）。过程见执行记录步骤 4。同步后 #83 全部检查通过。
-- [x] PR 4：Agent Loop 请求路径。L5、M2（三个提交）、M1 都已落地，过程见执行记录步骤 5。
-- [ ] PR 5：路径安全模块。
+- [x] PR 4：Agent Loop 请求路径。L5、M2（三个提交）、M1 都已落地，过程见执行记录步骤 5。[#94](https://github.com/WakeUp-Jin/actspace-agent/pull/94)，全部检查通过。
+- [x] PR 5：路径安全模块。一份共享实现、逐处替换、一个防止再手写的检查，过程见执行记录步骤 6。
 - [ ] PR 6：类型安全。
 - [ ] PR 7：命名。
 - [ ] PR 8：格式化。
@@ -195,6 +203,14 @@
 - 2026-11-13：M1 的内存数字以这次量的为准，审查报告的 55.8 MB 不再引用。量法：合成回合，每步一条 2 KB 工具结果，最后一次请求派发前强制 GC 后读 `heapUsed`，修之前减修之后。200 步、请求带 1 个工具定义约 7 MB（修之前 signal 上 398 个监听器，修之后 0 个）；400 步约 26 MB；200 步、30 个工具定义约 10.5 MB；工具结果换成 20 KB 不变。原因：55.8 MB 是审查时另一个合成场景的数字，探针没有留下来，这次没有复现；而且留住的量随步数和工具定义的数量变（每个被留住的请求快照带着整份消息列表和全部工具定义的副本），单给一个数字说明不了问题。探针不是测试，没有入库；入库的是「监听器数不随步数增长」的断言。
 - 2026-11-13：核对 §13 时发现 `LlmRetryScope` 没有实现（两次尝试之间没有 lease，退避期间 registration 被完整注销的话重试报错）。这个 PR 不实现它，只在 §13 末尾写明实现现状，并记到技术债。原因：生产里路由随 Harness generation 注册和注销，进行中的 Run 持有 generation 的 lease，这种情况走不到；实现它要改 `llm-service` 的 lease 模型和 Agent Loop 的重试循环，超出 M2「去重」的范围。用一个临时用例确认过现象：首次尝试期间开始注销路由，重试时 registration 的状态是 `disposed`，这一步以 `LLM registration … is disposed.` 失败。
 - 2026-11-13：PR 4 不写发布记录。原因：五个提交里没有用户能直接感知的变化；重试过钩子改的是给插件的约定，目前没有生产插件用到。
+- 2026-11-13：M5 的共享实现不引 `node:path`，路径规则（`relative`、`isAbsolute`、`sep`）由调用方传。原因：`shared` 同时跑在浏览器和 Node 里；界面里的工具卡片也要用这份判断，传 `pathe` 就行。另一个好处是测试可以在 Linux 上把 `path.win32` 的规则跑一遍，云端没有 Windows。
+- 2026-11-13：M5 的共享实现只比较字面，不解析符号链接。原因：各处对符号链接的处理本来就不一样（两边都 realpath、只 realpath 根目录、输入已经是真实路径），把 realpath 做进共享函数会改掉其中一些的行为；`tool-runtime` 的 `isPathWithin` 保留自己「根目录存在时先换成真实路径」这一步，只换最后的比较。
+- 2026-11-13：`isLexicallyInside` 的 `includeRoot` 必填，没有默认值。原因：「路径就是根目录本身」算不算在里面，各处答案不同。工作区本身可以读、可以当 cwd；删除目标、重定向目标、卸载 Skill 必须严格在里面，否则会删掉或覆盖整个目录。
+- 2026-11-13：`sandbox`、`sandbox-nono` 新增对 `@actspace/shared` 的依赖。原因：两个包各有一份写法相同、同样有错的 `contains`，再留一份本地副本没有理由；`shared` 在依赖的最底层，`pnpm check:packages` 通过。
+- 2026-11-13：`cordis-adapter` 不引用共享实现，在原地改成同样的三个条件，留一份本地副本。原因：它和 `shared` 同在最底层，互不依赖。副本记在检查脚本的清单里，注释写明改动时对照 `shared` 的用例。
+- 2026-11-13：`pnpm check:path-containment` 只认 `startsWith` 这一种写法，可以保留的文件按「文件加处数」记清单，处数多了少了都失败。原因：改之前的 28 处全是这种写法，拦得住照旧写法再抄一份；用正则、`slice` 或根目录字符串前缀比较的认不出来，这一点写在脚本开头，不假装全覆盖。记处数是为了已经在清单里的文件也不能悄悄多写一处。
+- 2026-11-13：`scripts/package-agent-cli.mjs`、`scripts/package-browser-components.mjs` 里的两处宽松写法不改，记进检查的清单。原因：构建脚本单独运行，不引用工作区的包，要改只能在原地再各写一份；而这两处只会多拒绝，不会放过越界的路径（后一处按定义如此，前一处用 80 万组随机路径和共享实现比过，没有一组是它放行而共享实现拒绝的），改的收益很小。后一个文件还是「发布」工作流的路径过滤条件，PR 改到它会在四个平台上跑一遍打包。
+- 2026-11-13：PR 5 的发布记录并进这一批已有的 2026-11-10 那一条，不新开 2026-11-13 的。原因：同一天有两条发布记录，官网构建会失败（PR 3 上出过一次，见执行记录步骤 4）；`main` 上几乎每天都有一条，新开一条当天的，合并时容易和 `main` 上同一天的那条撞上。这一批作为一个整体合并，记在同一条里也方便看。
 
 ## 执行模式
 
