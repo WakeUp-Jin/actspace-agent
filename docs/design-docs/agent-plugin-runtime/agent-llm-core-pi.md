@@ -379,6 +379,8 @@ scope 只能从自己已经持有的 generation 派生 attempt。replacement 使
 
 重试可以重新组装消息，但继承同一 exact model、连接、backend、defaults 和 pricing。每次 attempt 对新的消息执行校验，不能复用已消费的 PreparedAdapterCall。非重试的新逻辑请求重新选择当前 generation。
 
+重试的消息和工具和首次请求一样经过 `agent/request`（payload 的 `attempt` 大于 1）。钩子在重试时返回的路由和模型不采纳，否则一次设置变化或一个钩子就能让同一个逻辑请求中途换连接。
+
 owner lease 在成功、不可重试失败、重试耗尽、backoff abort、snapshot/checkpoint 异常和 hook 短路后由外层 finally 释放。shutdown 撤销 scope 的后续派生资格并取消 active I/O 与 backoff，等待 settle 后释放资源；保留现有 30 秒 drain 上限，超时报告失败，不伪装安全 dispose。
 
 关键回归序列：429 → 释放 attempt lease 但保留 scope lease → backoff → replacement → 原 scope 在旧 generation 重试 → 结束后旧资源恰好 dispose 一次。并行的新 scope 必须使用新 generation。

@@ -288,7 +288,10 @@ export class AgentLoop {
     const { turnId, stepId, mode, configuration, budgetSummary } = step;
     const sessionId = this.options.session.header.sessionId;
     const runtime = { mode, selectedSkillIds: configuration.selectedSkillIds ?? [], budgetSummary };
-    const defaults = { routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model };
+    // 路由和模型在这一步的首次请求定下，重试沿用（agent-llm-core-pi.md §13）：重试的上下文按定下的模型组装，钩子看到的也是它。
+    const target = previous === undefined
+      ? { routeId: this.options.descriptor.routeId, model: configuration.model ?? this.options.descriptor.model }
+      : { routeId: previous.routeId, model: previous.model };
     let candidate = this.candidate({
       sessionId,
       turnId,
@@ -297,50 +300,28 @@ export class AgentLoop {
       surface: this.options.session.journal.surface.entries.map((entry) => surfaceMessage(entry.node)),
       hostFacts: { agentRunId: step.agentRunId, agentMode: mode, hostKind: this.options.host.hostKind, invocationId: this.options.host.invocationId, workspaceRoot: this.options.session.header.cwd ?? this.options.host.workspaceRef ?? this.options.toolEnvironment(this.options.session).workspaceRoot },
       selectedSkillIds: Object.freeze(mode === "chat" ? [] : [...(configuration.selectedSkillIds ?? [])]),
-    }, step.tools as unknown as RuntimeV2JsonValue[], defaults);
+    }, step.tools as unknown as RuntimeV2JsonValue[], target);
     const requestId = randomUUID();
-    let converted: StepRequest["converted"];
-    let prepared: PreparedLlmCall;
-    let routeId: string;
-    let model: string;
-    let visibleToolNames: ReadonlySet<string>;
-    if (previous === undefined) {
-      converted = await this.contextInput(candidate, requestId, { cacheRetention: mode === "chat" ? "long" : "short", ...(configuration.thinkingEnabled === undefined ? {} : { reasoning: configuration.thinkingEnabled }), ...(configuration.reasoningEffort === undefined ? {} : { reasoningEffort: configuration.reasoningEffort }) }, runtime);
-      let llmInput = converted.input;
-      visibleToolNames = new Set(llmInput.tools.map((tool) => tool.name));
-      const requestPlan = await this.waterfall("agent/request", { requestId, turnId, stepId, ...defaults, messages: llmInput.messages, tools: llmInput.tools });
-      const requestRecord: Readonly<Record<string, unknown>> = isRecord(requestPlan) ? requestPlan : {};
-      routeId = typeof requestRecord.routeId === "string" ? requestRecord.routeId : defaults.routeId;
-      model = typeof requestRecord.model === "string" ? requestRecord.model : defaults.model;
-      let messages = Array.isArray(requestRecord.messages) ? requestRecord.messages as unknown as readonly LlmMessage[] : llmInput.messages;
-      if (routeId !== llmInput.routeId || model !== llmInput.model) {
-        candidate = { ...candidate, requestOptions: { routeId, model } };
-        converted = await this.contextInput(candidate, requestId, llmInput.options, runtime);
-        llmInput = converted.input;
-        messages = [...llmInput.messages.filter(message => message.role === "system"), ...messages.filter(message => message.role !== "system")];
-      }
-      prepared = await this.options.llm.prepareAsync({
-        requestId,
-        sessionId,
-        routeId,
-        model,
-        messages,
-        tools: budgetSummary ? [] : Array.isArray(requestRecord.tools) ? requestRecord.tools as unknown as readonly LlmToolDefinition[] : llmInput.tools,
-        options: llmInput.options,
-        signal: step.signal,
-      });
-    } else {
-      // 重试沿用这一步首次请求选定的路由、模型、工具和适配器调用，不经过 agent/request。
-      ({ routeId, model, visibleToolNames } = previous);
+    let converted = await this.contextInput(candidate, requestId, { cacheRetention: mode === "chat" ? "long" : "short", ...(configuration.thinkingEnabled === undefined ? {} : { reasoning: configuration.thinkingEnabled }), ...(configuration.reasoningEffort === undefined ? {} : { reasoningEffort: configuration.reasoningEffort }) }, runtime);
+    let llmInput = converted.input;
+    const visibleToolNames = new Set(llmInput.tools.map((tool) => tool.name));
+    // 重试和首次请求一样经过 agent/request，attempt 让钩子分得清是第几次。消息和工具每次都按钩子的返回值来，路由和模型只有首次请求采纳。
+    const requestPlan = await this.waterfall("agent/request", { requestId, turnId, stepId, ...target, attempt, messages: llmInput.messages, tools: llmInput.tools });
+    const requestRecord: Readonly<Record<string, unknown>> = isRecord(requestPlan) ? requestPlan : {};
+    const routeId = previous === undefined && typeof requestRecord.routeId === "string" ? requestRecord.routeId : target.routeId;
+    const model = previous === undefined && typeof requestRecord.model === "string" ? requestRecord.model : target.model;
+    let messages = Array.isArray(requestRecord.messages) ? requestRecord.messages as unknown as readonly LlmMessage[] : llmInput.messages;
+    if (routeId !== llmInput.routeId || model !== llmInput.model) {
       candidate = { ...candidate, requestOptions: { routeId, model } };
-      converted = await this.contextInput(candidate, requestId, previous.converted.input.options, runtime);
-      prepared = await this.options.llm.prepareCapturedAsync(previous.origin.registration, {
-        ...previous.origin.request,
-        requestId,
-        messages: converted.input.messages,
-      }, step.signal, previous.origin.preparedAdapterCall);
+      converted = await this.contextInput(candidate, requestId, llmInput.options, runtime);
+      llmInput = converted.input;
+      messages = [...llmInput.messages.filter(message => message.role === "system"), ...messages.filter(message => message.role !== "system")];
     }
-    // 首次请求的 prepared call：重试从它的 registration 和适配器调用派生。
+    const tools = budgetSummary ? [] : Array.isArray(requestRecord.tools) ? requestRecord.tools as unknown as readonly LlmToolDefinition[] : llmInput.tools;
+    // 重试从首次请求的 registration 和适配器调用派生，不重新取路由：同名路由中途换成新的，这一步也不会换到新连接上。
+    const prepared = previous === undefined
+      ? await this.options.llm.prepareAsync({ requestId, sessionId, routeId, model, messages, tools, options: llmInput.options, signal: step.signal })
+      : await this.options.llm.prepareCapturedAsync(previous.origin.registration, { ...previous.origin.request, requestId, messages, tools }, step.signal, previous.origin.preparedAdapterCall);
     const origin = previous?.origin ?? prepared;
     // 准备好之后、派发之前出任何错都释放：没派发的调用不会自己归还 lease，路由注销会等到超时后报错。
     try {

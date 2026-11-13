@@ -130,6 +130,28 @@ describe("LlmService", () => {
     await old.dispose(100);
   });
 
+  it.each(["prepareCaptured", "prepareCapturedAsync"] as const)("detaches the messages and tool schemas given to %s", async (method) => {
+    const source = {
+      content: [{ type: "text" as const, text: "original" }],
+      schema: { type: "object", properties: { value: { type: "string" } } },
+    };
+    const routes = new LlmRouteRegistry();
+    const handle = routes.register({ routeId: "retry", providerId: "provider", modelPattern: "*", adapter: adapter([]), credentialRef: "credential", defaults: {} });
+    const service = new LlmService(routes, credentials);
+    const first = service.prepare({ routeId: "retry", model: "model", messages: [] });
+    const retry = await service[method](handle.registration, { ...first.request, requestId: "retry-request",
+      messages: [{ role: "user", content: source.content }],
+      tools: [{ name: "tool", definitionVersion: 1, definitionDigest: "d", description: "tool", inputSchema: source.schema }],
+    }, undefined, first.preparedAdapterCall);
+    source.content[0].text = "mutated";
+    source.schema.properties.value.type = "number";
+    expect(retry.request.messages[0]?.content).toEqual([{ type: "text", text: "original" }]);
+    expect(retry.request.tools[0]?.inputSchema).toEqual({ type: "object", properties: { value: { type: "string" } } });
+    first.release();
+    retry.release();
+    await handle.dispose(100);
+  });
+
   it("acquires before async adapter preparation and permits only that retry scope through draining", async () => {
     let resolvePreparation!: (call: import("../adapter.js").LlmPreparedAdapterCall) => void;
     const routes = new LlmRouteRegistry();

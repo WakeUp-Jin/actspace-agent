@@ -61,6 +61,8 @@ export async function runToolStreamFixture(options: {
   contextWindow?: number;
   /** 在 fixture 自己的回合开始前调用；返回 Promise 时会等它结束，可以用来先跑一个回合。 */
   onLoop?: (loop: AgentLoop, inbox: MainAgentInbox) => void | Promise<void>;
+  /** 交出路由表和 fixture 注册的那条路由，测试可以在回合进行中把它换掉。 */
+  onRoute?: (routes: LlmRouteRegistry, handle: import("@actspace/llm-service").LlmRouteRegistrationHandle) => void;
   wake?: boolean;
 } = {}) {
   const registry = createCoreCodecRegistry();
@@ -103,6 +105,7 @@ export async function runToolStreamFixture(options: {
       }
     })(),
   } });
+  options.onRoute?.(routes, handle);
   const events: AgentLoopLiveEvent[] = [];
   const inbox = new MainAgentInbox(session);
   const loop = new AgentLoop({ createContextEngine: options.createContextEngine, contextSources: options.contextSources ?? passThroughSources(), session, tools, inbox, inputSource: options.inputSource,

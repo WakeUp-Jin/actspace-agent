@@ -92,8 +92,9 @@ export class LlmService {
     const actualSignal = signal ?? new AbortController().signal;
     const lease = registration.leaseOwner.acquire(true);
     try {
-      const prepared = previous?.forAttempt?.(request) ?? registration.adapter.prepare?.({ request, signal: actualSignal } satisfies LlmAdapterPrepareInput);
-      const resolvedRequest = prepared?.request ?? request;
+      const attempt = detachAttempt(request);
+      const prepared = previous?.forAttempt?.(attempt) ?? registration.adapter.prepare?.({ request: attempt, signal: actualSignal } satisfies LlmAdapterPrepareInput);
+      const resolvedRequest = prepared?.request ?? attempt;
       return new PreparedLlmCall(registration, resolvedRequest, this.credentials, actualSignal, lease, prepared);
     } catch (error) {
       lease.release();
@@ -105,14 +106,20 @@ export class LlmService {
     const actualSignal = signal ?? new AbortController().signal;
     const lease = registration.leaseOwner.acquire(true);
     try {
-      const prepared = previous?.forAttempt?.(request)
-        ?? (registration.adapter.prepareAsync ? await registration.adapter.prepareAsync({ request, signal: actualSignal }) : registration.adapter.prepare?.({ request, signal: actualSignal }));
-      return new PreparedLlmCall(registration, prepared?.request ?? request, this.credentials, actualSignal, lease, prepared);
+      const attempt = detachAttempt(request);
+      const prepared = previous?.forAttempt?.(attempt)
+        ?? (registration.adapter.prepareAsync ? await registration.adapter.prepareAsync({ request: attempt, signal: actualSignal }) : registration.adapter.prepare?.({ request: attempt, signal: actualSignal }));
+      return new PreparedLlmCall(registration, prepared?.request ?? attempt, this.credentials, actualSignal, lease, prepared);
     } catch (error) {
       lease.release();
       throw error;
     }
   }
+}
+
+/** 重试的消息和工具由调用方给，可以来自钩子：和首次请求一样先复制一份，之后调用方再改也不影响这次请求。 */
+function detachAttempt(request: ResolvedLlmRequest): ResolvedLlmRequest {
+  return { ...request, messages: cloneMessages(request.messages), tools: cloneTools(request.tools) };
 }
 
 function cloneMessages(messages: readonly LlmMessage[]): readonly LlmMessage[] {
