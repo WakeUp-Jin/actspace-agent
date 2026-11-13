@@ -1,33 +1,38 @@
 import { describe, expect, it } from "vitest";
 import { createCordisRoot } from "@actspace/cordis-adapter";
 import { surfaceNode } from "@actspace/shared/runtime-v2";
+import { ContextSourceRegistry } from "@actspace/context-engine";
 import { runToolStreamFixture } from "../testing.js";
 
+/** 记下每次组装上下文时来源读到的模式：生产里提示词来源就是从这里判断用哪套提示词。 */
+function modeProbe() {
+  const seen: { stepId: string | undefined; mode: unknown }[] = [];
+  const sources = new ContextSourceRegistry();
+  sources.register({ id: "probe", owner: "probe", order: 0, criticality: "required", fields: [],
+    get: (context) => { seen.push({ stepId: context.request.stepId, mode: (context.status.plugins["actspace.loop"] as { mode?: unknown } | undefined)?.mode }); } });
+  return { seen, sources };
+}
+
 describe("AgentLoop tool live events", () => {
-  it.each(["chat", "plan", "agent"] as const)("persists %s mode at the end of the user message", async (mode) => {
-    const requests: string[] = [];
-    const { journal } = await runToolStreamFixture({ mode, terminalOnly: true, onMessages: (messages) => requests.push(JSON.stringify(messages)) });
+  it.each(["chat", "plan", "agent"] as const)("stores the user message as given and hands %s mode to context sources", async (mode) => {
+    const probe = modeProbe();
+    const { journal } = await runToolStreamFixture({ mode, terminalOnly: true, contextSources: probe.sources });
     expect(journal.find((event) => event.type === "request/context")?.data).toMatchObject({
       snapshot: { prepared: { defaults: { cacheRetention: mode === "chat" ? "long" : "short" } } },
     });
     const userEvent = journal.find((event) => event.type === "user/message");
-    const user = userEvent ? surfaceNode(userEvent) : null;
-    expect(user?.content).toEqual([
-      { type: "text", text: "Read fixture" },
-      { type: "runtime-context", context: { agentMode: mode, agentModeRevision: 0 } },
-    ]);
-    expect(requests[0]).toContain(`<runtime_context>{\\"agentMode\\":\\"${mode}\\",\\"agentModeRevision\\":0}</runtime_context>`);
+    expect(userEvent ? surfaceNode(userEvent).content : null).toBe("Read fixture");
+    expect(probe.seen.length).toBeGreaterThan(0);
+    expect(probe.seen.every((entry) => entry.mode === mode)).toBe(true);
   });
 
-  it("replays the same persisted runtime context on the next tool step", async () => {
+  it("hands the same mode to context sources again on the next tool step", async () => {
+    const probe = modeProbe();
     const requests: (readonly import("@actspace/llm-service").LlmMessage[])[] = [];
-    await runToolStreamFixture({ mode: "agent", onMessages: (messages) => requests.push(messages) });
+    await runToolStreamFixture({ mode: "agent", contextSources: probe.sources, onMessages: (messages) => requests.push(messages) });
     expect(requests).toHaveLength(2);
-    const marker = '<runtime_context>{"agentMode":"agent","agentModeRevision":0}</runtime_context>';
-    for (const messages of requests) {
-      const content = messages.find((message) => message.role === "user")?.content;
-      expect(Array.isArray(content) ? content.at(-1) : null).toEqual({ type: "text", text: marker });
-    }
+    expect(new Set(probe.seen.map((entry) => entry.stepId)).size).toBe(2);
+    expect(probe.seen.every((entry) => entry.mode === "agent")).toBe(true);
   });
 
   it("reserves the last subagent step for a tool-free summary and preserves lineage", async () => {
