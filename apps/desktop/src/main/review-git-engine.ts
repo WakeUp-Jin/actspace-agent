@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { lstat, open, readFile, realpath } from "node:fs/promises";
-import { extname, isAbsolute, relative, resolve, sep } from "node:path";
-import { hostChildEnv } from "@actspace/shared";
+import * as nodePath from "node:path";
+import { extname, relative, resolve, sep } from "node:path";
+import { hostChildEnv, isLexicallyInside } from "@actspace/shared";
 import type {
   ReviewBranch,
   ReviewCapabilities,
@@ -1071,8 +1072,7 @@ function sanitizeGitFailure(result: ReviewGitCommandResult): string {
 }
 
 function isInside(root: string, target: string): boolean {
-  const path = relative(resolve(root), resolve(target));
-  return path === "" || (!path.startsWith("..") && !isAbsolute(path));
+  return isLexicallyInside(nodePath, root, target, { includeRoot: true });
 }
 
 function isImagePath(path: string): boolean {
