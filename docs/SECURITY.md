@@ -41,7 +41,7 @@
 ## 文件系统访问控制
 
 - **文件工具边界**：v2 Tool Runtime 在审批前 canonicalize file resource，并由 `default/full-access`、敏感分类、Tool Permission 与 Host capability 合并决策；`default` 的 workspace 外读写需要审批，Desktop 可对非敏感核心文件签发当前 Session/当前主 Agent 的 exact 或显式 subtree Grant，CLI 不签发或消费。Grant 仍按 action/access/audience/policyVersion 和当前资源完整覆盖复验；`full-access` 只扩大非敏感文件范围。executor 在 syscall 前重新解析并核对已准入资源，路径、目标类型、Grant 或符号链接状态变化时 fail-closed。
-- **Bash 边界**：Bash 默认要求批准；本地 Desktop 主 Agent 可显式签发当前会话、当前工作区的命令前缀授权，后续符合工具规则的简单命令可复用。硬拒绝优先于授权，复杂语法、排除参数及申请出沙箱（`sandbox_permissions: "require_escalated"`）的命令不复用；`full-access` 不扩大工作目录范围。前缀授权不是只读保证，包含项目脚本，只在命令会进沙箱执行时提供。Bash 经 Harness `sandbox` 服务执行（macOS：nono，其次 Seatbelt），`full-access` 下不进沙箱；其他模式下出沙箱必须附 `justification` 并每次批准；沙箱缺失或不可用时转审批并标为“真实环境”，不会静默在沙箱外执行，详见[沙箱设计](design-docs/execution-safety/agent-沙箱设计.md)。详见 [前缀授权方案](exec-plans/completed/20261011-approval-card-cursor-style/backend-bash-command-prefix-grant.md)。
+- **Bash 边界**：Bash 默认要求批准；本地 Desktop 主 Agent 可显式签发当前会话、当前工作区的命令前缀授权，后续符合工具规则的简单命令可复用。硬拒绝优先于授权，复杂语法、排除参数及申请出沙箱（`sandbox_permissions: "require_escalated"`）的命令不复用；`full-access` 不扩大工作目录范围。前缀授权不是只读保证，包含项目脚本，只在命令会进沙箱执行时提供。Bash 经 Harness `sandbox` 服务执行（macOS：nono，其次 Seatbelt），`full-access` 下不进沙箱；其他模式下出沙箱必须附 `justification` 并每次批准；沙箱缺失或不可用时转审批并标为“真实环境”，不会静默在沙箱外执行，详见[沙箱设计](design-docs/execution-safety/agent-沙箱设计.md)。前缀授权的规则见 [tool-shell 包说明](../packages/shell/tool-shell/README.md)「Bash 会话前缀授权」。
 - **读类工具边界**：v2 Tool Runtime 由 Host capability、Session permission mode 和 plugin manifest 共同约束读写范围；不得沿用 v1 的任意主 Agent 读边界。
   - **当前取舍**：需要回读 Session artifact、诊断或工具输出时，通过显式 artifact / projection capability 授权，不把整个 `userData` 目录提升为默认 workspace。
   - **v1 guard**：旧 scheduler 双校验属于历史实现，已随 v1 产品路径从 v2 删除。
@@ -134,7 +134,7 @@ git grep -n -I -E '(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{36}|g
 - 数据分级、脱敏与保留策略。
 - 对外 API、Webhook、文件上传和沙箱执行的规则。
 - API Key 轮换与更完整的错误脱敏策略。
-- 主文档 CSP 的 `style-src` 去掉 `'unsafe-inline'`：需要 mermaid SVG 改为 DOM 挂载并把 `<style>` 转成 `adoptedStyleSheets`、CodeMirror 走 `EditorView.cspNonce`、Vite dev 配 `html.cspNonce`。headless Chrome 实测见 `docs/exec-runs/20261109-desktop-security-debt/execution-process.md`。
+- 主文档 CSP 的 `style-src` 去掉 `'unsafe-inline'`：需要 mermaid SVG 改为 DOM 挂载并把 `<style>` 转成 `adoptedStyleSheets`、CodeMirror 走 `EditorView.cspNonce`、Vite dev 配 `html.cspNonce`。实测结论见 `docs/exec-plans/tech-debt-tracker.md`「Desktop 安全遗留」。
 - `hostChildEnv` 白名单之外的非敏感偏好 env（`ACTSPACE_DISABLED_TOOLS` 等）仍由 `settings/env.ts` 写进 main 自己的 `process.env`，退役时机见 `docs/exec-plans/tech-debt-tracker.md`。
 - 读类工具放开 workspace 边界后的「敏感路径 blocklist + 按需读审核」（见 `docs/exec-plans/tech-debt-tracker.md`）。
 
@@ -155,4 +155,4 @@ git grep -n -I -E '(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{36}|g
 - WebSocket 的 Origin：`allowedOrigins` 只接受精确的 https origin；回环 http 来源（`http://127.0.0.1|localhost|[::1]:*`）仅在 Host 未启用 TLS（即只能回环监听）时放行，用于本机开发和同源预览。手机经 `tailscale serve` 访问时必须把 `ts.net` 地址写进 `allowedOrigins`。
 - Service Worker 只缓存导航页面与 `/assets/*`，从不缓存或拦截 `/rpc`。
 
-操作说明与当前验收边界见 [Agent Host](design-docs/agent-plugin-runtime/agent-host-guide.md) 和 [P4 计划](exec-plans/completed/20261003-agent-harness-host-refactor/phase-4.md)。
+操作说明与当前验收边界见 [Agent Host](design-docs/agent-plugin-runtime/agent-host-guide.md)。

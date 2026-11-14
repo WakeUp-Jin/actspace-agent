@@ -1,6 +1,6 @@
-# Composer 文件引用与回复批注：决策与验收归档
+# Composer 文件引用与回复批注：决策与验收
 
-归档：来自原《Composer 文件引用与回复批注设计》。现行规则见 `docs/design-docs/frontend/front-composer-file-mentions-and-response-annotations.md`；本文只保留实施决策修订表、方案取舍、开放决策和验收清单。
+从原《Composer 文件引用与回复批注设计》拆出，随本计划保留到 PB 完成。现行规则见 `docs/design-docs/frontend/front-composer-file-mentions-and-response-annotations.md`；本文只保留实施决策修订表、方案取舍、开放决策和验收清单，表里的 § 编号指原设计稿的章节。
 
 
 ## 实施决策修订（2026-09-28）

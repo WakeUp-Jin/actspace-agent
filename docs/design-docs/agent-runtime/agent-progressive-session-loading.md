@@ -24,7 +24,3 @@ Journal 仍是恢复、模型上下文和完整导出的唯一事实源。浏览
 冷读（缓存未命中或被淘汰）仍需完整读取与重放；列表逐会话读取摘要，当前不再使用后台 indexing 状态。37MB 的真实 Journal 冷读约 0.3s，命中约 0.3ms，追加后续读 3–11ms（本机基准，不是性能承诺）。
 
 上下文估算先从完整请求计算，浏览页仅保存紧凑的请求预览和估算结果；不以截短后的预览重新估算 Token。完整 Context 详情仍走现有详情入口。
-
-## 验证
-
-旧浏览行为的验收见[原执行摘要](../../exec-runs/20260921-session-projection-cutover/execution-summary.md)，其中磁盘缓存证据不代表当前实现。存储替换后的缓存隔离、revision 失效及当前实机范围见[本轮执行摘要](../../exec-runs/20261004-agent-storage-and-cleanup/execution-summary.md)。

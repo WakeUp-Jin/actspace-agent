@@ -1,7 +1,6 @@
 # Agent 形态与三种工作模式
 
-> 代码已接入；实机与外部服务验收结果见执行摘要。
-> 执行入口：[执行计划](../../exec-plans/completed/20260928-agent-forms-and-modes.md)与[执行摘要](../../exec-runs/20260928-agent-forms-and-modes/execution-summary.md)。
+> 代码已接入。实机验证过三种模式的切换、Chat 的搜索与生图、Plan 的只读探索与 Todo、重启与 fork 后模式保留；没有实机验证的有：无工作区会话切到 Plan / Agent 时选目录、子任务运行期间切换模式、深色窄窗口与忙碌禁用状态、已有授权在切换前后的对照。
 
 ## 1. 已确认的产品方向
 
@@ -11,7 +10,7 @@
 4. Chat 只提供当前实现的两个模型工具：`web` 与 `generate_image`。`web` 保留现有 `search/open` 操作，不额外暴露 `web_search`、`web_fetch`。
 5. 设计与计划经用户审核后已授权实施。
 
-本文取代早期讨论稿中 Chat / Workspace / Minimal 多形态的建议。本文是当前规范，实机覆盖边界以执行摘要为准。
+本文取代早期讨论稿中 Chat / Workspace / Minimal 多形态的建议。本文是当前规范。
 
 ## 2. 本稿建议审核的决定
 

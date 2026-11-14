@@ -57,7 +57,7 @@ Core 的工具参数使用独立 `tool-call-delta`，不能复用正文 `assista
 
 ToolRuntime 并行 body 结束后立即提交结果；OrderedToolCommitQueue 保留调用顺序，后发先完成的结果仍等待前序提交，但不再等待整批 body 完成。Renderer 收到单个 finished 立即收尾，也允许 finished 直接创建工具条目，迟到的参数、进度和审批不能回退终态。
 
-Read/List/Grep/Glob/Search 等轻量组件在失败时保留动作、目标和明确的终态标记（failed/denied/aborted/outcome unknown），错误诊断放在可展开详情中，不能替代工具身份；使用 danger 主题 token，长诊断允许换行。失败的 Read 不打开文件，失败详情不复用旧成功预览。Bash 保留 denied/cancelled，Write/Edit/Delete 使用已有 failed/denied 组件并保留错误说明。具体实现与验收见 [工具流式渲染设计](../../exec-plans/completed/design-archive/frontend/front-agent-tool-stream-rendering.md)。
+Read/List/Grep/Glob/Search 等轻量组件在失败时保留动作、目标和明确的终态标记（failed/denied/aborted/outcome unknown），错误诊断放在可展开详情中，不能替代工具身份；使用 danger 主题 token，长诊断允许换行。失败的 Read 不打开文件，失败详情不复用旧成功预览。Bash 保留 denied/cancelled，Write/Edit/Delete 使用已有 failed/denied 组件并保留错误说明。
 
 ## 内置工具规范
 

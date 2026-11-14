@@ -14,4 +14,4 @@ Journal 限制单条事件不超过 1 MiB，可以拦住异常输入。但 TaskS
 
 同一个边界也适用于异步缓存：缓存成功的初始化Promise可以合并并发，但永久缓存临时获取写锁的失败，会让锁过期后仍无法恢复。允许重试必须同时确认“尚未取得资源”和“明确的可重试错误”；不能把已取得资源后的持久化失败一起放开。并发共享、失败清除、下一次请求重试和关闭时不主动重开，都应分别验证。
 
-参考：[修复过程](../../exec-runs/20261006-context-acceptance-bugfix/execution-process.md)。
+参考：[上下文引擎第一版 history](../../histories/2026-10/20261006-1051-context-progressive-disclosure-design.md)（含验收后的修复）。

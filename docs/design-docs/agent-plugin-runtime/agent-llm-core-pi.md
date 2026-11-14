@@ -2,8 +2,7 @@
 
 ## 1. 文档状态
 
-- 本文保留契约、边界和未完成的外部验收项；M0–M4 均已实现。执行计划：[completed/20260922-llm-core-pi.md](../../exec-plans/completed/20260922-llm-core-pi.md)。
-- 执行入口：[LLM Core Pi 执行计划](../../exec-plans/completed/20260922-llm-core-pi.md)。
+- 本文保留契约、边界和未完成的外部验收项；M0–M4 均已实现。
 - 与[现有 Adapter 设计](agent-target-llm-adapter.md)共享 ActSpace 领域边界；本文件记录本次 prepare、Host 和 pi-ai 收敛实现的契约与验收边界。
 - 目标：收敛 ActSpace 的 LLM 调用链，让 pi-ai 成为默认 Provider wire implementation，同时保留 ActSpace 自己的运行时、会话、凭据、重试和可观测性边界。
 - 适用范围：LLM service/pi-ai、Agent Loop、Desktop/CLI 的模型与连接适配边界、Runtime exports 和必要的 Session replay 契约。
@@ -424,7 +423,7 @@ Desktop 在 prepare 阶段应用连接级关闭开关，`promptCacheMode: off` �
 
 ## 17. pi-ai 1.5.0 与复用内置服务商（2026-11-08）
 
-> 执行计划：[20261108-pi-ai-builtin-providers](../../exec-plans/completed/20261108-pi-ai-builtin-providers.md)。起因是外部 PR #34（OpenCode Go）：同一个服务商下不同模型走不同协议、还要带会话请求头，这些 pi-ai 内置服务商已经做好，我们自己拼 Provider 做不到。
+> 起因是外部 PR #34（OpenCode Go）：同一个服务商下不同模型走不同协议、还要带会话请求头，这些 pi-ai 内置服务商已经做好，我们自己拼 Provider 做不到。
 
 ### 17.1 依赖
 

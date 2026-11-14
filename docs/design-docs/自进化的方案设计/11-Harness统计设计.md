@@ -1,6 +1,6 @@
 # Harness 统计设计
 
-本文定义 Harness 统计的方向与决策（D1–D15）；执行计划见 [20261101-harness-stats](../../exec-plans/completed/20261101-harness-stats.md)。
+本文定义 Harness 统计的方向与决策（D1–D15）。
 
 ## 1. 为什么做
 

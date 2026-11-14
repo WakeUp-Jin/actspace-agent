@@ -6,7 +6,7 @@
 
 本文档完整记录 Browser Use 62 条 canonical command 的分类、用途和关键行为边界。当前机器事实来源为 `browser-bridge/apps/cli/internal/commands/registry.go` 与 `schemas.go`；模型可以通过 `browser_help` 查询实际 schema。
 
-这 62 条已经全部进入 Go registry 并标记为 `implemented`，但不等于向模型平铺 62 个 tools。模型通过 9 个分类工具、`browser_help` 和 `browser_run` 使用它们。当前架构入口见 `docs/design-docs/browser/agent-browser-use-index.md`；真实 Chrome 验收状态见 `docs/exec-plans/completed/20260928-chrome-connect-experience.md`。
+这 62 条已经全部进入 Go registry 并标记为 `implemented`，但不等于向模型平铺 62 个 tools。模型通过 9 个分类工具、`browser_help` 和 `browser_run` 使用它们。当前架构入口见 `docs/design-docs/browser/agent-browser-use-index.md`；真实 Chrome 验收的缺口登记在 `docs/exec-plans/tech-debt-tracker.md`「Browser Use 遗留」。
 
 命令 ID 中的 `playwright_*` 是兼容命名；本项目不引入 Playwright 运行时，而是在 Browser Bridge 内维护 ActSpace 自研 Locator Runtime。模型可见分类名统一使用 `browser_locator`。
 

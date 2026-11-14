@@ -1,6 +1,6 @@
 # 上下文引擎插件设计原则
 
-第一版实现已接入；自动化与真实界面的验证范围见[执行摘要](../../exec-runs/20261006-context-management-engine/execution-summary.md)。本文维护设计契约，不承诺未执行的 Provider 验收。
+第一版实现已接入。本文维护设计契约，不承诺未执行的 Provider 验收。
 
 ## 模块化与低耦合
 

@@ -2,7 +2,7 @@
 
 想给 Electron 的主文档加一条严格 CSP（`script-src 'self'; style-src 'self'`），通常的担心是「React 的内联样式会不会被拦」。实测下来，这个担心不成立，真正会被打坏的是另一类东西：**由主文档派生出来的 srcdoc iframe**。
 
-2026-10-06 在 Electron 39 上做了两组实验（独立小程序 + 真实应用临时加 meta，结论见 `docs/exec-runs/20261005-desktop-fe-11-security-ipc/execution-summary.md` 的 T9 一行；原始执行记录已清理，见 git 历史）。
+2026-10-06 在 Electron 39 上做了两组实验（独立小程序 + 真实应用临时加 meta；对应变更见 `docs/histories/2026-10/20261006-0040-desktop-fe-11-security-ipc.md`）。
 
 ## 三个反直觉的结论
 

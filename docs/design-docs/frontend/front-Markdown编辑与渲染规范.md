@@ -1,6 +1,6 @@
 # Markdown 编辑与渲染规范
 
-管「文档」面板正文区的 Markdown 编辑与渲染：预览和源码两种模式**都能编辑**，共用同一份文档（CodeMirror 6 + Lezer）；预览是实时预览，语法标记平时隐藏，光标进入时露出。面板的树、操作栏、草稿、保存、新鲜度、离开确认见 [front-文档面板规范.md](front-文档面板规范.md)。D1–D12 决策表、测试与验收清单、demo 截图对照见 `docs/exec-plans/completed/design-archive/frontend/front-Markdown编辑与渲染-决策与验收.md`；原型 demo 已随实现落地删除，参考实现是 `apps/desktop/src/renderer/components/markdown-editor/`。
+管「文档」面板正文区的 Markdown 编辑与渲染：预览和源码两种模式**都能编辑**，共用同一份文档（CodeMirror 6 + Lezer）；预览是实时预览，语法标记平时隐藏，光标进入时露出。面板的树、操作栏、草稿、保存、新鲜度、离开确认见 [front-文档面板规范.md](front-文档面板规范.md)。原型 demo 已随实现落地删除，参考实现是 `apps/desktop/src/renderer/components/markdown-editor/`。
 
 | 范围 | 说明 |
 | --- | --- |

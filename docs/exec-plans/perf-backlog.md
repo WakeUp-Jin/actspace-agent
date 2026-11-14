@@ -9,7 +9,7 @@
 - **进行中**：已经开了执行计划。
 - **已完成**：写明提交号。
 
-一项做完，就从「待做」移到「已完成」，写上实测前后的数字。第三轮（P1–P4）2026-11-09 完成，实机对比待用户按[内存采样工具](../tools/heap-monitor/README.md)重跑一轮后补数字；执行记录见 [执行摘要](../exec-runs/20261108-perf-round3/execution-summary.md)。
+一项做完，就从「待做」移到「已完成」，写上实测前后的数字。第三轮（P1–P4）2026-11-09 完成，实机对比待用户按[内存采样工具](../tools/heap-monitor/README.md)重跑一轮后补数字：尽量复现 run8 的工作量（多会话、开自动审查、有子 Agent、会话超过 512 条事件），用 `analyze.mjs` 看 `reviewSessionAction`、`contextInput` / `resolve`、`getSubagents` 处理函数、`readEvents` / `snapshotSessionJson` 这四项的分配。
 
 ## 待做
 

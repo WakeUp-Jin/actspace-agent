@@ -4,7 +4,7 @@ schema 9（历史版本号，当前以 `usage-read-model-schema.ts` 为准）、
 
 > 2026-11-06 起，请求清单不再写进日志：`request/context` 只留小字段，提示词与工具改成变化才写的 `request/system-prompt` / `request/tools`，估算统一成 `ceil(字数/4)` 加结构开销，并由同一个折叠函数 `applyContextEstimate` 从日志推算。本文 §5 的「manifest 随 `request/context` 持久化」与 §10 的 `context-content-1` 估算器已被取代，以[请求记录规范](../../agent-plugin-runtime/agent-spec-request-record.md)为准。
 
-执行入口：[联合执行计划](../../../exec-plans/completed/20261011-context-sqlite-integration/README.md)。测试入口：[联合测试验收计划](../../../exec-plans/completed/20261011-context-sqlite-integration/acceptance.md)。本文是 Context V2 在面板查询与 SQLite 集成方面的增补；01–03 的 Session 权威、实例生命周期和插件边界继续有效。
+本文是 Context V2 在面板查询与 SQLite 集成方面的增补；01–03 的 Session 权威、实例生命周期和插件边界继续有效。
 
 ## 1. 原实施基线与范围
 
@@ -184,7 +184,7 @@ schema 9 的内部模块为 `read-model-sync`（批次发布）、`read-model-sc
 
 主面板与后续分页都检查响应字节数，目标 200KiB、硬限 1MiB；必要时减少页条数并返回后续 cursor，趋势/事件体积收缩有明确截断元数据。Composer 圆环只读 `contextEstimate` 投影，与面板「当前」是同一个数；`describeContext` 轮询已删除，不启动新的全局索引。
 
-SQLite 写入支持按新增 rowid 分组汇总，显式避免 GROUP BY 选择覆盖索引扫描全历史；少量行使用原逐行触发器。页缓存固定 32MiB，WAL 每约 16MiB 自动 checkpoint；这只是有界资源配置，不代表 250ms 增量同步目标已通过。证据及剩余性能问题见联合执行记录。
+SQLite 写入支持按新增 rowid 分组汇总，显式避免 GROUP BY 选择覆盖索引扫描全历史；少量行使用原逐行触发器。页缓存固定 32MiB，WAL 每约 16MiB 自动 checkpoint；这只是有界资源配置，不代表 250ms 增量同步目标已通过，实测数值见[数据存储设计](../../core-data-storage-design.md)。
 
 ### 当前能力不可用时的历史读取
 

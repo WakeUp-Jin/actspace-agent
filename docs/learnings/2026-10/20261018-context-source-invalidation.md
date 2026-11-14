@@ -22,4 +22,4 @@
 
 自检：新增依赖时，哪里让旧值失效？若一个工具同时改变对话和导航，两者能否独立刷新？把缓存全部清掉，得到的业务结果是否相同？
 
-来源：[Context Step 更新执行记录](../../exec-runs/20261018-context-step-update/execution-summary.md)。
+来源：[Context Step 更新 history](../../histories/2026-10/20261018-1531-context-design-decisions.md)。

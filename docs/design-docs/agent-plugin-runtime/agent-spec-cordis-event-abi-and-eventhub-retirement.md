@@ -1,6 +1,6 @@
 # Cordis 事件 ABI 与 Agent Loop 插入面
 
-本文是 Cordis 原生事件契约与 Agent Loop 干预面/通知面的唯一规范，EventHub 已退役。自动化与实机验收见 [P5 摘要](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-summary.md)。
+本文是 Cordis 原生事件契约与 Agent Loop 干预面/通知面的唯一规范，EventHub 已退役。
 
 ## 唯一事件机制
 
@@ -55,7 +55,7 @@ ctx.on("session/event", containNotification(ctx, function (event) {
 - `agent/tasks-updated`：任务快照变化；`harness/selection-updated`：组合选择变化。
 - `session/created`、`session/disposed`：会话生命周期观察。
 
-类型中的生命周期名称不代表每个名称都有生产发布者。当前发布者、订阅者和资源归属见 [P5 事件清单](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-event-inventory.md)。恢复仍来自 Journal；WSS/IPC、投影订阅和 durable Journal 各有自己的协议，不能为了统一插件事件而机械替换。
+类型中的生命周期名称不代表每个名称都有生产发布者或订阅者；以源码里的发射和注册处为准，`pnpm check:harness-events` 校验声明与调用模式一致。恢复仍来自 Journal；WSS/IPC、投影订阅和 durable Journal 各有自己的协议，不能为了统一插件事件而机械替换。
 
 ## Subject 与 scope
 
