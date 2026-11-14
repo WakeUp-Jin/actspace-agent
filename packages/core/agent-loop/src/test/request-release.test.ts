@@ -48,4 +48,25 @@ describe("prepared calls that never dispatch", () => {
     } as never });
     await expect(run).rejects.toThrow("hook failed");
   });
+
+  const hookContext = (stream: (next: () => Promise<AsyncIterable<LlmStreamEvent>>) => AsyncIterable<LlmStreamEvent>) => ({
+    get: () => ({ flush: async () => {} }),
+    waterfall: async (type: string, _payload: unknown, next: unknown) => (type === "llm/stream"
+      ? stream(next as () => Promise<AsyncIterable<LlmStreamEvent>>)
+      : (next as () => Promise<object>)()),
+  }) as never;
+
+  it("releases the call when an llm/stream hook answers with its own stream instead of dispatching", async () => {
+    const { result } = await runToolStreamFixture({ terminalOnly: true, context: hookContext(async function* () {
+      yield { type: "done", stopReason: "stop", usage: EMPTY_LLM_USAGE, content: [{ type: "text", text: "Replaced" }] };
+    }) });
+    expect(result.finalText).toBe("Replaced");
+  });
+
+  it("keeps the call for an llm/stream hook that dispatches only once its stream is read", async () => {
+    const { result } = await runToolStreamFixture({ terminalOnly: true, context: hookContext(async function* (next) {
+      yield* await next();
+    }) });
+    expect(result.finalText).toBe("Done.");
+  });
 });

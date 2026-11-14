@@ -93,6 +93,8 @@ ctx.on("session/event", containNotification(ctx, function (event) {
 
 `agent/request` 在一步的每次尝试提交前都调用，重试也不例外；payload 的 `attempt` 从 1 开始，告诉钩子这是第几次。返回的消息和工具对这一次尝试生效。路由和模型只在首次请求（`attempt` 为 1）采纳：重试时 payload 里是这一步已经定下的路由和模型，返回别的值不生效，原因见 [LLM Core Pi 设计 §13](agent-llm-core-pi.md#13-重试-generation-所有权)。
 
+`llm/stream` 的监听器可以不调用 `next()`、直接返回自己的流。这时 Provider 不会被调用；Loop 读完这条流之后归还这次调用占着的路由，适配器卸载不会被一次没发出的请求卡住。监听器也可以等流被读取时再调用 `next()`。
+
 系统提示词、规则、Skill 和动态内容通过 Context 来源接口贡献；英语学习使用按 Session/Agent 隔离的 PromptExtensionRegistry。`system-prompt/assemble` 已移除，模型输入只有 Context 转换链路。
 
 干预结果最终通过 Session 的 request、assistant、tool、step 等事实体现。监听本身不另建持久化。工具安全细节见 [Tool Runtime ABI](agent-spec-tool-runtime-abi.md)。

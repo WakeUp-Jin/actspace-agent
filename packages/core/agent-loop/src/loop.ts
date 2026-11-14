@@ -188,6 +188,10 @@ export class AgentLoop {
             // llm/stream 钩子可能在派发之前就抛错。
             prepared.release();
             output = failedStreamOutput(normalizeLlmFailure(error, attempt));
+          } finally {
+            // 监听器可以不调用 next()、直接给出自己的流。这次准备好的调用没有派发，不会自己归还 lease。
+            // 等流读完再还：监听器在流被读取时才调用 next() 的写法不受影响。
+            if (!prepared.dispatched) prepared.release();
           }
           if (output.failure === null) break;
           const recovery = await this.waterfall("agent/request-error", { requestId, turnId, stepId, attempt, failure: output.failure }, () => undefined as unknown as Readonly<Record<string, unknown>>);
