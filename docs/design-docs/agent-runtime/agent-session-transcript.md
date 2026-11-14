@@ -82,7 +82,7 @@ _Turn ended: aborted [#31]_
 - 图片和附件写成 `[image: 名称]` / `[attachment: 名称]`。
 - 有调用没结果的工具：轮次进行中写 `→ running`（子智能体运行时别人读到的就是这个），轮次结束时写 `→ no result recorded`。
 - 后台 Bash 日志被清理（单会话超 50MB）的那次调用，结果行末尾加 ` (log pruned)`（来自父会话 `background/task` 的 `prune`）。
-- 子智能体的完成通知写成 `## Subagent notification [#N]` 加一行 summary；子智能体之间或发给父会话的消息写成 `## Message from <发送方 agent_id> [#N]`，正文去掉 `<agent_message>` 外壳。
+- 子智能体的完成通知写成 `## Subagent notification [#N]` 加一行 summary；父会话与子智能体之间的消息写成 `## Message from <发送方 agent_id> [#N]`，正文去掉 `<agent_message>` 外壳。
 - 子智能体 transcript 的头部在 `Origin` 之外多三行：`- Description:`、`- Preset:`（`general` / `explore`，fork 和外部写种类）、`- Model:`，取自父会话的 `subagent/spawned` 与激活记录。
 - 头部 `Origin` 说明来历：主会话 / side chat of / fork of / subagent delegated by。侧边对话和 Fork 再加一行“截至 `[#N]` 的内容复制自父会话，去读父会话的 transcript”。
 

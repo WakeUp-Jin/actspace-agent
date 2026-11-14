@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { CLAUDE_NOT_FOUND, claudeCodeConfig, claudeTranscriptPath, createClaudeCodeBackend, encodeClaudeProjectPath } from "../backend.js";
 import { manifest } from "../manifest.js";
 
-// S5：Claude Code 后端（设计 04 §3.2）。假 `claude` 读 stdin、按 FAKE_MODE 写死 stream-json，不调真实 CLI。
+// S5：Claude Code 后端（agent-subagent-runtime.md「外部子智能体」）。假 `claude` 读 stdin、按 FAKE_MODE 写死 stream-json，不调真实 CLI。
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
 

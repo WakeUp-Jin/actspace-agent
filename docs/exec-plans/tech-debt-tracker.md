@@ -127,6 +127,9 @@
 | 2026-11-03 | 外部子智能体 / 进程残留 | Host 被强杀时 Codex / Claude Code 子进程可能留下；下次启动只把那次运行补记成 `lost`，不清理进程。 | 启动外部 CLI 时记 pid，启动时清理上次留下的进程。 |
 | 2026-11-12 | 同步子智能体 / 停止 | 同步运行的子智能体不进后台任务登记表，模型不能用 `task_stop` 停它（父会话本来就在等它），只有用户能在界面上停。 | 暂不处理；出现「模型需要中途放弃同步子智能体」的场景再议。 |
 | 2026-11-12 | 同步转后台 / 登记失败 | 同步子智能体等满 30 分钟转后台时如果登记失败，它会被直接停掉、不发通知，界面上没有单独提示；转后台这条路径只有单测。 | 登记失败时给父会话一条说明；实机上把等待时间调短验一次转后台。 |
+| 2026-11-12 | 官网文档 | `apps/site/src/content/docs/subagents.md` 还是 2026-11-04 的说法：默认在后台运行、做完可以继续派活、停掉后仍可续派、子智能体之间互相发消息、面板显示模型和第几轮。现在是默认等结果、做完就结束、兄弟之间不能发消息、列表不显示模型。 | 按[子智能体运行规范](../design-docs/collaboration/agent-subagent-runtime.md)重写「默认在后台运行」「在右侧查看」两节和 `description`，配图 `subagent-running.png` 一并核对。 |
+| 2026-11-12 | 插件页说明 | `packages/subagent/subagent/src/manifest.ts` 的 `display.description` 还是「子智能体的创建、续派、插话、中断与完成通知」，显示在 扩展 › 插件 里；续派和中断工具都没有了。 | 改成现在的能力（创建、消息、停止、完成通知）。 |
+| 2026-11-07 | 对话里的通知行 | 子智能体完成通知在 `groupMessagesIntoTurns` 里被跳过，来信走 `SubagentMessageCard`，所以 `BackgroundNoticeRow.tsx` 里 `taskKind` 为 `subagent`、`agent_message` 的分支（标题、展开内容、「打开子智能体」按钮）在桌面端对话里走不到，只有 `background-notice-row.test.tsx` 在用。 | 确认 Web 端也不用之后，把这些分支和对应用例删掉，组件只留 Bash 通知。 |
 
 ## 没有实机验证记录的功能
 

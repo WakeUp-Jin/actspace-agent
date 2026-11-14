@@ -16,7 +16,7 @@ export type SubagentToolRegistration = { readonly name: string; readonly dispose
 const AGENT_ID = { type: "string", minLength: 1, description: SEND_MESSAGE_PARAMETERS.agent_id };
 
 /**
- * Register the four subagent tools of `local` and forked subagents (design 02 §2). The Host port does the work;
+ * Register the four subagent tools of `local` and forked subagents (agent-subagent-runtime.md「工具」). The Host port does the work;
  * `mainScope` resolves a main agent's scope (child callers are resolved by the Host).
  */
 export function registerSubagentTools(runtime: ToolRuntime, port: SubagentHostPort, mainScope: (sessionId: string) => AgentScope | undefined): readonly SubagentToolRegistration[] {
@@ -87,7 +87,7 @@ export function registerSubagentTools(runtime: ToolRuntime, port: SubagentHostPo
 }
 
 /**
- * Register `agent_codex` / `agent_claude_code` for one external backend (design 04 §2). `pluginId` is the
+ * Register `agent_codex` / `agent_claude_code` for one external backend (agent-subagent-runtime.md「外部子智能体」). `pluginId` is the
  * plugin that owns the backend, so the tool is a member of that plugin in the main Agent form.
  */
 export function registerExternalSubagentTool(runtime: ToolRuntime, port: SubagentHostPort, backend: ExternalSubagentBackend, pluginId: string, mainScope: (sessionId: string) => AgentScope | undefined): SubagentToolRegistration {

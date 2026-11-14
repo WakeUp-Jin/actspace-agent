@@ -34,16 +34,16 @@ export type SpawnForkInput = SubagentCaller & {
   readonly background: boolean;
   readonly model?: string;
   readonly reasoningEffort?: string;
-  /** Tools the caller sees right now; the fork sees the same list (design 02 §5.1). */
+  /** Tools the caller sees right now; the fork sees the same list (agent-subagent-runtime.md「能力与权限」). */
   readonly parentToolNames: readonly string[];
   readonly signal: AbortSignal;
 };
 
-/** Host side of the subagent tools; the texts it returns are design 02 §2 verbatim. */
+/** Host side of the subagent tools; the texts it returns come from `messages.ts`. */
 export interface SubagentHostPort {
   spawn(input: SpawnSubagentInput): Promise<SubagentToolOutcome>;
   spawnFork(input: SpawnForkInput): Promise<SubagentToolOutcome>;
-  /** `agent_codex` / `agent_claude_code` (design 04): one CLI run, scheduled like any subagent. */
+  /** `agent_codex` / `agent_claude_code` (agent-subagent-runtime.md「外部子智能体」): one CLI run, scheduled like any subagent. */
   spawnExternal(backend: ExternalSubagentBackend, input: SpawnExternalInput): Promise<SubagentToolOutcome>;
   sendMessage(input: SubagentCaller & { readonly agentId: string; readonly message: string }): Promise<SubagentToolOutcome>;
   listModels(input: SubagentCaller): Promise<SubagentToolOutcome>;

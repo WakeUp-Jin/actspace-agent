@@ -81,7 +81,7 @@ Session Journal
 
 ## 6. 子智能体
 
-- 父轨迹里，一次委派只占 `agent` 工具调用那一行，不把子会话记录并进来（「子工具」只指同一会话里带 `parentCallId` 的嵌套调用）。`trajectoryDelegations(snapshot)`（`subagents.ts`）从 `delegation/requested` 取出 `parentCallId → childSessionId`，`agent` 行详情的「概述」据此显示「子智能体」一栏和「查看轨迹」按钮。
+- 父轨迹里，一次委派只占 `agent` 工具调用那一行，不把子会话记录并进来（「子工具」只指同一会话里带 `parentCallId` 的嵌套调用）。`trajectoryDelegations(snapshot)`（`subagents.ts`）用 `foldSubagentTree` 从 `subagent/spawned`、`subagent/activation` 取出「调用 → 子智能体」（老会话来自 `delegation/requested`），创建子智能体的那一行详情的「概述」据此显示「子智能体」一栏（种类 · 描述）和「查看轨迹」按钮；Codex / Claude Code 没有子会话，没有按钮。
 - 点「查看轨迹」在右侧「子 Agent」面板打开这个子会话并停在轨迹页，面板顶部栏最右用与主会话相同的 `SessionViewToggle` 切换对话 / 轨迹；子轨迹由 `<TrajectoryView sessionId={child} variant="panel" />` 渲染：只在挂载时 `bridge.watch` 子会话，不处理 Context 面板跳转，详情从下半部分弹出、不能拖宽。
 
 ## 7. 不做

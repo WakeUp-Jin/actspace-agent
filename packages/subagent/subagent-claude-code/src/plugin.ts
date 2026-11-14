@@ -7,7 +7,7 @@ import { CLAUDE_CODE_SUBAGENT_PLUGIN_ID } from "./manifest.js";
 
 export const inject = ["tools.runtime", "agent.registry", "actspace.host.subagents"];
 
-/** Registers `agent_claude_code` only when `claude` is installed; otherwise the plugin reports why (design 04 §1). */
+/** Registers `agent_claude_code` only when `claude` is installed; otherwise the plugin reports why (agent-subagent-runtime.md「外部子智能体」). */
 export async function apply(ctx: CordisContext, config: Readonly<Record<string, unknown>> = {}): Promise<void> {
   const tools = ctx.get?.("tools.runtime") as ToolRuntime;
   const registry = ctx.get?.("agent.registry") as AgentRegistry;

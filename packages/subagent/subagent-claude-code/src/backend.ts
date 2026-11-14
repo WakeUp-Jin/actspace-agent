@@ -8,7 +8,7 @@ import { firstErrorLine, OutputTail, resolveCommand, terminate, type ExternalRun
 
 export const CLAUDE_CODE_PERMISSION_MODES = Object.freeze(["dontAsk", "acceptEdits", "auto", "manual", "plan", "bypassPermissions"] as const);
 export type ClaudeCodeConfig = { readonly permissionMode: (typeof CLAUDE_CODE_PERMISSION_MODES)[number] };
-/** `dontAsk`: anything the user has not allowed is refused, never prompted (design 04 §4). */
+/** `dontAsk`: anything the user has not allowed is refused, never prompted (agent-subagent-runtime.md「外部子智能体」). */
 export const DEFAULT_CLAUDE_CODE_CONFIG: ClaudeCodeConfig = Object.freeze({ permissionMode: "dontAsk" });
 
 export const CLAUDE_NOT_FOUND = "本机没有找到 claude 命令";
@@ -42,7 +42,7 @@ export type ClaudeCodeBackendOptions = {
 };
 
 /**
- * `agent_claude_code` (design 04 §3.2): `claude -p` with stream-json output and a session id chosen here,
+ * `agent_claude_code` (agent-subagent-runtime.md「外部子智能体」): `claude -p` with stream-json output and a session id chosen here,
  * so the record path is known before the process starts. The prompt goes in on stdin.
  */
 export function createClaudeCodeBackend(options: ClaudeCodeBackendOptions = {}): ExternalSubagentBackend {

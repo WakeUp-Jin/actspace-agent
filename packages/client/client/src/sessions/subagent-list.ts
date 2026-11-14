@@ -103,7 +103,7 @@ export function foldSubagentList(journal: Iterable<Pick<SessionEventEnvelopeV1, 
 }
 
 /**
- * The right-side 子 Agent panel's list (design 05 §2), folded from a whole Journal.
+ * The right-side 子 Agent panel's list (front-子Agent与后台任务规范.md §2), folded from a whole Journal.
  * 一次性整份折叠，只用于测试或低频路径；面板轮询走 `reduceSubagentList` 增量折叠。
  */
 export function projectSubagentItems(journal: readonly SessionEventEnvelopeV1[], childModels: ReadonlyMap<string, string> = new Map()): SubagentListItem[] {

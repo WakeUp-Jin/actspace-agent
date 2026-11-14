@@ -38,7 +38,7 @@ export class ProgressiveDisclosure implements CompactionDisclosure {
       const path = await this.host.historyPath(session.header.sessionId);
       const replacements = path ? [...state.paths.values()].filter(value => value.history?.sessionId === state.sessionId).map(value => ({ oldId: value.id, path, history: { sessionId: session.header.sessionId, sourceEventSeqs: value.history!.sourceEventSeqs } })) : [];
       // A forked subagent (`agent_fork`) must send its parent's message prefix unchanged so the provider cache still
-      // hits (design 02 §8.4); the navigation list it writes next supersedes the inherited one anyway.
+      // hits (agent-subagent-runtime.md「Fork」); the navigation list it writes next supersedes the inherited one anyway.
       if (session.header.lineage?.origin !== "delegation") await new ContextSupplements(session).remove(DISCLOSURE_OWNER, "navigation");
       await this.append(session, { op: "fork", sessionId: session.header.sessionId, replacements });
     }

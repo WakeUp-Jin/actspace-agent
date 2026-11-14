@@ -19,7 +19,7 @@ const BODY_CLASS =
 
 const STATUS_LABELS: Record<string, string> = { completed: "已完成", failed: "失败", stopped: "已停止", lost: "已失联", output_match: "输出匹配" };
 
-/** 子智能体一次激活结束：「子智能体 ‹描述› 已完成」；子智能体发来消息：「‹描述› 发来消息」；Bash 照旧（设计 05 §1）。 */
+/** 子智能体一次激活结束：「子智能体 ‹描述› 已完成」；子智能体发来消息：「‹描述› 发来消息」；Bash 照旧（front-子Agent与后台任务规范.md §2.1）。 */
 export function backgroundNoticeLabel(message: Pick<BackgroundNoticeMessage, "taskKind" | "title" | "status">): string {
   if (message.taskKind === "subagent") return `子智能体 ${message.title} ${subagentActivationStatusLabel(message.status)}`;
   if (message.taskKind === "agent_message") return `${message.title} 发来消息`;
