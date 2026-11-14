@@ -281,5 +281,5 @@ CSS 与 Tailwind 陷阱、滚动容器所有权、浮层与 iframe 几何、颜�
 - 2026-06 [Electron macOS ad-hoc signing: avoid `codesign --deep`](2026-06/electron-ad-hoc-codesign-without-deep.md)
 - 2026-06 [Self-Replacing Updaters Need a Two-Phase Boundary](2026-06/self-replacing-updaters-need-a-two-phase-boundary.md)
 - 2026-07 [单实例锁 vs 遗言心跳：一个文件同时承载两种语义时的自锁陷阱](2026-07/single-instance-lock-vs-farewell-heartbeat.md)
-- 2026-11 [Actions 缓存开着不等于用上了：先核对谁存、谁读、存了什么、省不省时间](2026-11/actions-cache-who-saves-who-reads.md)
+- 2026-11 [Actions 缓存开着不等于用上了：先核对谁存、谁读、存了什么、省不省时间、放久了还在不在](2026-11/actions-cache-who-saves-who-reads.md)
 - 2026-11 [runner 镜像换版的几天里新旧并存：CI 的红绿或耗时变了，先按镜像版本分组再归因](2026-11/runner-image-rollout-mixes-old-and-new.md)

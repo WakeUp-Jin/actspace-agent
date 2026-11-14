@@ -8,7 +8,7 @@
 
 | 日期 | 计划 | 一句话 |
 |---|---|---|
-| 2026-11-13 | [CI 提速第二轮：去掉重复工作、测试再分片、路径过滤与缓存收敛](20261113-ci-speedup-round2.md) | 测试和检查一条没少，PR 上 `ci.yml` 整次运行 185 s → 120–136 s：`pnpm build` 不再把同一批包编两遍、根脚本测试并行、包测试两片、桌面端三片、路径过滤改有序 `paths`、Browser Bridge 的 Go 缓存接上、发布工作流在 macOS / Windows 上不再存 pnpm store；PR #92；`main` 上的路径和「只改文档不触发」要合并后人工看；`包测试` 在 #83 合入前仍会随机变红 |
+| 2026-11-13 | [CI 提速第二轮：去掉重复工作、测试再分片、路径过滤与缓存收敛](20261113-ci-speedup-round2.md) | 测试和检查一条没少，PR 上 `ci.yml` 整次运行 185 s → 107–142 s：`pnpm build` 不再把同一批包编两遍、根脚本测试并行、包测试两片、桌面端三片、路径过滤改有序 `paths`、Browser Bridge 的 Go 缓存接上、发布工作流在 macOS / Windows 上不再存 pnpm store；PR #92；`main` 上的路径和「只改文档不触发」要合并后人工看；`包测试` 在 #83 合入前仍会随机变红 |
 | 2026-11-12 | [子智能体简化：临时上下文窗口 + 并入后台任务](20261112-subagent-simplify.md) | 子智能体默认同步（30 分钟转后台）、只跑一次不续派；后台的登记进后台任务登记表（`kind: "agent"`），统一 `<task_notification>`、`task_list` / `task_output` / `task_stop`；删 `wait_agent` / `task_wait` / `list_agents` / `interrupt_agent` 和 `context-subagents`；`send_message` 只有主→运行中的子、子→父；Electron 实机检查未做 |
 | 2026-11-11 | [资源监控：悬浮窗与「资源占用」页](20261111-resource-monitor.md) | 侧栏性能文字换成常驻悬浮窗 + 设置页「资源占用」：单核口径 CPU、RSS、主线程延迟、分组进程表（含 Agent 子进程）、复制快照；关着时零开销；用户实机验收通过 |
 | 2026-11-11 | [简化思考过程](20261111-thinking-compact.md) | 设置 `general.simplifyThinking`（缺省开启）：思考进行时固定一行 `Thinking 6s · 开头一句` 加扫光，结束后 `Thought for 9s`，点标题仍可展开；用时只在流式状态里、不写入会话；只改桌面端；Electron 走查未做 |
