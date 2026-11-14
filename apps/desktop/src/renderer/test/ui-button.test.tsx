@@ -77,8 +77,12 @@ describe("IconButton", () => {
   });
 
   it("requires a label at the type level", () => {
-    // @ts-expect-error label 是必填：没有名字的图标按钮不应通过类型检查。
-    const element = <IconButton><Plus aria-hidden="true" /></IconButton>;
+    const element = (
+      // @ts-expect-error label 是必填：没有名字的图标按钮不应通过类型检查。指令只管紧跟着的那一行，所以写在标签上面。
+      <IconButton>
+        <Plus aria-hidden="true" />
+      </IconButton>
+    );
     expect(element).toBeTruthy();
   });
 });
