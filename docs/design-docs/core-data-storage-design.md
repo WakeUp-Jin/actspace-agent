@@ -1,6 +1,6 @@
 # ActSpace 数据存储结构与职责
 
-本文是存储归属、读写路由与资源边界的现行设计。验证证据见[执行摘要](../exec-runs/20261018-session-storage-refactor/execution-summary.md)与[实施计划](../exec-plans/completed/20261018-session-storage-refactor.md)；决策依据（Q1–Q14）、运行态实现落点、SQLite 查询读模型与查询 Worker 见本文第 11–16 节。冷读优化与产品级验证单独列明，不以架构确认代替验收。
+本文是存储归属、读写路由与资源边界的现行设计。决策依据（Q1–Q14）、运行态实现落点、SQLite 查询读模型与查询 Worker 见本文第 11–16 节。冷读优化与产品级验证单独列明，不以架构确认代替验收。
 
 ## 结构总览
 
@@ -166,7 +166,7 @@ Agent 执行、上下轮衔接和恢复不查 SQLite。当前前端也不是所�
 
 ## 8. 现有实现的核对清单
 
-下列是长期完整性与产品级核对清单。本轮自动化覆盖见执行摘要，不能把已通过的包测试等同于清单全量或真实界面验收：
+下列是长期完整性与产品级核对清单，不能把已通过的包测试等同于清单全量或真实界面验收：
 
 - SQLite 重建是否保持费用依据、请求去重、历史模型信息和其他业务含义。
 - 会话功能是否存在只保存在索引、内存或旁路文件的权威事实。
@@ -194,7 +194,7 @@ Agent 执行、上下轮衔接和恢复不查 SQLite。当前前端也不是所�
 
 ## 10. 交付边界
 
-已完成的增量校验、持久写入背压、已落盘正文释放、当前业务投影和附件 fsync 见[实施计划](../exec-plans/completed/20261018-session-storage-refactor.md)及[执行摘要](../exec-runs/20261018-session-storage-refactor/execution-summary.md)。
+增量校验、持久写入背压、已落盘正文释放、当前业务投影和附件 fsync 已完成。
 
 - Journal 默认近期正文预算为 512 条 / 4 MiB，只释放 durable 前缀；无历史回读能力的临时或内存后端不能丢掉唯一事实。
 - 4 MiB 不是进程内存上限。当前 Surface、业务记录、去重 ID、文件位置索引和工具视图仍有各自开销。
@@ -278,7 +278,7 @@ Q7 的出发点：模型 Context 由压缩控制，前端历史由 SQLite 查询
 
 ## 13. 产品级完整性核对与验收边界
 
-增量运行态重构已完成，自动化证据见[执行摘要](../exec-runs/20261018-session-storage-refactor/execution-summary.md)。更广的产品级核对仍按事实清单推进：业务字段 → 唯一写入者 → JSON/JSONL 事件或领域记录 → 所需正文 → 内存计算 → 可选 SQLite 投影 → 恢复方式。
+增量运行态重构已完成。更广的产品级核对仍按事实清单推进：业务字段 → 唯一写入者 → JSON/JSONL 事件或领域记录 → 所需正文 → 内存计算 → 可选 SQLite 投影 → 恢复方式。
 
 下列是完整性验收目标，不能全部标记为本轮已验证，也不授权操作真实用户数据：
 
@@ -289,7 +289,7 @@ Q7 的出发点：模型 Context 由压缩控制，前端历史由 SQLite 查询
 - 中途崩溃不导致重复工具副作用、错误发送确认或分叉附件丢失。
 - 使用当前配置重建旧数据时，不改变历史模型、费用及请求证据。
 
-当前实现未新增数据库或文件检查点写入器，也未移动附件目录。真实 Provider、Electron 和断电验证未执行；已验证项及剩余限制以执行摘要为准。
+当前实现未新增数据库或文件检查点写入器，也未移动附件目录。真实 Provider、Electron 和断电验证未执行。
 
 ## 14. 运行态实现落点与边界
 
@@ -317,7 +317,7 @@ Q7 的出发点：模型 Context 由压缩控制，前端历史由 SQLite 查询
 
 4 MiB 约束的是近期事件的序列化正文，不是 JS heap 或进程总内存。当前 Surface、业务记录、去重 ID、字节索引和前端工具视图仍可能随有效业务规模增长。未启用压缩时，Surface 自然也会增长。显式全量导出/检查、现有冷打开 `inspect()` 仍可临时加载完整日志。当前没有增加文件投影检查点，也没有改变物理日志格式或保证所有历史操作 O(1)。
 
-十万条普通事件验证覆盖增量校验次数、文件完整回读、近期正文上限、关闭重开和 seq 连续性；它不是十万次真实模型/工具调用的内存基准。具体命令与结果见执行摘要。
+十万条普通事件验证覆盖增量校验次数、文件完整回读、近期正文上限、关闭重开和 seq 连续性；它不是十万次真实模型/工具调用的内存基准。增量校验次数的用例在 `packages/session/session-journal/src/test/incremental.test.ts`。
 
 ## 15. SQLite 查询读模型
 
@@ -481,7 +481,7 @@ flowchart LR
 
 Workspace admission 继续从 Session 事实恢复；启动时只按批读取 workspace 相关字段，不完整重放 transcript/Usage，也不把 SQLite 当权限事实源。Provider 支持按事件类型过滤返回，但 cursor 仍跨所有物理事件推进。
 
-当前已按联合计划恢复测试与测量。已完成的百万行 Worker 热查询达到初始目标，但真实 Journal 的 1,000 行增量尚未达到 250 ms 目标；M/L/XL 和真实 Electron 验收不能用小数据结果替代。最新数值、失败项和环境限制见[执行摘要](../exec-runs/20261011-usage-sqlite-read-model/execution-summary.md)。
+百万行 Worker 热查询达到初始目标。真实 Journal 一次追加 1,000 行没有达到 250 ms 目标（2026-10 实测 p95 约 358 ms，5,000 行约 1.75 s），用户已接受这个限制；日常一次追加 1–5 条的 p95 约 8 ms。510 万条规模（L）的完整统计验收由用户取消，没有通过记录；M/L/XL 不能用小数据结果替代。
 
 ### 一次性实施的验收边界
 
@@ -505,7 +505,7 @@ Workspace admission 继续从 Session 事实恢复；启动时只按批读取 wo
 - 首次同步、重建、查询与 fallback 状态可见；取消 SQL 查询通过终止查询 Worker 实现，Provider 批读和同步在批次边界检查取消。SQLite 所有者租约防止另一个 Worker 删除活动库。
 - Flush 不再主动初始化没人读取的全局摘要缓存；已有缓存仍在 flush 后更新。Journal append/fsync、checkpoint 和 Agent 读取协议保持不变。
 - 未打开的其他进程文件以完整前缀供查询，不把它当作跨进程 fsync 确认。文件被替换、截断、同水位 stamp 改变时重建对应 Session。
-- 全量查询摘要的复杂度主要取决于不同维度组合数；极高基数与按会话标题筛选仍可能更慢，需要在验收记录中保留边界。
+- 全量查询摘要的复杂度主要取决于不同维度组合数；极高基数与按会话标题筛选仍可能更慢。
 
 #### 后台历史恢复边界
 
@@ -647,7 +647,7 @@ Worker 相关验收至少覆盖：
 
 JSONL 每批至多 256 events、目标 256 KiB，单记录最大 1 MiB；SQLite 按 step/call 关联重算精简 Usage 行，不把整库装进数组。读模型每批提交 cursor、关联状态与构建进度。同 schema 重建写 building generation，旧 published 保持可读；完成后原子发布新代，部分构建不冒充完成水位。追加批次提交其已处理的 durable 前缀。单关联组 10,000 events / 8 MiB、fallback 1,000 Sessions / 5,000 events / 8 MiB 精简状态是当前有界失败阈值。
 
-原 JSON cache 文件保留；主查询不再通过它加载全部历史。fallback 在 Worker 内复用原 Session projection，并用请求级内存 SQLite 复用正式 FTS、cursor 与汇总查询；超过预算时明确失败。取消、索引进度和 rollup 已实现，真实 Electron 资源验收仍在执行，详见[执行摘要](../exec-runs/20261011-usage-sqlite-read-model/execution-summary.md)。
+原 JSON cache 文件保留；主查询不再通过它加载全部历史。fallback 在 Worker 内复用原 Session projection，并用请求级内存 SQLite 复用正式 FTS、cursor 与汇总查询；超过预算时明确失败。取消、索引进度和 rollup 已实现。
 
 #### 实际实现与测量边界
 
@@ -655,7 +655,7 @@ JSONL 每批至多 256 events、目标 256 KiB，单记录最大 1 MiB；SQLite 
 
 Provider 描述符每批 128 个，事件每批最多 256 个/目标 256 KiB，单记录上限 1 MiB；Query Service 排队上限 8，Worker 连续无进展等待上限 60 秒（大删除每500行报告存活并续期）。等待者取消仅释放自身需求；共享任务仍有消费者就继续，否则在安全批次停止并保留游标。显式取消恰逢原生 SQL 执行时才终止 Query Worker，等待旧 owner 真正退出后按已持久化水位恢复；不能依靠同步 SQLite 函数执行期间读取普通取消消息。
 
-性能记录持续更新到 [执行摘要](../exec-runs/20261011-usage-sqlite-read-model/execution-summary.md)。百万行合成 Worker 基准已通过热查询目标，真实 Journal、L/XL 和 Electron 尚待完整验收。
+百万行合成 Worker 基准已通过热查询目标；真实 Journal 的批量追加和 L/XL 规模没有通过记录。
 
 #### SQLite 临时存储的读写策略
 
@@ -700,7 +700,5 @@ Context/Usage/catalog 共用 Query Worker 与单写 owner，投影水位分开�
 `user_version` 变化时首次查询触发新 schema 空表/索引创建，按需逐 Session 导入；跨 schema 不承诺旧结果可读（最近一次是统计页重做的 17 → 18 整库重建）。同 schema 重建使用独立 building 表，FTS/rollup/run 计数随原子发布切换，退出和恢复复用已提交进度。
 
 Usage 批量插入在事务内按新增 rowid 范围汇总，范围 SQL 强制避免 GROUP BY 选择全历史覆盖索引。逐行/批量结果及回滚有性质回归；这不等于已通过增量耗时门槛。SQLite 页缓存预算 32 MiB，WAL 自动 checkpoint 约 16 MiB；Native 内存仍须与 JS heap 分开量测。
-
-当前性能失败和 CU 结论以联合执行记录（`docs/exec-runs/20261011-context-sqlite-integration/`）及 U 清单（`docs/exec-runs/20261011-usage-sqlite-read-model/`）为准，不沿用旧版通过结论。
 
 构建表只保留身份、Session与投影关联需要的索引，不复制正式activity表的七个分页/筛选索引；旧schema9私有索引可以移除而不改变已提交cursor。普通有界Journal追加可用MEMORY临时空间，重建、metadata变更和查询使用FILE。发布复制按rowid推进，仍是一个Session原子事务；心跳/yield不代表其他Worker查询能在事务内插入，公平调度与长事务性能尚有缺口。

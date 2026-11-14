@@ -44,4 +44,4 @@ Cordis 按函数形态判断插件是否像构造器。具名普通函数可能�
 2. 插件函数会不会被 Cordis 当构造器，disposer 是否丢了？
 3. 依赖图只画了运行时调用吗？关闭阶段的调用纳入了吗？某步清理失败后剩余资源还有释放机会吗？
 
-本轮实例见 [P5 测试接替](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-test-map.md)；领域租约仍有独立价值，因为 Effect 不能撤销已发生的写入或外部请求。
+本轮实例见 [P5 Cordis 与 Host 收敛 history](../../histories/2026-10/20261004-1310-p5-cordis-host-convergence.md)；领域租约仍有独立价值，因为 Effect 不能撤销已发生的写入或外部请求。

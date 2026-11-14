@@ -1,6 +1,6 @@
 # Agent 重构隔离验收环境
 
-用于 `20261005-agent-refactor-final-closeout` 的真实 Electron/Host 验收。只创建新隔离目录，使用 synthetic credential，不读取或复制用户设置。先从当前源码完成 `pnpm --filter @actspace/agent-cli... build`。
+2026-10 Agent 重构收尾时用的真实 Electron/Host 验收环境（当时的计划和验收点已随归档删除，见 git 历史）。只创建新隔离目录，使用 synthetic credential，不读取或复制用户设置。先从当前源码完成 `pnpm --filter @actspace/agent-cli... build`。
 
 ```sh
 node scripts/acceptance/agent-refactor/fixture.mjs start --root /tmp/actspace-final-cu-new
@@ -31,7 +31,7 @@ Provider 标记：
 
 当前 SSH 的 UI 连接只接受 alias/port，调用系统 SSH 默认配置；测试函数有 configFile seam，但 UI 没有独立配置路径入口。不得修改真实 `~/.ssh` 来假装隔离。SSH 自动化可按 `ACTSPACE_TEST_SSH=1` 运行，CU7.9 使用下述专用验收装配，不能改验 WSS 后写通过。
 
-验收点、分组与签收依据见[验证附件](../../../docs/exec-plans/completed/20261005-agent-refactor-final-closeout/verification.md)。这是测试设施，不是产品后台服务或线上 Provider 验证。
+这是测试设施，不是产品后台服务或线上 Provider 验证。
 
 ## SSH 的真实界面隔离装配
 

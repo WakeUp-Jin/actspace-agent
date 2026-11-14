@@ -1,6 +1,6 @@
 # Harness 与 Host 重构：最终决定
 
-本文是 Harness / Host 重构的最终决定，已由 P1–P5 与[最终收尾计划](../../exec-plans/completed/20261005-agent-refactor-final-closeout/README.md)实现，验收证据和保留限制见[最终结算](../../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。它不表示全仓已被证明不存在任何冗余，也不包含未来自进化具体功能。
+本文是 Harness / Host 重构的最终决定，已由 P1–P5 与最终收尾实现。它不表示全仓已被证明不存在任何冗余，也不包含未来自进化具体功能。
 
 ## 目标与优先级
 
@@ -84,7 +84,7 @@ ActSpace 采用 DSH 发布的 `@deepseek-ai/cordis` 族作为插件生命周期�
 
 不为假想外部使用者保留永久兼容层，内部消费者一起迁移。设置、凭据和连接配置必须保留；本轮不清理真实会话历史、用户工作区或产物。
 
-[P1–P5 计划](../../exec-plans/completed/20261003-agent-harness-host-refactor/README.md)记录批准范围；[最终验收](../../exec-runs/20261003-agent-harness-host-refactor/execution-summary.md)区分 UI、协议、进程和未覆盖项。实机验收委派 gpt-6.1-sol，开发与修复由主智能体负责。
+验收在本机受控的 Provider 与 Host 上完成，界面、协议和进程三类证据分开记录；真实云部署、外部付费 Provider、手机界面、新旧 Harness 升级后的恢复没有验证。
 
 原始讨论可通过 Git 查看：`git show 1bc434d62152a783990e30e738eacc9ec302e140:docs/design-docs/agent-plugin-runtime/agent-harness-host-refactor-decisions.md`。该快照包含被后续决定替代的方案，不作当前实现依据。
 

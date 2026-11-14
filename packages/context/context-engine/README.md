@@ -13,6 +13,6 @@
 
 Host 在恢复 Session 前加载纯 Codec。行为停用不删除历史；不识别 required Codec 的旧二进制只能 browse-only。原始历史和 artifact 由 `DisclosureHost` 提供，Context 不依赖 JSONL 布局；引用不会授予工具读取权限。
 
-`assembly.ts` 仅保留旧库调用兼容，生产不发布 `context.assembly`。请求快照保持现有 schemaVersion 2。设计和验证见[规范](../../../docs/design-docs/上下文管理引擎设计/上下文管理引擎V2/README.md)及[执行摘要](../../../docs/exec-runs/20261011-context-management-engine-v2/execution-summary.md)。
+`assembly.ts` 仅保留旧库调用兼容，生产不发布 `context.assembly`。请求快照保持现有 schemaVersion 2。设计见[规范](../../../docs/design-docs/上下文管理引擎设计/上下文管理引擎V2/README.md)。
 
 退役条件：先让根导出和自身兼容测试都切换到 `ContextEngine` / `toLlmInput`，再删除 `assembly.ts`；删除前必须证明动态入口、契约矩阵和历史恢复路径都不再解析 `context.assembly`。

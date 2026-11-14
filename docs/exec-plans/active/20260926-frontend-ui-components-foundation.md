@@ -107,8 +107,8 @@ Radix primitives / 原生 HTML
 - [x] 基础组件规范已并入 `docs/design-docs/frontend/front-组件与交互模式规范.md`。
 - [x] 盘点现有重复控件：按钮、菜单、弹层已收口，剩 Switch / Textarea / Tabs。
 - [x] 公共 `components/ui/Tooltip.tsx` 已存在；另有 HoverCard（Sheet 已在重构 10 删除）。这里只确认文件落地，不代替本计划的统一迁移验收。
-- [x] 新增 `components/ui/Button.tsx`、`IconButton.tsx`。2026-09-26 由 `completed/20260926-frontend-design-token-convergence.md` 的 T12 完成，并迁移了设置中心、审批卡、Composer、Sidebar、右侧面板工具条和各对话框按钮。仍未迁移的按钮形态（菜单项、下拉触发器、分段控件）见 `front-组件与交互模式规范.md`，随下面的 `Tabs` 一起迁移。
-- [x] 新增 `components/ui/DropdownMenu.tsx`。2026-10-06 由 [Desktop 前端重构 16](../completed/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md) 完成，实现为 `ui/Menu.tsx`（另含 Popover、Dialog、ConfirmDialog、Select、ContextMenu），消息操作菜单、设置页下拉、侧栏右键等已迁移；Composer 内的菜单随 09 迁移。规范见 `front-组件与交互模式规范.md`。
+- [x] 新增 `components/ui/Button.tsx`、`IconButton.tsx`。2026-09-26 由设计 token 收口那一轮（T12）完成，并迁移了设置中心、审批卡、Composer、Sidebar、右侧面板工具条和各对话框按钮。仍未迁移的按钮形态（菜单项、下拉触发器、分段控件）见 `front-组件与交互模式规范.md`，随下面的 `Tabs` 一起迁移。
+- [x] 新增 `components/ui/DropdownMenu.tsx`。2026-10-06 由 Desktop 前端重构 16（UI 原语与组件拆分）完成，实现为 `ui/Menu.tsx`（另含 Popover、Dialog、ConfirmDialog、Select、ContextMenu），消息操作菜单、设置页下拉、侧栏右键等已迁移；Composer 内的菜单随 09 迁移。规范见 `front-组件与交互模式规范.md`。
 - [ ] 新增 `components/ui/Switch.tsx`。
 - [ ] 新增 `components/ui/Textarea.tsx`、`Tabs.tsx`。
 - [x] 迁移消息操作菜单（2026-10-06，随 `ui/Menu`）。

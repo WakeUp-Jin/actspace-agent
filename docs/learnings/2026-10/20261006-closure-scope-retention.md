@@ -72,4 +72,4 @@ Composer 的 onSend
 2. 为什么把 `useMemo` 换成「浅比较复用」能减少泄漏，而不只是换一种写法？
 3. 如果不能拆组件，还有什么办法让旧渲染的作用域不被留住？（提示：回调用 ref 读最新值，依赖设为 `[]`）
 
-来源：[14 执行过程「Electron 检查与内存修复」](../../exec-runs/20261005-desktop-fe-14-renderer-state/execution-process.md)，现行规范 §8。
+来源：[Desktop 前端重构 14 history](../../histories/2026-10/20261006-0555-desktop-fe-14-renderer-state.md)（Electron 检查与内存修复），现行规范 §8。

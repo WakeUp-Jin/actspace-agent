@@ -160,7 +160,7 @@ pnpm check:browser
 
 ## P5 测试迁移与运行顺序
 
-旧测试按保护行为迁移，不因旧内部 API 删除就删掉行为保护。checkpoint 服务、原生通知、工具 Cordis 插入点、Host 装配与退出的接替见 [P5 测试映射](../../exec-runs/20261003-agent-harness-host-refactor/phase-5-test-map.md)。存储行为迁入 agent-host，CLI 保留接入与真实进程回归；组合/Run 租约原测试保留。
+旧测试按保护行为迁移，不因旧内部 API 删除就删掉行为保护。P5 迁移后，checkpoint 由必需 Service 的测试保护（服务缺失或写入失败时不能继续），工具中间件夹具由原生 Cordis pre / post 插入点测试接替，Host 装配与退出由 `packages/host/agent-host` 的生命周期与 bootstrap 测试保护。存储行为迁入 agent-host，CLI 保留接入与真实进程回归；组合/Run 租约原测试保留。
 
 先构建依赖闭包，再跑消费 dist 的测试；`pnpm typecheck` 自带构建步骤，不与这类测试并发运行。事件目录从源声明生成，校验具体成员，不硬编码过时的总数。
 

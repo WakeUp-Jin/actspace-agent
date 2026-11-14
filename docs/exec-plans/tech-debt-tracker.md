@@ -8,7 +8,7 @@
 
 ## 前端设计 token 遗留
 
-2026-09-26 设计 token 收口（`completed/20260926-frontend-design-token-convergence.md`）后仍保留的写死值和未统一控件：
+2026-09-26 设计 token 收口后仍保留的写死值和未统一控件：
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
@@ -19,7 +19,7 @@
 
 ## Desktop 前端组件遗留
 
-2026-10-06 Desktop 前端重构 16（UI 原语与组件拆分，`completed/20261005-desktop-frontend-refactor/16-UI原语与组件拆分执行计划.md`）之后仍未处理的项，结果见 `docs/exec-runs/20261005-desktop-fe-16-ui-primitives/execution-summary.md`：
+2026-10-06 Desktop 前端重构 16（UI 原语与组件拆分）之后仍未处理的项：
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
@@ -34,7 +34,7 @@
 
 ## Desktop 安全遗留
 
-2026-10-06 Desktop 前端重构 11（安全与 IPC，`completed/20261005-desktop-frontend-refactor/11-安全与IPC执行计划.md`）之后登记的四条，2026-11-09 由 [Desktop 安全遗留清零](completed/20261109-desktop-security-debt.md) 收口，结果见 `docs/exec-runs/20261109-desktop-security-debt/execution-summary.md`：
+2026-10-06 Desktop 前端重构 11（安全与 IPC）之后登记的四条，2026-11-09 的「Desktop 安全遗留清零」已收口；没划掉的是那一轮留下的：
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
@@ -43,12 +43,14 @@
 | 2026-10-06 | scripts / IPC 审计 | ~~`check:ipc-channels` 不检查注册是否经过 `assertTrustedSender`。~~ 13 之后注册器强制 sender 校验与 guard，审计以契约为来源并区分方向；2026-11-09 再加一条：main 在 `ipc/registry.ts` 之外直接调用 `ipcMain.handle / handleOnce / on / once` 即失败。 | 已完成。 |
 | 2026-10-06 | renderer / 主文档 CSP | ~~主文档没有 CSP。~~ 已解决：main 用 `onHeadersReceived` 下发 CSP，`script-src 'self'`、`connect-src 'self'`、frame / object / worker / base-uri / form-action 全 `'none'`，dev 只放开 Vite 需要的内联脚本和 ws。 | 已完成。残余见下一行。 |
 | 2026-11-09 | main / safeStorage | ~~`SecretCrypto`（secrets v1 迁移）与 `remote-hosts/credentials.ts` 调用 `safeStorage.encryptString / decryptString / isEncryptionAvailable`，Electron 45 弃用、46 移除，此前未登记。~~ 已解决：全部改为 `isAsyncEncryptionAvailable / encryptStringAsync / decryptStringAsync`，`HostCredentials` 读到 `shouldReEncrypt` 时顺手重写。 | 已完成。升级 Electron 46 时不再被这条挡住。 |
-| 2026-11-09 | renderer / CSP `style-src` | `style-src` 仍含 `'unsafe-inline'`。headless Chrome 实测（`execution-process.md`）：`style-src 'self'` 下 innerHTML 的 `<style>` 和 `style` 属性都被拦，DOMParser + `importNode` 的 `style` 属性能活、`<style>` 不行，`adoptedStyleSheets` / `el.style.cssText` 可用；但 CodeMirror 的 style-mod 用 `<style>` 标签注入、Vite dev 也注入 `<style>`，要去掉 `'unsafe-inline'` 需三处同时改。 | mermaid 改 DOM 挂载 + `<style>` 转 `adoptedStyleSheets`；CodeMirror 传 `EditorView.cspNonce`，nonce 由 main 每次启动生成并随 CSP 头与 preload 下发；Vite dev 配 `html.cspNonce`。做完后 `style-src 'self' 'nonce-…'`。 |
+| 2026-11-09 | renderer / CSP `style-src` | `style-src` 仍含 `'unsafe-inline'`。headless Chrome 实测：`style-src 'self'` 下 innerHTML 的 `<style>` 和 `style` 属性都被拦，DOMParser + `importNode` 的 `style` 属性能活、`<style>` 不行，`adoptedStyleSheets` / `el.style.cssText` 可用；但 CodeMirror 的 style-mod 用 `<style>` 标签注入、Vite dev 也注入 `<style>`，要去掉 `'unsafe-inline'` 需三处同时改。 | mermaid 改 DOM 挂载 + `<style>` 转 `adoptedStyleSheets`；CodeMirror 传 `EditorView.cspNonce`，nonce 由 main 每次启动生成并随 CSP 头与 preload 下发；Vite dev 配 `html.cspNonce`。做完后 `style-src 'self' 'nonce-…'`。 |
 | 2026-11-09 | main / 偏好 env | `settings/env.ts` 仍把 `IMAGE_GENERATION_BASE_URL` / `IMAGE_GENERATION_MODEL` / `ACTSPACE_DISABLED_TOOLS` / `ACTSPACE_BASH_ALWAYS_ASK` / `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` 写进 main 自己的 `process.env`（不含凭据）。 | 找出 Desktop 内还在读这些 env 的路径，改走 settings 读模型后删掉 `applyToEnv` 与 `reloadEnv`。 |
+| 2026-11-09 | main / git、ssh 子进程环境 | `hostChildEnv` 是白名单（基础变量加 `LC_` / `XDG_` 前缀），不传 `GIT_*`、`GIT_SSH_COMMAND` 这类自定义 git 变量；依赖它们的用户，Desktop 自己发起的 git / ssh 会和终端里的行为不一样。 | 有反馈再在 `HOST_ENV_PREFIXES` 加 `GIT_`，加之前评估 `GIT_CONFIG_*` 的注入面。 |
+| 2026-11-09 | 实机验证 | 这一轮的五项只有自动化覆盖，没有实机结果：打包版与 dev 下打开 DevTools 看 CSP 有没有违规（mermaid、代码高亮、KaTeX、图片附件预览、文档面板编辑、统计页、mermaid 下载 PNG）；Browser Bridge「选择源码扩展」的目录对话框和校验；Agent bash 里 `env` 看不到搜索 Key；远程主机凭据重启后还在；v1 `secrets.json` 迁移。 | 升级 Electron 46 时把 CSP 走查并进去一起做。 |
 
 ## Desktop settings 遗留
 
-2026-10-07 Desktop 前端重构 17（settings-service 拆分，`completed/20261005-desktop-frontend-refactor/17-settings-service拆分执行计划.md`）的特征测试（T1，以及 T6 / T7 变异检查后补的用例）记下的现有行为。17 是纯搬迁，不改；测试按现状断言（`apps/desktop/src/main/test/settings-characterization.test.ts`）。三行已立项：[Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md)。
+2026-10-07 Desktop 前端重构 17（settings-service 拆分）的特征测试（T1，以及 T6 / T7 变异检查后补的用例）记下的现有行为。17 是纯搬迁，不改；测试按现状断言（`apps/desktop/src/main/test/settings-characterization.test.ts`）。三行已立项：[Desktop settings 写入一致性修复](active/20261007-desktop-settings-write-consistency.md)。
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
@@ -70,7 +72,7 @@
 
 ## CI 与工程化遗留
 
-2026-11-08 CI 重新上线（`completed/20261108-ci-pipelines.md`）时发现、但不在那一轮处理的事项：
+2026-11-08 CI 重新上线时发现、但不在那一轮处理的事项：
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
@@ -84,11 +86,16 @@
 | 2026-11-08 | 供应链安全 | ~~`supply-chain-security.yml` 的 `osv-scan` 对整个 lockfile（含 devDependencies）扫描，当前报 93 条已知漏洞（axios、vite 5、vitest 3、devalue、fast-uri、joi 等），所以每个改到 `pnpm-lock.yaml` 的 PR 这个 job 都是红的，和改动本身无关；`pnpm audit --prod` 只剩 `katex` 一条 low。~~ 已解决：vite 7 / vitest 4 / esbuild 0.28 / astro 7.4 / wait-on 9 / katex 0.18 升级并重新生成 lockfile 后，osv-scanner 本地与 CI 扫描都是 0 条；工作流的路径过滤还排除了 `docs/**` 下的原型 `package.json`。 | 已完成。`osv-scan` 仍不是必需检查，后续新漏洞由每周定时扫描和 Dependabot 分组 PR 兜底。 |
 | 2026-11-08 | Release / Windows | Windows 包只在 CI 上打出、校验过文件结构，没有人实机启动过；沙盒缺位（nono 只有 darwin / linux）没验证。浏览器桥 CLI 在 Windows 上只是能编译（`ownedByCurrentUser` 的 Windows 实现恒为 `false`，实例注册表用 Unix socket 与 POSIX 权限位），`browser-tools` 插件在 Windows 上不可用。 | 第一个 tag 的草稿 Release 出来后，用 Windows 机器解压运行 `ActSpace.exe` 走一遍聊天、工具调用、浏览器桥。 |
 | 2026-11-08 | Release | 四个平台的完整产物经 Actions artifact 中转到 Release（每次 tag 约 700 MB，保留 1 天）；若将来 artifact 配额紧张，改成在各 job 内直接 `gh release upload` 到草稿。 | 观察 Settings › Billing 的 Actions storage，超过一半再改。 |
-| 2026-11-09 | CI / `build` job | `ci.yml` 的 `build` job 和 `release-package.sh` 仍走逐包 `pnpm --filter ... build`，没有接 `setup-workspace` 的 `tsc -b` 缓存（`completed/20261109-ci-speedup.md` 决策记录）。`build` 不是最长的 job，而且 release 链需要确认 `tsc -b` 产物与逐包 build 完全等价（esbuild 包、prompts 拷贝、默认 harness）才能换。 | `build` 成为 `ci.yml` 关键路径时，让它也用 `setup-workspace` + `pnpm build:deps`，再比对两种方式的 `dist/` 目录差异后替换 release 链。 |
+| 2026-11-09 | CI / `build` job | `ci.yml` 的 `build` job 和 `release-package.sh` 仍走逐包 `pnpm --filter ... build`，没有接 `setup-workspace` 的 `tsc -b` 缓存（原因见 [CI 提速计划](active/20261109-ci-speedup.md)的决策记录）。`build` 不是最长的 job，而且 release 链需要确认 `tsc -b` 产物与逐包 build 完全等价（esbuild 包、prompts 拷贝、默认 harness）才能换。 | `build` 成为 `ci.yml` 关键路径时，让它也用 `setup-workspace` + `pnpm build:deps`，再比对两种方式的 `dist/` 目录差异后替换 release 链。 |
+| 2026-11-08 | Release / 首次实发 | `v*` tag 触发的四平台发布合入后还没有真的打过 tag（仓库里只有 2026-07 的 `v0.1.0`）：草稿 Release 的产物、attestation、`release-manifest.json`、`sbom.spdx.json` 只在 PR 的打包验证里跑过。 | 发第一个版本时按 `docs/CICD.md` 核对草稿 Release 的附件，再点 Publish。 |
+| 2026-11-08 | Electron 45 | 升到 Electron 45 后只在 Linux 的 `xvfb` 下用 CDP 验过启动和 preload 桥；macOS 真实桌面上的窗口、审批弹层、保存再读回 API key、图片和文件的三种复制粘贴没有走查记录。 | 下次 macOS 实机验收时顺带走一遍。 |
+| 2026-11-01 | 文档检查 | `check:package-readmes` 的类别核对要读 `packages/core/runtime/dist/plugin-catalog.js`，没构建时整项跳过，只打印一行提示；`base-checks.yml` 不构建，所以必需检查里这一项不生效。能力目录 README 里「包之间怎么连」靠人工同步，脚本不核对依赖方向。 | 让脚本直接读源码里的 catalog，或把这一项挪到构建之后的 job。 |
+| 2026-11-09 | 测试环境 / 增量刷新 | `session-persistence-jsonl` 的 `refresh` 在文件大小不变时只比 `dev:ino:birthtimeMs:size:mtimeMs:ctimeMs`，同一个时间戳粒度内的等长改写会被当成没变。`refresh.test.ts > same-size rewrite falls back to a full read` 因此在部分机器上失败（`expected 'unchanged' to be 'replaced'`，2026-11-14 在云端 Linux VM 上复现），GitHub runner 上通过。 | 先让用例不依赖时间戳粒度；日志正常只追加，等长改写只会来自外部改文件，要不要给这种情况加内容校验另行决定。 |
+| 2026-11-14 | CI / 包测试 | `main` 上 `CI` 的「包测试」连续两次失败，失败的用例不同，都是 2026-11-12 子智能体简化带进来的、和等待时间有关的用例：`bf566305` 那次是 `packages/subagent/subagent` 的 `external.test.ts > runs a Codex task in the background, records it like any subagent and notifies the parent`（`expected [] to deeply equal ['root']`）；`d0ca51c7` 那次是 `packages/shell/tool-shell` 的 `node-ports.test.ts > runs subagent commands in the foreground and kills them at the time limit`（`expected 'failed' to be 'completed'`）。 | 两条用例各自在 runner 上反复跑，分清是测试里的等待太紧还是产品逻辑有竞态，再修。 |
 
 ## Web / PWA 客户端遗留
 
-2026-10-17 `apps/web` 首版（`completed/20261017-web-pwa-client.md`）留下的事项，结果见 `docs/exec-runs/20261017-web-pwa-client/execution-summary.md`：
+2026-10-17 `apps/web` 首版留下的事项，以及之后登记的远程客户端问题：
 
 | 日期 | 区域 | 债务描述 | 后续动作 |
 |---|---|---|---|
@@ -98,3 +105,42 @@
 | 2026-10-17 | web 运行计时 | 状态行「运行中 · Ns」从页面第一次看到这个 Run 开始计时，打开页面时已在跑的 Run 会少算。 | Host 的 tasks 快照带上 Run 开始时间后改用它。 |
 | 2026-10-18 | web 时间线规则 | 按轮拆分、Worked for 时长、本轮用量行顺序是桌面端 `turns.ts` / `turnUsageModel` 的重写（`apps/web/src/sessions/turn-model.ts`、`usage-format.ts`），两边靠测试和人工对齐。 | 把这几段纯函数抽到 `@actspace/client`，desktop 和 web 共用。 |
 | 2026-10-17 | Host 列表通知 | Host 每次 projection 更新都发 `sessions-changed`，流式输出时每个片段一次；web 端已改成 300ms 窗口内只刷新一次，但事件本身仍很密。 | Host 侧合并：只在会话元数据（标题、updatedAt 分钟级、归档等）变化时发。 |
+| 2026-11-05 | web Bash 输出 | `apps/web/src/pages/session/blocks/BashRow.tsx` 展开时调 `sessions.output` 取内容，那个接口返回的是模型还没定稿的回复正文，不是 bash 的输出。 | 改成读工具结果里的输出；远端没有工具输出接口时先只显示内联结果。 |
+| 2026-11-05 | 远程底稿回放测试 | 桌面远程适配器（`remote-hosts/desktop-adapter.ts`）的底稿回放、web 的 `session-observer.ts` 没有自动化测试。 | 给两处各补一条「运行中切走再切回，未定稿文字补回、不重复」的测试。 |
+
+## Browser Use 遗留
+
+2026-11-01 功能减法把浏览器改成默认不加载的可选插件，当时进行中的「Chrome 扩展连接、启动与使用体验闭环」计划（2026-09-28 立项）随之暂停。工程实现已合入，没补完的是 macOS + Google Chrome 上的实机验收：
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-11-01 | Chrome 扩展连接 / 实机验收 | 16 个验收点里通过的有 A01 首次启动、A04 自动连接、A07 多 profile、A08 真实对话里使用浏览器；A09 授权、A10 停止与断线只覆盖了一部分（批准、拒绝、等待中停止）。其余各点都还有没覆盖的范围：A02 随包安装、A03 Chrome 引导、A05 晚加载与忙碌 Runtime、A06 再次启动、A11 分层恢复、A12 主动断开、A13 更新回滚、A14 高级开发入口、A15 主题与窄窗口、A16 制品与隐私；其中应用重启后恢复、主动断开跨重启保持验过。 | 把 Browser Use 恢复成默认能力之前重新立项补验。原计划和各验收点的定义用 `git show d0ca51c7:docs/exec-plans/completed/20260928-chrome-connect-experience.md` 查看。 |
+
+## 子智能体与后台任务遗留
+
+2026-11-03 子智能体与后台任务重做、2026-11-12 子智能体简化之后留下的：
+
+| 日期 | 区域 | 债务描述 | 后续动作 |
+|---|---|---|---|
+| 2026-11-03 | 通知文案 | 应用退出导致中断（`lost`）的通知行，展开后显示的是给模型看的英文摘要（`Subagent … was interrupted because the app exited…`）。 | 展开内容给 `lost` 单独写一句中文说明，模型看到的原文不变。 |
+| 2026-11-03 | 外部子智能体 / 记录路径 | 按 2026-11-03 的核对，Claude Code 对很长的工作区路径会截断并加哈希；`encodeClaudeProjectPath` 只做字符替换，极长路径的工作区里算出来的记录文件路径可能对不上。 | 照 Claude Code 的规则补截断与哈希，用一个超长路径对照。 |
+| 2026-11-03 | 外部子智能体 / 进程残留 | Host 被强杀时 Codex / Claude Code 子进程可能留下；下次启动只把那次运行补记成 `lost`，不清理进程。 | 启动外部 CLI 时记 pid，启动时清理上次留下的进程。 |
+| 2026-11-12 | 同步子智能体 / 停止 | 同步运行的子智能体不进后台任务登记表，模型不能用 `task_stop` 停它（父会话本来就在等它），只有用户能在界面上停。 | 暂不处理；出现「模型需要中途放弃同步子智能体」的场景再议。 |
+| 2026-11-12 | 同步转后台 / 登记失败 | 同步子智能体等满 30 分钟转后台时如果登记失败，它会被直接停掉、不发通知，界面上没有单独提示；转后台这条路径只有单测。 | 登记失败时给父会话一条说明；实机上把等待时间调短验一次转后台。 |
+
+## 没有实机验证记录的功能
+
+下面这些功能交付时只有自动化测试和浏览器 mock，没有在 Electron 里验过的记录（日常使用可能已经覆盖了一部分）。验过一项就删掉一行，发现问题另行登记。
+
+| 交付日期 | 功能 | 没验的内容 |
+|---|---|---|
+| 2026-11-01 | 统一验收没覆盖的边界 | 真实触发步数上限和三小时审批超时；外部改文档后靠窗口聚焦触发「重新加载」；运行中、带用量的失败请求的未知费用口径；统计图表的悬停；英语学习的朗读（没有语音凭据）；从读文件工具行打开 HTML / TS。 |
+| 2026-11-02 | 上下文面板「Bash 命令」卡片 | 老会话第一次打开时补齐、调用次数和轨迹一致；新调用几秒内计入（含失败数、子命令展开）。 |
+| 2026-11-07 | 编辑重发与回退 | 编辑态外观、变淡淡出、提问条点击、空闲发送不闪托盘、回退后重载、`recovery/` 里的归档。 |
+| 2026-11-07 | 统计页重做 | 使用统计、Harness 统计两页在真实数据下的走查。 |
+| 2026-11-08 | 内置服务商改用 pi-ai | DeepSeek、Kimi、Anthropic、OpenAI、OpenRouter、自定义中转各发一条带工具调用的消息（开、关思考各一次）；代理可用和代理地址写错两种情况。 |
+| 2026-11-08 | 模型目录价格锁定 | 启动后设置页的价格、回复尾部的花费显示正常。 |
+| 2026-11-09 | 内置工具插件拆分 | Chat / Plan / Agent 三种模式各自的工具集合；自进化工具只在 Agent 模式可见；旧数据目录升级后自动换到新内置产物；子智能体的上下文里没有后台任务清单；压缩后披露状态恢复；`--mock` 下文件与 Bash 工具报不可用。 |
+| 2026-11-11 | 简化思考过程 | 真实模型下思考行保持一行、点标题看全文、多段思考、回复完成后收进 Worked、关闭开关后回到原样。 |
+| 2026-11-11 | 三层字号 | 浅色、深色下的历史会话；用户消息、正文、输入框字号一致；展开 `Worked for`；界面字号调到 12 和 18。 |
+| 2026-11-12 | 子智能体简化 | 同步子智能体、后台子智能体与通知、面板停止与 `task_stop`、结束后 `send_message`、改动前的老会话。Codex 子智能体的成功链路从 2026-11-03 起就没验过（当时本机 Codex CLI 不能用）。 |

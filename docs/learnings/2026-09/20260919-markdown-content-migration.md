@@ -22,4 +22,4 @@ H1 移入站点 title、相对资源路径适配、折叠容器转换，是呈�
 
 当前站点的 Astro 7 默认使用 Sätteri，不能假定 remark 插件仍由默认处理器执行。扩展前先确认当前处理器的插件接口；保留现有引擎通常比为一个链接转换切换整套 Markdown 渲染链更容易控制差异。
 
-本次对应记录：[官网内容迁移执行过程](../../exec-runs/20260919-site-content-migration/execution-process.md)。
+本次对应记录：[官网内容迁移 history](../../histories/2026-09/20260919-1716-site-content-migration.md)。

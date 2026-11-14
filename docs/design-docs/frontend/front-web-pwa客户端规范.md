@@ -1,6 +1,6 @@
 # Web / PWA 客户端规范
 
-`apps/web` 是 ActSpace 的浏览器客户端：一套响应式代码，手机竖屏单栏、浏览器宽屏两栏；支持 PWA（手机「添加到主屏幕」后全屏使用）；直连部署在服务器上的 `agent-host`（`actspace-agent host serve`），不经过本机桌面端，也不经过中转服务。主要场景是不在电脑前时看进度、处理审批、派新任务，复杂工作仍回桌面端。视觉是「轻玻璃」（iOS 原生感，手机优先）。决策表（D1–D4）与验收清单见 `docs/exec-plans/completed/design-archive/frontend/front-web-pwa客户端-决策与验收.md`；执行计划见 [20261017-web-pwa-client](../../exec-plans/completed/20261017-web-pwa-client.md)；本机联调和手机访问步骤见 [apps/web/README.md](../../../apps/web/README.md)。
+`apps/web` 是 ActSpace 的浏览器客户端：一套响应式代码，手机竖屏单栏、浏览器宽屏两栏；支持 PWA（手机「添加到主屏幕」后全屏使用）；直连部署在服务器上的 `agent-host`（`actspace-agent host serve`），不经过本机桌面端，也不经过中转服务。主要场景是不在电脑前时看进度、处理审批、派新任务，复杂工作仍回桌面端。视觉是「轻玻璃」（iOS 原生感，手机优先）。本机联调和手机访问步骤见 [apps/web/README.md](../../../apps/web/README.md)。
 
 ## 1. 与桌面前端共用的规则
 

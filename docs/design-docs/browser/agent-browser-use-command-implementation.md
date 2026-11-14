@@ -84,7 +84,7 @@ Chrome DevTools Protocol 是所有浏览器操作的最底层。页面操作主�
 - `browser-bridge/apps/chrome-extension/src/background.js`：Chrome/CDP primitive 与 Native Messaging。
 - `packages/browser/tool-browser/src/node-capability.ts`：Socket adapter、batch preflight、结果与 artifact 转换。
 
-修改命令时先更新 Go registry，再通过 `node scripts/check-browser-command-registry.mjs` 校验 metadata 与文档标题。Registry 的 implemented 状态不等于所有真实浏览器场景已验收；当前验收缺口见 [连接体验计划](../../exec-plans/completed/20260928-chrome-connect-experience.md)。
+修改命令时先更新 Go registry，再通过 `node scripts/check-browser-command-registry.mjs` 校验 metadata 与文档标题。Registry 的 implemented 状态不等于所有真实浏览器场景已验收；当前验收缺口登记在[技术债表](../../exec-plans/tech-debt-tracker.md)「Browser Use 遗留」。
 
 ### iframe坐标的测量时序
 

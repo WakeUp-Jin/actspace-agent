@@ -1,6 +1,6 @@
 # Task、Run 与 Harness 的生产接线
 
-当前契约包含 P2 统一任务、P3 Harness 控制和 P4 独立 Host/远端传输；阶段背景见 [P2 记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-2-summary.md)，最终清理与验收状态见[收尾摘要](../../exec-runs/20261005-agent-refactor-final-closeout/execution-summary.md)。
+当前契约包含 P2 统一任务、P3 Harness 控制和 P4 独立 Host/远端传输。
 
 ## 所有权
 
@@ -85,4 +85,4 @@ Headless 的 submit-and-wait 返回通用 outcome/value，等待 Run settlement 
 
 直接子智能体的 TaskLedger 由 Subagent lease 创建、完成和释放。接纳任务前通过 AgentService.registerExternalLedger 登记；Host snapshot 只能读取它的已确认状态，不能为这个 Session 再执行 TaskLedger.open/recover。外部持有期间，另一个调度入口必须返回 SESSION_BUSY。lease 释放时解除登记，Host 关闭仍先排空子执行，再释放 Harness；外部 Ledger 不转移给 SessionRunManager。
 
-该约束防止 UI 或 RPC 的只读任务查询将正在运行的子任务误恢复成 interrupted。实现与验证见[修复记录](../../exec-runs/20261018-subagent-durability/execution-summary.md)。
+该约束防止 UI 或 RPC 的只读任务查询将正在运行的子任务误恢复成 interrupted。

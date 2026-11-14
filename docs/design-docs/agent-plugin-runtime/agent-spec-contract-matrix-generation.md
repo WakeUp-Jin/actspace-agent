@@ -24,4 +24,4 @@
 
 未实现：任意动态调用的完整 producer/consumer 图、sourceRef 的 TypeScript symbol 解析、所有 Profile 的全语义证明。sourceDigest 只检测源内容变化；格式检查不能证明手工修改的 digest 与内容一致，须运行生成检查。测试源存在也不等于该测试本轮运行或真实 Electron/Provider 验收通过。
 
-旧计划要求的第二套全域语义引擎取消；可定位的具体缺口在[旧计划结算](../../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)记录，不把取消设计写成能力已实现。
+旧计划要求的第二套全域语义引擎取消，不把取消的设计写成能力已实现。

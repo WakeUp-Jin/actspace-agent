@@ -2,7 +2,7 @@
 
 合并自：测试断言被“命令回显”假阳性满足的陷阱、故障注入也需要证明自己真的生效、搬家式重构先用变异测试看看测试守住了什么。
 
-关联：`docs/histories/2026-07/20260703-1745-bash-background-verification-fixes.md`、`docs/histories/2026-10/20261006-1930-desktop-fe-09-composer.md`、[联合执行记录](../../exec-runs/20261011-context-sqlite-integration/execution-process.md)
+关联：`docs/histories/2026-07/20260703-1745-bash-background-verification-fixes.md`、`docs/histories/2026-10/20261006-1930-desktop-fe-09-composer.md`、[Context / SQLite 联合实现](../../histories/2026-10/20261011-2059-context-sqlite-joint-plan.md)
 
 共同问题：**一条验证即便被测功能完全坏了也会是绿的**，它给的是“这条链路已覆盖”的错误信心，比没有测试更糟。每次写验证都问：被测功能完全不工作时，这条验证会红吗？
 

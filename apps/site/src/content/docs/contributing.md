@@ -7,13 +7,13 @@ updatedAt: 2026-09-19
 draft: false
 ---
 
-ActSpace 的正式开发知识位于仓库 `docs/`。官网文档面向使用者，设计文档和执行记录面向维护者，修改功能时需要同步对应入口。
+ActSpace 的正式开发知识位于仓库 `docs/`。官网文档面向使用者，设计文档和变更记录面向维护者，修改功能时需要同步对应入口。
 
 ## 先读仓库导航
 
 开始前阅读根目录 `AGENTS.md`，再进入 `docs/REPO_COLLAB_GUIDE.md`、`docs/ARCHITECTURE.md` 和 `docs/README.md`（文档总导航）；做前端先读 `docs/design-docs/frontend/front-新功能开发清单.md`。当前 v2 专题是实现入口，`docs/archive/v1/` 用于历史追溯。
 
-复杂或跨多轮的变更在 `docs/exec-plans/active/` 建计划，执行过程放在 `docs/exec-runs/`，完成后记录 `docs/histories/` 并更新计划状态。
+复杂或跨多轮的变更在 `docs/exec-plans/active/` 建计划；完成后在 `docs/histories/` 记一份变更记录，计划随即删除，不归档。
 
 ## 主要目录
 

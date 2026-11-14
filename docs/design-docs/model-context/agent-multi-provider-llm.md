@@ -13,7 +13,6 @@
 
 - `packages/core/runtime/`、`packages/llm/` 与 `docs/design-docs/agent-plugin-runtime/`：当前 v2 Runtime、LLM 领域包与插件边界事实。
 - [模型 usage、价格快照和成本统计](agent-token-usage-and-context-state.md)。
-- 最初的执行计划：`docs/exec-plans/completed/20260724-multi-provider-llm/README.md`；之后的重做：`20260926-custom-connection-setup-redesign.md`、`20261021-model-provider-redesign.md`、`20261108-pi-ai-builtin-providers.md`。
 
 ## 背景
 
@@ -431,7 +430,7 @@ OpenRouter 连接成功后自动安装少量精选模型，覆盖：
 
 ## 设置页信息架构
 
-当前设置中心重构后，顶层不再提供“服务商”或“智能体”页面，只保留一个“模型”页面作为 Provider、Connection 和 Model 的统一用户入口。数据层仍然保持三者分离，详细的页面、交互和持久化目标以 [`front-设置中心重构规范.md`](../../exec-plans/completed/design-archive/frontend/front-设置中心重构规范.md) 为准。
+当前设置中心重构后，顶层不再提供“服务商”或“智能体”页面，只保留一个“模型”页面作为 Provider、Connection 和 Model 的统一用户入口。数据层仍然保持三者分离，页面与交互以[设置页规范](../frontend/front-设置页规范.md)为准，持久化结构以 `packages/util/shared/src/settings.ts` 的 `SettingsV4` 为准。
 
 ```text
 模型
@@ -516,7 +515,7 @@ settings.json
 └── activity.usage
 ```
 
-其中 `models.connections`、`models.definitions` 和 `models.installed` 使用稳定 ID，`taskBindings` 只保存稳定的 `modelKey` 引用。完整结构、v3 → v4 迁移和页面偏好边界见 [`front-设置中心重构规范.md`](../../exec-plans/completed/design-archive/frontend/front-设置中心重构规范.md)。
+其中 `models.connections`、`models.definitions` 和 `models.installed` 使用稳定 ID，`taskBindings` 只保存稳定的 `modelKey` 引用。完整结构见 `packages/util/shared/src/settings.ts` 的 `SettingsV4`，v3 → v4 迁移在 `apps/desktop/src/main/settings/migrations.ts`。
 
 敏感值：
 

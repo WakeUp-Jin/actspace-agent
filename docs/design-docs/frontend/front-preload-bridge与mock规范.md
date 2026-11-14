@@ -1,6 +1,6 @@
 # Preload bridge 与 Mock 规范
 
-验证方式（mock 场景表）见[前端验证约定](../../FRONTEND_VERIFICATION.md)；设计由来见归档的 [Preload 接口与 MockBridge](../../exec-plans/completed/design-archive/desktop-frontend-refactor/04-Preload接口与MockBridge.md)。
+验证方式（mock 场景表）见[前端验证约定](../../FRONTEND_VERIFICATION.md)。
 
 renderer 与 Electron main 之间只有一条通道：`window.actspace`。它的全部成员由一份契约生成，preload、main、mock 和测试都以这份契约为准。
 

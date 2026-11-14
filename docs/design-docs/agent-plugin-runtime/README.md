@@ -30,8 +30,8 @@ Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧�
 
 ## 决策背景
 
-[Harness 与 Host 重构：最终决定](agent-harness-host-refactor-decisions.md)汇总 Profile-first、v2 foundation、Cordis 采用范围与门禁的理由；它解释取舍，不替代上面的当前实现入口。重构过程的阶段记录在 [exec-runs/20261003-agent-harness-host-refactor](../../exec-runs/20261003-agent-harness-host-refactor/)，早期后端计划的独有欠账见[旧计划结算](../../exec-runs/20261004-agent-storage-and-cleanup/legacy-plan-resolution.md)。
+[Harness 与 Host 重构：最终决定](agent-harness-host-refactor-decisions.md)汇总 Profile-first、v2 foundation、Cordis 采用范围与门禁的理由；它解释取舍，不替代上面的当前实现入口。
 
 ## 验收边界
 
-已实现计划位于 [completed](../../exec-plans/completed/)，执行记录在 exec-runs。真实 Provider、Browser / Chrome Extension、Electron reload / quit / flush、签名公证和发行制品是否通过，以具体执行摘要为准；本页不把旧环境状态描述成当前实测结果。
+真实 Provider、Browser / Chrome Extension、Electron reload / quit / flush、签名公证和发行制品是否通过，以各文档正文写明的验证边界和[技术债表](../../exec-plans/tech-debt-tracker.md)为准；本页不把旧环境状态描述成当前实测结果。

@@ -15,4 +15,4 @@ Host 内唯一的 Session 任务调度所有者。依赖结构化 `RunFactory` �
 
 未领取的引导在人工撤回、Run 终止或 Host 恢复时，解除目标 Run 并回到普通队首；同批多条保持原队列中的相对顺序，任务身份和 submissionId 不变。该转移通过 required `plugin/actspace.agent-service/queue-return` v1 事件（`placement: front`）持久化，与结束或恢复事件同批 append、flush 后才发布快照。历史 v1 `task/designate`、`run/finish`、`queue/recover` 的重放顺序保持原样；不认识新事件的旧读取器只能浏览，不能继续调度。领取和撤回仍走同一串行 lane 和 revision 校验，已领取内容不能再返回队列。
 
-验证：`pnpm --filter @actspace/agent-service test`。生产接线和验收范围见 [P2 计划](../../../docs/exec-plans/completed/20261003-agent-harness-host-refactor/phase-2.md)。
+验证：`pnpm --filter @actspace/agent-service test`。

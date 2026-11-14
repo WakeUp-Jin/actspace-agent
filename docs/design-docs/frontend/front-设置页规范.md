@@ -4,8 +4,6 @@
 
 代码：`apps/desktop/src/renderer/components/settings/`（`SettingsPage.tsx`、`SettingsNav.tsx`、`SettingsPrimitives.tsx`、`sections/`、`models/`）、`components/UsageStatisticsPage.tsx`、`components/harness-stats/`。设置数据按 `SettingsV4` 命名空间读写（`packages/util/shared/src/settings.ts`）。
 
-历史方案、Maka 对照与实施分期见归档：[设置中心重构规范](../../exec-plans/completed/design-archive/frontend/front-设置中心重构规范.md)、[模型设置页面 Maka 重做规范](../../exec-plans/completed/design-archive/frontend/front-模型设置页面-Maka重做规范.md)、[使用统计刷新](../../exec-plans/completed/design-archive/frontend/front-usage-statistics-refresh.md)。
-
 ## 1. 信息架构
 
 导航分四组，顺序固定（`SETTINGS_GROUPS`）：

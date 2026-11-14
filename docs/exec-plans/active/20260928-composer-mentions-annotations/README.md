@@ -3,7 +3,7 @@
 状态：执行中（交互模式）。当前进度：M0、P0、PA 已实施；PA2（回复批注交互重做）已实施，真实 Electron 主要流程通过、边界项待补验；PB 待实施。
 
 - 分支 / worktree：`feat/composer-file-mentions-annotations` @ `../actspace-agent-composer-mentions`（从 `main@186a18b` 切出）。
-- 设计真源：[Composer 文件引用与回复批注设计](../../../design-docs/frontend/front-composer-file-mentions-and-response-annotations.md)。设计文档顶部的「实施决策修订」优先于正文中与之冲突的旧描述。
+- 设计真源：[Composer 文件引用与回复批注设计](../../../design-docs/frontend/front-composer-file-mentions-and-response-annotations.md)。实施决策修订表、方案取舍和验收清单在[决策与验收](decisions-and-acceptance.md)。
 - 执行记录：[`docs/exec-runs/20260928-composer-mentions-annotations/`](../../../exec-runs/20260928-composer-mentions-annotations/execution-process.md)。
 - 执行模式：交互模式。每个子计划完成后停下，给出验证结果，确认后再进入下一个。
 
@@ -64,4 +64,4 @@ pnpm check:docs
 - [x] PA：回复批注（2026-09-28，详见执行过程步骤 6；真实交互按 PA2 修订验收，范围见下）。
 - [x] PA2：回复批注交互重做（2026-10-01，详见执行过程步骤 7；真实 Electron 主要流程通过，边界项见[逐项记录](../../../exec-runs/20260928-composer-mentions-annotations/pa2-computer-use/acceptance.md)，尚未完整签收）。
 - [ ] PB：编辑器与 `@` 文件引用。
-- [ ] 收尾：Electron 真实验收、执行摘要、history、设计文档状态更新，计划移入 `completed/`。
+- [ ] 收尾：Electron 真实验收、history、设计文档状态更新；未验证的范围写进 history，遗留登记到技术债表，然后删除本计划目录和执行记录目录。

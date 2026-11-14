@@ -47,7 +47,7 @@ export function ReviewStrip({ summary, onOpenReview }: ReviewStripProps) {
           </>
         ) : null}
       </Button>
-      {/* 技术债：还没有菜单内容，按钮没有 onClick（见 09 执行记录）。 */}
+      {/* 技术债：还没有菜单内容，按钮没有 onClick（见技术债表「Desktop 前端组件遗留」）。 */}
       <IconButton className="review-overflow-button" label="更多审查操作" variant="secondary" shape="round">
         <Ellipsis size={16} aria-hidden="true" />
       </IconButton>

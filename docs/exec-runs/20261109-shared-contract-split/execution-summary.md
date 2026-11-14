@@ -46,7 +46,6 @@
 
 ## 已知风险和遗留事项
 
-- `docs/exec-plans/completed/**` 里约 100 处 `packages/util/shared/src/ipc.ts` / `session.ts` 的文字引用是历史记录，未改；`check:docs` 只校验 Markdown 链接，纯文字路径不受影响。
 - 新规则只看 `@actspace/shared` 根入口的命名导入；如果将来有后端包用 `import * as shared from "@actspace/shared"` 再取 `shared.X`，规则看不到。目前仓库没有这种写法。
 
 ## 后续建议

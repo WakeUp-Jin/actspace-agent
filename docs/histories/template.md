@@ -23,6 +23,13 @@
 
 *简洁直击要点的说明为什么要这么改？*
 
+### Unverified & Leftovers（未验证与遗留）
+
+*没有就写「无」。*
+
+- **未验证**：只跑了自动化测试、没在真实环境（Electron、真实模型、真实外部服务）里验过的范围，以及建议怎么验。
+- **遗留**：没做完、或发现了但没处理的事；需要后续处理的同时登记到 `docs/exec-plans/tech-debt-tracker.md`。
+
 ### 📁 Files Modified
 
 - `path/to/src/core/file.ts`

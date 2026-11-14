@@ -2,7 +2,7 @@
 
 合并自：分页要限制哪一层的工作量、分页预算与“整轮统计”是两个不同承诺。
 
-来源：[P4 修复记录](../../exec-runs/20261003-agent-harness-host-refactor/phase-4-bug-fixes.md)
+来源：[P4 远端 Host history](../../histories/2026-10/20261004-0108-p4-remote-host-in-progress.md)
 
 ## 1. 分页限制的是读取，不只是返回
 
