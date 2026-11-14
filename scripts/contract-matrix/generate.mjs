@@ -340,7 +340,8 @@ export function renderMarkdown(matrix) {
     "# Agent Contract Matrix",
     "",
     "> Generated artifact; edit source declarations instead. Do not hand-edit this file.",
-    `> Generator ${matrix.generatorVersion}; source digest \`${matrix.sourceDigest}\`.`,
+    // The source digest stays out of the committed file: it covers every byte of the sources, so a comment-only edit would make this file stale.
+    `> Generator ${matrix.generatorVersion}.`,
     "",
     "This document is an audit view of the current ActSpace v2 declarations. It never activates Runtime services, plugins, Session persistence, tools or Cordis entries.",
     "",
