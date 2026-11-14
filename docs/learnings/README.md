@@ -206,7 +206,7 @@ Session Journal 的事实与视图、事件平面、投影一致性、派生索�
 - 2026-10-08 [文件监听降噪：在事件源头按 Git 语义过滤，拿不准就放行](2026-10/20261008-fail-open-watch-filter.md)
 - 2026-10-23 [多条 Markdown 回复如何共享一个页面](2026-10/20261023-markdown-fragment-scope.md)
 
-## React 与前端状态管理（21）
+## React 与前端状态管理（22）
 
 状态归属与生命周期、请求身份、异步时序、测试可信度。
 
@@ -231,6 +231,7 @@ Session Journal 的事实与视图、事件平面、投影一致性、派生索�
 - 2026-10-06 [同一个函数里的闭包共用一个作用域：大组件为什么会留住旧数据](2026-10/20261006-closure-scope-retention.md)
 - 2026-10-06 [什么会让代码留在生产包：静态 import、顶层调用、引入即注册](2026-10/20261006-dev-only-code-out-of-bundle.md)
 - 2026-10-23 [类型收窄不会删除运行时字段](2026-10/20261023-structural-types-and-object-spread.md)
+- 2026-11 [改 vitest 的分片数，会换掉每一片里替懒加载页面付冷转译的那条用例](2026-11/vitest-shard-count-moves-lazy-cold-load.md)
 
 ## 布局、滚动、浮层与样式（34）
 
@@ -271,7 +272,7 @@ CSS 与 Tailwind 陷阱、滚动容器所有权、浮层与 iframe 几何、颜�
 - 2026-10-23 [虚拟滚动画布：内容宽度与可视宽度要分开](2026-10/20261023-virtual-canvas-viewport-width.md)
 - 2026-10-24 [浮层自动翻转为什么仍会越出屏幕](2026-10/20261024-popover-available-height.md)
 
-## Electron 打包、发布与工程（5）
+## Electron 打包、发布与工程（7）
 
 打包、签名、更新、单实例与脚本。
 
@@ -280,3 +281,5 @@ CSS 与 Tailwind 陷阱、滚动容器所有权、浮层与 iframe 几何、颜�
 - 2026-06 [Electron macOS ad-hoc signing: avoid `codesign --deep`](2026-06/electron-ad-hoc-codesign-without-deep.md)
 - 2026-06 [Self-Replacing Updaters Need a Two-Phase Boundary](2026-06/self-replacing-updaters-need-a-two-phase-boundary.md)
 - 2026-07 [单实例锁 vs 遗言心跳：一个文件同时承载两种语义时的自锁陷阱](2026-07/single-instance-lock-vs-farewell-heartbeat.md)
+- 2026-11 [Actions 缓存开着不等于用上了：先核对谁存、谁读、存了什么、省不省时间](2026-11/actions-cache-who-saves-who-reads.md)
+- 2026-11 [runner 镜像换版的几天里新旧并存：CI 的红绿或耗时变了，先按镜像版本分组再归因](2026-11/runner-image-rollout-mixes-old-and-new.md)
