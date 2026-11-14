@@ -1,11 +1,12 @@
 /**
- * 把宣传片逐帧渲染成 MP4。
+ * 把片子逐帧渲染成 MP4。
  *
- *   node scripts/render.mjs                    渲染整片到 out/actspace-promo.mp4
+ *   node scripts/render.mjs                    渲染产品宣传片到 out/actspace-promo.mp4
+ *   node scripts/render.mjs --film origin      渲染《诞生记》到 out/actspace-origin.mp4（片子清单见 src/films.js）
  *   node scripts/render.mjs --no-audio         不混入配乐
  *   node scripts/render.mjs --music a.mp3 --music-start 12   换一首曲子试听：从它的第 12 秒开始用
  *   node scripts/render.mjs --from 20 --to 30  只渲染一段，调某个分镜时用
- *   node scripts/render.mjs --stills 3,12.5    只导出这些时刻的 PNG 到 out/stills/
+ *   node scripts/render.mjs --stills 3,12.5    只导出这些时刻的 PNG 到 out/stills/（《诞生记》是 out/stills-origin/）
  *
  * 做法：无头 Chrome 打开合成页，每一帧先 seek 到对应时刻再截图，图片顺序喂给 ffmpeg。
  * 画面完全由时刻决定，所以渲染多慢都不会掉帧。
@@ -16,13 +17,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { launchChrome } from "./lib/chrome.mjs";
-import { soundtrack } from "../src/soundtrack.js";
+import { DEFAULT_FILM, filmById } from "../src/films.js";
 import { packageRoot, startComposition } from "./lib/servers.mjs";
 import { audioArgs, ensureSoundtrack, measureLoudness } from "./lib/soundtrack.mjs";
 
 const { values: options } = parseArgs({
   options: {
-    out: { type: "string", default: "out/actspace-promo.mp4" },
+    film: { type: "string", default: DEFAULT_FILM },
+    out: { type: "string" },
     music: { type: "string" },
     "music-start": { type: "string" },
     from: { type: "string" },
@@ -31,6 +33,7 @@ const { values: options } = parseArgs({
     "no-audio": { type: "boolean", default: false },
   },
 });
+const { soundtrack, ...selected } = filmById(options.film);
 
 const composition = await startComposition();
 const chrome = await launchChrome({ width: 1920, height: 1080 });
@@ -40,9 +43,9 @@ try {
   page.onConsole((type, text) => {
     if (type === "error" || type === "warning") console.warn(`[页面 ${type}] ${text}`);
   });
-  await page.goto(`${composition.url}?render=1`);
+  await page.goto(`${composition.url}?render=1&film=${options.film}`);
   const film = await page.evaluate("window.__promo.ready.then((info) => ({ ...info, fps: window.__promo.fps }))");
-  console.log(`成片 ${film.duration.toFixed(2)} 秒，${film.fps} 帧/秒，${film.scenes.length} 个分镜`);
+  console.log(`《${selected.title}》${film.duration.toFixed(2)} 秒，${film.fps} 帧/秒，${film.scenes.length} 个分镜`);
   for (const scene of film.scenes) console.log(`  ${scene.start.toFixed(2).padStart(6)} 秒  ${scene.id}`);
 
   const frameAt = async (time) => {
@@ -51,7 +54,7 @@ try {
   };
 
   if (options.stills) {
-    const directory = resolve(packageRoot, "out/stills");
+    const directory = resolve(packageRoot, selected.stills);
     await mkdir(directory, { recursive: true });
     for (const value of options.stills.split(",")) {
       const time = Number(value);
@@ -65,13 +68,14 @@ try {
     const first = Math.round(from * film.fps);
     const count = Math.round((to - from) * film.fps);
     const seconds = count / film.fps;
-    const output = resolve(packageRoot, options.out);
+    const output = resolve(packageRoot, options.out ?? selected.output);
     let audio = { input: [], output: [] };
     if (!options["no-audio"]) {
-      // 默认用 src/soundtrack.js 里写的那首；--music 换成本机的另一个文件。
-      const file = options.music ? resolve(options.music) : await ensureSoundtrack();
+      // 默认用这部片子自己的配乐；--music 换成本机的另一个文件。
+      const file = options.music ? resolve(options.music) : await ensureSoundtrack(soundtrack);
       const offset = Number(options["music-start"] ?? (options.music ? 0 : soundtrack.start)) + from;
-      audio = audioArgs({ file, offset, seconds, loudness: await measureLoudness(file, { offset, seconds }) });
+      const loudness = await measureLoudness(file, { offset, seconds });
+      audio = audioArgs({ file, offset, seconds, loudness, fadeIn: soundtrack.fadeIn });
     }
     await mkdir(resolve(output, ".."), { recursive: true });
 

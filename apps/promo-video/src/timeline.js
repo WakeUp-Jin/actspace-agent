@@ -6,7 +6,7 @@
  * 预览时按真实时间连续调用 seek，渲染时按帧号逐帧调用，两边走的是同一条路。
  */
 import { createCamera } from "./camera.js";
-import { formatNumber, parseKeys, valueAt } from "./tween.js";
+import { formatNumber, linear, parseKeys, valueAt } from "./tween.js";
 
 function typingDriver(element) {
   const text = element.dataset.type;
@@ -23,8 +23,9 @@ function typingDriver(element) {
 function countDriver(element) {
   const keys = parseKeys(element.dataset.count);
   const format = { digits: Number(element.dataset.digits ?? 0), group: element.dataset.group !== undefined };
+  const ease = element.dataset.linear === undefined ? undefined : linear;
   return (local) => {
-    const next = formatNumber(valueAt(keys, local), format);
+    const next = formatNumber(valueAt(keys, local, ease), format);
     if (element.textContent !== next) element.textContent = next;
   };
 }
