@@ -97,6 +97,8 @@
 | 2026-11-10 | Agent Host / 上传清理 | 上传的定时清理每 60 秒把所有上传的 `state.json` 读一遍。被任务引用的上传跟着会话一直留着，所以这一遍随附件总数增长。它是后台任务，不在请求路径上。 | 上传数量大到这一遍明显占用磁盘读取时，改成只扫还没被引用的上传（内存里已经有这份集合）。 |
 | 2026-11-10 | Agent Host / 产物错误 | `NodeArtifactStore` 在产物不存在、产物不属于这个会话时抛普通 `Error`，设备收到的是 -32603 `Host operation failed`，看不出是哪种情况（Host 日志里有）。 | 这两种情况改抛 `HostError`（`NOT_FOUND`、`FORBIDDEN`）。 |
 | 2026-11-10 | 子进程输出解码 | `apps/desktop/src/main/browser-bridge-service.ts` 收集编译日志、`packages/subagent/subagent/src/external-cli.ts` 的 `OutputTail` 都按块 `toString`，一个多字节字符落在两块之间时显示成乱码。两处都只在失败时给出诊断信息。 | 换成 `setEncoding("utf8")` 或 `StringDecoder`，和 `tool-fs-search` 读 ripgrep 输出的写法一致。 |
+| 2026-11-13 | LLM 重试 / `LlmRetryScope` | `agent-llm-core-pi.md` §13 设计的 `LlmRetryScope`（一个 lease 覆盖一个逻辑请求的全部尝试和退避等待）没有实现。现在每次尝试的 lease 在它的流结束时归还，重试时重新取一次；退避期间 registration 被完整注销的话，重试报 `LLM registration … is disposed.`，这一步失败。生产里走不到：路由随 Harness generation 一起注册和注销，进行中的 Run 持有那个 generation 的 lease。直接使用 `LlmService` 并自己注销路由的调用方没有这层保护。§13 末尾的「实现现状」写了差异。 | 出现不经 Harness 就使用带重试的 LLM 调用的地方，或者 Run 持有 generation lease 的做法要改时，在 `llm-service` 里实现 `LlmRetryScope`，并补 §13 关键回归序列里缺的那一段测试（退避期间旧 registration 被注销）。 |
+| 2026-11-13 | Agent Loop / `llm/stream` 钩子 | `llm/stream` 钩子在派发之后抛错时，那条已经派发的流没有人读，也没有人中止：路由的 lease 会归还，但这次请求要等回合被中止或 Provider 那边结束才停。适配器拿到的是整个回合共用的 signal，没有只属于这一次请求的中止手段；生产适配器也都没有实现 `cancel`。目前没有生产插件注册 `llm/stream` 钩子。 | 有插件要注册 `llm/stream` 钩子之前，给每次请求派生自己的 `AbortSignal`（回合的 signal 触发时跟着触发），钩子在派发后抛错时中止这一次请求。 |
 
 ## Web / PWA 客户端遗留
 

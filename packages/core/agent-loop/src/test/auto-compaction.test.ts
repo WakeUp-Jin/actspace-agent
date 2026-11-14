@@ -25,7 +25,7 @@ describe("auto compaction live events", () => {
       compaction: stubCompaction(async (onStarted) => { onStarted(); return true; }),
     });
     const kinds = events.map((event) => event.kind === "run-state" ? `run-state:${event.message}` : event.kind);
-    expect(kinds.slice(-3)).toEqual(["compaction-started", "compaction-finished", "run-state:completed"]);
+    expect(kinds.slice(-4)).toEqual(["compaction-started", "compaction-finished", "run-state:context-updated", "run-state:completed"]);
     expect(events.find((event) => event.kind === "compaction-finished")).toMatchObject({ removedCount: 3, agentRunId: "run-test" });
     expect(result.reason).toBe("completed");
   });

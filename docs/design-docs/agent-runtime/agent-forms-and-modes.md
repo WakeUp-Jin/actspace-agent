@@ -124,7 +124,7 @@ Chat 复用当前 Chat prompt：不主动读取/注入工作区 AGENTS、cwd/Git
 
 Plan/Agent 保持工作区上下文和现有 Skills 机制，但 Skill 文字不能扩大工具权限。Chat 下不消费 selected Skills；切换不删除草稿或附件，发送前按目标模式的既有附件规则校验，不支持的附件要求用户移除或换模式，不能静默丢弃。
 
-Chat 继续消费已有 `chatCompactionTriggerRatio` 设置，按当前模式判断，不再按旧 preset 判断；模式切换不自动触发一次压缩。动态模式事实通过持久化 runtime-context 传递，renderer/transcript 隐藏；同一模式稳定输入仍应保持 prompt 前缀稳定，跨模式切换不承诺相同前缀。
+Chat 继续消费已有 `chatCompactionTriggerRatio` 设置，按当前模式判断，不再按旧 preset 判断；模式切换不自动触发一次压缩。动态模式事实由 Context runtime 来源写成独立的 Context supplement，不进对话 Surface，也不改写 `user/message`；旧会话里用户消息末尾的 runtime-context 块照常读取，renderer/transcript 隐藏；同一模式稳定输入仍应保持 prompt 前缀稳定，跨模式切换不承诺相同前缀。
 
 Desktop Composer 统一展示 Chat / Plan / Agent 模式菜单；删除形态切换导致新建并归档空会话的路径。活动会话禁用切换并提示先停止。新建入口可以预选模式，但最终创建同一形态；默认新建继续 Agent。
 
