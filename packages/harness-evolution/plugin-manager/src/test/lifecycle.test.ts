@@ -9,7 +9,7 @@ import { HarnessControl, type SelectionRecord } from "@actspace/harness-control"
 import { HarnessHmr } from "@actspace/harness-hmr";
 import type { ToolRuntime, ToolExecutionContext } from "@actspace/tool-runtime";
 import { PluginManager } from "../service.js";
-import { apply } from "../plugin.js";
+import { apply, type PluginManagerPort } from "../plugin.js";
 import { buildTool } from "../build.js";
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const fn of cleanup.splice(0).reverse()) await fn(); });
@@ -136,6 +136,33 @@ it("registers proxy tools and disposes their handles", async () => {
     expect(tools.registry.listDefinitions().map(d => d.name)).toEqual(["harness_inspect", "plugin_manager"]);
     await cleanup(); expect(tools.registry.listDefinitions()).toEqual([]);
   } finally { await lease.release(); }
+});
+it("looks up the Host's evolution port each time a tool runs, and says so when the Host has none", async () => {
+  type Registration = Parameters<ToolRuntime["register"]>[0];
+  const registered: Registration[] = [];
+  const tools = {
+    register: (input: Registration) => { registered.push(input); return { registration: { definition: input.definition }, beginDrain: () => {}, dispose: async () => {} }; },
+    registry: { listDefinitions: () => [{ name: "listed" }] },
+  };
+  const host: { evolution?: PluginManagerPort } = {};
+  const context = { sessionId: "a" } as ToolExecutionContext;
+  const mount = (hostPort: unknown) => apply({ get: (name: string) => name === "tools.runtime" ? tools : hostPort, provide: () => {}, effect: () => {} } as never);
+
+  mount(host);
+  const [inspect, manage] = registered.map(registration => (args: Record<string, unknown>) => registration.executor.execute(args as never, context));
+  await expect(inspect!({})).rejects.toThrow("Harness evolution is unavailable on this Host");
+  await expect(manage!({ action: "status" })).rejects.toThrow("Harness evolution is unavailable on this Host");
+
+  // The port object is the same one the plugin was mounted with; only its `evolution` appeared afterwards.
+  const seen: unknown[] = [];
+  host.evolution = { inspect: async received => { seen.push(received); return { harnessId: "h" }; }, execute: async (args, received) => { seen.push(args, received); return { ok: true }; } };
+  expect(await inspect!({})).toMatchObject({ status: "completed", summary: "harness_inspect", modelOutput: [{ type: "json", value: { harnessId: "h", tools: [{ name: "listed" }] } }] });
+  expect(await manage!({ action: "status" })).toMatchObject({ status: "completed", summary: "plugin_manager", modelOutput: [{ type: "json", value: { ok: true } }] });
+  expect(seen).toEqual([context, { action: "status" }, context]);
+
+  registered.length = 0;
+  mount(undefined);
+  await expect(registered[0]!.executor.execute({} as never, context)).rejects.toThrow("Harness evolution is unavailable on this Host");
 });
 it("rejects external imports before emitting or executing candidate code", async () => {
   const s = await setup();

@@ -7,7 +7,7 @@ export const inject = ["tools.runtime", "actspace.host.agent"];
 /** A per-generation proxy; durable management lives in the stable Host. */
 export function apply(ctx: CordisContext): void {
   const tools = getService(ctx, TOOL_RUNTIME_SERVICE);
-  const evolution = getService(ctx, PLUGIN_MANAGER_HOST_VIEW)?.evolution;
+  const host = getService(ctx, PLUGIN_MANAGER_HOST_VIEW);
   if (!tools) throw new Error("Plugin Manager requires tools.runtime");
   const handles: ReturnType<ToolRuntimeContract["register"]>[] = [];
   try { for (const name of ["harness_inspect", "plugin_manager"]) handles.push(tools.register({
@@ -16,9 +16,9 @@ export function apply(ctx: CordisContext): void {
       inputSchema: name === "harness_inspect" ? { type: "object", properties: {}, additionalProperties: false } : { type: "object", properties: { action: { type: "string", enum: ["create", "build", "prepare", "apply", "status", "discard", "rollback"] }, purpose: { type: "string" }, toolName: { type: "string" }, entryId: { type: "string" }, workspaceId: { type: "string" }, executionDigest: { type: "string" } }, required: ["action"], additionalProperties: false },
       effects: name === "harness_inspect" ? [] : [{ capabilityId: "process", mode: "execute", resourceScope: "workspace" }], modes: ["agent"], concurrency: "exclusive", sensitiveArgumentPaths: [], resultSchemaVersion: 1 },
     executor: { execute: async (args, context) => {
-      if (!evolution) throw new Error("Harness evolution is unavailable on this Host");
+      if (!host?.evolution) throw new Error("Harness evolution is unavailable on this Host");
       try {
-        const value = name === "harness_inspect" ? { ...(await evolution.inspect(context) as object), tools: tools.registry.listDefinitions() } : await evolution.execute(args, context);
+        const value = name === "harness_inspect" ? { ...(await host.evolution.inspect(context) as object), tools: tools.registry.listDefinitions() } : await host.evolution.execute(args, context);
         return { status: "completed", summary: name, modelOutput: [{ type: "json", value: JSON.parse(JSON.stringify(value)) }] };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
