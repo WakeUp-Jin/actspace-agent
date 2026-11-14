@@ -130,7 +130,7 @@ function scaleRates(rates: ModelRates, factor: number): ModelRates {
 
 /**
  * 把思考档位映射回运行时和对话框已经在用的 ModelCapabilities 字段，对话框因此不用改。
- * 映射表见 docs/exec-plans/completed/20261021-model-provider-redesign.md「数据设计」。
+ * 各档位形态对应的字段取值见 `src/test/model-layers.test.ts` 的「thinking levels ↔ capabilities」。
  */
 export function thinkingToCapabilities(thinking: ModelThinking | null): {
   thinkingDefault: boolean;
