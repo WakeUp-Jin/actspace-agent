@@ -22,7 +22,6 @@
 | `execution-safety/` | Tool Runtime、权限模式、审批、Grant、Bash 硬防线、沙箱 | [README](execution-safety/README.md) |
 | `browser/` | Browser Bridge、ActSpace 集成与 canonical command | [入口](browser/agent-browser-use-index.md) |
 | `collaboration/` | 子智能体、后台 Bash 任务、侧边对话 | [子智能体](collaboration/agent-subagent-runtime.md)、[后台任务](collaboration/agent-background-tasks.md)、[侧边对话](collaboration/side-chat-design.md) |
-| `子智能体和后台任务设计规范/` | 子智能体与后台任务改造的设计决策与分项规范（模型可见文本、界面与设置） | [README](子智能体和后台任务设计规范/README.md) |
 | `自进化的方案设计/` | Harness 自进化：V1 用户显式修改、下一条消息使用新版本；V2 失败触发与沙箱评估；Harness 统计 | [README](自进化的方案设计/README.md)、[V1 使用说明](自进化的方案设计/10-V1实现与使用说明.md)、[Harness 统计](自进化的方案设计/11-Harness统计设计.md) |
 | `架构优化/` | 功能减法（什么属于 ActSpace）与插件结构（`packages/<能力>/<包>`、全局 / 会话插件、插件清单） | [README](架构优化/README.md) |
 | `多智能体协作/` | Space 工作台、Actor 名册与一对一对话的产品与前端设计（只做前端演示，不是 v2 Runtime 事实） | [README](多智能体协作/README.md) |
