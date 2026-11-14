@@ -26,18 +26,12 @@ type ProviderRuntimeConfig = {
   readonly authScheme?: import("@actspace/shared").CustomConnectionResolvedAuth;
   readonly transport?: { readonly proxyUrl: string };
 };
-type LegacyLlmConfig = {
-  readonly model: string;
-  readonly apiKey: string;
-  readonly baseUrl: string;
-};
 
 export interface ResolvedRuntimeModel {
   key: ModelKey;
   connectionId?: string;
   definition: ModelDefinition;
   providerRuntime: ProviderRuntimeConfig;
-  llmConfig: LegacyLlmConfig;
   source: "requested" | "configured" | "default" | "fallback";
   fallbackReason?: string;
 }
@@ -170,13 +164,8 @@ export class ModelRuntimeService {
         ...(model.installed.connectionId ? { connectionId: model.installed.connectionId } : {}),
         definition,
         providerRuntime: runtime,
-        llmConfig: toLegacyLlmConfig(definition.apiModel, runtime),
         source,
       },
     };
   }
-}
-
-function toLegacyLlmConfig(model: string, runtime: ProviderRuntimeConfig): LegacyLlmConfig {
-  return { model, apiKey: runtime.apiKey, baseUrl: runtime.baseUrl };
 }
