@@ -45,5 +45,6 @@ session-journal ──→ session-persistence ──→ session-storage（端口
 ## 怎么扩展
 
 - **换一种物理存储**（例如 SQLite）：新建 `session/session-persistence-<名>`，实现 `session-storage` 里的 `SessionStorage`，provides `session.storage`；在 `core/runtime/src/plugin-catalog.ts` 用新包替换 `session-jsonl` 那一行（同名服务只能有一个提供者），并更新 `core/runtime/package.json`。日志语义和持久化协调不用改。
+- **给物理存储加一种能力**（`refresh`、`rewritePrefix` 这类可选方法）：加到 `session-storage` 的 `SessionStorage` 接口，在 `session-persistence-jsonl/src/storage.ts` 实现，再在同包 `plugin.ts` 的包装服务里转发。注册在 `session.storage` 下的是这个包装服务，消费方按「有没有这个方法」判断后端支不支持，漏转发不报错、只表现为不支持；包装类用 `implements` 约束了存储的全部公开成员，漏了编译不过。
 - **新增一种会话事件**：在拥有它的插件里写 Codec（`./codec`），登记到清单的 `codec` 字段；Host 在恢复会话前加载 Codec。
 - 通用步骤见[总地图](../README.md)。
