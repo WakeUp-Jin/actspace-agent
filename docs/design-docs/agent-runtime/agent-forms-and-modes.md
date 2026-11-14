@@ -79,14 +79,14 @@ Session 与存储服务由 Host 持有；LLM、工具注册表、Prompt 与 Loop
 | 模式 | 目标 | 允许的工具贡献 |
 |---|---|---|
 | Chat | 对话、网络查询与生图 | 恰好 `web`、`generate_image` |
-| Plan（建议） | 探索、分析并产出可执行计划 | `read_file`、`list_directory`、`grep`、`glob`、`web_search`、`web_fetch`、`inspect_image`、`explore`、`todo_read`、`todo_write`、`task_list`、`task_output`、`task_stop` |
-| Agent（建议） | 在权限允许范围内执行任务 | 当前 Core Tools 除 `web` 的工具；现有 Todo、后台任务工具、`agent`/`explore` 与已装载 Browser 工具 |
+| Plan（建议） | 探索、分析并产出可执行计划 | `read_file`、`list_directory`、`grep`、`glob`、`web_search`、`web_fetch`、`inspect_image`、`agent`、`agent_fork`、`send_message`、`list_subagent_models`、`todo_read`、`todo_write`、`task_list`、`task_output`、`task_stop` |
+| Agent（建议） | 在权限允许范围内执行任务 | 当前 Core Tools 除 `web` 的工具；现有 Todo、后台任务工具、子智能体工具与已装载 Browser 工具 |
 
 上表是当前各工具插件在自己的 `ToolDefinition.modes` 里声明的结果，不是 `core/agent` 里的常量：`web` 声明 `["chat"]`、`generate_image` 声明 `["chat", "agent"]`、文件探索/Web 查询/图片分析/Todo/后台任务/内部 Subagent 工具声明 `["plan", "agent"]`、文件修改/`bash`/`present`/Browser/外部 Subagent 后端/`plugin_manager`/`harness_inspect` 声明 `["agent"]`。自进化产出的 `actspace.evolved.*` 工具由 `plugin-manager/build.ts` 统一钉死为 `["agent"]`，`allowedAgentModeTools` 再按 pluginId 前缀兜底一次，候选插件自己声明的 modes 不生效。实际可见集合仍与 Profile 已注册集合取交集。新增工具必须声明 `modes`（`normalizeToolDefinition` 拒绝缺失或未知值），`packages/core/runtime/src/harness/default-harness.test.ts` 对三种模式的实际集合做快照断言，改动 modes 要同步改那里。
 
-Plan 的限制不依赖 `read-only` 标记推断：禁用 Shell 工具 `bash`；禁用文件修改、Browser、生图及通用 `agent` 委派。允许 Todo 是有意允许写入会话规划状态，不表示允许修改工作区；允许后台任务工具是为了管理后台 `explore`，Plan 下没有后台 Bash 来源。计划正文作为回复持久化；本版不增加计划文件写入例外。
+Plan 的限制不依赖 `read-only` 标记推断：禁用 Shell 工具 `bash`；禁用文件修改、Browser 和生图。允许 Todo 是有意允许写入会话规划状态，不表示允许修改工作区；允许后台任务工具是为了管理后台子智能体，Plan 下没有后台 Bash 来源。计划正文作为回复持久化；本版不增加计划文件写入例外。
 
-Plan 的 Explore 子 Agent 只能使用父策略与自身只读 preset 的交集；子 Agent 不能通过嵌套委派或默认 `agent` 模式扩权。Chat 不允许 Subagent、Skills、Todo、图片分析或任何文件工具。
+Plan 下创建的子智能体只拿到 Plan 允许的工具（`explore` 预设再收窄到四个只读工具），不能借委派扩权，见[子智能体运行规范](../collaboration/agent-subagent-runtime.md)「能力与权限」。Chat 不允许 Subagent、Skills、Todo、图片分析或任何文件工具。
 
 Chat 生图可产生费用和 Session Artifact，因此不是“完全只读”。缺少搜索/图片服务配置时保留两个 schema，返回现有明确配置错误，不回退到文件或 Shell 工具。Profile 缺少这两个必需注册本身则不能进入 Chat。
 
