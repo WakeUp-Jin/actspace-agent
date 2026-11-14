@@ -5,7 +5,9 @@ kind: "package-group"
 
 # background-tasks
 
-后台任务有两种来源：转后台的 Bash 命令（`bash`）和后台子智能体（`agent`，`taskId` 就是 `agent_id`，见 [`subagent/`](../subagent/README.md)）。登记表记录每个任务的状态与输出，统一发 `<task_notification>` 完成通知，并保证每个结果只送达模型一次；重启后把没收尾的任务标 `lost` 并通知。模型通过 `task_list`、`task_output`、`task_stop` 查看和停止任务，没有等待工具。命令进程归 `tool-shell` 持有，日志写在会话目录 `sessions-v2/<id>/bash-log/` 下随会话保留（单会话超 50MB 时清理最早已结束的）；子智能体由 `SubagentManager` 运行，登记时给出 transcript 路径、结束信号和停止方法。并发上限按种类分开：同一会话最多 5 个后台 Bash，子智能体由管理器限 10 个。
+后台任务有两种来源：转后台的 Bash 命令（`bash`）和后台子智能体（`agent`，`taskId` 就是 `agent_id`，见 [`subagent/`](../subagent/README.md)）。登记表记录每个任务的状态与输出，统一发完成通知，重启后把没收尾的任务标 `lost`；模型通过 `task_list`、`task_output`、`task_stop` 查看和停止任务。命令进程归 `tool-shell` 持有，子智能体由 `SubagentManager` 运行，登记时给出 transcript 路径、结束信号和停止方法。
+
+日志、通知与唤醒、并发上限等规则只写在[后台任务](../../docs/design-docs/collaboration/agent-background-tasks.md)，这里只写包怎么分、怎么连。
 
 ## 包
 
@@ -25,7 +27,6 @@ kind: "package-group"
 
 - `background-tasks/src/registry.ts`、`notification.ts`、`types.ts`；`tool-background-tasks/src/tools.ts`、`plugin.ts`。
 - 测试在各包 `src/test/`：`pnpm --filter @actspace/background-tasks test`、`pnpm --filter @actspace/tool-background-tasks test`。
-- 设计见[后台任务](../../docs/design-docs/collaboration/agent-background-tasks.md)。
 
 ## 怎么扩展
 
