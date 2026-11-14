@@ -48,7 +48,7 @@
 
 - **未验证**：这轮没改运行时代码，代码文件里只动了注释、mock 的文档列表和 `currentTruthFiles` 的一行。没有实机验证。
 - **遗留**：
-  - 核对时发现的五处代码遗留登记在 `tech-debt-tracker.md`「上下文引擎遗留」：Loop 里不带 Context 来源的旧请求路径（生产不走，但 `agent-loop` 用测试帮助函数的 12 个测试文件里有 8 个完全不带来源，走的是它）、`context-engine` 的旧 `ContextAssembler`、没有人注册的 reducer 注册表、只有自己测试在用的包清单、披露插件在插件页的说明文字。
+  - 核对时发现的五处代码遗留登记在 `tech-debt-tracker.md`「上下文引擎遗留」：Loop 里不带 Context 来源的旧请求路径（生产不走，但 `agent-loop` 用测试帮助函数的 12 个测试文件里有 8 个完全不带来源，走的是它）、`context-engine` 的旧 `ContextAssembler`、没有人注册的 reducer 注册表、只有自己测试在用的包清单、披露插件在插件页的说明文字。第一处里 Loop 的分支和测试帮助函数，未合并的 #94 已经改掉了；表里那一行写了它合入后还剩哪些（`prompt` 包里的 `RequestAssembler` 等几样）。
   - `agent-target-agent-core.md` §6、`agent-target-llm-adapter.md`、`agent-spec-session-format-v1.md`、`agent-forms-and-modes.md` 里还在用「Request Assembly」「request candidate」这类实现前的说法描述请求流程。它们属于 Agent Runtime 那一组规范，留到那一组整理时一起改。
   - 现有 histories 里指向已删文档的链接成了断链，按 `HISTORY_GUIDE.md` 不修。原文用 `git show 0a4a7145:<路径>` 查看。
 

@@ -13,6 +13,7 @@
 | `context-source-support.ts` | `./source-support`：来源包用它把 contributor 转成 Context 内容（`contribute`、`promptSourceKey`、`runtimeInfo`、`SourceFactory`） |
 | `extensions.ts` | `PromptExtensionRegistry`：Host 按会话或按 Agent scope 追加来源 |
 | `contributor.ts` | contributor 的类型：层、种类、必需与可选 |
-| `assembler.ts`、`registry.ts`、`context-bridge.ts`、`request-snapshot.ts` | 旧的 `RequestAssembler` 路径：Loop 没配 Context 来源时的回退，只有测试在用；退役见[技术债表](../../../docs/exec-plans/tech-debt-tracker.md)「上下文引擎遗留」 |
+| `request-snapshot.ts` | `LogicalRequestCandidate`、`PreparedRequestMetadata`：Loop 拼请求、写请求记录时用的类型。`LogicalRequestSnapshot` 只有下一行的旧路径在用 |
+| `assembler.ts`、`registry.ts`、`context-bridge.ts` | 旧的 `RequestAssembler` 路径：Loop 没配 Context 来源时的回退，只有测试在用；退役见[技术债表](../../../docs/exec-plans/tech-debt-tracker.md)「上下文引擎遗留」 |
 
 测试：`pnpm --filter @actspace/prompt test`。
