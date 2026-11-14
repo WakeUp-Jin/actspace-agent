@@ -21,7 +21,7 @@
 | 投影与读模型 | [Runtime Projection](agent-spec-runtime-projection.md)（Durable / Live / Diagnostics 三平面、Generic Tool DTO、当前读取实现与水位） |
 | Agent 与 Scope | [Agent Core 所有权](agent-target-agent-core.md)、[Agent Scope 模型](agent-spec-agent-scope-model.md)、[子智能体运行规范](../collaboration/agent-subagent-runtime.md) |
 | Tool | [Tool Runtime 内核与外壳](agent-spec-tool-runtime-boundary.md)、[Tool Runtime ABI](agent-spec-tool-runtime-abi.md)、[Tool Name 契约](agent-spec-tool-name-contract.md)、[Tool 插件边界与 Todo 领域事件](agent-tool-plugin-boundaries.md) |
-| Prompt 与上下文贡献 | [Prompt 与 Context Contributor](agent-spec-prompt-context-contributors.md) |
+| Prompt 与上下文来源 | [上下文引擎规范](../上下文管理引擎设计/agent-context-engine.md)「来源」 |
 | LLM | [LLM Adapter 目标](agent-target-llm-adapter.md)、[LLM Core Pi](agent-llm-core-pi.md)（含 pi-ai 内置服务商复用）、[多供应商与模型管理](../model-context/agent-multi-provider-llm.md) |
 | 契约矩阵 | [生成与检查边界](agent-spec-contract-matrix-generation.md)、[生成结果](agent-contract-matrix.generated.md)（审计视图，由脚本生成） |
 | Host 与插件 | [独立 Agent Host 指南](agent-host-guide.md)（启动、配对、WSS / SSH、附件、停机、[systemd 示例](actspace-host.service.example)）、[英语辅助学习插件](agent-english-learning.md) |

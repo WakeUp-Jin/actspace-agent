@@ -40,7 +40,9 @@ call 9 | hit=4608 miss= 127
 2. `model-fact`：模型需要看见的稳定结构化事实（descriptor、capability 摘要）；
 3. `request-fact`：只用于审计/诊断的动态事实（run、request、Host invocation identity）。
 
-snapshot 同时保存 `facts` 与 `modelFacts`，但 system prompt 只渲染 `modelFacts`——不为缓存牺牲可审计性。一个事实若只用于 Trajectory 调试，不该进 `modelFacts`。
+system prompt 只渲染 `modelFacts`，审计用的 id 记在请求事件上、不进提示词——不为缓存牺牲可审计性。一个事实若只用于 Trajectory 调试，不该进 `modelFacts`。
+
+（历史：最初 snapshot 同时保存 `facts` 与 `modelFacts`。现在提示段和模型事实写在 `request/system-prompt`，requestId、turnId、stepId 写在 `request/header` 和 `request/context`；`request-fact` 这个种类只剩旧的 `RequestAssembler` 还认。）
 
 ## 4. 逐轮动态信息必须随消息持久化
 
@@ -51,6 +53,8 @@ system:  stable prompt sections + stable model facts
 history: durable Journal Surface
 current user: text / attachments / runtime-context
 ```
+
+（历史：最初动态块拼在 `user/message` 里。现在模式、日期这类运行状态是独立的补充事件 `plugin/actspace.context/supplement`，挂在写入时的对话末尾，内容变了才追加新版本，见[上下文引擎规范](../../design-docs/上下文管理引擎设计/agent-context-engine.md)「补充与临时插槽」。结论不变：动态信息必须落盘，并且放在末尾。）
 
 UI、标题、自然语言摘要可以隐藏内部块，但 token 估算仍要计入，因为模型确实收到了它。
 
