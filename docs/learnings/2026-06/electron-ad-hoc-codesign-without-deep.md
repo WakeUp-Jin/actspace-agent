@@ -33,6 +33,22 @@ codesign --verify --no-strict --verbose=2 "Actspace.app"
 - `signed: false` 可以继续表示“不是 Developer ID 正式签名”；用 `signature: "ad-hoc"` 单独标明本地临时签名状态。
 - `codesign --verify --strict` 可能仍会卡在 Electron framework 的结构上；本地 ad-hoc 验证可以使用 `--no-strict`。
 
+## 签名之后，不要在包里运行会写文件的东西
+
+2026-11 补充（来源：`docs/histories/2026-11/20261113-2100-python-verify-pycache.md`）。
+
+签名会把 `.app` 里每个文件的哈希封进去，之后包里多一个文件、改一个文件，`codesign --verify` 就报：
+
+```txt
+a sealed resource is missing or invalid
+```
+
+`release-package.sh` 签完名后，为了确认随包 Python 能用，会用它去 `import openpyxl, docx, pptx, PIL…`。Python 导入时默认在每个包旁边写 `__pycache__/*.pyc`，一次验证就往已签名的包里写了 700 多个文件。打包脚本本身不在验证之后再校验签名，所以打包「成功」，直到本地更新启动前的 `codesign --verify` 才失败。
+
+- 签名后还要在包里跑的检查，必须保证只读。Python 用 `-B`。
+- 随包 shim 带 `-E`（忽略所有 `PYTHON*` 环境变量），所以 `PYTHONDONTWRITEBYTECODE=1` 在这里不起作用，只能传参数。
+- 包内所有检查跑完之后，再 `codesign --verify` 一次，让这类问题在打包阶段就失败。
+
 ## 可迁移经验
 
 做 Electron macOS 打包时，不要把签名简化成“对最终 `.app` 运行一次 `--deep`”。更可靠的方式是区分目标：
@@ -46,3 +62,4 @@ codesign --verify --no-strict --verbose=2 "Actspace.app"
 - 为什么 `ad-hoc` 签名不能被描述成“已签名分发包”？
 - 什么时候应该使用 `codesign --verify --no-strict`，什么时候应该坚持完整 Developer ID + notarization？
 - 如果未来要对外发布，当前脚本里的 ad-hoc 分支还缺哪些能力？
+- 签名之后脚本里还跑了哪些包内程序？它们会不会写文件？
