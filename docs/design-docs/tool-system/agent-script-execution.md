@@ -1,6 +1,6 @@
 # Agent 脚本执行设计
 
-管模型在 ActSpace 里怎么写、怎么跑一段 Python / Node 脚本：不新增脚本专用工具，由 `bash` 工具的命令规则、随应用发布的解释器、会话临时目录、系统提示词与官方 Skill 五层共同实现。实施见 [执行计划](../../exec-plans/active/20261109-script-execution.md)；外部 harness 调研见 [参考资料](../../references/script-execution-harness-survey-20261109.md)。
+管模型在 ActSpace 里怎么写、怎么跑一段 Python / Node 脚本：不新增脚本专用工具，由 `bash` 工具的命令规则、随应用发布的解释器、会话临时目录、系统提示词与官方 Skill 五层共同实现。外部 harness 调研见 [参考资料](../../references/script-execution-harness-survey-20261109.md)。
 
 ## 1. 为什么做、做成什么样
 
@@ -78,7 +78,7 @@
 
 **暴露方式——不新增工具。** DSH 用 `load_workspace_dependencies` 工具返回路径；ActSpace 用两个更轻的手段：
 
-- `bash` 子进程环境：`ACTSPACE_PYTHON=<绝对路径>`，PATH 前置一个 shim 目录，里面只有 `actspace-python`（Windows 为 `actspace-python.cmd`）。不叫 `python3`，所以不遮蔽用户自己的解释器和 venv——这正是 DSH"不改 PATH"要守住的东西。
+- `bash` 子进程环境：`ACTSPACE_PYTHON=<绝对路径>`，PATH 前置一个 shim 目录，里面只有 `actspace-python`（Windows 的包里另有 `actspace-python.cmd`，`ACTSPACE_PYTHON` 指向它）。不叫 `python3`，所以不遮蔽用户自己的解释器和 venv——这正是 DSH"不改 PATH"要守住的东西。
 - 系统提示词 model-fact（`host/scripting-facts`）：`actspace-python` 版本与核心包、数据扩展是否已装、`ACTSPACE_SCRATCH` 路径；没有随包运行时时退化为"写脚本文件后用系统 python3 执行"。
 
 Codex 没有打包 Python，靠系统 `python3` + 沙箱放行；DSH 打包但不带 PDF 库。ActSpace 两者都要：放行是前提，打包是保证。
