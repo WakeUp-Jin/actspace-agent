@@ -40,7 +40,7 @@
 
 - 已冻结的对象，或者刚 `JSON.parse` 出来、还没有别人引用的对象，不要再做 `snapshotSessionJson`、`structuredClone` 或 `JSON.parse(JSON.stringify(x))`。需要防改的，`Object.freeze` 就够了。
 - 深拷贝只在**信任边界**做一次：IPC 入口、写盘前、插件交回的数据。之后在进程内传引用。
-- 已信任的视图（日志交出的 surface 视图）直接引用，用版本号判断变没变，不要序列化后再比较。参考 [上下文引擎直接用日志视图](../design-docs/agent-plugin-runtime/agent-spec-context-trusted-surface.md)。
+- 已信任的视图（日志交出的 surface 视图）直接引用，用版本号判断变没变，不要序列化后再比较。参考[上下文引擎规范](../design-docs/上下文管理引擎设计/agent-context-engine.md)「已信任的对话视图」。
 
 ## 4. 同一份内容只存一份
 

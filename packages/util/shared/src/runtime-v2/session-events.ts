@@ -83,7 +83,7 @@ export function surfaceNode(event: SurfaceNodeSource): SessionSurfaceNodeV1 | nu
   const cached = derivedNodes.get(event);
   if (cached !== undefined) return cached;
   // 推出的节点外壳冻结；字段引用 data，日志里的 data 已深度冻结，所以日志交出的对话整体只读
-  //（agent-spec-context-trusted-surface.md §3.1）。
+  //（agent-context-engine.md「已信任的对话视图」）。
   const node = deriveSurfaceNode(event);
   if (node !== null) Object.freeze(node);
   derivedNodes.set(event, node);

@@ -9,7 +9,7 @@ import { ContextSourceRegistry } from "../registry.js";
 import type { ContextSession } from "../supplements.js";
 import type { Context, ContextRequest } from "../types.js";
 
-// agent-spec-context-trusted-surface.md §6：已信任对话不复制、兼容路径照旧检查、版本号驱动 contextRevision。
+// agent-context-engine.md「已信任的对话视图」：已信任对话不复制、兼容路径照旧检查、版本号驱动 contextRevision。
 
 const source = { ownerPluginId: "@actspace/core" } as const;
 const request: ContextRequest = { sessionId: "s", logicalAgentScopeId: "main", turnId: "t", stepId: "step-1", requestId: "r1", routeId: "route", model: "model", options: { reasoning: true } };
