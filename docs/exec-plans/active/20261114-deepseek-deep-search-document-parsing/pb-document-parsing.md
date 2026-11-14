@@ -1,6 +1,6 @@
 # PB：文档解析
 
-状态：待审核，尚未开始（交互模式）。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。
+状态：待审核，尚未开始（交互模式）。上级：[总览](README.md)。依赖：[P0](p0-foundation-and-settings.md)。和 [PA](pa-deep-search.md) 互不依赖，默认排在 PA 之后；PA 新建、这里往里加的几个文件，任务里都写了先做 PB 时怎么办。
 
 ## 目标
 
@@ -18,7 +18,7 @@
 
 - [设计文档](../../../design-docs/tool-system/agent-deep-search-and-document-parsing.md) 第 3.2、3.3、5、6、8、9.2、9.3、9.4、10、13 节。
 - [demo](../../../design-docs/frontend/deep-search-and-document-demo.html) 第 4、5 节。
-- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`、`docs/design-docs/execution-safety/agent-tool-permission-model.md`、`docs/design-docs/tool-system/agent-script-execution.md`。
+- `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`、`docs/design-docs/execution-safety/agent-tool-permission-model.md`、`docs/design-docs/tool-system/agent-tool-output-references.md`、`docs/design-docs/tool-system/agent-script-execution.md`。
 - `docs/design-docs/frontend/front-新功能开发清单.md`、`front-视觉token规范.md`、`front-文案与状态表达规范.md`、`front-组件与交互模式规范.md`、`front-中间消息区规范.md`、`front-设置页规范.md`、`front-聊天输入框规范.md`；验收方式见 `docs/FRONTEND_VERIFICATION.md`。
 - `docs/coding-standards/perf-memory-conventions.md`：行的投影在每次会话投影的路径上。
 - 照着写的现有代码：
@@ -49,7 +49,7 @@
 | --- | --- | --- |
 | 第 3 步 | 路径规则照 `read_file`：`context.admittedResources` 里有文件资源时，`canonicalizeFileResource` 的结果必须和它的 `canonicalPath`、`targetKind` 相同；没有时只允许 `realpath` 之后仍在工作区内的路径。然后 `open`，用同一个句柄 `stat` | `readArtifact(context.sessionId, artifact_id)`，读到全部字节。抛错，或 Host 没给读取器：`DOCUMENT_ARTIFACT_NOT_FOUND` |
 | 显示名 | 模型给的路径去掉结尾的分隔符后的最后一段（按 `/` 和 `\` 切） | 附件元数据里的 `fileName`，没有就是 `attachment` |
-| 缓存键 | 规范路径 + `stat` 的大小 + `mtimeMs` | artifact ID |
+| 缓存键 | `path:` + 规范路径 + `stat` 的大小 + `mtimeMs` | `artifact:` + artifact ID |
 | 第 6 步 | 用第 3 步的句柄读前 1,024 字节，然后关闭句柄。排队期间不占着句柄 | 字节已经在内存里，直接做完整的类型判断 |
 | 第 7 步轮到之后 | 再复核一次路径，重新 `open`、`stat`；大小或修改时间和缓存键里的不一样时失败（`IO_ERROR`，消息说明文件在读取期间变了）；读进整个文件，关闭句柄 | 用第 3 步读到的字节 |
 
@@ -377,7 +377,7 @@ export function createNodeDocumentPorts(options: NodeDocumentPortsOptions): Tool
   - 本机检查的每一种失败都没有调用 `fetch`：超过上限（把 `maxBytes` 改小）、扩展名不对、内容不对、设了密码的 DOCX。
   - 路径：工作区内的相对路径和绝对路径；`admittedResources` 和实际路径不一致时 `IO_ERROR`；没有 `admittedResources` 且路径在工作区外时 `IO_ERROR`；不存在的路径、目录。
   - 排队期间文件被改了（大小变了）：轮到之后得到 `IO_ERROR`，没有调用 `fetch`。
-  - 附件：读取器抛错、没有读取器时 `DOCUMENT_ARTIFACT_NOT_FOUND`；有 `fileName` 时显示名用它，没有时是 `attachment`；每次调用都调了读取器，包括命中缓存的那次。
+  - 附件：读取器拿到的是 `context.sessionId`；读取器抛错、没有读取器时 `DOCUMENT_ARTIFACT_NOT_FOUND`；有 `fileName` 时显示名用它，没有时是 `attachment`；每次调用都调了读取器，包括命中缓存的那次；会话 A 读过的附件，会话 B 用同一个 ID 调用时读取器先被调用并失败，拿不到缓存里的内容。
   - 缓存：同一份文件读两次只发一次请求；改了文件内容（大小或修改时间变了）之后重新发；两个会话读同一个路径共用缓存。
   - 成功路径：进度只上报一次且内容是显示名；摘要、明细、文本符合契约；没有 `actspace.context.file` 明细。
   - 「失败」表里 HTTP 那几行各一条走完整路径；`fetch` 抛网络错误时 `DOCUMENT_FAILED`；190 秒计时（测试里改小）到了时 `DOCUMENT_TIMEOUT`。
@@ -410,9 +410,10 @@ export function createNodeDocumentPorts(options: NodeDocumentPortsOptions): Tool
   - 新建 `apps/desktop/src/main/test/runtime-v2-document-port.test.ts`：开关或 Key 变化后 `available()` 立刻跟着变；端口每次调用读当前 Key；`modelRuntime` 没有这几个可选成员时 `available()` 为假；`DESKTOP_TRUSTED_GRANT_AUDIENCES` 正好是原来的四个加上文档这一个。
   - `packages/host/agent-host/src/test/` 加一条：两个环境变量四种组合下 `available()` 的值。
   - `packages/document/tool-document/src/test/` 新建 `permission.test.ts`（运行时环境的搭法照 `packages/core/tool-runtime/src/test/runtime.test.ts` 里会话授权那一条）：范围受信任时，工作区外的 `path`（放在临时目录里）触发审批，带精确路径和所在目录两条授权建议；按所在目录授权之后，同目录的第二份文档不再询问；发给 `actspace.filesystem-read` 的会话授权不让 `read_document` 通过；`artifact_id` 的调用不触发审批。
-  - `packages/core/runtime/src/harness/default-harness.test.ts` 加一条：Host 提供 `actspace.host.tools.document` 且可用时，Plan、Agent 的可见工具里有 `read_document`，Chat 里没有；用真实的 `createNodeDocumentPorts`（假 `fetch`）跑通一次调用；`explore` 预设的子智能体没有这个工具，`general` 预设有；不可用时三个模式都没有，Run 能正常启动。
+  - `packages/core/runtime/src/harness/default-harness.test.ts` 加一条：Host 提供 `actspace.host.tools.document` 且可用时，Plan、Agent 的可见工具里有 `read_document`，Chat 里没有；用真实的 `createNodeDocumentPorts`（假 `fetch`）跑通一次调用；不可用时三个模式都没有，Run 能正常启动。
+  - `packages/subagent/subagent/src/test/preset.test.ts`（PA.4 新建的文件；先做 PB 时由 PB 新建）加 `subagentToolNames` 的两条：父级允许 `read_document` 时 `general` 预设有它，`explore` 预设没有；它不在已注册名单里（被隐藏）时两个预设都没有。
 
-验证：`pnpm --filter @actspace/desktop test && pnpm --filter @actspace/agent-host test && pnpm --filter @actspace/runtime test && pnpm --filter @actspace/tool-document test && pnpm check:packages && pnpm check:desktop-build-graph`。
+验证：`pnpm --filter @actspace/desktop test && pnpm --filter @actspace/agent-host test && pnpm --filter @actspace/runtime test && pnpm --filter @actspace/subagent test && pnpm --filter @actspace/tool-document test && pnpm check:packages && pnpm check:desktop-build-graph`。
 
 ### PB.6 附件的文件名和媒体类型
 
@@ -424,9 +425,16 @@ export function createNodeDocumentPorts(options: NodeDocumentPortsOptions): Tool
   - `importAttachment` 调 `create` 时传 `fileName: basename(path)`。
   - `attachmentMediaType` 挪到新文件 `apps/desktop/src/main/runtime-v2/attachment-media-type.ts` 并导出（`runtime-registry.ts` 已经 845 行，不再往里加），补四种：`.doc` → `application/msword`，`.docx` → `application/vnd.openxmlformats-officedocument.wordprocessingml.document`，`.ppt` → `application/vnd.ms-powerpoint`，`.pptx` → `application/vnd.openxmlformats-officedocument.presentationml.presentation`。
 - 附件导入的 20 MiB 上限、`Attached file: <名字> (<id>)` 这一行文字、Chat 的附件路径都不改。
+- 新增的四种媒体类型只改变新导入的文档附件存下来的类型（今天这四种扩展名存成 `text/plain`），不改变附件怎么交给模型：
+  - Chat 用自己的 `chatAttachmentMediaType`，不经过 `attachmentMediaType`，Office 和 PDF 在 Chat 里照旧被拒绝。
+  - Agent / Plan 里 `fixed-renderer-ipc.ts` 的 `toRunContent` 按附件的 `kind` 分支，不看媒体类型；文档是 `kind: "file"`，仍然是一行 `Attached file: <名字> (<id>)`，模型靠这一行拿到 `artifact_id`。
+  - `reuseAttachment` 只在 Chat 里解码文本内容。
+  - `read_document` 读附件时按内容判断类型，不看存下来的媒体类型，所以这次改动之前导入的文档附件（存成 `text/plain`）也能读。
 - 测试：
   - `apps/desktop/src/main/test/runtime-v2-artifact-store.test.ts`：带 `fileName` 创建后 `readForSession` 能读回；没有 `fileName` 的旧元数据照常读；元数据里 `fileName` 是数字或空字符串时当作没有；控制字符被去掉、超长被截断；`copyForSession` 带着名字；另一个会话读不到。
   - 新建 `apps/desktop/src/main/test/attachment-media-type.test.ts`：原有的每种扩展名和新增的四种，大小写不敏感，未知扩展名仍是 `text/plain`。
+  - `apps/desktop/src/main/test/runtime-v2-run-references-ipc.test.ts` 加一条：Agent 模式下 `kind: "file"` 的 PDF 附件，发给模型的内容里是一行 `Attached file: <名字> (<id>)`。
+  - `apps/desktop/src/main/test/runtime-v2-chat-attachments.test.ts` 现有的「Chat 拒绝 Office / PDF」用例不改就能通过。
 
 验证：`pnpm --filter @actspace/desktop test`。
 
@@ -544,7 +552,7 @@ Web / PWA：
 
 mock 场景：
 
-- `apps/desktop/src/renderer/mock/scenarios/deepseek-tools.ts`（PA.7 新建并登记的场景；先做 PB 时由 PB 新建并在 `scenarios/index.ts` 登记为 `deepseek-tools`，同时在 `docs/FRONTEND_VERIFICATION.md` 的场景表里加一行）加一个会话，内容照 demo 第 4 节：带附件的用户消息；读附件 2 页的完成行；124 页的长文档先 `124 pages`，再 `pages 31-45`、`pages 46-60`；带「第 13 页识别不完整，内容已截断。」的一行；设了密码的失败行；超过 1,000 页的失败行。
+- `apps/desktop/src/renderer/mock/scenarios/deepseek-tools.ts`（PA.7 新建并登记的场景；先做 PB 时由 PB 新建并在 `scenarios/index.ts` 登记为 `deepseek-tools`，同时在 `docs/FRONTEND_VERIFICATION.md` 的场景表里加一行）加一个会话，内容照 demo 第 4 节：带附件的用户消息；读附件 2 页的完成行；124 页的长文档先 `124 pages`，再 `pages 31-45`、`pages 46-60`；带「第 13 页识别不完整，内容已截断。」的一行；设了密码的失败行；超过 1,000 页的失败行。场景表里这一行已经有了的话，把文档的行补进它的说明。
 
 验证：`pnpm --filter @actspace/desktop test && pnpm --filter @actspace/web test && pnpm check:frontend-tokens && pnpm check:frontend-theme`；`pnpm --filter @actspace/desktop dev:renderer` 打开 `?mock=deepseek-tools`，浅色、深色、480px 窄宽各看一遍，对照 demo 第 4 节。
 
@@ -558,8 +566,12 @@ mock 场景：
 - Office and PDF files: when read_document is in your tool list, use it to read text from PDF, Word and PowerPoint files (it also reads scans); otherwise, and for spreadsheets, convert with markitdown when the data extension is installed or read with python-docx / openpyxl / pypdf. To see a page's layout render it with pypdfium2 and inspect_image. Data analysis needs the data extension (numpy, pandas); when it is not installed, say so and point the user to 设置 › 扩展 › 插件 › 命令行.
 ```
 
-- `packages/skill/official-skills/skills/pdf/SKILL.md`：「速查」表前面加一行：「工具列表里有 `read_document` 时，读文字（包括扫描件）先用它，按页返回 Markdown；没有这个工具时按下表。合并、拆分、填表单、提取表格数据仍然按下表。」
+- `packages/skill/official-skills/skills/pdf/SKILL.md`，三处：
+  - 「速查」表前面加一行：「工具列表里有 `read_document` 时，读文字（包括扫描件）先用它，按页返回 Markdown；没有这个工具时按下表。合并、拆分、填表单、提取表格数据仍然按下表。」
+  - 「速查」表「OCR」那一行现在写的是「本机没有」。改成：有 `read_document` 时用它；没有时渲染成图后用 `inspect_image` 读。「要可搜索 PDF 就说明做不到」那半句留着。
+  - 「看版面」一节里「扫描件没有文本层时只能走这条路」那句改成：有 `read_document` 时先用它读文字，没有时走这条路；要看版面仍然渲染成图。
 - `packages/skill/official-skills/skills/office-docx/SKILL.md`、`office-pptx/SKILL.md`：路线表「读取内容」那一行，路线的开头加「工具列表里有 `read_document` 时先用它（老格式 `.doc` / `.ppt` 也能读）；否则」，后面是原来的文字。PB.1 里老格式读不了时去掉括号里那句。
+- `office-xlsx`、`data-analysis` 两个 Skill 不改：表格不走 OCR。
 - 测试：
   - `packages/context/prompt/src/test/scripting.test.ts`：这一段仍然不超过 10 行；包含 `read_document`；原有的断言不变。有提示词快照的测试跟着更新，逐个看 diff。
   - `packages/skill/official-skills/src/test/resources.test.ts`：`pdf`、`office-docx`、`office-pptx` 三份都包含 `read_document`；原有的断言不变。
@@ -570,7 +582,8 @@ mock 场景：
 
 文档：
 
-- `docs/design-docs/agent-plugin-runtime/agent-tool-plugin-boundaries.md`：第 37 行附近「Desktop 仅信任这三个 audience」改成当前事实（Bash、文件读、文件搜索、文件写、文档五个），写明 `actspace.document` 的 `permissionDomain` 是 `document-read`，和 `read_file` 的授权互不通用。
+- `docs/design-docs/agent-plugin-runtime/agent-tool-plugin-boundaries.md`：第 37 行附近「Desktop 仅信任这三个 audience」改成当前事实（Bash、文件读、文件搜索、文件写、文档五个），写明 `actspace.document` 的 `permissionDomain` 是 `document-read`，和 `read_file` 的授权互不通用。包表里 P0 加的 `@actspace/tool-document` 那一行，核对工具名和 Host 端口与实际一致。
+- `docs/design-docs/tool-system/agent-tool-output-references.md`：补两句。附件元数据多了可选的文件名（旧元数据没有这一项，照常读）；文档附件由 `read_document` 按 `artifact_id` 读取，归属校验和现有的 artifact 读取是同一套，不给模型文件路径。
 - `docs/design-docs/execution-safety/agent-tool-permission-model.md`：所有权表加 `packages/document/tool-document` 一行；「可以共享」那一组规则后面补一句 `read_document` 用自己的授权范围，不和 `read_file`、`grep`、`glob` 共享。
 - `docs/design-docs/tool-system/agent-tool-preview-design-guidelines.md`：`read_file` 一节后面新增 `read_document` 一节（`kind: "read"` 加 `document` 字段；名字和统计的来源；延迟加载时用什么；不能点开）。
 - `docs/design-docs/frontend/front-中间消息区规范.md`：「工具行」一节的表里加文档的 `Read` 行，写明文件名不是链接、警示行的写法。
@@ -614,4 +627,4 @@ mock 场景：
 
 ## 回退
 
-关掉设置开关即可停用。要撤代码：回退 PB 的提交；P0 留着无害。`deepseekDocumentEnabled` 留在设置文件里不会被读取；附件元数据里多出来的 `fileName` 旧版本读取时会忽略。
+关掉设置开关即可停用。要撤代码：回退 PB 的提交；P0 留着无害。`deepseekDocumentEnabled` 留在设置文件里不会被读取；附件元数据里多出来的 `fileName` 旧版本读取时会忽略；回退之前导入的 Word、PPT 附件存下来的媒体类型是新增的那四种，旧版本对 Agent / Plan 的附件只区分是不是图片，照常当普通文件。

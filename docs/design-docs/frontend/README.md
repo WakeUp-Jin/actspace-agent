@@ -62,4 +62,4 @@
 
 ## 资产与 demo
 
-- 规范和 token 为准；demo 只用于选方向，选定后结论写进区域规范、demo 删除。目前保留的 demo 有五份。四份已选定方向，等 Electron 复验视觉后就删：`context-panel-polish-demo.html`（上下文面板）、`stats-redesign-demo.html`（统计页）、`subagent-compact-demo.html`（子智能体卡片）、`thinking-compact-demo.html`（简化思考过程，选定 D）。一份已选定方向，对应功能尚未实现，实现并在 Electron 里复验后再删：`deep-search-and-document-demo.html`（DeepSeek 深度搜索工具行、回复里的出处、文档解析、设置开关；选定运行时 B、展开 b、行内链接、开关位置 ②，契约见[设计文档](../tool-system/agent-deep-search-and-document-parsing.md)第 9 节）。
+- 规范和 token 为准；demo 只用于选方向，选定后结论写进区域规范、demo 删除。目前保留的 demo 有五份。四份已选定方向，等 Electron 复验视觉后就删：`context-panel-polish-demo.html`（上下文面板）、`stats-redesign-demo.html`（统计页）、`subagent-compact-demo.html`（子智能体卡片）、`thinking-compact-demo.html`（简化思考过程，选定 D）。一份已选定方向（2026-11-14：运行时 B、展开 b、回复里用行内链接、文档开关在「工具」页「多媒体」组），对应功能尚未实现，实现并在 Electron 里复验后删：`deep-search-and-document-demo.html`（DeepSeek 深度搜索工具行、回复里的出处、文档解析、设置开关），契约见[目标设计](../tool-system/agent-deep-search-and-document-parsing.md)。

@@ -97,7 +97,7 @@ PA 和 PB 只依赖 P0，互不依赖。两者会改到同一批文件，但各�
 - **特别长的页会被拆开。** 一次调用最多给模型 50,000 字符。不含图片的 Word、PPT 是 DeepSeek 直接提取文字的，长文档有可能整份只算一两页，所以超过 50,000 字符的页按行拆成几页。拆过之后，行尾的页数和页码是拆完之后的，可能比文档自己的页数、DeepSeek 计费的页数多。
 - **工作区外的文档，审批卡上可以点「本会话允许」**，这个授权只对 `read_document` 有效，和 `read_file` 的互不通用。为此桌面端受信任的授权范围多登记一项。
 - **分叉出来的会话读不到原会话里的文档附件**，要重新添加或给路径；子智能体同样读不到父会话的附件。这是现有附件机制的限制，这次不改。
-- **提示词和三个官方 Skill（`pdf`、`office-docx`、`office-pptx`）各改一处**，写成「工具列表里有 `read_document` 时先用它，否则按原来的做法」。这句话不跟着开关变，切换开关不会改动系统提示词。
+- **提示词改一行，三个官方 Skill（`pdf`、`office-docx`、`office-pptx`）各改读文字的那几句**，写成「工具列表里有 `read_document` 时先用它，否则按原来的做法」；`pdf` 里两处「本机没有 OCR」的说法跟着改。这些文字不跟着开关变，切换开关不会改动系统提示词。
 - **输入框「+」只在文档解析可用时变成「图片与文件」**，不可用时保持「图片」。
 - **「扩展 › 插件」的内置列表多两行**：「深度搜索」（多轮搜索网页，给出带出处的结论）和「读文档」（读取 PDF、Word 和 PPT 里的文字）。不能在那里关闭，是否给模型用由设置开关决定。
 - **Web / PWA 上 `Deep Search` 行第一版只有一行，不能展开。**
@@ -163,6 +163,8 @@ pnpm typecheck
 pnpm --filter @actspace/tool-runtime test
 pnpm --filter @actspace/agent test
 pnpm --filter @actspace/runtime test
+pnpm --filter @actspace/harness-control test
+pnpm --filter @actspace/subagent test
 pnpm --filter @actspace/tool-deep-search test
 pnpm --filter @actspace/tool-document test
 pnpm --filter @actspace/agent-host test
@@ -234,11 +236,23 @@ pnpm check:ipc-channels
 | `docs/design-docs/frontend/front-聊天输入框规范.md` | 「+」面板入口和「附件」一节 | PB |
 | `docs/design-docs/tool-system/agent-script-execution.md` | Office / PDF 提取那几行 | PB |
 | `docs/design-docs/execution-safety/agent-tool-permission-model.md` | 授权范围表加 `read_document` | PB |
+| `docs/design-docs/tool-system/agent-tool-output-references.md` | 附件元数据多了可选的文件名 | PB |
 | `docs/SECURITY.md` | 「不依赖服务商原生联网搜索」「不写 provider tool result 原文」两句 | PA、PB |
-| `docs/FRONTEND_VERIFICATION.md` | mock 场景表加一行 | PA |
+| `docs/FRONTEND_VERIFICATION.md` | mock 场景表加一行；文档的行加进这个场景后补上说明 | PA、PB |
 | 设计文档本身 | 实现的那一半改写成当前事实；全部完成后去掉标题里的「未实现」 | PA、PB |
 | `docs/design-docs/frontend/README.md` | demo 清单：功能实现并在 Electron 里复验后删除 demo | 收尾 |
 | `docs/histories/` | 每个子计划记一条 | P0、PA、PB |
+
+## 收尾
+
+P0、PA、PB 都完成并确认之后做，接在最后完成的那个子计划后面：
+
+1. 跑 `pnpm run ci` 和 `pnpm build`。
+2. 在 Electron 里对照 demo 把两种行、两个开关和输入框入口复验一遍。然后删掉 demo 文件，从 `docs/design-docs/frontend/README.md` 的 demo 清单里去掉这一行；设计文档开头和本计划各文件里指向 demo 的链接一起去掉，以 `pnpm check:docs` 通过为准。
+3. 设计文档的标题和开头去掉「目标设计，未实现」；`docs/design-docs/index.md` 里那一行改成当前事实。
+4. 执行记录写完 `execution-summary.md`：验收结论、没有验证的项、人工验证指引。
+5. 计划目录移到 `docs/exec-plans/completed/`，更新 `docs/exec-plans/README.md`，指向计划的链接跟着改。
+6. history 补一条。
 
 ## 进度
 

@@ -238,9 +238,10 @@ export function createNodeDeepSearchPorts(options: NodeDeepSearchPortsOptions): 
 - 测试：
   - 新建 `apps/desktop/src/main/test/runtime-v2-deep-search-port.test.ts`：开关或 Key 变化后 `available()` 立刻跟着变；端口每次调用读当前 Key；`modelRuntime` 没有这几个可选成员时 `available()` 为假。
   - `packages/host/agent-host/src/test/` 加一条：两个环境变量四种组合下 `available()` 的值。
-  - `packages/core/runtime/src/harness/default-harness.test.ts` 里 P0.5 加的那条测试改用真实的 `createNodeDeepSearchPorts`（假 `fetch`），跑通一次工具调用，并确认 `explore` 预设的子智能体没有这个工具、`general` 预设有。
+  - `packages/core/runtime/src/harness/default-harness.test.ts` 里 P0.5 加的那条测试改用真实的 `createNodeDeepSearchPorts`（假 `fetch`），跑通一次工具调用。
+  - 新建 `packages/subagent/subagent/src/test/preset.test.ts`，测 `subagentToolNames`：父级允许 `deep_search` 时 `general` 预设有它，`explore` 预设没有；它不在已注册名单里（被隐藏）时两个预设都没有。
 
-验证：`pnpm --filter @actspace/desktop test && pnpm --filter @actspace/agent-host test && pnpm --filter @actspace/runtime test && pnpm check:packages && pnpm check:desktop-build-graph`。
+验证：`pnpm --filter @actspace/desktop test && pnpm --filter @actspace/agent-host test && pnpm --filter @actspace/runtime test && pnpm --filter @actspace/subagent test && pnpm check:packages && pnpm check:desktop-build-graph`。
 
 ### PA.5 设置开关
 
@@ -310,7 +311,7 @@ mock 场景：
 
 按总览「出入 1」的审核结论做。下面是计划里写的做法（独立工具）：
 
-- `packages/web/tool-deep-search/src/plugin.ts`：`deep_search` 的 `modes` 改成 `["chat", "plan", "agent"]`。定义摘要变了，`definitionVersion` 仍是 1（这个版本还没有发布过）。
+- `packages/web/tool-deep-search/src/plugin.ts`：`deep_search` 的 `modes` 改成 `["chat", "plan", "agent"]`。定义摘要会变：P0 和 PA 在同一个发布版本里时 `definitionVersion` 保持 1；P0 已经单独发给用户时升到 2。
 - `packages/core/agent/src/main-preset.ts`：Chat 预设的 `allowedToolNames` 类型和值加上 `"deep_search"`，注释写明它只在可用时出现。这个字段只用来说明，运行时按工具定义的 `modes` 决定。
 - 测试：
   - `packages/core/agent/src/test/main-preset.test.ts`：标题和断言改成「Chat 固定两个工具，另有可选的 `deep_search`」。

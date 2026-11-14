@@ -240,6 +240,8 @@ Pages that could not be opened:
 
 用户中止时状态是 `aborted`，没有明细。超时和中止都不返回已经收到的部分结果。工具自己不重试。
 
+主 Agent 里，调用发出后工具被隐藏（第 5 节表格第三行），运行时在执行前就拒绝，失败码是 `TOOL_SCOPE_DENIED`，不是 `DEEP_SEARCH_UNAVAILABLE`。界面把这两个码显示成同一句话。`read_document` 同理。
+
 ### 7.7 Chat 模式
 
 `deep_search` 的定义声明 Chat、Plan、Agent 三个模式，Chat 里和 `web`、`generate_image` 并列出现。不可用时不出现，Chat 仍然是原来两个工具。
@@ -489,8 +491,10 @@ Long pages were split; page numbers here are positions in this output, not the d
 - `packages/host/agent-host/src/node-ports/tool-host-services.ts`：CLI 和远程 Host 的端口。
 - `apps/desktop/src/main/runtime-v2/tool-host-services.ts`、`apps/desktop/src/main/model-runtime-service.ts`：桌面端的端口、开关和 Key。
 - `apps/desktop/src/main/runtime-v2/artifact-store.ts`、`apps/desktop/src/main/runtime-v2/runtime-registry.ts`：附件文件名和媒体类型。
+- `apps/desktop/src/main/runtime-v2/desktop-host-adapter.ts`：桌面端受信任的授权范围，加 `read_document` 的那一项。
 - `packages/util/shared/src/settings.ts`：两个设置字段。
 - `packages/client/client/src/sessions/tool-card.ts`：工具行投影。
 - `apps/desktop/src/renderer/components/messages/ToolLogLine.tsx`、`apps/desktop/src/renderer/components/settings/SearchSettings.tsx`、`apps/desktop/src/renderer/components/settings/sections/ToolsSection.tsx`、`apps/desktop/src/renderer/components/Composer.tsx`：行、设置、输入框。
 - `packages/core/agent/src/agent-mode-policy.ts`、`packages/core/agent/src/main-preset.ts`：模式暴露。
 - `packages/context/prompt/src/core-contributors.ts`：Office / PDF 那一行提示词。
+- `packages/skill/official-skills/skills/pdf/SKILL.md`、`packages/skill/official-skills/skills/office-docx/SKILL.md`、`packages/skill/official-skills/skills/office-pptx/SKILL.md`：读文字的路线里「有 `read_document` 时先用它」的那几句；`pdf` 里说本机没有 OCR 的两处一起改。
