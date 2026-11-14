@@ -9,7 +9,9 @@
 //   - `runtime-v2` 这个目录名、文件名和引入路径（`@actspace/shared/runtime-v2`），IPC channel（`runtime-v2:*`），
 //     契约 id（`actspace.runtime.v2`），落盘目录（`sessions-v2`）。这些是落盘或跨进程可见的字符串，不跟着标识符改；
 //   - 设置和 Session 事件的格式版本（`SettingsV4`、`AppSettingsV2`、`SessionEventEnvelopeV1` 等），它们是真实的版本号；
-//   - 说的是旧数据和迁移的 `legacy*`（`migrateLegacyRemoteModels`、`legacyCallArgs` 等）。
+//   - 说的是旧数据和迁移的 `legacy*`（`migrateLegacyRemoteModels`、`legacyCallArgs` 等）；
+//   - `LegacyProxyWireEngine`：LLM 设计里的 legacy transport，指采用 pi-ai 之前的那条 wire，只在列明的路线上保留，
+//     名字和设计一致（docs/design-docs/agent-plugin-runtime/agent-llm-core-pi.md 第 7 节）。
 // 扫描 apps/、packages/、scripts/、browser-bridge/ 下的 TypeScript 和 JavaScript 源码，含测试，不含构建产物。
 // 只按文本找「整个标识符」，不区分代码、注释和字符串：注释和字符串里写旧名字也会报。
 // 确实要保留的记在下面的 ALLOWED 里，按「文件、名字、处数」记，每条写明理由；处数多了少了都失败。
@@ -50,6 +52,8 @@ export const RENAMES = new Map([
   ["RunV2Io", "RunIo"],
   ["bootCliV2", "bootCli"],
   ["CliV2ApprovalBroker", "CliApprovalBroker"],
+  // 桌面端唯一的 LLM adapter。原来的注释写着这个名字等 v1 源码删掉之后再改，v1 已经删了。
+  ["DesktopLegacyLlmAdapter", "DesktopLlmAdapter"],
 ]);
 
 export const ALLOWED = [

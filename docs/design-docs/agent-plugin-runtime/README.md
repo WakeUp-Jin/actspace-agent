@@ -28,7 +28,7 @@
 
 Session Format v1 是当前 v2 使用的格式版本，不能按名称归入旧产品资料。早期逻辑语义与后续事件规范冲突时，以 DSH 事件模型和实际 codec 为准。写入 / 恢复先读存储边界，读取 / 投影先读 Runtime Projection。
 
-代码里的名字不带 `V2`。仓库里只有一套 Runtime，类型、函数和常量直接叫 `RuntimeJsonValue`、`bootDesktopRuntime`、`RUNTIME_FIXED_RENDERER_CHANNELS`。带 `v2` 的只剩几个写在磁盘上或跨进程可见的字符串：`runtime-v2` 目录名和引入路径 `@actspace/shared/runtime-v2`（Harness 产物里记着这个路径）、IPC channel 的 `runtime-v2:` 前缀、契约 id `actspace.runtime.v2`、落盘目录 `sessions-v2`，改它们要带迁移。设置的 `SettingsV4`、Session 事件的 `SessionEventEnvelopeV1` 这类是格式版本号，照常保留。`pnpm check:transitional-names`（`scripts/check-transitional-names.mjs`）检查源码里有没有再出现带 `V2` 的名字，加 `--write` 按同一张表直接改；设计文档里的由 `pnpm check:docs` 检查。
+代码里的名字不带 `V2`。仓库里只有一套 Runtime，类型、函数和常量直接叫 `RuntimeJsonValue`、`bootDesktopRuntime`、`RUNTIME_FIXED_RENDERER_CHANNELS`。带 `v2` 的只剩几个写在磁盘上或跨进程可见的字符串：`runtime-v2` 目录名和引入路径 `@actspace/shared/runtime-v2`（Harness 产物里记着这个路径）、IPC channel 的 `runtime-v2:` 前缀、契约 id `actspace.runtime.v2`、落盘目录 `sessions-v2`，改它们要带迁移。设置的 `SettingsV4`、Session 事件的 `SessionEventEnvelopeV1` 这类是格式版本号，照常保留。`pnpm check:transitional-names`（`scripts/check-transitional-names.mjs`）检查源码里有没有再出现改名前的名字，加 `--write` 按同一张表直接改；设计文档里的由 `pnpm check:docs` 检查。
 
 ## 决策背景
 

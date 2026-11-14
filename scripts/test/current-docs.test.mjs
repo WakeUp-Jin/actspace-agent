@@ -205,12 +205,15 @@ test("identifiers renamed out of the RuntimeV2 era need a historical label; path
       "const channels = RUNTIME_V2_FIXED_RENDERER_CHANNELS;",
       "```",
       "CLI 入口是 runV2Command。",
+      "",
+      "桌面端的 adapter 是 `DesktopLegacyLlmAdapter`。",
     ].join("\n"));
     const failures = await checkMarkdownFiles(root, ["current.md"]);
     assert.deepEqual(failures.map((line) => line.replace(/（.*$/u, "")), [
       "current.md:1: 仍使用改名前的标识符",
       "current.md:3: 仍使用改名前的标识符",
       "current.md:5: 仍使用改名前的标识符",
+      "current.md:7: 仍使用改名前的标识符",
     ]);
     assert.ok(failures.every((line) => line.includes("check-transitional-names.mjs --write")));
 
@@ -218,6 +221,7 @@ test("identifiers renamed out of the RuntimeV2 era need a historical label; path
       "投影类型是 `RuntimeDesktopSessionProjection`（旧名 `RuntimeV2DesktopSessionProjection`）。",
       "契约在 `@actspace/shared/runtime-v2`，channel 以 `runtime-v2:` 开头，契约 id 是 `actspace.runtime.v2`。",
       "设置的格式版本是 `SettingsV4`，Session 事件信封是 `SessionEventEnvelopeV1`。",
+      "OpenRouter 的账单金额走 `LegacyProxyWireEngine`。",
     ].join("\n"));
     assert.deepEqual(await checkMarkdownFiles(root, ["current.md"]), []);
   } finally {

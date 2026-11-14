@@ -10,8 +10,8 @@ import { customConnectionPricingInput, type DesktopRuntimeModelPort } from "./mo
 
 type SessionArtifactReader = (sessionId: string, artifactId: string) => Promise<{ readonly bytes: Uint8Array; readonly mediaType: string }>;
 
-/** Desktop v2 provider boundary. The historical filename remains until P15 removes v1 source. */
-export class DesktopLegacyLlmAdapter implements LlmAdapter {
+/** Desktop provider boundary. */
+export class DesktopLlmAdapter implements LlmAdapter {
   readonly adapterVersion = "actspace.desktop-pi-ai.v3";
   readonly #proxies = new ProviderProxyPool();
   #deepSeekFiles: DeepSeekFileUploader | undefined;

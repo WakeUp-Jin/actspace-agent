@@ -42,6 +42,7 @@ test("names on the list are renamed as a whole, before the general rule", () => 
   assert.equal(replacementFor("RunV2Io"), "RunIo");
   assert.equal(replacementFor("bootCliV2"), "bootCli");
   assert.equal(replacementFor("CliV2ApprovalBroker"), "CliApprovalBroker");
+  assert.equal(replacementFor("DesktopLegacyLlmAdapter"), "DesktopLlmAdapter");
 });
 
 test("format versions, legacy data names and unrelated names are not transitional", () => {
@@ -49,6 +50,7 @@ test("format versions, legacy data names and unrelated names are not transitiona
     "SettingsV4", "AppSettingsV2", "PersistedSettingsV3", "SessionEventEnvelopeV1", "getV4", "updateV2", "RV2",
     "Runtime", "runtime", "RUNTIME", "RuntimeState", "RuntimeV1Thing", "runtimeV3", "RUNTIME_V1", "RUNTIME_V", "RuntimeV",
     "legacyCallArgs", "migrateLegacyRemoteModels", "runCommand", "runV2", "V2Command", "CliV2",
+    "LegacyProxyWireEngine", "legacyProxy", "DesktopLegacyLlmAdapterOptions", "LegacyLlmAdapter",
   ]) assert.equal(replacementFor(name), null, name);
 });
 

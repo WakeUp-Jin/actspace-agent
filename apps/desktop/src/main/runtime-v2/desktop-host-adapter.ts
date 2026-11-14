@@ -7,7 +7,7 @@ import { DesktopArtifactStore } from "./artifact-store";
 import { BROWSER_TOOLS_HOST_PORT_ID } from "@actspace/tool-browser";
 import { createDesktopBrowserCapability } from "./browser-capability";
 import { DEFAULT_CREDENTIAL_REF, DesktopCredentialResolver } from "./credential-resolver";
-import { DesktopLegacyLlmAdapter } from "./legacy-llm-adapter";
+import { DesktopLlmAdapter } from "./llm-adapter";
 import type { RuntimeModule } from "./runtime-loader";
 import { createDesktopModelsHostPort, type DesktopRuntimeModelPort } from "./model-port";
 import { MODELS_HOST_PORT_ID } from "@actspace/shared";
@@ -111,14 +111,14 @@ export async function bootDesktopRuntime(options: DesktopRuntimeBootOptions) {
           routeId: "default",
           providerId: "desktop",
           modelPattern: "*",
-          adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId)),
+          adapter: new DesktopLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId)),
           credentialRef: DEFAULT_CREDENTIAL_REF,
           defaults: {},
         }, {
           routeId: "utility",
           providerId: "desktop",
           modelPattern: "*",
-          adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "utility"),
+          adapter: new DesktopLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "utility"),
           credentialRef: "desktop:utility",
           // 思考档位读用途表（设置 › 模型），由 adapter 在 prepare 时带上。
           defaults: {},
@@ -126,7 +126,7 @@ export async function bootDesktopRuntime(options: DesktopRuntimeBootOptions) {
           routeId: "auto-review",
           providerId: "desktop",
           modelPattern: "*",
-          adapter: new DesktopLegacyLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "auto-review"),
+          adapter: new DesktopLlmAdapter(options.models, (sessionId, artifactId) => artifacts.readForSession(sessionId, artifactId), "auto-review"),
           credentialRef: DEFAULT_CREDENTIAL_REF,
           defaults: {},
         }]),
