@@ -62,4 +62,4 @@
 
 ## 资产与 demo
 
-- 规范和 token 为准；demo 只用于选方向，选定后结论写进区域规范、demo 删除。目前保留的 demo 只有四份，都是等 Electron 复验视觉后就删：`context-panel-polish-demo.html`（上下文面板）、`stats-redesign-demo.html`（统计页）、`subagent-compact-demo.html`（子智能体卡片）、`thinking-compact-demo.html`（简化思考过程，选定 D）。
+- 规范和 token 为准；demo 只用于选方向，选定后结论写进区域规范、demo 删除。目前保留的 demo 有五份。四份已选定方向，等 Electron 复验视觉后就删：`context-panel-polish-demo.html`（上下文面板）、`stats-redesign-demo.html`（统计页）、`subagent-compact-demo.html`（子智能体卡片）、`thinking-compact-demo.html`（简化思考过程，选定 D）。一份还在选方向，对应功能尚未实现：`deep-search-and-document-demo.html`（DeepSeek 深度搜索工具行、回复里的出处、文档解析、设置开关）。
