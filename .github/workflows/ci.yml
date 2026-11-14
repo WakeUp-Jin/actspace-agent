@@ -256,6 +256,13 @@ jobs:
       - name: Point nested Go builds at the restored cache
         run: echo "GOCACHE=$(go env GOCACHE)" >> "$GITHUB_ENV"
 
+      # 恢复出来的缓存文件带着保存那天的修改时间，而 go 每次构建结束时会删掉 5 天没用过的缓存条目。
+      # 缓存存下 5 天之后，这个 job 的第一条 go 命令一跑完，go test 和交叉编译要用的条目就被删掉了，等于白恢复。
+      # 这里把条目的时间刷新成现在。只跑一条 go 命令的 job（「构建」、release.yml）不受影响。
+      - name: Keep restored Go cache entries from being trimmed
+        run: |
+          if [ -d "$GOCACHE" ]; then find "$GOCACHE" -exec touch {} +; fi
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
